@@ -1,0 +1,49 @@
+services:
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+
+    tty: true
+
+    environment:
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "superplane"
+      DB_USERNAME: "postgres"
+      APPLICATION_NAME: "superplane"
+      DB_PASSWORD: "the-cake-is-a-lie"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+
+    links:
+      - db:db
+      - rabbitmq:rabbitmq
+
+    volumes:
+      - go-pkg-cache:/go
+      - .:/app
+      - /tmp:/tmp
+
+  db:
+    image: postgres:9.6
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "the-cake-is-a-lie"
+  rabbitmq:
+    image: rabbitmq:3.8.17-management-alpine
+    container_name: 'rabbitmq'
+    ports:
+      - 5672:5672
+      - 15672:15672
+volumes:
+  repo-data:
+    driver: local
+
+  go-pkg-cache:
+    driver: local
+
+  postgres-data:
+    driver: local
