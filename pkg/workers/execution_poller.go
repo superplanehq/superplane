@@ -148,7 +148,7 @@ func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *model
 func (w *ExecutionPoller) resolveResultFromSemaphoreWorkflow(logger *log.Entry, execution *models.StageExecution, api *semaphore.Semaphore) (string, error) {
 	pipeline, err := w.findPipeline(api, execution.ReferenceID)
 	if err != nil {
-		log.Errorf("Error finding pipeline %s: %v", execution.ReferenceID, err)
+		log.Errorf("Error finding pipeline: %v", err)
 		return "", err
 	}
 
@@ -170,12 +170,12 @@ func (w *ExecutionPoller) resolveResultFromSemaphoreWorkflow(logger *log.Entry, 
 func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID string) (*semaphore.Pipeline, error) {
 	workflow, err := api.DescribeWorkflow(workflowID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("workflow %s not found", workflowID)
 	}
 
 	pipeline, err := api.DescribePipeline(workflow.InitialPplID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 	}
 
 	return pipeline, nil

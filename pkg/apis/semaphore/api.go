@@ -16,9 +16,8 @@ type Semaphore struct {
 
 func NewSemaphoreAPI(URL, token string) *Semaphore {
 	return &Semaphore{
-		URL:        URL,
-		Token:      token,
-		APIVersion: "v2",
+		URL:   URL,
+		Token: token,
 	}
 }
 
@@ -50,10 +49,14 @@ type Workflow struct {
 }
 
 const (
-	PipelineStateDone    = "DONE"
-	PipelineResultPassed = "PASSED"
-	PipelineResultFailed = "FAILED"
+	PipelineStateDone    = "done"
+	PipelineResultPassed = "passed"
+	PipelineResultFailed = "failed"
 )
+
+type PipelineResponse struct {
+	Pipeline *Pipeline `json:"pipeline"`
+}
 
 type Pipeline struct {
 	ID         string `json:"ppl_id"`
@@ -63,7 +66,7 @@ type Pipeline struct {
 }
 
 func (s *Semaphore) DescribeWorkflow(workflowID string) (*Workflow, error) {
-	URL := fmt.Sprintf("%s/workflows/%s", s.URL, workflowID)
+	URL := fmt.Sprintf("%s/api/v2/workflows/%s", s.URL, workflowID)
 	req, err := http.NewRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -95,8 +98,9 @@ func (s *Semaphore) DescribeWorkflow(workflowID string) (*Workflow, error) {
 	return &workflow, nil
 }
 
+// NOTE: pipelines v2 API is not working :)
 func (s *Semaphore) DescribePipeline(pipelineID string) (*Pipeline, error) {
-	URL := fmt.Sprintf("%s/pipelines/%s", s.URL, pipelineID)
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", s.URL, pipelineID)
 	req, err := http.NewRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -119,17 +123,17 @@ func (s *Semaphore) DescribePipeline(pipelineID string) (*Pipeline, error) {
 		return nil, fmt.Errorf("error reading body: %v", err)
 	}
 
-	var pipeline Pipeline
-	err = json.Unmarshal(responseBody, &pipeline)
+	var pipelineResponse PipelineResponse
+	err = json.Unmarshal(responseBody, &pipelineResponse)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	return &pipeline, nil
+	return pipelineResponse.Pipeline, nil
 }
 
 func (s *Semaphore) TriggerTask(projectID, taskID string, spec TaskTriggerSpec) (string, error) {
-	URL := fmt.Sprintf("%s/projects/%s/tasks/%s/triggers", s.URL, projectID, taskID)
+	URL := fmt.Sprintf("%s/api/v2/projects/%s/tasks/%s/triggers", s.URL, projectID, taskID)
 
 	body, err := json.Marshal(&TaskTrigger{
 		APIVersion: s.APIVersion,
@@ -169,7 +173,9 @@ func (s *Semaphore) TriggerTask(projectID, taskID string, spec TaskTriggerSpec) 
 		return "", fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	// TODO: check trigger.Metadata.Status
+	if trigger.Metadata.Status != "PASSED" {
+		return "", fmt.Errorf("trigger status was %s", trigger.Metadata.Status)
+	}
 
 	return trigger.Metadata.WorkflowID, nil
 }

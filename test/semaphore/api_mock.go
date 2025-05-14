@@ -38,12 +38,12 @@ func (s *SemaphoreAPIMock) AddPipeline(ID, workflowID, result string) {
 
 func (s *SemaphoreAPIMock) Init() {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/workflows") {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/workflows") {
 			s.DescribeWorkflow(w, r)
 			return
 		}
 
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/pipelines") {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1alpha/pipelines") {
 			s.DescribePipeline(w, r)
 			return
 		}
@@ -61,8 +61,9 @@ func (s *SemaphoreAPIMock) Init() {
 
 func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Request) {
 	path := strings.Split(r.URL.Path, "/")
-	workflowID := path[2]
+	workflowID := path[4]
 
+	log.Infof("Workflows: %v", s.Workflows)
 	log.Infof("Describing workflow: %s", workflowID)
 
 	pipeline, ok := s.Workflows[workflowID]
@@ -77,17 +78,19 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 
 func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Request) {
 	path := strings.Split(r.URL.Path, "/")
-	pipelineID := path[2]
+	pipelineID := path[4]
 
 	log.Infof("Describing pipeline: %s", pipelineID)
 
 	for wfID, p := range s.Workflows {
 		if p.ID == pipelineID {
-			data, _ := json.Marshal(semaphore.Pipeline{
-				ID:         p.ID,
-				WorkflowID: wfID,
-				State:      semaphore.PipelineStateDone,
-				Result:     p.Result,
+			data, _ := json.Marshal(semaphore.PipelineResponse{
+				Pipeline: &semaphore.Pipeline{
+					ID:         p.ID,
+					WorkflowID: wfID,
+					State:      semaphore.PipelineStateDone,
+					Result:     p.Result,
+				},
 			})
 
 			w.Write(data)
@@ -113,6 +116,7 @@ func (s *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	trigger.Metadata.WorkflowID = uuid.New().String()
+	trigger.Metadata.Status = "PASSED"
 	data, err := json.Marshal(trigger)
 	if err != nil {
 		w.WriteHeader(500)
