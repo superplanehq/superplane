@@ -28,12 +28,12 @@ func NewSemaphoreAPIMock() *SemaphoreAPIMock {
 	return &SemaphoreAPIMock{Workflows: map[string]Pipeline{}}
 }
 
-func (m *SemaphoreAPIMock) Close() {
-	m.Server.Close()
+func (s *SemaphoreAPIMock) Close() {
+	s.Server.Close()
 }
 
-func (m *SemaphoreAPIMock) AddPipeline(ID, workflowID, result string) {
-	m.Workflows[workflowID] = Pipeline{ID: ID, Result: result}
+func (s *SemaphoreAPIMock) AddPipeline(ID, workflowID, result string) {
+	s.Workflows[workflowID] = Pipeline{ID: ID, Result: result}
 }
 
 func (s *SemaphoreAPIMock) Init() {
@@ -59,13 +59,13 @@ func (s *SemaphoreAPIMock) Init() {
 	s.Server = server
 }
 
-func (m *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Request) {
+func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Request) {
 	path := strings.Split(r.URL.Path, "/")
 	workflowID := path[2]
 
 	log.Infof("Describing workflow: %s", workflowID)
 
-	pipeline, ok := m.Workflows[workflowID]
+	pipeline, ok := s.Workflows[workflowID]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -75,13 +75,13 @@ func (m *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 	w.Write(data)
 }
 
-func (m *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Request) {
+func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Request) {
 	path := strings.Split(r.URL.Path, "/")
 	pipelineID := path[2]
 
 	log.Infof("Describing pipeline: %s", pipelineID)
 
-	for wfID, p := range m.Workflows {
+	for wfID, p := range s.Workflows {
 		if p.ID == pipelineID {
 			data, _ := json.Marshal(semaphore.Pipeline{
 				ID:         p.ID,
@@ -98,7 +98,7 @@ func (m *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (m *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
+func (s *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(500)
@@ -119,6 +119,6 @@ func (m *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	m.LastTaskTrigger = &trigger
+	s.LastTaskTrigger = &trigger
 	w.Write(data)
 }

@@ -8,6 +8,7 @@ services:
 
     tty: true
 
+    command: go run cmd/main.go
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
@@ -16,6 +17,17 @@ services:
       APPLICATION_NAME: "superplane"
       DB_PASSWORD: "the-cake-is-a-lie"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      START_PUBLIC_API: yes
+      START_INTERNAL_API: yes
+      START_PENDING_EVENTS_WORKER: yes
+      START_PENDING_STAGE_EVENTS_WORKER: yes
+      START_TIME_WINDOW_WORKER: yes
+      START_STAGE_EVENT_APPROVED_CONSUMER: yes
+      START_EXECUTIONS_POLLER: yes
+      START_PENDING_EXECUTIONS_WORKER: yes
+      PUBLIC_API_BASE_PATH: /api/v1
+      ENCRYPTION_KEY: dev
+      JWT_SECRET: dev
 
     links:
       - db:db
