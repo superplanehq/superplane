@@ -115,12 +115,12 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 func main() {
 	log.SetFormatter(&log.TextFormatter{TimestampFormat: time.StampMilli})
 
-	encryptorURL := os.Getenv("ENCRYPTOR_URL")
-	if encryptorURL == "" {
-		panic("ENCRYPTOR_URL can't be empty")
+	encryptionKey := os.Getenv("ENCRYPTION_KEY")
+	if encryptionKey == "" {
+		panic("ENCRYPTION_KEY can't be empty")
 	}
 
-	encryptor := encryptor.NewGrpcEncryptor(encryptorURL)
+	encryptor := encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
