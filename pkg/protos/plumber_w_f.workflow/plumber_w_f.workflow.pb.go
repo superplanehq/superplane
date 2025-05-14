@@ -3573,7 +3573,7 @@ const file_plumber_w_f_workflow_proto_rawDesc = "" +
 	"\n" +
 	"Reschedule\x12(.InternalApi.PlumberWF.RescheduleRequest\x1a'.InternalApi.PlumberWF.ScheduleResponse\x12g\n" +
 	"\fGetProjectId\x12*.InternalApi.PlumberWF.GetProjectIdRequest\x1a+.InternalApi.PlumberWF.GetProjectIdResponse\x12U\n" +
-	"\x06Create\x12$.InternalApi.PlumberWF.CreateRequest\x1a%.InternalApi.PlumberWF.CreateResponseBOZMgithub.com/superplanehq/superplane/pkg/protos/plumber_w_f.workflowb\x06proto3"
+	"\x06Create\x12$.InternalApi.PlumberWF.CreateRequest\x1a%.InternalApi.PlumberWF.CreateResponseBDZBgithub.com/superplanehq/superplane/pkg/protos/plumber_w_f.workflowb\x06proto3"
 
 var (
 	file_plumber_w_f_workflow_proto_rawDescOnce sync.Once

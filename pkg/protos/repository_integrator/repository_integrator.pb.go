@@ -978,7 +978,7 @@ const file_repository_integrator_proto_rawDesc = "" +
 	"\aGetFile\x120.InternalApi.RepositoryIntegrator.GetFileRequest\x1a1.InternalApi.RepositoryIntegrator.GetFileResponse\x12\x9b\x01\n" +
 	"\x16GithubInstallationInfo\x12?.InternalApi.RepositoryIntegrator.GithubInstallationInfoRequest\x1a@.InternalApi.RepositoryIntegrator.GithubInstallationInfoResponse\x12\x9b\x01\n" +
 	"\x16InitGithubInstallation\x12?.InternalApi.RepositoryIntegrator.InitGithubInstallationRequest\x1a@.InternalApi.RepositoryIntegrator.InitGithubInstallationResponse\x12\x86\x01\n" +
-	"\x0fGetRepositories\x128.InternalApi.RepositoryIntegrator.GetRepositoriesRequest\x1a9.InternalApi.RepositoryIntegrator.GetRepositoriesResponseBPZNgithub.com/superplanehq/superplane/pkg/protos/repository_integratorb\x06proto3"
+	"\x0fGetRepositories\x128.InternalApi.RepositoryIntegrator.GetRepositoriesRequest\x1a9.InternalApi.RepositoryIntegrator.GetRepositoriesResponseBEZCgithub.com/superplanehq/superplane/pkg/protos/repository_integratorb\x06proto3"
 
 var (
 	file_repository_integrator_proto_rawDescOnce sync.Once

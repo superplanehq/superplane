@@ -6667,7 +6667,7 @@ const file_plumber_pipeline_proto_rawDesc = "" +
 	"\x11ScheduleExtension\x12-.InternalApi.Plumber.ScheduleExtensionRequest\x1a..InternalApi.Plumber.ScheduleExtensionResponse\x12Q\n" +
 	"\x06Delete\x12\".InternalApi.Plumber.DeleteRequest\x1a#.InternalApi.Plumber.DeleteResponse\x12i\n" +
 	"\x0ePartialRebuild\x12*.InternalApi.Plumber.PartialRebuildRequest\x1a+.InternalApi.Plumber.PartialRebuildResponse\x12T\n" +
-	"\aVersion\x12#.InternalApi.Plumber.VersionRequest\x1a$.InternalApi.Plumber.VersionResponseBKZIgithub.com/superplanehq/superplane/pkg/protos/plumber.pipelineb\x06proto3"
+	"\aVersion\x12#.InternalApi.Plumber.VersionRequest\x1a$.InternalApi.Plumber.VersionResponseB@Z>github.com/superplanehq/superplane/pkg/protos/plumber.pipelineb\x06proto3"
 
 var (
 	file_plumber_pipeline_proto_rawDescOnce sync.Once

@@ -1444,7 +1444,7 @@ const file_repo_proxy_proto_rawDesc = "" +
 	"\x10ListBlockedHooks\x12..InternalApi.RepoProxy.ListBlockedHooksRequest\x1a/.InternalApi.RepoProxy.ListBlockedHooksResponse\x12|\n" +
 	"\x13ScheduleBlockedHook\x121.InternalApi.RepoProxy.ScheduleBlockedHookRequest\x1a2.InternalApi.RepoProxy.ScheduleBlockedHookResponse\x12U\n" +
 	"\x06Create\x12$.InternalApi.RepoProxy.CreateRequest\x1a%.InternalApi.RepoProxy.CreateResponse\x12d\n" +
-	"\vCreateBlank\x12).InternalApi.RepoProxy.CreateBlankRequest\x1a*.InternalApi.RepoProxy.CreateBlankResponseBEZCgithub.com/superplanehq/superplane/pkg/protos/repo_proxyb\x06proto3"
+	"\vCreateBlank\x12).InternalApi.RepoProxy.CreateBlankRequest\x1a*.InternalApi.RepoProxy.CreateBlankResponseB:Z8github.com/superplanehq/superplane/pkg/protos/repo_proxyb\x06proto3"
 
 var (
 	file_repo_proxy_proto_rawDescOnce sync.Once

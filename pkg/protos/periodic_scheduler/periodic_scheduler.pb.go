@@ -2904,7 +2904,7 @@ const file_periodic_scheduler_proto_rawDesc = "" +
 	"ListKeyset\x120.InternalApi.PeriodicScheduler.ListKeysetRequest\x1a1.InternalApi.PeriodicScheduler.ListKeysetResponse\x12e\n" +
 	"\x06Delete\x12,.InternalApi.PeriodicScheduler.DeleteRequest\x1a-.InternalApi.PeriodicScheduler.DeleteResponse\x12w\n" +
 	"\fGetProjectId\x122.InternalApi.PeriodicScheduler.GetProjectIdRequest\x1a3.InternalApi.PeriodicScheduler.GetProjectIdResponse\x12h\n" +
-	"\aVersion\x12-.InternalApi.PeriodicScheduler.VersionRequest\x1a..InternalApi.PeriodicScheduler.VersionResponseBMZKgithub.com/superplanehq/superplane/pkg/protos/periodic_schedulerb\x06proto3"
+	"\aVersion\x12-.InternalApi.PeriodicScheduler.VersionRequest\x1a..InternalApi.PeriodicScheduler.VersionResponseBBZ@github.com/superplanehq/superplane/pkg/protos/periodic_schedulerb\x06proto3"
 
 var (
 	file_periodic_scheduler_proto_rawDescOnce sync.Once

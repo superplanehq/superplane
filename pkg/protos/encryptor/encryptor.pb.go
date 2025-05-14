@@ -230,7 +230,7 @@ const file_encryptor_proto_rawDesc = "" +
 	"\x03raw\x18\x01 \x01(\fR\x03raw2\xbf\x01\n" +
 	"\tEncryptor\x12X\n" +
 	"\aEncrypt\x12%.InternalApi.Encryptor.EncryptRequest\x1a&.InternalApi.Encryptor.EncryptResponse\x12X\n" +
-	"\aDecrypt\x12%.InternalApi.Encryptor.DecryptRequest\x1a&.InternalApi.Encryptor.DecryptResponseBDZBgithub.com/superplanehq/superplane/pkg/protos/encryptorb\x06proto3"
+	"\aDecrypt\x12%.InternalApi.Encryptor.DecryptRequest\x1a&.InternalApi.Encryptor.DecryptResponseB9Z7github.com/superplanehq/superplane/pkg/protos/encryptorb\x06proto3"
 
 var (
 	file_encryptor_proto_rawDescOnce sync.Once

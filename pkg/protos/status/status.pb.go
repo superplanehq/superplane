@@ -93,7 +93,7 @@ const file_include_internal_api_status_proto_rawDesc = "" +
 	"!include/internal_api/status.proto\x12\vInternalApi\x1a\x15google/rpc/code.proto\"H\n" +
 	"\x06Status\x12$\n" +
 	"\x04code\x18\x01 \x01(\x0e2\x10.google.rpc.CodeR\x04code\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessageBAZ?github.com/superplanehq/superplane/pkg/protos/statusb\x06proto3"
+	"\amessage\x18\x02 \x01(\tR\amessageB6Z4github.com/superplanehq/superplane/pkg/protos/statusb\x06proto3"
 
 var (
 	file_include_internal_api_status_proto_rawDescOnce sync.Once

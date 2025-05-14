@@ -3827,7 +3827,7 @@ const file_delivery_proto_rawDesc = "" +
 	"\vUpdateStage\x12(.InternalApi.Delivery.UpdateStageRequest\x1a).InternalApi.Delivery.UpdateStageResponse\x12t\n" +
 	"\x11ApproveStageEvent\x12..InternalApi.Delivery.ApproveStageEventRequest\x1a/.InternalApi.Delivery.ApproveStageEventResponse\x12Y\n" +
 	"\bListTags\x12%.InternalApi.Delivery.ListTagsRequest\x1a&.InternalApi.Delivery.ListTagsResponse\x12k\n" +
-	"\x0eUpdateTagState\x12+.InternalApi.Delivery.UpdateTagStateRequest\x1a,.InternalApi.Delivery.UpdateTagStateResponseBCZAgithub.com/superplanehq/superplane/pkg/protos/deliveryb\x06proto3"
+	"\x0eUpdateTagState\x12+.InternalApi.Delivery.UpdateTagStateRequest\x1a,.InternalApi.Delivery.UpdateTagStateResponseB8Z6github.com/superplanehq/superplane/pkg/protos/deliveryb\x06proto3"
 
 var (
 	file_delivery_proto_rawDescOnce sync.Once

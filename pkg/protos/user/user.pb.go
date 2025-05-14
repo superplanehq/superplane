@@ -2957,7 +2957,7 @@ const file_user_proto_rawDesc = "" +
 	"\x0eUnblockAccount\x12'.InternalApi.User.UnblockAccountRequest\x1a\x16.InternalApi.User.User\x12o\n" +
 	"\x12GetRepositoryToken\x12+.InternalApi.User.GetRepositoryTokenRequest\x1a,.InternalApi.User.GetRepositoryTokenResponse\x12\x84\x01\n" +
 	"\x19RefreshRepositoryProvider\x122.InternalApi.User.RefreshRepositoryProviderRequest\x1a3.InternalApi.User.RefreshRepositoryProviderResponse\x12A\n" +
-	"\x06Create\x12\x1f.InternalApi.User.CreateRequest\x1a\x16.InternalApi.User.UserB?Z=github.com/superplanehq/superplane/pkg/protos/userb\x06proto3"
+	"\x06Create\x12\x1f.InternalApi.User.CreateRequest\x1a\x16.InternalApi.User.UserB4Z2github.com/superplanehq/superplane/pkg/protos/userb\x06proto3"
 
 var (
 	file_user_proto_rawDescOnce sync.Once

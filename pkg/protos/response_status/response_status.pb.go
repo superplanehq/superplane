@@ -142,7 +142,7 @@ const file_include_internal_api_response_status_proto_rawDesc = "" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\x1d\n" +
 	"\x04Code\x12\x06\n" +
 	"\x02OK\x10\x00\x12\r\n" +
-	"\tBAD_PARAM\x10\x01BJZHgithub.com/superplanehq/superplane/pkg/protos/response_statusb\x06proto3"
+	"\tBAD_PARAM\x10\x01B?Z=github.com/superplanehq/superplane/pkg/protos/response_statusb\x06proto3"
 
 var (
 	file_include_internal_api_response_status_proto_rawDescOnce sync.Once
