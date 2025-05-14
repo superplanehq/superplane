@@ -6,24 +6,26 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/renderedtext/go-tackle"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/models"
-	pplproto "github.com/superplanehq/superplane/pkg/protos/plumber.pipeline"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
-	"google.golang.org/protobuf/proto"
 )
 
 const ExecutionFinishedRoutingKey = "execution-finished"
 
-func Test__PipelineDoneConsumer(t *testing.T) {
+func Test__ExecutionPoller(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Grpc: true,
+		Source:       true,
+		SemaphoreAPI: true,
 	})
+
+	defer r.Close()
 
 	connections := []models.StageConnection{
 		{
@@ -32,21 +34,16 @@ func Test__PipelineDoneConsumer(t *testing.T) {
 		},
 	}
 
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.RunTemplate(), connections, support.TagUsageDef(r.Source.Name))
+	runTemplate := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, runTemplate, connections, support.TagUsageDef(r.Source.Name))
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
 
+	encryptor := &encryptor.NoOpEncryptor{}
+
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewPipelineDoneConsumer(amqpURL, "0.0.0.0:50052")
-
-	go w.Start()
-	defer w.Stop()
-
-	//
-	// give the worker a few milliseconds to start before we start running the tests
-	//
-	time.Sleep(100 * time.Millisecond)
+	w := NewExecutionPoller(encryptor)
 
 	t.Run("failed pipeline -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
@@ -63,19 +60,12 @@ func Test__PipelineDoneConsumer(t *testing.T) {
 		defer testconsumer.Stop()
 
 		//
-		// Mock failed result and publish pipeline done message.
+		// Mock failed result and tick worker
 		//
-		r.Grpc.PipelineService.MockPipelineResult(pplproto.Pipeline_FAILED)
-		r.Grpc.PipelineService.MockWorkflow(workflowID)
-		message := pplproto.PipelineEvent{PipelineId: uuid.New().String()}
-		body, err := proto.Marshal(&message)
+		pipelineID := uuid.New().String()
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultFailed)
+		err = w.Tick()
 		require.NoError(t, err)
-		require.NoError(t, tackle.PublishMessage(&tackle.PublishParams{
-			AmqpURL:    amqpURL,
-			RoutingKey: "done",
-			Exchange:   "pipeline_state_exchange",
-			Body:       body,
-		}))
 
 		//
 		// Verify execution eventually goes to the finished state, with result = failed.
@@ -135,19 +125,12 @@ func Test__PipelineDoneConsumer(t *testing.T) {
 		defer testconsumer.Stop()
 
 		//
-		// Mock failed result and publish pipeline done message.
+		// Mock passed result and tick worker
 		//
-		r.Grpc.PipelineService.MockPipelineResult(pplproto.Pipeline_PASSED)
-		r.Grpc.PipelineService.MockWorkflow(workflowID)
-		message := pplproto.PipelineEvent{PipelineId: uuid.New().String()}
-		body, err := proto.Marshal(&message)
+		pipelineID := uuid.New().String()
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
+		err = w.Tick()
 		require.NoError(t, err)
-		require.NoError(t, tackle.PublishMessage(&tackle.PublishParams{
-			AmqpURL:    amqpURL,
-			RoutingKey: "done",
-			Exchange:   "pipeline_state_exchange",
-			Body:       body,
-		}))
 
 		//
 		// Verify execution eventually goes to the finished state, with result = failed.

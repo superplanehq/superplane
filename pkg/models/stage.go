@@ -147,15 +147,17 @@ type RunTemplate struct {
 	//
 	// Triggers a workflow on an existing Semaphore project/task.
 	//
-	Semaphore *SemaphoreRunTemplate `json:"semaphore_workflow,omitempty"`
+	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
 }
 
 type SemaphoreRunTemplate struct {
-	ProjectID    string            `json:"project_id"`
-	Branch       string            `json:"branch"`
-	PipelineFile string            `json:"pipeline_file"`
-	Parameters   map[string]string `json:"parameters"`
-	TaskID       string            `json:"task_id"`
+	APIToken        string            `json:"api_token"`
+	OrganizationURL string            `json:"organization_url"`
+	ProjectID       string            `json:"project_id"`
+	Branch          string            `json:"branch"`
+	PipelineFile    string            `json:"pipeline_file"`
+	Parameters      map[string]string `json:"parameters"`
+	TaskID          string            `json:"task_id"`
 }
 
 func FindStageByID(id uuid.UUID) (*Stage, error) {

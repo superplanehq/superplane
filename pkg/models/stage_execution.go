@@ -169,11 +169,11 @@ func FindExecutionInState(stageID uuid.UUID, states []string) (*StageExecution, 
 	return &execution, nil
 }
 
-func ListPendingStageExecutions() ([]StageExecution, error) {
+func ListStageExecutionsInState(state string) ([]StageExecution, error) {
 	var executions []StageExecution
 
 	err := database.Conn().
-		Where("state = ?", StageExecutionPending).
+		Where("state = ?", state).
 		Find(&executions).
 		Error
 

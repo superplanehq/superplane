@@ -2,12 +2,14 @@ package actions
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"slices"
 	"sort"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	err := ValidateUUIDs(req.OrganizationId, req.CanvasId, req.RequesterId)
 	if err != nil {
 		return nil, err
@@ -28,7 +30,7 @@ func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateSta
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
-	template, err := validateRunTemplate(req.RunTemplate)
+	template, err := validateRunTemplate(ctx, encryptor, req.RunTemplate)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
@@ -119,21 +121,40 @@ func validateTagUsageDefinition(usage *pb.TagUsageDefinition, connections []mode
 	return &out, nil
 }
 
-func validateRunTemplate(in *pb.RunTemplate) (*models.RunTemplate, error) {
+func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in *pb.RunTemplate) (*models.RunTemplate, error) {
 	if in == nil {
 		return nil, fmt.Errorf("missing run template")
 	}
 
 	switch in.Type {
 	case pb.RunTemplate_TYPE_SEMAPHORE:
+		if in.Semaphore.OrganizationUrl == "" {
+			return nil, fmt.Errorf("missing organization URL")
+		}
+
+		if in.Semaphore.ApiToken == "" {
+			return nil, fmt.Errorf("missing API token")
+		}
+
+		if in.Semaphore.TaskId == "" {
+			return nil, fmt.Errorf("only triggering tasks is supported for now")
+		}
+
+		token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
+		if err != nil {
+			return nil, fmt.Errorf("error encrypting API token: %v", err)
+		}
+
 		return &models.RunTemplate{
 			Type: models.RunTemplateTypeSemaphore,
 			Semaphore: &models.SemaphoreRunTemplate{
-				ProjectID:    in.Semaphore.ProjectId,
-				Branch:       in.Semaphore.Branch,
-				PipelineFile: in.Semaphore.PipelineFile,
-				Parameters:   in.Semaphore.Parameters,
-				TaskID:       in.Semaphore.TaskId,
+				OrganizationURL: in.Semaphore.OrganizationUrl,
+				APIToken:        base64.StdEncoding.EncodeToString(token),
+				ProjectID:       in.Semaphore.ProjectId,
+				Branch:          in.Semaphore.Branch,
+				PipelineFile:    in.Semaphore.PipelineFile,
+				Parameters:      in.Semaphore.Parameters,
+				TaskID:          in.Semaphore.TaskId,
 			},
 		}, nil
 
@@ -531,11 +552,12 @@ func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, erro
 		return &pb.RunTemplate{
 			Type: pb.RunTemplate_TYPE_SEMAPHORE,
 			Semaphore: &pb.SemaphoreRunTemplate{
-				ProjectId:    runTemplate.Semaphore.ProjectID,
-				Branch:       runTemplate.Semaphore.Branch,
-				PipelineFile: runTemplate.Semaphore.PipelineFile,
-				Parameters:   runTemplate.Semaphore.Parameters,
-				TaskId:       runTemplate.Semaphore.TaskID,
+				OrganizationUrl: runTemplate.Semaphore.OrganizationURL,
+				ProjectId:       runTemplate.Semaphore.ProjectID,
+				Branch:          runTemplate.Semaphore.Branch,
+				PipelineFile:    runTemplate.Semaphore.PipelineFile,
+				Parameters:      runTemplate.Semaphore.Parameters,
+				TaskId:          runTemplate.Semaphore.TaskID,
 			},
 		}, nil
 

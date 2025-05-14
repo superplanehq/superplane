@@ -1,30 +1,38 @@
 package support
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/delivery"
-	"github.com/superplanehq/superplane/test/grpcmock"
+	"github.com/superplanehq/superplane/test/semaphore"
 )
 
 type ResourceRegistry struct {
-	Org    uuid.UUID
-	User   uuid.UUID
-	Canvas *models.Canvas
-	Source *models.EventSource
-	Stage  *models.Stage
-	Grpc   *grpcmock.ServiceRegistry
+	Org              uuid.UUID
+	User             uuid.UUID
+	Canvas           *models.Canvas
+	Source           *models.EventSource
+	Stage            *models.Stage
+	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
+}
+
+func (r *ResourceRegistry) Close() {
+	if r.SemaphoreAPIMock != nil {
+		r.SemaphoreAPIMock.Close()
+	}
 }
 
 type SetupOptions struct {
-	Source    bool
-	Stage     bool
-	Grpc      bool
-	Approvals int
+	Source       bool
+	Stage        bool
+	SemaphoreAPI bool
+	Approvals    int
 }
 
 func Setup(t *testing.T) *ResourceRegistry {
@@ -66,9 +74,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		require.NoError(t, err)
 	}
 
-	if options.Grpc {
-		r.Grpc, err = grpcmock.Start()
-		require.NoError(t, err)
+	if options.SemaphoreAPI {
+		r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
+		r.SemaphoreAPIMock.Init()
+		log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 	}
 
 	return &r
@@ -124,29 +133,19 @@ func TagUsageDef(sourceName string) models.StageTagUsageDefinition {
 }
 
 func RunTemplate() models.RunTemplate {
+	return RunTemplateWithURL("http://localhost:8000")
+}
+
+func RunTemplateWithURL(URL string) models.RunTemplate {
 	return models.RunTemplate{
 		Type: models.RunTemplateTypeSemaphore,
 		Semaphore: &models.SemaphoreRunTemplate{
-			ProjectID:    "demo-project",
-			Branch:       "main",
-			PipelineFile: ".semaphore/semaphore.yml",
-			Parameters:   map[string]string{},
-		},
-	}
-}
-
-func WorkflowRunTemplate() models.RunTemplate {
-	return RunTemplate()
-}
-
-func TaskRunTemplate() models.RunTemplate {
-	return models.RunTemplate{
-		Type: models.RunTemplateTypeSemaphore,
-		Semaphore: &models.SemaphoreRunTemplate{
-			ProjectID:    "demo-project",
-			TaskID:       "demo-task",
-			Branch:       "main",
-			PipelineFile: ".semaphore/run.yml",
+			OrganizationURL: URL,
+			APIToken:        base64.StdEncoding.EncodeToString([]byte("token")),
+			ProjectID:       "demo-project",
+			TaskID:          "demo-task",
+			Branch:          "main",
+			PipelineFile:    ".semaphore/run.yml",
 			Parameters: map[string]string{
 				"PARAM_1": "VALUE_1",
 				"PARAM_2": "VALUE_2",
@@ -159,10 +158,13 @@ func ProtoRunTemplate() *protos.RunTemplate {
 	return &protos.RunTemplate{
 		Type: protos.RunTemplate_TYPE_SEMAPHORE,
 		Semaphore: &protos.SemaphoreRunTemplate{
-			ProjectId:    "test",
-			Branch:       "main",
-			PipelineFile: ".semaphore/semaphore.yml",
-			Parameters:   map[string]string{},
+			OrganizationUrl: "http://localhost:8000",
+			ApiToken:        "test",
+			ProjectId:       "test",
+			TaskId:          "task",
+			Branch:          "main",
+			PipelineFile:    ".semaphore/semaphore.yml",
+			Parameters:      map[string]string{},
 		},
 	}
 }

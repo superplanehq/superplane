@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/encryptor"
 	protos "github.com/superplanehq/superplane/pkg/protos/delivery"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -20,8 +21,10 @@ const StageCreatedRoutingKey = "stage-created"
 func Test__CreateStage(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
+	encryptor := &encryptor.NoOpEncryptor{}
+
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       uuid.New().String(),
 			Name:           "test",
@@ -36,7 +39,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -50,7 +53,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -71,7 +74,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -95,7 +98,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -122,7 +125,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -151,7 +154,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -180,7 +183,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -210,7 +213,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -241,7 +244,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("no tag usage definition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -263,7 +266,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("tag usage definition with invalid from -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -289,7 +292,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("no tags in tag usage definition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -315,7 +318,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("tag with empty name -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -347,7 +350,7 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		runTemplate := support.ProtoRunTemplate()
-		res, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		res, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",
@@ -405,7 +408,11 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, r.Org.String(), res.Stage.OrganizationId)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.CanvasId)
 		assert.Equal(t, "test", res.Stage.Name)
-		assert.Equal(t, runTemplate, res.Stage.RunTemplate)
+		assert.Equal(t, runTemplate.Type, res.Stage.RunTemplate.Type)
+		assert.Equal(t, runTemplate.Semaphore.Branch, res.Stage.RunTemplate.Semaphore.Branch)
+		assert.Equal(t, runTemplate.Semaphore.PipelineFile, res.Stage.RunTemplate.Semaphore.PipelineFile)
+		assert.Equal(t, runTemplate.Semaphore.OrganizationUrl, res.Stage.RunTemplate.Semaphore.OrganizationUrl)
+		assert.Equal(t, runTemplate.Semaphore.Parameters, res.Stage.RunTemplate.Semaphore.Parameters)
 
 		// Assert connections are correct
 		require.Len(t, res.Stage.Connections, 1)
@@ -430,7 +437,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			OrganizationId: r.Org.String(),
 			CanvasId:       r.Canvas.ID.String(),
 			Name:           "test",

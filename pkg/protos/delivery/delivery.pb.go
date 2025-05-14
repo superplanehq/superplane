@@ -1727,14 +1727,16 @@ func (x *RunTemplate) GetSemaphore() *SemaphoreRunTemplate {
 }
 
 type SemaphoreRunTemplate struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Branch        string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	PipelineFile  string                 `protobuf:"bytes,3,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
-	TaskId        string                 `protobuf:"bytes,4,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	Parameters    map[string]string      `protobuf:"bytes,5,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId       string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Branch          string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	PipelineFile    string                 `protobuf:"bytes,3,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
+	TaskId          string                 `protobuf:"bytes,4,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Parameters      map[string]string      `protobuf:"bytes,5,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ApiToken        string                 `protobuf:"bytes,6,opt,name=api_token,json=apiToken,proto3" json:"api_token,omitempty"`
+	OrganizationUrl string                 `protobuf:"bytes,7,opt,name=organization_url,json=organizationUrl,proto3" json:"organization_url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *SemaphoreRunTemplate) Reset() {
@@ -1800,6 +1802,20 @@ func (x *SemaphoreRunTemplate) GetParameters() map[string]string {
 		return x.Parameters
 	}
 	return nil
+}
+
+func (x *SemaphoreRunTemplate) GetApiToken() string {
+	if x != nil {
+		return x.ApiToken
+	}
+	return ""
+}
+
+func (x *SemaphoreRunTemplate) GetOrganizationUrl() string {
+	if x != nil {
+		return x.OrganizationUrl
+	}
+	return ""
 }
 
 type CreateStageResponse struct {
@@ -3674,7 +3690,7 @@ const file_delivery_proto_rawDesc = "" +
 	"\tsemaphore\x18\x02 \x01(\v2*.InternalApi.Delivery.SemaphoreRunTemplateR\tsemaphore\",\n" +
 	"\x04Type\x12\x10\n" +
 	"\fTYPE_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0eTYPE_SEMAPHORE\x10\x01\"\xa6\x02\n" +
+	"\x0eTYPE_SEMAPHORE\x10\x01\"\xee\x02\n" +
 	"\x14SemaphoreRunTemplate\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x16\n" +
@@ -3683,7 +3699,9 @@ const file_delivery_proto_rawDesc = "" +
 	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12Z\n" +
 	"\n" +
 	"parameters\x18\x05 \x03(\v2:.InternalApi.Delivery.SemaphoreRunTemplate.ParametersEntryR\n" +
-	"parameters\x1a=\n" +
+	"parameters\x12\x1b\n" +
+	"\tapi_token\x18\x06 \x01(\tR\bapiToken\x12)\n" +
+	"\x10organization_url\x18\a \x01(\tR\x0forganizationUrl\x1a=\n" +
 	"\x0fParametersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"H\n" +

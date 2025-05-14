@@ -8,11 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	schedulepb "github.com/superplanehq/superplane/pkg/protos/periodic_scheduler"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
@@ -21,64 +22,24 @@ const ExecutionStartedRoutingKey = "execution-started"
 
 func Test__PendingExecutionsWorker(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Stage: true, Grpc: true, Approvals: 1,
+		Source: true, Stage: true, SemaphoreAPI: true, Approvals: 1,
 	})
+
+	defer r.Close()
 
 	w := PendingExecutionsWorker{
-		RepoProxyURL: "0.0.0.0:50052",
-		SchedulerURL: "0.0.0.0:50052",
-		JwtSigner:    jwt.NewSigner("test"),
+		JwtSigner: jwt.NewSigner("test"),
+		Encryptor: &encryptor.NoOpEncryptor{},
 	}
+
 	amqpURL, _ := config.RabbitMQURL()
-
-	t.Run("semaphore workflow is created", func(t *testing.T) {
-		//
-		// Create stage that creates Semaphore workflows.
-		//
-		require.NoError(t, r.Canvas.CreateStage("stage-wf", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, support.TagUsageDef(r.Source.Name)))
-
-		stage, err := r.Canvas.FindStageByName("stage-wf")
-		require.NoError(t, err)
-
-		testconsumer := testconsumer.New(amqpURL, ExecutionStartedRoutingKey)
-		testconsumer.Start()
-		defer testconsumer.Stop()
-
-		//
-		// Create pending execution.
-		//
-		execution := support.CreateExecution(t, r.Source, stage)
-
-		//
-		// Trigger the worker, and verify that request to repo proxy was sent,
-		// and that execution was moved to 'started' state.
-		//
-		err = w.Tick()
-		require.NoError(t, err)
-		execution, err = stage.FindExecutionByID(execution.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionStarted, execution.State)
-		assert.NotEmpty(t, execution.ReferenceID)
-		assert.NotEmpty(t, execution.StartedAt)
-		assert.True(t, testconsumer.HasReceivedMessage())
-		repoProxyReq := r.Grpc.RepoProxyService.GetLastCreateRequest()
-		require.NotNil(t, repoProxyReq)
-		assert.Equal(t, "demo-project", repoProxyReq.ProjectId)
-		assert.Equal(t, ".semaphore/semaphore.yml", repoProxyReq.DefinitionFile)
-		assert.Equal(t, stage.CreatedBy.String(), repoProxyReq.RequesterId)
-		assert.Equal(t, "refs/heads/main", repoProxyReq.Git.Reference)
-	})
 
 	t.Run("semaphore task is triggered with simple parameters", func(t *testing.T) {
 		//
 		// Create stage that trigger Semaphore task.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, support.TaskRunTemplate(), []models.StageConnection{
+		template := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
+		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, template, []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -86,6 +47,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		}, support.TagUsageDef(r.Source.Name)))
 
 		stage, err := r.Canvas.FindStageByName("stage-task")
+
 		require.NoError(t, err)
 
 		//
@@ -109,12 +71,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		assert.NotEmpty(t, execution.StartedAt)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.Grpc.SchedulerService.GetLastRunNowRequest()
+		req := r.SemaphoreAPIMock.LastTaskTrigger
 		require.NotNil(t, req)
-		assert.Equal(t, "demo-task", req.Id)
-		assert.Equal(t, "main", req.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
-		assert.Equal(t, stage.CreatedBy.String(), req.Requester)
+		assert.Equal(t, "main", req.Spec.Branch)
+		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"PARAM_1": "VALUE_1",
 			"PARAM_2": "VALUE_2",
@@ -125,7 +85,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that trigger Semaphore task.
 		//
-		template := support.TaskRunTemplate()
+		template := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
 		template.Semaphore.Parameters = map[string]string{
 			"REF":             "${{ self.Conn('gh').ref }}",
 			"REF_TYPE":        "${{ self.Conn('gh').ref_type }}",
@@ -177,12 +137,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		assert.NotEmpty(t, execution.StartedAt)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.Grpc.SchedulerService.GetLastRunNowRequest()
+		req := r.SemaphoreAPIMock.LastTaskTrigger
 		require.NotNil(t, req)
-		assert.Equal(t, "demo-task", req.Id)
-		assert.Equal(t, "main", req.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
-		assert.Equal(t, stage.CreatedBy.String(), req.Requester)
+		assert.Equal(t, "main", req.Spec.Branch)
+		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"REF":             "refs/heads/test",
 			"REF_TYPE":        "branch",
@@ -191,7 +149,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, req *schedulepb.RunNowRequest, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
 		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
 		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
@@ -201,15 +159,15 @@ func assertParameters(t *testing.T, req *schedulepb.RunNowRequest, execution *mo
 		all[k] = v
 	}
 
-	assert.Len(t, req.ParameterValues, len(all)+1)
+	assert.Len(t, trigger.Spec.Parameters, len(all)+1)
 	for name, value := range all {
-		assert.True(t, slices.ContainsFunc(req.ParameterValues, func(v *schedulepb.ParameterValue) bool {
-			return v.Name == name && v.Value == value
+		assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
+			return p.Name == name && p.Value == value
 		}))
 	}
 
-	assert.True(t, slices.ContainsFunc(req.ParameterValues, func(v *schedulepb.ParameterValue) bool {
-		return v.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && v.Value != ""
+	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
+		return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
 	}))
 }
 

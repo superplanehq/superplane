@@ -21,10 +21,13 @@ func Test__Resolve(t *testing.T) {
 		require.NotNil(t, newTemplate)
 		assert.Equal(t, models.RunTemplateTypeSemaphore, newTemplate.Type)
 		assert.Equal(t, "demo-project", newTemplate.Semaphore.ProjectID)
-		assert.Equal(t, ".semaphore/semaphore.yml", newTemplate.Semaphore.PipelineFile)
+		assert.Equal(t, "demo-task", newTemplate.Semaphore.TaskID)
+		assert.Equal(t, ".semaphore/run.yml", newTemplate.Semaphore.PipelineFile)
 		assert.Equal(t, "main", newTemplate.Semaphore.Branch)
-		assert.Equal(t, map[string]string{}, newTemplate.Semaphore.Parameters)
-		assert.Empty(t, newTemplate.Semaphore.TaskID)
+		assert.Equal(t, map[string]string{
+			"PARAM_1": "VALUE_1",
+			"PARAM_2": "VALUE_2",
+		}, newTemplate.Semaphore.Parameters)
 	})
 
 	t.Run("with variables to resolve", func(t *testing.T) {
@@ -45,8 +48,8 @@ func Test__Resolve(t *testing.T) {
 		assert.Equal(t, models.RunTemplateTypeSemaphore, newTemplate.Type)
 		assert.Equal(t, "other", newTemplate.Semaphore.ProjectID)
 		assert.Equal(t, "hello", newTemplate.Semaphore.Branch)
-		assert.Equal(t, ".semaphore/semaphore.yml", newTemplate.Semaphore.PipelineFile)
-		assert.Empty(t, newTemplate.Semaphore.TaskID)
+		assert.Equal(t, ".semaphore/run.yml", newTemplate.Semaphore.PipelineFile)
+		assert.Equal(t, "demo-task", newTemplate.Semaphore.TaskID)
 		assert.Equal(t, map[string]string{
 			"PARAM_1": "value1",
 			"PARAM_2": "value2",

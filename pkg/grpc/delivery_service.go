@@ -37,7 +37,7 @@ func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.Descr
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return actions.CreateStage(ctx, req)
+	return actions.CreateStage(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
