@@ -5,9 +5,21 @@ agent:
     type: f1-standard-2
     os_image: ubuntu2204
 blocks:
-  - name: 'Block #1'
+  - name: "\U0001F9EA QA"
     task:
+      env_vars:
+        - name: DOCKER_BUILDKIT
+          value: "1"
+        - name: APP_ENV
+          value: prod
+      prologue:
+        commands:
+          - checkout
       jobs:
-        - name: 'Job #1'
+        - name: "\U0001F9EA Test"
           commands:
-            - checkout
+            - make test.setup
+            - make test
+        - name: "\U0001F9EA Lint"
+          commands:
+            - make lint
