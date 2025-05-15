@@ -52,13 +52,6 @@ CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
 FROM base AS builder
 
-RUN protoc --proto_path protos/ \
-        --proto_path protos/include \
-        --openapiv2_out=api/swagger \
-        --openapiv2_opt=logtostderr=true \
-        --openapiv2_opt=use_go_templates=true \
-        protos/superplane.proto
-
 RUN rm -rf build && go build -o build/${APP_NAME} cmd/main.go
 
 FROM ${RUNNER_IMAGE} AS runner
