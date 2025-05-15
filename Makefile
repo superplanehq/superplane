@@ -2,7 +2,6 @@
 
 APP_NAME=superplane
 APP_ENV=prod
-PLATFORM=linux/arm64
 
 test.setup: openapi.spec.gen
 	docker-compose build
