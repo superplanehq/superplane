@@ -142,7 +142,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	authenticatedRoute.Use(OrganizationMiddleware)
 	authenticatedRoute.Use(additionalMiddlewares...)
 
 	//
@@ -243,8 +242,6 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.Context().Value(orgIDKey).(uuid.UUID)
-
 	//
 	// Any verification that happens here must be quick
 	// so we always respond with a 200 OK to the event origin.
@@ -268,7 +265,7 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 	// TODO: we don't have the canvas ID here.
 	// We could put it in the path, but then the path will become quite big.
 	// For now, just organization/source IDs are enough for us.
-	source, err := models.FindEventSource(organizationID, sourceID)
+	source, err := models.FindEventSource(sourceID)
 	if err != nil {
 		http.Error(w, "source ID not found", http.StatusNotFound)
 		return
@@ -329,8 +326,6 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.Context().Value(orgIDKey).(uuid.UUID)
-
 	//
 	// Any verification that happens here must be quick
 	// so we always respond with a 200 OK to the event origin.
@@ -351,7 +346,7 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	source, err := models.FindEventSource(organizationID, sourceID)
+	source, err := models.FindEventSource(sourceID)
 	if err != nil {
 		http.Error(w, "source ID not found", http.StatusNotFound)
 		return

@@ -24,9 +24,8 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		req := &protos.CreateEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       uuid.New().String(),
-			Name:           "test",
+			CanvasId: uuid.New().String(),
+			Name:     "test",
 		}
 
 		_, err := CreateEventSource(context.Background(), encryptor, req)
@@ -43,9 +42,8 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
+			CanvasId: r.Canvas.ID.String(),
+			Name:     "test",
 		})
 
 		require.NoError(t, err)
@@ -55,16 +53,14 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.NotEmpty(t, response.EventSource.CreatedAt)
 		assert.NotEmpty(t, response.Key)
 		assert.Equal(t, "test", response.EventSource.Name)
-		assert.Equal(t, r.Org.String(), response.EventSource.OrganizationId)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
 		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
+			CanvasId: r.Canvas.ID.String(),
+			Name:     "test",
 		})
 
 		s, ok := status.FromError(err)

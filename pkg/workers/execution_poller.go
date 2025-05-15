@@ -67,6 +67,11 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
+	if result == models.StageExecutionStarted {
+		logger.Info("No change in state")
+		return nil
+	}
+
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		tags, err := w.processExecutionTags(tx, logger, execution, result)
 		if err != nil {

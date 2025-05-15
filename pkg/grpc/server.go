@@ -11,6 +11,7 @@ import (
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/reflection"
 )
 
 //
@@ -56,6 +57,8 @@ func RunServer(encryptor encryptor.Encryptor, port int) {
 	//
 	service := NewDeliveryService(encryptor)
 	protos.RegisterSuperplaneServer(grpcServer, service)
+
+	reflection.Register(grpcServer)
 
 	//
 	// Start handling incoming requests

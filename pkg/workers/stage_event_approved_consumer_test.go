@@ -39,11 +39,10 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	// Approve event once
 	//
 	_, err := actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
-		OrganizationId: r.Org.String(),
-		CanvasId:       r.Canvas.ID.String(),
-		StageId:        r.Stage.ID.String(),
-		EventId:        event.ID.String(),
-		RequesterId:    uuid.New().String(),
+		CanvasId:    r.Canvas.ID.String(),
+		StageId:     r.Stage.ID.String(),
+		EventId:     event.ID.String(),
+		RequesterId: uuid.New().String(),
 	})
 
 	require.NoError(t, err)
@@ -61,11 +60,10 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	// Approve event again
 	//
 	_, err = actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
-		OrganizationId: r.Org.String(),
-		CanvasId:       r.Canvas.ID.String(),
-		StageId:        r.Stage.ID.String(),
-		EventId:        event.ID.String(),
-		RequesterId:    uuid.New().String(),
+		CanvasId:    r.Canvas.ID.String(),
+		StageId:     r.Stage.ID.String(),
+		EventId:     event.ID.String(),
+		RequesterId: uuid.New().String(),
 	})
 
 	require.NoError(t, err)

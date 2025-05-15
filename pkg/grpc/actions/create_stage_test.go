@@ -25,11 +25,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       uuid.New().String(),
-			Name:           "test",
-			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			CanvasId:    uuid.New().String(),
+			Name:        "test",
+			RequesterId: r.User.String(),
+			RunTemplate: support.ProtoRunTemplate(),
 		})
 
 		s, ok := status.FromError(err)
@@ -40,10 +39,9 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
 		})
 
 		s, ok := status.FromError(err)
@@ -54,11 +52,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: "source-does-not-exist",
@@ -75,11 +72,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -99,11 +95,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -126,11 +121,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -155,11 +149,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -184,11 +177,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -214,11 +206,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -245,12 +236,11 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("no tag usage definition -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
-			Conditions:     []*protos.Condition{},
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
+			Conditions:  []*protos.Condition{},
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -267,12 +257,11 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("tag usage definition with invalid from -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
-			Conditions:     []*protos.Condition{},
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
+			Conditions:  []*protos.Condition{},
 			Use: &protos.TagUsageDefinition{
 				From: []string{"does-not-exist"},
 				Tags: []*protos.TagDefinition{{Name: "version", ValueFrom: "ref"}},
@@ -293,12 +282,11 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("no tags in tag usage definition -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
-			Conditions:     []*protos.Condition{},
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
+			Conditions:  []*protos.Condition{},
 			Use: &protos.TagUsageDefinition{
 				From: []string{r.Source.Name},
 				Tags: []*protos.TagDefinition{},
@@ -319,12 +307,11 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("tag with empty name -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
-			RequesterId:    r.User.String(),
-			Conditions:     []*protos.Condition{},
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: support.ProtoRunTemplate(),
+			RequesterId: r.User.String(),
+			Conditions:  []*protos.Condition{},
 			Use: &protos.TagUsageDefinition{
 				From: []string{r.Source.Name},
 				Tags: []*protos.TagDefinition{{Name: ""}},
@@ -351,11 +338,10 @@ func Test__CreateStage(t *testing.T) {
 
 		runTemplate := support.ProtoRunTemplate()
 		res, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RunTemplate:    runTemplate,
-			RequesterId:    r.User.String(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RunTemplate: runTemplate,
+			RequesterId: r.User.String(),
 			Use: &protos.TagUsageDefinition{
 				From: []string{r.Source.Name},
 				Tags: []*protos.TagDefinition{
@@ -405,7 +391,6 @@ func Test__CreateStage(t *testing.T) {
 		require.NotNil(t, res)
 		assert.NotNil(t, res.Stage.Id)
 		assert.NotNil(t, res.Stage.CreatedAt)
-		assert.Equal(t, r.Org.String(), res.Stage.OrganizationId)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.CanvasId)
 		assert.Equal(t, "test", res.Stage.Name)
 		assert.Equal(t, runTemplate.Type, res.Stage.RunTemplate.Type)
@@ -438,11 +423,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           "test",
-			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			CanvasId:    r.Canvas.ID.String(),
+			Name:        "test",
+			RequesterId: r.User.String(),
+			RunTemplate: support.ProtoRunTemplate(),
 			Use: &protos.TagUsageDefinition{
 				From: []string{r.Source.Name},
 				Tags: []*protos.TagDefinition{

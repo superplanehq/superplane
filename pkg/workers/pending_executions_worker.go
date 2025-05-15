@@ -25,7 +25,7 @@ func (w *PendingExecutionsWorker) Start() {
 	for {
 		err := w.Tick()
 		if err != nil {
-			log.Errorf("Error processing pending events: %v", err)
+			log.Errorf("Error processing pending executions: %v", err)
 		}
 
 		time.Sleep(time.Second)

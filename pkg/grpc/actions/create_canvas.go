@@ -14,19 +14,13 @@ import (
 )
 
 func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
-	orgID, err := uuid.Parse(req.OrganizationId)
-	if err != nil {
-		log.Errorf("Error reading organization id on %v for CreateCanvas: %v", req, err)
-		return nil, err
-	}
-
 	requesterID, err := uuid.Parse(req.RequesterId)
 	if err != nil {
 		log.Errorf("Error reading requester id on %v for CreateCanvas: %v", req, err)
 		return nil, err
 	}
 
-	canvas, err := models.CreateCanvas(orgID, requesterID, req.Name)
+	canvas, err := models.CreateCanvas(requesterID, req.Name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -38,10 +32,9 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateC
 
 	response := &pb.CreateCanvasResponse{
 		Canvas: &pb.Canvas{
-			Id:             canvas.ID.String(),
-			Name:           canvas.Name,
-			OrganizationId: canvas.OrganizationID.String(),
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
+			Id:        canvas.ID.String(),
+			Name:      canvas.Name,
+			CreatedAt: timestamppb.New(*canvas.CreatedAt),
 		},
 	}
 

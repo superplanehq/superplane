@@ -15,14 +15,12 @@ import (
 
 func Test__CreateCanvas(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	orgID := uuid.New()
 	user := uuid.New()
 
 	t.Run("name still not used -> canvas is created", func(t *testing.T) {
 		response, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
-			OrganizationId: orgID.String(),
-			RequesterId:    user.String(),
-			Name:           "test",
+			RequesterId: user.String(),
+			Name:        "test",
 		})
 
 		require.NoError(t, err)
@@ -31,14 +29,12 @@ func Test__CreateCanvas(t *testing.T) {
 		assert.NotEmpty(t, response.Canvas.Id)
 		assert.NotEmpty(t, response.Canvas.CreatedAt)
 		assert.Equal(t, "test", response.Canvas.Name)
-		assert.Equal(t, orgID.String(), response.Canvas.OrganizationId)
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
 		_, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
-			OrganizationId: orgID.String(),
-			RequesterId:    user.String(),
-			Name:           "test",
+			RequesterId: user.String(),
+			Name:        "test",
 		})
 
 		s, ok := status.FromError(err)

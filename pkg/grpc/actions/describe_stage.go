@@ -15,12 +15,12 @@ import (
 )
 
 func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.CanvasId)
+	err := ValidateUUIDs(req.CanvasId)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.CanvasId, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}

@@ -11,10 +11,8 @@ import (
 func Test__StageExecution(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
-	org := uuid.New()
 	user := uuid.New()
-
-	canvas, err := CreateCanvas(org, user, "test")
+	canvas, err := CreateCanvas(user, "test")
 	require.NoError(t, err)
 	source, err := canvas.CreateEventSource("gh", []byte("my-key"))
 	require.NoError(t, err)

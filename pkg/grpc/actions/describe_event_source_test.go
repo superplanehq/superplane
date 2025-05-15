@@ -18,8 +18,7 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("invalid canvas ID -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			Id:             uuid.New().String(),
+			Id: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -30,9 +29,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       uuid.New().String(),
-			Id:             uuid.New().String(),
+			CanvasId: uuid.New().String(),
+			Id:       uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -43,9 +41,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Id:             uuid.New().String(),
+			CanvasId: r.Canvas.ID.String(),
+			Id:       uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -56,8 +53,7 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("no name and no ID -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
+			CanvasId: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -68,9 +64,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("using id", func(t *testing.T) {
 		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Id:             r.Source.ID.String(),
+			CanvasId: r.Canvas.ID.String(),
+			Id:       r.Source.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -78,16 +73,14 @@ func Test__DescribeEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.Equal(t, r.Source.ID.String(), response.EventSource.Id)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
-		assert.Equal(t, r.Org.String(), response.EventSource.OrganizationId)
 		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.CreatedAt.AsTime())
 		assert.Equal(t, r.Source.Name, response.EventSource.Name)
 	})
 
 	t.Run("using name", func(t *testing.T) {
 		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			Name:           r.Source.Name,
+			CanvasId: r.Canvas.ID.String(),
+			Name:     r.Source.Name,
 		})
 
 		require.NoError(t, err)
@@ -95,7 +88,6 @@ func Test__DescribeEventSource(t *testing.T) {
 		require.NotNil(t, response.EventSource)
 		assert.Equal(t, r.Source.ID.String(), response.EventSource.Id)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
-		assert.Equal(t, r.Org.String(), response.EventSource.OrganizationId)
 		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.CreatedAt.AsTime())
 		assert.Equal(t, r.Source.Name, response.EventSource.Name)
 	})

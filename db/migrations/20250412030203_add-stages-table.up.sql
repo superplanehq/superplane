@@ -3,7 +3,6 @@ begin;
 CREATE TABLE stages (
   id                uuid NOT NULL DEFAULT uuid_generate_v4(),
   name              CHARACTER VARYING(128) NOT NULL,
-  organization_id   uuid NOT NULL,
   canvas_id         uuid NOT NULL,
   created_at        TIMESTAMP NOT NULL,
   created_by        uuid NOT NULL,
@@ -12,7 +11,7 @@ CREATE TABLE stages (
   use               jsonb,
 
   PRIMARY KEY (id),
-  UNIQUE (organization_id, canvas_id, name),
+  UNIQUE (canvas_id, name),
   FOREIGN KEY (canvas_id) REFERENCES canvases(id)
 );
 

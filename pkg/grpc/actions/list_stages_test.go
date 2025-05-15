@@ -16,22 +16,8 @@ import (
 func Test__ListStages(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("no org ID -> error", func(t *testing.T) {
-		_, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasId: r.Canvas.ID.String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
-	})
-
 	t.Run("no canvas ID -> error", func(t *testing.T) {
-		_, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			OrganizationId: r.Org.String(),
-		})
-
+		_, err := ListStages(context.Background(), &protos.ListStagesRequest{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -39,12 +25,11 @@ func Test__ListStages(t *testing.T) {
 	})
 
 	t.Run("no stages -> empty list", func(t *testing.T) {
-		canvas, err := models.CreateCanvas(r.Org, r.User, "empty-canvas")
+		canvas, err := models.CreateCanvas(r.User, "empty-canvas")
 		require.NoError(t, err)
 
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasId:       canvas.ID.String(),
-			OrganizationId: r.Org.String(),
+			CanvasId: canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -54,8 +39,7 @@ func Test__ListStages(t *testing.T) {
 
 	t.Run("with stage -> list", func(t *testing.T) {
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			OrganizationId: r.Org.String(),
-			CanvasId:       r.Canvas.ID.String(),
+			CanvasId: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -63,7 +47,6 @@ func Test__ListStages(t *testing.T) {
 		require.Len(t, res.Stages, 1)
 		assert.Equal(t, r.Stage.ID.String(), res.Stages[0].Id)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stages[0].CanvasId)
-		assert.Equal(t, r.Org.String(), res.Stages[0].OrganizationId)
 		assert.NotEmpty(t, res.Stages[0].CreatedAt)
 		assert.NotEmpty(t, res.Stages[0].RunTemplate)
 		require.Len(t, res.Stages[0].Conditions, 1)

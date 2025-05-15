@@ -22,10 +22,9 @@ func Test__ApproveStageEvent(t *testing.T) {
 	event := support.CreateStageEvent(t, r.Source, r.Stage)
 	userID := uuid.New().String()
 
-	t.Run("no org ID -> error", func(t *testing.T) {
+	t.Run("no canvas ID -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
 			StageId:     uuid.New().String(),
-			CanvasId:    r.Canvas.ID.String(),
 			EventId:     event.ID.String(),
 			RequesterId: uuid.New().String(),
 		})
@@ -36,27 +35,12 @@ func Test__ApproveStageEvent(t *testing.T) {
 		assert.Contains(t, s.Message(), "invalid UUID")
 	})
 
-	t.Run("no canvas ID -> error", func(t *testing.T) {
-		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			StageId:        uuid.New().String(),
-			OrganizationId: r.Canvas.OrganizationID.String(),
-			EventId:        event.ID.String(),
-			RequesterId:    uuid.New().String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
-	})
-
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			OrganizationId: r.Canvas.OrganizationID.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			StageId:        uuid.New().String(),
-			EventId:        event.ID.String(),
-			RequesterId:    uuid.New().String(),
+			CanvasId:    r.Canvas.ID.String(),
+			StageId:     uuid.New().String(),
+			EventId:     event.ID.String(),
+			RequesterId: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -67,11 +51,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 
 	t.Run("stage event does not exist -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			OrganizationId: r.Canvas.OrganizationID.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			StageId:        r.Stage.ID.String(),
-			EventId:        uuid.New().String(),
-			RequesterId:    uuid.New().String(),
+			CanvasId:    r.Canvas.ID.String(),
+			StageId:     r.Stage.ID.String(),
+			EventId:     uuid.New().String(),
+			RequesterId: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -87,11 +70,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 		defer testconsumer.Stop()
 
 		res, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			OrganizationId: r.Canvas.OrganizationID.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			StageId:        r.Stage.ID.String(),
-			EventId:        event.ID.String(),
-			RequesterId:    userID,
+			CanvasId:    r.Canvas.ID.String(),
+			StageId:     r.Stage.ID.String(),
+			EventId:     event.ID.String(),
+			RequesterId: userID,
 		})
 
 		require.NoError(t, err)
@@ -111,11 +93,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 
 	t.Run("approves with same requester ID -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			OrganizationId: r.Canvas.OrganizationID.String(),
-			CanvasId:       r.Canvas.ID.String(),
-			StageId:        r.Stage.ID.String(),
-			EventId:        event.ID.String(),
-			RequesterId:    userID,
+			CanvasId:    r.Canvas.ID.String(),
+			StageId:     r.Stage.ID.String(),
+			EventId:     event.ID.String(),
+			RequesterId: userID,
 		})
 
 		s, ok := status.FromError(err)

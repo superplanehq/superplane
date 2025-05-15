@@ -14,12 +14,12 @@ import (
 )
 
 func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.CanvasId, req.StageId)
+	err := ValidateUUIDs(req.CanvasId, req.StageId)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.CanvasId, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, err
 	}

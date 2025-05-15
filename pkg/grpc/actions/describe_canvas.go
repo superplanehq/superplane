@@ -14,12 +14,12 @@ import (
 )
 
 func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.Id)
+	err := ValidateUUIDs(req.Id)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.Id, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.Id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")
@@ -31,11 +31,10 @@ func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.Des
 
 	response := &pb.DescribeCanvasResponse{
 		Canvas: &pb.Canvas{
-			Id:             canvas.ID.String(),
-			Name:           canvas.Name,
-			OrganizationId: canvas.OrganizationID.String(),
-			CreatedAt:      timestamppb.New(*canvas.CreatedAt),
-			CreatedBy:      canvas.CreatedBy.String(),
+			Id:        canvas.ID.String(),
+			Name:      canvas.Name,
+			CreatedAt: timestamppb.New(*canvas.CreatedAt),
+			CreatedBy: canvas.CreatedBy.String(),
 		},
 	}
 

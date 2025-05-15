@@ -26,9 +26,8 @@ func ForStage(stage *models.Stage) *log.Entry {
 
 	return log.WithFields(
 		log.Fields{
-			"organization_id": stage.OrganizationID,
-			"canvas_id":       stage.CanvasID,
-			"name":            stage.Name,
+			"canvas_id": stage.CanvasID,
+			"name":      stage.Name,
 		},
 	)
 }
@@ -40,9 +39,8 @@ func ForCanvas(canvas *models.Canvas) *log.Entry {
 
 	return log.WithFields(
 		log.Fields{
-			"id":              canvas.ID,
-			"name":            canvas.Name,
-			"organization_id": canvas.OrganizationID,
+			"id":   canvas.ID,
+			"name": canvas.Name,
 		},
 	)
 }

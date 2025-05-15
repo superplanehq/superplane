@@ -181,15 +181,13 @@ service Superplane {
 message Canvas {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
-  string created_by = 4;
-  google.protobuf.Timestamp created_at = 5;
+  string created_by = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message CreateCanvasRequest {
   string name = 1;
-  string organization_id = 2;
-  string requester_id = 3;
+  string requester_id = 2;
 }
 
 message CreateCanvasResponse {
@@ -199,7 +197,6 @@ message CreateCanvasResponse {
 message DescribeCanvasRequest {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
 }
 
 message DescribeCanvasResponse {
@@ -209,16 +206,14 @@ message DescribeCanvasResponse {
 message EventSource {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
-  string canvas_id = 4;
-  google.protobuf.Timestamp created_at = 5;
+  string canvas_id = 3;
+  google.protobuf.Timestamp created_at = 4;
 }
 
 message DescribeStageRequest {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
-  string canvas_id = 4;
+  string canvas_id = 3;
 }
 
 message DescribeStageResponse {
@@ -227,9 +222,8 @@ message DescribeStageResponse {
 
 message CreateEventSourceRequest {
   string name = 1;
-  string organization_id = 2;
-  string canvas_id = 3;
-  string requester_id = 4;
+  string canvas_id = 2;
+  string requester_id = 3;
 }
 
 message CreateEventSourceResponse {
@@ -240,8 +234,7 @@ message CreateEventSourceResponse {
 message DescribeEventSourceRequest {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
-  string canvas_id = 4;
+  string canvas_id = 3;
 }
 
 message DescribeEventSourceResponse {
@@ -294,13 +287,12 @@ message Connection {
 message Stage {
   string id = 1;
   string name = 2;
-  string organization_id = 3;
-  string canvas_id = 4;
-  google.protobuf.Timestamp created_at = 5;
-  repeated Connection connections = 6;
-  repeated Condition conditions = 7;
-  TagUsageDefinition use = 8;
-  RunTemplate run_template = 9;
+  string canvas_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  repeated Connection connections = 5;
+  repeated Condition conditions = 6;
+  TagUsageDefinition use = 7;
+  RunTemplate run_template = 8;
 }
 
 message Condition {
@@ -327,13 +319,12 @@ message ConditionTimeWindow {
 
 message CreateStageRequest {
   string name = 1;
-  string organization_id = 2;
-  string canvas_id = 3;
-  string requester_id = 4;
-  repeated Connection connections = 5;
-  repeated Condition conditions = 6;
-  TagUsageDefinition use = 7;
-  RunTemplate run_template = 8;
+  string canvas_id = 2;
+  string requester_id = 3;
+  repeated Connection connections = 4;
+  repeated Condition conditions = 5;
+  TagUsageDefinition use = 6;
+  RunTemplate run_template = 7;
 }
 
 message TagUsageDefinition {
@@ -382,8 +373,7 @@ message UpdateStageResponse {
 }
 
 message ListStagesRequest {
-  string organization_id = 1;
-  string canvas_id = 2;
+  string canvas_id = 1;
 }
 
 message ListStagesResponse {
@@ -391,8 +381,7 @@ message ListStagesResponse {
 }
 
 message ListEventSourcesRequest {
-  string organization_id = 1;
-  string canvas_id = 2;
+  string canvas_id = 1;
 }
 
 message ListEventSourcesResponse {
@@ -401,10 +390,9 @@ message ListEventSourcesResponse {
 
 message ListStageEventsRequest {
   string stage_id = 1;
-  string organization_id = 2;
-  string canvas_id = 3;
-  repeated StageEvent.State states = 4;
-  repeated StageEvent.StateReason state_reasons = 5;
+  string canvas_id = 2;
+  repeated StageEvent.State states = 3;
+  repeated StageEvent.StateReason state_reasons = 4;
 }
 
 message ListStageEventsResponse {
@@ -481,10 +469,9 @@ message StageEventApproval {
 
 message ApproveStageEventRequest {
   string stage_id = 1;
-  string organization_id = 2;
-  string canvas_id = 3;
-  string event_id = 4;
-  string requester_id = 5;
+  string canvas_id = 2;
+  string event_id = 3;
+  string requester_id = 4;
 }
 
 message ApproveStageEventResponse {

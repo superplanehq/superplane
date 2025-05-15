@@ -9,9 +9,8 @@ import (
 )
 
 type Semaphore struct {
-	URL        string
-	Token      string
-	APIVersion string
+	URL   string
+	Token string
 }
 
 func NewSemaphoreAPI(URL, token string) *Semaphore {
@@ -136,7 +135,7 @@ func (s *Semaphore) TriggerTask(projectID, taskID string, spec TaskTriggerSpec) 
 	URL := fmt.Sprintf("%s/api/v2/projects/%s/tasks/%s/triggers", s.URL, projectID, taskID)
 
 	body, err := json.Marshal(&TaskTrigger{
-		APIVersion: s.APIVersion,
+		APIVersion: "v2",
 		Kind:       "TaskTrigger",
 		Spec:       spec,
 	})
@@ -157,14 +156,13 @@ func (s *Semaphore) TriggerTask(projectID, taskID string, spec TaskTriggerSpec) 
 		return "", fmt.Errorf("error executing request: %v", err)
 	}
 
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
 	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
 	}
 
 	var trigger TaskTrigger

@@ -18,12 +18,11 @@ const (
 )
 
 type Stage struct {
-	ID             uuid.UUID `gorm:"type:uuid;primary_key;"`
-	OrganizationID uuid.UUID
-	CanvasID       uuid.UUID
-	Name           string
-	CreatedAt      *time.Time
-	CreatedBy      uuid.UUID
+	ID        uuid.UUID `gorm:"type:uuid;primary_key;"`
+	CanvasID  uuid.UUID
+	Name      string
+	CreatedAt *time.Time
+	CreatedBy uuid.UUID
 
 	Use         datatypes.JSONType[StageTagUsageDefinition]
 	Conditions  datatypes.JSONSlice[StageCondition]
@@ -179,11 +178,10 @@ func FindStageByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Stage, error) {
 	return &stage, nil
 }
 
-func FindStage(id, orgID, canvasID uuid.UUID) (*Stage, error) {
+func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	var stage Stage
 
 	err := database.Conn().
-		Where("organization_id = ?", orgID).
 		Where("canvas_id = ?", canvasID).
 		Where("id = ?", id).
 		First(&stage).

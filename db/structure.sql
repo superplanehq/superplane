@@ -45,7 +45,6 @@ SET default_tablespace = '';
 
 CREATE TABLE public.canvases (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
@@ -59,7 +58,6 @@ CREATE TABLE public.canvases (
 
 CREATE TABLE public.event_sources (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
@@ -176,7 +174,6 @@ CREATE TABLE public.stage_executions (
 CREATE TABLE public.stages (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(128) NOT NULL,
-    organization_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
@@ -187,11 +184,11 @@ CREATE TABLE public.stages (
 
 
 --
--- Name: canvases canvases_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: canvases canvases_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.canvases
-    ADD CONSTRAINT canvases_organization_id_name_key UNIQUE (organization_id, name);
+    ADD CONSTRAINT canvases_name_key UNIQUE (name);
 
 
 --
@@ -203,11 +200,11 @@ ALTER TABLE ONLY public.canvases
 
 
 --
--- Name: event_sources event_sources_organization_id_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: event_sources event_sources_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_organization_id_canvas_id_name_key UNIQUE (organization_id, canvas_id, name);
+    ADD CONSTRAINT event_sources_canvas_id_name_key UNIQUE (canvas_id, name);
 
 
 --
@@ -291,11 +288,11 @@ ALTER TABLE ONLY public.stage_executions
 
 
 --
--- Name: stages stages_organization_id_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: stages stages_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stages
-    ADD CONSTRAINT stages_organization_id_canvas_id_name_key UNIQUE (organization_id, canvas_id, name);
+    ADD CONSTRAINT stages_canvas_id_name_key UNIQUE (canvas_id, name);
 
 
 --
@@ -304,13 +301,6 @@ ALTER TABLE ONLY public.stages
 
 ALTER TABLE ONLY public.stages
     ADD CONSTRAINT stages_pkey PRIMARY KEY (id);
-
-
---
--- Name: uix_canvases_orgs; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_canvases_orgs ON public.canvases USING btree (organization_id);
 
 
 --

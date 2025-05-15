@@ -20,12 +20,12 @@ import (
 )
 
 func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.CanvasId, req.RequesterId)
+	err := ValidateUUIDs(req.CanvasId, req.RequesterId)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.CanvasId, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
@@ -474,15 +474,14 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 	}
 
 	return &pb.Stage{
-		Id:             stage.ID.String(),
-		Name:           stage.Name,
-		OrganizationId: stage.OrganizationID.String(),
-		CanvasId:       stage.CanvasID.String(),
-		CreatedAt:      timestamppb.New(*stage.CreatedAt),
-		Conditions:     conditions,
-		Connections:    connections,
-		Use:            serializeTagUsageDefinition(stage.Use.Data()),
-		RunTemplate:    runTemplate,
+		Id:          stage.ID.String(),
+		Name:        stage.Name,
+		CanvasId:    stage.CanvasID.String(),
+		CreatedAt:   timestamppb.New(*stage.CreatedAt),
+		Conditions:  conditions,
+		Connections: connections,
+		Use:         serializeTagUsageDefinition(stage.Use.Data()),
+		RunTemplate: runTemplate,
 	}, nil
 }
 

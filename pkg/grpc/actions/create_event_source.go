@@ -17,12 +17,12 @@ import (
 )
 
 func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.CanvasId)
+	err := ValidateUUIDs(req.CanvasId)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.CanvasId, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
@@ -66,11 +66,10 @@ func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *
 
 func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 	return &pb.EventSource{
-		Id:             eventSource.ID.String(),
-		Name:           eventSource.Name,
-		OrganizationId: eventSource.OrganizationID.String(),
-		CanvasId:       eventSource.CanvasID.String(),
-		CreatedAt:      timestamppb.New(*eventSource.CreatedAt),
+		Id:        eventSource.ID.String(),
+		Name:      eventSource.Name,
+		CanvasId:  eventSource.CanvasID.String(),
+		CreatedAt: timestamppb.New(*eventSource.CreatedAt),
 	}
 }
 

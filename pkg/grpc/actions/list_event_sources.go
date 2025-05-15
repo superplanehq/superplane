@@ -8,12 +8,12 @@ import (
 )
 
 func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	err := ValidateUUIDs(req.OrganizationId, req.CanvasId)
+	err := ValidateUUIDs(req.CanvasId)
 	if err != nil {
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvasByID(req.CanvasId, req.OrganizationId)
+	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, err
 	}

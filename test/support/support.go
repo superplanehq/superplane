@@ -14,7 +14,6 @@ import (
 )
 
 type ResourceRegistry struct {
-	Org              uuid.UUID
 	User             uuid.UUID
 	Canvas           *models.Canvas
 	Source           *models.EventSource
@@ -47,12 +46,11 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
 	r := ResourceRegistry{
-		Org:  uuid.New(),
 		User: uuid.New(),
 	}
 
 	var err error
-	r.Canvas, err = models.CreateCanvas(r.Org, r.User, "test")
+	r.Canvas, err = models.CreateCanvas(r.User, "test")
 	require.NoError(t, err)
 
 	if options.Source {
