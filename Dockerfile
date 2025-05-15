@@ -61,7 +61,7 @@ CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
 FROM base AS builder
 
-RUN rm -rf build && go build -o build/${APP_NAME} cmd/main.go
+RUN rm -rf build && go build -tags embed -o build/${APP_NAME} cmd/main.go
 
 FROM ${RUNNER_IMAGE} AS runner
 
