@@ -55,23 +55,11 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 
 	validEvent := []byte(`{"action": "created"}`)
 	validSignature := "sha256=ee9f99fa8d06b44ffc69ee1c2a7e32e848e8b40536bb5e8405dabb3bbbcaf619"
-	validURL := "/sources/" + eventSource.ID.String() + "/github"
 
-	t.Run("missing organization header -> 404", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method: "POST",
-			path:   validURL,
-			orgID:  "",
-		})
-
-		require.Equal(t, 404, response.Code)
-	})
-
-	t.Run("invalid organization header -> 404", func(t *testing.T) {
+	t.Run("invalid organization ID -> 404", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       "not-a-uuid",
+			path:        generateSourcesUrl("not-a-uuid", eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -81,11 +69,9 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	})
 
 	t.Run("event for invalid source -> 404", func(t *testing.T) {
-		invalidURL := "/sources/invalidsource/github"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), "not-a-uuid", "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -98,8 +84,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "",
@@ -111,8 +96,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/x-www-form-urlencoded",
@@ -122,11 +106,9 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	})
 
 	t.Run("event for source that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/sources/" + uuid.New().String() + "/github"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), uuid.New().String(), "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -139,8 +121,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("event with missing signature header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   "",
 			contentType: "application/json",
@@ -153,8 +134,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("invalid signature -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   "sha256=823a7b73b066321f4f644e70e1d32c15dc8f4677968149c1f35eb07639013271",
 			contentType: "application/json",
@@ -167,8 +147,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("properly signed event is received -> 200", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -187,8 +166,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	t.Run("event data is limited to 64k", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "github"),
 			body:        generateBigBody(t),
 			signature:   validSignature,
 			contentType: "application/json",
@@ -223,26 +201,10 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	validSignatureBytes := mac.Sum(nil)
 	validSignature := "sha256=" + hex.EncodeToString(validSignatureBytes)
 
-	validURL := "/sources/" + eventSource.ID.String() + "/semaphore"
-
-	t.Run("missing organization header -> 404", func(t *testing.T) {
+	t.Run("invalid organization ID -> 404", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       "",
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		require.Equal(t, 404, response.Code)
-	})
-
-	t.Run("invalid organization header -> 404", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			orgID:       "not-a-uuid",
+			path:        generateSourcesUrl("not-a-uuid", eventSource.ID.String(), "semaphore"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -252,11 +214,9 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	})
 
 	t.Run("event for invalid source -> 404", func(t *testing.T) {
-		invalidURL := "/sources/invalidsource/semaphore"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), "invalidsource", "semaphore"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -269,8 +229,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:    "POST",
-			path:      validURL,
-			orgID:     orgID.String(),
+			path:      generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:      validEvent,
 			signature: validSignature,
 		})
@@ -281,8 +240,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/x-www-form-urlencoded",
@@ -292,11 +250,9 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	})
 
 	t.Run("event for source that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/sources/" + uuid.New().String() + "/semaphore"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), uuid.New().String(), "semaphore"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -309,8 +265,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("event with missing signature header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:        validEvent,
 			contentType: "application/json",
 		})
@@ -322,8 +277,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("invalid signature -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:        validEvent,
 			signature:   "sha256=invalid-signature",
 			contentType: "application/json",
@@ -336,8 +290,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("properly signed event is received -> 200", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
@@ -367,8 +320,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("event data is limited to 64k", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       orgID.String(),
+			path:        generateSourcesUrl(orgID.String(), eventSource.ID.String(), "semaphore"),
 			body:        generateBigBody(t),
 			signature:   validSignature,
 			contentType: "application/json",
@@ -387,29 +339,14 @@ func Test__HandleExecutionTags(t *testing.T) {
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, r.Stage)
-	validURL := "/executions/" + execution.ID.String() + "/tags"
 	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
 	tags := []byte(`{"version":"1.0.0","sha":"078fc8755c051"}`)
 
-	t.Run("missing organization header -> 404", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			orgID:       "",
-			body:        tags,
-			contentType: "application/json",
-			authToken:   validToken,
-		})
-
-		require.Equal(t, 404, response.Code)
-	})
-
 	t.Run("invalid organization header -> 404", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       "not-a-uuid",
+			path:        generateExecutionTagsUrl("not-a-uuid", execution.ID.String()),
 			body:        tags,
 			contentType: "application/json",
 			authToken:   validToken,
@@ -419,11 +356,9 @@ func Test__HandleExecutionTags(t *testing.T) {
 	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		invalidURL := "/executions/invalidsource/tags"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), "invalidsource"),
 			body:        tags,
 			authToken:   validToken,
 			contentType: "application/json",
@@ -436,8 +371,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        tags,
 			contentType: "",
 			authToken:   validToken,
@@ -449,8 +383,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        tags,
 			contentType: "application/x-www-form-urlencoded",
 			authToken:   validToken,
@@ -460,11 +393,9 @@ func Test__HandleExecutionTags(t *testing.T) {
 	})
 
 	t.Run("event for execution that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/executions/" + uuid.New().String() + "/tags"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), uuid.New().String()),
 			body:        tags,
 			contentType: "application/json",
 			authToken:   validToken,
@@ -477,10 +408,8 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        tags,
-			signature:   "",
 			authToken:   "",
 			contentType: "application/json",
 		})
@@ -492,8 +421,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        tags,
 			authToken:   "invalid",
 			contentType: "application/json",
@@ -506,8 +434,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("proper request -> 200 and tags are saved in execution", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        tags,
 			authToken:   validToken,
 			contentType: "application/json",
@@ -522,8 +449,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("tags are limited to 4k", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			orgID:       r.Org.String(),
+			path:        generateExecutionTagsUrl(r.Org.String(), execution.ID.String()),
 			body:        generateBigBody(t),
 			authToken:   validToken,
 			contentType: "application/json",
@@ -659,7 +585,6 @@ func checkSwaggerFiles(t *testing.T) {
 type requestParams struct {
 	method      string
 	path        string
-	orgID       string
 	body        []byte
 	signature   string
 	authToken   string
@@ -671,10 +596,6 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 
 	if params.contentType != "" {
 		req.Header.Add("Content-Type", params.contentType)
-	}
-
-	if params.orgID != "" {
-		req.Header.Add("x-semaphore-org-id", params.orgID)
 	}
 
 	// Set the appropriate signature header based on the path
@@ -696,6 +617,14 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 	res := httptest.NewRecorder()
 	server.Router.ServeHTTP(res, req)
 	return res
+}
+
+func generateSourcesUrl(orgID string, sourceID string, suffix string) string {
+	return "/" + orgID + "/sources/" + sourceID + "/" + suffix
+}
+
+func generateExecutionTagsUrl(orgID string, executionID string) string {
+	return "/" + orgID + "/executions/" + executionID + "/tags"
 }
 
 func generateBigBody(t *testing.T) []byte {

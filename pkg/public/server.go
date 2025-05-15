@@ -128,17 +128,17 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	authenticatedRoute := r.Methods(http.MethodPost).Subrouter()
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
+		HandleFunc(s.BasePath+"/{orgID}/sources/{sourceID}/github", s.HandleGithubWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
+		HandleFunc(s.BasePath+"/{orgID}/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/executions/{executionID}/tags", s.HandleExecutionTags).
+		HandleFunc(s.BasePath+"/{orgID}/executions/{executionID}/tags", s.HandleExecutionTags).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -183,6 +183,14 @@ func (s *Server) Close() {
 
 func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+
+	_, ok := r.Context().Value(orgIDKey).(uuid.UUID)
+
+	if !ok {
+		http.Error(w, "organization ID not found", http.StatusNotFound)
+		return
+	}
+
 	executionID, err := uuid.Parse(vars["executionID"])
 	if err != nil {
 		http.Error(w, "execution not found", http.StatusNotFound)
@@ -243,8 +251,12 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.Context().Value(orgIDKey).(uuid.UUID)
+	organizationID, ok := r.Context().Value(orgIDKey).(uuid.UUID)
 
+	if !ok {
+		http.Error(w, "organization ID not found", http.StatusNotFound)
+		return
+	}
 	//
 	// Any verification that happens here must be quick
 	// so we always respond with a 200 OK to the event origin.
@@ -329,7 +341,12 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
-	organizationID := r.Context().Value(orgIDKey).(uuid.UUID)
+	organizationID, ok := r.Context().Value(orgIDKey).(uuid.UUID)
+
+	if !ok {
+		http.Error(w, "organization ID not found", http.StatusNotFound)
+		return
+	}
 
 	//
 	// Any verification that happens here must be quick

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
 )
 
 type contextKey string
@@ -13,9 +14,10 @@ var orgIDKey contextKey = "org-id"
 
 func OrganizationMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		orgID := r.Header.Get("x-semaphore-org-id")
+		vars := mux.Vars(r)
+		orgID := vars["orgID"]
+
 		if orgID == "" {
-			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 
