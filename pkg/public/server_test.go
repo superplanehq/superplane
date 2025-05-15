@@ -619,11 +619,11 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 	return res
 }
 
-func generateSourcesUrl(orgID string, sourceID string, suffix string) string {
+func generateSourcesURL(orgID string, sourceID string, suffix string) string {
 	return "/" + orgID + "/sources/" + sourceID + "/" + suffix
 }
 
-func generateExecutionTagsUrl(orgID string, executionID string) string {
+func generateExecutionTagsURL(orgID string, executionID string) string {
 	return "/" + orgID + "/executions/" + executionID + "/tags"
 }
 
