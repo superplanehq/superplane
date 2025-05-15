@@ -5,22 +5,22 @@ APP_ENV=prod
 PLATFORM=linux/arm64
 
 test.setup: openapi.spec.gen
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose build
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose run --rm app go get ./...
+	docker-compose build
+	docker-compose run --rm app go get ./...
 	-$(MAKE) db.test.create
 	$(MAKE) db.migrate
 
 lint:
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
+	docker-compose run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
 test:
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
+	docker-compose run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
 
 test.watch:
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
+	docker-compose run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
 
 tidy:
-	DOCKER_DEFAULT_PLATFORM=$(PLATFORM) docker-compose run --rm app go mod tidy
+	docker-compose run --rm app go mod tidy
 
 #
 # Database
@@ -58,8 +58,8 @@ db.test.delete:
 MODULES := superplane
 REST_API_MODULES := superplane
 pb.gen:
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	docker-compose run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	docker-compose run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 
 openapi.spec.gen:
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
