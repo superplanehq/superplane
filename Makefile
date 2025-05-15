@@ -62,3 +62,12 @@ pb.gen:
 	git clone git@github.com:renderedtext/internal_api.git $(TMP_REPO_DIR) && (cd $(TMP_REPO_DIR) && git checkout $(INTERNAL_API_BRANCH) && cd -)
 	docker-compose run --rm --no-deps app /app/scripts/protoc.sh $(INTERNAL_API_MODULES) $(INTERNAL_API_BRANCH) $(TMP_REPO_DIR)
 	rm -rf $(TMP_REPO_DIR)
+
+
+dev.setup: db.test.create db.migrate
+
+dev.console: dev.setup
+	docker compose run --rm app /bin/bash 
+
+dev.server: dev.setup
+	docker compose run --rm app air 

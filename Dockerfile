@@ -42,6 +42,7 @@ RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.1
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN go install github.com/air-verse/air@latest
 
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
