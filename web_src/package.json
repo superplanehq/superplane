@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "clean": "rm -rf ../dist",
+    "build": "tsc -b && vite build --base=/app",
+    "clean": "rm -rf ../pkg/web/assets/dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },

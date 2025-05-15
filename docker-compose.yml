@@ -16,6 +16,13 @@ services:
       APPLICATION_NAME: "superplane"
       DB_PASSWORD: "the-cake-is-a-lie"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+    
+    ports:
+      - 4000:4000
+      - 5173:5173
+      - 4173:4173
+      - 8000:8000
+      - 50051:50051
 
     links:
       - db:db

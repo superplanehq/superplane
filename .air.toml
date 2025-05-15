@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 
 [build]
   args_bin = []
-  bin = "./tmp/main"
+  bin = ";export $(grep -v '^#' .env | xargs); ./tmp/main"
   cmd = "go build -o ./tmp/main cmd/main.go"
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "web_src", "pkg/web/assets"]
@@ -12,14 +12,13 @@ tmp_dir = "tmp"
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = ""
   include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
   include_file = []
   kill_delay = "0s"
   log = "build-errors.log"
-  poll = false
-  poll_interval = 0
+  poll = true
+  poll_interval = 100
   post_cmd = []
   pre_cmd = []
   rerun = false

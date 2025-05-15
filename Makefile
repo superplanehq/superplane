@@ -67,7 +67,7 @@ pb.gen:
 dev.setup: db.test.create db.migrate
 
 dev.console: dev.setup
-	docker compose run --rm app /bin/bash 
+	docker compose run --rm --service-ports app /bin/bash 
 
 dev.server: dev.setup
-	docker compose run --rm app air 
+	docker compose run --rm --service-ports app air 

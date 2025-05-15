@@ -13,6 +13,12 @@ RUN echo "Build of $APP_NAME started"
 RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl postgresql-client libc-bin libc6 \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
+# Install Node.js and npm
+RUN apt-get update -y && apt-get install --no-install-recommends -y \
+    nodejs \
+    npm \
+    && apt-get clean && rm -f /var/lib/apt/lists/*_*
+
 WORKDIR /tmp
 RUN curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz && \
     mv /tmp/migrate /usr/bin/migrate && \
@@ -25,6 +31,7 @@ COPY go.mod go.mod
 COPY go.sum go.sum
 COPY db/migrations /app/db/migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY web_src web_src
 
 WORKDIR /app
 
@@ -43,6 +50,12 @@ RUN go install gotest.tools/gotestsum@v1.12.1
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/air-verse/air@latest
+
+WORKDIR /app/web_src
+RUN npm install
+RUN npm run build
+
+WORKDIR /app
 
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
@@ -73,6 +86,7 @@ COPY --from=builder --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
 COPY --from=builder --chown=nobody:root /app/build/${APP_NAME} /app/build/${APP_NAME}
 COPY --from=builder --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --from=builder --chown=nobody:root /app/db/migrations /app/db/migrations
+COPY --from=builder --chown=nobody:root /app/web/assets/dist /app/web/assets/dist
 
 USER nobody
 
