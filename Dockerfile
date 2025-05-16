@@ -10,7 +10,12 @@ ENV APP_NAME=${APP_NAME}
 
 RUN echo "Build of $APP_NAME started"
 
-RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl postgresql-client libc-bin libc6 \
+# Add PostgreSQL repository for version 17.5
+RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl gnupg lsb-release libc-bin libc6 \
+    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
+    && apt-get update -y \
+    && apt-get install --no-install-recommends -y postgresql-client-17 \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # Install Node.js 22.4.1 directly from NodeSource repository
@@ -84,7 +89,12 @@ FROM ${RUNNER_IMAGE} AS runner
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
-RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates postgresql-client \
+# Install PostgreSQL 17.5 client tools
+RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates gnupg lsb-release \
+    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg \
+    && apt-get update -y \
+    && apt-get install --no-install-recommends -y postgresql-client-17 \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
 # We don't need Docker health checks, since these containers

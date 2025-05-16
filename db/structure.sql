@@ -1,8 +1,8 @@
 --
 -- PostgreSQL database dump
 --
--- Dumped from database version 9.6.24
--- Dumped by pg_dump version 15.12 (Debian 15.12-0+deb12u2)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg120+1)
 SET
     statement_timeout = 0;
 
@@ -11,6 +11,9 @@ SET
 
 SET
     idle_in_transaction_session_timeout = 0;
+
+SET
+    transaction_timeout = 0;
 
 SET
     client_encoding = 'UTF8';
@@ -34,10 +37,6 @@ SET
     row_security = off;
 
 --
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
--- *not* creating schema, since initdb creates it
---
 -- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
 --
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
@@ -50,11 +49,15 @@ COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UU
 SET
     default_tablespace = '';
 
+SET
+    default_table_access_method = heap;
+
 --
 -- Name: canvases; Type: TABLE; Schema: public; Owner: -
 --
 CREATE TABLE public.canvases (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
@@ -66,6 +69,7 @@ CREATE TABLE public.canvases (
 --
 CREATE TABLE public.event_sources (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
@@ -166,6 +170,7 @@ CREATE TABLE public.stage_executions (
 CREATE TABLE public.stages (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(128) NOT NULL,
+    organization_id uuid NOT NULL,
     canvas_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
@@ -175,12 +180,12 @@ CREATE TABLE public.stages (
 );
 
 --
--- Name: canvases canvases_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: canvases canvases_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 ALTER TABLE
     ONLY public.canvases
 ADD
-    CONSTRAINT canvases_name_key UNIQUE (name);
+    CONSTRAINT canvases_organization_id_name_key UNIQUE (organization_id, name);
 
 --
 -- Name: canvases canvases_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -191,12 +196,12 @@ ADD
     CONSTRAINT canvases_pkey PRIMARY KEY (id);
 
 --
--- Name: event_sources event_sources_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: event_sources event_sources_organization_id_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 ALTER TABLE
     ONLY public.event_sources
 ADD
-    CONSTRAINT event_sources_canvas_id_name_key UNIQUE (canvas_id, name);
+    CONSTRAINT event_sources_organization_id_canvas_id_name_key UNIQUE (organization_id, canvas_id, name);
 
 --
 -- Name: event_sources event_sources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -279,12 +284,12 @@ ADD
     CONSTRAINT stage_executions_pkey PRIMARY KEY (id);
 
 --
--- Name: stages stages_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: stages stages_organization_id_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 ALTER TABLE
     ONLY public.stages
 ADD
-    CONSTRAINT stages_canvas_id_name_key UNIQUE (canvas_id, name);
+    CONSTRAINT stages_organization_id_canvas_id_name_key UNIQUE (organization_id, canvas_id, name);
 
 --
 -- Name: stages stages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
@@ -293,6 +298,11 @@ ALTER TABLE
     ONLY public.stages
 ADD
     CONSTRAINT stages_pkey PRIMARY KEY (id);
+
+--
+-- Name: uix_canvases_orgs; Type: INDEX; Schema: public; Owner: -
+--
+CREATE INDEX uix_canvases_orgs ON public.canvases USING btree (organization_id);
 
 --
 -- Name: uix_event_sources_canvas; Type: INDEX; Schema: public; Owner: -
@@ -409,8 +419,8 @@ ADD
 --
 -- PostgreSQL database dump
 --
--- Dumped from database version 9.6.24
--- Dumped by pg_dump version 15.12 (Debian 15.12-0+deb12u2)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
+-- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg120+1)
 SET
     statement_timeout = 0;
 
@@ -419,6 +429,9 @@ SET
 
 SET
     idle_in_transaction_session_timeout = 0;
+
+SET
+    transaction_timeout = 0;
 
 SET
     client_encoding = 'UTF8';

@@ -58,15 +58,14 @@ services:
     environment:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
   
-  pgadmin:
-    image: dpage/pgadmin4
+  pgweb:
+    image: sosedoff/pgweb
     environment:
-      PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
-      PGADMIN_DEFAULT_PASSWORD: "the-cake-is-a-lie"
+      DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane?sslmode=disable"
     ports:
-      - 5050:80
+      - 8081:8081
     links:
-      - db:postgres
+      - db:db
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
