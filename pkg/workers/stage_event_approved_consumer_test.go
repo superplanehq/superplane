@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/protos/delivery"
+	"github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test__StageEventApprovedConsumer(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Stage: true, Grpc: true, Approvals: 2,
+		Source: true, Stage: true, Approvals: 2,
 	})
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
@@ -38,7 +38,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event once
 	//
-	_, err := actions.ApproveStageEvent(context.Background(), &delivery.ApproveStageEventRequest{
+	_, err := actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		OrganizationId: r.Org.String(),
 		CanvasId:       r.Canvas.ID.String(),
 		StageId:        r.Stage.ID.String(),
@@ -60,7 +60,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event again
 	//
-	_, err = actions.ApproveStageEvent(context.Background(), &delivery.ApproveStageEventRequest{
+	_, err = actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		OrganizationId: r.Org.String(),
 		CanvasId:       r.Canvas.ID.String(),
 		StageId:        r.Stage.ID.String(),

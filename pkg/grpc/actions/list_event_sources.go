@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/delivery"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 )
 
 func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {

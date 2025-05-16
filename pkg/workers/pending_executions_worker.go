@@ -2,29 +2,23 @@ package workers
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/resolver"
-	"google.golang.org/genproto/googleapis/rpc/code"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	schedulerproto "github.com/superplanehq/superplane/pkg/protos/periodic_scheduler"
-	wfproto "github.com/superplanehq/superplane/pkg/protos/plumber_w_f.workflow"
-	repoproxyproto "github.com/superplanehq/superplane/pkg/protos/repo_proxy"
 )
 
 type PendingExecutionsWorker struct {
-	RepoProxyURL string
-	SchedulerURL string
-	JwtSigner    *jwt.Signer
+	JwtSigner *jwt.Signer
+	Encryptor encryptor.Encryptor
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -39,7 +33,7 @@ func (w *PendingExecutionsWorker) Start() {
 }
 
 func (w *PendingExecutionsWorker) Tick() error {
-	executions, err := models.ListPendingStageExecutions()
+	executions, err := models.ListStageExecutionsInState(models.StageExecutionPending)
 	if err != nil {
 		return fmt.Errorf("error listing pending stage executions: %v", err)
 	}
@@ -94,96 +88,67 @@ func (w *PendingExecutionsWorker) StartExecution(logger *log.Entry, stage *model
 	switch template.Type {
 	case models.RunTemplateTypeSemaphore:
 		//
-		// If a task ID is specified, we trigger a task instead of a plain workflow.
+		// For now, only task runs are supported,
+		// until the workflow API is updated to support parameters.
 		//
-		if template.Semaphore.TaskID != "" {
-			return w.TriggerSemaphoreTask(logger, stage, execution, template.Semaphore)
+		if template.Semaphore.TaskID == "" {
+			return "", fmt.Errorf("only task runs are supported")
 		}
 
-		return w.StartPlainWorkflow(logger, stage, template.Semaphore)
+		return w.TriggerSemaphoreTask(logger, stage, execution, template.Semaphore)
 	default:
 		return "", fmt.Errorf("unknown run template type")
 	}
 }
 
 func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage *models.Stage, execution models.StageExecution, template *models.SemaphoreRunTemplate) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.NewClient(w.SchedulerURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	api, err := w.newSemaphoreAPI(template)
 	if err != nil {
-		return "", fmt.Errorf("error connecting to task API: %v", err)
+		return "", err
 	}
-
-	defer conn.Close()
-
-	// TODO: call RBAC API to check if s.CreatedBy can create workflow
 
 	parameters, err := w.buildParameters(execution, template.Parameters)
 	if err != nil {
 		return "", fmt.Errorf("error building parameters: %v", err)
 	}
 
-	client := schedulerproto.NewPeriodicServiceClient(conn)
-	res, err := client.RunNow(ctx, &schedulerproto.RunNowRequest{
-		Id:              template.TaskID,
-		Requester:       stage.CreatedBy.String(),
-		Branch:          template.Branch,
-		PipelineFile:    template.PipelineFile,
-		ParameterValues: parameters,
+	workflowID, err := api.TriggerTask(template.ProjectID, template.TaskID, semaphore.TaskTriggerSpec{
+		Branch:       template.Branch,
+		PipelineFile: template.PipelineFile,
+		Parameters:   parameters,
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("error calling task API: %v", err)
+		return "", err
 	}
 
-	if res.Status.Code != code.Code_OK {
-		return "", fmt.Errorf("task API returned %v: %s", res.Status.Code, res.Status.Message)
-	}
-
-	logger.Infof("Semaphore task triggered - workflow=%s", res.Trigger.ScheduledWorkflowId)
-	return res.Trigger.ScheduledWorkflowId, nil
+	logger.Infof("Semaphore task triggered - workflow=%s", workflowID)
+	return workflowID, nil
 }
 
-func (w *PendingExecutionsWorker) StartPlainWorkflow(logger *log.Entry, stage *models.Stage, template *models.SemaphoreRunTemplate) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	conn, err := grpc.NewClient(w.RepoProxyURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func (w *PendingExecutionsWorker) newSemaphoreAPI(template *models.SemaphoreRunTemplate) (*semaphore.Semaphore, error) {
+	token, err := base64.StdEncoding.DecodeString(template.APIToken)
 	if err != nil {
-		return "", fmt.Errorf("error connecting to repo proxy API: %v", err)
+		return nil, err
 	}
 
-	defer conn.Close()
-
-	// TODO: call RBAC API to check if s.CreatedBy can create workflow
-
-	client := repoproxyproto.NewRepoProxyServiceClient(conn)
-	res, err := client.Create(ctx, &repoproxyproto.CreateRequest{
-		ProjectId:      template.ProjectID,
-		RequestToken:   uuid.New().String(),
-		RequesterId:    stage.CreatedBy.String(),
-		DefinitionFile: template.PipelineFile,
-		TriggeredBy:    wfproto.TriggeredBy_API,
-		Git: &repoproxyproto.CreateRequest_Git{
-			Reference: "refs/heads/" + template.Branch,
-		},
-	})
-
+	t, err := w.Encryptor.Decrypt(context.Background(), token, []byte(template.OrganizationURL))
 	if err != nil {
-		return "", fmt.Errorf("error calling repo proxy API: %v", err)
+		return nil, err
 	}
 
-	logger.Infof("Semaphore workflow created: workflow=%s", res.WorkflowId)
-	return res.WorkflowId, nil
+	return semaphore.NewSemaphoreAPI(template.OrganizationURL, string(t)), nil
 }
 
-func (w *PendingExecutionsWorker) buildParameters(execution models.StageExecution, parameters map[string]string) ([]*schedulerproto.ParameterValue, error) {
-	//
-	// Aside from the parameters specified in the run template,
-	// we also need to include the token for the execution to push extra tags.
-	//
-	parameterValues := []*schedulerproto.ParameterValue{
+// TODO
+// How should we pass these SEMAPHORE_* parameters to the job?
+// SEMAPHORE_STAGE_ID and SEMAPHORE_STAGE_EXECUTION_ID are not sensitive values,
+// but currently, if the task does not define a parameter, it is ignored.
+//
+// Additionally, SEMAPHORE_STAGE_EXECUTION_TOKEN is sensitive,
+// so if we pass it here, it will be visible in UI / API responses.
+func (w *PendingExecutionsWorker) buildParameters(execution models.StageExecution, parameters map[string]string) ([]semaphore.TaskTriggerParameter, error) {
+	parameterValues := []semaphore.TaskTriggerParameter{
 		{Name: "SEMAPHORE_STAGE_ID", Value: execution.StageID.String()},
 		{Name: "SEMAPHORE_STAGE_EXECUTION_ID", Value: execution.ID.String()},
 	}
@@ -193,18 +158,13 @@ func (w *PendingExecutionsWorker) buildParameters(execution models.StageExecutio
 		return nil, fmt.Errorf("error generating tags token: %v", err)
 	}
 
-	//
-	// TODO: this is a sensitive value, so we can't display it in the UI.
-	// We'd need to update plumber to support sensitive parameters if we are gonna do it this way.
-	// Otherwise, we'd need to expose these values from zebra.
-	//
-	parameterValues = append(parameterValues, &schedulerproto.ParameterValue{
+	parameterValues = append(parameterValues, semaphore.TaskTriggerParameter{
 		Name:  "SEMAPHORE_STAGE_EXECUTION_TOKEN",
 		Value: token,
 	})
 
 	for key, value := range parameters {
-		parameterValues = append(parameterValues, &schedulerproto.ParameterValue{
+		parameterValues = append(parameterValues, semaphore.TaskTriggerParameter{
 			Name:  key,
 			Value: value,
 		})

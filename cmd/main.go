@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
-func startWorkers(jwtSigner *jwt.Signer) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor encryptor.Encryptor) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -54,37 +54,17 @@ func startWorkers(jwtSigner *jwt.Signer) {
 		go w.Start()
 	}
 
-	if os.Getenv("START_PIPELINE_DONE_CONSUMER") == "yes" {
-		log.Println("Starting Pipeline Done Consumer")
+	if os.Getenv("START_EXECUTIONS_POLLER") == "yes" {
+		log.Println("Starting Executions Poller")
 
-		pipelineAPIURL, err := config.PipelineAPIURL()
-		if err != nil {
-			panic(err)
-		}
-
-		w := workers.NewPipelineDoneConsumer(rabbitMQURL, pipelineAPIURL)
+		w := workers.NewExecutionPoller(encryptor)
 		go w.Start()
 	}
 
 	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {
 		log.Println("Starting Pending Stage Events Worker")
 
-		repoProxyURL, err := config.RepoProxyURL()
-		if err != nil {
-			panic(err)
-		}
-
-		schedulerURL, err := config.SchedulerAPIURL()
-		if err != nil {
-			panic(err)
-		}
-
-		w := workers.PendingExecutionsWorker{
-			RepoProxyURL: repoProxyURL,
-			SchedulerURL: schedulerURL,
-			JwtSigner:    jwtSigner,
-		}
-
+		w := workers.PendingExecutionsWorker{JwtSigner: jwtSigner, Encryptor: encryptor}
 		go w.Start()
 	}
 }
@@ -105,6 +85,22 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	server, err := public.NewServer(encryptor, jwtSigner, basePath)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
+	}
+
+	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
+		log.Println("Adding gRPC Gateway to Public API")
+
+		grpcServerAddr := os.Getenv("GRPC_SERVER_ADDR")
+		if grpcServerAddr == "" {
+			grpcServerAddr = "localhost:50051"
+		}
+
+		err := server.RegisterGRPCGateway(grpcServerAddr)
+		if err != nil {
+			log.Fatalf("Failed to register gRPC gateway: %v", err)
+		}
+
+		server.RegisterOpenAPIHandler()
 	}
 
 	err = server.Serve("0.0.0.0", 8000)
@@ -161,7 +157,7 @@ func main() {
 		go startWebServer()
 	}
 
-	startWorkers(jwtSigner)
+	startWorkers(jwtSigner, encryptor)
 
 	log.Println("Superplane is UP.")
 

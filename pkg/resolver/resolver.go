@@ -71,11 +71,13 @@ func (r *Resolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
 	return &models.RunTemplate{
 		Type: models.RunTemplateTypeSemaphore,
 		Semaphore: &models.SemaphoreRunTemplate{
-			ProjectID:    projectID,
-			Branch:       branch,
-			PipelineFile: pipelineFile,
-			TaskID:       taskID,
-			Parameters:   parameters,
+			OrganizationURL: t.OrganizationURL,
+			APIToken:        t.APIToken,
+			ProjectID:       projectID,
+			Branch:          branch,
+			PipelineFile:    pipelineFile,
+			TaskID:          taskID,
+			Parameters:      parameters,
 		},
 	}, nil
 }

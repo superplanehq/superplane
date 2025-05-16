@@ -1,5 +1,4 @@
 services:
-
   app:
     build:
       context: .
@@ -8,6 +7,7 @@ services:
 
     tty: true
 
+    command: go run cmd/main.go
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
@@ -16,7 +16,19 @@ services:
       APPLICATION_NAME: "superplane"
       DB_PASSWORD: "the-cake-is-a-lie"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
-    
+      SWAGGER_BASE_PATH: "/app/api/swagger"
+      START_PUBLIC_API: "yes"
+      START_INTERNAL_API: "yes"
+      START_PENDING_EVENTS_WORKER: "yes"
+      START_PENDING_STAGE_EVENTS_WORKER: "yes"
+      START_TIME_WINDOW_WORKER: "yes"
+      START_STAGE_EVENT_APPROVED_CONSUMER: "yes"
+      START_EXECUTIONS_POLLER: "yes"
+      START_PENDING_EXECUTIONS_WORKER: "yes"
+      PUBLIC_API_BASE_PATH: /api/v1
+      ENCRYPTION_KEY: dev
+      JWT_SECRET: dev
+
     ports:
       - 4000:4000
       - 5173:5173
@@ -41,7 +53,7 @@ services:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
-    container_name: 'rabbitmq'
+    container_name: "rabbitmq"
     ports:
       - 5672:5672
       - 15672:15672

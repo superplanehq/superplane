@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/protos/delivery"
+	"github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -35,8 +35,8 @@ func Test__UpdateTagState(t *testing.T) {
 
 	t.Run("missing tag name", func(t *testing.T) {
 		setup()
-		_, err := UpdateTagState(context.Background(), &delivery.UpdateTagStateRequest{
-			Tag: &delivery.Tag{},
+		_, err := UpdateTagState(context.Background(), &superplane.UpdateTagStateRequest{
+			Tag: &superplane.Tag{},
 		})
 
 		s, ok := status.FromError(err)
@@ -47,8 +47,8 @@ func Test__UpdateTagState(t *testing.T) {
 
 	t.Run("missing tag value", func(t *testing.T) {
 		setup()
-		_, err := UpdateTagState(context.Background(), &delivery.UpdateTagStateRequest{
-			Tag: &delivery.Tag{Name: "VERSION"},
+		_, err := UpdateTagState(context.Background(), &superplane.UpdateTagStateRequest{
+			Tag: &superplane.Tag{Name: "VERSION"},
 		})
 
 		s, ok := status.FromError(err)
@@ -65,11 +65,11 @@ func Test__UpdateTagState(t *testing.T) {
 			events[0].UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonUnhealthy),
 		)
 
-		res, err := UpdateTagState(context.Background(), &delivery.UpdateTagStateRequest{
-			Tag: &delivery.Tag{
+		res, err := UpdateTagState(context.Background(), &superplane.UpdateTagStateRequest{
+			Tag: &superplane.Tag{
 				Name:  "VERSION",
 				Value: "v1",
-				State: delivery.Tag_TAG_STATE_HEALTHY,
+				State: superplane.Tag_TAG_STATE_HEALTHY,
 			},
 		})
 
@@ -117,11 +117,11 @@ func Test__UpdateTagState(t *testing.T) {
 
 	t.Run("tag is marked as unhealthy", func(t *testing.T) {
 		setup()
-		res, err := UpdateTagState(context.Background(), &delivery.UpdateTagStateRequest{
-			Tag: &delivery.Tag{
+		res, err := UpdateTagState(context.Background(), &superplane.UpdateTagStateRequest{
+			Tag: &superplane.Tag{
 				Name:  "VERSION",
 				Value: "v1",
-				State: delivery.Tag_TAG_STATE_UNHEALTHY,
+				State: superplane.Tag_TAG_STATE_UNHEALTHY,
 			},
 		})
 

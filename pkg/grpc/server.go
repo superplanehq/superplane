@@ -8,7 +8,7 @@ import (
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/encryptor"
-	protos "github.com/superplanehq/superplane/pkg/protos/delivery"
+	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 )
@@ -55,7 +55,7 @@ func RunServer(encryptor encryptor.Encryptor, port int) {
 	// Initialize services exposed by this server.
 	//
 	service := NewDeliveryService(encryptor)
-	protos.RegisterDeliveryServer(grpcServer, service)
+	protos.RegisterSuperplaneServer(grpcServer, service)
 
 	//
 	// Start handling incoming requests

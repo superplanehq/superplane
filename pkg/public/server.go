@@ -1,10 +1,12 @@
 package public
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -12,11 +14,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	grpcLib "google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -47,6 +53,70 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 	server.timeoutHandlerTimeout = 15 * time.Second
 	server.InitRouter(middlewares...)
 	return server, nil
+}
+
+func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
+	ctx := context.Background()
+
+	grpcGatewayMux := runtime.NewServeMux(
+		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
+			return key, true
+		}),
+	)
+
+	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
+
+	err := pb.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = grpcGatewayMux.HandlePath("GET", "/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// This is necessary because it is not possible to use the current router with
+	// runtime Mux. Runtime mux has no specification for the added paths and it the only
+	// supported tool for grpc-gateway.
+	s.Router.PathPrefix("/api/v1/canvases").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		grpcGatewayMux.ServeHTTP(w, r2)
+	}))
+
+	return nil
+}
+
+// RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
+func (s *Server) RegisterOpenAPIHandler() {
+	swaggerFilesPath := os.Getenv("SWAGGER_BASE_PATH")
+	if swaggerFilesPath == "" {
+		log.Errorf("SWAGGER_BASE_PATH is not set")
+		return
+	}
+
+	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) {
+		log.Errorf("API documentation directory %s does not exist", swaggerFilesPath)
+		return
+	}
+
+	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
+	})
+
+	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
+	})
+
+	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
+	log.Infof("Swagger UI available at %s", swaggerFilesPath)
+	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {

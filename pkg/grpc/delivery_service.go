@@ -5,7 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/delivery"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -37,7 +37,7 @@ func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.Descr
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return actions.CreateStage(ctx, req)
+	return actions.CreateStage(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {

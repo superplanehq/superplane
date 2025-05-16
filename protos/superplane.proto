@@ -1,0 +1,548 @@
+syntax = "proto3";
+
+package Superplane;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/superplane";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane API";
+    version: "1.0";
+    description: "API for the Superplane service";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Superplane {
+  rpc CreateCanvas(CreateCanvasRequest) returns (CreateCanvasResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas";
+      description: "Creates a new canvas with the given name and organization ID";
+      tags: "Canvas";
+    };
+  }
+  
+  rpc CreateEventSource(CreateEventSourceRequest) returns (CreateEventSourceResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/event-sources"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new event source";
+      description: "Creates a new event source for the specified canvas";
+      tags: "EventSource";
+    };
+  }
+  
+  rpc CreateStage(CreateStageRequest) returns (CreateStageResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/stages"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new stage";
+      description: "Creates a new stage for the specified canvas";
+      tags: "Stage";
+    };
+  }
+
+  rpc DescribeCanvas(DescribeCanvasRequest) returns (DescribeCanvasResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas details";
+      description: "Returns the details of a specific canvas";
+      tags: "Canvas";
+    };
+  }
+  
+  rpc DescribeStage(DescribeStageRequest) returns (DescribeStageResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/stages/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get stage details";
+      description: "Returns the details of a specific stage";
+      tags: "Stage";
+    };
+  }
+  
+  rpc DescribeEventSource(DescribeEventSourceRequest) returns (DescribeEventSourceResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/event-sources/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get event source details";
+      description: "Returns the details of a specific event source";
+      tags: "EventSource";
+    };
+  }
+
+  rpc ListStages(ListStagesRequest) returns (ListStagesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/stages"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List stages";
+      description: "Returns a list of all stages for the specified canvas";
+      tags: "Stage";
+    };
+  }
+  
+  rpc ListEventSources(ListEventSourcesRequest) returns (ListEventSourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/event-sources"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List event sources";
+      description: "Returns a list of all event sources for the specified canvas";
+      tags: "EventSource";
+    };
+  }
+  
+  rpc ListStageEvents(ListStageEventsRequest) returns (ListStageEventsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/stages/{stage_id}/events"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List stage events";
+      description: "Returns a list of events for the specified stage";
+      tags: "Event";
+    };
+  }
+
+  rpc UpdateStage(UpdateStageRequest) returns (UpdateStageResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id}/stages/{id}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a stage";
+      description: "Updates the specified stage";
+      tags: "Stage";
+    };
+  }
+  
+  rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/stages/{stage_id}/events/{event_id}/approve"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Approve a stage event";
+      description: "Approves the specified stage event";
+      tags: "Event";
+    };
+  }
+
+  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/tags"
+      additional_bindings {
+        get: "/api/v1/stages/{stage_id}/tags"
+      }
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List tags";
+      description: "Returns a list of tags, optionally filtered by stage";
+      tags: "Tag";
+    };
+  }
+  
+  rpc UpdateTagState(UpdateTagStateRequest) returns (UpdateTagStateResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/tags"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update tag state";
+      description: "Updates the state of the specified tag";
+      tags: "Tag";
+    };
+  }
+}
+
+message Canvas {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+  string created_by = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateCanvasRequest {
+  string name = 1;
+  string organization_id = 2;
+  string requester_id = 3;
+}
+
+message CreateCanvasResponse {
+  Canvas canvas = 1;
+}
+
+message DescribeCanvasRequest {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+}
+
+message DescribeCanvasResponse {
+  Canvas canvas = 1;
+}
+
+message EventSource {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+  string canvas_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message DescribeStageRequest {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+  string canvas_id = 4;
+}
+
+message DescribeStageResponse {
+  Stage stage = 1;
+}
+
+message CreateEventSourceRequest {
+  string name = 1;
+  string organization_id = 2;
+  string canvas_id = 3;
+  string requester_id = 4;
+}
+
+message CreateEventSourceResponse {
+  EventSource event_source = 1;
+  string key = 2;
+}
+
+message DescribeEventSourceRequest {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+  string canvas_id = 4;
+}
+
+message DescribeEventSourceResponse {
+  EventSource event_source = 1;
+}
+
+message Connection {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_EVENT_SOURCE = 1;
+    TYPE_STAGE = 2;
+  }
+
+  enum FilterType {
+    FILTER_TYPE_UNKNOWN = 0;
+    FILTER_TYPE_DATA = 1;
+    FILTER_TYPE_HEADER = 2;
+  }
+
+  message Filter {
+    FilterType type = 1;
+    DataFilter data = 2;
+    HeaderFilter header = 3;
+  }
+
+  message DataFilter {
+    string expression = 1;
+  }
+
+  message HeaderFilter {
+    string expression = 1;
+  }
+
+  //
+  // Filters can be combined in two ways:
+  //   - FILTER_OPERATOR_AND: all filters must be true (default)
+  //   - FILTER_OPERATOR_OR: at least one filter must be true
+  //
+  enum FilterOperator {
+    FILTER_OPERATOR_AND = 0;
+    FILTER_OPERATOR_OR = 1;
+  }
+
+  Type type = 1;
+  string name = 2;
+  repeated Filter filters = 3;
+  FilterOperator filter_operator = 4;
+}
+
+message Stage {
+  string id = 1;
+  string name = 2;
+  string organization_id = 3;
+  string canvas_id = 4;
+  google.protobuf.Timestamp created_at = 5;
+  repeated Connection connections = 6;
+  repeated Condition conditions = 7;
+  TagUsageDefinition use = 8;
+  RunTemplate run_template = 9;
+}
+
+message Condition {
+  enum Type {
+    CONDITION_TYPE_UNKNOWN = 0;
+    CONDITION_TYPE_APPROVAL = 1;
+    CONDITION_TYPE_TIME_WINDOW = 2;
+  }
+
+  Type type = 1;
+  ConditionApproval approval = 2;
+  ConditionTimeWindow time_window = 3;
+}
+
+message ConditionApproval {
+  uint32 count = 1;
+}
+
+message ConditionTimeWindow {
+  string start = 1;
+  string end = 2;
+  repeated string week_days = 3;
+}
+
+message CreateStageRequest {
+  string name = 1;
+  string organization_id = 2;
+  string canvas_id = 3;
+  string requester_id = 4;
+  repeated Connection connections = 5;
+  repeated Condition conditions = 6;
+  TagUsageDefinition use = 7;
+  RunTemplate run_template = 8;
+}
+
+message TagUsageDefinition {
+  repeated string from = 1;
+  repeated TagDefinition tags = 2;
+}
+
+message TagDefinition {
+  string name = 1;
+  string valueFrom = 2;
+}
+
+message RunTemplate {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_SEMAPHORE = 1;
+  }
+
+  Type type = 1;
+  SemaphoreRunTemplate semaphore = 2;
+}
+
+message SemaphoreRunTemplate {
+  string project_id = 1;
+  string branch = 2;
+  string pipeline_file = 3;
+  string task_id = 4;
+  map<string, string> parameters = 5;
+  string api_token = 6;
+  string organization_url = 7;
+}
+
+message CreateStageResponse {
+  Stage stage = 1;
+}
+
+message UpdateStageRequest {
+  string id = 1;
+  string canvas_id = 2; // Added for REST API path
+  repeated Connection connections = 3;
+  string requester_id = 4;
+}
+
+message UpdateStageResponse {
+  Stage stage = 1;
+}
+
+message ListStagesRequest {
+  string organization_id = 1;
+  string canvas_id = 2;
+}
+
+message ListStagesResponse {
+  repeated Stage stages = 1;
+}
+
+message ListEventSourcesRequest {
+  string organization_id = 1;
+  string canvas_id = 2;
+}
+
+message ListEventSourcesResponse {
+  repeated EventSource event_sources = 1;
+}
+
+message ListStageEventsRequest {
+  string stage_id = 1;
+  string organization_id = 2;
+  string canvas_id = 3;
+  repeated StageEvent.State states = 4;
+  repeated StageEvent.StateReason state_reasons = 5;
+}
+
+message ListStageEventsResponse {
+  repeated StageEvent events = 1;
+}
+
+message StageEvent {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_WAITING = 2;
+    STATE_PROCESSED = 4;
+  }
+
+  enum StateReason {
+    STATE_REASON_UNKNOWN = 0;
+    STATE_REASON_APPROVAL = 1;
+    STATE_REASON_TIME_WINDOW = 2;
+    STATE_REASON_EXECUTION = 3;
+    STATE_REASON_CONNECTION = 4;
+    STATE_REASON_CANCELLED = 5;
+    STATE_REASON_UNHEALTHY = 6;
+  }
+
+  string id = 1;
+  string source_id = 2;
+  Connection.Type source_type = 3;
+  State state = 4;
+  StateReason state_reason = 5;
+  google.protobuf.Timestamp created_at = 6;
+  repeated StageEventApproval approvals = 7;
+  repeated Tag tags = 8;
+}
+
+message ListTagsRequest {
+  string name = 1;
+  string value = 2;
+  repeated Tag.State states = 3;
+  string stage_id = 4;
+}
+
+message ListTagsResponse {
+  repeated StageTag tags = 1;
+}
+
+message StageTag {
+  string stage_id = 1;
+  StageEvent.State stage_event_state = 2;
+  Tag tag = 3;
+}
+
+message Tag {
+  enum State {
+    TAG_STATE_UNKNOWN = 0;
+    TAG_STATE_HEALTHY = 1;
+    TAG_STATE_UNHEALTHY = 2;
+  }
+
+  string name = 1;
+  string value = 2;
+  State state = 3;
+}
+
+message UpdateTagStateRequest {
+  Tag tag = 1;
+}
+
+message UpdateTagStateResponse {}
+
+message StageEventApproval {
+  string approved_by = 1;
+  google.protobuf.Timestamp approved_at = 2;
+}
+
+message ApproveStageEventRequest {
+  string stage_id = 1;
+  string organization_id = 2;
+  string canvas_id = 3;
+  string event_id = 4;
+  string requester_id = 5;
+}
+
+message ApproveStageEventResponse {
+  StageEvent event = 1;
+}
+
+message StageCreated {
+  string canvas_id = 1;
+  string stage_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message StageUpdated {
+  string canvas_id = 1;
+  string stage_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message EventSourceCreated {
+  string canvas_id = 1;
+  string source_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message StageEventCreated {
+  string canvas_id = 1;
+  string stage_id = 2;
+  string event_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message StageEventApproved {
+  string canvas_id = 1;
+  string stage_id = 2;
+  string event_id = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message StageExecutionCreated {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string stage_id = 3;
+  string event_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StageExecutionStarted {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string stage_id = 3;
+  string event_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
+
+message StageExecutionFinished {
+  string canvas_id = 1;
+  string execution_id = 2;
+  string stage_id = 3;
+  string event_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
+}
