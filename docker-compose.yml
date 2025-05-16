@@ -7,7 +7,7 @@ services:
 
     tty: true
 
-    command: go run cmd/main.go
+    command: go run cmd/server/main.go
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
