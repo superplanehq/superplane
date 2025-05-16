@@ -1,5 +1,4 @@
 services:
-
   app:
     build:
       context: .
@@ -31,6 +30,13 @@ services:
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
+    ports:
+      - 4000:4000
+      - 5173:5173
+      - 4173:4173
+      - 8000:8000
+      - 50051:50051
+
     links:
       - db:db
       - rabbitmq:rabbitmq
@@ -52,7 +58,7 @@ services:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
-    container_name: 'rabbitmq'
+    container_name: "rabbitmq"
     ports:
       - 5672:5672
       - 15672:15672

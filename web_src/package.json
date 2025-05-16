@@ -1,0 +1,39 @@
+{
+  "name": "web_src",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build --base=/app",
+    "clean": "rm -rf ../pkg/web/assets/dist",
+    "lint": "eslint .",
+    "generate:api": "openapi-ts",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@hey-api/client-fetch": "^0.10.1",
+    "@tailwindcss/vite": "^4.1.6",
+    "@tippyjs/react": "^4.2.6",
+    "@types/node": "^22.15.18",
+    "@xyflow/react": "^12.6.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.6",
+    "zustand": "^5.0.4"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.25.0",
+    "@hey-api/openapi-ts": "^0.67.4",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "eslint": "^9.25.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "eslint-plugin-react-refresh": "^0.4.19",
+    "globals": "^16.0.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.30.1",
+    "vite": "^6.3.5"
+  }
+}
