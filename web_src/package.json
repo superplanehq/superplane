@@ -8,9 +8,11 @@
     "build": "tsc -b && vite build --base=/app",
     "clean": "rm -rf ../pkg/web/assets/dist",
     "lint": "eslint .",
+    "generate:api": "openapi-ts",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@hey-api/client-fetch": "^0.10.1",
     "@tailwindcss/vite": "^4.1.6",
     "@tippyjs/react": "^4.2.6",
     "@types/node": "^22.15.18",
@@ -22,6 +24,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@hey-api/openapi-ts": "^0.67.4",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",

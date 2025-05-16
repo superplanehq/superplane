@@ -13,20 +13,32 @@ RUN echo "Build of $APP_NAME started"
 RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl postgresql-client libc-bin libc6 \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
-# Install Node.js and npm
-RUN apt-get update -y && apt-get install --no-install-recommends -y \
-    nodejs \
-    npm \
-    && apt-get clean && rm -f /var/lib/apt/lists/*_*
+# Install Node.js 22.4.1 directly from NodeSource repository
+RUN apt-get update -y && apt-get install --no-install-recommends -y curl gnupg && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+    apt-get update -y && \
+    apt-get install -y nodejs && \
+    apt-get clean && rm -f /var/lib/apt/lists/*_* && \
+    node -v && \
+    npm -v
 
 WORKDIR /tmp
 RUN curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz && \
     mv /tmp/migrate /usr/bin/migrate && \
     chmod +x /usr/bin/migrate
 
-RUN curl -sL https://github.com/google/protobuf/releases/download/v3.3.0/protoc-3.3.0-linux-x86_64.zip -o protoc && \
-    unzip protoc && \
-    mv bin/protoc /usr/local/bin/protoc
+# Install protoc for the appropriate architecture
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+    curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-aarch_64.zip -o protoc.zip; \
+    else \
+    curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v3.15.8/protoc-3.15.8-linux-x86_64.zip -o protoc.zip; \
+    fi && \
+    unzip protoc.zip && \
+    mv bin/protoc /usr/local/bin/protoc && \
+    rm -rf protoc.zip
 
 
 WORKDIR /app
@@ -44,6 +56,7 @@ RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
 RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
+RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app
 
@@ -54,9 +67,6 @@ COPY test test
 WORKDIR /app
 RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.1
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-RUN go install github.com/air-verse/air@latest
 
 WORKDIR /app/web_src
 RUN npm install
