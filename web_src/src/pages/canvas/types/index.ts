@@ -1,6 +1,8 @@
 // Define interfaces for our data types to ensure type safety
 import { Connection, Condition, RunTemplate } from './flow';
 
+// import { SuperplaneStage } from '@/api-client'
+
 export interface Stage {
   id: string;
   name: string;

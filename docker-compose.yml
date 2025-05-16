@@ -52,11 +52,22 @@ services:
       - 50051:50051
 
   db:
-    image: postgres:9.6
+    image: postgres:17.5
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
+      PGADMIN_DEFAULT_PASSWORD: "the-cake-is-a-lie"
+    ports:
+      - 5050:80
+    links:
+      - db:postgres
+
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
     container_name: "rabbitmq"
