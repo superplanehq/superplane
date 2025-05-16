@@ -42,8 +42,8 @@ export default defineConfig(({ command }: { command: string} ) => {
   },
   resolve: {
     alias: {
-      '@/canvas': path.resolve('./src/canvas'),
-      "@": path.resolve('./src'),
+      '@/canvas': path.resolve(__dirname, 'src/canvas'),
+      "@": path.resolve(__dirname, 'src'),
     },
   },
   build: {
