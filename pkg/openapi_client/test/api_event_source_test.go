@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
-	openapiclient "github.com/GIT_USER_ID/GIT_REPO_ID/openapi_client"
+	openapiclient "github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func Test_openapi_client_EventSourceAPIService(t *testing.T) {

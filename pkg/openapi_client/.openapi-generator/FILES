@@ -53,4 +53,9 @@ model_superplane_update_stage_body.go
 model_superplane_update_stage_response.go
 model_superplane_update_tag_state_request.go
 response.go
+test/api_canvas_test.go
+test/api_event_source_test.go
+test/api_event_test.go
+test/api_stage_test.go
+test/api_tag_test.go
 utils.go
