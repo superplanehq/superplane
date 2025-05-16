@@ -62,3 +62,11 @@ pb.gen:
 
 openapi.spec.gen:
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+
+dev.setup: db.test.create db.migrate
+
+dev.console: dev.setup
+	docker compose run --rm --service-ports app /bin/bash 
+
+dev.server: dev.setup
+	docker compose run --rm --service-ports app air 

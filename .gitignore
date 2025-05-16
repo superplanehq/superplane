@@ -1,2 +1,8 @@
 junit-report.xml
+<<<<<<< HEAD
+pkg/web/assets/dist
+tmp
+||||||| 5a08743
+=======
 api/swagger/superplane.swagger.json
+>>>>>>> main

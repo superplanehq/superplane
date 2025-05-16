@@ -10,6 +10,7 @@ import (
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
+	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
@@ -108,6 +109,25 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	}
 }
 
+func startWebServer() {
+	log.Println("Starting Web Server")
+
+	basePath := os.Getenv("WEB_BASE_PATH")
+	if basePath == "" {
+		panic("WEB_BASE_PATH must be set")
+	}
+
+	server, err := web.NewServer(basePath)
+	if err != nil {
+		log.Panicf("Error creating web server: %v", err)
+	}
+
+	err = server.Serve("0.0.0.0", 4000)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	log.SetFormatter(&log.TextFormatter{TimestampFormat: time.StampMilli})
 
@@ -131,6 +151,10 @@ func main() {
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
 		go startInternalAPI(encryptor)
+	}
+
+	if os.Getenv("START_WEB_SERVER") == "yes" {
+		go startWebServer()
 	}
 
 	startWorkers(jwtSigner, encryptor)
