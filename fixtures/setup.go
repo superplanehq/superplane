@@ -26,11 +26,12 @@ func Setup(db *gorm.DB) error {
 	_, b, _, _ := runtime.Caller(0)
 	basepath := filepath.Dir(b)
 
-	// Initialize the fixtures loader
+	// Initialize the fixtures loader with minimal options
 	fixtures, err = testfixtures.New(
 		testfixtures.Database(sqlDB),
 		testfixtures.Dialect("postgres"),
 		testfixtures.Directory(filepath.Join(basepath, "yaml")),
+		testfixtures.DangerousSkipTestDatabaseCheck(),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create fixtures loader: %w", err)
@@ -58,16 +59,31 @@ func Load() error {
 }
 
 // SeedTestData is a helper function to easily load test data in development or test environments
-func SeedTestData() {
+func SeedTestData() error {
 	// Truncate all tables before loading fixtures
 	if err := database.TruncateTables(); err != nil {
-		log.Fatalf("Failed to truncate tables: %v", err)
+		return fmt.Errorf("failed to truncate tables: %w", err)
 	}
 
 	// Load the fixtures
 	if err := Load(); err != nil {
-		log.Fatalf("Failed to load fixtures: %v", err)
+		return fmt.Errorf("failed to load fixtures: %w", err)
 	}
 
 	log.Println("Seed data has been successfully loaded into the database")
+
+	return nil
+}
+
+// ClearTestData removes all seeded data from the database by truncating all tables
+func ClearTestData() error {
+	log.Println("Clearing all seeded data from the database...")
+	
+	// Truncate all tables to remove all data
+	if err := database.TruncateTables(); err != nil {
+		return fmt.Errorf("failed to clear seeded data: %w", err)
+	}
+	
+	log.Println("All seeded data has been successfully cleared from the database")
+	return nil
 }

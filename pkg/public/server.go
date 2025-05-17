@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -117,6 +119,25 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
 	log.Infof("Swagger UI available at %s", swaggerFilesPath)
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
+}
+
+func (s *Server) RegisterWebRoutes(webBasePath string) {
+	// The web app routes are registered on the main router
+	log.Infof("Registering web routes with base path: %s", webBasePath)
+
+	// Check if we're in development mode
+	if os.Getenv("ENV") == "dev" {
+		log.Info("Running in development mode - proxying to Vite dev server for web app")
+		s.setupDevProxy(s.Router, webBasePath)
+	} else {
+		log.Info("Running in production mode - serving static web assets")
+		
+		// Create a subrouter for the web app
+		webRouter := s.Router.PathPrefix(webBasePath).Methods(http.MethodGet).Subrouter()
+		
+		// Serve static files from pkg/web/assets/dist
+		webRouter.PathPrefix("/").HandlerFunc(s.ServeWebAssets)
+	}
 }
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
@@ -414,4 +435,51 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 	}
 
 	return json.Marshal(parsedHeaders)
+}
+
+// ServeWebAssets serves static assets for the web application
+func (s *Server) ServeWebAssets(w http.ResponseWriter, r *http.Request) {
+	log.Infof("Serving web assets for %s", r.URL.Path)
+	http.FileServer(http.FS(assets.EmbeddedAssets)).ServeHTTP(w, r)
+}
+
+// setupDevProxy configures a simple reverse proxy to the Vite development server
+func (s *Server) setupDevProxy(r *mux.Router, webBasePath string) {
+	// Configure the target Vite dev server URL
+	target, err := url.Parse("http://localhost:5173")
+	if err != nil {
+		log.Fatalf("Error parsing Vite dev server URL: %v", err)
+	}
+
+	// Create a simple proxy
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Simple director modification
+	origDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		// Store original path for logging
+		originalPath := req.URL.Path
+
+		// Execute original director function
+		origDirector(req)
+
+		// Set host header to target
+		req.Host = target.Host
+
+		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
+	}
+
+	// Create a handler for web app routes
+	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip API requests
+		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+			return
+		}
+
+		// Forward to Vite
+		proxy.ServeHTTP(w, r)
+	})
+
+	// Mount the handler to the web app path
+	r.PathPrefix(webBasePath).Handler(proxyHandler)
 }

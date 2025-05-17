@@ -22,9 +22,7 @@ const HomePage = () => {
         
         // Mock data for demonstration
         const mockCanvases: SuperplaneCanvas[] = [
-          { id: '1', name: 'Project Architecture', organizationId: 'org1' },
-          { id: '2', name: 'User Flow Diagram', organizationId: 'org1' },
-          { id: '3', name: 'System Design', organizationId: 'org1' },
+          { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Project Architecture', organizationId: 'org1' }
         ]
         
         // Simulate API delay
