@@ -964,6 +964,9 @@
     "SuperplaneUpdateStageBody": {
       "type": "object",
       "properties": {
+        "requesterId": {
+          "type": "string"
+        },
         "connections": {
           "type": "array",
           "items": {
@@ -971,8 +974,15 @@
             "$ref": "#/definitions/SuperplaneConnection"
           }
         },
-        "requesterId": {
-          "type": "string"
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneCondition"
+          }
+        },
+        "runTemplate": {
+          "$ref": "#/definitions/SuperplaneRunTemplate"
         }
       }
     },

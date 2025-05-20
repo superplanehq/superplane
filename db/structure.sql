@@ -165,6 +165,8 @@ CREATE TABLE public.stages (
     canvas_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
+    updated_at timestamp without time zone,
+    updated_by uuid,
     run_template jsonb NOT NULL,
     conditions jsonb,
     use jsonb

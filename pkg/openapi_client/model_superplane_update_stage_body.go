@@ -20,8 +20,10 @@ var _ MappedNullable = &SuperplaneUpdateStageBody{}
 
 // SuperplaneUpdateStageBody struct for SuperplaneUpdateStageBody
 type SuperplaneUpdateStageBody struct {
-	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
+	Connections []SuperplaneConnection `json:"connections,omitempty"`
+	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
+	RunTemplate *SuperplaneRunTemplate `json:"runTemplate,omitempty"`
 }
 
 // NewSuperplaneUpdateStageBody instantiates a new SuperplaneUpdateStageBody object
@@ -39,38 +41,6 @@ func NewSuperplaneUpdateStageBody() *SuperplaneUpdateStageBody {
 func NewSuperplaneUpdateStageBodyWithDefaults() *SuperplaneUpdateStageBody {
 	this := SuperplaneUpdateStageBody{}
 	return &this
-}
-
-// GetConnections returns the Connections field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetConnections() []SuperplaneConnection {
-	if o == nil || IsNil(o.Connections) {
-		var ret []SuperplaneConnection
-		return ret
-	}
-	return o.Connections
-}
-
-// GetConnectionsOk returns a tuple with the Connections field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetConnectionsOk() ([]SuperplaneConnection, bool) {
-	if o == nil || IsNil(o.Connections) {
-		return nil, false
-	}
-	return o.Connections, true
-}
-
-// HasConnections returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasConnections() bool {
-	if o != nil && !IsNil(o.Connections) {
-		return true
-	}
-
-	return false
-}
-
-// SetConnections gets a reference to the given []SuperplaneConnection and assigns it to the Connections field.
-func (o *SuperplaneUpdateStageBody) SetConnections(v []SuperplaneConnection) {
-	o.Connections = v
 }
 
 // GetRequesterId returns the RequesterId field value if set, zero value otherwise.
@@ -105,6 +75,102 @@ func (o *SuperplaneUpdateStageBody) SetRequesterId(v string) {
 	o.RequesterId = &v
 }
 
+// GetConnections returns the Connections field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetConnections() []SuperplaneConnection {
+	if o == nil || IsNil(o.Connections) {
+		var ret []SuperplaneConnection
+		return ret
+	}
+	return o.Connections
+}
+
+// GetConnectionsOk returns a tuple with the Connections field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetConnectionsOk() ([]SuperplaneConnection, bool) {
+	if o == nil || IsNil(o.Connections) {
+		return nil, false
+	}
+	return o.Connections, true
+}
+
+// HasConnections returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasConnections() bool {
+	if o != nil && !IsNil(o.Connections) {
+		return true
+	}
+
+	return false
+}
+
+// SetConnections gets a reference to the given []SuperplaneConnection and assigns it to the Connections field.
+func (o *SuperplaneUpdateStageBody) SetConnections(v []SuperplaneConnection) {
+	o.Connections = v
+}
+
+// GetConditions returns the Conditions field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetConditions() []SuperplaneCondition {
+	if o == nil || IsNil(o.Conditions) {
+		var ret []SuperplaneCondition
+		return ret
+	}
+	return o.Conditions
+}
+
+// GetConditionsOk returns a tuple with the Conditions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetConditionsOk() ([]SuperplaneCondition, bool) {
+	if o == nil || IsNil(o.Conditions) {
+		return nil, false
+	}
+	return o.Conditions, true
+}
+
+// HasConditions returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasConditions() bool {
+	if o != nil && !IsNil(o.Conditions) {
+		return true
+	}
+
+	return false
+}
+
+// SetConditions gets a reference to the given []SuperplaneCondition and assigns it to the Conditions field.
+func (o *SuperplaneUpdateStageBody) SetConditions(v []SuperplaneCondition) {
+	o.Conditions = v
+}
+
+// GetRunTemplate returns the RunTemplate field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetRunTemplate() SuperplaneRunTemplate {
+	if o == nil || IsNil(o.RunTemplate) {
+		var ret SuperplaneRunTemplate
+		return ret
+	}
+	return *o.RunTemplate
+}
+
+// GetRunTemplateOk returns a tuple with the RunTemplate field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetRunTemplateOk() (*SuperplaneRunTemplate, bool) {
+	if o == nil || IsNil(o.RunTemplate) {
+		return nil, false
+	}
+	return o.RunTemplate, true
+}
+
+// HasRunTemplate returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasRunTemplate() bool {
+	if o != nil && !IsNil(o.RunTemplate) {
+		return true
+	}
+
+	return false
+}
+
+// SetRunTemplate gets a reference to the given SuperplaneRunTemplate and assigns it to the RunTemplate field.
+func (o *SuperplaneUpdateStageBody) SetRunTemplate(v SuperplaneRunTemplate) {
+	o.RunTemplate = &v
+}
+
 func (o SuperplaneUpdateStageBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -115,11 +181,17 @@ func (o SuperplaneUpdateStageBody) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneUpdateStageBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.RequesterId) {
+		toSerialize["requesterId"] = o.RequesterId
+	}
 	if !IsNil(o.Connections) {
 		toSerialize["connections"] = o.Connections
 	}
-	if !IsNil(o.RequesterId) {
-		toSerialize["requesterId"] = o.RequesterId
+	if !IsNil(o.Conditions) {
+		toSerialize["conditions"] = o.Conditions
+	}
+	if !IsNil(o.RunTemplate) {
+		toSerialize["runTemplate"] = o.RunTemplate
 	}
 	return toSerialize, nil
 }

@@ -60,7 +60,7 @@ func (w *PendingStageEventsWorker) Tick() error {
 }
 
 func (w *PendingStageEventsWorker) ProcessStage(stageID uuid.UUID) error {
-	stage, err := models.FindStageByID(stageID)
+	stage, err := models.FindStageByID(stageID.String())
 	if err != nil {
 		return fmt.Errorf("error finding stage")
 	}

@@ -6,6 +6,8 @@ CREATE TABLE stages (
   canvas_id         uuid NOT NULL,
   created_at        TIMESTAMP NOT NULL,
   created_by        uuid NOT NULL,
+  updated_at        TIMESTAMP,
+  updated_by        uuid,
   run_template      jsonb NOT NULL,
   conditions        jsonb,
   use               jsonb,

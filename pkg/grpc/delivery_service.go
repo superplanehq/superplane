@@ -6,8 +6,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type DeliveryService struct {
@@ -45,7 +43,7 @@ func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeSta
 }
 
 func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateStage not implemented")
+	return actions.UpdateStage(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {

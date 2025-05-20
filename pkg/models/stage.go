@@ -22,7 +22,9 @@ type Stage struct {
 	CanvasID  uuid.UUID
 	Name      string
 	CreatedAt *time.Time
+	UpdatedAt *time.Time
 	CreatedBy uuid.UUID
+	UpdatedBy uuid.UUID
 
 	Conditions  datatypes.JSONSlice[StageCondition]
 	RunTemplate datatypes.JSONType[RunTemplate]
@@ -148,11 +150,11 @@ type SemaphoreRunTemplate struct {
 	TaskID          string            `json:"task_id"`
 }
 
-func FindStageByID(id uuid.UUID) (*Stage, error) {
+func FindStageByID(id string) (*Stage, error) {
 	return FindStageByIDInTransaction(database.Conn(), id)
 }
 
-func FindStageByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Stage, error) {
+func FindStageByIDInTransaction(tx *gorm.DB, id string) (*Stage, error) {
 	var stage Stage
 
 	err := tx.

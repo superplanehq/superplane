@@ -57,7 +57,7 @@ func (w *ExecutionPoller) Tick() error {
 }
 
 func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.StageExecution) error {
-	stage, err := models.FindStageByID(execution.StageID)
+	stage, err := models.FindStageByID(execution.StageID.String())
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	})
 
 	if err == nil {
-		stage, err := models.FindStageByID(execution.StageID)
+		stage, err := models.FindStageByID(execution.StageID.String())
 		if err != nil {
 			logger.Errorf("Error finding stage for execution: %v", err)
 			return err
@@ -187,7 +187,7 @@ func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID stri
 }
 
 func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
-	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID)
+	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}

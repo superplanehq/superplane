@@ -170,6 +170,36 @@ func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition
 	})
 }
 
+func (c *Canvas) UpdateStage(id, requesterID string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("stage_id = ?", id).Delete(&StageConnection{}).Error; err != nil {
+			return fmt.Errorf("failed to delete existing connections: %v", err)
+		}
+
+		for _, connection := range connections {
+			connection.StageID = uuid.Must(uuid.Parse(id))
+			if err := tx.Create(&connection).Error; err != nil {
+				return fmt.Errorf("failed to create connection: %v", err)
+			}
+		}
+
+		now := time.Now()
+		err := tx.Model(&Stage{}).
+			Where("id = ?", id).
+			Update("updated_at", now).
+			Update("updated_by", requesterID).
+			Update("run_template", datatypes.NewJSONType(template)).
+			Update("conditions", datatypes.NewJSONSlice(conditions)).
+			Error
+
+		if err != nil {
+			return fmt.Errorf("failed to update stage timestamp: %v", err)
+		}
+
+		return nil
+	})
+}
+
 func FindCanvas(id string) (*Canvas, error) {
 	canvas := Canvas{}
 

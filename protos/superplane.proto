@@ -326,8 +326,10 @@ message CreateStageResponse {
 message UpdateStageRequest {
   string id = 1;
   string canvas_id = 2;
-  repeated Connection connections = 3;
-  string requester_id = 4;
+  string requester_id = 3;
+  repeated Connection connections = 4;
+  repeated Condition conditions = 5;
+  RunTemplate run_template = 6;
 }
 
 message UpdateStageResponse {

@@ -24,7 +24,7 @@ var RootCmd = &cobra.Command{
 	Short: "Superplane command line interface",
 	Long: `Superplane CLI - Command line interface for the Superplane API.
 	
-Allows you to manage Canvases, Event Sources, Stages, and Tags from your terminal.`,
+Allows you to manage Canvases, Event Sources, and Stages.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		if !Verbose {
 			log.SetOutput(io.Discard)
