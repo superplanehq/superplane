@@ -35,7 +35,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	}
 
 	runTemplate := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, runTemplate, connections, support.TagUsageDef(r.Source.Name))
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, runTemplate, connections)
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
@@ -98,16 +98,6 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)
 		require.True(t, testconsumer.HasReceivedMessage())
-
-		//
-		// Verify tags are marked as unhealthy
-		//
-		tags, err := models.ListStageTags("VERSION", "", []string{}, "", execution.StageEventID.String())
-		require.NoError(t, err)
-		require.Len(t, tags, 1)
-		assert.Equal(t, "VERSION", tags[0].TagName)
-		assert.Equal(t, "v1", tags[0].TagValue)
-		assert.Equal(t, models.TagStateUnhealthy, tags[0].TagState)
 	})
 
 	t.Run("passed pipeline -> execution passes", func(t *testing.T) {
@@ -163,16 +153,6 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)
 		require.True(t, testconsumer.HasReceivedMessage())
-
-		//
-		// Verify tags are marked as healthy
-		//
-		tags, err := models.ListStageTags("VERSION", "", []string{}, "", execution.StageEventID.String())
-		require.NoError(t, err)
-		require.Len(t, tags, 1)
-		assert.Equal(t, "VERSION", tags[0].TagName)
-		assert.Equal(t, "v1", tags[0].TagValue)
-		assert.Equal(t, models.TagStateHealthy, tags[0].TagState)
 	})
 }
 

@@ -63,11 +63,3 @@ func (s *DeliveryService) ListStages(ctx context.Context, req *pb.ListStagesRequ
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	return actions.ListStageEvents(ctx, req)
 }
-
-func (s *DeliveryService) UpdateTagState(ctx context.Context, req *pb.UpdateTagStateRequest) (*pb.UpdateTagStateResponse, error) {
-	return actions.UpdateTagState(ctx, req)
-}
-
-func (s *DeliveryService) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*pb.ListTagsResponse, error) {
-	return actions.ListTags(ctx, req)
-}

@@ -117,15 +117,9 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
-		Tags:        []*pb.Tag{},
 	}
 
 	approvals, err := in.FindApprovals()
-	if err != nil {
-		return nil, err
-	}
-
-	tags, err := models.FindStageEventTags(in.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -134,14 +128,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		e.Approvals = append(e.Approvals, &pb.StageEventApproval{
 			ApprovedBy: approval.ApprovedBy.String(),
 			ApprovedAt: timestamppb.New(*approval.ApprovedAt),
-		})
-	}
-
-	for _, tag := range tags {
-		e.Tags = append(e.Tags, &pb.Tag{
-			Name:  tag.Name,
-			Value: tag.Value,
-			State: tagStateToProto(tag.State),
 		})
 	}
 

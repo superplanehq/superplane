@@ -24,19 +24,8 @@ type Stage struct {
 	CreatedAt *time.Time
 	CreatedBy uuid.UUID
 
-	Use         datatypes.JSONType[StageTagUsageDefinition]
 	Conditions  datatypes.JSONSlice[StageCondition]
 	RunTemplate datatypes.JSONType[RunTemplate]
-}
-
-type StageTagUsageDefinition struct {
-	From []string             `json:"from"`
-	Tags []StageTagDefinition `json:"tags"`
-}
-
-type StageTagDefinition struct {
-	Name      string `json:"name"`
-	ValueFrom string `json:"value_from"`
 }
 
 type StageCondition struct {

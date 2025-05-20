@@ -24,7 +24,6 @@ type SuperplaneCreateStageBody struct {
 	RequesterId *string `json:"requesterId,omitempty"`
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
-	Use *SuperplaneTagUsageDefinition `json:"use,omitempty"`
 	RunTemplate *SuperplaneRunTemplate `json:"runTemplate,omitempty"`
 }
 
@@ -173,38 +172,6 @@ func (o *SuperplaneCreateStageBody) SetConditions(v []SuperplaneCondition) {
 	o.Conditions = v
 }
 
-// GetUse returns the Use field value if set, zero value otherwise.
-func (o *SuperplaneCreateStageBody) GetUse() SuperplaneTagUsageDefinition {
-	if o == nil || IsNil(o.Use) {
-		var ret SuperplaneTagUsageDefinition
-		return ret
-	}
-	return *o.Use
-}
-
-// GetUseOk returns a tuple with the Use field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneCreateStageBody) GetUseOk() (*SuperplaneTagUsageDefinition, bool) {
-	if o == nil || IsNil(o.Use) {
-		return nil, false
-	}
-	return o.Use, true
-}
-
-// HasUse returns a boolean if a field has been set.
-func (o *SuperplaneCreateStageBody) HasUse() bool {
-	if o != nil && !IsNil(o.Use) {
-		return true
-	}
-
-	return false
-}
-
-// SetUse gets a reference to the given SuperplaneTagUsageDefinition and assigns it to the Use field.
-func (o *SuperplaneCreateStageBody) SetUse(v SuperplaneTagUsageDefinition) {
-	o.Use = &v
-}
-
 // GetRunTemplate returns the RunTemplate field value if set, zero value otherwise.
 func (o *SuperplaneCreateStageBody) GetRunTemplate() SuperplaneRunTemplate {
 	if o == nil || IsNil(o.RunTemplate) {
@@ -258,9 +225,6 @@ func (o SuperplaneCreateStageBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Conditions) {
 		toSerialize["conditions"] = o.Conditions
-	}
-	if !IsNil(o.Use) {
-		toSerialize["use"] = o.Use
 	}
 	if !IsNil(o.RunTemplate) {
 		toSerialize["runTemplate"] = o.RunTemplate

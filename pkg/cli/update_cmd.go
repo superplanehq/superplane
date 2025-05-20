@@ -89,113 +89,9 @@ var updateCmd = &cobra.Command{
 
 			fmt.Printf("Stage '%s' updated successfully.\n", stageID)
 
-		case "tag":
-			var yamlData map[string]interface{}
-			err = yaml.Unmarshal(data, &yamlData)
-			utils.Check(err)
-
-			var name, value string
-			var tagState string
-
-			if metaIf, ok := yamlData["metadata"]; ok {
-				metadata, ok := metaIf.(map[interface{}]interface{})
-				if !ok {
-					utils.Fail("Invalid Tag YAML: metadata section format incorrect")
-				}
-
-				if n, ok := metadata["name"].(string); ok {
-					name = n
-				}
-				if v, ok := metadata["value"].(string); ok {
-					value = v
-				}
-			}
-
-			if specIf, ok := yamlData["spec"]; ok {
-				spec, ok := specIf.(map[interface{}]interface{})
-				if !ok {
-					utils.Fail("Invalid Tag YAML: spec section format incorrect")
-				}
-
-				if state, ok := spec["state"].(string); ok {
-					tagState = state
-				}
-			}
-
-			if name == "" || value == "" {
-				utils.Fail("Invalid Tag YAML: name or value missing")
-			}
-
-			if tagState == "" {
-				utils.Fail("Invalid Tag YAML: state missing")
-			}
-
-			var apiState string
-			switch strings.ToUpper(tagState) {
-			case "HEALTHY":
-				apiState = "TAG_STATE_HEALTHY"
-			case "UNHEALTHY":
-				apiState = "TAG_STATE_UNHEALTHY"
-			default:
-				utils.Fail(fmt.Sprintf("Invalid tag state '%s'. Must be HEALTHY or UNHEALTHY.", tagState))
-			}
-
-			tag := openapi_client.NewSuperplaneTag()
-			tag.SetName(name)
-			tag.SetValue(value)
-			tag.SetState(openapi_client.SuperplaneTagState(apiState))
-
-			request := openapi_client.NewSuperplaneUpdateTagStateRequest()
-			request.SetTag(*tag)
-
-			_, _, err = c.TagAPI.SuperplaneUpdateTagState(context.Background()).Body(*request).Execute()
-			utils.Check(err)
-
-			fmt.Printf("Tag '%s=%s' state updated to '%s'.\n", name, value, tagState)
-
 		default:
 			utils.Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))
 		}
-	},
-}
-
-var updateTagCmd = &cobra.Command{
-	Use:     "tag [NAME] [VALUE] [STATE]",
-	Short:   "Update a tag's state",
-	Long:    `Update the state of a tag. STATE can be HEALTHY or UNHEALTHY.`,
-	Aliases: []string{"tags"},
-	Args:    cobra.ExactArgs(3),
-
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		value := args[1]
-		state := args[2]
-
-		var tagState string
-		switch state {
-		case "HEALTHY":
-			tagState = "TAG_STATE_HEALTHY"
-		case "UNHEALTHY":
-			tagState = "TAG_STATE_UNHEALTHY"
-		default:
-			fmt.Printf("Invalid state '%s'. Must be HEALTHY or UNHEALTHY.\n", state)
-			os.Exit(1)
-		}
-
-		c := DefaultClient()
-
-		tag := openapi_client.NewSuperplaneTag()
-		tag.SetName(name)
-		tag.SetValue(value)
-		tag.SetState(openapi_client.SuperplaneTagState(tagState))
-
-		request := openapi_client.NewSuperplaneUpdateTagStateRequest()
-		request.SetTag(*tag)
-
-		_, _, err := c.TagAPI.SuperplaneUpdateTagState(context.Background()).Body(*request).Execute()
-		utils.Check(err)
-
-		fmt.Printf("Tag '%s=%s' state updated to '%s'.\n", name, value, state)
 	},
 }
 
@@ -263,9 +159,6 @@ func init() {
 	// File flag for root update command
 	desc := "Filename, directory, or URL to files to use to update the resource"
 	updateCmd.Flags().StringP("file", "f", "", desc)
-
-	// Tag command
-	updateCmd.AddCommand(updateTagCmd)
 
 	// Stage command
 	updateCmd.AddCommand(updateStageCmd)

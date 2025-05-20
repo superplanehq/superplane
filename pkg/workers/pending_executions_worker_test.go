@@ -44,7 +44,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, support.TagUsageDef(r.Source.Name)))
+		}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task")
 
@@ -103,7 +103,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceName: r.Stage.Name,
 				SourceType: models.SourceTypeStage,
 			},
-		}, support.TagUsageDef(r.Source.Name)))
+		}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)

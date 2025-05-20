@@ -57,8 +57,6 @@ type APIClient struct {
 	EventSourceAPI *EventSourceAPIService
 
 	StageAPI *StageAPIService
-
-	TagAPI *TagAPIService
 }
 
 type service struct {
@@ -81,7 +79,6 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.EventAPI = (*EventAPIService)(&c.common)
 	c.EventSourceAPI = (*EventSourceAPIService)(&c.common)
 	c.StageAPI = (*StageAPIService)(&c.common)
-	c.TagAPI = (*TagAPIService)(&c.common)
 
 	return c
 }

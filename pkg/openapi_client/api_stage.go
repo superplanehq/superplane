@@ -404,7 +404,7 @@ SuperplaneUpdateStage Update a stage
 Updates the specified stage
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId Added for REST API path
+ @param canvasId
  @param id
  @return ApiSuperplaneUpdateStageRequest
 */

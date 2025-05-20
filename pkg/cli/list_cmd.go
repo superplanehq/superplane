@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/superplanehq/superplane/pkg/cli/utils"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 var listCanvasesCmd = &cobra.Command{
@@ -138,76 +137,6 @@ var listEventsCmd = &cobra.Command{
 	},
 }
 
-var listTagsCmd = &cobra.Command{
-	Use:   "tags",
-	Short: "List tags",
-	Long:  `List all tags, optionally filtered by stage`,
-	Args:  cobra.NoArgs,
-
-	Run: func(cmd *cobra.Command, args []string) {
-		stageID, _ := cmd.Flags().GetString("stage-id")
-		name, _ := cmd.Flags().GetString("name")
-		value, _ := cmd.Flags().GetString("value")
-		states, _ := cmd.Flags().GetStringSlice("states")
-
-		c := DefaultClient()
-		var response *openapi_client.SuperplaneListTagsResponse
-		var err error
-
-		// Use the appropriate endpoint based on whether stageID is provided
-		if stageID != "" {
-			listRequest := c.TagAPI.SuperplaneListTags2(context.Background(), stageID)
-			if name != "" {
-				listRequest = listRequest.Name(name)
-			}
-			if value != "" {
-				listRequest = listRequest.Value(value)
-			}
-			if len(states) > 0 {
-				listRequest = listRequest.States(states)
-			}
-
-			response, _, err = listRequest.Execute()
-		} else {
-			listRequest := c.TagAPI.SuperplaneListTags(context.Background())
-			if name != "" {
-				listRequest = listRequest.Name(name)
-			}
-			if value != "" {
-				listRequest = listRequest.Value(value)
-			}
-			if len(states) > 0 {
-				listRequest = listRequest.States(states)
-			}
-
-			response, _, err = listRequest.Execute()
-		}
-
-		utils.Check(err)
-
-		if len(response.Tags) == 0 {
-			fmt.Println("No tags found.")
-			return
-		}
-
-		fmt.Printf("Found %d tags:\n\n", len(response.Tags))
-		for i, stageTag := range response.Tags {
-			fmt.Printf("%d. %s=%s\n", i+1, *stageTag.Tag.Name, *stageTag.Tag.Value)
-			fmt.Printf("   State: %s\n", *stageTag.Tag.State)
-			if stageTag.StageId != nil {
-				fmt.Printf("   Stage: %s\n", *stageTag.StageId)
-			}
-			if *stageTag.StageEventState != "" {
-				fmt.Printf("   Event State: %s\n", *stageTag.StageEventState)
-			}
-
-			if i < len(response.Tags)-1 {
-				fmt.Println()
-			}
-		}
-	},
-}
-
 // Root list command
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -232,11 +161,4 @@ func init() {
 	listCmd.AddCommand(listEventsCmd)
 	listEventsCmd.Flags().StringSlice("states", []string{}, "Filter by event states (PENDING, WAITING, PROCESSED)")
 	listEventsCmd.Flags().StringSlice("state-reasons", []string{}, "Filter by event state reasons")
-
-	// Tags command
-	listCmd.AddCommand(listTagsCmd)
-	listTagsCmd.Flags().String("stage-id", "", "Filter tags by stage ID")
-	listTagsCmd.Flags().String("name", "", "Filter tags by name")
-	listTagsCmd.Flags().String("value", "", "Filter tags by value")
-	listTagsCmd.Flags().StringSlice("states", []string{}, "Filter by tag states (HEALTHY, UNHEALTHY)")
 }
