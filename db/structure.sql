@@ -120,18 +120,6 @@ CREATE TABLE public.stage_event_approvals (
 
 
 --
--- Name: stage_event_tags; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_event_tags (
-    name character varying(64) NOT NULL,
-    value character varying(128) NOT NULL,
-    stage_event_id uuid NOT NULL,
-    state character varying(64) NOT NULL
-);
-
-
---
 -- Name: stage_events; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -264,14 +252,6 @@ ALTER TABLE ONLY public.stage_event_approvals
 
 
 --
--- Name: stage_event_tags stage_event_tags_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_event_tags
-    ADD CONSTRAINT stage_event_tags_pkey PRIMARY KEY (name, value, stage_event_id);
-
-
---
 -- Name: stage_events stage_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -388,14 +368,6 @@ ALTER TABLE ONLY public.stage_connections
 
 ALTER TABLE ONLY public.stage_event_approvals
     ADD CONSTRAINT stage_event_approvals_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id);
-
-
---
--- Name: stage_event_tags stage_event_tags_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_event_tags
-    ADD CONSTRAINT stage_event_tags_stage_event_id_fkey FOREIGN KEY (stage_event_id) REFERENCES public.stage_events(id);
 
 
 --
