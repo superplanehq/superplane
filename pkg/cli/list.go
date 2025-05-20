@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/superplanehq/superplane/pkg/cli/utils"
 )
 
 var listCanvasesCmd = &cobra.Command{
@@ -34,7 +32,7 @@ var listEventSourcesCmd = &cobra.Command{
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneListEventSources(context.Background(), canvasID).Execute()
-		utils.Check(err)
+		Check(err)
 
 		if len(response.EventSources) == 0 {
 			fmt.Println("No event sources found for this canvas.")
@@ -65,7 +63,7 @@ var listStagesCmd = &cobra.Command{
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneListStages(context.Background(), canvasID).Execute()
-		utils.Check(err)
+		Check(err)
 
 		if len(response.Stages) == 0 {
 			fmt.Println("No stages found for this canvas.")
@@ -109,7 +107,7 @@ var listEventsCmd = &cobra.Command{
 		}
 
 		response, _, err := listRequest.Execute()
-		utils.Check(err)
+		Check(err)
 
 		if len(response.Events) == 0 {
 			fmt.Println("No events found.")

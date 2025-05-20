@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 
-	"gopkg.in/yaml.v2"
+	"github.com/goccy/go-yaml"
+	"github.com/google/uuid"
 
 	"github.com/spf13/cobra"
 
-	"github.com/superplanehq/superplane/pkg/cli/utils"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -23,74 +22,66 @@ var updateCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		path, err := cmd.Flags().GetString("file")
-		utils.CheckWithMessage(err, "Path not provided")
+		CheckWithMessage(err, "Path not provided")
 
 		// #nosec
 		data, err := os.ReadFile(path)
-		utils.CheckWithMessage(err, "Failed to read from resource file.")
+		CheckWithMessage(err, "Failed to read from resource file.")
 
-		_, kind, err := utils.ParseYamlResourceHeaders(data)
-		utils.Check(err)
+		_, kind, err := ParseYamlResourceHeaders(data)
+		Check(err)
 
 		c := DefaultClient()
 
-		switch strings.ToLower(kind) {
-		case "stage":
-			var yamlData map[string]interface{}
+		switch kind {
+		case "Stage":
+			var yamlData map[string]any
 			err = yaml.Unmarshal(data, &yamlData)
-			utils.Check(err)
+			Check(err)
 
-			metadata, ok := yamlData["metadata"].(map[interface{}]interface{})
+			metadata, ok := yamlData["metadata"].(map[string]any)
 			if !ok {
-				utils.Fail("Invalid Stage YAML: metadata section missing")
+				Fail("Invalid Stage YAML: metadata section missing")
 			}
 
 			canvasID, ok := metadata["canvasId"].(string)
 			if !ok {
-				utils.Fail("Invalid Stage YAML: canvasId field missing")
+				Fail("Invalid Stage YAML: canvasId field missing")
 			}
 
 			stageID, ok := metadata["id"].(string)
 			if !ok {
-				utils.Fail("Invalid Stage YAML: id field missing")
+				Fail("Invalid Stage YAML: id field missing")
 			}
 
-			requesterID, _ := metadata["requesterId"].(string)
-
-			var connections []interface{}
-			if spec, ok := yamlData["spec"].(map[interface{}]interface{}); ok {
-				if conns, ok := spec["connections"].([]interface{}); ok {
-					connections = conns
-				}
+			spec, ok := yamlData["spec"].(map[string]any)
+			if !ok {
+				Fail("Invalid Stage YAML: spec section missing")
 			}
 
-			request := openapi_client.NewSuperplaneUpdateStageBody()
-			if requesterID != "" {
-				request.SetRequesterId(requesterID)
-			}
+			// Convert to JSON
+			specData, err := json.Marshal(spec)
+			Check(err)
 
-			if len(connections) > 0 {
-				connJSON, err := json.Marshal(connections)
-				utils.Check(err)
+			// Convert JSON to stage request
+			var request openapi_client.SuperplaneUpdateStageBody
+			err = json.Unmarshal(specData, &request)
+			Check(err)
 
-				var apiConnections []openapi_client.SuperplaneConnection
-				err = json.Unmarshal(connJSON, &apiConnections)
-				utils.Check(err)
+			// TODO: this should be known through the API token used to call the API
+			// so we just put something here until we have auth in this API.
+			request.SetRequesterId(uuid.NewString())
 
-				request.SetConnections(apiConnections)
-			}
+			_, _, err = c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasID, stageID).
+				Body(request).
+				Execute()
 
-			_, _, err = c.StageAPI.SuperplaneUpdateStage(
-				context.Background(),
-				canvasID,
-				stageID,
-			).Body(*request).Execute()
-			utils.Check(err)
+			Check(err)
 
 			fmt.Printf("Stage '%s' updated successfully.\n", stageID)
 
 		default:
-			utils.Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))
+			Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))
 		}
 	},
 }
@@ -113,11 +104,11 @@ var updateStageCmd = &cobra.Command{
 		}
 
 		data, err := os.ReadFile(yamlFile)
-		utils.CheckWithMessage(err, "Failed to read from stage configuration file.")
+		CheckWithMessage(err, "Failed to read from stage configuration file.")
 
 		var yamlData map[string]interface{}
 		err = yaml.Unmarshal(data, &yamlData)
-		utils.Check(err)
+		Check(err)
 
 		var connections []interface{}
 		if spec, ok := yamlData["spec"].(map[interface{}]interface{}); ok {
@@ -132,11 +123,11 @@ var updateStageCmd = &cobra.Command{
 
 		if len(connections) > 0 {
 			connJSON, err := json.Marshal(connections)
-			utils.Check(err)
+			Check(err)
 
 			var apiConnections []openapi_client.SuperplaneConnection
 			err = json.Unmarshal(connJSON, &apiConnections)
-			utils.Check(err)
+			Check(err)
 
 			request.SetConnections(apiConnections)
 		}
@@ -147,7 +138,7 @@ var updateStageCmd = &cobra.Command{
 			canvasID,
 			stageID,
 		).Body(*request).Execute()
-		utils.Check(err)
+		Check(err)
 
 		fmt.Printf("Stage '%s' updated successfully.\n", stageID)
 	},

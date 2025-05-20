@@ -6,9 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/superplanehq/superplane/pkg/cli/utils"
-
-	homedir "github.com/mitchellh/go-homedir"
+	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,14 +37,6 @@ Allows you to manage Canvases, Event Sources, and Stages.`,
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -62,7 +52,7 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		home, err := homedir.Dir()
-		utils.CheckWithMessage(err, "failed to find home directory")
+		CheckWithMessage(err, "failed to find home directory")
 
 		viper.AddConfigPath(home)
 		viper.SetConfigName(".superplane")

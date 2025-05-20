@@ -6,12 +6,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-
-	"github.com/superplanehq/superplane/pkg/cli/utils"
 )
 
 const (
-	DefaultAPIURL = "https://api.superplane.com"
+	DefaultAPIURL = "http://localhost:8000"
 )
 
 // Configuration keys
@@ -56,7 +54,7 @@ var configSetCmd = &cobra.Command{
 
 		viper.Set(key, value)
 		err := viper.WriteConfig()
-		utils.CheckWithMessage(err, "Failed to write configuration")
+		CheckWithMessage(err, "Failed to write configuration")
 
 		fmt.Printf("Configuration '%s' set to '%s'\n", key, value)
 	},

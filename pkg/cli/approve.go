@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/superplanehq/superplane/pkg/cli/utils"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -34,7 +33,7 @@ var approveEventCmd = &cobra.Command{
 			stageID,
 			eventID,
 		).Body(*request).Execute()
-		utils.Check(err)
+		Check(err)
 
 		fmt.Printf("Event '%s' approved successfully.\n", *response.Event.Id)
 	},
