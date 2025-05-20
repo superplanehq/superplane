@@ -90,7 +90,7 @@ func connect() *gorm.DB {
 func TruncateTables() error {
 	return Conn().Exec(`
 		truncate table canvases, events, event_sources, stages,
-		stage_events, stage_event_approvals, stage_event_tags,
+		stage_events, stage_event_approvals,
 		stage_connections, stage_executions;
 	`).Error
 }

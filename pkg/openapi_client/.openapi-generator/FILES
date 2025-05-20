@@ -49,5 +49,4 @@ test/api_canvas_test.go
 test/api_event_source_test.go
 test/api_event_test.go
 test/api_stage_test.go
-test/api_tag_test.go
 utils.go
