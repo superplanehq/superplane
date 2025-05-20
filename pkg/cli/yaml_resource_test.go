@@ -13,7 +13,7 @@ apiVersio              n: v1alpha`)
 
 	_, _, err := ParseYamlResourceHeaders(resource)
 
-	assert.Equal(t, err.Error(), "Failed to parse resource; error converting YAML to JSON: yaml: line 2: found character that cannot start any token")
+	assert.Equal(t, err.Error(), "failed to parse resource; error converting YAML to JSON: yaml: line 2: found character that cannot start any token")
 }
 
 func Test__ParseYamlResourceHeaders__ValidResource(t *testing.T) {
@@ -33,7 +33,7 @@ func Test__ParseYamlResourceHeaders__KindMissing(t *testing.T) {
 
 	_, _, err := ParseYamlResourceHeaders(resource)
 
-	assert.Equal(t, err.Error(), "Failed to parse resource's kind")
+	assert.Equal(t, err.Error(), "failed to parse resource's kind")
 }
 
 func Test__ParseYamlResourceHeaders__ApiVersionMissing(t *testing.T) {
@@ -41,7 +41,7 @@ func Test__ParseYamlResourceHeaders__ApiVersionMissing(t *testing.T) {
 
 	_, _, err := ParseYamlResourceHeaders(resource)
 
-	assert.Equal(t, err.Error(), "Failed to parse resource's api version")
+	assert.Equal(t, err.Error(), "failed to parse resource's api version")
 }
 
 func Test__ParseYamlResourceHeaders__KindIsWrongType(t *testing.T) {
@@ -52,7 +52,7 @@ apiVersion: v1alpha`)
 
 	_, _, err := ParseYamlResourceHeaders(resource)
 
-	assert.Equal(t, err.Error(), "Failed to parse resource's kind")
+	assert.Equal(t, err.Error(), "failed to parse resource's kind")
 }
 
 func Test__ParseYamlResourceHeaders__ApiVersionWrongType(t *testing.T) {
@@ -63,5 +63,5 @@ apiVersion:
 
 	_, _, err := ParseYamlResourceHeaders(resource)
 
-	assert.Equal(t, err.Error(), "Failed to parse resource's api version")
+	assert.Equal(t, err.Error(), "failed to parse resource's api version")
 }
