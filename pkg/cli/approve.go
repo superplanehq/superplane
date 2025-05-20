@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/superplanehq/superplane/pkg/openapi_client"
@@ -20,12 +21,11 @@ var approveEventCmd = &cobra.Command{
 		canvasID := args[0]
 		stageID := args[1]
 		eventID := args[2]
-		requesterID, _ := cmd.Flags().GetString("requester-id")
 
 		c := DefaultClient()
 
 		request := openapi_client.NewSuperplaneApproveStageEventBody()
-		request.SetRequesterId(requesterID)
+		request.SetRequesterId(uuid.NewString())
 
 		response, _, err := c.EventAPI.SuperplaneApproveStageEvent(
 			context.Background(),
@@ -49,5 +49,4 @@ var approveCmd = &cobra.Command{
 func init() {
 	RootCmd.AddCommand(approveCmd)
 	approveCmd.AddCommand(approveEventCmd)
-	approveEventCmd.Flags().String("requester-id", "", "ID of the user approving the event")
 }

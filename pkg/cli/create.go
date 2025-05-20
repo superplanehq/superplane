@@ -34,12 +34,12 @@ var createCmd = &cobra.Command{
 		switch kind {
 		case "Canvas":
 			// Parse YAML to map
-			var yamlData map[string]interface{}
+			var yamlData map[string]any
 			err = yaml.Unmarshal(data, &yamlData)
 			Check(err)
 
 			// Extract the name and requesterID from the YAML
-			metadata, ok := yamlData["metadata"].(map[interface{}]interface{})
+			metadata, ok := yamlData["metadata"].(map[string]any)
 			if !ok {
 				Fail("Invalid Canvas YAML: metadata section missing")
 			}
@@ -61,12 +61,12 @@ var createCmd = &cobra.Command{
 
 		case "EventSource":
 			// Parse YAML to map
-			var yamlData map[string]interface{}
+			var yamlData map[string]any
 			err = yaml.Unmarshal(data, &yamlData)
 			Check(err)
 
 			// Extract the metadata from the YAML
-			metadata, ok := yamlData["metadata"].(map[interface{}]interface{})
+			metadata, ok := yamlData["metadata"].(map[string]any)
 			if !ok {
 				Fail("Invalid EventSource YAML: metadata section missing")
 			}
