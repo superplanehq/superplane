@@ -14,9 +14,24 @@ var listCanvasesCmd = &cobra.Command{
 	Args:  cobra.NoArgs,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// Note: The OpenAPI spec doesn't have a list canvases endpoint
-		// This is a placeholder for when that endpoint is added
-		fmt.Println("Listing canvases operation is not available in the current API version.")
+		c := DefaultClient()
+		response, _, err := c.CanvasAPI.SuperplaneListCanvases(context.Background()).Execute()
+		Check(err)
+
+		if len(response.Canvases) == 0 {
+			fmt.Println("No canvases found.")
+			return
+		}
+
+		for i, canvas := range response.Canvases {
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *canvas.Name, *canvas.Id)
+			fmt.Printf("   Created at: %s\n", *canvas.CreatedAt)
+			fmt.Printf("   Created by: %s\n", *canvas.CreatedBy)
+
+			if i < len(response.Canvases)-1 {
+				fmt.Println()
+			}
+		}
 	},
 }
 

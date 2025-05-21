@@ -3,7 +3,7 @@
 --
 
 -- Dumped from database version 9.6.24
--- Dumped by pg_dump version 15.12 (Debian 15.12-0+deb12u2)
+-- Dumped by pg_dump version 15.13 (Debian 15.13-0+deb12u1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -413,7 +413,7 @@ ALTER TABLE ONLY public.stages
 --
 
 -- Dumped from database version 9.6.24
--- Dumped by pg_dump version 15.12 (Debian 15.12-0+deb12u2)
+-- Dumped by pg_dump version 15.13 (Debian 15.13-0+deb12u1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
