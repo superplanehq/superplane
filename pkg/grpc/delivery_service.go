@@ -58,6 +58,10 @@ func (s *DeliveryService) ListStages(ctx context.Context, req *pb.ListStagesRequ
 	return actions.ListStages(ctx, req)
 }
 
+func (s *DeliveryService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
+	return actions.ListCanvases(ctx, req)
+}
+
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	return actions.ListStageEvents(ctx, req)
 }

@@ -35,6 +35,7 @@ model_superplane_describe_stage_response.go
 model_superplane_event_source.go
 model_superplane_execution.go
 model_superplane_execution_state.go
+model_superplane_list_canvases_response.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_stage_events_response.go
 model_superplane_list_stages_response.go

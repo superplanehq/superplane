@@ -26,6 +26,28 @@
   ],
   "paths": {
     "/api/v1/canvases": {
+      "get": {
+        "summary": "List canvases",
+        "description": "Returns a list of all canvases",
+        "operationId": "Superplane_ListCanvases",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListCanvasesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Canvas"
+        ]
+      },
       "post": {
         "summary": "Create a new canvas",
         "description": "Creates a new canvas with the given name and organization ID",
@@ -836,6 +858,18 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneListCanvasesResponse": {
+      "type": "object",
+      "properties": {
+        "canvases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneCanvas"
+          }
+        }
+      }
     },
     "SuperplaneListEventSourcesResponse": {
       "type": "object",

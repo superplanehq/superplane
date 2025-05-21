@@ -25,6 +25,17 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Superplane {
+  rpc ListCanvases(ListCanvasesRequest) returns (ListCanvasesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvases";
+      description: "Returns a list of all canvases";
+      tags: "Canvas";
+    };
+  }
+
   rpc CreateCanvas(CreateCanvasRequest) returns (CreateCanvasResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases"
@@ -150,6 +161,12 @@ service Superplane {
       tags: "Event";
     };
   }
+}
+
+message ListCanvasesRequest {}
+
+message ListCanvasesResponse {
+  repeated Canvas canvases = 1;
 }
 
 message Canvas {

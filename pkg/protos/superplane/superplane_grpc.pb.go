@@ -19,6 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	Superplane_ListCanvases_FullMethodName        = "/Superplane.Superplane/ListCanvases"
 	Superplane_CreateCanvas_FullMethodName        = "/Superplane.Superplane/CreateCanvas"
 	Superplane_CreateEventSource_FullMethodName   = "/Superplane.Superplane/CreateEventSource"
 	Superplane_CreateStage_FullMethodName         = "/Superplane.Superplane/CreateStage"
@@ -36,6 +37,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SuperplaneClient interface {
+	ListCanvases(ctx context.Context, in *ListCanvasesRequest, opts ...grpc.CallOption) (*ListCanvasesResponse, error)
 	CreateCanvas(ctx context.Context, in *CreateCanvasRequest, opts ...grpc.CallOption) (*CreateCanvasResponse, error)
 	CreateEventSource(ctx context.Context, in *CreateEventSourceRequest, opts ...grpc.CallOption) (*CreateEventSourceResponse, error)
 	CreateStage(ctx context.Context, in *CreateStageRequest, opts ...grpc.CallOption) (*CreateStageResponse, error)
@@ -55,6 +57,16 @@ type superplaneClient struct {
 
 func NewSuperplaneClient(cc grpc.ClientConnInterface) SuperplaneClient {
 	return &superplaneClient{cc}
+}
+
+func (c *superplaneClient) ListCanvases(ctx context.Context, in *ListCanvasesRequest, opts ...grpc.CallOption) (*ListCanvasesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCanvasesResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListCanvases_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *superplaneClient) CreateCanvas(ctx context.Context, in *CreateCanvasRequest, opts ...grpc.CallOption) (*CreateCanvasResponse, error) {
@@ -171,6 +183,7 @@ func (c *superplaneClient) ApproveStageEvent(ctx context.Context, in *ApproveSta
 // All implementations should embed UnimplementedSuperplaneServer
 // for forward compatibility.
 type SuperplaneServer interface {
+	ListCanvases(context.Context, *ListCanvasesRequest) (*ListCanvasesResponse, error)
 	CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error)
 	CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error)
 	CreateStage(context.Context, *CreateStageRequest) (*CreateStageResponse, error)
@@ -191,6 +204,9 @@ type SuperplaneServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSuperplaneServer struct{}
 
+func (UnimplementedSuperplaneServer) ListCanvases(context.Context, *ListCanvasesRequest) (*ListCanvasesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCanvases not implemented")
+}
 func (UnimplementedSuperplaneServer) CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateCanvas not implemented")
 }
@@ -242,6 +258,24 @@ func RegisterSuperplaneServer(s grpc.ServiceRegistrar, srv SuperplaneServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Superplane_ServiceDesc, srv)
+}
+
+func _Superplane_ListCanvases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListCanvases(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListCanvases_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListCanvases(ctx, req.(*ListCanvasesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Superplane_CreateCanvas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -449,6 +483,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Superplane.Superplane",
 	HandlerType: (*SuperplaneServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListCanvases",
+			Handler:    _Superplane_ListCanvases_Handler,
+		},
 		{
 			MethodName: "CreateCanvas",
 			Handler:    _Superplane_CreateCanvas_Handler,

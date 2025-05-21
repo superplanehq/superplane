@@ -200,6 +200,21 @@ func (c *Canvas) UpdateStage(id, requesterID string, conditions []StageCondition
 	})
 }
 
+func ListCanvases() ([]Canvas, error) {
+	var canvases []Canvas
+
+	err := database.Conn().
+		Order("name ASC").
+		Find(&canvases).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
 func FindCanvas(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
