@@ -17,6 +17,7 @@ const setHmrPortFromPortPlugin = {
       if (config.server.hmr === true) config.server.hmr = {}
       config.server.hmr ??= {}
       config.server.hmr.clientPort = config.server.port
+      config.server.hmr.overlay = true 
     }
   }
 };

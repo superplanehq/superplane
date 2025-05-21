@@ -69,7 +69,7 @@ dev.console: dev.setup
 	docker compose run --rm --service-ports app /bin/bash 
 
 dev.server: dev.setup
-	docker compose run --rm --service-ports app air 
+	docker compose run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
 
 dev.fixtures:
 	docker compose run --rm app go run cmd/fixtures/main.go

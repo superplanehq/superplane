@@ -2,18 +2,21 @@ import { StrictMode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources } from "../../api-client";
-import { Stage, EventSource } from "./types";
-import { ConnectionFilterOperator, ConditionType, RunTemplateType } from "./types/flow";
+import { useSetupEventHandlers } from "./store/handlers/setup";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents } from "@/api-client";
+import { StageWithEventQueue } from "./store/types";
 
 // No props needed as we'll get the ID from the URL params
 
 export function Canvas() {
+  
   // Get the canvas ID from the URL params
   const { id } = useParams<{ id: string }>();
-  const { initialize, setupLiveViewHandlers } = useCanvasStore();
+  const { initialize, markEventHandlersAsSetup } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Custom hook for setting up event handlers - must be called at top level
+  useSetupEventHandlers(id!);
   
   useEffect(() => {
     // Return early if no ID is available
@@ -57,88 +60,32 @@ export function Canvas() {
           throw new Error('Failed to fetch event sources data');
         }
         
-        // Map API response to internal Stage type
-        const mappedStages: Stage[] = (stagesResponse.data?.stages || []).map(apiStage => {
-          // Create proper Connection objects from API connections if they exist
-          const connections = apiStage.connections?.map(conn => {
-            // Map the string filter operator to the enum value
-            let filterOp = ConnectionFilterOperator.AND; // Default to AND
-            if (conn.filterOperator === 'FILTER_OPERATOR_OR') {
-              filterOp = ConnectionFilterOperator.OR;
-            }
-            
-            return {
-              name: conn.name || '',
-              type: conn.type || '',
-              filters: conn.filters?.map(f => JSON.stringify(f)) || [],
-              filter_operator: filterOp
-            };
-          }) || [];
-          
-          // Map API conditions to internal Condition type
-          const conditions = apiStage.conditions?.map(cond => {
-            // Map the condition type
-            const condType = cond.type === 'CONDITION_TYPE_APPROVAL' ? 
-              ConditionType.APPROVAL : ConditionType.TIME_WINDOW;
-            
-            return {
-              type: condType,
-              approval: cond.approval ? {
-                count: cond.approval.count || 0
-              } : { count: 0 },
-              time_window: cond.timeWindow ? {
-                start: cond.timeWindow.start || '',
-                end: cond.timeWindow.end || '',
-                timezone: 'UTC', // Default timezone since our type requires it
-                week_days: cond.timeWindow?.weekDays || []
-              } : {
-                start: '',
-                end: '',
-                timezone: 'UTC',
-                week_days: []
-              }
-            };
-          }) || [];
-          
-          return {
-            id: apiStage.id || '',
-            name: apiStage.name || '',
-            timestamp: apiStage.createdAt,
-            connections,
-            conditions,
-            // Add any other required fields for Stage type
-            status: '',
-            labels: [],
-            icon: '',
-            queue: [],
-            run_template: {
-              type: RunTemplateType.SEMAPHORE,
-              semaphore: {
-                project_id: '',
-                branch: '',
-                pipeline_file: '',
-                task_id: '',
-                parameters: []
-              }
-            }
-          };
-        });
+        // Use the API stages directly with minimal adaptation
+        const mappedStages = stagesResponse.data?.stages || [];
         
-        // Map API response to internal EventSource type
-        const mappedEventSources: EventSource[] = (eventSourcesResponse.data?.eventSources || []).map(apiEventSource => ({
-          id: apiEventSource.id || '',
-          name: apiEventSource.name || '',
-          timestamp: apiEventSource.createdAt,
-          type: 'default',  // Default type since it's required by our internal type
-          release: '',      // Required by our internal type
-          // Map other properties as needed
-          ...apiEventSource
-        }));
+        // Initialize queues array for each stage (for the real-time events)
+        // Using for...of to properly handle async/await
+        const stagesWithQueues: StageWithEventQueue[] = [];
+        
+        for (const stage of mappedStages) {
+          // fetch stage events
+          const stageEventsResponse = await superplaneListStageEvents({
+            path: { canvasId: id!, stageId: stage.id! }
+          });
+          
+          stagesWithQueues.push({
+            ...stage,
+            queue: stageEventsResponse.data?.events || [] // Add stage events from API
+          });
+        }
+        
+        // Use the API event sources directly
+        const mappedEventSources = eventSourcesResponse.data?.eventSources || [];
         
         // Initialize the store with the mapped data
         const initialData = {
           canvas: canvasResponse.data?.canvas || {},
-          stages: mappedStages,
+          stages: stagesWithQueues,
           event_sources: mappedEventSources,
           handleEvent: () => {},
           removeHandleEvent: () => {},
@@ -147,12 +94,11 @@ export function Canvas() {
         
         initialize(initialData);
         
-        // Set up LiveView event handlers and get cleanup function
-        const cleanup = setupLiveViewHandlers(initialData);
+        // Mark event handlers as ready to be set up
+        markEventHandlersAsSetup();
         setIsLoading(false);
         
-        // Return cleanup function to remove event handlers on unmount
-        return cleanup;
+        // No cleanup function needed here, it will be handled by the useSetupEventHandlers hook
       } catch (err) {
         console.error('Error fetching canvas data:', err);
         setError('Failed to load canvas data');
@@ -161,7 +107,7 @@ export function Canvas() {
     };
     
     fetchCanvasData();
-  }, [id, initialize, setupLiveViewHandlers]);
+  }, [id, initialize, markEventHandlersAsSetup]);
   
   if (isLoading) {
     return <div className="loading-state">Loading canvas...</div>;

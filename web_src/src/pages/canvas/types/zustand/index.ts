@@ -4,7 +4,6 @@ import { AllNodeType, EdgeType } from "../flow";
 
 export type FlowStoreType = {
     fitViewNode: (nodeId: string) => void;
-    autoSaveFlow: (() => void) | undefined;
     componentsToUpdate: string[];
     nodes: AllNodeType[];
     edges: EdgeType[];

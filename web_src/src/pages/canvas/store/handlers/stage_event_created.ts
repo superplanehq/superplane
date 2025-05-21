@@ -1,23 +1,22 @@
-import type { Stage } from "../../types";
-import type { CanvasState } from "../types";
-import type { Event } from "@/canvas/types/flow";
+import type { CanvasState, StageWithEventQueue } from "@/canvas/store/types";
+import type { EventWithStage } from "@/canvas/types/events";
+import { SuperplaneStageEvent } from "@/api-client";
 
 /**
- * Handler for the stage_updated event
+ * Handler for the stage_event_created event
  * Manages updating stages based on incoming events
  */
 export function handleStageEventCreated(
-  payload: any,
+  payload: EventWithStage,
   state: Pick<CanvasState, 'stages' | 'updateStage'>
 ): void {
-  const event = payload as EventWithStage;
-  console.log('Stage updated event received:', event);
+  console.log('Stage event created event received:', payload);
   
   // Check if stage already exists
-  const existingStage = state.stages.find((s: Stage) => s.id === event.stage_id);
+  const existingStage = state.stages.find((s: StageWithEventQueue) => s.id === payload.stage_id);
   if (existingStage) {
-    let queues = existingStage.queues.filter((q: Event) => q.id !== event.id);
-    queues.push(event);
+    const queues = existingStage.queue.filter((q: SuperplaneStageEvent) => q.id !== payload.id);
+    queues.push(payload);
     const updatedStage = {
       ...existingStage,
       queues
@@ -25,7 +24,3 @@ export function handleStageEventCreated(
     state.updateStage(updatedStage);
   }
 }
-
-type EventWithStage = Event & { stage_id: string };
-
-  

@@ -2,13 +2,9 @@ import { Handle, Position, useReactFlow } from '@xyflow/react';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import 'tippy.js/themes/light.css';
-import { useRef, useEffect, useState, CSSProperties } from 'react';
-import { HandleProps,
-  Connection,
-  Condition,
- Approval,
- TimeWindow,
-  } from '@/canvas/types/flow';
+import { useEffect, useState, CSSProperties } from 'react';
+import { HandleProps } from '@/canvas/types/flow';
+import { SuperplaneConnection, SuperplaneCondition, SuperplaneConditionTimeWindow, SuperplaneConditionApproval } from '@/api-client/types.gen';
 
 const BAR_WIDTH = 48;
 const BAR_HEIGHT = 6;
@@ -49,8 +45,7 @@ function BarHandleRight({handleStyle}: {handleStyle: CSSProperties}) {
   return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500"/>
 }
 
-function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handleStyle: CSSProperties, connections?: Connection[], conditions?: Condition[]}) {
-  const handleRef = useRef<HTMLDivElement>(null);
+function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handleStyle: CSSProperties, connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[]}) {
   // Access ReactFlow instance to get zoom level
   const { getZoom } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -79,7 +74,7 @@ function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handle
     };
 
 return (
-  <div className="custom-handle-container" ref={handleRef}>
+  <div className="custom-handle-container">
     {/* Use Tippy directly on the Handle component */}
     <Tippy
       content={<div style={tooltipStyle}><TooltipContent connections={connections} conditions={conditions} /></div>}
@@ -103,23 +98,20 @@ return (
         ]
       }}
     >
-      {/* Use a simple div as the reference */}
-      <div style={{ display: 'flex' }}>
-        <Handle
+      <Handle
           type="target"
           position={Position.Left}
           id="target"
           style={handleStyle}
           className="custom-bar-handle !bg-blue-500"
         />
-      </div>
     </Tippy>
   </div>
 );
 }
 
 
-function TooltipContent({ connections = [], conditions = [] }: { connections?: Connection[], conditions?: Condition[] }) {
+function TooltipContent({ connections = [], conditions = [] }: { connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[] }) {
   return (
     <div className="p-2 min-w-[300px] bg-white">
       <div className="text-xs text-gray-600 font-semibold mb-1">Connections:</div>
@@ -150,17 +142,17 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: C
   );
 }
 
-  function ConditionContent({ condition }: { condition: Condition }) {
+  function ConditionContent({ condition }: { condition: SuperplaneCondition }) {
   switch (condition.type) {
     case 'CONDITION_TYPE_APPROVAL':
-      return <ApprovalContent approval={condition.approval} />;
+      return <ApprovalContent approval={condition.approval!} />;
     case 'CONDITION_TYPE_TIME_WINDOW':
-      return <TimeWindowContent timeWindow={condition.time_window} />;
+      return <TimeWindowContent timeWindow={condition.timeWindow!} />;
     default:
       return null;
   }
 
-  function ApprovalContent({ approval }: { approval: Approval }) {
+  function ApprovalContent({ approval }: { approval: SuperplaneConditionApproval }) {
     return (
       <div className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-1 rounded mr-1 mb-1 border border-emerald-200 flex flex-col">
         <div className="font-bold mb-0.5">Approval Required</div>
@@ -172,7 +164,7 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: C
     );
   }
 
-  function TimeWindowContent({ timeWindow }: { timeWindow: TimeWindow }) {
+  function TimeWindowContent({ timeWindow }: { timeWindow: SuperplaneConditionTimeWindow }) {
     return (
       <div className="bg-amber-100 text-amber-800 text-xs font-semibold px-2 py-1 rounded mr-1 mb-1 border border-amber-200 flex flex-col">
         <div className="font-bold mb-0.5">Time Window</div>
@@ -185,8 +177,8 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: C
         <div className="flex items-center gap-1">
           <span className="font-medium">Days:</span>
           <div className="flex flex-wrap gap-1">
-            {timeWindow.week_days.map((day, i) => (
-              <span key={i} className="bg-amber-200 px-1.5 py-0.5 rounded-full">{day}</span>
+            {timeWindow.weekDays?.map((day, index) => (
+              <span key={index} className="bg-amber-200 px-1.5 py-0.5 rounded-full">{day}</span>
             ))}
           </div>
         </div>

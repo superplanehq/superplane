@@ -1,4 +1,4 @@
-import type { Stage } from "../../types";
+import type { SuperplaneStage } from "@/api-client";
 import type { CanvasState } from "../types";
 
 /**
@@ -6,15 +6,14 @@ import type { CanvasState } from "../types";
  * Manages updating stages based on incoming events
  */
 export function handleStageUpdated(
-  payload: any,
+  payload: SuperplaneStage,
   state: Pick<CanvasState, 'stages' | 'updateStage'>
 ): void {
-  const stage = payload as Stage;
-  console.log('Stage updated event received:', stage);
+  console.log('Stage updated event received:', payload);
   
   // Check if stage already exists
-  const existingStage = state.stages.find((s: Stage) => s.id === stage.id);
+  const existingStage = state.stages.find((s: SuperplaneStage) => s.id === payload.id);
   if (existingStage) {
-    state.updateStage(stage);
+    state.updateStage(payload);
   }
 }

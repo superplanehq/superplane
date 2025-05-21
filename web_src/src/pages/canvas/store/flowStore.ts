@@ -11,7 +11,6 @@ export const useFlowStore = create<FlowStoreType>((set, get) => ({
   nodes: [],
   edges: [],
   componentsToUpdate: [],
-  autoSaveFlow: undefined,
   playgroundPage: false,
   lastCopiedSelection: null,
   handleDragging: undefined,
@@ -29,9 +28,6 @@ export const useFlowStore = create<FlowStoreType>((set, get) => ({
   },
 
   setNode: (id, update, _isUserChange = true, callback) => {
-    // Using _isUserChange with underscore to indicate it's intentionally unused
-    // You can implement tracking of user changes vs. programmatic changes if needed
-    
     const { nodes } = get();
     const nodeIndex = nodes.findIndex((node) => node.id === id);
     

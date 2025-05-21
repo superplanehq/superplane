@@ -8,5 +8,5 @@ export function ViewportLogger() {
       )}, zoom: ${s.transform[2].toFixed(2)}`,
   );
  
-  return <Panel position="bottom-left" className="ml-12">{viewport}</Panel>;
+  return <Panel position="bottom-left" className="!ml-12">{viewport}</Panel>;
 }

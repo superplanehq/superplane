@@ -2,7 +2,7 @@
   stage_id: e1860d7b-62c3-4c9f-8c39-6a1cd3e1d997
   source_id: c0d3b5e7-a561-48e3-9c23-d1c5e4cb1034
   source_name: GitHub Webhooks
-  source_type: event_source
+  source_type: event-source
   filters: '[{"type":"data","data":{"expression":"data.action == \"opened\" && data.pull_request.base.ref == \"main\""}}]'
   filter_operator: and
 

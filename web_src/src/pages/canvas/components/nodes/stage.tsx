@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css'; 
 import CustomBarHandle from './handle';
-import { StageNodeType, QueueState } from '@/canvas/types/flow';
+import { StageNodeType } from '@/canvas/types/flow';
 // import { QueueState } from '../../types/flow';
 
 // Define the data type for the deployment card
@@ -13,17 +13,17 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   
   // Filter events by their state
   const pendingEvents = useMemo(() => 
-    props.data.queues?.filter(event => event.state === QueueState.PENDING) || [], 
+    props.data.queues?.filter(event => event.state === 'STATE_PENDING') || [], 
     [props.data.queues]
   );
   
   const waitingEvents = useMemo(() => 
-    props.data.queues?.filter(event => event.state === QueueState.WAITING) || [], 
+    props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [], 
     [props.data.queues]
   );
   
   const processedEvents = useMemo(() => 
-    props.data.queues?.filter(event => event.state === QueueState.PROCESSED) || [], 
+    props.data.queues?.filter(event => event.state === 'STATE_PROCESSED') || [], 
     [props.data.queues]
   );
   
@@ -63,7 +63,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         <span className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mr-2">
           <span className="material-symbols-outlined text-lg">{props.data.icon}</span>
         </span>
-        <span className="font-bold text-gray-900 flex-1">{props.data.label}</span>
+        <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
         {/* Example action button (menu) */}
         <button className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
           <span className="material-symbols-outlined text-gray-500">more_vert</span>
@@ -98,8 +98,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             <div className="flex items-center p-2 bg-amber-50 rounded mb-1">
               <div className="material-symbols-outlined text-amber-600 mr-2">pending</div>
               <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(pendingEvents[0].created_at).toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {pendingEvents[0].id.substring(0, 8)}...</div>
+                <div className="text-sm font-medium">{new Date(pendingEvents[0].createdAt || '').toLocaleString()}</div>
+                <div className="text-xs text-gray-600">ID: {pendingEvents[0].id!.substring(0, 8)}...</div>
               </div>
             </div>
             {/* Show count of additional pending items */}
@@ -120,12 +120,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             <div className="flex items-center p-2 bg-blue-50 rounded mb-1">
               <div className="material-symbols-outlined text-blue-600 mr-2">hourglass_empty</div>
               <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(waitingEvents[0].created_at).toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {waitingEvents[0].id.substring(0, 8)}...</div>
+                <div className="text-sm font-medium">{new Date(waitingEvents[0].createdAt!).toLocaleString()}</div>
+                <div className="text-xs text-gray-600">ID: {waitingEvents[0].id!.substring(0, 8)}...</div>
               </div>
               <button 
-                onClick={() => props.data.approve_stage_event(waitingEvents[0])}
-                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={() => props.data.approveStageEvent(waitingEvents[0])}
+                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Approve
               </button>
@@ -146,7 +146,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <div className="material-symbols-outlined text-green-600 mr-2">check_circle</div>
               <div className="flex-1">
                 <div className="text-sm">{processedEvents.length} processed</div>
-                <div className="text-xs text-gray-600">Latest: {new Date(processedEvents[0].created_at).toLocaleString()}</div>
+                <div className="text-xs text-gray-600">Latest: {new Date(processedEvents[0].createdAt!).toLocaleString()}</div>
               </div>
             </div>
           </>

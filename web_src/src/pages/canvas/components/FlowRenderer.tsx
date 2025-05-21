@@ -7,7 +7,8 @@ import '@xyflow/react/dist/style.css';
 import StageNode from './nodes/stage';
 import GithubIntegration from './nodes/event_source';
 import { FlowDevTools } from './devtools';
-import { AllNodeType, Event } from "../types/flow";
+import { AllNodeType } from "../types/flow";
+import { SuperplaneStageEvent } from "@/api-client/types.gen";
 
 export const nodeTypes = {
   deploymentCard: StageNode,
@@ -41,16 +42,16 @@ export const FlowRenderer: React.FC = () => {
         id: es.id,
         type: 'githubIntegration',
         data: {
-          label: es.name,
-          repoName: es.name,
-          repoUrl: es.url,
-          lastEvent: es.lastEvent || {
+          id: es.name,
+          repoName: "repo/name",
+          repoUrl: "repo/url",
+          lastEvent: {
             type: 'push',
             release: 'v1.0.0',
             timestamp: '2023-01-01T00:00:00'
           }
         },
-        position: nodePositions[es.id] || { x: 0, y: idx * 320 },
+        position: nodePositions[es.id!] || { x: 0, y: idx * 320 },
         draggable: true
       })),
       ...stages.map((st, idx) => ({
@@ -58,23 +59,23 @@ export const FlowRenderer: React.FC = () => {
         type: 'deploymentCard',
         data: {
           label: st.name,
-          labels: st.labels || [],
-          status: st.status,
-          timestamp: st.timestamp,
-          icon: st.icon || "storage",
-          queues: st.queues || [],
+          labels: [],
+          status: "",
+          icon: "storage",
+          queues: st.queue || [],
           connections: st.connections || [],
           conditions: st.conditions || [],
-          run_template: st.run_template,
-          approve_stage_event: (event: Event) => {
-            console.log('Approve stage event', event);
-            approveStageEvent(event.id, st.id);
+          runTemplate: st.runTemplate,
+          approveStageEvent: (event: SuperplaneStageEvent) => {
+            approveStageEvent(event.id!, st.id!);
           }
         },
-        position: nodePositions[st.id] || { x: 600 * ((st.connections?.length || 1)), y: (idx -1) * 400 },
+        position: nodePositions[st.id!] || { x: 600 * ((st.connections?.length || 1)), y: (idx -1) * 400 },
         draggable: true
-      }))
+      })) 
     ] as AllNodeType[]; // Use type assertion to resolve the complex type issue
+
+    
     
     // Convert data model to React Flow edges
     const flowEdges = stages.flatMap((st) =>
@@ -83,11 +84,11 @@ export const FlowRenderer: React.FC = () => {
         const sourceObj =
           event_sources.find((es) => es.name === conn.name) ||
           stages.find((s) => s.name === conn.name);
-        const sourceId = sourceObj?.id ?? conn.name;
+        const sourceId = sourceObj?.id ?? conn.name!;
         return { 
           id: `e-${conn.name}-${st.id}`, 
           source: sourceId, 
-          target: st.id, 
+          target: st.id!, 
           type: "smoothstep", 
           animated: true, 
           style: isEvent ? { stroke: '#FF0000', strokeWidth: 2 } : undefined 

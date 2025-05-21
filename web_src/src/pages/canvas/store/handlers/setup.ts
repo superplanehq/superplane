@@ -1,58 +1,42 @@
-import type { CanvasInitialData } from "../../types";
+import { useWebSocketEvent } from "../../hooks/useWebSocket";
+import { handleStageAdded } from "./stage_added";
+import { handleStageUpdated } from "./stage_updated";
+import { handleEventSourceAdded } from "./event_source_added";
+import { handleCanvasUpdated } from "./canvas_updated";
+import { handleStageEventCreated } from "./stage_event_created";
+import { handleStageEventApproved } from "./stage_event_approved";
+import { useCanvasStore } from "../canvasStore";
 
 /**
- * Sets up the event handlers for the canvas store
- * Registers listeners for relevant events and returns a cleanup function
+ * Custom React hook that sets up the event handlers for the canvas store
+ * Registers listeners for relevant events
+ * This must be used within a React component or another custom hook
  */
-export function setupEventHandlers(
-  initialData: CanvasInitialData,
-): () => void {
-  if (!initialData.handleEvent) {
-    console.warn("handleEvent not provided to Canvas Store");
-    return () => {};
-  }
+export function useSetupEventHandlers(canvasId: string): void {
+  // Get store from Zustand
+  const store = useCanvasStore();
+  
+  useWebSocketEvent('stage_added', (payload) => {
+    handleStageAdded(payload, store);
+  }, canvasId);
 
-  // const handlerRefs: HandlerRef[] = [];
+  useWebSocketEvent('stage_updated', (payload) => {
+    handleStageUpdated(payload, store);
+  }, canvasId);
 
-  // // Register the stage_added event handler
-  // const stageAddedRef = initialData.handleEvent('stage_added', (payload) => {
-  //   handleStageAdded(payload, state);
-  // });
-  // handlerRefs.push(stageAddedRef);
+  useWebSocketEvent('event_source_added', (payload) => {
+    handleEventSourceAdded(payload, store);
+  }, canvasId);
 
-  // // Register the stage_updated event handler
-  // const stageUpdatedRef = initialData.handleEvent('stage_updated', (payload) => {
-  //   handleStageUpdated(payload, state);
-  // });
-  // handlerRefs.push(stageUpdatedRef);
+  useWebSocketEvent('canvas_updated', (payload) => {
+    handleCanvasUpdated(payload, store);
+  }, canvasId);
 
-  // // Register the event_source_added event handler
-  // const eventSourceAddedRef = initialData.handleEvent('event_source_added', (payload) => {
-  //   handleEventSourceAdded(payload, state);
-  // });
-  // handlerRefs.push(eventSourceAddedRef);
+  useWebSocketEvent('new_stage_event', (payload) => {
+    handleStageEventCreated(payload, store);
+  }, canvasId);
 
-  // // Register the canvas_updated event handler
-  // const canvasUpdatedRef = initialData.handleEvent('canvas_updated', (payload) => {
-  //   handleCanvasUpdated(payload, state);
-  // });
-  // handlerRefs.push(canvasUpdatedRef);
-
-  // const stageEventCreatedRef = initialData.handleEvent('new_stage_event', (payload) => {
-  //   handleStageEventCreated(payload, state);
-  // });
-  // handlerRefs.push(stageEventCreatedRef);
-
-  // const stageEventApprovedRef = initialData.handleEvent('stage_event_approved', (payload) => {
-  //   handleStageEventApproved(payload, state);
-  // });
-  // handlerRefs.push(stageEventApprovedRef);
-
-  // // Return cleanup function to remove all handlers
-  // return () => {
-  //   if (initialData.removeHandleEvent) {
-  //     handlerRefs.forEach(ref => initialData.removeHandleEvent(ref));
-  //   }
-  // };
-  return () => {};
+  useWebSocketEvent('stage_event_approved', (payload) => {
+    handleStageEventApproved(payload, store);
+  }, canvasId);
 }

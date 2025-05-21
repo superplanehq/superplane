@@ -27,12 +27,10 @@ services:
       START_PENDING_EXECUTIONS_WORKER: "yes"
       START_GRPC_GATEWAY: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
-      START_GRPC_GATEWAY: "yes"
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
     ports:
-      - 4000:4000
       - 5173:5173
       - 4173:4173
       - 8000:8000
@@ -46,10 +44,6 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
-
-    ports:
-      - 8000:8000
-      - 50051:50051
 
   db:
     image: postgres:17.5
