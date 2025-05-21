@@ -64,13 +64,18 @@ openapi.spec.gen:
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
-	rm -rf pkg/openapi_client && \
+	rm -rf pkg/openapi_client
 	openapi-generator generate \
 		-i api/swagger/superplane.swagger.json \
 		-g go \
 		-o pkg/openapi_client \
-		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false && \
+		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
 	rm -rf pkg/openapi_client/test
+	rm -rf pkg/openapi_client/docs
+	rm -rf pkg/openapi_client/api
+	rm -rf pkg/openapi_client/.travis.yml
+	rm -rf pkg/openapi_client/README.md
+	rm -rf pkg/openapi_client/git_push.sh
 
 dev.setup: db.test.create db.migrate
 

@@ -388,6 +388,30 @@ message StageEvent {
   StateReason state_reason = 5;
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
+  Execution execution = 8;
+}
+
+message Execution {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_FINISHED = 4;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+  }
+
+  string id = 1;
+  string reference_id = 2;
+  State state = 3;
+  Result result = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
 }
 
 message StageEventApproval {

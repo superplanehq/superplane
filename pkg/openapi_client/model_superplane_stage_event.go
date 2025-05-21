@@ -24,10 +24,11 @@ type SuperplaneStageEvent struct {
 	Id *string `json:"id,omitempty"`
 	SourceId *string `json:"sourceId,omitempty"`
 	SourceType *SuperplaneConnectionType `json:"sourceType,omitempty"`
-	State *StageEventState `json:"state,omitempty"`
+	State *SuperplaneStageEventState `json:"state,omitempty"`
 	StateReason *StageEventStateReason `json:"stateReason,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
+	Execution *SuperplaneExecution `json:"execution,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -38,7 +39,7 @@ func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
 	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
-	var state StageEventState = STAGEEVENTSTATE_STATE_UNKNOWN
+	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason StageEventStateReason = STAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
 	this.StateReason = &stateReason
@@ -52,7 +53,7 @@ func NewSuperplaneStageEventWithDefaults() *SuperplaneStageEvent {
 	this := SuperplaneStageEvent{}
 	var sourceType SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
 	this.SourceType = &sourceType
-	var state StageEventState = STAGEEVENTSTATE_STATE_UNKNOWN
+	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
 	var stateReason StageEventStateReason = STAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
 	this.StateReason = &stateReason
@@ -156,9 +157,9 @@ func (o *SuperplaneStageEvent) SetSourceType(v SuperplaneConnectionType) {
 }
 
 // GetState returns the State field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetState() StageEventState {
+func (o *SuperplaneStageEvent) GetState() SuperplaneStageEventState {
 	if o == nil || IsNil(o.State) {
-		var ret StageEventState
+		var ret SuperplaneStageEventState
 		return ret
 	}
 	return *o.State
@@ -166,7 +167,7 @@ func (o *SuperplaneStageEvent) GetState() StageEventState {
 
 // GetStateOk returns a tuple with the State field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetStateOk() (*StageEventState, bool) {
+func (o *SuperplaneStageEvent) GetStateOk() (*SuperplaneStageEventState, bool) {
 	if o == nil || IsNil(o.State) {
 		return nil, false
 	}
@@ -182,8 +183,8 @@ func (o *SuperplaneStageEvent) HasState() bool {
 	return false
 }
 
-// SetState gets a reference to the given StageEventState and assigns it to the State field.
-func (o *SuperplaneStageEvent) SetState(v StageEventState) {
+// SetState gets a reference to the given SuperplaneStageEventState and assigns it to the State field.
+func (o *SuperplaneStageEvent) SetState(v SuperplaneStageEventState) {
 	o.State = &v
 }
 
@@ -283,6 +284,38 @@ func (o *SuperplaneStageEvent) SetApprovals(v []SuperplaneStageEventApproval) {
 	o.Approvals = v
 }
 
+// GetExecution returns the Execution field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetExecution() SuperplaneExecution {
+	if o == nil || IsNil(o.Execution) {
+		var ret SuperplaneExecution
+		return ret
+	}
+	return *o.Execution
+}
+
+// GetExecutionOk returns a tuple with the Execution field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStageEvent) GetExecutionOk() (*SuperplaneExecution, bool) {
+	if o == nil || IsNil(o.Execution) {
+		return nil, false
+	}
+	return o.Execution, true
+}
+
+// HasExecution returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasExecution() bool {
+	if o != nil && !IsNil(o.Execution) {
+		return true
+	}
+
+	return false
+}
+
+// SetExecution gets a reference to the given SuperplaneExecution and assigns it to the Execution field.
+func (o *SuperplaneStageEvent) SetExecution(v SuperplaneExecution) {
+	o.Execution = &v
+}
+
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -313,6 +346,9 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Approvals) {
 		toSerialize["approvals"] = o.Approvals
+	}
+	if !IsNil(o.Execution) {
+		toSerialize["execution"] = o.Execution
 	}
 	return toSerialize, nil
 }

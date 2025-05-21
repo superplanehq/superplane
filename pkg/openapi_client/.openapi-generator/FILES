@@ -10,9 +10,9 @@ model_connection_filter.go
 model_connection_filter_operator.go
 model_connection_filter_type.go
 model_connection_header_filter.go
+model_execution_result.go
 model_protobuf_any.go
 model_rpc_status.go
-model_stage_event_state.go
 model_stage_event_state_reason.go
 model_superplane_approve_stage_event_body.go
 model_superplane_approve_stage_event_response.go
@@ -33,6 +33,8 @@ model_superplane_describe_canvas_response.go
 model_superplane_describe_event_source_response.go
 model_superplane_describe_stage_response.go
 model_superplane_event_source.go
+model_superplane_execution.go
+model_superplane_execution_state.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_stage_events_response.go
 model_superplane_list_stages_response.go
@@ -42,6 +44,7 @@ model_superplane_semaphore_run_template.go
 model_superplane_stage.go
 model_superplane_stage_event.go
 model_superplane_stage_event_approval.go
+model_superplane_stage_event_state.go
 model_superplane_update_stage_body.go
 model_superplane_update_stage_response.go
 response.go

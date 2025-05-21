@@ -544,15 +544,14 @@
         }
       }
     },
-    "StageEventState": {
+    "ExecutionResult": {
       "type": "string",
       "enum": [
-        "STATE_UNKNOWN",
-        "STATE_PENDING",
-        "STATE_WAITING",
-        "STATE_PROCESSED"
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED"
       ],
-      "default": "STATE_UNKNOWN"
+      "default": "RESULT_UNKNOWN"
     },
     "StageEventStateReason": {
       "type": "string",
@@ -799,6 +798,45 @@
         }
       }
     },
+    "SuperplaneExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "referenceId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/ExecutionResult"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finishedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
     "SuperplaneListEventSourcesResponse": {
       "type": "object",
       "properties": {
@@ -931,7 +969,7 @@
           "$ref": "#/definitions/SuperplaneConnectionType"
         },
         "state": {
-          "$ref": "#/definitions/StageEventState"
+          "$ref": "#/definitions/SuperplaneStageEventState"
         },
         "stateReason": {
           "$ref": "#/definitions/StageEventStateReason"
@@ -946,6 +984,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneStageEventApproval"
           }
+        },
+        "execution": {
+          "$ref": "#/definitions/SuperplaneExecution"
         }
       }
     },
@@ -960,6 +1001,16 @@
           "format": "date-time"
         }
       }
+    },
+    "SuperplaneStageEventState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_WAITING",
+        "STATE_PROCESSED"
+      ],
+      "default": "STATE_UNKNOWN"
     },
     "SuperplaneUpdateStageBody": {
       "type": "object",
