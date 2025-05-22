@@ -5,11 +5,6 @@ ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 
 FROM ${BUILDER_IMAGE} AS base
 
-ARG APP_NAME
-ENV APP_NAME=${APP_NAME}
-
-RUN echo "Build of $APP_NAME started"
-
 RUN apt-get update -y && apt-get install --no-install-recommends -y ca-certificates unzip curl postgresql-client libc-bin libc6 \
     && apt-get clean && rm -f /var/lib/apt/lists/*_*
 
@@ -68,17 +63,16 @@ WORKDIR /app
 RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.1
 
-WORKDIR /app/web_src
-RUN npm install
-RUN npm run build
-
-WORKDIR /app
-
 CMD [ "/bin/bash",  "-c \"while sleep 1000; do :; done\"" ]
 
 FROM base AS builder
 
-RUN rm -rf build && go build -o build/${APP_NAME} cmd/server/main.go
+WORKDIR /app
+RUN rm -rf build && go build -o build/superplane cmd/server/main.go
+
+WORKDIR /app/web_src
+RUN npm install
+RUN npm run build
 
 FROM ${RUNNER_IMAGE} AS runner
 
@@ -94,16 +88,13 @@ HEALTHCHECK NONE
 WORKDIR /app
 RUN chown nobody /app
 
-ARG APP_NAME
-ENV APP_NAME=${APP_NAME}
-
-# Only copy the binary, migrations, entrypoint, and a few CLIs needed for the app startup from the build stage
+# Copy every artifact needed to run the application from previous stages
 COPY --from=builder --chown=nobody:root /usr/bin/createdb /usr/bin/createdb
 COPY --from=builder --chown=nobody:root /usr/bin/migrate /usr/bin/migrate
-COPY --from=builder --chown=nobody:root /app/build/${APP_NAME} /app/build/${APP_NAME}
+COPY --from=builder --chown=nobody:root /app/build/superplane /app/build/superplane
 COPY --from=builder --chown=nobody:root /app/docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY --from=builder --chown=nobody:root /app/db/migrations /app/db/migrations
-COPY --from=builder --chown=nobody:root /app/web/assets/dist /app/web/assets/dist
+COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/web/assets/dist
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
 
 USER nobody

@@ -77,6 +77,30 @@ openapi.client.gen:
 	rm -rf pkg/openapi_client/README.md
 	rm -rf pkg/openapi_client/git_push.sh
 
+#
+# Image and CLI build
+#
+
+cli.build:
+	go build -o build/cli cmd/cli/main.go
+
+IMAGE?=superplane
+IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
+REGISTRY_HOST?=ghcr.io/superplanehq
+image.build:
+	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --progress plain -t $(IMAGE):$(IMAGE_TAG) .
+
+image.auth:
+	@printf "%s" "$(GITHUB_TOKEN)" | docker login ghcr.io -u superplanehq --password-stdin
+
+image.push:
+	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
+
+#
+# Dev environment helpers
+#
+
 dev.setup: db.test.create db.migrate
 
 dev.console: dev.setup
@@ -84,6 +108,3 @@ dev.console: dev.setup
 
 dev.server: dev.setup
 	docker compose run --rm --service-ports app air 
-
-build.cli:
-	go build -o build/cli cmd/cli/main.go
