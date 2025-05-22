@@ -35,7 +35,7 @@ services:
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
     ports:
-      - 8000:8000
+      - 80:8000
       - 50051:50051
 
     links:
