@@ -414,8 +414,7 @@
                 "STATE_REASON_TIME_WINDOW",
                 "STATE_REASON_EXECUTION",
                 "STATE_REASON_CONNECTION",
-                "STATE_REASON_CANCELLED",
-                "STATE_REASON_UNHEALTHY"
+                "STATE_REASON_CANCELLED"
               ]
             },
             "collectionFormat": "multi"
@@ -583,8 +582,7 @@
         "STATE_REASON_TIME_WINDOW",
         "STATE_REASON_EXECUTION",
         "STATE_REASON_CONNECTION",
-        "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY"
+        "STATE_REASON_CANCELLED"
       ],
       "default": "STATE_REASON_UNKNOWN"
     },
@@ -689,6 +687,13 @@
         },
         "filterOperator": {
           "$ref": "#/definitions/ConnectionFilterOperator"
+        },
+        "kv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneKVDef"
+          }
         }
       }
     },
@@ -859,6 +864,31 @@
       ],
       "default": "STATE_UNKNOWN"
     },
+    "SuperplaneKV": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneKVDef": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
       "properties": {
@@ -912,6 +942,13 @@
       "properties": {
         "type": {
           "$ref": "#/definitions/SuperplaneRunTemplateType"
+        },
+        "kv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneKVDef"
+          }
         },
         "semaphore": {
           "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
@@ -1021,6 +1058,13 @@
         },
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
+        },
+        "kv": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneKV"
+          }
         }
       }
     },

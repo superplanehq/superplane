@@ -81,6 +81,18 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		return nil, fmt.Errorf("missing run template")
 	}
 
+	//
+	// Validate KV definitions
+	//
+	kvDefs := []models.KVDef{}
+	for _, kvDef := range in.Kv {
+		if kvDef.Key == "" {
+			return nil, fmt.Errorf("invalid key-value pair definition")
+		}
+
+		kvDefs = append(kvDefs, models.KVDef{Key: kvDef.Key, Required: &kvDef.Required})
+	}
+
 	switch in.Type {
 	case pb.RunTemplate_TYPE_SEMAPHORE:
 		if in.Semaphore.OrganizationUrl == "" {
@@ -102,6 +114,7 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 
 		return &models.RunTemplate{
 			Type: models.RunTemplateTypeSemaphore,
+			KV:   kvDefs,
 			Semaphore: &models.SemaphoreRunTemplate{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
@@ -136,12 +149,29 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 			return nil, err
 		}
 
+		//
+		// Validate KV definitions
+		//
+		kvDefs := []models.KVDef{}
+		if len(connection.Kv) == 0 {
+			return nil, fmt.Errorf("empty key-value pair definitions")
+		}
+
+		for _, kvDef := range connection.Kv {
+			if kvDef.Key == "" || kvDef.ValueFrom == "" {
+				return nil, fmt.Errorf("invalid key-value pair definition")
+			}
+
+			kvDefs = append(kvDefs, models.KVDef{Key: kvDef.Key, ValueFrom: &kvDef.ValueFrom})
+		}
+
 		cs = append(cs, models.StageConnection{
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
 			SourceType:     protoToConnectionType(connection.Type),
 			FilterOperator: protoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
+			KV:             kvDefs,
 		})
 	}
 

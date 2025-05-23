@@ -35,7 +35,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     mv bin/protoc /usr/local/bin/protoc && \
     rm -rf protoc.zip
 
-
 WORKDIR /app
 COPY pkg pkg
 COPY cmd cmd

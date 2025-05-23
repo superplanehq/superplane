@@ -31,6 +31,7 @@ type StageExecution struct {
 	UpdatedAt    *time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
+	KV           datatypes.JSON
 
 	//
 	// TODO: not so sure about this column
@@ -42,10 +43,32 @@ type StageExecution struct {
 	// that all IDs will be UUIDs.
 	//
 	ReferenceID string
+}
 
-	// TODO: I'm storing the extra tags pushed from the execution here,
-	// but I'm not sure if that is the best place for it
-	Tags datatypes.JSON
+func (e *StageExecution) GetKVFromEvent(tx *gorm.DB) (map[string]string, error) {
+	var data struct {
+		Raw datatypes.JSON
+	}
+
+	err := tx.
+		Table("stage_executions").
+		Select("stage_events.kv").
+		Joins("inner join stage_events ON stage_executions.stage_event_id = stage_events.id").
+		Where("stage_executions.id = ?", e.ID).
+		Scan(&data).
+		Error
+
+	if err != nil {
+		return nil, fmt.Errorf("error finding event: %v", err)
+	}
+
+	var m map[string]string
+	err = json.Unmarshal(data.Raw, &m)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling data: %v", err)
+	}
+
+	return m, nil
 }
 
 func (e *StageExecution) GetEventData() (map[string]any, error) {
@@ -115,10 +138,10 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 		Error
 }
 
-func (e *StageExecution) AddTags(tags []byte) error {
+func (e *StageExecution) AddKV(kv []byte) error {
 	return database.Conn().Model(e).
 		Clauses(clause.Returning{}).
-		Update("tags", tags).
+		Update("kv", kv).
 		Update("updated_at", time.Now()).
 		Error
 }

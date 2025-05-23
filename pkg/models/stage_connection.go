@@ -21,8 +21,29 @@ type StageConnection struct {
 	SourceID       uuid.UUID
 	SourceName     string
 	SourceType     string
-	Filters        datatypes.JSONSlice[StageConnectionFilter]
 	FilterOperator string
+	Filters        datatypes.JSONSlice[StageConnectionFilter]
+	KV             datatypes.JSONSlice[KVDef]
+}
+
+type KVDef struct {
+	Key       string  `json:"key"`
+	ValueFrom *string `json:"value_from,omitempty"`
+	Required  *bool   `json:"required,omitempty"`
+}
+
+func (c *StageConnection) EvaluateKVs(event *Event) (map[string]string, error) {
+	kv := map[string]string{}
+	for _, kvDef := range c.KV {
+		v, err := event.EvaluateStringExpression(*kvDef.ValueFrom)
+		if err != nil {
+			return nil, err
+		}
+
+		kv[kvDef.Key] = v
+	}
+
+	return kv, nil
 }
 
 func (c *StageConnection) Accept(event *Event) (bool, error) {

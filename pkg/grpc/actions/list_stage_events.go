@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -117,6 +118,20 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
+		Kv:          []*pb.KV{},
+	}
+
+	//
+	// Add KV pairs.
+	//
+	var kv map[string]string
+	err := json.Unmarshal(in.KV, &kv)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range kv {
+		e.Kv = append(e.Kv, &pb.KV{Key: k, Value: v})
 	}
 
 	//
@@ -225,8 +240,6 @@ func stateReasonToProto(stateReason string) pb.StageEvent_StateReason {
 		return pb.StageEvent_STATE_REASON_CONNECTION
 	case models.StageEventStateReasonCancelled:
 		return pb.StageEvent_STATE_REASON_CANCELLED
-	case models.StageEventStateReasonUnhealthy:
-		return pb.StageEvent_STATE_REASON_UNHEALTHY
 	default:
 		return pb.StageEvent_STATE_REASON_UNKNOWN
 	}

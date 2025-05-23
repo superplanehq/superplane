@@ -414,7 +414,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		assert.Equal(t, 200, response.Code)
 		execution, err := models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		compareJSONB(t, tags, []byte(execution.Tags))
+		compareJSONB(t, tags, []byte(execution.KV))
 	})
 
 	t.Run("tags are limited to 4k", func(t *testing.T) {

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -22,7 +23,6 @@ const (
 	StageEventStateReasonExecution  = "execution"
 	StageEventStateReasonConnection = "connection"
 	StageEventStateReasonCancelled  = "cancelled"
-	StageEventStateReasonUnhealthy  = "unhealthy"
 )
 
 var (
@@ -39,6 +39,7 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
+	KV          datatypes.JSON
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -113,10 +114,15 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 }
 
 func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason)
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, map[string]string{})
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, kv map[string]string) (*StageEvent, error) {
+	data, err := json.Marshal(kv)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	stageEvent := StageEvent{
 		StageID:     stageID,
@@ -127,9 +133,10 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		State:       state,
 		StateReason: stateReason,
 		CreatedAt:   &now,
+		KV:          datatypes.JSON(data),
 	}
 
-	err := tx.Create(&stageEvent).
+	err = tx.Create(&stageEvent).
 		Clauses(clause.Returning{}).
 		Error
 

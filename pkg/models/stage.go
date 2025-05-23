@@ -132,11 +132,8 @@ type ApprovalCondition struct {
 }
 
 type RunTemplate struct {
-	Type string `json:"type"`
-
-	//
-	// Triggers a workflow on an existing Semaphore project/task.
-	//
+	Type      string                `json:"type"`
+	KV        []KVDef               `json:"kv"`
 	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
 }
 

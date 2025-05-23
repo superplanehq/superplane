@@ -101,12 +101,13 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		return nil
 	}
 
-	err = w.enqueueEvent(logger, event, stages)
+	err = w.enqueueEvent(event, stages, connections)
 	if err != nil {
+		logger.Errorf("Error enqueueing event: %v", err)
 		return err
 	}
 
-	log.Infof("Stages after filtering: %v", w.idsFromStages(stages))
+	log.Infof("Event enqueued: %v", w.idsFromStages(stages))
 	return nil
 }
 
@@ -150,10 +151,20 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 	return filtered, nil
 }
 
-func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Event, stages []models.Stage) error {
+func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage, connections []models.StageConnection) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
-			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "")
+			connection, err := findConnectionForStage(stage.ID.String(), connections)
+			if err != nil {
+				return fmt.Errorf("error finding connection for stage: %v", err)
+			}
+
+			keyValuePairs, err := connection.EvaluateKVs(event)
+			if err != nil {
+				return fmt.Errorf("error evaluating key-value pairs: %v", err)
+			}
+
+			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", keyValuePairs)
 			if err != nil {
 				return err
 			}

@@ -273,6 +273,13 @@ message Connection {
   string name = 2;
   repeated Filter filters = 3;
   FilterOperator filter_operator = 4;
+  repeated KVDef kv = 5;
+}
+
+message KVDef {
+  string key = 1;
+  string value_from = 2;
+  bool required = 3;
 }
 
 message Stage {
@@ -323,7 +330,8 @@ message RunTemplate {
   }
 
   Type type = 1;
-  SemaphoreRunTemplate semaphore = 2;
+  repeated KVDef kv = 2;
+  SemaphoreRunTemplate semaphore = 3;
 }
 
 message SemaphoreRunTemplate {
@@ -395,7 +403,6 @@ message StageEvent {
     STATE_REASON_EXECUTION = 3;
     STATE_REASON_CONNECTION = 4;
     STATE_REASON_CANCELLED = 5;
-    STATE_REASON_UNHEALTHY = 6;
   }
 
   string id = 1;
@@ -406,6 +413,12 @@ message StageEvent {
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
+  repeated KV kv = 9;
+}
+
+message KV {
+  string key = 1;
+  string value = 2;
 }
 
 message Execution {

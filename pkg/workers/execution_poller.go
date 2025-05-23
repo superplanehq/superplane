@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -73,7 +74,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		tags, err := w.processExecutionTags(tx, logger, execution, result)
+		kvPairs, err := w.processExecutionKV(tx, execution)
 		if err != nil {
 			logger.Errorf("Error processing execution tags: %v", err)
 			return err
@@ -97,7 +98,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.
 		//
-		if err := w.createStageCompletionEvent(tx, execution, tags); err != nil {
+		if err := w.createStageCompletionEvent(tx, execution, kvPairs); err != nil {
 			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
@@ -186,13 +187,13 @@ func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID stri
 	return pipeline, nil
 }
 
-func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
+func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, kvPairs map[string]string) error {
 	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}
 
-	e, err := events.NewStageExecutionCompletion(execution, tags)
+	e, err := events.NewStageExecutionCompletion(execution, kvPairs)
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
@@ -210,18 +211,46 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 	return nil
 }
 
-func (w *ExecutionPoller) processExecutionTags(tx *gorm.DB, logger *log.Entry, execution *models.StageExecution, result string) (map[string]string, error) {
-	tags := map[string]string{}
+func (w *ExecutionPoller) processExecutionKV(tx *gorm.DB, execution *models.StageExecution) (map[string]string, error) {
+	//
+	// Include key-value pairs from stage event.
+	//
+	kv, err := execution.GetKVFromEvent(tx)
+	if err != nil {
+		return nil, err
+	}
 
 	//
 	// Include extra tags from execution, if any.
 	//
-	if execution.Tags != nil {
-		err := json.Unmarshal(execution.Tags, &tags)
+	if execution.KV != nil {
+		var m map[string]string
+		err := json.Unmarshal(execution.KV, &m)
 		if err != nil {
-			return nil, fmt.Errorf("error adding tags from execution: %v", err)
+			return nil, fmt.Errorf("error adding labels from execution: %v", err)
 		}
+
+		maps.Copy(kv, m)
 	}
 
-	return tags, nil
+	//
+	// Create stage kv pairs
+	//
+	now := time.Now()
+	records := []models.StageKV{}
+	for k, v := range kv {
+		records = append(records, models.StageKV{
+			StageID:   execution.StageID,
+			Key:       k,
+			Value:     v,
+			CreatedAt: &now,
+		})
+	}
+
+	err = database.Conn().Create(records).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return kv, nil
 }

@@ -138,7 +138,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/executions/{executionID}/tags", s.HandleExecutionTags).
+		HandleFunc(s.BasePath+"/executions/{executionID}/kv", s.HandleExecutionKV).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -180,7 +180,7 @@ func (s *Server) Close() {
 	}
 }
 
-func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleExecutionKV(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	executionID, err := uuid.Parse(vars["executionID"])
 	if err != nil {
@@ -232,7 +232,7 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = execution.AddTags(body)
+	err = execution.AddKV(body)
 	if err != nil {
 		http.Error(w, "Error updating tags", http.StatusInternalServerError)
 		return

@@ -103,7 +103,8 @@ CREATE TABLE public.stage_connections (
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
     filter_operator character varying(16) NOT NULL,
-    filters jsonb NOT NULL
+    filters jsonb NOT NULL,
+    kv_defs jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -132,7 +133,8 @@ CREATE TABLE public.stage_events (
     source_type character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     state_reason character varying(64),
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    kv jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -147,11 +149,24 @@ CREATE TABLE public.stage_executions (
     reference_id character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
-    tags jsonb,
+    kv jsonb,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
     finished_at timestamp without time zone
+);
+
+
+--
+-- Name: stage_kvs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stage_kvs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    stage_id uuid NOT NULL,
+    key character varying(64) NOT NULL,
+    value character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -267,6 +282,14 @@ ALTER TABLE ONLY public.stage_events
 
 ALTER TABLE ONLY public.stage_executions
     ADD CONSTRAINT stage_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: stage_kvs stage_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_kvs
+    ADD CONSTRAINT stage_kvs_pkey PRIMARY KEY (id);
 
 
 --
@@ -397,6 +420,14 @@ ALTER TABLE ONLY public.stage_executions
 
 
 --
+-- Name: stage_kvs stage_kvs_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_kvs
+    ADD CONSTRAINT stage_kvs_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
+
+
+--
 -- Name: stages stages_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -431,7 +462,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250512212918	f
+20250522204154	f
 \.
 
 
