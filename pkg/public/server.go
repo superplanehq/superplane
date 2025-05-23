@@ -48,6 +48,11 @@ type Server struct {
 	wsHub                 *ws.Hub
 }
 
+// WebsocketHub returns the websocket hub for this server
+func (s *Server) WebsocketHub() *ws.Hub {
+	return s.wsHub
+}
+
 func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
@@ -59,6 +64,7 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 		upgrader:              &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
+				// TODO: implement origin checking
 				return true
 			},
 			ReadBufferSize:  1024,
@@ -142,7 +148,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	s.Router.HandleFunc("/ws/{canvasId}", s.handleWebSocket)
 
 	// Check if we're in development mode
-	if os.Getenv("ENV") == "dev" {
+	if os.Getenv("APP_ENV") == "development" {
 		log.Info("Running in development mode - proxying to Vite dev server for web app")
 		s.setupDevProxy(webBasePath)
 	} else {

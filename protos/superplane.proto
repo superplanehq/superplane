@@ -94,17 +94,6 @@ service Superplane {
     };
   }
 
-  rpc ListCanvases(ListCanvasesRequest) returns (ListCanvasesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvases";
-      description: "Returns a list of all canvases";
-      tags: "Canvas";
-    };
-  }
-
   rpc ListStages(ListStagesRequest) returns (ListStagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/stages"
@@ -381,14 +370,6 @@ message UpdateStageRequest {
 
 message UpdateStageResponse {
   Stage stage = 1;
-}
-
-message ListCanvasesRequest {
-  string organization_id = 1;
-}
-
-message ListCanvasesResponse {
-  repeated Canvas canvases = 1;
 }
 
 message ListStagesRequest {

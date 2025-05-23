@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"encoding/json"
@@ -35,7 +35,7 @@ func HandleExecutionCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Found execution in database, convert to a WebSocket-friendly format
 	wsEvent := map[string]interface{}{
-		"type": "execution_created",
+		"event": "execution_created",
 		"payload": map[string]interface{}{
 			"id":             execution.ID.String(),
 			"stage_id":       execution.StageID.String(),

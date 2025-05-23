@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func HandleEventSourceCreated(messageBody []byte, wsHub *ws.Hub) error {
 	// Convert protobuf to a more websocket-friendly format with complete information
 	// Use only the fields that exist in the EventSource structure
 	wsEvent := map[string]interface{}{
-		"type": "event_source_added",
+		"event":   "event_source_added",
 		"payload": describeEventSourceResp.EventSource,
 	}
 

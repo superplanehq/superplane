@@ -65,17 +65,13 @@ func (h *Hub) registerClient(client *Client) {
 	h.mutex.Lock()
 	defer h.mutex.Unlock()
 
-	// Register the client globally
 	h.clients[client] = true
 
-	// If the client is subscribed to a specific canvas, register it there too
-	if client.canvasID != "" {
-		if _, ok := h.canvasSubscriptions[client.canvasID]; !ok {
-			h.canvasSubscriptions[client.canvasID] = make(map[*Client]bool)
-		}
-		h.canvasSubscriptions[client.canvasID][client] = true
-		log.Debugf("Client subscribed to canvas: %s", client.canvasID)
+	if _, ok := h.canvasSubscriptions[client.canvasID]; !ok {
+		h.canvasSubscriptions[client.canvasID] = make(map[*Client]bool)
 	}
+	h.canvasSubscriptions[client.canvasID][client] = true
+	log.Debugf("Client subscribed to canvas: %s", client.canvasID)
 
 	log.Debugf("New client registered, total clients: %d", len(h.clients))
 }

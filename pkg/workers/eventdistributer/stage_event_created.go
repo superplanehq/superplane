@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"context"
@@ -46,7 +46,7 @@ func HandleStageEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Convert to a websocket-friendly format
 	wsEvent := map[string]interface{}{
-		"type":    "new_stage_event",
+		"event":   "new_stage_event",
 		"payload": payload,
 	}
 
