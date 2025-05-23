@@ -1,0 +1,39 @@
+- id: 4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a
+  stage_id: e1860d7b-62c3-4c9f-8c39-6a1cd3e1d997
+  event_id: 9a8b7c6d-5e4f-4e2d-9f0a-9b8c7d6e5f4a
+  source_id: c0d3b5e7-a561-48e3-9c23-d1c5e4cb1034
+  source_name: GitHub Webhooks
+  source_type: event_source
+  state: processed
+  state_reason: approval
+  created_at: '2025-05-15T11:00:00Z'
+
+- id: 1e29b57f-3c7d-4571-ab4e-be2b592f8be0
+  stage_id: e1860d7b-62c3-4c9f-8c39-6a1cd3e1d997
+  event_id: 9a8b7c6d-5e4f-4e2d-9f0a-9b8c7d6e5f4a
+  source_id: c0d3b5e7-a561-48e3-9c23-d1c5e4cb1034
+  source_name: GitHub Webhooks
+  source_type: event_source
+  state: pending 
+  state_reason: approval
+  created_at: '2025-05-15T11:00:00Z'
+
+- id: 5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b
+  stage_id: 7d2e892f-b65a-4d1c-a4c6-95cd5df0d423
+  event_id: 9a8b7c6d-5e4f-4e2d-9f0a-9b8c7d6e5f4a
+  source_id: e1860d7b-62c3-4c9f-8c39-6a1cd3e1d997
+  source_name: Build
+  source_type: stage
+  state: processed
+  state_reason: approval
+  created_at: '2025-05-15T11:15:00Z'
+
+- id: 6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c
+  stage_id: 9f7b3c5a-8e2d-4f1b-9d0c-6a8e7c9b5a3d
+  event_id: 9a8b7c6d-5e4f-4e2d-9f0a-9b8c7d6e5f4a
+  source_id: 7d2e892f-b65a-4d1c-a4c6-95cd5df0d423
+  source_name: Test
+  source_type: stage
+  state: pending
+  state_reason: approval
+  created_at: '2025-05-15T11:30:00Z'

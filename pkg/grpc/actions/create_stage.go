@@ -409,7 +409,7 @@ func findConnectionName(stages []models.Stage, sources []models.EventSource, con
 		return "", fmt.Errorf("event source %s not found", connection.ID)
 
 	default:
-		return "", errors.New("invalid type")
+		return "", errors.New("invalid type " + connection.SourceType)
 	}
 }
 

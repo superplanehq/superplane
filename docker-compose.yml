@@ -26,12 +26,10 @@ services:
       START_EXECUTIONS_POLLER: "yes"
       START_PENDING_EXECUTIONS_WORKER: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
-      START_GRPC_GATEWAY: "yes"
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
     ports:
-      - 4000:4000
       - 5173:5173
       - 4173:4173
       - 8000:8000
@@ -47,11 +45,21 @@ services:
       - /tmp:/tmp
 
   db:
-    image: postgres:9.6
+    image: postgres:17.5
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
+  
+  pgweb:
+    image: sosedoff/pgweb
+    environment:
+      DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane?sslmode=disable"
+    ports:
+      - 8081:8081
+    links:
+      - db:db
+
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
     container_name: "rabbitmq"

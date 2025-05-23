@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -21,6 +23,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -38,16 +42,36 @@ type Server struct {
 	encryptor             encryptor.Encryptor
 	jwt                   *jwt.Signer
 	timeoutHandlerTimeout time.Duration
+	upgrader              *websocket.Upgrader
 	Router                *mux.Router
 	BasePath              string
+	wsHub                 *ws.Hub
+}
+
+// WebsocketHub returns the websocket hub for this server
+func (s *Server) WebsocketHub() *ws.Hub {
+	return s.wsHub
 }
 
 func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
+	// Create and initialize a new WebSocket hub
+	wsHub := ws.NewHub()
+
 	server := &Server{
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		upgrader:              &websocket.Upgrader{
+			CheckOrigin: func(r *http.Request) bool {
+				// Allow all connections - you may want to restrict this in production
+				// TODO: implement origin checking
+				return true
+			},
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+		},
 		BasePath:              basePath,
+		wsHub:                 wsHub,
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -59,9 +83,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	ctx := context.Background()
 
 	grpcGatewayMux := runtime.NewServeMux(
-		runtime.WithIncomingHeaderMatcher(func(key string) (string, bool) {
-			return key, true
-		}),
+		runtime.WithIncomingHeaderMatcher(runtime.DefaultHeaderMatcher),
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
@@ -119,6 +141,34 @@ func (s *Server) RegisterOpenAPIHandler() {
 	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
 }
 
+func (s *Server) RegisterWebRoutes(webBasePath string) {
+	// The web app routes are registered on the main router
+	log.Infof("Registering web routes with base path: %s", webBasePath)
+
+	s.Router.HandleFunc("/ws/{canvasId}", s.handleWebSocket)
+
+	// Check if we're in development mode
+	if os.Getenv("APP_ENV") == "development" {
+		log.Info("Running in development mode - proxying to Vite dev server for web app")
+		s.setupDevProxy(webBasePath)
+	} else {
+		log.Info("Running in production mode - serving static web assets")
+		
+		fileServer := http.FileServer(http.FS(assets.EmbeddedAssets))
+		assetHandler := http.StripPrefix(webBasePath, fileServer)
+		
+		s.Router.PathPrefix(webBasePath).Handler(assetHandler)
+		
+		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == webBasePath {
+				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
+				return
+			}
+			assetHandler.ServeHTTP(w, r)
+		})
+	}
+}
+
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
 
@@ -159,16 +209,17 @@ func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) Serve(host string, port int) error {
 	log.Infof("Starting server at %s:%d", host, port)
+
+	// Start the WebSocket hub
+	log.Info("Starting WebSocket hub")
+	s.wsHub.Run()
+
 	s.httpServer = &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", host, port),
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		Handler: http.TimeoutHandler(
-			handlers.LoggingHandler(os.Stdout, s.Router),
-			s.timeoutHandlerTimeout,
-			"request timed out",
-		),
+		Handler:      handlers.LoggingHandler(os.Stdout, s.Router),
 	}
 
 	return s.httpServer.ListenAndServe()
@@ -414,4 +465,66 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 	}
 
 	return json.Marshal(parsedHeaders)
+}
+
+func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
+	
+	// Extract the canvasId from the URL path variables
+	vars := mux.Vars(r)
+	canvasID := vars["canvasId"]
+	log.Infof("WebSocket connection for canvas ID: %s", canvasID)
+	
+	ws, err := s.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		if _, ok := err.(websocket.HandshakeError); !ok {
+			log.Println(err)
+		}
+		log.Infof("Failed to upgrade to WebSocket: %v", err)
+		return
+	}
+
+	s.wsHub.NewClient(ws, canvasID)
+	log.Infof("WebSocket client registered with hub")
+}
+
+// setupDevProxy configures a simple reverse proxy to the Vite development server
+func (s *Server) setupDevProxy(webBasePath string) {
+	// Configure the target Vite dev server URL
+	target, err := url.Parse("http://localhost:5173")
+	if err != nil {
+		log.Fatalf("Error parsing Vite dev server URL: %v", err)
+	}
+
+	// Create a simple proxy
+	proxy := httputil.NewSingleHostReverseProxy(target)
+
+	// Simple director modification
+	origDirector := proxy.Director
+	proxy.Director = func(req *http.Request) {
+		// Store original path for logging
+		originalPath := req.URL.Path
+
+		// Execute original director function
+		origDirector(req)
+
+		// Set host header to target
+		req.Host = target.Host
+
+		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
+	}
+
+	// Create a handler for web app routes
+	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip API requests
+		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
+			return
+		}
+
+		// Forward to Vite
+		proxy.ServeHTTP(w, r)
+	})
+
+	// Mount the handler to the web app path
+	s.Router.PathPrefix(webBasePath).Handler(proxyHandler)
 }

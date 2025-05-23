@@ -10,7 +10,6 @@ import (
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
-	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
@@ -75,7 +74,7 @@ func startInternalAPI(encryptor encryptor.Encryptor) {
 }
 
 func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
-	log.Println("Starting Public API")
+	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
 	if basePath == "" {
@@ -85,6 +84,28 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	server, err := public.NewServer(encryptor, jwtSigner, basePath)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
+	}
+	
+	// Start the EventDistributer worker if enabled
+	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
+		log.Println("Starting Event Distributer Worker")
+		eventDistributer := workers.NewEventDistributer(server.WebsocketHub())
+		go eventDistributer.Start()
+	} else {
+		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
+	}
+
+	// Register web routes only if START_WEB_SERVER is set to "yes"
+	if os.Getenv("START_WEB_SERVER") == "yes" {
+		webBasePath := os.Getenv("WEB_BASE_PATH")
+		if webBasePath == "" {
+			log.Warn("WEB_BASE_PATH is not set, defaulting to /app")
+			webBasePath = "/app"
+		}
+		log.Printf("Registering web routes in public API server with base path: %s", webBasePath)
+		server.RegisterWebRoutes(webBasePath)
+	} else {
+		log.Println("Web server routes not registered (START_WEB_SERVER != yes)")
 	}
 
 	if os.Getenv("START_GRPC_GATEWAY") == "yes" {
@@ -109,25 +130,6 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	}
 }
 
-func startWebServer() {
-	log.Println("Starting Web Server")
-
-	basePath := os.Getenv("WEB_BASE_PATH")
-	if basePath == "" {
-		panic("WEB_BASE_PATH must be set")
-	}
-
-	server, err := web.NewServer(basePath)
-	if err != nil {
-		log.Panicf("Error creating web server: %v", err)
-	}
-
-	err = server.Serve("0.0.0.0", 4000)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func main() {
 	log.SetFormatter(&log.TextFormatter{TimestampFormat: time.StampMilli})
 
@@ -135,6 +137,8 @@ func main() {
 	if encryptionKey == "" {
 		panic("ENCRYPTION_KEY can't be empty")
 	}
+
+	log.SetLevel(log.DebugLevel)
 
 	encryptor := encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
 
@@ -151,10 +155,6 @@ func main() {
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
 		go startInternalAPI(encryptor)
-	}
-
-	if os.Getenv("START_WEB_SERVER") == "yes" {
-		go startWebServer()
 	}
 
 	startWorkers(jwtSigner, encryptor)

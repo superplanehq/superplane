@@ -17,6 +17,7 @@ const setHmrPortFromPortPlugin = {
       if (config.server.hmr === true) config.server.hmr = {}
       config.server.hmr ??= {}
       config.server.hmr.clientPort = config.server.port
+      config.server.hmr.overlay = true 
     }
   }
 };
@@ -42,7 +43,7 @@ export default defineConfig(({ command }: { command: string} ) => {
   },
   resolve: {
     alias: {
-      '@/canvas': path.resolve(__dirname, 'src/canvas'),
+      '@/canvas': path.resolve(__dirname, 'src/pages/canvas'),
       "@": path.resolve(__dirname, 'src'),
     },
   },
