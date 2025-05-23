@@ -95,17 +95,16 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 			return nil, fmt.Errorf("only triggering tasks is supported for now")
 		}
 
-		// token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
-		// if err != nil {
-		// 	return nil, fmt.Errorf("error encrypting API token: %v", err)
-		// }
-		testToken := []byte(in.Semaphore.ApiToken)
+		token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
+		if err != nil {
+			return nil, fmt.Errorf("error encrypting API token: %v", err)
+		}
 
 		return &models.RunTemplate{
 			Type: models.RunTemplateTypeSemaphore,
 			Semaphore: &models.SemaphoreRunTemplate{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
-				APIToken:        base64.StdEncoding.EncodeToString(testToken),
+				APIToken:        base64.StdEncoding.EncodeToString(token),
 				ProjectID:       in.Semaphore.ProjectId,
 				Branch:          in.Semaphore.Branch,
 				PipelineFile:    in.Semaphore.PipelineFile,
