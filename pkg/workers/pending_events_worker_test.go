@@ -42,7 +42,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, support.TagUsageDef(r.Source.Name))
+		})
 
 		require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, support.TagUsageDef(r.Source.Name))
+		})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -91,25 +91,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.Len(t, stage2Events, 1)
 		assert.Equal(t, r.Source.ID, stage2Events[0].SourceID)
 		assert.True(t, testconsumer.HasReceivedMessage())
-
-		//
-		// Tag is created for each stage event too
-		//
-		e := stage1Events[0]
-		tags, err := models.FindStageEventTags(e.ID)
-		require.NoError(t, err)
-		require.Len(t, tags, 1)
-		assert.Equal(t, []models.StageEventTag{
-			{Name: "VERSION", Value: "v1", State: models.TagStateUnknown, StageEventID: e.ID},
-		}, tags)
-
-		e = stage2Events[0]
-		tags, err = models.FindStageEventTags(e.ID)
-		require.NoError(t, err)
-		require.Len(t, tags, 1)
-		assert.Equal(t, []models.StageEventTag{
-			{Name: "VERSION", Value: "v1", State: models.TagStateUnknown, StageEventID: e.ID},
-		}, tags)
 	})
 
 	t.Run("stage completion event is processed", func(t *testing.T) {
@@ -123,7 +104,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, support.TagUsageDef(r.Source.Name))
+		})
 
 		require.NoError(t, err)
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
@@ -133,11 +114,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 			{
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
-			},
-		}, models.StageTagUsageDefinition{
-			From: []string{firstStage.Name},
-			Tags: []models.StageTagDefinition{
-				{Name: "VERSION", ValueFrom: "tags.VERSION"},
 			},
 		})
 
@@ -192,7 +168,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, support.TagUsageDef(r.Source.Name))
+		})
 
 		require.NoError(t, err)
 
@@ -210,7 +186,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, support.TagUsageDef(r.Source.Name))
+		})
 
 		require.NoError(t, err)
 
@@ -243,119 +219,5 @@ func Test__PendingEventsWorker(t *testing.T) {
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
-	})
-
-	t.Run("tag usage definition with multiple from", func(t *testing.T) {
-		//
-		// Create two stages, connecting event source to them.
-		// First stage has a filter that should pass our event,
-		// but the second stage has a filter that should not pass.
-		//
-		err := r.Canvas.CreateStage("preprod1", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, support.TagUsageDef(r.Source.Name))
-		require.NoError(t, err)
-		preprod1, err := r.Canvas.FindStageByName("preprod1")
-		require.NoError(t, err)
-
-		err = r.Canvas.CreateStage("preprod2", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, support.TagUsageDef(r.Source.Name))
-		require.NoError(t, err)
-		preprod2, err := r.Canvas.FindStageByName("preprod2")
-		require.NoError(t, err)
-
-		//
-		// Create third stage, connected to the previous two
-		//
-		err = r.Canvas.CreateStage(
-			"prod",
-			r.User.String(),
-			[]models.StageCondition{},
-			support.RunTemplate(),
-			[]models.StageConnection{
-				{
-					SourceID:   preprod1.ID,
-					SourceType: models.SourceTypeStage,
-				},
-				{
-					SourceID:   preprod2.ID,
-					SourceType: models.SourceTypeStage,
-				},
-			},
-			models.StageTagUsageDefinition{
-				From: []string{preprod1.Name, preprod2.Name},
-				Tags: []models.StageTagDefinition{
-					{Name: "VERSION", ValueFrom: "tags.VERSION"},
-				},
-			},
-		)
-
-		require.NoError(t, err)
-		prod, err := r.Canvas.FindStageByName("prod")
-		require.NoError(t, err)
-
-		//
-		// Simulating a stage completion event coming in for the preprod1 stage.
-		//
-		event, err := models.CreateEvent(preprod1.ID, preprod1.Name, models.SourceTypeStage, []byte(`{"tags":{"VERSION":"v1"}}`), eventHeaders)
-		require.NoError(t, err)
-		err = w.Tick()
-		require.NoError(t, err)
-
-		//
-		// Event is moved to processed state.
-		// Stage event is created in waiting(connection) state.
-		//
-		event, err = models.FindEventByID(event.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.EventStateProcessed, event.State)
-		events, err := prod.ListPendingEvents()
-		require.NoError(t, err)
-		require.Empty(t, events)
-		events, err = prod.ListEvents([]string{models.StageEventStateWaiting}, []string{models.StageEventStateReasonConnection})
-		require.NoError(t, err)
-		require.Len(t, events, 1)
-		assert.Equal(t, preprod1.ID, events[0].SourceID)
-
-		//
-		// Simulating a stage completion event coming in for the preprod2 stage.
-		//
-		event, err = models.CreateEvent(preprod2.ID, preprod2.Name, models.SourceTypeStage, []byte(`{"tags":{"VERSION":"v1"}}`), eventHeaders)
-		require.NoError(t, err)
-		err = w.Tick()
-		require.NoError(t, err)
-
-		//
-		// Event is moved to processed state.
-		//
-		event, err = models.FindEventByID(event.ID)
-		require.NoError(t, err)
-		assert.Equal(t, models.EventStateProcessed, event.State)
-
-		//
-		// Verify that new pending stage event is created for the preprod2 event
-		//
-		events, err = prod.ListPendingEvents()
-		require.NoError(t, err)
-		require.Len(t, events, 1)
-		assert.Equal(t, preprod2.ID, events[0].SourceID)
-
-		//
-		// Verify that stage event for preprod1 is moved to processed(cancelled).
-		//
-		events, err = prod.ListEvents([]string{models.StageEventStateWaiting}, []string{models.StageEventStateReasonConnection})
-		require.NoError(t, err)
-		require.Len(t, events, 0)
-		events, err = prod.ListEvents([]string{models.StageEventStateProcessed}, []string{models.StageEventStateReasonCancelled})
-		require.NoError(t, err)
-		require.Len(t, events, 1)
-		assert.Equal(t, preprod1.ID, events[0].SourceID)
 	})
 }

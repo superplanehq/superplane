@@ -234,102 +234,6 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "invalid condition: invalid time window condition: invalid day DoesNotExist", s.Message())
 	})
 
-	t.Run("no tag usage definition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
-			Conditions:  []*protos.Condition{},
-			Connections: []*protos.Connection{
-				{
-					Name: r.Source.Name,
-					Type: protos.Connection_TYPE_EVENT_SOURCE,
-				},
-			},
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "missing tag usage definition", s.Message())
-	})
-
-	t.Run("tag usage definition with invalid from -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
-			Conditions:  []*protos.Condition{},
-			Use: &protos.TagUsageDefinition{
-				From: []string{"does-not-exist"},
-				Tags: []*protos.TagDefinition{{Name: "version", ValueFrom: "ref"}},
-			},
-			Connections: []*protos.Connection{
-				{
-					Name: r.Source.Name,
-					Type: protos.Connection_TYPE_EVENT_SOURCE,
-				},
-			},
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid tag: invalid from does-not-exist", s.Message())
-	})
-
-	t.Run("no tags in tag usage definition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
-			Conditions:  []*protos.Condition{},
-			Use: &protos.TagUsageDefinition{
-				From: []string{r.Source.Name},
-				Tags: []*protos.TagDefinition{},
-			},
-			Connections: []*protos.Connection{
-				{
-					Name: r.Source.Name,
-					Type: protos.Connection_TYPE_EVENT_SOURCE,
-				},
-			},
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "tags must not be empty", s.Message())
-	})
-
-	t.Run("tag with empty name -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
-			Conditions:  []*protos.Condition{},
-			Use: &protos.TagUsageDefinition{
-				From: []string{r.Source.Name},
-				Tags: []*protos.TagDefinition{{Name: ""}},
-			},
-			Connections: []*protos.Connection{
-				{
-					Name: r.Source.Name,
-					Type: protos.Connection_TYPE_EVENT_SOURCE,
-				},
-			},
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid tag: no name or value defined", s.Message())
-	})
-
 	t.Run("stage is created", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
 		testconsumer := testconsumer.New(amqpURL, StageCreatedRoutingKey)
@@ -342,15 +246,6 @@ func Test__CreateStage(t *testing.T) {
 			Name:        "test",
 			RunTemplate: runTemplate,
 			RequesterId: r.User.String(),
-			Use: &protos.TagUsageDefinition{
-				From: []string{r.Source.Name},
-				Tags: []*protos.TagDefinition{
-					{
-						Name:      "version",
-						ValueFrom: "ref",
-					},
-				},
-			},
 			Conditions: []*protos.Condition{
 				{
 					Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
@@ -404,12 +299,6 @@ func Test__CreateStage(t *testing.T) {
 		assert.Len(t, res.Stage.Connections[0].Filters, 2)
 		assert.Equal(t, protos.Connection_FILTER_OPERATOR_AND, res.Stage.Connections[0].FilterOperator)
 
-		// Assert tag usage definition is correct
-		require.NotNil(t, res.Stage.Use)
-		assert.Equal(t, []string{r.Source.Name}, res.Stage.Use.From)
-		assert.Equal(t, "version", res.Stage.Use.Tags[0].Name)
-		assert.Equal(t, "ref", res.Stage.Use.Tags[0].ValueFrom)
-
 		// Assert conditions are correct
 		require.Len(t, res.Stage.Conditions, 2)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, res.Stage.Conditions[0].Type)
@@ -427,15 +316,6 @@ func Test__CreateStage(t *testing.T) {
 			Name:        "test",
 			RequesterId: r.User.String(),
 			RunTemplate: support.ProtoRunTemplate(),
-			Use: &protos.TagUsageDefinition{
-				From: []string{r.Source.Name},
-				Tags: []*protos.TagDefinition{
-					{
-						Name:      "version",
-						ValueFrom: "ref",
-					},
-				},
-			},
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,

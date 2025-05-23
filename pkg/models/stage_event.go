@@ -96,43 +96,6 @@ func (e *StageEvent) FindApprovals() ([]StageEventApproval, error) {
 	return approvals, nil
 }
 
-func FindStageEventTags(id uuid.UUID) ([]StageEventTag, error) {
-	return FindStageEventTagsInTransaction(database.Conn(), id)
-}
-
-func FindStageEventTagsInTransaction(tx *gorm.DB, id uuid.UUID) ([]StageEventTag, error) {
-	var tags []StageEventTag
-	err := tx.Where("stage_event_id = ?", id).Find(&tags).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return tags, nil
-}
-
-func FindStageEventsByTag(name, value, state, reason string) ([]string, error) {
-	return FindStageEventsByTagInTransaction(database.Conn(), name, value, state, reason)
-}
-
-func FindStageEventsByTagInTransaction(tx *gorm.DB, name, value, state, reason string) ([]string, error) {
-	var ids []string
-	err := tx.Table("stage_events AS e").
-		Joins("INNER JOIN stage_event_tags AS t ON e.id = t.stage_event_id").
-		Select("e.id").
-		Where("t.name = ?", name).
-		Where("t.value = ?", value).
-		Where("e.state = ?", state).
-		Where("e.state_reason", reason).
-		Find(&ids).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return ids, nil
-}
-
 func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 	var event StageEvent
 

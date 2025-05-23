@@ -1,0 +1,59 @@
+services:
+  nginx:
+    image: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./key.pem:/root/ssl/key.pem
+      - ./cert.pem:/root/ssl/cert.pem
+    ports:
+      - "443:443"
+    depends_on:
+      - app
+  app:
+    image: ghcr.io/superplanehq/superplane:${IMAGE_TAG}
+    environment:
+      POSTGRES_DB_SSL: "false"
+      DB_HOST: "db"
+      DB_PORT: "5432"
+      DB_NAME: "superplane"
+      DB_USERNAME: "postgres"
+      APPLICATION_NAME: "superplane"
+      DB_PASSWORD: "the-cake-is-a-lie"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      SWAGGER_BASE_PATH: "/app/api/swagger"
+      START_PUBLIC_API: "yes"
+      START_INTERNAL_API: "yes"
+      START_PENDING_EVENTS_WORKER: "yes"
+      START_PENDING_STAGE_EVENTS_WORKER: "yes"
+      START_TIME_WINDOW_WORKER: "yes"
+      START_STAGE_EVENT_APPROVED_CONSUMER: "yes"
+      START_EXECUTIONS_POLLER: "yes"
+      START_PENDING_EXECUTIONS_WORKER: "yes"
+      PUBLIC_API_BASE_PATH: /api/v1
+      START_GRPC_GATEWAY: "yes"
+      ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
+      JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
+
+    ports:
+      - 80:8000
+      - 50051:50051
+
+    links:
+      - db:db
+      - rabbitmq:rabbitmq
+
+  db:
+    image: postgres:9.6
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: "the-cake-is-a-lie"
+  rabbitmq:
+    image: rabbitmq:3.8.17-management-alpine
+    container_name: "rabbitmq"
+    ports:
+      - 5672:5672
+      - 15672:15672
+volumes:
+  postgres-data:
+    driver: local

@@ -66,7 +66,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{}, TagUsageDef(r.Source.Name))
+		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{})
 		require.NoError(t, err)
 		r.Stage, err = r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)
@@ -90,23 +90,6 @@ func CreateStageEventWithData(t *testing.T, source *models.EventSource, stage *m
 	require.NoError(t, err)
 	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "")
 	require.NoError(t, err)
-
-	tags := map[string]string{}
-	for _, tag := range stage.Use.Data().Tags {
-		v, err := event.EvaluateStringExpression(tag.ValueFrom)
-		require.NoError(t, err)
-		tags[tag.Name] = v
-	}
-
-	require.NoError(t,
-		models.UpdateStageEventTagStateInBulk(
-			database.Conn(),
-			stageEvent.ID,
-			models.TagStateUnknown,
-			tags,
-		),
-	)
-
 	return stageEvent
 }
 
@@ -119,15 +102,6 @@ func CreateExecutionWithData(t *testing.T, source *models.EventSource, stage *mo
 	execution, err := models.CreateStageExecution(stage.ID, event.ID)
 	require.NoError(t, err)
 	return execution
-}
-
-func TagUsageDef(sourceName string) models.StageTagUsageDefinition {
-	return models.StageTagUsageDefinition{
-		From: []string{sourceName},
-		Tags: []models.StageTagDefinition{
-			{Name: "VERSION", ValueFrom: "ref"},
-		},
-	}
 }
 
 func RunTemplate() models.RunTemplate {

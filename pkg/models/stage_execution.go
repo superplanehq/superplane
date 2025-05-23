@@ -37,7 +37,7 @@ type StageExecution struct {
 	// TODO: maybe we can use a special execution tag for this?
 	// The ID of the "thing" that is running.
 	// For now, since we only have workflow/task runs,
-	// this is always a Semaphore workflow ID, but we might want to support other types of executions in the future,
+	// this is always a Semaphore workflow ID, but we want to support other types of executions in the future,
 	// so keeping the name generic for now, and also not using uuid.UUID for this column, since we can't guarantee
 	// that all IDs will be UUIDs.
 	//
@@ -143,6 +143,21 @@ func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
 
 	err := database.Conn().
 		Where("id = ?", id).
+		First(&execution).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
+}
+
+func FindExecutionByStageEventID(id uuid.UUID) (*StageExecution, error) {
+	var execution StageExecution
+
+	err := database.Conn().
+		Where("stage_event_id = ?", id).
 		First(&execution).
 		Error
 

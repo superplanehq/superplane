@@ -26,6 +26,28 @@
   ],
   "paths": {
     "/api/v1/canvases": {
+      "get": {
+        "summary": "List canvases",
+        "description": "Returns a list of all canvases",
+        "operationId": "Superplane_ListCanvases",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListCanvasesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Canvas"
+        ]
+      },
       "post": {
         "summary": "Create a new canvas",
         "description": "Creates a new canvas with the given name and organization ID",
@@ -307,7 +329,6 @@
         "parameters": [
           {
             "name": "canvasId",
-            "description": "Added for REST API path",
             "in": "path",
             "required": true,
             "type": "string"
@@ -494,156 +515,6 @@
           "Canvas"
         ]
       }
-    },
-    "/api/v1/stages/{stageId}/tags": {
-      "get": {
-        "summary": "List tags",
-        "description": "Returns a list of tags, optionally filtered by stage",
-        "operationId": "Superplane_ListTags2",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListTagsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "stageId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "states",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "TAG_STATE_UNKNOWN",
-                "TAG_STATE_HEALTHY",
-                "TAG_STATE_UNHEALTHY"
-              ]
-            },
-            "collectionFormat": "multi"
-          }
-        ],
-        "tags": [
-          "Tag"
-        ]
-      }
-    },
-    "/api/v1/tags": {
-      "get": {
-        "summary": "List tags",
-        "description": "Returns a list of tags, optionally filtered by stage",
-        "operationId": "Superplane_ListTags",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListTagsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "value",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "states",
-            "in": "query",
-            "required": false,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "TAG_STATE_UNKNOWN",
-                "TAG_STATE_HEALTHY",
-                "TAG_STATE_UNHEALTHY"
-              ]
-            },
-            "collectionFormat": "multi"
-          },
-          {
-            "name": "stageId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Tag"
-        ]
-      },
-      "put": {
-        "summary": "Update tag state",
-        "description": "Updates the state of the specified tag",
-        "operationId": "Superplane_UpdateTagState",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateTagStateResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateTagStateRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Tag"
-        ]
-      }
     }
   },
   "definitions": {
@@ -694,6 +565,15 @@
           "type": "string"
         }
       }
+    },
+    "ExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED"
+      ],
+      "default": "RESULT_UNKNOWN"
     },
     "StageEventStateReason": {
       "type": "string",
@@ -885,9 +765,6 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "use": {
-          "$ref": "#/definitions/SuperplaneTagUsageDefinition"
-        },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
         }
@@ -943,6 +820,57 @@
         }
       }
     },
+    "SuperplaneExecution": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "referenceId": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneExecutionState"
+        },
+        "result": {
+          "$ref": "#/definitions/ExecutionResult"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finishedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneExecutionState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_STARTED",
+        "STATE_FINISHED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneListCanvasesResponse": {
+      "type": "object",
+      "properties": {
+        "canvases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneCanvas"
+          }
+        }
+      }
+    },
     "SuperplaneListEventSourcesResponse": {
       "type": "object",
       "properties": {
@@ -975,18 +903,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneStage"
-          }
-        }
-      }
-    },
-    "SuperplaneListTagsResponse": {
-      "type": "object",
-      "properties": {
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneStageTag"
           }
         }
       }
@@ -1069,9 +985,6 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "use": {
-          "$ref": "#/definitions/SuperplaneTagUsageDefinition"
-        },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
         }
@@ -1106,12 +1019,8 @@
             "$ref": "#/definitions/SuperplaneStageEventApproval"
           }
         },
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneTag"
-          }
+        "execution": {
+          "$ref": "#/definitions/SuperplaneExecution"
         }
       }
     },
@@ -1137,75 +1046,12 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneStageTag": {
-      "type": "object",
-      "properties": {
-        "stageId": {
-          "type": "string"
-        },
-        "stageEventState": {
-          "$ref": "#/definitions/SuperplaneStageEventState"
-        },
-        "tag": {
-          "$ref": "#/definitions/SuperplaneTag"
-        }
-      }
-    },
-    "SuperplaneTag": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "value": {
-          "type": "string"
-        },
-        "state": {
-          "$ref": "#/definitions/SuperplaneTagState"
-        }
-      }
-    },
-    "SuperplaneTagDefinition": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "valueFrom": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneTagState": {
-      "type": "string",
-      "enum": [
-        "TAG_STATE_UNKNOWN",
-        "TAG_STATE_HEALTHY",
-        "TAG_STATE_UNHEALTHY"
-      ],
-      "default": "TAG_STATE_UNKNOWN"
-    },
-    "SuperplaneTagUsageDefinition": {
-      "type": "object",
-      "properties": {
-        "from": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "tags": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneTagDefinition"
-          }
-        }
-      }
-    },
     "SuperplaneUpdateStageBody": {
       "type": "object",
       "properties": {
+        "requesterId": {
+          "type": "string"
+        },
         "connections": {
           "type": "array",
           "items": {
@@ -1213,8 +1059,15 @@
             "$ref": "#/definitions/SuperplaneConnection"
           }
         },
-        "requesterId": {
-          "type": "string"
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneCondition"
+          }
+        },
+        "runTemplate": {
+          "$ref": "#/definitions/SuperplaneRunTemplate"
         }
       }
     },
@@ -1225,17 +1078,6 @@
           "$ref": "#/definitions/SuperplaneStage"
         }
       }
-    },
-    "SuperplaneUpdateTagStateRequest": {
-      "type": "object",
-      "properties": {
-        "tag": {
-          "$ref": "#/definitions/SuperplaneTag"
-        }
-      }
-    },
-    "SuperplaneUpdateTagStateResponse": {
-      "type": "object"
     },
     "protobufAny": {
       "type": "object",

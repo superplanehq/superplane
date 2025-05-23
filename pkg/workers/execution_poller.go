@@ -57,7 +57,7 @@ func (w *ExecutionPoller) Tick() error {
 }
 
 func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.StageExecution) error {
-	stage, err := models.FindStageByID(execution.StageID)
+	stage, err := models.FindStageByID(execution.StageID.String())
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	})
 
 	if err == nil {
-		stage, err := models.FindStageByID(execution.StageID)
+		stage, err := models.FindStageByID(execution.StageID.String())
 		if err != nil {
 			logger.Errorf("Error finding stage for execution: %v", err)
 			return err
@@ -187,7 +187,7 @@ func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID stri
 }
 
 func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
-	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID)
+	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}
@@ -211,51 +211,17 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 }
 
 func (w *ExecutionPoller) processExecutionTags(tx *gorm.DB, logger *log.Entry, execution *models.StageExecution, result string) (map[string]string, error) {
-	allTags := map[string]string{}
+	tags := map[string]string{}
 
 	//
 	// Include extra tags from execution, if any.
 	//
 	if execution.Tags != nil {
-		err := json.Unmarshal(execution.Tags, &allTags)
+		err := json.Unmarshal(execution.Tags, &tags)
 		if err != nil {
 			return nil, fmt.Errorf("error adding tags from execution: %v", err)
 		}
 	}
 
-	//
-	// Include tags from event
-	//
-	tagsFromEvent, err := models.FindStageEventTagsInTransaction(tx, execution.StageEventID)
-	if err != nil {
-		return nil, fmt.Errorf("error finding tags from stage event: %v", err)
-	}
-
-	for _, t := range tagsFromEvent {
-		allTags[t.Name] = t.Value
-	}
-
-	if len(allTags) == 0 {
-		logger.Warningf("No tags")
-		return allTags, nil
-	}
-
-	newState := resolveTagState(result)
-	err = models.UpdateStageEventTagStateInBulk(tx, execution.StageEventID, newState, allTags)
-	if err != nil {
-		logger.Errorf("Error updating tags to %s state: %v", newState, err)
-		return nil, err
-	}
-
-	logger.Infof("Updated tags %v to %s state", allTags, newState)
-	return allTags, nil
-}
-
-func resolveTagState(result string) string {
-	switch result {
-	case models.StageExecutionResultPassed:
-		return models.TagStateHealthy
-	default:
-		return models.TagStateUnhealthy
-	}
+	return tags, nil
 }

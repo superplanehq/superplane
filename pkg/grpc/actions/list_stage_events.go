@@ -107,7 +107,7 @@ func serializeStageEvents(in []models.StageEvent) ([]*pb.StageEvent, error) {
 	return out, nil
 }
 
-// TODO: very inefficient way of querying the approvals/tags that we should fix later
+// TODO: very inefficient way of querying the approvals/execution that we should fix later
 func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	e := pb.StageEvent{
 		Id:          in.ID.String(),
@@ -117,15 +117,22 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
-		Tags:        []*pb.Tag{},
 	}
 
-	approvals, err := in.FindApprovals()
+	//
+	// Add execution
+	//
+	execution, err := serializeStageEventExecution(in)
 	if err != nil {
 		return nil, err
 	}
 
-	tags, err := models.FindStageEventTags(in.ID)
+	e.Execution = execution
+
+	//
+	// Add approvals
+	//
+	approvals, err := in.FindApprovals()
 	if err != nil {
 		return nil, err
 	}
@@ -137,15 +144,60 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		})
 	}
 
-	for _, tag := range tags {
-		e.Tags = append(e.Tags, &pb.Tag{
-			Name:  tag.Name,
-			Value: tag.Value,
-			State: tagStateToProto(tag.State),
-		})
+	return &e, nil
+}
+
+func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error) {
+	execution, err := models.FindExecutionByStageEventID(event.ID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+
+		return nil, nil
 	}
 
-	return &e, nil
+	e := &pb.Execution{
+		Id:          execution.ID.String(),
+		ReferenceId: execution.ReferenceID,
+		State:       executionStateToProto(execution.State),
+		Result:      executionResultToProto(execution.Result),
+		CreatedAt:   timestamppb.New(*execution.CreatedAt),
+	}
+
+	if execution.StartedAt != nil {
+		e.StartedAt = timestamppb.New(*execution.StartedAt)
+	}
+
+	if execution.FinishedAt != nil {
+		e.FinishedAt = timestamppb.New(*execution.FinishedAt)
+	}
+
+	return e, nil
+}
+
+func executionStateToProto(state string) pb.Execution_State {
+	switch state {
+	case models.StageExecutionPending:
+		return pb.Execution_STATE_PENDING
+	case models.StageExecutionStarted:
+		return pb.Execution_STATE_STARTED
+	case models.StageExecutionFinished:
+		return pb.Execution_STATE_FINISHED
+	default:
+		return pb.Execution_STATE_UNKNOWN
+	}
+}
+
+func executionResultToProto(state string) pb.Execution_Result {
+	switch state {
+	case models.StageExecutionResultFailed:
+		return pb.Execution_RESULT_FAILED
+	case models.StageExecutionResultPassed:
+		return pb.Execution_RESULT_PASSED
+	default:
+		return pb.Execution_RESULT_UNKNOWN
+	}
 }
 
 func stateToProto(state string) pb.StageEvent_State {

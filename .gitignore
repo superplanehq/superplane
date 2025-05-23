@@ -1,3 +1,4 @@
 junit-report.xml
 pkg/web/assets/dist
 tmp
+build/

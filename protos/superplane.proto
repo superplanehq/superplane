@@ -25,6 +25,17 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Superplane {
+  rpc ListCanvases(ListCanvasesRequest) returns (ListCanvasesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvases";
+      description: "Returns a list of all canvases";
+      tags: "Canvas";
+    };
+  }
+
   rpc CreateCanvas(CreateCanvasRequest) returns (CreateCanvasResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases"
@@ -150,32 +161,12 @@ service Superplane {
       tags: "Event";
     };
   }
+}
 
-  rpc ListTags(ListTagsRequest) returns (ListTagsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/tags"
-      additional_bindings {
-        get: "/api/v1/stages/{stage_id}/tags"
-      }
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List tags";
-      description: "Returns a list of tags, optionally filtered by stage";
-      tags: "Tag";
-    };
-  }
-  
-  rpc UpdateTagState(UpdateTagStateRequest) returns (UpdateTagStateResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/tags"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update tag state";
-      description: "Updates the state of the specified tag";
-      tags: "Tag";
-    };
-  }
+message ListCanvasesRequest {}
+
+message ListCanvasesResponse {
+  repeated Canvas canvases = 1;
 }
 
 message Canvas {
@@ -291,8 +282,7 @@ message Stage {
   google.protobuf.Timestamp created_at = 4;
   repeated Connection connections = 5;
   repeated Condition conditions = 6;
-  TagUsageDefinition use = 7;
-  RunTemplate run_template = 8;
+  RunTemplate run_template = 7;
 }
 
 message Condition {
@@ -323,18 +313,7 @@ message CreateStageRequest {
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
-  TagUsageDefinition use = 6;
-  RunTemplate run_template = 7;
-}
-
-message TagUsageDefinition {
-  repeated string from = 1;
-  repeated TagDefinition tags = 2;
-}
-
-message TagDefinition {
-  string name = 1;
-  string valueFrom = 2;
+  RunTemplate run_template = 6;
 }
 
 message RunTemplate {
@@ -363,9 +342,11 @@ message CreateStageResponse {
 
 message UpdateStageRequest {
   string id = 1;
-  string canvas_id = 2; // Added for REST API path
-  repeated Connection connections = 3;
-  string requester_id = 4;
+  string canvas_id = 2;
+  string requester_id = 3;
+  repeated Connection connections = 4;
+  repeated Condition conditions = 5;
+  RunTemplate run_template = 6;
 }
 
 message UpdateStageResponse {
@@ -424,43 +405,31 @@ message StageEvent {
   StateReason state_reason = 5;
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
-  repeated Tag tags = 8;
+  Execution execution = 8;
 }
 
-message ListTagsRequest {
-  string name = 1;
-  string value = 2;
-  repeated Tag.State states = 3;
-  string stage_id = 4;
-}
-
-message ListTagsResponse {
-  repeated StageTag tags = 1;
-}
-
-message StageTag {
-  string stage_id = 1;
-  StageEvent.State stage_event_state = 2;
-  Tag tag = 3;
-}
-
-message Tag {
+message Execution {
   enum State {
-    TAG_STATE_UNKNOWN = 0;
-    TAG_STATE_HEALTHY = 1;
-    TAG_STATE_UNHEALTHY = 2;
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_STARTED = 2;
+    STATE_FINISHED = 4;
   }
 
-  string name = 1;
-  string value = 2;
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+  }
+
+  string id = 1;
+  string reference_id = 2;
   State state = 3;
+  Result result = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp finished_at = 7;
 }
-
-message UpdateTagStateRequest {
-  Tag tag = 1;
-}
-
-message UpdateTagStateResponse {}
 
 message StageEventApproval {
   string approved_by = 1;

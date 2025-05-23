@@ -22,21 +22,12 @@ type Stage struct {
 	CanvasID  uuid.UUID
 	Name      string
 	CreatedAt *time.Time
+	UpdatedAt *time.Time
 	CreatedBy uuid.UUID
+	UpdatedBy uuid.UUID
 
-	Use         datatypes.JSONType[StageTagUsageDefinition]
 	Conditions  datatypes.JSONSlice[StageCondition]
 	RunTemplate datatypes.JSONType[RunTemplate]
-}
-
-type StageTagUsageDefinition struct {
-	From []string             `json:"from"`
-	Tags []StageTagDefinition `json:"tags"`
-}
-
-type StageTagDefinition struct {
-	Name      string `json:"name"`
-	ValueFrom string `json:"value_from"`
 }
 
 type StageCondition struct {
@@ -159,11 +150,11 @@ type SemaphoreRunTemplate struct {
 	TaskID          string            `json:"task_id"`
 }
 
-func FindStageByID(id uuid.UUID) (*Stage, error) {
+func FindStageByID(id string) (*Stage, error) {
 	return FindStageByIDInTransaction(database.Conn(), id)
 }
 
-func FindStageByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Stage, error) {
+func FindStageByIDInTransaction(tx *gorm.DB, id string) (*Stage, error) {
 	var stage Stage
 
 	err := tx.

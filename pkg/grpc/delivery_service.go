@@ -6,8 +6,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type DeliveryService struct {
@@ -45,7 +43,7 @@ func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeSta
 }
 
 func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method UpdateStage not implemented")
+	return actions.UpdateStage(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
@@ -60,14 +58,10 @@ func (s *DeliveryService) ListStages(ctx context.Context, req *pb.ListStagesRequ
 	return actions.ListStages(ctx, req)
 }
 
+func (s *DeliveryService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
+	return actions.ListCanvases(ctx, req)
+}
+
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	return actions.ListStageEvents(ctx, req)
-}
-
-func (s *DeliveryService) UpdateTagState(ctx context.Context, req *pb.UpdateTagStateRequest) (*pb.UpdateTagStateResponse, error) {
-	return actions.UpdateTagState(ctx, req)
-}
-
-func (s *DeliveryService) ListTags(ctx context.Context, req *pb.ListTagsRequest) (*pb.ListTagsResponse, error) {
-	return actions.ListTags(ctx, req)
 }

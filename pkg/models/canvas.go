@@ -133,7 +133,7 @@ func (c *Canvas) ListStages() ([]Stage, error) {
 	return stages, nil
 }
 
-func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition, template RunTemplate, connections []StageConnection, use StageTagUsageDefinition) error {
+func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
 	now := time.Now()
 	ID := uuid.New()
 
@@ -143,7 +143,6 @@ func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition
 			CanvasID:    c.ID,
 			Name:        name,
 			Conditions:  datatypes.NewJSONSlice(conditions),
-			Use:         datatypes.NewJSONType(use),
 			CreatedAt:   &now,
 			CreatedBy:   uuid.Must(uuid.Parse(createdBy)),
 			RunTemplate: datatypes.NewJSONType(template),
@@ -169,6 +168,51 @@ func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition
 
 		return nil
 	})
+}
+
+func (c *Canvas) UpdateStage(id, requesterID string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("stage_id = ?", id).Delete(&StageConnection{}).Error; err != nil {
+			return fmt.Errorf("failed to delete existing connections: %v", err)
+		}
+
+		for _, connection := range connections {
+			connection.StageID = uuid.Must(uuid.Parse(id))
+			if err := tx.Create(&connection).Error; err != nil {
+				return fmt.Errorf("failed to create connection: %v", err)
+			}
+		}
+
+		now := time.Now()
+		err := tx.Model(&Stage{}).
+			Where("id = ?", id).
+			Update("updated_at", now).
+			Update("updated_by", requesterID).
+			Update("run_template", datatypes.NewJSONType(template)).
+			Update("conditions", datatypes.NewJSONSlice(conditions)).
+			Error
+
+		if err != nil {
+			return fmt.Errorf("failed to update stage timestamp: %v", err)
+		}
+
+		return nil
+	})
+}
+
+func ListCanvases() ([]Canvas, error) {
+	var canvases []Canvas
+
+	err := database.Conn().
+		Order("name ASC").
+		Find(&canvases).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
 }
 
 func FindCanvas(id string) (*Canvas, error) {

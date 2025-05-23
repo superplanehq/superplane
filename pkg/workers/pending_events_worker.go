@@ -2,7 +2,6 @@ package workers
 
 import (
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -154,17 +153,7 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Event, stages []models.Stage) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
-
-			//
-			// Start by computing our map of tags
-			//
-			tags, err := w.evaluateTags(logger, event, stage.Use.Data())
-			if err != nil {
-				return err
-			}
-
-			logger.Infof("Evaluated tags: %v", tags)
-			stageEvent, err := w.createStageEvent(tx, stage, event, tags)
+			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "")
 			if err != nil {
 				return err
 			}
@@ -181,139 +170,6 @@ func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Even
 
 		return nil
 	})
-}
-
-func (w *PendingEventsWorker) createStageEvent(tx *gorm.DB, stage models.Stage, event *models.Event, tags map[string]string) (*models.StageEvent, error) {
-	tagUsageDefinition := stage.Use.Data()
-	if len(tagUsageDefinition.From) == 1 {
-		return w.createStageEventAndTags(tx, stage, event, tags, models.StageEventStatePending, "")
-	}
-
-	return w.handleMultipleConnectionTagSource(tx, stage, event, tags)
-}
-
-func (w *PendingEventsWorker) createStageEventAndTags(tx *gorm.DB,
-	stage models.Stage,
-	event *models.Event,
-	tags map[string]string,
-	state, stateReason string,
-) (*models.StageEvent, error) {
-
-	//
-	// If we are just concerned with the tags coming from one connection,
-	// we can create the stage event in pending state directly.
-	//
-	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, state, stateReason)
-	if err != nil {
-		return nil, fmt.Errorf("error creating pending stage event: %v", err)
-	}
-
-	// TODO: doing it in bulk would be better
-	for k, v := range tags {
-		err = models.CreateStageEventTagInTransaction(tx, k, v, stageEvent.ID)
-		if err != nil {
-			return nil, fmt.Errorf("error creating tag value: %v", err)
-		}
-	}
-
-	return stageEvent, nil
-}
-
-func (w *PendingEventsWorker) handleMultipleConnectionTagSource(tx *gorm.DB, stage models.Stage, event *models.Event, tags map[string]string) (*models.StageEvent, error) {
-	//
-	// List all stage events in waiting(connection) for this
-	//
-	existingStageEvents, err := stage.ListEventsInTransaction(tx,
-		[]string{models.StageEventStateWaiting},
-		[]string{models.StageEventStateReasonConnection},
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// If events for (all sources - currentSource) are not there,
-	// we create a new stage event in waiting(connection) state for this one.
-	//
-	from := stage.Use.Data().From
-	connections := slices.DeleteFunc(from, func(c string) bool { return c == event.SourceName })
-	if !allConnectionsReceived(existingStageEvents, connections) {
-		return w.createStageEventAndTags(tx,
-			stage,
-			event,
-			tags,
-			models.StageEventStateWaiting,
-			models.StageEventStateReasonConnection,
-		)
-	}
-
-	//
-	// If events for (all sources - currentSource) are there,
-	// we create a new pending stage event for this one, and
-	// move all the previous ones to processed(cancelled).
-	//
-	stageEvent, err := w.createStageEventAndTags(tx, stage, event, tags, models.StageEventStatePending, "")
-	if err != nil {
-		return nil, err
-	}
-
-	ids := []string{}
-	for _, e := range existingStageEvents {
-		ids = append(ids, e.ID.String())
-	}
-
-	err = models.UpdateStageEventsInTransaction(tx,
-		ids,
-		models.StageEventStateProcessed,
-		models.StageEventStateReasonCancelled,
-	)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return stageEvent, nil
-}
-
-func allConnectionsReceived(events []models.StageEvent, connections []string) bool {
-	for _, c := range connections {
-		contains := slices.ContainsFunc(events, func(e models.StageEvent) bool {
-			return e.SourceName == c
-		})
-
-		if !contains {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (w *PendingEventsWorker) evaluateTags(logger *log.Entry, event *models.Event, tagUsage models.StageTagUsageDefinition) (map[string]string, error) {
-
-	//
-	// If we don't use any tags from this source,
-	// no need to do anything regarding tags here.
-	//
-	if !slices.Contains(tagUsage.From, event.SourceName) {
-		logger.Infof("Source %s is not in tag usage definition (%v)", event.SourceName, tagUsage.From)
-		return map[string]string{}, nil
-	}
-
-	logger.Infof("Processing tags %v...", tagUsage.Tags)
-
-	tagMap := map[string]string{}
-	for _, tagDefinition := range tagUsage.Tags {
-		value, err := event.EvaluateStringExpression(tagDefinition.ValueFrom)
-		if err != nil {
-			return nil, fmt.Errorf("error finding tag value for tag %s: %v", tagDefinition.Name, err)
-		}
-
-		tagMap[tagDefinition.Name] = value
-	}
-
-	return tagMap, nil
 }
 
 func (w *PendingEventsWorker) stageIDsFromConnections(connections []models.StageConnection) []uuid.UUID {

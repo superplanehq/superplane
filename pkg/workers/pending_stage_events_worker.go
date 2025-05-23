@@ -60,7 +60,7 @@ func (w *PendingStageEventsWorker) Tick() error {
 }
 
 func (w *PendingStageEventsWorker) ProcessStage(stageID uuid.UUID) error {
-	stage, err := models.FindStageByID(stageID)
+	stage, err := models.FindStageByID(stageID.String())
 	if err != nil {
 		return fmt.Errorf("error finding stage")
 	}
@@ -80,24 +80,10 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 	logger := logging.ForStageEvent(event)
 
 	//
-	// Check if any of the tags in this event is unhealthy
-	//
-	proceed, err := w.checkForUnhealthyTag(logger, event)
-	if err != nil {
-		return err
-	}
-
-	if !proceed {
-		return nil
-	}
-
-	logger.Info("All tags are healthy")
-
-	//
 	// Check if another execution is already in progress.
 	// TODO: this could probably be built into the query that we do above.
 	//
-	_, err = models.FindExecutionInState(event.StageID, []string{
+	_, err := models.FindExecutionInState(event.StageID, []string{
 		models.StageExecutionPending,
 		models.StageExecutionStarted,
 	})
@@ -154,25 +140,6 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 
 	logging.ForStage(stage).Infof("Started execution %s", execution.ID)
 	return nil
-}
-
-func (w PendingStageEventsWorker) checkForUnhealthyTag(logger *log.Entry, event *models.StageEvent) (bool, error) {
-	tags, err := models.FindStageEventTags(event.ID)
-	if err != nil {
-		return false, err
-	}
-
-	for _, tag := range tags {
-		if tag.State == models.TagStateUnhealthy {
-			logger.Infof("Tag %v is unhealthy - moving to waiting(unhealthy) state", tag)
-			return false, event.UpdateState(
-				models.StageEventStateWaiting,
-				models.StageEventStateReasonUnhealthy,
-			)
-		}
-	}
-
-	return true, nil
 }
 
 func (w *PendingStageEventsWorker) checkCondition(logger *log.Entry, event *models.StageEvent, condition models.StageCondition) (bool, error) {
