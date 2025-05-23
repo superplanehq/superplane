@@ -1,7 +1,7 @@
 begin;
 
 ALTER TABLE stage_executions RENAME COLUMN tags TO kv;
-ALTER TABLE stage_connections ADD COLUMN kv_defs jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE stage_connections ADD COLUMN kv jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE stage_events ADD COLUMN kv jsonb NOT NULL DEFAULT '{}';
 
 CREATE TABLE stage_kvs (
