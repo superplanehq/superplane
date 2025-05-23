@@ -233,6 +233,10 @@ func (w *ExecutionPoller) processExecutionKV(tx *gorm.DB, execution *models.Stag
 		maps.Copy(kv, m)
 	}
 
+	if len(kv) == 0 {
+		return kv, nil
+	}
+
 	//
 	// Create stage kv pairs
 	//
@@ -247,7 +251,7 @@ func (w *ExecutionPoller) processExecutionKV(tx *gorm.DB, execution *models.Stag
 		})
 	}
 
-	err = database.Conn().Create(records).Error
+	err = tx.Create(records).Error
 	if err != nil {
 		return nil, err
 	}

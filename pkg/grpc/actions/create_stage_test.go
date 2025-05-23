@@ -80,6 +80,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -103,6 +106,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -129,6 +135,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -157,6 +166,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -185,6 +197,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -214,6 +229,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -264,6 +282,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 					Filters: []*protos.Connection_Filter{
 						{
 							Type: protos.Connection_FILTER_TYPE_DATA,
@@ -297,6 +318,7 @@ func Test__CreateStage(t *testing.T) {
 		// Assert connections are correct
 		require.Len(t, res.Stage.Connections, 1)
 		assert.Len(t, res.Stage.Connections[0].Filters, 2)
+		assert.Len(t, res.Stage.Connections[0].Kv, 1)
 		assert.Equal(t, protos.Connection_FILTER_OPERATOR_AND, res.Stage.Connections[0].FilterOperator)
 
 		// Assert conditions are correct
@@ -320,6 +342,9 @@ func Test__CreateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Kv: []*protos.KVDef{
+						{Key: "version", ValueFrom: "ref"},
+					},
 				},
 			},
 		})

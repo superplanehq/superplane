@@ -47,7 +47,7 @@ type StageExecution struct {
 
 func (e *StageExecution) GetKVFromEvent(tx *gorm.DB) (map[string]string, error) {
 	var data struct {
-		Raw datatypes.JSON
+		KV datatypes.JSON
 	}
 
 	err := tx.
@@ -63,7 +63,7 @@ func (e *StageExecution) GetKVFromEvent(tx *gorm.DB) (map[string]string, error) 
 	}
 
 	var m map[string]string
-	err = json.Unmarshal(data.Raw, &m)
+	err = json.Unmarshal(data.KV, &m)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling data: %v", err)
 	}
