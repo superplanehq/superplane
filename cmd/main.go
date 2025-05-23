@@ -85,6 +85,15 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
+	
+	// Start the EventDistributer worker if enabled
+	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
+		log.Println("Starting Event Distributer Worker")
+		eventDistributer := workers.NewEventDistributer(server.WebsocketHub())
+		go eventDistributer.Start()
+	} else {
+		log.Println("Event Distributer not started (START_EVENT_DISTRIBUTER != yes)")
+	}
 
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
@@ -128,6 +137,8 @@ func main() {
 	if encryptionKey == "" {
 		panic("ENCRYPTION_KEY can't be empty")
 	}
+
+	log.SetLevel(log.DebugLevel)
 
 	encryptor := encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
 

@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"encoding/json"
@@ -68,7 +68,7 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Create the websocket event
 	wsEvent := map[string]interface{}{
-		"type": "execution_started",
+		"event": "execution_started",
 		"payload": payload,
 	}
 

@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"encoding/json"
@@ -21,16 +21,16 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 			"event": "stage_event_approved",
 		}
 	}
-	
+
 	// Extract important fields
 	eventID, _ := rawMsg["event_id"].(string)
 	if eventID == "" {
 		eventID, _ = rawMsg["id"].(string)
 	}
-	
+
 	stageID, _ := rawMsg["stage_id"].(string)
 	canvasID, _ := rawMsg["canvas_id"].(string)
-	
+
 	// Since we don't have access to the actual gRPC service anymore,
 	// we'll just use the raw message data we received
 	payload := map[string]interface{}{
@@ -39,7 +39,7 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 		"canvas_id": canvasID,
 		"approved":  true,
 	}
-	
+
 	// Copy any additional fields from the raw message
 	for k, v := range rawMsg {
 		// Don't overwrite our existing fields
@@ -50,7 +50,7 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Create the websocket event
 	wsEvent := map[string]interface{}{
-		"type": "stage_event_approved",
+		"event":   "stage_event_approved",
 		"payload": payload,
 	}
 

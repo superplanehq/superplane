@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"context"
@@ -12,16 +12,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// HandleStageUpdated processes a stage updated message and forwards it to websocket clients
-func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
-	log.Debugf("Received stage_updated event")
+// HandleStageCreated processes a stage created message and forwards it to websocket clients
+func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
+	log.Debugf("Received stage_added event")
 
 	// Parse the protobuf message
-	pbMsg := &pb.StageUpdated{}
+	pbMsg := &pb.StageCreated{}
 	if err := proto.Unmarshal(messageBody, pbMsg); err != nil {
-		return fmt.Errorf("failed to unmarshal StageUpdated message: %w", err)
+		return fmt.Errorf("failed to unmarshal StageCreated message: %w", err)
 	}
 
+	// Fetch complete stage information using gRPC
 	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
 		CanvasId: pbMsg.CanvasId,
 		Id:       pbMsg.StageId,
@@ -30,17 +31,16 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to describe stage: %w", err)
 	}
 
-	// Convert protobuf to a more websocket-friendly format
+	// Convert protobuf to a more websocket-friendly format with complete information
 	wsEvent := map[string]interface{}{
-		"type": "stage_updated",
+		"event": "stage_added",
 		"payload": map[string]interface{}{
 			"id":           describeStageResp.Stage.Id,
 			"canvas_id":    describeStageResp.Stage.CanvasId,
-			"name":         describeStageResp.Stage.Name,
+			"name":         describeStageResp.Stage.Name, 
 			"created_at":   describeStageResp.Stage.CreatedAt,
 			"use":          describeStageResp.Stage.Use,
 			"conditions":   describeStageResp.Stage.Conditions,
-			"connections":  describeStageResp.Stage.Connections,
 			"run_template": describeStageResp.Stage.RunTemplate,
 		},
 	}
@@ -53,7 +53,7 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Send to all clients subscribed to this canvas
 	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
-	log.Debugf("Broadcasted stage_updated event to canvas %s", pbMsg.CanvasId)
+	log.Debugf("Broadcasted stage_added event to canvas %s", pbMsg.CanvasId)
 
 	return nil
 }

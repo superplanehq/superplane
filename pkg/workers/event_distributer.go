@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/public/ws"
-	"github.com/superplanehq/superplane/pkg/workers/event_distributer"
+	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
 
 // EventDistributer coordinates message consumption from RabbitMQ
@@ -43,14 +43,14 @@ func (e *EventDistributer) Start() error {
 		RoutingKey string
 		Handler    func(delivery tackle.Delivery) error
 	}{
-		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(event_distributer.HandleStageEventCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(event_distributer.HandleStageEventApproved)},
-		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(event_distributer.HandleEventSourceCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(event_distributer.HandleExecutionCreated)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(event_distributer.HandleExecutionStarted)},
-		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(event_distributer.HandleExecutionFinished)},
-		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(event_distributer.HandleStageCreated)},
-		{messages.DeliveryHubCanvasExchange, "stage-updated", e.createHandler(event_distributer.HandleStageUpdated)},
+		{messages.DeliveryHubCanvasExchange, messages.StageEventCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageEventCreated)},
+		{messages.DeliveryHubCanvasExchange, messages.StageEventApprovedRoutingKey, e.createHandler(eventdistributer.HandleStageEventApproved)},
+		{messages.DeliveryHubCanvasExchange, messages.EventSourceCreatedRoutingKey, e.createHandler(eventdistributer.HandleEventSourceCreated)},
+		{messages.DeliveryHubCanvasExchange, messages.ExecutionCreatedRoutingKey, e.createHandler(eventdistributer.HandleExecutionCreated)},
+		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},
+		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleExecutionFinished)},
+		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
+		{messages.DeliveryHubCanvasExchange, "stage-updated", e.createHandler(eventdistributer.HandleStageUpdated)},
 	}
 
 	// Start a consumer for each route

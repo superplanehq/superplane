@@ -1,4 +1,4 @@
-package event_distributer
+package eventdistributer
 
 import (
 	"encoding/json"
@@ -37,7 +37,7 @@ func HandleExecutionFinished(messageBody []byte, wsHub *ws.Hub) error {
 		"timestamp": rawMsg["timestamp"],
 	}
 	wsEvent := map[string]interface{}{
-		"type":    "execution_finished",
+		"event":    "execution_finished",
 		"payload": payload,
 	}
 

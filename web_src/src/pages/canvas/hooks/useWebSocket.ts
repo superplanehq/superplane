@@ -9,7 +9,7 @@ export const useWebSocketEvent = <K extends keyof EventMap>(
   canvasId: string
 ) => {
   useEffect(() => {
-    wsClient.connect('ws://localhost:8000/ws/'+canvasId);
+    wsClient.connect(getWebSocketUrl('/ws/'+canvasId));
     wsClient.register(event, handler);
 
     return () => {
@@ -17,3 +17,9 @@ export const useWebSocketEvent = <K extends keyof EventMap>(
     };
   }, [event, handler, canvasId]);
 };
+
+function getWebSocketUrl(path: string): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}${path}`;
+}
