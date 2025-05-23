@@ -38,7 +38,6 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 			"canvas_id":    describeStageResp.Stage.CanvasId,
 			"name":         describeStageResp.Stage.Name,
 			"created_at":   describeStageResp.Stage.CreatedAt,
-			"use":          describeStageResp.Stage.Use,
 			"conditions":   describeStageResp.Stage.Conditions,
 			"connections":  describeStageResp.Stage.Connections,
 			"run_template": describeStageResp.Stage.RunTemplate,
