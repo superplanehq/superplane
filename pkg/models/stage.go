@@ -12,7 +12,9 @@ import (
 )
 
 const (
-	RunTemplateTypeSemaphore     = "semaphore"
+	RunTemplateTypeSemaphore = "semaphore"
+	RunTemplateTypeHTTP      = "http"
+
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
 )
@@ -132,12 +134,9 @@ type ApprovalCondition struct {
 }
 
 type RunTemplate struct {
-	Type string `json:"type"`
-
-	//
-	// Triggers a workflow on an existing Semaphore project/task.
-	//
+	Type      string                `json:"type"`
 	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
+	HTTP      *HTTPRunTemplate      `json:"http,omitempty"`
 }
 
 type SemaphoreRunTemplate struct {
@@ -148,6 +147,17 @@ type SemaphoreRunTemplate struct {
 	PipelineFile    string            `json:"pipeline_file"`
 	Parameters      map[string]string `json:"parameters"`
 	TaskID          string            `json:"task_id"`
+}
+
+type HTTPRunTemplate struct {
+	URL           string             `json:"url"`
+	Payload       map[string]string  `json:"payload"`
+	Headers       map[string]string  `json:"headers"`
+	SuccessPolicy *HTTPSuccessPolicy `json:"success_policy"`
+}
+
+type HTTPSuccessPolicy struct {
+	Statuses []int
 }
 
 func FindStageByID(id string) (*Stage, error) {

@@ -1,4 +1,4 @@
-package resolver
+package executions
 
 import (
 	"testing"
@@ -9,13 +9,13 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test__Resolve(t *testing.T) {
+func Test__TemplateResolve(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("no variables to resolve", func(t *testing.T) {
 		execution := support.CreateExecutionWithData(t, r.Source, r.Stage, []byte(`{"ref":"v1","data": {"branch": "hello"}}`), []byte(`{"ref":"v1","data": {"branch": "hello"}}`))
 		template := support.RunTemplate()
-		resolver := NewResolver(*execution, template)
+		resolver := NewTemplateResolver(*execution, template)
 		newTemplate, err := resolver.Resolve()
 		require.NoError(t, err)
 		require.NotNil(t, newTemplate)
@@ -41,7 +41,7 @@ func Test__Resolve(t *testing.T) {
 			"PARAM_2": "${{self.Conn('gh').param2}}",
 		}
 
-		resolver := NewResolver(*execution, template)
+		resolver := NewTemplateResolver(*execution, template)
 		newTemplate, err := resolver.Resolve()
 		require.NoError(t, err)
 		require.NotNil(t, newTemplate)

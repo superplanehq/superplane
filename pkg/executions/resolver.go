@@ -1,4 +1,4 @@
-package resolver
+package executions
 
 import (
 	"context"
@@ -12,22 +12,22 @@ import (
 
 const expressionRegex = `^\$\{\{(.*)\}\}$`
 
-type Resolver struct {
+type TemplateResolver struct {
 	execution models.StageExecution
 	template  models.RunTemplate
 	regex     *regexp.Regexp
 }
 
-func NewResolver(execution models.StageExecution, template models.RunTemplate) *Resolver {
+func NewTemplateResolver(execution models.StageExecution, template models.RunTemplate) *TemplateResolver {
 	regex := regexp.MustCompile(expressionRegex)
-	return &Resolver{
+	return &TemplateResolver{
 		execution: execution,
 		template:  template,
 		regex:     regex,
 	}
 }
 
-func (r *Resolver) Resolve() (*models.RunTemplate, error) {
+func (r *TemplateResolver) Resolve() (*models.RunTemplate, error) {
 	switch r.template.Type {
 	case models.RunTemplateTypeSemaphore:
 		return r.resolveSemaphoreTemplate()
@@ -36,7 +36,7 @@ func (r *Resolver) Resolve() (*models.RunTemplate, error) {
 	}
 }
 
-func (r *Resolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
+func (r *TemplateResolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
 	t := r.template.Semaphore
 	projectID, err := r.resolveExpression(t.ProjectID)
 	if err != nil {
@@ -82,7 +82,7 @@ func (r *Resolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
 	}, nil
 }
 
-func (r *Resolver) resolveExpression(expression string) (string, error) {
+func (r *TemplateResolver) resolveExpression(expression string) (string, error) {
 	if r.regex.MatchString(expression) {
 		matches := r.regex.FindStringSubmatch(expression)
 		if len(matches) != 2 {
@@ -95,7 +95,7 @@ func (r *Resolver) resolveExpression(expression string) (string, error) {
 	return expression, nil
 }
 
-func (r *Resolver) _resolveExpression(expression string) (string, error) {
+func (r *TemplateResolver) _resolveExpression(expression string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 

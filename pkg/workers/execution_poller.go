@@ -1,17 +1,15 @@
 package workers
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
+	"github.com/superplanehq/superplane/pkg/executions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -62,15 +60,28 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
-	result, err := w.resolveExecutionResult(logger, stage, execution)
+	template := stage.RunTemplate.Data()
+	executor, err := executions.NewExecutor(*execution, template, w.Encryptor, nil)
 	if err != nil {
 		return err
 	}
 
-	if result == models.StageExecutionStarted {
-		logger.Info("No change in state")
+	status, err := executor.AsyncCheck(execution.ReferenceID)
+	if err != nil {
+		return err
+	}
+
+	if !status.Finished() {
+		logger.Info("Not finished yet")
 		return nil
 	}
+
+	result := models.StageExecutionResultFailed
+	if status.Successful() {
+		result = models.StageExecutionResultPassed
+	}
+
+	logger.Infof("Finished with result: %s", result)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		tags, err := w.processExecutionTags(tx, logger, execution, result)
@@ -120,70 +131,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	return err
-}
-
-func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *models.Stage, execution *models.StageExecution) (string, error) {
-	template := stage.RunTemplate.Data()
-	switch template.Type {
-	case models.RunTemplateTypeSemaphore:
-		t := template.Semaphore
-		decoded, err := base64.StdEncoding.DecodeString(t.APIToken)
-		if err != nil {
-			return "", err
-		}
-
-		token, err := w.Encryptor.Decrypt(context.Background(), decoded, []byte(t.OrganizationURL))
-		if err != nil {
-			return "", err
-		}
-
-		return w.resolveResultFromSemaphoreWorkflow(
-			logger,
-			execution,
-			semaphore.NewSemaphoreAPI(
-				template.Semaphore.OrganizationURL,
-				string(token),
-			),
-		)
-	default:
-		return "", fmt.Errorf("run template %s not supported", template.Type)
-	}
-}
-
-func (w *ExecutionPoller) resolveResultFromSemaphoreWorkflow(logger *log.Entry, execution *models.StageExecution, api *semaphore.Semaphore) (string, error) {
-	pipeline, err := w.findPipeline(api, execution.ReferenceID)
-	if err != nil {
-		log.Errorf("Error finding pipeline: %v", err)
-		return "", err
-	}
-
-	if pipeline.State != semaphore.PipelineStateDone {
-		logger.Infof("Pipeline state is %s - skipping", pipeline.State)
-		return models.StageExecutionStarted, nil
-	}
-
-	logger.Infof("Pipeline %s - state=%s, result=%s", pipeline.ID, pipeline.State, pipeline.Result)
-
-	switch pipeline.Result {
-	case semaphore.PipelineResultPassed:
-		return models.StageExecutionResultPassed, nil
-	default:
-		return models.StageExecutionResultFailed, nil
-	}
-}
-
-func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID string) (*semaphore.Pipeline, error) {
-	workflow, err := api.DescribeWorkflow(workflowID)
-	if err != nil {
-		return nil, fmt.Errorf("workflow %s not found", workflowID)
-	}
-
-	pipeline, err := api.DescribePipeline(workflow.InitialPplID)
-	if err != nil {
-		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
-	}
-
-	return pipeline, nil
 }
 
 func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
