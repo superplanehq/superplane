@@ -24,6 +24,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
 	grpcLib "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -154,17 +155,15 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	} else {
 		log.Info("Running in production mode - serving static web assets")
 		
-		fileServer := http.FileServer(http.FS(assets.EmbeddedAssets))
-		assetHandler := http.StripPrefix(webBasePath, fileServer)
-		
-		s.Router.PathPrefix(webBasePath).Handler(assetHandler)
+		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
+		s.Router.PathPrefix(webBasePath).Handler(handler)
 		
 		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == webBasePath {
 				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
 				return
 			}
-			assetHandler.ServeHTTP(w, r)
+			handler.ServeHTTP(w, r)
 		})
 	}
 }
