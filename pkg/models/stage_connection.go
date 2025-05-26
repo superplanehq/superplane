@@ -23,27 +23,6 @@ type StageConnection struct {
 	SourceType     string
 	FilterOperator string
 	Filters        datatypes.JSONSlice[StageConnectionFilter]
-	Labels         datatypes.JSONSlice[LabelDefinition]
-}
-
-type LabelDefinition struct {
-	Name      string  `json:"name"`
-	ValueFrom *string `json:"value_from,omitempty"`
-	Required  *bool   `json:"required,omitempty"`
-}
-
-func (c *StageConnection) EvaluateLabels(event *Event) (map[string]string, error) {
-	labels := map[string]string{}
-	for _, labelDef := range c.Labels {
-		v, err := event.EvaluateStringExpression(*labelDef.ValueFrom)
-		if err != nil {
-			return nil, err
-		}
-
-		labels[labelDef.Name] = v
-	}
-
-	return labels, nil
 }
 
 func (c *StageConnection) Accept(event *Event) (bool, error) {

@@ -22,6 +22,7 @@ var _ MappedNullable = &SuperplaneCreateEventSourceBody{}
 type SuperplaneCreateEventSourceBody struct {
 	Name *string `json:"name,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
+	LabelDefinitions []SuperplaneLabelDefinition `json:"labelDefinitions,omitempty"`
 }
 
 // NewSuperplaneCreateEventSourceBody instantiates a new SuperplaneCreateEventSourceBody object
@@ -105,6 +106,38 @@ func (o *SuperplaneCreateEventSourceBody) SetRequesterId(v string) {
 	o.RequesterId = &v
 }
 
+// GetLabelDefinitions returns the LabelDefinitions field value if set, zero value otherwise.
+func (o *SuperplaneCreateEventSourceBody) GetLabelDefinitions() []SuperplaneLabelDefinition {
+	if o == nil || IsNil(o.LabelDefinitions) {
+		var ret []SuperplaneLabelDefinition
+		return ret
+	}
+	return o.LabelDefinitions
+}
+
+// GetLabelDefinitionsOk returns a tuple with the LabelDefinitions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneCreateEventSourceBody) GetLabelDefinitionsOk() ([]SuperplaneLabelDefinition, bool) {
+	if o == nil || IsNil(o.LabelDefinitions) {
+		return nil, false
+	}
+	return o.LabelDefinitions, true
+}
+
+// HasLabelDefinitions returns a boolean if a field has been set.
+func (o *SuperplaneCreateEventSourceBody) HasLabelDefinitions() bool {
+	if o != nil && !IsNil(o.LabelDefinitions) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabelDefinitions gets a reference to the given []SuperplaneLabelDefinition and assigns it to the LabelDefinitions field.
+func (o *SuperplaneCreateEventSourceBody) SetLabelDefinitions(v []SuperplaneLabelDefinition) {
+	o.LabelDefinitions = v
+}
+
 func (o SuperplaneCreateEventSourceBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o SuperplaneCreateEventSourceBody) ToMap() (map[string]interface{}, error)
 	}
 	if !IsNil(o.RequesterId) {
 		toSerialize["requesterId"] = o.RequesterId
+	}
+	if !IsNil(o.LabelDefinitions) {
+		toSerialize["labelDefinitions"] = o.LabelDefinitions
 	}
 	return toSerialize, nil
 }

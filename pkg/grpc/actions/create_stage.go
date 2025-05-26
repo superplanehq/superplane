@@ -44,7 +44,12 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections)
+	labelDefinitions, err := validateLabelDefinitionsForStage(req.LabelDefinitions)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections, labelDefinitions)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -76,21 +81,22 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	return response, nil
 }
 
+func validateLabelDefinitionsForStage(in []*pb.LabelDefinition) ([]models.LabelDefinition, error) {
+	out := []models.LabelDefinition{}
+	for _, labelDef := range in {
+		if labelDef.Name == "" {
+			return nil, fmt.Errorf("invalid label definition")
+		}
+
+		out = append(out, models.LabelDefinition{Name: labelDef.Name, Required: &labelDef.Required})
+	}
+
+	return out, nil
+}
+
 func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in *pb.RunTemplate) (*models.RunTemplate, error) {
 	if in == nil {
 		return nil, fmt.Errorf("missing run template")
-	}
-
-	//
-	// Validate label definitions
-	//
-	labelDefs := []models.LabelDefinition{}
-	for _, labelDef := range in.Labels {
-		if labelDef.Name == "" {
-			return nil, fmt.Errorf("invalid key-value pair definition")
-		}
-
-		labelDefs = append(labelDefs, models.LabelDefinition{Name: labelDef.Name, Required: &labelDef.Required})
 	}
 
 	switch in.Type {
@@ -113,8 +119,7 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		}
 
 		return &models.RunTemplate{
-			Type:   models.RunTemplateTypeSemaphore,
-			Labels: labelDefs,
+			Type: models.RunTemplateTypeSemaphore,
 			Semaphore: &models.SemaphoreRunTemplate{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
@@ -149,29 +154,12 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 			return nil, err
 		}
 
-		//
-		// Validate label definitions
-		//
-		labelDefs := []models.LabelDefinition{}
-		if len(connection.Labels) == 0 {
-			return nil, fmt.Errorf("empty label definitions")
-		}
-
-		for _, labelDef := range connection.Labels {
-			if labelDef.Name == "" || labelDef.ValueFrom == "" {
-				return nil, fmt.Errorf("invalid label definition")
-			}
-
-			labelDefs = append(labelDefs, models.LabelDefinition{Name: labelDef.Name, ValueFrom: &labelDef.ValueFrom})
-		}
-
 		cs = append(cs, models.StageConnection{
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
 			SourceType:     protoToConnectionType(connection.Type),
 			FilterOperator: protoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
-			Labels:         labelDefs,
 		})
 	}
 
@@ -459,14 +447,28 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 	}
 
 	return &pb.Stage{
-		Id:          stage.ID.String(),
-		Name:        stage.Name,
-		CanvasId:    stage.CanvasID.String(),
-		CreatedAt:   timestamppb.New(*stage.CreatedAt),
-		Conditions:  conditions,
-		Connections: connections,
-		RunTemplate: runTemplate,
+		Id:               stage.ID.String(),
+		Name:             stage.Name,
+		CanvasId:         stage.CanvasID.String(),
+		CreatedAt:        timestamppb.New(*stage.CreatedAt),
+		Conditions:       conditions,
+		Connections:      connections,
+		RunTemplate:      runTemplate,
+		LabelDefinitions: serializeLabelDefinitions(stage.LabelDefinitions),
 	}, nil
+}
+
+func serializeLabelDefinitions(in []models.LabelDefinition) []*pb.LabelDefinition {
+	out := []*pb.LabelDefinition{}
+	for _, labelDef := range in {
+		out = append(out, &pb.LabelDefinition{
+			Name:      labelDef.Name,
+			ValueFrom: *labelDef.ValueFrom,
+			Required:  *labelDef.Required,
+		})
+	}
+
+	return out
 }
 
 func serializeConditions(conditions []models.StageCondition) ([]*pb.Condition, error) {

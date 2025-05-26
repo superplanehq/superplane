@@ -14,9 +14,9 @@ func Test__StageExecution(t *testing.T) {
 	user := uuid.New()
 	canvas, err := CreateCanvas(user, "test")
 	require.NoError(t, err)
-	source, err := canvas.CreateEventSource("gh", []byte("my-key"))
+	source, err := canvas.CreateEventSource("gh", []byte("my-key"), []LabelDefinition{})
 	require.NoError(t, err)
-	require.NoError(t, canvas.CreateStage("stg-1", user.String(), []StageCondition{}, RunTemplate{}, []StageConnection{}))
+	require.NoError(t, canvas.CreateStage("stg-1", user.String(), []StageCondition{}, RunTemplate{}, []StageConnection{}, []LabelDefinition{}))
 	stage, err := canvas.FindStageByName("stg-1")
 	require.NoError(t, err)
 

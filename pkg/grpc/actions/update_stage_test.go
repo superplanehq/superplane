@@ -44,9 +44,6 @@ func Test__UpdateStage(t *testing.T) {
 			{
 				Name: r.Source.Name,
 				Type: protos.Connection_TYPE_EVENT_SOURCE,
-				Labels: []*protos.LabelDef{
-					{Name: "version", ValueFrom: "ref"},
-				},
 				Filters: []*protos.Connection_Filter{
 					{
 						Type: protos.Connection_FILTER_TYPE_DATA,
@@ -111,9 +108,6 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: "source-does-not-exist",
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Labels: []*protos.LabelDef{
-						{Name: "version", ValueFrom: "ref"},
-					},
 				},
 			},
 		})
@@ -134,9 +128,6 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Labels: []*protos.LabelDef{
-						{Name: "version", ValueFrom: "ref"},
-					},
 					Filters: []*protos.Connection_Filter{
 						{
 							Type: protos.Connection_FILTER_TYPE_DATA,
@@ -165,9 +156,6 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Labels: []*protos.LabelDef{
-						{Name: "version", ValueFrom: "ref"},
-					},
 				},
 			},
 			Conditions: []*protos.Condition{
@@ -201,11 +189,8 @@ func Test__UpdateStage(t *testing.T) {
 			Conditions: []*protos.Condition{},
 			Connections: []*protos.Connection{
 				{
-					Name: r.Source.Name,
-					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Labels: []*protos.LabelDef{
-						{Name: "version", ValueFrom: "ref"},
-					},
+					Name:           r.Source.Name,
+					Type:           protos.Connection_TYPE_EVENT_SOURCE,
 					FilterOperator: protos.Connection_FILTER_OPERATOR_OR,
 					Filters: []*protos.Connection_Filter{
 						{

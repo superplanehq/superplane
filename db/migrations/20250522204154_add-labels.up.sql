@@ -1,7 +1,9 @@
 begin;
 
+ALTER TABLE stages DROP COLUMN use;
+ALTER TABLE stages ADD COLUMN label_definitions jsonb NOT NULL DEFAULT '{}';
+ALTER TABLE event_sources ADD COLUMN label_definitions jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE stage_executions RENAME COLUMN tags TO labels;
-ALTER TABLE stage_connections ADD COLUMN labels jsonb NOT NULL DEFAULT '{}';
 ALTER TABLE stage_events ADD COLUMN labels jsonb NOT NULL DEFAULT '{}';
 
 CREATE TABLE stage_execution_labels (

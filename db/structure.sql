@@ -58,7 +58,8 @@ CREATE TABLE public.event_sources (
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    key bytea NOT NULL
+    key bytea NOT NULL,
+    label_definitions jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -99,8 +100,7 @@ CREATE TABLE public.stage_connections (
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
     filter_operator character varying(16) NOT NULL,
-    filters jsonb NOT NULL,
-    labels jsonb DEFAULT '{}'::jsonb NOT NULL
+    filters jsonb NOT NULL
 );
 
 
@@ -182,7 +182,7 @@ CREATE TABLE public.stages (
     updated_by uuid,
     run_template jsonb NOT NULL,
     conditions jsonb,
-    use jsonb
+    label_definitions jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 

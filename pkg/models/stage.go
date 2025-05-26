@@ -26,8 +26,9 @@ type Stage struct {
 	CreatedBy uuid.UUID
 	UpdatedBy uuid.UUID
 
-	Conditions  datatypes.JSONSlice[StageCondition]
-	RunTemplate datatypes.JSONType[RunTemplate]
+	Conditions       datatypes.JSONSlice[StageCondition]
+	LabelDefinitions datatypes.JSONSlice[LabelDefinition]
+	RunTemplate      datatypes.JSONType[RunTemplate]
 }
 
 type StageCondition struct {
@@ -133,7 +134,6 @@ type ApprovalCondition struct {
 
 type RunTemplate struct {
 	Type      string                `json:"type"`
-	Labels    []LabelDefinition     `json:"labels"`
 	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
 }
 

@@ -687,13 +687,6 @@
         },
         "filterOperator": {
           "$ref": "#/definitions/ConnectionFilterOperator"
-        },
-        "kv": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneKVDef"
-          }
         }
       }
     },
@@ -733,6 +726,13 @@
         },
         "requesterId": {
           "type": "string"
+        },
+        "labelDefinitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneLabelDefinition"
+          }
         }
       }
     },
@@ -772,6 +772,13 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
+        },
+        "labelDefinitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneLabelDefinition"
+          }
         }
       }
     },
@@ -822,6 +829,13 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "labelDefinitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneLabelDefinition"
+          }
         }
       }
     },
@@ -864,10 +878,10 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneKV": {
+    "SuperplaneLabel": {
       "type": "object",
       "properties": {
-        "key": {
+        "name": {
           "type": "string"
         },
         "value": {
@@ -875,10 +889,10 @@
         }
       }
     },
-    "SuperplaneKVDef": {
+    "SuperplaneLabelDefinition": {
       "type": "object",
       "properties": {
-        "key": {
+        "name": {
           "type": "string"
         },
         "valueFrom": {
@@ -942,13 +956,6 @@
       "properties": {
         "type": {
           "$ref": "#/definitions/SuperplaneRunTemplateType"
-        },
-        "kv": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneKVDef"
-          }
         },
         "semaphore": {
           "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
@@ -1024,6 +1031,13 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
+        },
+        "labelDefinitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneLabelDefinition"
+          }
         }
       }
     },
@@ -1059,11 +1073,11 @@
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
         },
-        "kv": {
+        "labels": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneKV"
+            "$ref": "#/definitions/SuperplaneLabel"
           }
         }
       }
@@ -1112,6 +1126,13 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
+        },
+        "labelDefinitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneLabelDefinition"
+          }
         }
       }
     },

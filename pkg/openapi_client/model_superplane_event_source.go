@@ -25,6 +25,7 @@ type SuperplaneEventSource struct {
 	Name *string `json:"name,omitempty"`
 	CanvasId *string `json:"canvasId,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	LabelDefinitions []SuperplaneLabelDefinition `json:"labelDefinitions,omitempty"`
 }
 
 // NewSuperplaneEventSource instantiates a new SuperplaneEventSource object
@@ -172,6 +173,38 @@ func (o *SuperplaneEventSource) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
+// GetLabelDefinitions returns the LabelDefinitions field value if set, zero value otherwise.
+func (o *SuperplaneEventSource) GetLabelDefinitions() []SuperplaneLabelDefinition {
+	if o == nil || IsNil(o.LabelDefinitions) {
+		var ret []SuperplaneLabelDefinition
+		return ret
+	}
+	return o.LabelDefinitions
+}
+
+// GetLabelDefinitionsOk returns a tuple with the LabelDefinitions field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSource) GetLabelDefinitionsOk() ([]SuperplaneLabelDefinition, bool) {
+	if o == nil || IsNil(o.LabelDefinitions) {
+		return nil, false
+	}
+	return o.LabelDefinitions, true
+}
+
+// HasLabelDefinitions returns a boolean if a field has been set.
+func (o *SuperplaneEventSource) HasLabelDefinitions() bool {
+	if o != nil && !IsNil(o.LabelDefinitions) {
+		return true
+	}
+
+	return false
+}
+
+// SetLabelDefinitions gets a reference to the given []SuperplaneLabelDefinition and assigns it to the LabelDefinitions field.
+func (o *SuperplaneEventSource) SetLabelDefinitions(v []SuperplaneLabelDefinition) {
+	o.LabelDefinitions = v
+}
+
 func (o SuperplaneEventSource) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -193,6 +226,9 @@ func (o SuperplaneEventSource) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt
+	}
+	if !IsNil(o.LabelDefinitions) {
+		toSerialize["labelDefinitions"] = o.LabelDefinitions
 	}
 	return toSerialize, nil
 }

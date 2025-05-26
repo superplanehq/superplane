@@ -199,6 +199,7 @@ message EventSource {
   string name = 2;
   string canvas_id = 3;
   google.protobuf.Timestamp created_at = 4;
+  repeated LabelDefinition label_definitions = 5;
 }
 
 message DescribeStageRequest {
@@ -215,6 +216,7 @@ message CreateEventSourceRequest {
   string name = 1;
   string canvas_id = 2;
   string requester_id = 3;
+  repeated LabelDefinition label_definitions = 4;
 }
 
 message CreateEventSourceResponse {
@@ -273,10 +275,9 @@ message Connection {
   string name = 2;
   repeated Filter filters = 3;
   FilterOperator filter_operator = 4;
-  repeated LabelDef labels = 5;
 }
 
-message LabelDef {
+message LabelDefinition {
   string name = 1;
   string value_from = 2;
   bool required = 3;
@@ -290,6 +291,7 @@ message Stage {
   repeated Connection connections = 5;
   repeated Condition conditions = 6;
   RunTemplate run_template = 7;
+  repeated LabelDefinition label_definitions = 8;
 }
 
 message Condition {
@@ -321,6 +323,7 @@ message CreateStageRequest {
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
   RunTemplate run_template = 6;
+  repeated LabelDefinition label_definitions = 7;
 }
 
 message RunTemplate {
@@ -330,7 +333,6 @@ message RunTemplate {
   }
 
   Type type = 1;
-  repeated LabelDef labels = 2;
   SemaphoreRunTemplate semaphore = 3;
 }
 
@@ -355,6 +357,7 @@ message UpdateStageRequest {
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
   RunTemplate run_template = 6;
+  repeated LabelDefinition label_definitions = 7;
 }
 
 message UpdateStageResponse {
