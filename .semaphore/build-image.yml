@@ -1,0 +1,16 @@
+version: v1.0
+name: Build Image
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2204
+blocks:
+  - name: "Build & Push"
+    task:
+      jobs:
+        - name: "Build and push image"
+          commands:
+            - checkout
+            - make image.auth
+            - make image.build
+            - make image.push
