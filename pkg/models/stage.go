@@ -133,7 +133,7 @@ type ApprovalCondition struct {
 
 type RunTemplate struct {
 	Type      string                `json:"type"`
-	KV        []KVDef               `json:"kv"`
+	Labels    []LabelDefinition     `json:"labels"`
 	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
 }
 

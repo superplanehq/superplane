@@ -23,27 +23,27 @@ type StageConnection struct {
 	SourceType     string
 	FilterOperator string
 	Filters        datatypes.JSONSlice[StageConnectionFilter]
-	KV             datatypes.JSONSlice[KVDef]
+	Labels         datatypes.JSONSlice[LabelDefinition]
 }
 
-type KVDef struct {
-	Key       string  `json:"key"`
+type LabelDefinition struct {
+	Name      string  `json:"name"`
 	ValueFrom *string `json:"value_from,omitempty"`
 	Required  *bool   `json:"required,omitempty"`
 }
 
-func (c *StageConnection) EvaluateKVs(event *Event) (map[string]string, error) {
-	kv := map[string]string{}
-	for _, kvDef := range c.KV {
-		v, err := event.EvaluateStringExpression(*kvDef.ValueFrom)
+func (c *StageConnection) EvaluateLabels(event *Event) (map[string]string, error) {
+	labels := map[string]string{}
+	for _, labelDef := range c.Labels {
+		v, err := event.EvaluateStringExpression(*labelDef.ValueFrom)
 		if err != nil {
 			return nil, err
 		}
 
-		kv[kvDef.Key] = v
+		labels[labelDef.Name] = v
 	}
 
-	return kv, nil
+	return labels, nil
 }
 
 func (c *StageConnection) Accept(event *Event) (bool, error) {

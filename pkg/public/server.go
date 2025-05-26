@@ -61,7 +61,7 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
-		upgrader:              &websocket.Upgrader{
+		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
 				// TODO: implement origin checking
@@ -70,8 +70,8 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		BasePath:              basePath,
-		wsHub:                 wsHub,
+		BasePath: basePath,
+		wsHub:    wsHub,
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -153,12 +153,12 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 		s.setupDevProxy(webBasePath)
 	} else {
 		log.Info("Running in production mode - serving static web assets")
-		
+
 		fileServer := http.FileServer(http.FS(assets.EmbeddedAssets))
 		assetHandler := http.StripPrefix(webBasePath, fileServer)
-		
+
 		s.Router.PathPrefix(webBasePath).Handler(assetHandler)
-		
+
 		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == webBasePath {
 				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
@@ -188,7 +188,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/executions/{executionID}/kv", s.HandleExecutionKV).
+		HandleFunc(s.BasePath+"/executions/{executionID}/labels", s.HandleExecutionLabels).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -231,7 +231,7 @@ func (s *Server) Close() {
 	}
 }
 
-func (s *Server) HandleExecutionKV(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleExecutionLabels(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	executionID, err := uuid.Parse(vars["executionID"])
 	if err != nil {
@@ -283,7 +283,7 @@ func (s *Server) HandleExecutionKV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = execution.AddKV(body)
+	err = execution.AddLabels(body)
 	if err != nil {
 		http.Error(w, "Error updating tags", http.StatusInternalServerError)
 		return
@@ -469,12 +469,12 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
-	
+
 	// Extract the canvasId from the URL path variables
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
 	log.Infof("WebSocket connection for canvas ID: %s", canvasID)
-	
+
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {

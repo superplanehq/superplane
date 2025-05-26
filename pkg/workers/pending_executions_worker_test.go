@@ -89,7 +89,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		template.Semaphore.Parameters = map[string]string{
 			"REF":             "${{ self.Conn('gh').ref }}",
 			"REF_TYPE":        "${{ self.Conn('gh').ref_type }}",
-			"STAGE_1_VERSION": "${{ self.Conn('stage-1').kv.version }}",
+			"STAGE_1_VERSION": "${{ self.Conn('stage-1').labels.version }}",
 		}
 
 		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, template, []models.StageConnection{
@@ -171,12 +171,12 @@ func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *m
 	}))
 }
 
-func createStageCompletionEvent(t *testing.T, r *support.ResourceRegistry, kv map[string]string) []byte {
+func createStageCompletionEvent(t *testing.T, r *support.ResourceRegistry, labels map[string]string) []byte {
 	e, err := events.NewStageExecutionCompletion(&models.StageExecution{
 		ID:      uuid.New(),
 		StageID: r.Stage.ID,
 		Result:  models.StageExecutionResultPassed,
-	}, kv)
+	}, labels)
 
 	require.NoError(t, err)
 	data, err := json.Marshal(e)

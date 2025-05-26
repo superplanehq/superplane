@@ -39,7 +39,7 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
-	KV          datatypes.JSON
+	Labels      datatypes.JSON
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -117,8 +117,8 @@ func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string
 	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, map[string]string{})
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, kv map[string]string) (*StageEvent, error) {
-	data, err := json.Marshal(kv)
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, labels map[string]string) (*StageEvent, error) {
+	data, err := json.Marshal(labels)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		State:       state,
 		StateReason: stateReason,
 		CreatedAt:   &now,
-		KV:          datatypes.JSON(data),
+		Labels:      datatypes.JSON(data),
 	}
 
 	err = tx.Create(&stageEvent).

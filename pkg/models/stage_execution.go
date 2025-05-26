@@ -31,7 +31,7 @@ type StageExecution struct {
 	UpdatedAt    *time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
-	KV           datatypes.JSON
+	Labels       datatypes.JSON
 
 	//
 	// TODO: not so sure about this column
@@ -45,30 +45,18 @@ type StageExecution struct {
 	ReferenceID string
 }
 
-func (e *StageExecution) GetKVFromEvent(tx *gorm.DB) (map[string]string, error) {
-	var data struct {
-		KV datatypes.JSON
-	}
-
+func (e *StageExecution) GetStageEvent(tx *gorm.DB) (*StageEvent, error) {
+	var event StageEvent
 	err := tx.
-		Table("stage_executions").
-		Select("stage_events.kv").
-		Joins("inner join stage_events ON stage_executions.stage_event_id = stage_events.id").
-		Where("stage_executions.id = ?", e.ID).
-		Scan(&data).
+		Where("id = ?", e.StageEventID).
+		First(&event).
 		Error
 
 	if err != nil {
 		return nil, fmt.Errorf("error finding event: %v", err)
 	}
 
-	var m map[string]string
-	err = json.Unmarshal(data.KV, &m)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling data: %v", err)
-	}
-
-	return m, nil
+	return &event, nil
 }
 
 func (e *StageExecution) GetEventData() (map[string]any, error) {
@@ -138,10 +126,10 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 		Error
 }
 
-func (e *StageExecution) AddKV(kv []byte) error {
+func (e *StageExecution) AddLabels(labels []byte) error {
 	return database.Conn().Model(e).
 		Clauses(clause.Returning{}).
-		Update("kv", kv).
+		Update("labels", labels).
 		Update("updated_at", time.Now()).
 		Error
 }

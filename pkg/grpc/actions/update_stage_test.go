@@ -44,8 +44,8 @@ func Test__UpdateStage(t *testing.T) {
 			{
 				Name: r.Source.Name,
 				Type: protos.Connection_TYPE_EVENT_SOURCE,
-				Kv: []*protos.KVDef{
-					{Key: "version", ValueFrom: "ref"},
+				Labels: []*protos.LabelDef{
+					{Name: "version", ValueFrom: "ref"},
 				},
 				Filters: []*protos.Connection_Filter{
 					{
@@ -111,8 +111,8 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: "source-does-not-exist",
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Kv: []*protos.KVDef{
-						{Key: "version", ValueFrom: "ref"},
+					Labels: []*protos.LabelDef{
+						{Name: "version", ValueFrom: "ref"},
 					},
 				},
 			},
@@ -134,8 +134,8 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Kv: []*protos.KVDef{
-						{Key: "version", ValueFrom: "ref"},
+					Labels: []*protos.LabelDef{
+						{Name: "version", ValueFrom: "ref"},
 					},
 					Filters: []*protos.Connection_Filter{
 						{
@@ -165,8 +165,8 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Kv: []*protos.KVDef{
-						{Key: "version", ValueFrom: "ref"},
+					Labels: []*protos.LabelDef{
+						{Name: "version", ValueFrom: "ref"},
 					},
 				},
 			},
@@ -203,8 +203,8 @@ func Test__UpdateStage(t *testing.T) {
 				{
 					Name: r.Source.Name,
 					Type: protos.Connection_TYPE_EVENT_SOURCE,
-					Kv: []*protos.KVDef{
-						{Key: "version", ValueFrom: "ref"},
+					Labels: []*protos.LabelDef{
+						{Name: "version", ValueFrom: "ref"},
 					},
 					FilterOperator: protos.Connection_FILTER_OPERATOR_OR,
 					Filters: []*protos.Connection_Filter{

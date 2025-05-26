@@ -100,7 +100,7 @@ CREATE TABLE public.stage_connections (
     source_type character varying(64) NOT NULL,
     filter_operator character varying(16) NOT NULL,
     filters jsonb NOT NULL,
-    kv jsonb DEFAULT '{}'::jsonb NOT NULL
+    labels jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -130,7 +130,22 @@ CREATE TABLE public.stage_events (
     state character varying(64) NOT NULL,
     state_reason character varying(64),
     created_at timestamp without time zone NOT NULL,
-    kv jsonb DEFAULT '{}'::jsonb NOT NULL
+    labels jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: stage_execution_labels; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stage_execution_labels (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    source_id uuid NOT NULL,
+    source_type character varying(64) NOT NULL,
+    execution_id uuid NOT NULL,
+    name character varying(64) NOT NULL,
+    value character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -145,24 +160,11 @@ CREATE TABLE public.stage_executions (
     reference_id character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
-    kv jsonb,
+    labels jsonb,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
     finished_at timestamp without time zone
-);
-
-
---
--- Name: stage_kvs; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_kvs (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    stage_id uuid NOT NULL,
-    key character varying(64) NOT NULL,
-    value character varying(64) NOT NULL,
-    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -273,19 +275,19 @@ ALTER TABLE ONLY public.stage_events
 
 
 --
+-- Name: stage_execution_labels stage_execution_labels_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_execution_labels
+    ADD CONSTRAINT stage_execution_labels_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: stage_executions stage_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stage_executions
     ADD CONSTRAINT stage_executions_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_kvs stage_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_kvs
-    ADD CONSTRAINT stage_kvs_pkey PRIMARY KEY (id);
 
 
 --
@@ -400,6 +402,14 @@ ALTER TABLE ONLY public.stage_events
 
 
 --
+-- Name: stage_execution_labels stage_execution_labels_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_execution_labels
+    ADD CONSTRAINT stage_execution_labels_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.stage_executions(id);
+
+
+--
 -- Name: stage_executions stage_executions_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -413,14 +423,6 @@ ALTER TABLE ONLY public.stage_executions
 
 ALTER TABLE ONLY public.stage_executions
     ADD CONSTRAINT stage_executions_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
-
-
---
--- Name: stage_kvs stage_kvs_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_kvs
-    ADD CONSTRAINT stage_kvs_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
 
 
 --

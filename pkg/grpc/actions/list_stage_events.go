@@ -118,20 +118,20 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
-		Kv:          []*pb.KV{},
+		Labels:      []*pb.Label{},
 	}
 
 	//
-	// Add KV pairs.
+	// Add labels
 	//
-	var kv map[string]string
-	err := json.Unmarshal(in.KV, &kv)
+	var labels map[string]string
+	err := json.Unmarshal(in.Labels, &labels)
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range kv {
-		e.Kv = append(e.Kv, &pb.KV{Key: k, Value: v})
+	for k, v := range labels {
+		e.Labels = append(e.Labels, &pb.Label{Name: k, Value: v})
 	}
 
 	//

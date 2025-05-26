@@ -18,7 +18,7 @@ type StageExecutionCompletion struct {
 	Type      string            `json:"type"`
 	Stage     *Stage            `json:"stage,omitempty"`
 	Execution *Execution        `json:"execution,omitempty"`
-	KV        map[string]string `json:"kv,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 type Stage struct {
@@ -33,7 +33,7 @@ type Execution struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
-func NewStageExecutionCompletion(execution *models.StageExecution, kv map[string]string) (*StageExecutionCompletion, error) {
+func NewStageExecutionCompletion(execution *models.StageExecution, labels map[string]string) (*StageExecutionCompletion, error) {
 	return &StageExecutionCompletion{
 		Type: StageExecutionCompletionType,
 		Stage: &Stage{
@@ -46,6 +46,6 @@ func NewStageExecutionCompletion(execution *models.StageExecution, kv map[string
 			StartedAt:  execution.StartedAt,
 			FinishedAt: execution.FinishedAt,
 		},
-		KV: kv,
+		Labels: labels,
 	}, nil
 }

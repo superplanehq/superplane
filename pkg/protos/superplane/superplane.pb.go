@@ -1211,7 +1211,7 @@ type Connection struct {
 	Name           string                    `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Filters        []*Connection_Filter      `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
 	FilterOperator Connection_FilterOperator `protobuf:"varint,4,opt,name=filter_operator,json=filterOperator,proto3,enum=Superplane.Connection_FilterOperator" json:"filter_operator,omitempty"`
-	Kv             []*KVDef                  `protobuf:"bytes,5,rep,name=kv,proto3" json:"kv,omitempty"`
+	Labels         []*LabelDef               `protobuf:"bytes,5,rep,name=labels,proto3" json:"labels,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1274,36 +1274,36 @@ func (x *Connection) GetFilterOperator() Connection_FilterOperator {
 	return Connection_FILTER_OPERATOR_AND
 }
 
-func (x *Connection) GetKv() []*KVDef {
+func (x *Connection) GetLabels() []*LabelDef {
 	if x != nil {
-		return x.Kv
+		return x.Labels
 	}
 	return nil
 }
 
-type KVDef struct {
+type LabelDef struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	ValueFrom     string                 `protobuf:"bytes,2,opt,name=value_from,json=valueFrom,proto3" json:"value_from,omitempty"`
 	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *KVDef) Reset() {
-	*x = KVDef{}
+func (x *LabelDef) Reset() {
+	*x = LabelDef{}
 	mi := &file_superplane_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *KVDef) String() string {
+func (x *LabelDef) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*KVDef) ProtoMessage() {}
+func (*LabelDef) ProtoMessage() {}
 
-func (x *KVDef) ProtoReflect() protoreflect.Message {
+func (x *LabelDef) ProtoReflect() protoreflect.Message {
 	mi := &file_superplane_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -1315,26 +1315,26 @@ func (x *KVDef) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use KVDef.ProtoReflect.Descriptor instead.
-func (*KVDef) Descriptor() ([]byte, []int) {
+// Deprecated: Use LabelDef.ProtoReflect.Descriptor instead.
+func (*LabelDef) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{15}
 }
 
-func (x *KVDef) GetKey() string {
+func (x *LabelDef) GetName() string {
 	if x != nil {
-		return x.Key
+		return x.Name
 	}
 	return ""
 }
 
-func (x *KVDef) GetValueFrom() string {
+func (x *LabelDef) GetValueFrom() string {
 	if x != nil {
 		return x.ValueFrom
 	}
 	return ""
 }
 
-func (x *KVDef) GetRequired() bool {
+func (x *LabelDef) GetRequired() bool {
 	if x != nil {
 		return x.Required
 	}
@@ -1684,7 +1684,7 @@ func (x *CreateStageRequest) GetRunTemplate() *RunTemplate {
 type RunTemplate struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          RunTemplate_Type       `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.RunTemplate_Type" json:"type,omitempty"`
-	Kv            []*KVDef               `protobuf:"bytes,2,rep,name=kv,proto3" json:"kv,omitempty"`
+	Labels        []*LabelDef            `protobuf:"bytes,2,rep,name=labels,proto3" json:"labels,omitempty"`
 	Semaphore     *SemaphoreRunTemplate  `protobuf:"bytes,3,opt,name=semaphore,proto3" json:"semaphore,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -1727,9 +1727,9 @@ func (x *RunTemplate) GetType() RunTemplate_Type {
 	return RunTemplate_TYPE_UNKNOWN
 }
 
-func (x *RunTemplate) GetKv() []*KVDef {
+func (x *RunTemplate) GetLabels() []*LabelDef {
 	if x != nil {
-		return x.Kv
+		return x.Labels
 	}
 	return nil
 }
@@ -2303,7 +2303,7 @@ type StageEvent struct {
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Approvals     []*StageEventApproval  `protobuf:"bytes,7,rep,name=approvals,proto3" json:"approvals,omitempty"`
 	Execution     *Execution             `protobuf:"bytes,8,opt,name=execution,proto3" json:"execution,omitempty"`
-	Kv            []*KV                  `protobuf:"bytes,9,rep,name=kv,proto3" json:"kv,omitempty"`
+	Labels        []*Label               `protobuf:"bytes,9,rep,name=labels,proto3" json:"labels,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2394,35 +2394,35 @@ func (x *StageEvent) GetExecution() *Execution {
 	return nil
 }
 
-func (x *StageEvent) GetKv() []*KV {
+func (x *StageEvent) GetLabels() []*Label {
 	if x != nil {
-		return x.Kv
+		return x.Labels
 	}
 	return nil
 }
 
-type KV struct {
+type Label struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *KV) Reset() {
-	*x = KV{}
+func (x *Label) Reset() {
+	*x = Label{}
 	mi := &file_superplane_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *KV) String() string {
+func (x *Label) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*KV) ProtoMessage() {}
+func (*Label) ProtoMessage() {}
 
-func (x *KV) ProtoReflect() protoreflect.Message {
+func (x *Label) ProtoReflect() protoreflect.Message {
 	mi := &file_superplane_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -2434,19 +2434,19 @@ func (x *KV) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use KV.ProtoReflect.Descriptor instead.
-func (*KV) Descriptor() ([]byte, []int) {
+// Deprecated: Use Label.ProtoReflect.Descriptor instead.
+func (*Label) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *KV) GetKey() string {
+func (x *Label) GetName() string {
 	if x != nil {
-		return x.Key
+		return x.Name
 	}
 	return ""
 }
 
-func (x *KV) GetValue() string {
+func (x *Label) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
@@ -3451,14 +3451,14 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
 	"\tcanvas_id\x18\x03 \x01(\tR\bcanvasId\"Y\n" +
 	"\x1bDescribeEventSourceResponse\x12:\n" +
-	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\"\xea\x05\n" +
+	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\"\xf5\x05\n" +
 	"\n" +
 	"Connection\x12/\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1b.Superplane.Connection.TypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x127\n" +
 	"\afilters\x18\x03 \x03(\v2\x1d.Superplane.Connection.FilterR\afilters\x12N\n" +
-	"\x0ffilter_operator\x18\x04 \x01(\x0e2%.Superplane.Connection.FilterOperatorR\x0efilterOperator\x12!\n" +
-	"\x02kv\x18\x05 \x03(\v2\x11.Superplane.KVDefR\x02kv\x1a\xb3\x01\n" +
+	"\x0ffilter_operator\x18\x04 \x01(\x0e2%.Superplane.Connection.FilterOperatorR\x0efilterOperator\x12,\n" +
+	"\x06labels\x18\x05 \x03(\v2\x14.Superplane.LabelDefR\x06labels\x1a\xb3\x01\n" +
 	"\x06Filter\x125\n" +
 	"\x04type\x18\x01 \x01(\x0e2!.Superplane.Connection.FilterTypeR\x04type\x125\n" +
 	"\x04data\x18\x02 \x01(\v2!.Superplane.Connection.DataFilterR\x04data\x12;\n" +
@@ -3484,9 +3484,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02\"A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x01\"T\n" +
-	"\x05KVDef\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x1d\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x01\"Y\n" +
+	"\bLabelDef\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
 	"value_from\x18\x02 \x01(\tR\tvalueFrom\x12\x1a\n" +
 	"\brequired\x18\x03 \x01(\bR\brequired\"\xb0\x02\n" +
@@ -3524,10 +3524,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"conditions\x18\x05 \x03(\v2\x15.Superplane.ConditionR\n" +
 	"conditions\x12:\n" +
-	"\frun_template\x18\x06 \x01(\v2\x17.Superplane.RunTemplateR\vrunTemplate\"\xd0\x01\n" +
+	"\frun_template\x18\x06 \x01(\v2\x17.Superplane.RunTemplateR\vrunTemplate\"\xdb\x01\n" +
 	"\vRunTemplate\x120\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x1c.Superplane.RunTemplate.TypeR\x04type\x12!\n" +
-	"\x02kv\x18\x02 \x03(\v2\x11.Superplane.KVDefR\x02kv\x12>\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x1c.Superplane.RunTemplate.TypeR\x04type\x12,\n" +
+	"\x06labels\x18\x02 \x03(\v2\x14.Superplane.LabelDefR\x06labels\x12>\n" +
 	"\tsemaphore\x18\x03 \x01(\v2 .Superplane.SemaphoreRunTemplateR\tsemaphore\",\n" +
 	"\x04Type\x12\x10\n" +
 	"\fTYPE_UNKNOWN\x10\x00\x12\x12\n" +
@@ -3573,7 +3573,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xcf\x05\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xda\x05\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -3585,8 +3585,8 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\tapprovals\x18\a \x03(\v2\x1e.Superplane.StageEventApprovalR\tapprovals\x123\n" +
-	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x12\x1e\n" +
-	"\x02kv\x18\t \x03(\v2\x0e.Superplane.KVR\x02kv\"U\n" +
+	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x12)\n" +
+	"\x06labels\x18\t \x03(\v2\x11.Superplane.LabelR\x06labels\"U\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
@@ -3598,9 +3598,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x18STATE_REASON_TIME_WINDOW\x10\x02\x12\x1a\n" +
 	"\x16STATE_REASON_EXECUTION\x10\x03\x12\x1b\n" +
 	"\x17STATE_REASON_CONNECTION\x10\x04\x12\x1a\n" +
-	"\x16STATE_REASON_CANCELLED\x10\x05\",\n" +
-	"\x02KV\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x16STATE_REASON_CANCELLED\x10\x05\"1\n" +
+	"\x05Label\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"\xf4\x03\n" +
 	"\tExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
@@ -3743,7 +3743,7 @@ var file_superplane_proto_goTypes = []any{
 	(*DescribeEventSourceRequest)(nil),  // 21: Superplane.DescribeEventSourceRequest
 	(*DescribeEventSourceResponse)(nil), // 22: Superplane.DescribeEventSourceResponse
 	(*Connection)(nil),                  // 23: Superplane.Connection
-	(*KVDef)(nil),                       // 24: Superplane.KVDef
+	(*LabelDef)(nil),                    // 24: Superplane.LabelDef
 	(*Stage)(nil),                       // 25: Superplane.Stage
 	(*Condition)(nil),                   // 26: Superplane.Condition
 	(*ConditionApproval)(nil),           // 27: Superplane.ConditionApproval
@@ -3761,7 +3761,7 @@ var file_superplane_proto_goTypes = []any{
 	(*ListStageEventsRequest)(nil),      // 39: Superplane.ListStageEventsRequest
 	(*ListStageEventsResponse)(nil),     // 40: Superplane.ListStageEventsResponse
 	(*StageEvent)(nil),                  // 41: Superplane.StageEvent
-	(*KV)(nil),                          // 42: Superplane.KV
+	(*Label)(nil),                       // 42: Superplane.Label
 	(*Execution)(nil),                   // 43: Superplane.Execution
 	(*StageEventApproval)(nil),          // 44: Superplane.StageEventApproval
 	(*ApproveStageEventRequest)(nil),    // 45: Superplane.ApproveStageEventRequest
@@ -3792,7 +3792,7 @@ var file_superplane_proto_depIdxs = []int32{
 	0,  // 8: Superplane.Connection.type:type_name -> Superplane.Connection.Type
 	55, // 9: Superplane.Connection.filters:type_name -> Superplane.Connection.Filter
 	2,  // 10: Superplane.Connection.filter_operator:type_name -> Superplane.Connection.FilterOperator
-	24, // 11: Superplane.Connection.kv:type_name -> Superplane.KVDef
+	24, // 11: Superplane.Connection.labels:type_name -> Superplane.LabelDef
 	59, // 12: Superplane.Stage.created_at:type_name -> google.protobuf.Timestamp
 	23, // 13: Superplane.Stage.connections:type_name -> Superplane.Connection
 	26, // 14: Superplane.Stage.conditions:type_name -> Superplane.Condition
@@ -3804,7 +3804,7 @@ var file_superplane_proto_depIdxs = []int32{
 	26, // 20: Superplane.CreateStageRequest.conditions:type_name -> Superplane.Condition
 	30, // 21: Superplane.CreateStageRequest.run_template:type_name -> Superplane.RunTemplate
 	4,  // 22: Superplane.RunTemplate.type:type_name -> Superplane.RunTemplate.Type
-	24, // 23: Superplane.RunTemplate.kv:type_name -> Superplane.KVDef
+	24, // 23: Superplane.RunTemplate.labels:type_name -> Superplane.LabelDef
 	31, // 24: Superplane.RunTemplate.semaphore:type_name -> Superplane.SemaphoreRunTemplate
 	58, // 25: Superplane.SemaphoreRunTemplate.parameters:type_name -> Superplane.SemaphoreRunTemplate.ParametersEntry
 	25, // 26: Superplane.CreateStageResponse.stage:type_name -> Superplane.Stage
@@ -3823,7 +3823,7 @@ var file_superplane_proto_depIdxs = []int32{
 	59, // 39: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
 	44, // 40: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
 	43, // 41: Superplane.StageEvent.execution:type_name -> Superplane.Execution
-	42, // 42: Superplane.StageEvent.kv:type_name -> Superplane.KV
+	42, // 42: Superplane.StageEvent.labels:type_name -> Superplane.Label
 	7,  // 43: Superplane.Execution.state:type_name -> Superplane.Execution.State
 	8,  // 44: Superplane.Execution.result:type_name -> Superplane.Execution.Result
 	59, // 45: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp

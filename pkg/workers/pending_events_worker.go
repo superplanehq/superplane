@@ -159,7 +159,7 @@ func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.
 				return fmt.Errorf("error finding connection for stage: %v", err)
 			}
 
-			keyValuePairs, err := connection.EvaluateKVs(event)
+			keyValuePairs, err := connection.EvaluateLabels(event)
 			if err != nil {
 				return fmt.Errorf("error evaluating key-value pairs: %v", err)
 			}

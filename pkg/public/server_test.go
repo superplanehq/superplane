@@ -310,7 +310,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	})
 }
 
-func Test__HandleExecutionTags(t *testing.T) {
+func Test__HandleExecutionLabels(t *testing.T) {
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test")
@@ -318,17 +318,17 @@ func Test__HandleExecutionTags(t *testing.T) {
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, r.Stage)
-	validURL := "/executions/" + execution.ID.String() + "/kv"
+	validURL := "/executions/" + execution.ID.String() + "/labels"
 	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
-	kv := []byte(`{"version":"1.0.0","sha":"078fc8755c051"}`)
+	labels := []byte(`{"version":"1.0.0","sha":"078fc8755c051"}`)
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		invalidURL := "/executions/invalidsource/kv"
+		invalidURL := "/executions/invalidsource/labels"
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        invalidURL,
-			body:        kv,
+			body:        labels,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -341,7 +341,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        validURL,
-			body:        kv,
+			body:        labels,
 			contentType: "",
 			authToken:   validToken,
 		})
@@ -353,7 +353,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        validURL,
-			body:        kv,
+			body:        labels,
 			contentType: "application/x-www-form-urlencoded",
 			authToken:   validToken,
 		})
@@ -362,11 +362,11 @@ func Test__HandleExecutionTags(t *testing.T) {
 	})
 
 	t.Run("event for execution that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/executions/" + uuid.New().String() + "/kv"
+		invalidURL := "/executions/" + uuid.New().String() + "/labels"
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        invalidURL,
-			body:        kv,
+			body:        labels,
 			contentType: "application/json",
 			authToken:   validToken,
 		})
@@ -379,7 +379,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        validURL,
-			body:        kv,
+			body:        labels,
 			signature:   "",
 			authToken:   "",
 			contentType: "application/json",
@@ -393,7 +393,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        validURL,
-			body:        kv,
+			body:        labels,
 			authToken:   "invalid",
 			contentType: "application/json",
 		})
@@ -406,7 +406,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        validURL,
-			body:        kv,
+			body:        labels,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -414,7 +414,7 @@ func Test__HandleExecutionTags(t *testing.T) {
 		assert.Equal(t, 200, response.Code)
 		execution, err := models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		compareJSONB(t, kv, []byte(execution.KV))
+		compareJSONB(t, labels, []byte(execution.Labels))
 	})
 
 	t.Run("key-value pairs are limited to 4k", func(t *testing.T) {

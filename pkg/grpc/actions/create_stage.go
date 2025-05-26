@@ -82,15 +82,15 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 	}
 
 	//
-	// Validate KV definitions
+	// Validate label definitions
 	//
-	kvDefs := []models.KVDef{}
-	for _, kvDef := range in.Kv {
-		if kvDef.Key == "" {
+	labelDefs := []models.LabelDefinition{}
+	for _, labelDef := range in.Labels {
+		if labelDef.Name == "" {
 			return nil, fmt.Errorf("invalid key-value pair definition")
 		}
 
-		kvDefs = append(kvDefs, models.KVDef{Key: kvDef.Key, Required: &kvDef.Required})
+		labelDefs = append(labelDefs, models.LabelDefinition{Name: labelDef.Name, Required: &labelDef.Required})
 	}
 
 	switch in.Type {
@@ -113,8 +113,8 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		}
 
 		return &models.RunTemplate{
-			Type: models.RunTemplateTypeSemaphore,
-			KV:   kvDefs,
+			Type:   models.RunTemplateTypeSemaphore,
+			Labels: labelDefs,
 			Semaphore: &models.SemaphoreRunTemplate{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
@@ -150,19 +150,19 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 		}
 
 		//
-		// Validate KV definitions
+		// Validate label definitions
 		//
-		kvDefs := []models.KVDef{}
-		if len(connection.Kv) == 0 {
-			return nil, fmt.Errorf("empty key-value pair definitions")
+		labelDefs := []models.LabelDefinition{}
+		if len(connection.Labels) == 0 {
+			return nil, fmt.Errorf("empty label definitions")
 		}
 
-		for _, kvDef := range connection.Kv {
-			if kvDef.Key == "" || kvDef.ValueFrom == "" {
-				return nil, fmt.Errorf("invalid key-value pair definition")
+		for _, labelDef := range connection.Labels {
+			if labelDef.Name == "" || labelDef.ValueFrom == "" {
+				return nil, fmt.Errorf("invalid label definition")
 			}
 
-			kvDefs = append(kvDefs, models.KVDef{Key: kvDef.Key, ValueFrom: &kvDef.ValueFrom})
+			labelDefs = append(labelDefs, models.LabelDefinition{Name: labelDef.Name, ValueFrom: &labelDef.ValueFrom})
 		}
 
 		cs = append(cs, models.StageConnection{
@@ -171,7 +171,7 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 			SourceType:     protoToConnectionType(connection.Type),
 			FilterOperator: protoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
-			KV:             kvDefs,
+			Labels:         labelDefs,
 		})
 	}
 
