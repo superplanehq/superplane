@@ -272,7 +272,7 @@ const (
 	StageEvent_STATE_UNKNOWN   StageEvent_State = 0
 	StageEvent_STATE_PENDING   StageEvent_State = 1
 	StageEvent_STATE_WAITING   StageEvent_State = 2
-	StageEvent_STATE_PROCESSED StageEvent_State = 4
+	StageEvent_STATE_PROCESSED StageEvent_State = 3
 )
 
 // Enum value maps for StageEvent_State.
@@ -281,13 +281,13 @@ var (
 		0: "STATE_UNKNOWN",
 		1: "STATE_PENDING",
 		2: "STATE_WAITING",
-		4: "STATE_PROCESSED",
+		3: "STATE_PROCESSED",
 	}
 	StageEvent_State_value = map[string]int32{
 		"STATE_UNKNOWN":   0,
 		"STATE_PENDING":   1,
 		"STATE_WAITING":   2,
-		"STATE_PROCESSED": 4,
+		"STATE_PROCESSED": 3,
 	}
 )
 
@@ -3618,7 +3618,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
 	"\rSTATE_WAITING\x10\x02\x12\x13\n" +
-	"\x0fSTATE_PROCESSED\x10\x04\"\xb5\x01\n" +
+	"\x0fSTATE_PROCESSED\x10\x03\"\xb5\x01\n" +
 	"\vStateReason\x12\x18\n" +
 	"\x14STATE_REASON_UNKNOWN\x10\x00\x12\x19\n" +
 	"\x15STATE_REASON_APPROVAL\x10\x01\x12\x1c\n" +

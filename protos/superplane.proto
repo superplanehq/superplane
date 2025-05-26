@@ -149,7 +149,7 @@ service Superplane {
       tags: "Stage";
     };
   }
-  
+
   rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/stages/{stage_id}/events/{event_id}/approve"
@@ -396,7 +396,7 @@ message StageEvent {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
     STATE_WAITING = 2;
-    STATE_PROCESSED = 4;
+    STATE_PROCESSED = 3;
   }
 
   enum StateReason {
