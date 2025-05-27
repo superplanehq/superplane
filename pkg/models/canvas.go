@@ -215,11 +215,26 @@ func ListCanvases() ([]Canvas, error) {
 	return canvases, nil
 }
 
-func FindCanvas(id string) (*Canvas, error) {
+func FindCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().
 		Where("id = ?", id).
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
+}
+
+func FindCanvasByName(name string) (*Canvas, error) {
+	canvas := Canvas{}
+
+	err := database.Conn().
+		Where("name = ?", name).
 		First(&canvas).
 		Error
 

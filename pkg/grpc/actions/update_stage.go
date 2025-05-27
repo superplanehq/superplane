@@ -15,11 +15,14 @@ import (
 
 func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	err := ValidateUUIDs(req.Id, req.CanvasId, req.RequesterId)
+
+	var canvas *models.Canvas
 	if err != nil {
-		return nil, err
+		canvas, err = models.FindCanvasByName(req.CanvasId)
+	} else {
+		canvas, err = models.FindCanvasByID(req.CanvasId)
 	}
 
-	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
