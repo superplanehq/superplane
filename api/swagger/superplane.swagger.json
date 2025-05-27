@@ -81,10 +81,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/event-sources": {
+    "/api/v1/canvases/{canvasIdOrName}/event-sources": {
       "get": {
         "summary": "List event sources",
-        "description": "Returns a list of all event sources for the specified canvas",
+        "description": "Returns a list of all event sources for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_ListEventSources",
         "responses": {
           "200": {
@@ -102,7 +102,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -114,7 +114,7 @@
       },
       "post": {
         "summary": "Create a new event source",
-        "description": "Creates a new event source for the specified canvas",
+        "description": "Creates a new event source for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_CreateEventSource",
         "responses": {
           "200": {
@@ -132,7 +132,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -151,10 +151,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/event-sources/{id}": {
+    "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}": {
       "get": {
         "summary": "Get event source details",
-        "description": "Returns the details of a specific event source",
+        "description": "Returns the details of a specific event source (canvas can be referenced by ID or name)",
         "operationId": "Superplane_DescribeEventSource",
         "responses": {
           "200": {
@@ -172,7 +172,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -195,10 +195,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages": {
+    "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
-        "description": "Returns a list of all stages for the specified canvas",
+        "description": "Returns a list of all stages for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_ListStages",
         "responses": {
           "200": {
@@ -216,7 +216,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -228,7 +228,7 @@
       },
       "post": {
         "summary": "Create a new stage",
-        "description": "Creates a new stage for the specified canvas",
+        "description": "Creates a new stage for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_CreateStage",
         "responses": {
           "200": {
@@ -246,7 +246,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -265,10 +265,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{id}": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{id}": {
       "get": {
         "summary": "Get stage details",
-        "description": "Returns the details of a specific stage",
+        "description": "Returns the details of a specific stage (canvas can be referenced by ID or name)",
         "operationId": "Superplane_DescribeStage",
         "responses": {
           "200": {
@@ -286,7 +286,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -310,7 +310,7 @@
       },
       "patch": {
         "summary": "Update a stage",
-        "description": "Updates the specified stage",
+        "description": "Updates the specified stage (canvas can be referenced by ID or name)",
         "operationId": "Superplane_UpdateStage",
         "responses": {
           "200": {
@@ -328,7 +328,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -353,10 +353,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{stageId}/events": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events": {
       "get": {
         "summary": "List stage events",
-        "description": "Returns a list of events for the specified stage",
+        "description": "Returns a list of events for the specified stage (canvas can be referenced by ID or name)",
         "operationId": "Superplane_ListStageEvents",
         "responses": {
           "200": {
@@ -374,7 +374,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -426,10 +426,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{stageId}/events/{eventId}/approve": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events/{eventId}/approve": {
       "post": {
         "summary": "Approve a stage event",
-        "description": "Approves the specified stage event",
+        "description": "Approves the specified stage event (canvas can be referenced by ID or name)",
         "operationId": "Superplane_ApproveStageEvent",
         "responses": {
           "200": {
@@ -447,7 +447,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
