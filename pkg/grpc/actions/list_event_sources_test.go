@@ -29,7 +29,7 @@ func Test__ListEventSources(t *testing.T) {
 		require.NoError(t, err)
 
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
-			CanvasId: canvas.ID.String(),
+			CanvasIdOrName: canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -39,7 +39,7 @@ func Test__ListEventSources(t *testing.T) {
 
 	t.Run("with event source -> list", func(t *testing.T) {
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
-			CanvasId: r.Canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)

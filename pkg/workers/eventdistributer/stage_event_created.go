@@ -24,8 +24,8 @@ func HandleStageEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// First get the stage information
 	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
-		CanvasId: pbMsg.CanvasId,
-		Id:       pbMsg.StageId,
+		CanvasIdOrName: pbMsg.CanvasId,
+		Id:             pbMsg.StageId,
 	})
 	if err != nil {
 		log.Warnf("Failed to describe stage: %v, continuing with basic info", err)

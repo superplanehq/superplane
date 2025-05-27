@@ -37,10 +37,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			StageId:     uuid.New().String(),
-			EventId:     event.ID.String(),
-			RequesterId: uuid.New().String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			StageId:        uuid.New().String(),
+			EventId:        event.ID.String(),
+			RequesterId:    uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -51,10 +51,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 
 	t.Run("stage event does not exist -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			StageId:     r.Stage.ID.String(),
-			EventId:     uuid.New().String(),
-			RequesterId: uuid.New().String(),
+			CanvasIdOrName: r.Canvas.Name,
+			StageId:        r.Stage.ID.String(),
+			EventId:        uuid.New().String(),
+			RequesterId:    uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -70,10 +70,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 		defer testconsumer.Stop()
 
 		res, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			StageId:     r.Stage.ID.String(),
-			EventId:     event.ID.String(),
-			RequesterId: userID,
+			CanvasIdOrName: r.Canvas.Name,
+			StageId:        r.Stage.ID.String(),
+			EventId:        event.ID.String(),
+			RequesterId:    userID,
 		})
 
 		require.NoError(t, err)
@@ -93,10 +93,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 
 	t.Run("approves with same requester ID -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			StageId:     r.Stage.ID.String(),
-			EventId:     event.ID.String(),
-			RequesterId: userID,
+			CanvasIdOrName: r.Canvas.Name,
+			StageId:        r.Stage.ID.String(),
+			EventId:        event.ID.String(),
+			RequesterId:    userID,
 		})
 
 		s, ok := status.FromError(err)

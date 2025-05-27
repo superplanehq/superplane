@@ -24,8 +24,8 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Fetch complete stage information using gRPC
 	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
-		CanvasId: pbMsg.CanvasId,
-		Id:       pbMsg.StageId,
+		CanvasIdOrName: pbMsg.CanvasId,
+		Id:             pbMsg.StageId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to describe stage: %w", err)
@@ -37,7 +37,7 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 		"payload": map[string]interface{}{
 			"id":           describeStageResp.Stage.Id,
 			"canvas_id":    describeStageResp.Stage.CanvasId,
-			"name":         describeStageResp.Stage.Name, 
+			"name":         describeStageResp.Stage.Name,
 			"created_at":   describeStageResp.Stage.CreatedAt,
 			"conditions":   describeStageResp.Stage.Conditions,
 			"run_template": describeStageResp.Stage.RunTemplate,

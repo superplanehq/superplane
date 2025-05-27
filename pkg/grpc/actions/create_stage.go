@@ -19,12 +19,12 @@ import (
 )
 
 func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	err := ValidateUUIDs(req.CanvasId, req.RequesterId)
+	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasId)
+		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
 	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasId)
+		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
 	}
 
 	if err != nil {

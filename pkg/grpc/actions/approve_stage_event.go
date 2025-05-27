@@ -15,13 +15,13 @@ import (
 )
 
 func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	err := ValidateUUIDs(req.CanvasId, req.StageId, req.EventId, req.RequesterId)
+	err := ValidateUUIDs(req.CanvasIdOrName, req.StageId, req.EventId, req.RequesterId)
 
 	var canvas *models.Canvas
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasId)
+		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
 	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasId)
+		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
 	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

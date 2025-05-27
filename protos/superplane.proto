@@ -50,24 +50,24 @@ service Superplane {
   
   rpc CreateEventSource(CreateEventSourceRequest) returns (CreateEventSourceResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/event-sources"
+      post: "/api/v1/canvases/{canvas_id_or_name}/event-sources"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a new event source";
-      description: "Creates a new event source for the specified canvas";
+      description: "Creates a new event source for the specified canvas (can be referenced by ID or name)";
       tags: "EventSource";
     };
   }
   
   rpc CreateStage(CreateStageRequest) returns (CreateStageResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/stages"
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create a new stage";
-      description: "Creates a new stage for the specified canvas";
+      description: "Creates a new stage for the specified canvas (can be referenced by ID or name)";
       tags: "Stage";
     };
   }
@@ -85,79 +85,79 @@ service Superplane {
   
   rpc DescribeStage(DescribeStageRequest) returns (DescribeStageResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/stages/{id}"
+      get: "/api/v1/canvases/{canvas_id_or_name}/stages/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get stage details";
-      description: "Returns the details of a specific stage";
+      description: "Returns the details of a specific stage (canvas can be referenced by ID or name)";
       tags: "Stage";
     };
   }
   
   rpc DescribeEventSource(DescribeEventSourceRequest) returns (DescribeEventSourceResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/event-sources/{id}"
+      get: "/api/v1/canvases/{canvas_id_or_name}/event-sources/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get event source details";
-      description: "Returns the details of a specific event source";
+      description: "Returns the details of a specific event source (canvas can be referenced by ID or name)";
       tags: "EventSource";
     };
   }
 
   rpc ListStages(ListStagesRequest) returns (ListStagesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/stages"
+      get: "/api/v1/canvases/{canvas_id_or_name}/stages"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List stages";
-      description: "Returns a list of all stages for the specified canvas";
+      description: "Returns a list of all stages for the specified canvas (can be referenced by ID or name)";
       tags: "Stage";
     };
   }
   
   rpc ListEventSources(ListEventSourcesRequest) returns (ListEventSourcesResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/event-sources"
+      get: "/api/v1/canvases/{canvas_id_or_name}/event-sources"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List event sources";
-      description: "Returns a list of all event sources for the specified canvas";
+      description: "Returns a list of all event sources for the specified canvas (can be referenced by ID or name)";
       tags: "EventSource";
     };
   }
   
   rpc ListStageEvents(ListStageEventsRequest) returns (ListStageEventsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/stages/{stage_id}/events"
+      get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List stage events";
-      description: "Returns a list of events for the specified stage";
+      description: "Returns a list of events for the specified stage (canvas can be referenced by ID or name)";
       tags: "Event";
     };
   }
 
   rpc UpdateStage(UpdateStageRequest) returns (UpdateStageResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/stages/{id}"
+      patch: "/api/v1/canvases/{canvas_id_or_name}/stages/{id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Update a stage";
-      description: "Updates the specified stage";
+      description: "Updates the specified stage (canvas can be referenced by ID or name)";
       tags: "Stage";
     };
   }
   
   rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/stages/{stage_id}/events/{event_id}/approve"
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events/{event_id}/approve"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Approve a stage event";
-      description: "Approves the specified stage event";
+      description: "Approves the specified stage event (canvas can be referenced by ID or name)";
       tags: "Event";
     };
   }
@@ -204,7 +204,7 @@ message EventSource {
 message DescribeStageRequest {
   string id = 1;
   string name = 2;
-  string canvas_id = 3;
+  string canvas_id_or_name = 3;
 }
 
 message DescribeStageResponse {
@@ -213,7 +213,7 @@ message DescribeStageResponse {
 
 message CreateEventSourceRequest {
   string name = 1;
-  string canvas_id = 2;
+  string canvas_id_or_name = 2;
   string requester_id = 3;
 }
 
@@ -225,7 +225,7 @@ message CreateEventSourceResponse {
 message DescribeEventSourceRequest {
   string id = 1;
   string name = 2;
-  string canvas_id = 3;
+  string canvas_id_or_name = 3;
 }
 
 message DescribeEventSourceResponse {
@@ -309,7 +309,7 @@ message ConditionTimeWindow {
 
 message CreateStageRequest {
   string name = 1;
-  string canvas_id = 2;
+  string canvas_id_or_name = 2;
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
@@ -342,7 +342,7 @@ message CreateStageResponse {
 
 message UpdateStageRequest {
   string id = 1;
-  string canvas_id = 2;
+  string canvas_id_or_name = 2;
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
@@ -354,7 +354,7 @@ message UpdateStageResponse {
 }
 
 message ListStagesRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
 }
 
 message ListStagesResponse {
@@ -362,7 +362,7 @@ message ListStagesResponse {
 }
 
 message ListEventSourcesRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
 }
 
 message ListEventSourcesResponse {
@@ -371,7 +371,7 @@ message ListEventSourcesResponse {
 
 message ListStageEventsRequest {
   string stage_id = 1;
-  string canvas_id = 2;
+  string canvas_id_or_name = 2;
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
 }
@@ -438,7 +438,7 @@ message StageEventApproval {
 
 message ApproveStageEventRequest {
   string stage_id = 1;
-  string canvas_id = 2;
+  string canvas_id_or_name = 2;
   string event_id = 3;
   string requester_id = 4;
 }

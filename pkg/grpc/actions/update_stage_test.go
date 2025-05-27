@@ -22,10 +22,10 @@ func Test__UpdateStage(t *testing.T) {
 	// Create a stage first that we'll update in tests
 	runTemplate := support.ProtoRunTemplate()
 	stage, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-		CanvasId:    r.Canvas.ID.String(),
-		Name:        "test-update-stage",
-		RunTemplate: runTemplate,
-		RequesterId: r.User.String(),
+		CanvasIdOrName: r.Canvas.ID.String(),
+		Name:           "test-update-stage",
+		RunTemplate:    runTemplate,
+		RequesterId:    r.User.String(),
 		Conditions: []*protos.Condition{
 			{
 				Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
@@ -62,9 +62,9 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          "invalid-uuid",
-			CanvasId:    r.Canvas.ID.String(),
-			RequesterId: r.User.String(),
+			Id:             "invalid-uuid",
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    r.User.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -75,9 +75,9 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          uuid.NewString(),
-			CanvasId:    r.Canvas.ID.String(),
-			RequesterId: r.User.String(),
+			Id:             uuid.NewString(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    r.User.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -88,8 +88,8 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:       stageID,
-			CanvasId: r.Canvas.ID.String(),
+			Id:             stageID,
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -100,10 +100,10 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          stageID,
-			CanvasId:    r.Canvas.ID.String(),
-			RequesterId: r.User.String(),
-			RunTemplate: support.ProtoRunTemplate(),
+			Id:             stageID,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    r.User.String(),
+			RunTemplate:    support.ProtoRunTemplate(),
 			Connections: []*protos.Connection{
 				{
 					Name: "source-does-not-exist",
@@ -120,10 +120,10 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          stageID,
-			CanvasId:    r.Canvas.ID.String(),
-			RequesterId: r.User.String(),
-			RunTemplate: support.ProtoRunTemplate(),
+			Id:             stageID,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    r.User.String(),
+			RunTemplate:    support.ProtoRunTemplate(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -148,10 +148,10 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          stageID,
-			CanvasId:    r.Canvas.ID.String(),
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			Id:             stageID,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RunTemplate:    support.ProtoRunTemplate(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -171,9 +171,9 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage is updated", func(t *testing.T) {
 		res, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:          stageID,
-			CanvasId:    r.Canvas.ID.String(),
-			RequesterId: r.User.String(),
+			Id:             stageID,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    r.User.String(),
 			RunTemplate: &protos.RunTemplate{
 				Type: protos.RunTemplate_TYPE_SEMAPHORE,
 				Semaphore: &protos.SemaphoreRunTemplate{

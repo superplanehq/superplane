@@ -23,8 +23,8 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
-		CanvasId: pbMsg.CanvasId,
-		Id:       pbMsg.StageId,
+		CanvasIdOrName: pbMsg.CanvasId,
+		Id:             pbMsg.StageId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to describe stage: %w", err)

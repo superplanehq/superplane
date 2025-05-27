@@ -29,7 +29,7 @@ func Test__ListStages(t *testing.T) {
 		require.NoError(t, err)
 
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasId: canvas.ID.String(),
+			CanvasIdOrName: canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -39,7 +39,7 @@ func Test__ListStages(t *testing.T) {
 
 	t.Run("with stage -> list", func(t *testing.T) {
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasId: r.Canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)

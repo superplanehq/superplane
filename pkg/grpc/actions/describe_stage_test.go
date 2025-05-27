@@ -18,8 +18,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: uuid.New().String(),
-			Name:     r.Stage.Name,
+			CanvasIdOrName: uuid.New().String(),
+			Name:           r.Stage.Name,
 		})
 
 		s, ok := status.FromError(err)
@@ -30,7 +30,7 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("no name and no ID -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -41,8 +41,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     "does-not-exist",
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "does-not-exist",
 		})
 
 		s, ok := status.FromError(err)
@@ -53,8 +53,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("with name", func(t *testing.T) {
 		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     r.Stage.Name,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           r.Stage.Name,
 		})
 
 		require.NoError(t, err)
@@ -71,8 +71,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("with ID", func(t *testing.T) {
 		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Id:       r.Stage.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Id:             r.Stage.ID.String(),
 		})
 
 		require.NoError(t, err)

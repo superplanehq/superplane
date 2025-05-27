@@ -10,13 +10,13 @@ import (
 )
 
 func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	err := ValidateUUIDs(req.CanvasId)
+	err := ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasId)
+		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
 	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasId)
+		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
 	}
 
 	if err != nil {
