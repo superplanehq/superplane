@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -283,13 +284,77 @@ func (s *Server) HandleExecutionLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = execution.AddLabels(body)
+	stageEvent, err := execution.GetStageEvent()
+	if err != nil {
+		http.Error(w, "Error finding stage event", http.StatusInternalServerError)
+		return
+	}
+
+	labels, err := s.buildLabelsForExecution(body, stageEvent, execution)
+	if err != nil {
+		http.Error(w, "Error building labels for execution", http.StatusInternalServerError)
+		return
+	}
+
+	data, err := json.Marshal(labels)
+	if err != nil {
+		http.Error(w, "Error building labels for execution", http.StatusInternalServerError)
+		return
+	}
+
+	err = execution.AddLabels(data)
 	if err != nil {
 		http.Error(w, "Error updating tags", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// If the label is not defined, we ignore it.
+func (s *Server) buildLabelsForExecution(body []byte, event *models.StageEvent, execution *models.StageExecution) (map[string]string, error) {
+	var labels map[string]string
+	err := json.Unmarshal(body, &labels)
+	if err != nil {
+		return nil, err
+	}
+
+	switch event.SourceType {
+	case models.SourceTypeEventSource:
+		source, err := models.FindEventSource(event.SourceID)
+		if err != nil {
+			return nil, err
+		}
+
+		for name := range labels {
+			if !hasLabelWithName(source.LabelDefinitions, name) {
+				delete(labels, name)
+			}
+		}
+
+		return labels, nil
+	case models.SourceTypeStage:
+		stage, err := models.FindStageByID(execution.StageID.String())
+		if err != nil {
+			return nil, err
+		}
+
+		for name := range labels {
+			if !hasLabelWithName(stage.LabelDefinitions, name) {
+				delete(labels, name)
+			}
+		}
+
+		return labels, nil
+	default:
+		return nil, fmt.Errorf("invalid source type %s", event.SourceType)
+	}
+}
+
+func hasLabelWithName(labelDefinitions []models.LabelDefinition, labelName string) bool {
+	return slices.ContainsFunc(labelDefinitions, func(labelDef models.LabelDefinition) bool {
+		return labelDef.Name == labelName
+	})
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {

@@ -74,7 +74,22 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		labels, err := w.processExecutionLabels(tx, execution)
+		executionLabels, err := execution.ParseLabels()
+		if err != nil {
+			return err
+		}
+
+		//
+		// Check if all required labels were pushed from the execution.
+		// If any required label wasn't pushed, mark the execution as failed.
+		//
+		missingRequiredLabels := stage.MissingRequiredLabels(executionLabels)
+		if len(missingRequiredLabels) > 0 {
+			logger.Infof("Missing labels %v - marking the execution as failed", missingRequiredLabels)
+			result = models.StageExecutionResultFailed
+		}
+
+		labels, err := w.processLabels(tx, execution, executionLabels)
 		if err != nil {
 			logger.Errorf("Error processing execution labels: %v", err)
 			return err
@@ -211,14 +226,14 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 	return nil
 }
 
-func (w *ExecutionPoller) processExecutionLabels(tx *gorm.DB, execution *models.StageExecution) (map[string]string, error) {
-	event, err := execution.GetStageEvent(tx)
+func (w *ExecutionPoller) processLabels(tx *gorm.DB, execution *models.StageExecution, executionLabels map[string]string) (map[string]string, error) {
+	event, err := execution.GetStageEventInTransaction(tx)
 	if err != nil {
 		return nil, err
 	}
 
 	//
-	// Include key-value pairs from stage event.
+	// Include labels from stage event.
 	//
 	var labels map[string]string
 	err = json.Unmarshal(event.Labels, &labels)
@@ -226,32 +241,21 @@ func (w *ExecutionPoller) processExecutionLabels(tx *gorm.DB, execution *models.
 		return nil, err
 	}
 
-	allLabels := map[string]string{}
-	maps.Copy(allLabels, labels)
-
 	//
-	// Include extra tags from execution, if any.
+	// Include labels from current execution.
 	//
-	if execution.Labels != nil {
-		var m map[string]string
-		err := json.Unmarshal(execution.Labels, &m)
-		if err != nil {
-			return nil, fmt.Errorf("error adding labels from execution: %v", err)
-		}
+	maps.Copy(labels, executionLabels)
 
-		maps.Copy(allLabels, m)
-	}
-
-	if len(allLabels) == 0 {
-		return allLabels, nil
+	if len(labels) == 0 {
+		return labels, nil
 	}
 
 	//
-	// Create execution labels
+	// Create execution label records
 	//
 	now := time.Now()
 	records := []models.StageExecutionLabel{}
-	for name, value := range allLabels {
+	for name, value := range labels {
 		records = append(records, models.StageExecutionLabel{
 			ExecutionID: execution.ID,
 			SourceID:    event.SourceID,
@@ -267,5 +271,5 @@ func (w *ExecutionPoller) processExecutionLabels(tx *gorm.DB, execution *models.
 		return nil, err
 	}
 
-	return allLabels, nil
+	return labels, nil
 }

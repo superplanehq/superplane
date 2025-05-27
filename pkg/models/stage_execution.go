@@ -45,7 +45,11 @@ type StageExecution struct {
 	ReferenceID string
 }
 
-func (e *StageExecution) GetStageEvent(tx *gorm.DB) (*StageEvent, error) {
+func (e *StageExecution) GetStageEvent() (*StageEvent, error) {
+	return e.GetStageEventInTransaction(database.Conn())
+}
+
+func (e *StageExecution) GetStageEventInTransaction(tx *gorm.DB) (*StageEvent, error) {
 	var event StageEvent
 	err := tx.
 		Where("id = ?", e.StageEventID).
@@ -86,7 +90,7 @@ func (e *StageExecution) GetEventData() (map[string]any, error) {
 	return m, nil
 }
 
-func (e *StageExecution) FindSource() (string, error) {
+func (e *StageExecution) FindSourceName() (string, error) {
 	var sourceName string
 	err := database.Conn().
 		Table("stage_executions").
@@ -132,6 +136,16 @@ func (e *StageExecution) AddLabels(labels []byte) error {
 		Update("labels", labels).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+func (e *StageExecution) ParseLabels() (map[string]string, error) {
+	var labels map[string]string
+	err := json.Unmarshal(e.Labels, &labels)
+	if err != nil {
+		return nil, err
+	}
+
+	return labels, nil
 }
 
 func FindExecutionByReference(referenceId string) (*StageExecution, error) {

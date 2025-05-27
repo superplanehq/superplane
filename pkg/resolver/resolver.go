@@ -136,7 +136,7 @@ type Self struct {
 }
 
 func (s Self) Conn(name string) (map[string]any, error) {
-	sourceName, err := s.execution.FindSource()
+	sourceName, err := s.execution.FindSourceName()
 	if err != nil {
 		return nil, fmt.Errorf("error finding source for execution: %v", err)
 	}

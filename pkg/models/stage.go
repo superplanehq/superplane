@@ -202,6 +202,21 @@ func (s *Stage) HasApprovalCondition() bool {
 	return false
 }
 
+func (s *Stage) MissingRequiredLabels(labels map[string]string) []string {
+	missingLabels := []string{}
+	for _, labelDef := range s.LabelDefinitions {
+		if !*labelDef.Required {
+			continue
+		}
+
+		if _, ok := labels[labelDef.Name]; !ok {
+			missingLabels = append(missingLabels, labelDef.Name)
+		}
+	}
+
+	return missingLabels
+}
+
 func (s *Stage) ListPendingEvents() ([]StageEvent, error) {
 	return s.ListEvents([]string{StageEventStatePending}, []string{})
 }
