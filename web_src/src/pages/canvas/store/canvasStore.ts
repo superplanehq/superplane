@@ -87,7 +87,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         eventId: stageEventId
       },
       body: {
-        organizationId: "3fa85f64-5717-4562-b3fc-2c963f66afa6",
         requesterId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
         // Both fields are optional, but the 'body' property itself is required
       }

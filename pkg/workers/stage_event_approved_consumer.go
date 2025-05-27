@@ -2,19 +2,21 @@ package workers
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
-	"github.com/superplanehq/superplane/pkg/retry"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
 )
+
+const StageEventApprovedServiceName = "superplane" + "." + messages.DeliveryHubCanvasExchange + "." + messages.StageEventApprovedRoutingKey + ".worker-consumer"
+const StageEventApprovedConnectionName = "superplane"
 
 type StageEventApprovedConsumer struct {
 	Consumer    *tackle.Consumer
@@ -31,21 +33,25 @@ func NewStageEventApprovedConsumer(rabbitMQURL string) *StageEventApprovedConsum
 func (c *StageEventApprovedConsumer) Start() error {
 	options := tackle.Options{
 		URL:            c.RabbitMQURL,
-		ConnectionName: "superplane",
-		Service:        "superplane-worker",
-		RemoteExchange: "superplane.canvas-exchange",
-		RoutingKey:     "stage-event-approved",
+		ConnectionName: StageEventApprovedConnectionName,
+		Service:        StageEventApprovedServiceName,
+		RemoteExchange: messages.DeliveryHubCanvasExchange,
+		RoutingKey:     messages.StageEventApprovedRoutingKey,
 	}
 
-	err := retry.WithConstantWait("RabbitMQ connection", 5, time.Second, func() error {
-		return c.Consumer.Start(&options, c.Consume)
-	})
+	for {
+		log.Infof("Connecting to RabbitMQ queue for %s events", messages.StageEventApprovedRoutingKey)
 
-	if err != nil {
-		return fmt.Errorf("error starting consumer: %v", err)
+		err := c.Consumer.Start(&options, c.Consume)
+		if err != nil {
+			log.Errorf("Error consuming messages from %s: %v", messages.StageEventApprovedRoutingKey, err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		log.Warnf("Connection to RabbitMQ closed for %s, reconnecting...", messages.StageEventApprovedRoutingKey)
+		time.Sleep(5 * time.Second)
 	}
-
-	return nil
 }
 
 func (c *StageEventApprovedConsumer) Stop() {

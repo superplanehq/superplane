@@ -1,5 +1,5 @@
 version: v1.0
-name: Initial Pipeline
+name: CI
 agent:
   machine:
     type: f1-standard-2
@@ -23,3 +23,23 @@ blocks:
         - name: "\U0001F9EA Lint"
           commands:
             - make lint
+      epilogue:
+        always:
+          commands:
+            - test-results publish junit-report.xml
+
+after_pipeline:
+  task:
+    jobs:
+      - name: Submit Reports
+        commands:
+          - test-results gen-pipeline-report
+
+promotions:
+  - name: Build Image
+    pipeline_file: build-image.yml
+    deployment_target: ghcr
+    auto_promote_on:
+      - result: passed
+        branch:
+          - "main"
