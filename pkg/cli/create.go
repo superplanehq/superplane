@@ -76,16 +76,19 @@ var createCmd = &cobra.Command{
 				Fail("Invalid EventSource YAML: name field missing")
 			}
 
-			canvasID, ok := metadata["canvasId"].(string)
+			canvasIDOrName, ok := metadata["canvasId"].(string)
 			if !ok {
-				Fail("Invalid EventSource YAML: canvasId field missing")
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid EventSource YAML: canvasId or canvasName field missing")
+				}
 			}
 
 			// Create the event source request
 			request := openapi_client.NewSuperplaneCreateEventSourceBody()
 			request.SetName(name)
 			request.SetRequesterId(uuid.NewString())
-			response, _, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasID).Body(*request).Execute()
+			response, _, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasIDOrName).Body(*request).Execute()
 			Check(err)
 
 			fmt.Printf("Event Source '%s' created with ID '%s'.\n",
@@ -108,9 +111,12 @@ var createCmd = &cobra.Command{
 				Fail("Invalid Stage YAML: name missing")
 			}
 
-			canvasID, ok := metadata["canvasId"].(string)
+			canvasIDOrName, ok := metadata["canvasId"].(string)
 			if !ok {
-				Fail("Invalid Stage YAML: canvasId field missing")
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid Stage YAML: canvasId or canvasName field missing")
+				}
 			}
 
 			spec, ok := yamlData["spec"].(map[string]any)
@@ -129,7 +135,7 @@ var createCmd = &cobra.Command{
 
 			request.SetName(name)
 			request.SetRequesterId(uuid.NewString())
-			response, httpResponse, err := c.StageAPI.SuperplaneCreateStage(context.Background(), canvasID).
+			response, httpResponse, err := c.StageAPI.SuperplaneCreateStage(context.Background(), canvasIDOrName).
 				Body(request).
 				Execute()
 

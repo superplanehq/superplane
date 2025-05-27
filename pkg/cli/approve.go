@@ -11,14 +11,14 @@ import (
 )
 
 var approveEventCmd = &cobra.Command{
-	Use:     "event [CANVAS_ID] [STAGE_ID] [EVENT_ID]",
+	Use:     "event [CANVAS_ID_OR_NAME] [STAGE_ID] [EVENT_ID]",
 	Short:   "Approve a stage event",
 	Long:    `Approve a pending stage event that requires approval.`,
 	Aliases: []string{"events"},
 	Args:    cobra.ExactArgs(3),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 		stageID := args[1]
 		eventID := args[2]
 
@@ -29,7 +29,7 @@ var approveEventCmd = &cobra.Command{
 
 		response, _, err := c.EventAPI.SuperplaneApproveStageEvent(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			stageID,
 			eventID,
 		).Body(*request).Execute()

@@ -44,9 +44,12 @@ var updateCmd = &cobra.Command{
 				Fail("Invalid Stage YAML: metadata section missing")
 			}
 
-			canvasID, ok := metadata["canvasId"].(string)
+			canvasIDOrName, ok := metadata["canvasId"].(string)
 			if !ok {
-				Fail("Invalid Stage YAML: canvasId field missing")
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid Stage YAML: canvasId or canvasName field missing")
+				}
 			}
 
 			stageID, ok := metadata["id"].(string)
@@ -72,7 +75,7 @@ var updateCmd = &cobra.Command{
 			// so we just put something here until we have auth in this API.
 			request.SetRequesterId(uuid.NewString())
 
-			_, _, err = c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasID, stageID).
+			_, _, err = c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
 				Body(request).
 				Execute()
 
@@ -87,13 +90,13 @@ var updateCmd = &cobra.Command{
 }
 
 var updateStageCmd = &cobra.Command{
-	Use:   "stage [CANVAS_ID] [STAGE_ID]",
+	Use:   "stage [CANVAS_ID_OR_NAME] [STAGE_ID]",
 	Short: "Update a stage's configuration",
 	Long:  `Update a stage's configuration, such as its connections.`,
 	Args:  cobra.ExactArgs(2),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 		stageID := args[1]
 		requesterID, _ := cmd.Flags().GetString("requester-id")
 		yamlFile, _ := cmd.Flags().GetString("file")
@@ -135,7 +138,7 @@ var updateStageCmd = &cobra.Command{
 		c := DefaultClient()
 		_, _, err = c.StageAPI.SuperplaneUpdateStage(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			stageID,
 		).Body(*request).Execute()
 		Check(err)

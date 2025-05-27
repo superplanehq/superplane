@@ -36,17 +36,17 @@ var listCanvasesCmd = &cobra.Command{
 }
 
 var listEventSourcesCmd = &cobra.Command{
-	Use:     "event-sources [CANVAS_ID]",
+	Use:     "event-sources [CANVAS_ID_OR_NAME]",
 	Short:   "List all event sources for a canvas",
 	Long:    `Retrieve a list of all event sources for the specified canvas`,
 	Aliases: []string{"eventsources"},
 	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 
 		c := DefaultClient()
-		response, _, err := c.EventSourceAPI.SuperplaneListEventSources(context.Background(), canvasID).Execute()
+		response, _, err := c.EventSourceAPI.SuperplaneListEventSources(context.Background(), canvasIDOrName).Execute()
 		Check(err)
 
 		if len(response.EventSources) == 0 {
@@ -68,16 +68,17 @@ var listEventSourcesCmd = &cobra.Command{
 }
 
 var listStagesCmd = &cobra.Command{
-	Use:   "stages [CANVAS_ID]",
-	Short: "List all stages for a canvas",
-	Long:  `Retrieve a list of all stages for the specified canvas`,
-	Args:  cobra.ExactArgs(1),
+	Use:     "stages [CANVAS_ID_OR_NAME]",
+	Short:   "List all stages for a canvas",
+	Long:    `Retrieve a list of all stages for the specified canvas`,
+	Aliases: []string{"stages"},
+	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 
 		c := DefaultClient()
-		response, _, err := c.StageAPI.SuperplaneListStages(context.Background(), canvasID).Execute()
+		response, _, err := c.StageAPI.SuperplaneListStages(context.Background(), canvasIDOrName).Execute()
 		Check(err)
 
 		if len(response.Stages) == 0 {
@@ -99,20 +100,20 @@ var listStagesCmd = &cobra.Command{
 }
 
 var listEventsCmd = &cobra.Command{
-	Use:   "events [CANVAS_ID] [STAGE_ID]",
+	Use:   "events [CANVAS_ID_OR_NAME] [STAGE_ID]",
 	Short: "List stage events",
 	Long:  `List all events for a specific stage`,
 	Args:  cobra.ExactArgs(2),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 		stageID := args[1]
 
 		states, _ := cmd.Flags().GetStringSlice("states")
 		stateReasons, _ := cmd.Flags().GetStringSlice("state-reasons")
 
 		c := DefaultClient()
-		listRequest := c.EventAPI.SuperplaneListStageEvents(context.Background(), canvasID, stageID)
+		listRequest := c.EventAPI.SuperplaneListStageEvents(context.Background(), canvasIDOrName, stageID)
 
 		if len(states) > 0 {
 			listRequest = listRequest.States(states)

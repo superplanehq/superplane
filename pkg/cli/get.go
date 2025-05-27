@@ -30,21 +30,21 @@ var getCanvasCmd = &cobra.Command{
 }
 
 var getEventSourceCmd = &cobra.Command{
-	Use:     "event-source [CANVAS_ID] [ID]",
+	Use:     "event-source [CANVAS_ID_OR_NAME] [ID]",
 	Short:   "Get event source details",
 	Long:    `Get details about a specific event source`,
 	Aliases: []string{"event-sources", "eventsource", "eventsources"},
 	Args:    cobra.ExactArgs(2),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 		id := args[1]
 		name, _ := cmd.Flags().GetString("name")
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneDescribeEventSource(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			id,
 		).Name(name).Execute()
 		Check(err)
@@ -56,21 +56,21 @@ var getEventSourceCmd = &cobra.Command{
 }
 
 var getStageCmd = &cobra.Command{
-	Use:     "stage [CANVAS_ID] [ID]",
+	Use:     "stage [CANVAS_ID_OR_NAME] [ID]",
 	Short:   "Get stage details",
 	Long:    `Get details about a specific stage`,
 	Aliases: []string{"stages"},
 	Args:    cobra.ExactArgs(2),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
+		canvasIDOrName := args[0]
 		id := args[1]
 		name, _ := cmd.Flags().GetString("name")
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneDescribeStage(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			id,
 		).Name(name).Execute()
 		Check(err)
