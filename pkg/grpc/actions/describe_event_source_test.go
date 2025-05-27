@@ -24,7 +24,7 @@ func Test__DescribeEventSource(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Equal(t, "canvas not found", s.Message())
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {

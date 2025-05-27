@@ -6,6 +6,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
@@ -18,7 +20,7 @@ func ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesR
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
 	stages, err := canvas.ListStages()

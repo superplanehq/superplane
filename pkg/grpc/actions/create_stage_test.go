@@ -47,7 +47,7 @@ func Test__CreateStage(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Equal(t, "canvas not found", s.Message())
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {

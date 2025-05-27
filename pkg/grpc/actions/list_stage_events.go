@@ -24,7 +24,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
 	stage, err := canvas.FindStageByID(req.StageId)

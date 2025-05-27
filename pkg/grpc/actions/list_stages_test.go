@@ -21,7 +21,7 @@ func Test__ListStages(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Contains(t, s.Message(), "canvas not found")
 	})
 
 	t.Run("no stages -> empty list", func(t *testing.T) {

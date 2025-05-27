@@ -70,7 +70,7 @@ func Test__UpdateStage(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Contains(t, s.Message(), "canvas not found")
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
@@ -95,7 +95,7 @@ func Test__UpdateStage(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Contains(t, s.Message(), "canvas not found")
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {

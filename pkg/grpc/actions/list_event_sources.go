@@ -5,6 +5,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
@@ -18,7 +20,7 @@ func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
 	sources, err := canvas.ListEventSources()
