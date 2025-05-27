@@ -574,6 +574,35 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "InputAssignmentValueFrom": {
+      "type": "object",
+      "properties": {
+        "eventData": {
+          "$ref": "#/definitions/InputAssignmentValueFromEventData"
+        },
+        "output": {
+          "$ref": "#/definitions/InputAssignmentValueFromOutput"
+        }
+      }
+    },
+    "InputAssignmentValueFromEventData": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string"
+        }
+      },
+      "description": "Used when defining an input from another stage's completion event,\nor from the event source raw event data."
+    },
+    "InputAssignmentValueFromOutput": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "description": "Used when defining an input from another stage's output."
+    },
     "StageEventStateReason": {
       "type": "string",
       "enum": [
@@ -687,6 +716,13 @@
         },
         "filterOperator": {
           "$ref": "#/definitions/ConnectionFilterOperator"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputAssignment"
+          }
         }
       }
     },
@@ -726,13 +762,6 @@
         },
         "requesterId": {
           "type": "string"
-        },
-        "labelDefinitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabelDefinition"
-          }
         }
       }
     },
@@ -772,13 +801,6 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
-        },
-        "labelDefinitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabelDefinition"
-          }
         }
       }
     },
@@ -829,13 +851,6 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
-        },
-        "labelDefinitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabelDefinition"
-          }
         }
       }
     },
@@ -865,6 +880,20 @@
         "finishedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInput"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutput"
+          }
         }
       }
     },
@@ -878,7 +907,7 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneLabel": {
+    "SuperplaneInput": {
       "type": "object",
       "properties": {
         "name": {
@@ -889,17 +918,29 @@
         }
       }
     },
-    "SuperplaneLabelDefinition": {
+    "SuperplaneInputAssignment": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string"
         },
         "valueFrom": {
+          "$ref": "#/definitions/InputAssignmentValueFrom"
+        }
+      },
+      "description": "InputAssignment represents how input values are assigned.\nFor now, assigning values to inputs from event data / outputs is supported."
+    },
+    "SuperplaneInputDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
           "type": "string"
         },
-        "required": {
-          "type": "boolean"
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
         }
       }
     },
@@ -951,11 +992,47 @@
         }
       }
     },
+    "SuperplaneOutput": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneOutputDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
     "SuperplaneRunTemplate": {
       "type": "object",
       "properties": {
         "type": {
           "$ref": "#/definitions/SuperplaneRunTemplateType"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         },
         "semaphore": {
           "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
@@ -1031,13 +1108,6 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
-        },
-        "labelDefinitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabelDefinition"
-          }
         }
       }
     },
@@ -1072,13 +1142,6 @@
         },
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
-        },
-        "labels": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabel"
-          }
         }
       }
     },
@@ -1126,13 +1189,6 @@
         },
         "runTemplate": {
           "$ref": "#/definitions/SuperplaneRunTemplate"
-        },
-        "labelDefinitions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneLabelDefinition"
-          }
         }
       }
     },

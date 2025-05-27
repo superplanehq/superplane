@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneLabel type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneLabel{}
+// checks if the SuperplaneInput type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneInput{}
 
-// SuperplaneLabel struct for SuperplaneLabel
-type SuperplaneLabel struct {
+// SuperplaneInput struct for SuperplaneInput
+type SuperplaneInput struct {
 	Name *string `json:"name,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// NewSuperplaneLabel instantiates a new SuperplaneLabel object
+// NewSuperplaneInput instantiates a new SuperplaneInput object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneLabel() *SuperplaneLabel {
-	this := SuperplaneLabel{}
+func NewSuperplaneInput() *SuperplaneInput {
+	this := SuperplaneInput{}
 	return &this
 }
 
-// NewSuperplaneLabelWithDefaults instantiates a new SuperplaneLabel object
+// NewSuperplaneInputWithDefaults instantiates a new SuperplaneInput object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneLabelWithDefaults() *SuperplaneLabel {
-	this := SuperplaneLabel{}
+func NewSuperplaneInputWithDefaults() *SuperplaneInput {
+	this := SuperplaneInput{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneLabel) GetName() string {
+func (o *SuperplaneInput) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *SuperplaneLabel) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneLabel) GetNameOk() (*string, bool) {
+func (o *SuperplaneInput) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *SuperplaneLabel) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneLabel) HasName() bool {
+func (o *SuperplaneInput) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *SuperplaneLabel) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneLabel) SetName(v string) {
+func (o *SuperplaneInput) SetName(v string) {
 	o.Name = &v
 }
 
 // GetValue returns the Value field value if set, zero value otherwise.
-func (o *SuperplaneLabel) GetValue() string {
+func (o *SuperplaneInput) GetValue() string {
 	if o == nil || IsNil(o.Value) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *SuperplaneLabel) GetValue() string {
 
 // GetValueOk returns a tuple with the Value field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneLabel) GetValueOk() (*string, bool) {
+func (o *SuperplaneInput) GetValueOk() (*string, bool) {
 	if o == nil || IsNil(o.Value) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *SuperplaneLabel) GetValueOk() (*string, bool) {
 }
 
 // HasValue returns a boolean if a field has been set.
-func (o *SuperplaneLabel) HasValue() bool {
+func (o *SuperplaneInput) HasValue() bool {
 	if o != nil && !IsNil(o.Value) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *SuperplaneLabel) HasValue() bool {
 }
 
 // SetValue gets a reference to the given string and assigns it to the Value field.
-func (o *SuperplaneLabel) SetValue(v string) {
+func (o *SuperplaneInput) SetValue(v string) {
 	o.Value = &v
 }
 
-func (o SuperplaneLabel) MarshalJSON() ([]byte, error) {
+func (o SuperplaneInput) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o SuperplaneLabel) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneLabel) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneInput) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -124,38 +124,38 @@ func (o SuperplaneLabel) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneLabel struct {
-	value *SuperplaneLabel
+type NullableSuperplaneInput struct {
+	value *SuperplaneInput
 	isSet bool
 }
 
-func (v NullableSuperplaneLabel) Get() *SuperplaneLabel {
+func (v NullableSuperplaneInput) Get() *SuperplaneInput {
 	return v.value
 }
 
-func (v *NullableSuperplaneLabel) Set(val *SuperplaneLabel) {
+func (v *NullableSuperplaneInput) Set(val *SuperplaneInput) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneLabel) IsSet() bool {
+func (v NullableSuperplaneInput) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneLabel) Unset() {
+func (v *NullableSuperplaneInput) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneLabel(val *SuperplaneLabel) *NullableSuperplaneLabel {
-	return &NullableSuperplaneLabel{value: val, isSet: true}
+func NewNullableSuperplaneInput(val *SuperplaneInput) *NullableSuperplaneInput {
+	return &NullableSuperplaneInput{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneLabel) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneInput) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneLabel) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneInput) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

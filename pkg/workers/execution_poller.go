@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -74,7 +73,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		executionLabels, err := execution.ParseLabels()
+		outputs, err := execution.ParseOutputs()
 		if err != nil {
 			return err
 		}
@@ -83,16 +82,10 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Check if all required labels were pushed from the execution.
 		// If any required label wasn't pushed, mark the execution as failed.
 		//
-		missingRequiredLabels := stage.MissingRequiredLabels(executionLabels)
-		if len(missingRequiredLabels) > 0 {
-			logger.Infof("Missing labels %v - marking the execution as failed", missingRequiredLabels)
+		missingOutputs := stage.MissingRequiredOutputs(outputs)
+		if len(missingOutputs) > 0 {
+			logger.Infof("Missing outputs %v - marking the execution as failed", missingOutputs)
 			result = models.StageExecutionResultFailed
-		}
-
-		labels, err := w.processLabels(tx, execution, executionLabels)
-		if err != nil {
-			logger.Errorf("Error processing execution labels: %v", err)
-			return err
 		}
 
 		if err := execution.FinishInTransaction(tx, result); err != nil {
@@ -113,7 +106,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.
 		//
-		if err := w.createStageCompletionEvent(tx, execution, labels); err != nil {
+		if err := w.createStageCompletionEvent(tx, execution, outputs); err != nil {
 			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
@@ -202,13 +195,13 @@ func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID stri
 	return pipeline, nil
 }
 
-func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, labels map[string]string) error {
+func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, outputs map[string]string) error {
 	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}
 
-	e, err := events.NewStageExecutionCompletion(execution, labels)
+	e, err := events.NewStageExecutionCompletion(execution, outputs)
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
@@ -224,52 +217,4 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 	}
 
 	return nil
-}
-
-func (w *ExecutionPoller) processLabels(tx *gorm.DB, execution *models.StageExecution, executionLabels map[string]string) (map[string]string, error) {
-	event, err := execution.GetStageEventInTransaction(tx)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// Include labels from stage event.
-	//
-	var labels map[string]string
-	err = json.Unmarshal(event.Labels, &labels)
-	if err != nil {
-		return nil, err
-	}
-
-	//
-	// Include labels from current execution.
-	//
-	maps.Copy(labels, executionLabels)
-
-	if len(labels) == 0 {
-		return labels, nil
-	}
-
-	//
-	// Create execution label records
-	//
-	now := time.Now()
-	records := []models.StageExecutionLabel{}
-	for name, value := range labels {
-		records = append(records, models.StageExecutionLabel{
-			ExecutionID: execution.ID,
-			SourceID:    event.SourceID,
-			SourceType:  event.SourceType,
-			Name:        name,
-			Value:       value,
-			CreatedAt:   &now,
-		})
-	}
-
-	err = tx.Create(records).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, nil
 }

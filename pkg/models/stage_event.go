@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -39,7 +38,6 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
-	Labels      datatypes.JSON
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -114,15 +112,10 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 }
 
 func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, map[string]string{})
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason)
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, labels map[string]string) (*StageEvent, error) {
-	data, err := json.Marshal(labels)
-	if err != nil {
-		return nil, err
-	}
-
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
 	now := time.Now()
 	stageEvent := StageEvent{
 		StageID:     stageID,
@@ -133,10 +126,9 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		State:       state,
 		StateReason: stateReason,
 		CreatedAt:   &now,
-		Labels:      datatypes.JSON(data),
 	}
 
-	err = tx.Create(&stageEvent).
+	err := tx.Create(&stageEvent).
 		Clauses(clause.Returning{}).
 		Error
 

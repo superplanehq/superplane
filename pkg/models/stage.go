@@ -26,9 +26,8 @@ type Stage struct {
 	CreatedBy uuid.UUID
 	UpdatedBy uuid.UUID
 
-	Conditions       datatypes.JSONSlice[StageCondition]
-	LabelDefinitions datatypes.JSONSlice[LabelDefinition]
-	RunTemplate      datatypes.JSONType[RunTemplate]
+	Conditions  datatypes.JSONSlice[StageCondition]
+	RunTemplate datatypes.JSONType[RunTemplate]
 }
 
 type StageCondition struct {
@@ -134,7 +133,20 @@ type ApprovalCondition struct {
 
 type RunTemplate struct {
 	Type      string                `json:"type"`
+	Inputs    []InputDefinition     `json:"inputs"`
+	Outputs   []OutputDefinition    `json:"outputs"`
 	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
+}
+
+type InputDefinition struct {
+	Name        string
+	Description string
+	Type        string
+}
+
+type OutputDefinition struct {
+	Name     string
+	Required bool
 }
 
 type SemaphoreRunTemplate struct {
@@ -202,15 +214,21 @@ func (s *Stage) HasApprovalCondition() bool {
 	return false
 }
 
-func (s *Stage) MissingRequiredLabels(labels map[string]string) []string {
+func (s *Stage) HasOutputWithName(name string) bool {
+	return slices.ContainsFunc(s.RunTemplate.Data().Outputs, func(output OutputDefinition) bool {
+		return output.Name == name
+	})
+}
+
+func (s *Stage) MissingRequiredOutputs(outputs map[string]string) []string {
 	missingLabels := []string{}
-	for _, labelDef := range s.LabelDefinitions {
-		if !*labelDef.Required {
+	for _, outputDef := range s.RunTemplate.Data().Outputs {
+		if !outputDef.Required {
 			continue
 		}
 
-		if _, ok := labels[labelDef.Name]; !ok {
-			missingLabels = append(missingLabels, labelDef.Name)
+		if _, ok := outputs[outputDef.Name]; !ok {
+			missingLabels = append(missingLabels, outputDef.Name)
 		}
 	}
 

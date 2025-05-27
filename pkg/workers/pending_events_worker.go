@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -102,7 +101,7 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		return nil
 	}
 
-	err = w.enqueueEvent(event, stages, connections)
+	err = w.enqueueEvent(event, stages)
 	if err != nil {
 		logger.Errorf("Error enqueueing event: %v", err)
 		return err
@@ -152,15 +151,10 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 	return filtered, nil
 }
 
-func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage, connections []models.StageConnection) error {
+func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
-			labels, err := w.EvaluateLabels(event)
-			if err != nil {
-				return err
-			}
-
-			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", labels)
+			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "")
 			if err != nil {
 				return err
 			}
@@ -177,44 +171,6 @@ func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.
 
 		return nil
 	})
-}
-
-func (w *PendingEventsWorker) EvaluateLabels(event *models.Event) (map[string]string, error) {
-	switch event.SourceType {
-	case models.SourceTypeStage:
-		return w.EvaluateStageLabels(event)
-	case models.SourceTypeEventSource:
-		return w.EvaluateEventSourceLabels(event)
-	default:
-		return nil, fmt.Errorf("unknown source type %s", event.SourceType)
-	}
-}
-
-// Labels for stages are already evaluated,
-// as they are pushed from the execution with their final values.
-func (w *PendingEventsWorker) EvaluateStageLabels(event *models.Event) (map[string]string, error) {
-	var labels map[string]string
-	err := json.Unmarshal(event.Raw, &labels)
-	if err != nil {
-		return nil, err
-	}
-
-	return labels, nil
-}
-
-// Labels for event sources are evaluated by the label definitions in the source itself.
-func (w *PendingEventsWorker) EvaluateEventSourceLabels(event *models.Event) (map[string]string, error) {
-	source, err := models.FindEventSource(event.SourceID)
-	if err != nil {
-		return nil, err
-	}
-
-	labels, err := source.EvaluateLabels(event)
-	if err != nil {
-		return nil, fmt.Errorf("error evaluating event source labels: %v", err)
-	}
-
-	return labels, nil
 }
 
 func (w *PendingEventsWorker) stageIDsFromConnections(connections []models.StageConnection) []uuid.UUID {

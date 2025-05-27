@@ -21,6 +21,8 @@ var _ MappedNullable = &SuperplaneRunTemplate{}
 // SuperplaneRunTemplate struct for SuperplaneRunTemplate
 type SuperplaneRunTemplate struct {
 	Type *SuperplaneRunTemplateType `json:"type,omitempty"`
+	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
+	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
 	Semaphore *SuperplaneSemaphoreRunTemplate `json:"semaphore,omitempty"`
 }
 
@@ -77,6 +79,70 @@ func (o *SuperplaneRunTemplate) SetType(v SuperplaneRunTemplateType) {
 	o.Type = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneRunTemplate) GetInputs() []SuperplaneInputDefinition {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInputDefinition
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneRunTemplate) GetInputsOk() ([]SuperplaneInputDefinition, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneRunTemplate) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInputDefinition and assigns it to the Inputs field.
+func (o *SuperplaneRunTemplate) SetInputs(v []SuperplaneInputDefinition) {
+	o.Inputs = v
+}
+
+// GetOutputs returns the Outputs field value if set, zero value otherwise.
+func (o *SuperplaneRunTemplate) GetOutputs() []SuperplaneOutputDefinition {
+	if o == nil || IsNil(o.Outputs) {
+		var ret []SuperplaneOutputDefinition
+		return ret
+	}
+	return o.Outputs
+}
+
+// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneRunTemplate) GetOutputsOk() ([]SuperplaneOutputDefinition, bool) {
+	if o == nil || IsNil(o.Outputs) {
+		return nil, false
+	}
+	return o.Outputs, true
+}
+
+// HasOutputs returns a boolean if a field has been set.
+func (o *SuperplaneRunTemplate) HasOutputs() bool {
+	if o != nil && !IsNil(o.Outputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetOutputs gets a reference to the given []SuperplaneOutputDefinition and assigns it to the Outputs field.
+func (o *SuperplaneRunTemplate) SetOutputs(v []SuperplaneOutputDefinition) {
+	o.Outputs = v
+}
+
 // GetSemaphore returns the Semaphore field value if set, zero value otherwise.
 func (o *SuperplaneRunTemplate) GetSemaphore() SuperplaneSemaphoreRunTemplate {
 	if o == nil || IsNil(o.Semaphore) {
@@ -121,6 +187,12 @@ func (o SuperplaneRunTemplate) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
+	}
+	if !IsNil(o.Outputs) {
+		toSerialize["outputs"] = o.Outputs
 	}
 	if !IsNil(o.Semaphore) {
 		toSerialize["semaphore"] = o.Semaphore

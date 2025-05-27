@@ -23,6 +23,25 @@ type StageConnection struct {
 	SourceType     string
 	FilterOperator string
 	Filters        datatypes.JSONSlice[StageConnectionFilter]
+	Inputs         datatypes.JSONSlice[InputAssignment]
+}
+
+type InputAssignment struct {
+	Name      string               `json:"name"`
+	ValueFrom *InputAssignmentFrom `json:"value_from"`
+}
+
+type InputAssignmentFrom struct {
+	Output    *InputAssgnimentFromOutput    `json:"output"`
+	EventData *InputAssignmentFromEventData `json:"event_data"`
+}
+
+type InputAssgnimentFromOutput struct {
+	Name string `json:"name"`
+}
+
+type InputAssignmentFromEventData struct {
+	Name string `json:"name"`
 }
 
 func (c *StageConnection) Accept(event *Event) (bool, error) {

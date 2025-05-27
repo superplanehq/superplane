@@ -54,7 +54,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), []models.LabelDefinition{})
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"))
 		require.NoError(t, err)
 	}
 
@@ -66,7 +66,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{}, []models.LabelDefinition{})
+		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{})
 		require.NoError(t, err)
 		r.Stage, err = r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)

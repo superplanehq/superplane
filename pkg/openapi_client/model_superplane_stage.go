@@ -28,7 +28,6 @@ type SuperplaneStage struct {
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
 	RunTemplate *SuperplaneRunTemplate `json:"runTemplate,omitempty"`
-	LabelDefinitions []SuperplaneLabelDefinition `json:"labelDefinitions,omitempty"`
 }
 
 // NewSuperplaneStage instantiates a new SuperplaneStage object
@@ -272,38 +271,6 @@ func (o *SuperplaneStage) SetRunTemplate(v SuperplaneRunTemplate) {
 	o.RunTemplate = &v
 }
 
-// GetLabelDefinitions returns the LabelDefinitions field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetLabelDefinitions() []SuperplaneLabelDefinition {
-	if o == nil || IsNil(o.LabelDefinitions) {
-		var ret []SuperplaneLabelDefinition
-		return ret
-	}
-	return o.LabelDefinitions
-}
-
-// GetLabelDefinitionsOk returns a tuple with the LabelDefinitions field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetLabelDefinitionsOk() ([]SuperplaneLabelDefinition, bool) {
-	if o == nil || IsNil(o.LabelDefinitions) {
-		return nil, false
-	}
-	return o.LabelDefinitions, true
-}
-
-// HasLabelDefinitions returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasLabelDefinitions() bool {
-	if o != nil && !IsNil(o.LabelDefinitions) {
-		return true
-	}
-
-	return false
-}
-
-// SetLabelDefinitions gets a reference to the given []SuperplaneLabelDefinition and assigns it to the LabelDefinitions field.
-func (o *SuperplaneStage) SetLabelDefinitions(v []SuperplaneLabelDefinition) {
-	o.LabelDefinitions = v
-}
-
 func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -334,9 +301,6 @@ func (o SuperplaneStage) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.RunTemplate) {
 		toSerialize["runTemplate"] = o.RunTemplate
-	}
-	if !IsNil(o.LabelDefinitions) {
-		toSerialize["labelDefinitions"] = o.LabelDefinitions
 	}
 	return toSerialize, nil
 }

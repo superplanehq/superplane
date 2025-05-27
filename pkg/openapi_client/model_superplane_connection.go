@@ -24,6 +24,7 @@ type SuperplaneConnection struct {
 	Name *string `json:"name,omitempty"`
 	Filters []ConnectionFilter `json:"filters,omitempty"`
 	FilterOperator *ConnectionFilterOperator `json:"filterOperator,omitempty"`
+	Inputs []SuperplaneInputAssignment `json:"inputs,omitempty"`
 }
 
 // NewSuperplaneConnection instantiates a new SuperplaneConnection object
@@ -179,6 +180,38 @@ func (o *SuperplaneConnection) SetFilterOperator(v ConnectionFilterOperator) {
 	o.FilterOperator = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneConnection) GetInputs() []SuperplaneInputAssignment {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInputAssignment
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnection) GetInputsOk() ([]SuperplaneInputAssignment, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneConnection) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInputAssignment and assigns it to the Inputs field.
+func (o *SuperplaneConnection) SetInputs(v []SuperplaneInputAssignment) {
+	o.Inputs = v
+}
+
 func (o SuperplaneConnection) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -200,6 +233,9 @@ func (o SuperplaneConnection) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.FilterOperator) {
 		toSerialize["filterOperator"] = o.FilterOperator
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
 	}
 	return toSerialize, nil
 }

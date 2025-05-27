@@ -44,12 +44,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	labelDefinitions, err := validateLabelDefinitionsForStage(req.LabelDefinitions)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections, labelDefinitions)
+	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -81,22 +76,19 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	return response, nil
 }
 
-func validateLabelDefinitionsForStage(in []*pb.LabelDefinition) ([]models.LabelDefinition, error) {
-	out := []models.LabelDefinition{}
-	for _, labelDef := range in {
-		if labelDef.Name == "" {
-			return nil, fmt.Errorf("invalid label definition")
-		}
-
-		out = append(out, models.LabelDefinition{Name: labelDef.Name, Required: &labelDef.Required})
-	}
-
-	return out, nil
-}
-
 func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in *pb.RunTemplate) (*models.RunTemplate, error) {
 	if in == nil {
 		return nil, fmt.Errorf("missing run template")
+	}
+
+	inputs, err := validateInputDefinitions(in.Inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	outputs, err := validateOutputDefinitions(in.Outputs)
+	if err != nil {
+		return nil, err
 	}
 
 	switch in.Type {
@@ -119,7 +111,9 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		}
 
 		return &models.RunTemplate{
-			Type: models.RunTemplateTypeSemaphore,
+			Type:    models.RunTemplateTypeSemaphore,
+			Inputs:  inputs,
+			Outputs: outputs,
 			Semaphore: &models.SemaphoreRunTemplate{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
@@ -134,6 +128,43 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 	default:
 		return nil, errors.New("invalid run template type")
 	}
+}
+
+func validateOutputDefinitions(in []*pb.OutputDefinition) ([]models.OutputDefinition, error) {
+	outputs := []models.OutputDefinition{}
+	for _, output := range in {
+		if output.Name == "" {
+			return nil, fmt.Errorf("invalid input: missing name")
+		}
+
+		outputs = append(outputs, models.OutputDefinition{
+			Name:     output.Name,
+			Required: output.Required,
+		})
+	}
+
+	return outputs, nil
+}
+
+func validateInputDefinitions(in []*pb.InputDefinition) ([]models.InputDefinition, error) {
+	inputs := []models.InputDefinition{}
+	for _, input := range in {
+		if input.Name == "" {
+			return nil, fmt.Errorf("invalid input: missing name")
+		}
+
+		if input.Type == "" {
+			return nil, fmt.Errorf("invalid input: missing type")
+		}
+
+		inputs = append(inputs, models.InputDefinition{
+			Name:        input.Name,
+			Type:        input.Type,
+			Description: input.Description,
+		})
+	}
+
+	return inputs, nil
 }
 
 func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.StageConnection, error) {
@@ -447,28 +478,14 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 	}
 
 	return &pb.Stage{
-		Id:               stage.ID.String(),
-		Name:             stage.Name,
-		CanvasId:         stage.CanvasID.String(),
-		CreatedAt:        timestamppb.New(*stage.CreatedAt),
-		Conditions:       conditions,
-		Connections:      connections,
-		RunTemplate:      runTemplate,
-		LabelDefinitions: serializeLabelDefinitions(stage.LabelDefinitions),
+		Id:          stage.ID.String(),
+		Name:        stage.Name,
+		CanvasId:    stage.CanvasID.String(),
+		CreatedAt:   timestamppb.New(*stage.CreatedAt),
+		Conditions:  conditions,
+		Connections: connections,
+		RunTemplate: runTemplate,
 	}, nil
-}
-
-func serializeLabelDefinitions(in []models.LabelDefinition) []*pb.LabelDefinition {
-	out := []*pb.LabelDefinition{}
-	for _, labelDef := range in {
-		out = append(out, &pb.LabelDefinition{
-			Name:      labelDef.Name,
-			ValueFrom: *labelDef.ValueFrom,
-			Required:  *labelDef.Required,
-		})
-	}
-
-	return out
 }
 
 func serializeConditions(conditions []models.StageCondition) ([]*pb.Condition, error) {
@@ -515,7 +532,9 @@ func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, erro
 	switch runTemplate.Type {
 	case models.RunTemplateTypeSemaphore:
 		return &pb.RunTemplate{
-			Type: pb.RunTemplate_TYPE_SEMAPHORE,
+			Type:    pb.RunTemplate_TYPE_SEMAPHORE,
+			Inputs:  serializeInputDefinitions(runTemplate.Inputs),
+			Outputs: serializeOutputDefinitions(runTemplate.Outputs),
 			Semaphore: &pb.SemaphoreRunTemplate{
 				OrganizationUrl: runTemplate.Semaphore.OrganizationURL,
 				ProjectId:       runTemplate.Semaphore.ProjectID,
@@ -529,6 +548,31 @@ func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, erro
 	default:
 		return nil, fmt.Errorf("invalid run template type: %s", runTemplate.Type)
 	}
+}
+
+func serializeInputDefinitions(in []models.InputDefinition) []*pb.InputDefinition {
+	inputs := []*pb.InputDefinition{}
+	for _, input := range in {
+		inputs = append(inputs, &pb.InputDefinition{
+			Name:        input.Name,
+			Description: input.Description,
+			Type:        input.Type,
+		})
+	}
+
+	return inputs
+}
+
+func serializeOutputDefinitions(in []models.OutputDefinition) []*pb.OutputDefinition {
+	outputs := []*pb.OutputDefinition{}
+	for _, output := range in {
+		outputs = append(outputs, &pb.OutputDefinition{
+			Name:     output.Name,
+			Required: output.Required,
+		})
+	}
+
+	return outputs
 }
 
 func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb.Stage, error) {

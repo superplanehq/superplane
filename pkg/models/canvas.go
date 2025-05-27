@@ -27,16 +27,15 @@ func (Canvas) TableName() string {
 }
 
 // NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSource(name string, key []byte, labelDefinitions []LabelDefinition) (*EventSource, error) {
+func (c *Canvas) CreateEventSource(name string, key []byte) (*EventSource, error) {
 	now := time.Now()
 
 	eventSource := EventSource{
-		Name:             name,
-		CanvasID:         c.ID,
-		CreatedAt:        &now,
-		UpdatedAt:        &now,
-		Key:              key,
-		LabelDefinitions: labelDefinitions,
+		Name:      name,
+		CanvasID:  c.ID,
+		CreatedAt: &now,
+		UpdatedAt: &now,
+		Key:       key,
 	}
 
 	err := database.Conn().
@@ -134,26 +133,19 @@ func (c *Canvas) ListStages() ([]Stage, error) {
 	return stages, nil
 }
 
-func (c *Canvas) CreateStage(
-	name, createdBy string,
-	conditions []StageCondition,
-	template RunTemplate,
-	connections []StageConnection,
-	labelDefinitions []LabelDefinition,
-) error {
+func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
 	now := time.Now()
 	ID := uuid.New()
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		stage := &Stage{
-			ID:               ID,
-			CanvasID:         c.ID,
-			Name:             name,
-			Conditions:       datatypes.NewJSONSlice(conditions),
-			CreatedAt:        &now,
-			CreatedBy:        uuid.Must(uuid.Parse(createdBy)),
-			RunTemplate:      datatypes.NewJSONType(template),
-			LabelDefinitions: datatypes.NewJSONSlice(labelDefinitions),
+			ID:          ID,
+			CanvasID:    c.ID,
+			Name:        name,
+			Conditions:  datatypes.NewJSONSlice(conditions),
+			CreatedAt:   &now,
+			CreatedBy:   uuid.Must(uuid.Parse(createdBy)),
+			RunTemplate: datatypes.NewJSONType(template),
 		}
 
 		err := tx.Clauses(clause.Returning{}).Create(&stage).Error

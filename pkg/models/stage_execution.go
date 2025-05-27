@@ -31,7 +31,7 @@ type StageExecution struct {
 	UpdatedAt    *time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
-	Labels       datatypes.JSON
+	Outputs      datatypes.JSON
 
 	//
 	// TODO: not so sure about this column
@@ -45,14 +45,17 @@ type StageExecution struct {
 	ReferenceID string
 }
 
-func (e *StageExecution) GetStageEvent() (*StageEvent, error) {
-	return e.GetStageEventInTransaction(database.Conn())
+func (e *StageExecution) GetEvent() (*Event, error) {
+	return e.GetEventInTransaction(database.Conn())
 }
 
-func (e *StageExecution) GetStageEventInTransaction(tx *gorm.DB) (*StageEvent, error) {
-	var event StageEvent
+func (e *StageExecution) GetEventInTransaction(tx *gorm.DB) (*Event, error) {
+	var event Event
 	err := tx.
-		Where("id = ?", e.StageEventID).
+		Table("events").
+		Joins("INNER JOIN stage_events ON stage_events.event_id = event.id").
+		Joins("INNER JOIN stage_executions ON stage_executions.stage_event_id = stage_events.id").
+		Where("stage_executions.id = ?", e.ID).
 		First(&event).
 		Error
 
@@ -130,22 +133,26 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 		Error
 }
 
-func (e *StageExecution) AddLabels(labels []byte) error {
+func (e *StageExecution) AddOutputs(outputs []byte) error {
 	return database.Conn().Model(e).
 		Clauses(clause.Returning{}).
-		Update("labels", labels).
+		Update("outputs", outputs).
 		Update("updated_at", time.Now()).
 		Error
 }
 
-func (e *StageExecution) ParseLabels() (map[string]string, error) {
-	var labels map[string]string
-	err := json.Unmarshal(e.Labels, &labels)
+func (e *StageExecution) ParseOutputs() (map[string]string, error) {
+	if e.Outputs == nil {
+		return map[string]string{}, nil
+	}
+
+	var outputs map[string]string
+	err := json.Unmarshal(e.Outputs, &outputs)
 	if err != nil {
 		return nil, err
 	}
 
-	return labels, nil
+	return outputs, nil
 }
 
 func FindExecutionByReference(referenceId string) (*StageExecution, error) {

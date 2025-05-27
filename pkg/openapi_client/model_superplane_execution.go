@@ -28,6 +28,8 @@ type SuperplaneExecution struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	Inputs []SuperplaneInput `json:"inputs,omitempty"`
+	Outputs []SuperplaneOutput `json:"outputs,omitempty"`
 }
 
 // NewSuperplaneExecution instantiates a new SuperplaneExecution object
@@ -279,6 +281,70 @@ func (o *SuperplaneExecution) SetFinishedAt(v time.Time) {
 	o.FinishedAt = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetInputs() []SuperplaneInput {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInput
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetInputsOk() ([]SuperplaneInput, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInput and assigns it to the Inputs field.
+func (o *SuperplaneExecution) SetInputs(v []SuperplaneInput) {
+	o.Inputs = v
+}
+
+// GetOutputs returns the Outputs field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetOutputs() []SuperplaneOutput {
+	if o == nil || IsNil(o.Outputs) {
+		var ret []SuperplaneOutput
+		return ret
+	}
+	return o.Outputs
+}
+
+// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetOutputsOk() ([]SuperplaneOutput, bool) {
+	if o == nil || IsNil(o.Outputs) {
+		return nil, false
+	}
+	return o.Outputs, true
+}
+
+// HasOutputs returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasOutputs() bool {
+	if o != nil && !IsNil(o.Outputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetOutputs gets a reference to the given []SuperplaneOutput and assigns it to the Outputs field.
+func (o *SuperplaneExecution) SetOutputs(v []SuperplaneOutput) {
+	o.Outputs = v
+}
+
 func (o SuperplaneExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -309,6 +375,12 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.FinishedAt) {
 		toSerialize["finishedAt"] = o.FinishedAt
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
+	}
+	if !IsNil(o.Outputs) {
+		toSerialize["outputs"] = o.Outputs
 	}
 	return toSerialize, nil
 }

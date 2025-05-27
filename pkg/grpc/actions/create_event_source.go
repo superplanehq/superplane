@@ -3,7 +3,6 @@ package actions
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -35,12 +34,7 @@ func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *
 		return nil, status.Errorf(codes.Internal, "error generating key")
 	}
 
-	labelDefinitions, err := validateLabelDefinitionsForSource(req.LabelDefinitions)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	eventSource, err := canvas.CreateEventSource(req.Name, encryptedKey, labelDefinitions)
+	eventSource, err := canvas.CreateEventSource(req.Name, encryptedKey)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -68,11 +62,10 @@ func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *
 
 func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 	return &pb.EventSource{
-		Id:               eventSource.ID.String(),
-		Name:             eventSource.Name,
-		CanvasId:         eventSource.CanvasID.String(),
-		CreatedAt:        timestamppb.New(*eventSource.CreatedAt),
-		LabelDefinitions: serializeLabelDefinitions(eventSource.LabelDefinitions),
+		Id:        eventSource.ID.String(),
+		Name:      eventSource.Name,
+		CanvasId:  eventSource.CanvasID.String(),
+		CreatedAt: timestamppb.New(*eventSource.CreatedAt),
 	}
 }
 
@@ -84,17 +77,4 @@ func genNewEventSourceKey(ctx context.Context, encryptor encryptor.Encryptor, na
 	}
 
 	return plainKey, encrypted, nil
-}
-
-func validateLabelDefinitionsForSource(in []*pb.LabelDefinition) ([]models.LabelDefinition, error) {
-	out := []models.LabelDefinition{}
-	for _, labelDef := range in {
-		if labelDef.Name == "" || labelDef.ValueFrom == "" {
-			return nil, fmt.Errorf("invalid label definition")
-		}
-
-		out = append(out, models.LabelDefinition{Name: labelDef.Name, ValueFrom: &labelDef.ValueFrom})
-	}
-
-	return out, nil
 }

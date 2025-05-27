@@ -49,7 +49,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"), []models.LabelDefinition{})
+	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"))
 	require.NoError(t, err)
 
 	validEvent := []byte(`{"action": "created"}`)
@@ -178,7 +178,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"), []models.LabelDefinition{})
+	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"))
 	require.NoError(t, err)
 
 	// No need to include organization ID in the payload anymore
@@ -414,7 +414,7 @@ func Test__HandleExecutionLabels(t *testing.T) {
 		assert.Equal(t, 200, response.Code)
 		execution, err := models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		compareJSONB(t, labels, []byte(execution.Labels))
+		compareJSONB(t, labels, []byte(execution.Outputs))
 	})
 
 	t.Run("key-value pairs are limited to 4k", func(t *testing.T) {

@@ -2,7 +2,6 @@ package actions
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -118,20 +117,6 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
-		Labels:      []*pb.Label{},
-	}
-
-	//
-	// Add labels
-	//
-	var labels map[string]string
-	err := json.Unmarshal(in.Labels, &labels)
-	if err != nil {
-		return nil, err
-	}
-
-	for k, v := range labels {
-		e.Labels = append(e.Labels, &pb.Label{Name: k, Value: v})
 	}
 
 	//

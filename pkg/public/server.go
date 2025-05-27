@@ -9,7 +9,6 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -283,13 +282,7 @@ func (s *Server) HandleExecutionLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stageEvent, err := execution.GetStageEvent()
-	if err != nil {
-		http.Error(w, "Error finding stage event", http.StatusInternalServerError)
-		return
-	}
-
-	labels, err := s.buildLabelsForExecution(body, stageEvent, execution)
+	labels, err := s.buildOutputsForExecution(body, execution)
 	if err != nil {
 		http.Error(w, "Error building labels for execution", http.StatusInternalServerError)
 		return
@@ -301,7 +294,7 @@ func (s *Server) HandleExecutionLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = execution.AddLabels(data)
+	err = execution.AddOutputs(data)
 	if err != nil {
 		http.Error(w, "Error updating tags", http.StatusInternalServerError)
 		return
@@ -311,49 +304,25 @@ func (s *Server) HandleExecutionLabels(w http.ResponseWriter, r *http.Request) {
 }
 
 // If the label is not defined, we ignore it.
-func (s *Server) buildLabelsForExecution(body []byte, event *models.StageEvent, execution *models.StageExecution) (map[string]string, error) {
-	var labels map[string]string
-	err := json.Unmarshal(body, &labels)
+func (s *Server) buildOutputsForExecution(body []byte, execution *models.StageExecution) (map[string]string, error) {
+	var outputs map[string]string
+	err := json.Unmarshal(body, &outputs)
 	if err != nil {
 		return nil, err
 	}
 
-	switch event.SourceType {
-	case models.SourceTypeEventSource:
-		source, err := models.FindEventSource(event.SourceID)
-		if err != nil {
-			return nil, err
-		}
-
-		for name := range labels {
-			if !hasLabelWithName(source.LabelDefinitions, name) {
-				delete(labels, name)
-			}
-		}
-
-		return labels, nil
-	case models.SourceTypeStage:
-		stage, err := models.FindStageByID(execution.StageID.String())
-		if err != nil {
-			return nil, err
-		}
-
-		for name := range labels {
-			if !hasLabelWithName(stage.LabelDefinitions, name) {
-				delete(labels, name)
-			}
-		}
-
-		return labels, nil
-	default:
-		return nil, fmt.Errorf("invalid source type %s", event.SourceType)
+	stage, err := models.FindStageByID(execution.StageID.String())
+	if err != nil {
+		return nil, err
 	}
-}
 
-func hasLabelWithName(labelDefinitions []models.LabelDefinition, labelName string) bool {
-	return slices.ContainsFunc(labelDefinitions, func(labelDef models.LabelDefinition) bool {
-		return labelDef.Name == labelName
-	})
+	for outputName := range outputs {
+		if !stage.HasOutputWithName(outputName) {
+			delete(outputs, outputName)
+		}
+	}
+
+	return outputs, nil
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {

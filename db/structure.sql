@@ -59,7 +59,7 @@ CREATE TABLE public.event_sources (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     key bytea NOT NULL,
-    label_definitions jsonb DEFAULT '{}'::jsonb NOT NULL
+    labels jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -182,7 +182,7 @@ CREATE TABLE public.stages (
     updated_by uuid,
     run_template jsonb NOT NULL,
     conditions jsonb,
-    label_definitions jsonb DEFAULT '{}'::jsonb NOT NULL
+    labels jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
