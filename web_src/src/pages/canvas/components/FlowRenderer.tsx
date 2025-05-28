@@ -124,8 +124,9 @@ export const FlowRenderer: React.FC = () => {
           fitView
           minZoom={0.4}
           maxZoom={1.5}
+          colorMode="light"
         >
-          <Controls />
+          <Controls  />
           <Background />
           <FlowDevTools />
         </ReactFlow>
