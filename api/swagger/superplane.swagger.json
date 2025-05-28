@@ -265,6 +265,52 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}": {
+      "patch": {
+        "summary": "Update a stage",
+        "description": "Updates the specified stage (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_UpdateStage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateStageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateStageBody"
+            }
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stages/{id}": {
       "get": {
         "summary": "Get stage details",
@@ -307,53 +353,9 @@
         "tags": [
           "Stage"
         ]
-      },
-      "patch": {
-        "summary": "Update a stage",
-        "description": "Updates the specified stage (canvas can be referenced by ID or name)",
-        "operationId": "Superplane_UpdateStage",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateStageResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateStageBody"
-            }
-          }
-        ],
-        "tags": [
-          "Stage"
-        ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events": {
       "get": {
         "summary": "List stage events",
         "description": "Returns a list of events for the specified stage (canvas can be referenced by ID or name)",
@@ -380,7 +382,7 @@
             "type": "string"
           },
           {
-            "name": "stageId",
+            "name": "stageIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -426,7 +428,7 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events/{eventId}/approve": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/approve": {
       "post": {
         "summary": "Approve a stage event",
         "description": "Approves the specified stage event (canvas can be referenced by ID or name)",
@@ -453,7 +455,7 @@
             "type": "string"
           },
           {
-            "name": "stageId",
+            "name": "stageIdOrName",
             "in": "path",
             "required": true,
             "type": "string"

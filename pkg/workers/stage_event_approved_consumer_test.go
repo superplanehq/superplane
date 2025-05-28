@@ -40,7 +40,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	_, err := actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
-		StageId:        r.Stage.ID.String(),
+		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),
 		RequesterId:    uuid.New().String(),
 	})
@@ -61,7 +61,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	_, err = actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
-		StageId:        r.Stage.ID.String(),
+		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),
 		RequesterId:    uuid.New().String(),
 	})

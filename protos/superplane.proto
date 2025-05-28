@@ -129,7 +129,7 @@ service Superplane {
   
   rpc ListStageEvents(ListStageEventsRequest) returns (ListStageEventsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events"
+      get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List stage events";
@@ -140,7 +140,7 @@ service Superplane {
 
   rpc UpdateStage(UpdateStageRequest) returns (UpdateStageResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id_or_name}/stages/{id}"
+      patch: "/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -152,7 +152,7 @@ service Superplane {
   
   rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events/{event_id}/approve"
+      post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -341,7 +341,7 @@ message CreateStageResponse {
 }
 
 message UpdateStageRequest {
-  string id = 1;
+  string id_or_name = 1;
   string canvas_id_or_name = 2;
   string requester_id = 3;
   repeated Connection connections = 4;
@@ -370,7 +370,7 @@ message ListEventSourcesResponse {
 }
 
 message ListStageEventsRequest {
-  string stage_id = 1;
+  string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   repeated StageEvent.State states = 3;
   repeated StageEvent.StateReason state_reasons = 4;
@@ -437,7 +437,7 @@ message StageEventApproval {
 }
 
 message ApproveStageEventRequest {
-  string stage_id = 1;
+  string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   string event_id = 3;
   string requester_id = 4;

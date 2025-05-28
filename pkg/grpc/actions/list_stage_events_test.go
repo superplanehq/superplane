@@ -19,7 +19,7 @@ func Test__ListStageEvents(t *testing.T) {
 
 	t.Run("no canvas ID -> error", func(t *testing.T) {
 		_, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
-			StageId: uuid.New().String(),
+			StageIdOrName: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -30,7 +30,7 @@ func Test__ListStageEvents(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
-			StageId:        uuid.New().String(),
+			StageIdOrName:  uuid.New().String(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
@@ -42,7 +42,7 @@ func Test__ListStageEvents(t *testing.T) {
 
 	t.Run("stage with no stage events -> empty list", func(t *testing.T) {
 		res, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
-			StageId:        r.Stage.ID.String(),
+			StageIdOrName:  r.Stage.ID.String(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
@@ -68,7 +68,7 @@ func Test__ListStageEvents(t *testing.T) {
 
 		res, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			StageId:        r.Stage.ID.String(),
+			StageIdOrName:  r.Stage.ID.String(),
 		})
 
 		require.NoError(t, err)

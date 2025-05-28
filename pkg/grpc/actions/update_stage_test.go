@@ -62,7 +62,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             "invalid-uuid",
+			IdOrName:       "invalid-uuid",
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
 		})
@@ -75,7 +75,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             uuid.NewString(),
+			IdOrName:       uuid.NewString(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
 		})
@@ -88,19 +88,19 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             stageID,
+			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "canvas not found")
+		assert.Contains(t, s.Message(), "requester ID is invalid")
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             stageID,
+			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
 			RunTemplate:    support.ProtoRunTemplate(),
@@ -120,7 +120,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             stageID,
+			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
 			RunTemplate:    support.ProtoRunTemplate(),
@@ -148,7 +148,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             stageID,
+			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RunTemplate:    support.ProtoRunTemplate(),
 			RequesterId:    r.User.String(),
@@ -171,7 +171,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage is updated", func(t *testing.T) {
 		res, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
-			Id:             stageID,
+			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
 			RunTemplate: &protos.RunTemplate{

@@ -11,10 +11,11 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	err := ValidateUUIDs(req.Id, req.CanvasIdOrName, req.RequesterId)
+	err := ValidateUUIDs(req.IdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -27,9 +28,26 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
-	_, err = models.FindStageByID(req.Id)
+	err = ValidateUUIDs(req.IdOrName)
+	var stage *models.Stage
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "stage not found")
+		stage, err = canvas.FindStageByName(req.IdOrName)
+	} else {
+		stage, err = canvas.FindStageByID(req.IdOrName)
+	}
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Errorf(codes.InvalidArgument, "stage not found")
+		}
+
+		return nil, err
+	}
+
+	err = ValidateUUIDs(req.RequesterId)
+
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "requester ID is invalid")
 	}
 
 	template, err := validateRunTemplate(ctx, encryptor, req.RunTemplate)
@@ -47,7 +65,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateStage(req.Id, req.RequesterId, conditions, *template, connections)
+	err = canvas.UpdateStage(stage.ID.String(), req.RequesterId, conditions, *template, connections)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -56,7 +74,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, err
 	}
 
-	stage, err := canvas.FindStageByID(req.Id)
+	stage, err = canvas.FindStageByID(stage.ID.String())
 	if err != nil {
 		return nil, err
 	}

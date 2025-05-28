@@ -14,7 +14,7 @@ import (
 )
 
 func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName, req.StageId)
+	err := ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -27,7 +27,14 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
-	stage, err := canvas.FindStageByID(req.StageId)
+	err = ValidateUUIDs(req.StageIdOrName)
+	var stage *models.Stage
+	if err != nil {
+		stage, err = canvas.FindStageByName(req.StageIdOrName)
+	} else {
+		stage, err = canvas.FindStageByID(req.StageIdOrName)
+	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Errorf(codes.InvalidArgument, "stage not found")

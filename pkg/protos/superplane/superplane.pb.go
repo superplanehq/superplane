@@ -1806,7 +1806,7 @@ func (x *CreateStageResponse) GetStage() *Stage {
 
 type UpdateStageRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	RequesterId    string                 `protobuf:"bytes,3,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	Connections    []*Connection          `protobuf:"bytes,4,rep,name=connections,proto3" json:"connections,omitempty"`
@@ -1846,9 +1846,9 @@ func (*UpdateStageRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{23}
 }
 
-func (x *UpdateStageRequest) GetId() string {
+func (x *UpdateStageRequest) GetIdOrName() string {
 	if x != nil {
-		return x.Id
+		return x.IdOrName
 	}
 	return ""
 }
@@ -2110,7 +2110,7 @@ func (x *ListEventSourcesResponse) GetEventSources() []*EventSource {
 
 type ListStageEventsRequest struct {
 	state          protoimpl.MessageState   `protogen:"open.v1"`
-	StageId        string                   `protobuf:"bytes,1,opt,name=stage_id,json=stageId,proto3" json:"stage_id,omitempty"`
+	StageIdOrName  string                   `protobuf:"bytes,1,opt,name=stage_id_or_name,json=stageIdOrName,proto3" json:"stage_id_or_name,omitempty"`
 	CanvasIdOrName string                   `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	States         []StageEvent_State       `protobuf:"varint,3,rep,packed,name=states,proto3,enum=Superplane.StageEvent_State" json:"states,omitempty"`
 	StateReasons   []StageEvent_StateReason `protobuf:"varint,4,rep,packed,name=state_reasons,json=stateReasons,proto3,enum=Superplane.StageEvent_StateReason" json:"state_reasons,omitempty"`
@@ -2148,9 +2148,9 @@ func (*ListStageEventsRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *ListStageEventsRequest) GetStageId() string {
+func (x *ListStageEventsRequest) GetStageIdOrName() string {
 	if x != nil {
-		return x.StageId
+		return x.StageIdOrName
 	}
 	return ""
 }
@@ -2466,7 +2466,7 @@ func (x *StageEventApproval) GetApprovedAt() *timestamp.Timestamp {
 
 type ApproveStageEventRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	StageId        string                 `protobuf:"bytes,1,opt,name=stage_id,json=stageId,proto3" json:"stage_id,omitempty"`
+	StageIdOrName  string                 `protobuf:"bytes,1,opt,name=stage_id_or_name,json=stageIdOrName,proto3" json:"stage_id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	EventId        string                 `protobuf:"bytes,3,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
 	RequesterId    string                 `protobuf:"bytes,4,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
@@ -2504,9 +2504,9 @@ func (*ApproveStageEventRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{34}
 }
 
-func (x *ApproveStageEventRequest) GetStageId() string {
+func (x *ApproveStageEventRequest) GetStageIdOrName() string {
 	if x != nil {
-		return x.StageId
+		return x.StageIdOrName
 	}
 	return ""
 }
@@ -3407,9 +3407,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +
 	"\x13CreateStageResponse\x12'\n" +
-	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\x9f\x02\n" +
-	"\x12UpdateStageRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12)\n" +
+	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\xad\x02\n" +
+	"\x12UpdateStageRequest\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12!\n" +
 	"\frequester_id\x18\x03 \x01(\tR\vrequesterId\x128\n" +
 	"\vconnections\x18\x04 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
@@ -3426,9 +3427,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x17ListEventSourcesRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"X\n" +
 	"\x18ListEventSourcesResponse\x12<\n" +
-	"\revent_sources\x18\x01 \x03(\v2\x17.Superplane.EventSourceR\feventSources\"\xdd\x01\n" +
-	"\x16ListStageEventsRequest\x12\x19\n" +
-	"\bstage_id\x18\x01 \x01(\tR\astageId\x12)\n" +
+	"\revent_sources\x18\x01 \x03(\v2\x17.Superplane.EventSourceR\feventSources\"\xeb\x01\n" +
+	"\x16ListStageEventsRequest\x12'\n" +
+	"\x10stage_id_or_name\x18\x01 \x01(\tR\rstageIdOrName\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x124\n" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
@@ -3483,9 +3484,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\vapproved_by\x18\x01 \x01(\tR\n" +
 	"approvedBy\x12;\n" +
 	"\vapproved_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"approvedAt\"\x9e\x01\n" +
-	"\x18ApproveStageEventRequest\x12\x19\n" +
-	"\bstage_id\x18\x01 \x01(\tR\astageId\x12)\n" +
+	"approvedAt\"\xac\x01\n" +
+	"\x18ApproveStageEventRequest\x12'\n" +
+	"\x10stage_id_or_name\x18\x01 \x01(\tR\rstageIdOrName\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x19\n" +
 	"\bevent_id\x18\x03 \x01(\tR\aeventId\x12!\n" +
 	"\frequester_id\x18\x04 \x01(\tR\vrequesterId\"I\n" +
@@ -3530,7 +3531,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\fexecution_id\x18\x02 \x01(\tR\vexecutionId\x12\x19\n" +
 	"\bstage_id\x18\x03 \x01(\tR\astageId\x12\x19\n" +
 	"\bevent_id\x18\x04 \x01(\tR\aeventId\x128\n" +
-	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xe3\x17\n" +
+	"\ttimestamp\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xfb\x17\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
@@ -3551,13 +3552,13 @@ const file_superplane_proto_rawDesc = "" +
 	"ListStages\x12\x1d.Superplane.ListStagesRequest\x1a\x1e.Superplane.ListStagesResponse\"\xa3\x01\x92Am\n" +
 	"\x05Stage\x12\vList stages\x1aWReturns a list of all stages for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x02-\x12+/api/v1/canvases/{canvas_id_or_name}/stages\x12\x9f\x02\n" +
 	"\x10ListEventSources\x12#.Superplane.ListEventSourcesRequest\x1a$.Superplane.ListEventSourcesResponse\"\xbf\x01\x92A\x81\x01\n" +
-	"\vEventSource\x12\x12List event sources\x1a^Returns a list of all event sources for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id_or_name}/event-sources\x12\x9a\x02\n" +
-	"\x0fListStageEvents\x12\".Superplane.ListStageEventsRequest\x1a#.Superplane.ListStageEventsResponse\"\xbd\x01\x92Au\n" +
-	"\x05Event\x12\x11List stage events\x1aYReturns a list of events for the specified stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02?\x12=/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events\x12\xec\x01\n" +
-	"\vUpdateStage\x12\x1e.Superplane.UpdateStageRequest\x1a\x1f.Superplane.UpdateStageResponse\"\x9b\x01\x92A]\n" +
-	"\x05Stage\x12\x0eUpdate a stage\x1aDUpdates the specified stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x025:\x01*20/api/v1/canvases/{canvas_id_or_name}/stages/{id}\x12\xac\x02\n" +
-	"\x11ApproveStageEvent\x12$.Superplane.ApproveStageEventRequest\x1a%.Superplane.ApproveStageEventResponse\"\xc9\x01\x92Ak\n" +
-	"\x05Event\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02U:\x01*\"P/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id}/events/{event_id}/approveB\xc4\x01\x92A\x86\x01\x12\\\n" +
+	"\vEventSource\x12\x12List event sources\x1a^Returns a list of all event sources for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id_or_name}/event-sources\x12\xa2\x02\n" +
+	"\x0fListStageEvents\x12\".Superplane.ListStageEventsRequest\x1a#.Superplane.ListStageEventsResponse\"\xc5\x01\x92Au\n" +
+	"\x05Event\x12\x11List stage events\x1aYReturns a list of events for the specified stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02G\x12E/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events\x12\xf4\x01\n" +
+	"\vUpdateStage\x12\x1e.Superplane.UpdateStageRequest\x1a\x1f.Superplane.UpdateStageResponse\"\xa3\x01\x92A]\n" +
+	"\x05Stage\x12\x0eUpdate a stage\x1aDUpdates the specified stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02=:\x01*28/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}\x12\xb4\x02\n" +
+	"\x11ApproveStageEvent\x12$.Superplane.ApproveStageEventRequest\x1a%.Superplane.ApproveStageEventResponse\"\xd1\x01\x92Ak\n" +
+	"\x05Event\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approveB\xc4\x01\x92A\x86\x01\x12\\\n" +
 	"\x0eSuperplane API\x12\x1eAPI for the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ8github.com/superplanehq/superplane/pkg/protos/superplaneb\x06proto3"
 

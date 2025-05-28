@@ -15,7 +15,7 @@ import (
 )
 
 func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName, req.StageId, req.EventId, req.RequesterId)
+	err := ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -31,7 +31,13 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
-	stage, err := canvas.FindStageByID(req.StageId)
+	err = ValidateUUIDs(req.StageIdOrName)
+	var stage *models.Stage
+	if err != nil {
+		stage, err = canvas.FindStageByName(req.StageIdOrName)
+	} else {
+		stage, err = canvas.FindStageByID(req.StageIdOrName)
+	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Errorf(codes.InvalidArgument, "stage not found")
@@ -40,8 +46,13 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
+	err = ValidateUUIDs(req.EventId, req.RequesterId)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid UUIDs")
+	}
+
 	logger := logging.ForStage(stage)
-	event, err := models.FindStageEventByID(req.EventId, req.StageId)
+	event, err := models.FindStageEventByID(req.EventId, req.StageIdOrName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Errorf(codes.InvalidArgument, "event not found")
