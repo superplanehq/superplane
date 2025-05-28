@@ -29,7 +29,7 @@ type ApiSuperplaneApproveStageEventRequest struct {
 	ctx context.Context
 	ApiService *EventAPIService
 	canvasIdOrName string
-	stageId string
+	stageIdOrName string
 	eventId string
 	body *SuperplaneApproveStageEventBody
 }
@@ -50,16 +50,16 @@ Approves the specified stage event (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @param stageId
+ @param stageIdOrName
  @param eventId
  @return ApiSuperplaneApproveStageEventRequest
 */
-func (a *EventAPIService) SuperplaneApproveStageEvent(ctx context.Context, canvasIdOrName string, stageId string, eventId string) ApiSuperplaneApproveStageEventRequest {
+func (a *EventAPIService) SuperplaneApproveStageEvent(ctx context.Context, canvasIdOrName string, stageIdOrName string, eventId string) ApiSuperplaneApproveStageEventRequest {
 	return ApiSuperplaneApproveStageEventRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
-		stageId: stageId,
+		stageIdOrName: stageIdOrName,
 		eventId: eventId,
 	}
 }
@@ -79,9 +79,9 @@ func (a *EventAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneAppr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events/{eventId}/approve"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/approve"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"stageId"+"}", url.PathEscape(parameterValueToString(r.stageId, "stageId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -159,7 +159,7 @@ type ApiSuperplaneListStageEventsRequest struct {
 	ctx context.Context
 	ApiService *EventAPIService
 	canvasIdOrName string
-	stageId string
+	stageIdOrName string
 	states *[]string
 	stateReasons *[]string
 }
@@ -185,15 +185,15 @@ Returns a list of events for the specified stage (canvas can be referenced by ID
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @param stageId
+ @param stageIdOrName
  @return ApiSuperplaneListStageEventsRequest
 */
-func (a *EventAPIService) SuperplaneListStageEvents(ctx context.Context, canvasIdOrName string, stageId string) ApiSuperplaneListStageEventsRequest {
+func (a *EventAPIService) SuperplaneListStageEvents(ctx context.Context, canvasIdOrName string, stageIdOrName string) ApiSuperplaneListStageEventsRequest {
 	return ApiSuperplaneListStageEventsRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
-		stageId: stageId,
+		stageIdOrName: stageIdOrName,
 	}
 }
 
@@ -212,9 +212,9 @@ func (a *EventAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageId}/events"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"stageId"+"}", url.PathEscape(parameterValueToString(r.stageId, "stageId")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

@@ -385,7 +385,7 @@ type ApiSuperplaneUpdateStageRequest struct {
 	ctx context.Context
 	ApiService *StageAPIService
 	canvasIdOrName string
-	id string
+	idOrName string
 	body *SuperplaneUpdateStageBody
 }
 
@@ -405,15 +405,15 @@ Updates the specified stage (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @param id
+ @param idOrName
  @return ApiSuperplaneUpdateStageRequest
 */
-func (a *StageAPIService) SuperplaneUpdateStage(ctx context.Context, canvasIdOrName string, id string) ApiSuperplaneUpdateStageRequest {
+func (a *StageAPIService) SuperplaneUpdateStage(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneUpdateStageRequest {
 	return ApiSuperplaneUpdateStageRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
-		id: id,
+		idOrName: idOrName,
 	}
 }
 
@@ -432,9 +432,9 @@ func (a *StageAPIService) SuperplaneUpdateStageExecute(r ApiSuperplaneUpdateStag
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{id}"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
