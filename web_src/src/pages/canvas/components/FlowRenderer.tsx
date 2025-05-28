@@ -45,11 +45,9 @@ export const FlowRenderer: React.FC = () => {
           id: es.name,
           repoName: "repo/name",
           repoUrl: "repo/url",
-          lastEvent: {
-            type: 'push',
-            release: 'v1.0.0',
-            timestamp: '2023-01-01T00:00:00'
-          }
+          eventType: 'push',
+          release: 'v1.0.0',
+          timestamp: '2023-01-01T00:00:00'
         },
         position: nodePositions[es.id!] || { x: 0, y: idx * 320 },
         draggable: true
