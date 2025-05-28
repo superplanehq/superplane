@@ -90,14 +90,14 @@ var updateCmd = &cobra.Command{
 }
 
 var updateStageCmd = &cobra.Command{
-	Use:   "stage [CANVAS_ID_OR_NAME] [STAGE_ID]",
+	Use:   "stage",
 	Short: "Update a stage's configuration",
 	Long:  `Update a stage's configuration, such as its connections.`,
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := args[0]
-		stageID := args[1]
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
 		requesterID, _ := cmd.Flags().GetString("requester-id")
 		yamlFile, _ := cmd.Flags().GetString("file")
 
@@ -139,11 +139,11 @@ var updateStageCmd = &cobra.Command{
 		_, _, err = c.StageAPI.SuperplaneUpdateStage(
 			context.Background(),
 			canvasIDOrName,
-			stageID,
+			stageIDOrName,
 		).Body(*request).Execute()
 		Check(err)
 
-		fmt.Printf("Stage '%s' updated successfully.\n", stageID)
+		fmt.Printf("Stage '%s' updated successfully.\n", stageIDOrName)
 	},
 }
 
@@ -156,6 +156,10 @@ func init() {
 
 	// Stage command
 	updateCmd.AddCommand(updateStageCmd)
+	updateStageCmd.Flags().String("canvas-id", "", "Canvas ID")
+	updateStageCmd.Flags().String("canvas-name", "", "Canvas name")
+	updateStageCmd.Flags().String("stage-id", "", "Stage ID")
+	updateStageCmd.Flags().String("stage-name", "", "Stage name")
 	updateStageCmd.Flags().String("requester-id", "", "ID of the user updating the stage")
 	updateStageCmd.Flags().StringP("file", "f", "", "File containing stage configuration updates")
 }
