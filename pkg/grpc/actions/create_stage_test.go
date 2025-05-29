@@ -28,7 +28,7 @@ func Test__CreateStage(t *testing.T) {
 			CanvasIdOrName: uuid.New().String(),
 			Name:           "test",
 			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 		})
 
 		s, ok := status.FromError(err)
@@ -41,7 +41,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 		})
 
 		s, ok := status.FromError(err)
@@ -54,7 +54,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -74,7 +74,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -97,7 +97,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -123,7 +123,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -151,7 +151,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -179,7 +179,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -208,7 +208,7 @@ func Test__CreateStage(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -240,11 +240,11 @@ func Test__CreateStage(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		runTemplate := support.ProtoRunTemplate()
+		executor := support.ProtoExecutor()
 		res, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
-			RunTemplate:    runTemplate,
+			Executor:       executor,
 			RequesterId:    r.User.String(),
 			Conditions: []*protos.Condition{
 				{
@@ -288,11 +288,11 @@ func Test__CreateStage(t *testing.T) {
 		assert.NotNil(t, res.Stage.CreatedAt)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.CanvasId)
 		assert.Equal(t, "test", res.Stage.Name)
-		assert.Equal(t, runTemplate.Type, res.Stage.RunTemplate.Type)
-		assert.Equal(t, runTemplate.Semaphore.Branch, res.Stage.RunTemplate.Semaphore.Branch)
-		assert.Equal(t, runTemplate.Semaphore.PipelineFile, res.Stage.RunTemplate.Semaphore.PipelineFile)
-		assert.Equal(t, runTemplate.Semaphore.OrganizationUrl, res.Stage.RunTemplate.Semaphore.OrganizationUrl)
-		assert.Equal(t, runTemplate.Semaphore.Parameters, res.Stage.RunTemplate.Semaphore.Parameters)
+		assert.Equal(t, executor.Type, res.Stage.Executor.Type)
+		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Executor.Semaphore.Branch)
+		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Executor.Semaphore.PipelineFile)
+		assert.Equal(t, executor.Semaphore.OrganizationUrl, res.Stage.Executor.Semaphore.OrganizationUrl)
+		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Executor.Semaphore.Parameters)
 
 		// Assert connections are correct
 		require.Len(t, res.Stage.Connections, 1)
@@ -315,7 +315,7 @@ func Test__CreateStage(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,

@@ -14,12 +14,12 @@ func Test__Resolve(t *testing.T) {
 
 	t.Run("no variables to resolve", func(t *testing.T) {
 		execution := support.CreateExecutionWithData(t, r.Source, r.Stage, []byte(`{"ref":"v1","data": {"branch": "hello"}}`), []byte(`{"ref":"v1","data": {"branch": "hello"}}`))
-		template := support.RunTemplate()
-		resolver := NewResolver(*execution, template)
+		executorSpec := support.ExecutorSpec()
+		resolver := NewResolver(*execution, executorSpec)
 		newTemplate, err := resolver.Resolve()
 		require.NoError(t, err)
 		require.NotNil(t, newTemplate)
-		assert.Equal(t, models.RunTemplateTypeSemaphore, newTemplate.Type)
+		assert.Equal(t, models.ExecutorSpecTypeSemaphore, newTemplate.Type)
 		assert.Equal(t, "demo-project", newTemplate.Semaphore.ProjectID)
 		assert.Equal(t, "demo-task", newTemplate.Semaphore.TaskID)
 		assert.Equal(t, ".semaphore/run.yml", newTemplate.Semaphore.PipelineFile)
@@ -33,26 +33,26 @@ func Test__Resolve(t *testing.T) {
 	t.Run("with variables to resolve", func(t *testing.T) {
 		e := `{"ref":"refs/heads/hello","branch":"hello","project":"other","param1":"value1","param2":"value2"}`
 		execution := support.CreateExecutionWithData(t, r.Source, r.Stage, []byte(e), []byte(`{}`))
-		template := support.RunTemplate()
-		template.Semaphore.Branch = "${{self.Conn('gh').branch}}"
-		template.Semaphore.ProjectID = "${{self.Conn('gh').project}}"
-		template.Semaphore.Parameters = map[string]string{
+		executorSpec := support.ExecutorSpec()
+		executorSpec.Semaphore.Branch = "${{self.Conn('gh').branch}}"
+		executorSpec.Semaphore.ProjectID = "${{self.Conn('gh').project}}"
+		executorSpec.Semaphore.Parameters = map[string]string{
 			"PARAM_1": "${{self.Conn('gh').param1}}",
 			"PARAM_2": "${{self.Conn('gh').param2}}",
 		}
 
-		resolver := NewResolver(*execution, template)
-		newTemplate, err := resolver.Resolve()
+		resolver := NewResolver(*execution, executorSpec)
+		spec, err := resolver.Resolve()
 		require.NoError(t, err)
-		require.NotNil(t, newTemplate)
-		assert.Equal(t, models.RunTemplateTypeSemaphore, newTemplate.Type)
-		assert.Equal(t, "other", newTemplate.Semaphore.ProjectID)
-		assert.Equal(t, "hello", newTemplate.Semaphore.Branch)
-		assert.Equal(t, ".semaphore/run.yml", newTemplate.Semaphore.PipelineFile)
-		assert.Equal(t, "demo-task", newTemplate.Semaphore.TaskID)
+		require.NotNil(t, spec)
+		assert.Equal(t, models.ExecutorSpecTypeSemaphore, spec.Type)
+		assert.Equal(t, "other", spec.Semaphore.ProjectID)
+		assert.Equal(t, "hello", spec.Semaphore.Branch)
+		assert.Equal(t, ".semaphore/run.yml", spec.Semaphore.PipelineFile)
+		assert.Equal(t, "demo-task", spec.Semaphore.TaskID)
 		assert.Equal(t, map[string]string{
 			"PARAM_1": "value1",
 			"PARAM_2": "value2",
-		}, newTemplate.Semaphore.Parameters)
+		}, spec.Semaphore.Parameters)
 	})
 }

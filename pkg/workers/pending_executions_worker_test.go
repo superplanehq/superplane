@@ -38,8 +38,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that trigger Semaphore task.
 		//
-		template := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
-		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, template, []models.StageConnection{
+		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
+		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -85,14 +85,14 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that trigger Semaphore task.
 		//
-		template := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
-		template.Semaphore.Parameters = map[string]string{
+		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
+		spec.Semaphore.Parameters = map[string]string{
 			"REF":             "${{ self.Conn('gh').ref }}",
 			"REF_TYPE":        "${{ self.Conn('gh').ref_type }}",
 			"STAGE_1_VERSION": "${{ self.Conn('stage-1').tags.version }}",
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, template, []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,

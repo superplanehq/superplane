@@ -66,7 +66,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{})
+		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, ExecutorSpec(), []models.StageConnection{})
 		require.NoError(t, err)
 		r.Stage, err = r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)
@@ -104,14 +104,14 @@ func CreateExecutionWithData(t *testing.T, source *models.EventSource, stage *mo
 	return execution
 }
 
-func RunTemplate() models.RunTemplate {
-	return RunTemplateWithURL("http://localhost:8000")
+func ExecutorSpec() models.ExecutorSpec {
+	return ExecutorSpecWithURL("http://localhost:8000")
 }
 
-func RunTemplateWithURL(URL string) models.RunTemplate {
-	return models.RunTemplate{
-		Type: models.RunTemplateTypeSemaphore,
-		Semaphore: &models.SemaphoreRunTemplate{
+func ExecutorSpecWithURL(URL string) models.ExecutorSpec {
+	return models.ExecutorSpec{
+		Type: models.ExecutorSpecTypeSemaphore,
+		Semaphore: &models.SemaphoreExecutorSpec{
 			OrganizationURL: URL,
 			APIToken:        base64.StdEncoding.EncodeToString([]byte("token")),
 			ProjectID:       "demo-project",
@@ -126,10 +126,10 @@ func RunTemplateWithURL(URL string) models.RunTemplate {
 	}
 }
 
-func ProtoRunTemplate() *protos.RunTemplate {
-	return &protos.RunTemplate{
-		Type: protos.RunTemplate_TYPE_SEMAPHORE,
-		Semaphore: &protos.SemaphoreRunTemplate{
+func ProtoExecutor() *protos.ExecutorSpec {
+	return &protos.ExecutorSpec{
+		Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
+		Semaphore: &protos.ExecutorSpec_Semaphore{
 			OrganizationUrl: "http://localhost:8000",
 			ApiToken:        "test",
 			ProjectId:       "test",

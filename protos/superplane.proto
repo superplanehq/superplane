@@ -282,7 +282,7 @@ message Stage {
   google.protobuf.Timestamp created_at = 4;
   repeated Connection connections = 5;
   repeated Condition conditions = 6;
-  RunTemplate run_template = 7;
+  ExecutorSpec executor = 7;
 }
 
 message Condition {
@@ -313,27 +313,27 @@ message CreateStageRequest {
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
-  RunTemplate run_template = 6;
+  ExecutorSpec executor = 6;
 }
 
-message RunTemplate {
+message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_SEMAPHORE = 1;
   }
 
-  Type type = 1;
-  SemaphoreRunTemplate semaphore = 2;
-}
+  message Semaphore {
+    string project_id = 1;
+    string branch = 2;
+    string pipeline_file = 3;
+    string task_id = 4;
+    map<string, string> parameters = 5;
+    string api_token = 6;
+    string organization_url = 7;
+  }
 
-message SemaphoreRunTemplate {
-  string project_id = 1;
-  string branch = 2;
-  string pipeline_file = 3;
-  string task_id = 4;
-  map<string, string> parameters = 5;
-  string api_token = 6;
-  string organization_url = 7;
+  Type type = 1;
+  Semaphore semaphore = 2;
 }
 
 message CreateStageResponse {
@@ -346,7 +346,7 @@ message UpdateStageRequest {
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
-  RunTemplate run_template = 6;
+  ExecutorSpec executor = 6;
 }
 
 message UpdateStageResponse {

@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	RunTemplateTypeSemaphore     = "semaphore"
+	ExecutorSpecTypeSemaphore = "semaphore"
+
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
 )
@@ -26,8 +27,8 @@ type Stage struct {
 	CreatedBy uuid.UUID
 	UpdatedBy uuid.UUID
 
-	Conditions  datatypes.JSONSlice[StageCondition]
-	RunTemplate datatypes.JSONType[RunTemplate]
+	Conditions   datatypes.JSONSlice[StageCondition]
+	ExecutorSpec datatypes.JSONType[ExecutorSpec]
 }
 
 type StageCondition struct {
@@ -131,16 +132,12 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-type RunTemplate struct {
-	Type string `json:"type"`
-
-	//
-	// Triggers a workflow on an existing Semaphore project/task.
-	//
-	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
+type ExecutorSpec struct {
+	Type      string                 `json:"type"`
+	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
 }
 
-type SemaphoreRunTemplate struct {
+type SemaphoreExecutorSpec struct {
 	APIToken        string            `json:"api_token"`
 	OrganizationURL string            `json:"organization_url"`
 	ProjectID       string            `json:"project_id"`

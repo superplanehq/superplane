@@ -57,13 +57,13 @@ func (w *PendingExecutionsWorker) Tick() error {
 // There is an issue here where, if we are having issues updating the state of the execution in the database,
 // we might end up creating more executions than we should.
 func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution) error {
-	resolver := resolver.NewResolver(execution, stage.RunTemplate.Data())
-	template, err := resolver.Resolve()
+	resolver := resolver.NewResolver(execution, stage.ExecutorSpec.Data())
+	spec, err := resolver.Resolve()
 	if err != nil {
-		return fmt.Errorf("error resolving run template: %v", err)
+		return fmt.Errorf("error resolving executor spec: %v", err)
 	}
 
-	executionID, err := w.StartExecution(logger, stage, execution, *template)
+	executionID, err := w.StartExecution(logger, stage, execution, *spec)
 	if err != nil {
 		return fmt.Errorf("error starting execution: %v", err)
 	}
@@ -84,37 +84,37 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 }
 
 // TODO: implement some retry and give up mechanism
-func (w *PendingExecutionsWorker) StartExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution, template models.RunTemplate) (string, error) {
-	switch template.Type {
-	case models.RunTemplateTypeSemaphore:
+func (w *PendingExecutionsWorker) StartExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution, spec models.ExecutorSpec) (string, error) {
+	switch spec.Type {
+	case models.ExecutorSpecTypeSemaphore:
 		//
 		// For now, only task runs are supported,
 		// until the workflow API is updated to support parameters.
 		//
-		if template.Semaphore.TaskID == "" {
+		if spec.Semaphore.TaskID == "" {
 			return "", fmt.Errorf("only task runs are supported")
 		}
 
-		return w.TriggerSemaphoreTask(logger, stage, execution, template.Semaphore)
+		return w.TriggerSemaphoreTask(logger, stage, execution, spec.Semaphore)
 	default:
-		return "", fmt.Errorf("unknown run template type")
+		return "", fmt.Errorf("unknown executor spec type")
 	}
 }
 
-func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage *models.Stage, execution models.StageExecution, template *models.SemaphoreRunTemplate) (string, error) {
-	api, err := w.newSemaphoreAPI(template)
+func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage *models.Stage, execution models.StageExecution, spec *models.SemaphoreExecutorSpec) (string, error) {
+	api, err := w.newSemaphoreAPI(spec)
 	if err != nil {
 		return "", err
 	}
 
-	parameters, err := w.buildParameters(execution, template.Parameters)
+	parameters, err := w.buildParameters(execution, spec.Parameters)
 	if err != nil {
 		return "", fmt.Errorf("error building parameters: %v", err)
 	}
 
-	workflowID, err := api.TriggerTask(template.ProjectID, template.TaskID, semaphore.TaskTriggerSpec{
-		Branch:       template.Branch,
-		PipelineFile: template.PipelineFile,
+	workflowID, err := api.TriggerTask(spec.ProjectID, spec.TaskID, semaphore.TaskTriggerSpec{
+		Branch:       spec.Branch,
+		PipelineFile: spec.PipelineFile,
 		Parameters:   parameters,
 	})
 
@@ -126,18 +126,18 @@ func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage 
 	return workflowID, nil
 }
 
-func (w *PendingExecutionsWorker) newSemaphoreAPI(template *models.SemaphoreRunTemplate) (*semaphore.Semaphore, error) {
-	token, err := base64.StdEncoding.DecodeString(template.APIToken)
+func (w *PendingExecutionsWorker) newSemaphoreAPI(spec *models.SemaphoreExecutorSpec) (*semaphore.Semaphore, error) {
+	token, err := base64.StdEncoding.DecodeString(spec.APIToken)
 	if err != nil {
 		return nil, err
 	}
 
-	t, err := w.Encryptor.Decrypt(context.Background(), token, []byte(template.OrganizationURL))
+	t, err := w.Encryptor.Decrypt(context.Background(), token, []byte(spec.OrganizationURL))
 	if err != nil {
 		return nil, err
 	}
 
-	return semaphore.NewSemaphoreAPI(template.OrganizationURL, string(t)), nil
+	return semaphore.NewSemaphoreAPI(spec.OrganizationURL, string(t)), nil
 }
 
 // TODO

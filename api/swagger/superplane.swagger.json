@@ -577,6 +577,35 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "ExecutorSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pipelineFile": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "apiToken": {
+          "type": "string"
+        },
+        "organizationUrl": {
+          "type": "string"
+        }
+      }
+    },
     "StageEventStateReason": {
       "type": "string",
       "enum": [
@@ -767,8 +796,8 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
         }
       }
     },
@@ -861,6 +890,25 @@
       ],
       "default": "STATE_UNKNOWN"
     },
+    "SuperplaneExecutorSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneExecutorSpecType"
+        },
+        "semaphore": {
+          "$ref": "#/definitions/ExecutorSpecSemaphore"
+        }
+      }
+    },
+    "SuperplaneExecutorSpecType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_SEMAPHORE"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
       "properties": {
@@ -909,54 +957,6 @@
         }
       }
     },
-    "SuperplaneRunTemplate": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/SuperplaneRunTemplateType"
-        },
-        "semaphore": {
-          "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
-        }
-      }
-    },
-    "SuperplaneRunTemplateType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE"
-      ],
-      "default": "TYPE_UNKNOWN"
-    },
-    "SuperplaneSemaphoreRunTemplate": {
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "apiToken": {
-          "type": "string"
-        },
-        "organizationUrl": {
-          "type": "string"
-        }
-      }
-    },
     "SuperplaneStage": {
       "type": "object",
       "properties": {
@@ -987,8 +987,8 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
         }
       }
     },
@@ -1068,8 +1068,8 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
         }
       }
     },

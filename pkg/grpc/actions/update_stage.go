@@ -50,7 +50,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, "requester ID is invalid")
 	}
 
-	template, err := validateRunTemplate(ctx, encryptor, req.RunTemplate)
+	executor, err := validateExecutorSpec(ctx, encryptor, req.Executor)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
@@ -65,7 +65,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateStage(stage.ID.String(), req.RequesterId, conditions, *template, connections)
+	err = canvas.UpdateStage(stage.ID.String(), req.RequesterId, conditions, *executor, connections)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())

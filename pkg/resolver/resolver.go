@@ -14,30 +14,30 @@ const expressionRegex = `^\$\{\{(.*)\}\}$`
 
 type Resolver struct {
 	execution models.StageExecution
-	template  models.RunTemplate
+	spec      models.ExecutorSpec
 	regex     *regexp.Regexp
 }
 
-func NewResolver(execution models.StageExecution, template models.RunTemplate) *Resolver {
+func NewResolver(execution models.StageExecution, spec models.ExecutorSpec) *Resolver {
 	regex := regexp.MustCompile(expressionRegex)
 	return &Resolver{
 		execution: execution,
-		template:  template,
+		spec:      spec,
 		regex:     regex,
 	}
 }
 
-func (r *Resolver) Resolve() (*models.RunTemplate, error) {
-	switch r.template.Type {
-	case models.RunTemplateTypeSemaphore:
-		return r.resolveSemaphoreTemplate()
+func (r *Resolver) Resolve() (*models.ExecutorSpec, error) {
+	switch r.spec.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		return r.resolveSemaphoreExecutorSpec()
 	default:
-		return nil, fmt.Errorf("resolution of run template type %s not supported", r.template.Type)
+		return nil, fmt.Errorf("resolution of executor spec type %s not supported", r.spec.Type)
 	}
 }
 
-func (r *Resolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
-	t := r.template.Semaphore
+func (r *Resolver) resolveSemaphoreExecutorSpec() (*models.ExecutorSpec, error) {
+	t := r.spec.Semaphore
 	projectID, err := r.resolveExpression(t.ProjectID)
 	if err != nil {
 		return nil, err
@@ -68,9 +68,9 @@ func (r *Resolver) resolveSemaphoreTemplate() (*models.RunTemplate, error) {
 		parameters[k] = value
 	}
 
-	return &models.RunTemplate{
-		Type: models.RunTemplateTypeSemaphore,
-		Semaphore: &models.SemaphoreRunTemplate{
+	return &models.ExecutorSpec{
+		Type: models.ExecutorSpecTypeSemaphore,
+		Semaphore: &models.SemaphoreExecutorSpec{
 			OrganizationURL: t.OrganizationURL,
 			APIToken:        t.APIToken,
 			ProjectID:       projectID,

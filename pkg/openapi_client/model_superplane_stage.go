@@ -27,7 +27,7 @@ type SuperplaneStage struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
-	RunTemplate *SuperplaneRunTemplate `json:"runTemplate,omitempty"`
+	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
 }
 
 // NewSuperplaneStage instantiates a new SuperplaneStage object
@@ -239,36 +239,36 @@ func (o *SuperplaneStage) SetConditions(v []SuperplaneCondition) {
 	o.Conditions = v
 }
 
-// GetRunTemplate returns the RunTemplate field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetRunTemplate() SuperplaneRunTemplate {
-	if o == nil || IsNil(o.RunTemplate) {
-		var ret SuperplaneRunTemplate
+// GetExecutor returns the Executor field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetExecutor() SuperplaneExecutorSpec {
+	if o == nil || IsNil(o.Executor) {
+		var ret SuperplaneExecutorSpec
 		return ret
 	}
-	return *o.RunTemplate
+	return *o.Executor
 }
 
-// GetRunTemplateOk returns a tuple with the RunTemplate field value if set, nil otherwise
+// GetExecutorOk returns a tuple with the Executor field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetRunTemplateOk() (*SuperplaneRunTemplate, bool) {
-	if o == nil || IsNil(o.RunTemplate) {
+func (o *SuperplaneStage) GetExecutorOk() (*SuperplaneExecutorSpec, bool) {
+	if o == nil || IsNil(o.Executor) {
 		return nil, false
 	}
-	return o.RunTemplate, true
+	return o.Executor, true
 }
 
-// HasRunTemplate returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasRunTemplate() bool {
-	if o != nil && !IsNil(o.RunTemplate) {
+// HasExecutor returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasExecutor() bool {
+	if o != nil && !IsNil(o.Executor) {
 		return true
 	}
 
 	return false
 }
 
-// SetRunTemplate gets a reference to the given SuperplaneRunTemplate and assigns it to the RunTemplate field.
-func (o *SuperplaneStage) SetRunTemplate(v SuperplaneRunTemplate) {
-	o.RunTemplate = &v
+// SetExecutor gets a reference to the given SuperplaneExecutorSpec and assigns it to the Executor field.
+func (o *SuperplaneStage) SetExecutor(v SuperplaneExecutorSpec) {
+	o.Executor = &v
 }
 
 func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
@@ -299,8 +299,8 @@ func (o SuperplaneStage) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Conditions) {
 		toSerialize["conditions"] = o.Conditions
 	}
-	if !IsNil(o.RunTemplate) {
-		toSerialize["runTemplate"] = o.RunTemplate
+	if !IsNil(o.Executor) {
+		toSerialize["executor"] = o.Executor
 	}
 	return toSerialize, nil
 }

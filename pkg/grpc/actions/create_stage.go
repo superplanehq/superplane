@@ -31,7 +31,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
-	template, err := validateRunTemplate(ctx, encryptor, req.RunTemplate)
+	spec, err := validateExecutorSpec(ctx, encryptor, req.Executor)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
@@ -46,7 +46,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections)
+	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *spec, connections)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -78,23 +78,23 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	return response, nil
 }
 
-func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in *pb.RunTemplate) (*models.RunTemplate, error) {
+func validateExecutorSpec(ctx context.Context, encryptor encryptor.Encryptor, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
 	if in == nil {
-		return nil, fmt.Errorf("missing run template")
+		return nil, fmt.Errorf("missing executor spec")
 	}
 
 	switch in.Type {
-	case pb.RunTemplate_TYPE_SEMAPHORE:
+	case pb.ExecutorSpec_TYPE_SEMAPHORE:
 		if in.Semaphore.OrganizationUrl == "" {
-			return nil, fmt.Errorf("missing organization URL")
+			return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
 		}
 
 		if in.Semaphore.ApiToken == "" {
-			return nil, fmt.Errorf("missing API token")
+			return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
 		}
 
 		if in.Semaphore.TaskId == "" {
-			return nil, fmt.Errorf("only triggering tasks is supported for now")
+			return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
 		}
 
 		token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
@@ -102,9 +102,9 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 			return nil, fmt.Errorf("error encrypting API token: %v", err)
 		}
 
-		return &models.RunTemplate{
-			Type: models.RunTemplateTypeSemaphore,
-			Semaphore: &models.SemaphoreRunTemplate{
+		return &models.ExecutorSpec{
+			Type: models.ExecutorSpecTypeSemaphore,
+			Semaphore: &models.SemaphoreExecutorSpec{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
 				ProjectID:       in.Semaphore.ProjectId,
@@ -116,7 +116,7 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		}, nil
 
 	default:
-		return nil, errors.New("invalid run template type")
+		return nil, errors.New("invalid executor spec type")
 	}
 }
 
@@ -420,7 +420,7 @@ func protoToConnectionType(t pb.Connection_Type) string {
 }
 
 func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage, error) {
-	runTemplate, err := serializeRunTemplate(stage.RunTemplate.Data())
+	executor, err := serializeExecutorSpec(stage.ExecutorSpec.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +437,7 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 		CreatedAt:   timestamppb.New(*stage.CreatedAt),
 		Conditions:  conditions,
 		Connections: connections,
-		RunTemplate: runTemplate,
+		Executor:    executor,
 	}, nil
 }
 
@@ -481,23 +481,23 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	}
 }
 
-func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, error) {
-	switch runTemplate.Type {
-	case models.RunTemplateTypeSemaphore:
-		return &pb.RunTemplate{
-			Type: pb.RunTemplate_TYPE_SEMAPHORE,
-			Semaphore: &pb.SemaphoreRunTemplate{
-				OrganizationUrl: runTemplate.Semaphore.OrganizationURL,
-				ProjectId:       runTemplate.Semaphore.ProjectID,
-				Branch:          runTemplate.Semaphore.Branch,
-				PipelineFile:    runTemplate.Semaphore.PipelineFile,
-				Parameters:      runTemplate.Semaphore.Parameters,
-				TaskId:          runTemplate.Semaphore.TaskID,
+func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, error) {
+	switch executor.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		return &pb.ExecutorSpec{
+			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+			Semaphore: &pb.ExecutorSpec_Semaphore{
+				OrganizationUrl: executor.Semaphore.OrganizationURL,
+				ProjectId:       executor.Semaphore.ProjectID,
+				Branch:          executor.Semaphore.Branch,
+				PipelineFile:    executor.Semaphore.PipelineFile,
+				Parameters:      executor.Semaphore.Parameters,
+				TaskId:          executor.Semaphore.TaskID,
 			},
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("invalid run template type: %s", runTemplate.Type)
+		return nil, fmt.Errorf("invalid executor spec type: %s", executor.Type)
 	}
 }
 

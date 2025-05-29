@@ -123,10 +123,10 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 }
 
 func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *models.Stage, execution *models.StageExecution) (string, error) {
-	template := stage.RunTemplate.Data()
-	switch template.Type {
-	case models.RunTemplateTypeSemaphore:
-		t := template.Semaphore
+	executor := stage.ExecutorSpec.Data()
+	switch executor.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		t := executor.Semaphore
 		decoded, err := base64.StdEncoding.DecodeString(t.APIToken)
 		if err != nil {
 			return "", err
@@ -141,12 +141,12 @@ func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *model
 			logger,
 			execution,
 			semaphore.NewSemaphoreAPI(
-				template.Semaphore.OrganizationURL,
+				executor.Semaphore.OrganizationURL,
 				string(token),
 			),
 		)
 	default:
-		return "", fmt.Errorf("run template %s not supported", template.Type)
+		return "", fmt.Errorf("executor %s not supported", executor.Type)
 	}
 }
 

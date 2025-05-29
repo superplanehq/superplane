@@ -34,13 +34,13 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 	wsEvent := map[string]interface{}{
 		"event": "stage_updated",
 		"payload": map[string]interface{}{
-			"id":           describeStageResp.Stage.Id,
-			"canvas_id":    describeStageResp.Stage.CanvasId,
-			"name":         describeStageResp.Stage.Name,
-			"created_at":   describeStageResp.Stage.CreatedAt,
-			"conditions":   describeStageResp.Stage.Conditions,
-			"connections":  describeStageResp.Stage.Connections,
-			"run_template": describeStageResp.Stage.RunTemplate,
+			"id":            describeStageResp.Stage.Id,
+			"canvas_id":     describeStageResp.Stage.CanvasId,
+			"name":          describeStageResp.Stage.Name,
+			"created_at":    describeStageResp.Stage.CreatedAt,
+			"conditions":    describeStageResp.Stage.Conditions,
+			"connections":   describeStageResp.Stage.Connections,
+			"executor_spec": describeStageResp.Stage.Executor,
 		},
 	}
 
