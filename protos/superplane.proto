@@ -285,6 +285,14 @@ message Stage {
   ExecutorSpec executor = 7;
   repeated InputDefinition inputs = 8;
   repeated InputMapping input_mappings = 9;
+  repeated OutputDefinition outputs = 10;
+}
+
+message OutputDefinition {
+  string name = 1;
+  string description = 2;
+  bool required = 3;
+  string default = 4;
 }
 
 message InputDefinition {
@@ -359,6 +367,7 @@ message CreateStageRequest {
   ExecutorSpec executor = 6;
   repeated InputDefinition inputs = 7;
   repeated InputMapping input_mappings = 8;
+  repeated OutputDefinition outputs = 9;
 }
 
 message ExecutorSpec {
@@ -394,6 +403,7 @@ message UpdateStageRequest {
   ExecutorSpec executor = 6;
   repeated InputDefinition inputs = 7;
   repeated InputMapping input_mappings = 8;
+  repeated OutputDefinition outputs = 9;
 }
 
 message UpdateStageResponse {
@@ -461,6 +471,11 @@ message InputValue {
   string value = 2;
 }
 
+message OutputValue {
+  string name = 1;
+  string value = 2;
+}
+
 message Execution {
   enum State {
     STATE_UNKNOWN = 0;
@@ -482,6 +497,7 @@ message Execution {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp started_at = 6;
   google.protobuf.Timestamp finished_at = 7;
+  repeated OutputValue outputs = 8;
 }
 
 message StageEventApproval {

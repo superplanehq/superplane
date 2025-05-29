@@ -144,7 +144,7 @@ CREATE TABLE public.stage_executions (
     reference_id character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
-    tags jsonb,
+    outputs jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
@@ -167,6 +167,7 @@ CREATE TABLE public.stages (
     executor_spec jsonb NOT NULL,
     conditions jsonb,
     inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    outputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
@@ -430,7 +431,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250529204828	f
+20250529183103	f
 \.
 
 

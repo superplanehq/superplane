@@ -5,7 +5,6 @@ apiVersion: v1
 kind: Stage
 metadata:
   name: stage-1
-  canvasId: a88894a7-8043-4e55-a9f1-e2ca85887a42
 spec:
   conditions: []
 
@@ -48,12 +47,12 @@ spec:
         required: true
 
     semaphore:
-      organizationUrl: https://lucaspin.sxmoon.com
-      apiToken: ${{ inputs.API_TOKEN }}
-      projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
-      taskId: fd67cfb1-e06c-4896-a517-c648f878330a
-      branch: sxmoon
-      pipelineFile: .semaphore/pipeline_3.yml
+      organizationUrl: https://myorg.semaphoreci.com
+      apiToken: ${{ secrets.API_TOKEN }}
+      projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
+      taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
+      branch: main
+      pipelineFile: .semaphore/stage-1.yml
       parameters:
         DOCS_VERSION: ${{ inputs.DOCS_VERSION }}
         TERRAFORM_VERSION: ${{ inputs.TERRAFORM_VERSION }}
@@ -71,7 +70,6 @@ apiVersion: v1
 kind: Stage
 metadata:
   name: stage-1
-  canvasId: a88894a7-8043-4e55-a9f1-e2ca85887a42
 spec:
   connections:
     - type: TYPE_EVENT_SOURCE
@@ -81,10 +79,6 @@ spec:
           valueFrom:
             eventData:
               expression: ref
-        # - name: TERRAFORM_VERSION
-        #   valueFrom:
-        #     latestInput:
-        #       name: TERRAFORM_VERSION
 
     - type: TYPE_EVENT_SOURCE
       name: terraform
@@ -111,12 +105,12 @@ spec:
         required: true
 
     semaphore:
-      organizationUrl: https://lucaspin.sxmoon.com
+      organizationUrl: https://myorg.semaphoreci.com
       apiToken: ${{ secrets.API_TOKEN }}
-      projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
-      taskId: fd67cfb1-e06c-4896-a517-c648f878330a
-      branch: sxmoon
-      pipelineFile: .semaphore/pipeline_3.yml
+      projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
+      taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
+      branch: main
+      pipelineFile: .semaphore/stage-1.yml
       parameters:
         - name: DOCS_VERSION
           value: ${{ inputs.DOCS_VERSION }}
@@ -140,7 +134,6 @@ apiVersion: v1
 kind: Stage
 metadata:
   name: stage-1
-  canvasId: a88894a7-8043-4e55-a9f1-e2ca85887a42
 spec:
   connections:
     - type: TYPE_EVENT_SOURCE
@@ -174,12 +167,12 @@ spec:
         required: true
 
     semaphore:
-      organizationUrl: https://lucaspin.sxmoon.com
+      organizationUrl: https://myorg.semaphoreci.com
       apiToken: ${{ secrets.API_TOKEN }}
-      projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
-      taskId: fd67cfb1-e06c-4896-a517-c648f878330a
-      branch: sxmoon
-      pipelineFile: .semaphore/pipeline_3.yml
+      projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
+      taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
+      branch: main
+      pipelineFile: .semaphore/stage-1.yml
       parameters:
         - name: DOCS_VERSION
           value: ${{ inputs.DOCS_VERSION }}
@@ -331,5 +324,3 @@ spec:
         - name: TERRAFORM_VERSION
           value: ${{ inputs.TERRAFORM_VERSION }}
 ```
-
-- inputs are resolved when event goes into the queue

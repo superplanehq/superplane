@@ -140,6 +140,7 @@ func (c *Canvas) CreateStage(
 	connections []StageConnection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
+	outputs []OutputDefinition,
 ) error {
 	now := time.Now()
 	ID := uuid.New()
@@ -155,6 +156,7 @@ func (c *Canvas) CreateStage(
 			ExecutorSpec:  datatypes.NewJSONType(executorSpec),
 			Inputs:        datatypes.NewJSONSlice(inputs),
 			InputMappings: datatypes.NewJSONSlice(inputMappings),
+			Outputs:       datatypes.NewJSONSlice(outputs),
 		}
 
 		err := tx.Clauses(clause.Returning{}).Create(&stage).Error
@@ -186,6 +188,7 @@ func (c *Canvas) UpdateStage(
 	connections []StageConnection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
+	outputs []OutputDefinition,
 ) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("stage_id = ?", id).Delete(&StageConnection{}).Error; err != nil {
@@ -208,6 +211,7 @@ func (c *Canvas) UpdateStage(
 			Update("conditions", datatypes.NewJSONSlice(conditions)).
 			Update("inputs", datatypes.NewJSONSlice(inputs)).
 			Update("input_mappings", datatypes.NewJSONSlice(inputMappings)).
+			Update("outputs", datatypes.NewJSONSlice(outputs)).
 			Error
 
 		if err != nil {

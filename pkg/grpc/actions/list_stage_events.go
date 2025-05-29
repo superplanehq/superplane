@@ -181,6 +181,7 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		State:       executionStateToProto(execution.State),
 		Result:      executionResultToProto(execution.Result),
 		CreatedAt:   timestamppb.New(*execution.CreatedAt),
+		Outputs:     []*pb.OutputValue{},
 	}
 
 	if execution.StartedAt != nil {
@@ -189,6 +190,10 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 
 	if execution.FinishedAt != nil {
 		e.FinishedAt = timestamppb.New(*execution.FinishedAt)
+	}
+
+	for k, v := range execution.Outputs.Data() {
+		e.Outputs = append(e.Outputs, &pb.OutputValue{Name: k, Value: v.(string)})
 	}
 
 	return e, nil

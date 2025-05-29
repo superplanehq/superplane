@@ -878,6 +878,13 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneInputMapping"
           }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },
@@ -957,6 +964,13 @@
         "finishedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputValue"
+          }
         }
       }
     },
@@ -1080,6 +1094,34 @@
         }
       }
     },
+    "SuperplaneOutputDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneOutputValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneStage": {
       "type": "object",
       "properties": {
@@ -1125,6 +1167,13 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
           }
         }
       }
@@ -1227,6 +1276,13 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
           }
         }
       }

@@ -155,7 +155,7 @@ func (w *PendingExecutionsWorker) buildParameters(execution models.StageExecutio
 
 	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
 	if err != nil {
-		return nil, fmt.Errorf("error generating tags token: %v", err)
+		return nil, fmt.Errorf("error generating outputs token: %v", err)
 	}
 
 	parameterValues = append(parameterValues, semaphore.TaskTriggerParameter{

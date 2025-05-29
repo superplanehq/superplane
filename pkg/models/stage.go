@@ -31,6 +31,7 @@ type Stage struct {
 	ExecutorSpec  datatypes.JSONType[ExecutorSpec]
 	Inputs        datatypes.JSONSlice[InputDefinition]
 	InputMappings datatypes.JSONSlice[InputMapping]
+	Outputs       datatypes.JSONSlice[OutputDefinition]
 }
 
 type InputDefinition struct {
@@ -41,6 +42,21 @@ type InputDefinition struct {
 }
 
 func (i *InputDefinition) Validate() error {
+	if i.Name == "" {
+		return fmt.Errorf("empty name")
+	}
+
+	return nil
+}
+
+type OutputDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+}
+
+func (i *OutputDefinition) Validate() error {
 	if i.Name == "" {
 		return fmt.Errorf("empty name")
 	}
@@ -246,6 +262,16 @@ func (s *Stage) ApprovalsRequired() int {
 func (s *Stage) HasApprovalCondition() bool {
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (s *Stage) HasOutputDefinition(name string) bool {
+	for _, outputDefinition := range s.Outputs {
+		if outputDefinition.Name == name {
 			return true
 		}
 	}

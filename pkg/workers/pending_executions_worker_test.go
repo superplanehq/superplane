@@ -44,7 +44,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task")
 
@@ -89,7 +89,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		spec.Semaphore.Parameters = map[string]string{
 			"REF":             "${{ self.Conn('gh').ref }}",
 			"REF_TYPE":        "${{ self.Conn('gh').ref_type }}",
-			"STAGE_1_VERSION": "${{ self.Conn('stage-1').tags.version }}",
+			"STAGE_1_VERSION": "${{ self.Conn('stage-1').outputs.version }}",
 		}
 
 		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
@@ -103,16 +103,16 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceName: r.Stage.Name,
 				SourceType: models.SourceTypeStage,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)
 
 		//
-		// Since we use the tags of a stage in the template for the execution,
+		// Since we use the outputs of a stage in the executor spec for the execution,
 		// we need a previous event for that stage to be available, so we create it here.
 		//
-		data := createStageCompletionEvent(t, r, map[string]string{"version": "1.0.0"})
+		data := createStageCompletionEvent(t, r, map[string]any{"version": "1.0.0"})
 		_, err = models.CreateEvent(r.Stage.ID, r.Stage.Name, models.SourceTypeStage, data, []byte(`{}`))
 		require.NoError(t, err)
 
@@ -171,12 +171,12 @@ func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *m
 	}))
 }
 
-func createStageCompletionEvent(t *testing.T, r *support.ResourceRegistry, tags map[string]string) []byte {
+func createStageCompletionEvent(t *testing.T, r *support.ResourceRegistry, outputs map[string]any) []byte {
 	e, err := events.NewStageExecutionCompletion(&models.StageExecution{
 		ID:      uuid.New(),
 		StageID: r.Stage.ID,
 		Result:  models.StageExecutionResultPassed,
-	}, tags)
+	}, outputs)
 
 	require.NoError(t, err)
 	data, err := json.Marshal(e)

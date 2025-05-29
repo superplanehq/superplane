@@ -61,7 +61,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
@@ -89,7 +89,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -135,7 +135,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 	t.Run("stage completion event is processed", func(t *testing.T) {
 		//
-		// TODO: update this test to use stage outputs as another stage's inputs
 		// Create two stages.
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
@@ -145,7 +144,31 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
+			},
+		})
 
 		require.NoError(t, err)
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
@@ -156,14 +179,33 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: firstStage.Name,
+								Expression: "outputs.VERSION",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
 		//
 		// Simulating a stage completion event coming in for the first stage.
 		//
-		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"tags":{"VERSION":"v1"}}`), eventHeaders)
+		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -209,7 +251,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
@@ -227,7 +269,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 

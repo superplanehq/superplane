@@ -73,12 +73,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		tags, err := w.processExecutionTags(tx, logger, execution, result)
-		if err != nil {
-			logger.Errorf("Error processing execution tags: %v", err)
-			return err
-		}
-
 		if err := execution.FinishInTransaction(tx, result); err != nil {
 			logger.Errorf("Error updating execution state: %v", err)
 			return err
@@ -97,7 +91,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.
 		//
-		if err := w.createStageCompletionEvent(tx, execution, tags); err != nil {
+		if err := w.createStageCompletionEvent(tx, execution, execution.Outputs.Data()); err != nil {
 			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
@@ -186,13 +180,13 @@ func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID stri
 	return pipeline, nil
 }
 
-func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
+func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, outputs map[string]any) error {
 	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}
 
-	e, err := events.NewStageExecutionCompletion(execution, tags)
+	e, err := events.NewStageExecutionCompletion(execution, outputs)
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
@@ -208,20 +202,4 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 	}
 
 	return nil
-}
-
-func (w *ExecutionPoller) processExecutionTags(tx *gorm.DB, logger *log.Entry, execution *models.StageExecution, result string) (map[string]string, error) {
-	tags := map[string]string{}
-
-	//
-	// Include extra tags from execution, if any.
-	//
-	if execution.Tags != nil {
-		err := json.Unmarshal(execution.Tags, &tags)
-		if err != nil {
-			return nil, fmt.Errorf("error adding tags from execution: %v", err)
-		}
-	}
-
-	return tags, nil
 }

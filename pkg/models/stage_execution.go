@@ -31,6 +31,7 @@ type StageExecution struct {
 	UpdatedAt    *time.Time
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
+	Outputs      datatypes.JSONType[map[string]any]
 
 	//
 	// TODO: not so sure about this column
@@ -42,10 +43,6 @@ type StageExecution struct {
 	// that all IDs will be UUIDs.
 	//
 	ReferenceID string
-
-	// TODO: I'm storing the extra tags pushed from the execution here,
-	// but I'm not sure if that is the best place for it
-	Tags datatypes.JSON
 }
 
 func (e *StageExecution) GetEventData() (map[string]any, error) {
@@ -115,10 +112,10 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 		Error
 }
 
-func (e *StageExecution) AddTags(tags []byte) error {
+func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 	return database.Conn().Model(e).
 		Clauses(clause.Returning{}).
-		Update("tags", tags).
+		Update("outputs", datatypes.NewJSONType(outputs)).
 		Update("updated_at", time.Now()).
 		Error
 }

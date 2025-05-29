@@ -66,7 +66,16 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, ExecutorSpec(), []models.StageConnection{}, []models.InputDefinition{}, []models.InputMapping{})
+		err = r.Canvas.CreateStage("stage-1",
+			r.User.String(),
+			conditions,
+			ExecutorSpec(),
+			[]models.StageConnection{},
+			[]models.InputDefinition{},
+			[]models.InputMapping{},
+			[]models.OutputDefinition{},
+		)
+
 		require.NoError(t, err)
 		r.Stage, err = r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)

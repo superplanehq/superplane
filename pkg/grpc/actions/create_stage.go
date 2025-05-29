@@ -56,7 +56,22 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *spec, connections, inputs, inputMappings)
+	outputs, err := validateOutputs(req.Outputs)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	err = canvas.CreateStage(
+		req.Name,
+		req.RequesterId,
+		conditions,
+		*spec,
+		connections,
+		inputs,
+		inputMappings,
+		outputs,
+	)
+
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -158,6 +173,27 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 	}
 
 	return cs, nil
+}
+
+func validateOutputs(in []*pb.OutputDefinition) ([]models.OutputDefinition, error) {
+	out := []models.OutputDefinition{}
+	for _, input := range in {
+		outputDefinition := models.OutputDefinition{
+			Name:        input.Name,
+			Description: input.Description,
+			Required:    input.Required,
+			Default:     input.Default,
+		}
+
+		err := outputDefinition.Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid input definition: %v", err)
+		}
+
+		out = append(out, outputDefinition)
+	}
+
+	return out, nil
 }
 
 func validateInputs(in []*pb.InputDefinition) ([]models.InputDefinition, error) {
