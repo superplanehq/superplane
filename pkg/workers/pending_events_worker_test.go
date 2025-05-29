@@ -42,7 +42,26 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		})
 
 		require.NoError(t, err)
 
@@ -51,7 +70,26 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{})
+		}, []models.InputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -85,16 +123,19 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, stage1Events, 1)
 		assert.Equal(t, r.Source.ID, stage1Events[0].SourceID)
+		assert.Equal(t, map[string]any{"VERSION": "v1"}, stage1Events[0].Inputs.Data())
 
 		stage2Events, err := stage2.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, stage2Events, 1)
 		assert.Equal(t, r.Source.ID, stage2Events[0].SourceID)
 		assert.True(t, testconsumer.HasReceivedMessage())
+		assert.Equal(t, map[string]any{"VERSION": "v1"}, stage1Events[0].Inputs.Data())
 	})
 
 	t.Run("stage completion event is processed", func(t *testing.T) {
 		//
+		// TODO: update this test to use stage outputs as another stage's inputs
 		// Create two stages.
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.

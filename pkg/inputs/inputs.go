@@ -13,6 +13,7 @@ import (
 // When validating, check:
 // - connection names point to existing connections
 // - input names point to existing input definitions
+// - if input is specified, there must be a input mapping for it
 // - cannot have multiple mappings with the same when.triggeredBy.connection
 // - if there is a mapping with no `when`, len(inputMappings) must be 1
 //
@@ -27,6 +28,12 @@ func NewBuilder(stage models.Stage) *InputBuilder {
 
 // Build() assumes that the input definitions and mappings were previously validated.
 func (b *InputBuilder) Build(tx *gorm.DB, event *models.Event) (map[string]any, error) {
+	//
+	// If the stage doesn't define any inputs, there's nothing for us to do here.
+	//
+	if len(b.stage.Inputs) == 0 {
+		return map[string]any{}, nil
+	}
 
 	//
 	// Find the proper set of value definitions to use for this event.
@@ -77,7 +84,7 @@ func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]mode
 		//
 		// If when is not defined, we know this is the only mapping we have.
 		//
-		if mapping.When != nil {
+		if mapping.When == nil {
 			return mapping.Values, nil
 		}
 
