@@ -620,14 +620,97 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 	}
 
 	return &pb.Stage{
-		Id:          stage.ID.String(),
-		Name:        stage.Name,
-		CanvasId:    stage.CanvasID.String(),
-		CreatedAt:   timestamppb.New(*stage.CreatedAt),
-		Conditions:  conditions,
-		Connections: connections,
-		Executor:    executor,
+		Id:            stage.ID.String(),
+		Name:          stage.Name,
+		CanvasId:      stage.CanvasID.String(),
+		CreatedAt:     timestamppb.New(*stage.CreatedAt),
+		Conditions:    conditions,
+		Connections:   connections,
+		Executor:      executor,
+		Inputs:        serializeInputs(stage.Inputs),
+		InputMappings: serializeInputMappings(stage.InputMappings),
 	}, nil
+}
+
+func serializeInputs(in []models.InputDefinition) []*pb.InputDefinition {
+	out := []*pb.InputDefinition{}
+	for _, inputDefinition := range in {
+		out = append(out, &pb.InputDefinition{
+			Name:        inputDefinition.Name,
+			Description: inputDefinition.Description,
+			Required:    inputDefinition.Required,
+			Default:     inputDefinition.Default.(string),
+		})
+	}
+
+	return out
+}
+
+func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
+	out := []*pb.InputMapping{}
+	for _, mapping := range in {
+		m := &pb.InputMapping{
+			Values: []*pb.InputMapping_ValueDefinition{},
+		}
+
+		for _, valueDefinition := range mapping.Values {
+			def := &pb.InputMapping_ValueDefinition{
+				Name:      valueDefinition.Name,
+				ValueFrom: serializeValueFrom(valueDefinition.ValueFrom),
+			}
+
+			if valueDefinition.Value != nil {
+				def.Value = *valueDefinition.Value
+			}
+
+			if valueDefinition.ValueFrom != nil {
+				def.ValueFrom = serializeValueFrom(valueDefinition.ValueFrom)
+			}
+
+			m.Values = append(m.Values, def)
+		}
+
+		if mapping.When != nil {
+			m.When = &pb.InputMapping_When{
+				TriggeredBy: &pb.InputMapping_WhenTriggeredBy{Connection: mapping.When.TriggeredBy.Connection},
+			}
+		}
+
+		out = append(out, m)
+	}
+
+	return out
+}
+
+func serializeValueFrom(in *models.InputValueFrom) *pb.InputMapping_ValueFrom {
+	if in == nil {
+		return nil
+	}
+
+	if in.EventData != nil {
+		return &pb.InputMapping_ValueFrom{
+			EventData: &pb.InputMapping_ValueFromEventData{
+				Connection: in.EventData.Connection,
+				Expression: in.EventData.Expression,
+			},
+		}
+	}
+
+	if in.LastExecution != nil {
+		results := []pb.Execution_Result{}
+		for _, result := range in.LastExecution.Results {
+			results = append(results, executionResultToProto(result))
+		}
+
+		return &pb.InputMapping_ValueFrom{
+			LastExecution: &pb.InputMapping_ValueFromLastExecution{
+				InputName: in.LastExecution.InputName,
+				Results:   results,
+			},
+		}
+	}
+
+	return nil
 }
 
 func serializeConditions(conditions []models.StageCondition) ([]*pb.Condition, error) {

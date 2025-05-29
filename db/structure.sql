@@ -128,7 +128,8 @@ CREATE TABLE public.stage_events (
     source_type character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     state_reason character varying(64),
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -429,7 +430,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250529183103	f
+20250529204828	f
 \.
 
 

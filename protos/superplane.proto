@@ -453,6 +453,12 @@ message StageEvent {
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
+  repeated InputValue inputs = 9;
+}
+
+message InputValue {
+  string name = 1;
+  string value = 2;
 }
 
 message Execution {

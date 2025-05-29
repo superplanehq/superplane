@@ -1021,6 +1021,17 @@
         }
       }
     },
+    "SuperplaneInputValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
       "properties": {
@@ -1149,6 +1160,13 @@
         },
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputValue"
+          }
         }
       }
     },

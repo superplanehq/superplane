@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -153,7 +154,12 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Event, stages []models.Stage) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
-			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "")
+			inputs, err := w.buildInputs(tx, event, stage)
+			if err != nil {
+				return err
+			}
+
+			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs)
 			if err != nil {
 				return err
 			}
@@ -170,6 +176,16 @@ func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Even
 
 		return nil
 	})
+}
+
+func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) (map[string]any, error) {
+	inputBuilder := inputs.NewBuilder(stage)
+	inputs, err := inputBuilder.Build(tx, event)
+	if err != nil {
+		return nil, err
+	}
+
+	return inputs, nil
 }
 
 func (w *PendingEventsWorker) stageIDsFromConnections(connections []models.StageConnection) []uuid.UUID {

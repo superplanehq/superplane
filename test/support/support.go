@@ -88,7 +88,7 @@ func CreateStageEvent(t *testing.T, source *models.EventSource, stage *models.St
 func CreateStageEventWithData(t *testing.T, source *models.EventSource, stage *models.Stage, data []byte, headers []byte) *models.StageEvent {
 	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
 	require.NoError(t, err)
-	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "")
+	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", map[string]any{})
 	require.NoError(t, err)
 	return stageEvent
 }
