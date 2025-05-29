@@ -18,7 +18,7 @@ import (
 // checks if the SuperplaneInputAssignment type satisfies the MappedNullable interface at compile time
 var _ MappedNullable = &SuperplaneInputAssignment{}
 
-// SuperplaneInputAssignment InputAssignment represents how input values are assigned. For now, assigning values to inputs from event data / outputs is supported.
+// SuperplaneInputAssignment InputAssignment represents how input values are assigned. For now, assigning values to inputs from event data is supported.
 type SuperplaneInputAssignment struct {
 	Name *string `json:"name,omitempty"`
 	ValueFrom *InputAssignmentValueFrom `json:"valueFrom,omitempty"`

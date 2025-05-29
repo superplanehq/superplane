@@ -2,6 +2,7 @@ package actions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -163,6 +164,38 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		State:       executionStateToProto(execution.State),
 		Result:      executionResultToProto(execution.Result),
 		CreatedAt:   timestamppb.New(*execution.CreatedAt),
+		Inputs:      []*pb.Input{},
+		Outputs:     []*pb.Output{},
+	}
+
+	//
+	// Include inputs
+	//
+	if event.Inputs != nil {
+		var inputs map[string]any
+		err := json.Unmarshal(event.Inputs, &inputs)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range inputs {
+			e.Inputs = append(e.Inputs, &pb.Input{Name: k, Value: v.(string)})
+		}
+	}
+
+	//
+	// Include outputs
+	//
+	if execution.Outputs != nil {
+		var outputs map[string]any
+		err := json.Unmarshal(execution.Outputs, &outputs)
+		if err != nil {
+			return nil, err
+		}
+
+		for k, v := range outputs {
+			e.Outputs = append(e.Outputs, &pb.Output{Name: k, Value: v.(string)})
+		}
 	}
 
 	if execution.StartedAt != nil {

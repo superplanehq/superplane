@@ -332,17 +332,17 @@ message RunTemplate {
 message InputDefinition {
   string name = 1;
   string description = 2;
-  string type = 3;
+  bool required = 3;
+  string default = 4;
 }
 
 //
 // InputAssignment represents how input values are assigned.
-// For now, assigning values to inputs from event data / outputs is supported.
+// For now, assigning values to inputs from event data is supported.
 //
 message InputAssignment {
   message ValueFrom {
     ValueFromEventData event_data = 1;
-    ValueFromOutput output = 2;
   }
 
   //
@@ -351,13 +351,6 @@ message InputAssignment {
   //
   message ValueFromEventData {
     string expression = 1;
-  }
-
-  //
-  // Used when defining an input from another stage's output.
-  //
-  message ValueFromOutput {
-    string name = 1;
   }
 
   string name = 1;

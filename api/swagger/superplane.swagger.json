@@ -579,9 +579,6 @@
       "properties": {
         "eventData": {
           "$ref": "#/definitions/InputAssignmentValueFromEventData"
-        },
-        "output": {
-          "$ref": "#/definitions/InputAssignmentValueFromOutput"
         }
       }
     },
@@ -593,15 +590,6 @@
         }
       },
       "description": "Used when defining an input from another stage's completion event,\nor from the event source raw event data."
-    },
-    "InputAssignmentValueFromOutput": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        }
-      },
-      "description": "Used when defining an input from another stage's output."
     },
     "StageEventStateReason": {
       "type": "string",
@@ -914,7 +902,8 @@
           "type": "string"
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "title": "TODO: we need to support more types here,\nso this field needs to be dynamically typed"
         }
       }
     },
@@ -928,7 +917,7 @@
           "$ref": "#/definitions/InputAssignmentValueFrom"
         }
       },
-      "description": "InputAssignment represents how input values are assigned.\nFor now, assigning values to inputs from event data / outputs is supported."
+      "description": "InputAssignment represents how input values are assigned.\nFor now, assigning values to inputs from event data is supported."
     },
     "SuperplaneInputDefinition": {
       "type": "object",
@@ -941,6 +930,13 @@
         },
         "type": {
           "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "default": {
+          "type": "string",
+          "title": "TODO: we need to support more types here,\nso this field needs to be dynamically typed"
         }
       }
     },
@@ -999,7 +995,8 @@
           "type": "string"
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "title": "TODO: we need to support more types here,\nso this field needs to be dynamically typed"
         }
       }
     },

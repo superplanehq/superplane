@@ -529,11 +529,16 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 }
 
 func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, error) {
+	inputDefinitions, err := serializeInputDefinitions(runTemplate.Inputs)
+	if err != nil {
+		return nil, err
+	}
+
 	switch runTemplate.Type {
 	case models.RunTemplateTypeSemaphore:
 		return &pb.RunTemplate{
 			Type:    pb.RunTemplate_TYPE_SEMAPHORE,
-			Inputs:  serializeInputDefinitions(runTemplate.Inputs),
+			Inputs:  inputDefinitions,
 			Outputs: serializeOutputDefinitions(runTemplate.Outputs),
 			Semaphore: &pb.SemaphoreRunTemplate{
 				OrganizationUrl: runTemplate.Semaphore.OrganizationURL,
@@ -550,17 +555,19 @@ func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, erro
 	}
 }
 
-func serializeInputDefinitions(in []models.InputDefinition) []*pb.InputDefinition {
+func serializeInputDefinitions(in []models.InputDefinition) ([]*pb.InputDefinition, error) {
 	inputs := []*pb.InputDefinition{}
 	for _, input := range in {
 		inputs = append(inputs, &pb.InputDefinition{
 			Name:        input.Name,
 			Description: input.Description,
 			Type:        input.Type,
+			Required:    input.Required,
+			Default:     input.Default.(string),
 		})
 	}
 
-	return inputs
+	return inputs, nil
 }
 
 func serializeOutputDefinitions(in []models.OutputDefinition) []*pb.OutputDefinition {

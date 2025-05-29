@@ -142,6 +142,8 @@ type InputDefinition struct {
 	Name        string
 	Description string
 	Type        string
+	Required    bool
+	Default     any
 }
 
 type OutputDefinition struct {

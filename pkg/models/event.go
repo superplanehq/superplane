@@ -136,6 +136,51 @@ func (e *Event) EvaluateBoolExpression(expression string, filterType string) (bo
 	return v, nil
 }
 
+func (e *Event) EvaluateAnyExpression(expression string) (any, error) {
+	//
+	// We don't want the expression to run for more than 5 seconds.
+	//
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	//
+	// Build our variable map.
+	//
+	variables := map[string]interface{}{
+		"ctx": ctx,
+	}
+
+	data, err := e.GetData()
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range data {
+		variables[key] = value
+	}
+
+	//
+	// Compile and run our expression.
+	//
+	program, err := expr.Compile(expression,
+		expr.Env(variables),
+		expr.AsAny(),
+		expr.WithContext("ctx"),
+		expr.Timezone(time.UTC.String()),
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("error compiling expression: %v", err)
+	}
+
+	output, err := expr.Run(program, variables)
+	if err != nil {
+		return "", fmt.Errorf("error running expression: %v", err)
+	}
+
+	return output, nil
+}
+
 func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	//
 	// We don't want the expression to run for more than 5 seconds.

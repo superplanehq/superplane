@@ -21,7 +21,6 @@ var _ MappedNullable = &InputAssignmentValueFrom{}
 // InputAssignmentValueFrom struct for InputAssignmentValueFrom
 type InputAssignmentValueFrom struct {
 	EventData *InputAssignmentValueFromEventData `json:"eventData,omitempty"`
-	Output *InputAssignmentValueFromOutput `json:"output,omitempty"`
 }
 
 // NewInputAssignmentValueFrom instantiates a new InputAssignmentValueFrom object
@@ -73,38 +72,6 @@ func (o *InputAssignmentValueFrom) SetEventData(v InputAssignmentValueFromEventD
 	o.EventData = &v
 }
 
-// GetOutput returns the Output field value if set, zero value otherwise.
-func (o *InputAssignmentValueFrom) GetOutput() InputAssignmentValueFromOutput {
-	if o == nil || IsNil(o.Output) {
-		var ret InputAssignmentValueFromOutput
-		return ret
-	}
-	return *o.Output
-}
-
-// GetOutputOk returns a tuple with the Output field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *InputAssignmentValueFrom) GetOutputOk() (*InputAssignmentValueFromOutput, bool) {
-	if o == nil || IsNil(o.Output) {
-		return nil, false
-	}
-	return o.Output, true
-}
-
-// HasOutput returns a boolean if a field has been set.
-func (o *InputAssignmentValueFrom) HasOutput() bool {
-	if o != nil && !IsNil(o.Output) {
-		return true
-	}
-
-	return false
-}
-
-// SetOutput gets a reference to the given InputAssignmentValueFromOutput and assigns it to the Output field.
-func (o *InputAssignmentValueFrom) SetOutput(v InputAssignmentValueFromOutput) {
-	o.Output = &v
-}
-
 func (o InputAssignmentValueFrom) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -117,9 +84,6 @@ func (o InputAssignmentValueFrom) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.EventData) {
 		toSerialize["eventData"] = o.EventData
-	}
-	if !IsNil(o.Output) {
-		toSerialize["output"] = o.Output
 	}
 	return toSerialize, nil
 }

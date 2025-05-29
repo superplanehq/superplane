@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -154,11 +156,17 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
-			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "")
+			inputs, err := w.buildInputs(tx, event, stage)
 			if err != nil {
 				return err
 			}
 
+			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs)
+			if err != nil {
+				return err
+			}
+
+			// TODO: this should be outside the transaction
 			err = messages.NewStageEventCreatedMessage(stage.CanvasID.String(), stageEvent).Publish()
 			if err != nil {
 				logging.ForStage(&stage).Errorf("failed to publish stage event created message: %v", err)
@@ -171,6 +179,33 @@ func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.
 
 		return nil
 	})
+}
+
+func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) ([]byte, error) {
+	connections, err := models.ListConnectionsForStageInTransaction(tx, stage.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	assignments := []models.InputAssignment{}
+	for _, connection := range connections {
+		for _, input := range connection.Inputs {
+			assignments = append(assignments, input)
+		}
+	}
+
+	inputResolver := inputs.NewInputResolver(stage.RunTemplate.Data().Inputs, assignments)
+	inputs, err := inputResolver.Resolve(event)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(inputs)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 func (w *PendingEventsWorker) stageIDsFromConnections(connections []models.StageConnection) []uuid.UUID {

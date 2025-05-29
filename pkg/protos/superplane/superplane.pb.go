@@ -1690,10 +1690,14 @@ func (x *RunTemplate) GetSemaphore() *SemaphoreRunTemplate {
 }
 
 type InputDefinition struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Type          string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Name        string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Type        string                 `protobuf:"bytes,3,opt,name=type,proto3" json:"type,omitempty"`
+	Required    bool                   `protobuf:"varint,4,opt,name=required,proto3" json:"required,omitempty"`
+	// TODO: we need to support more types here,
+	// so this field needs to be dynamically typed
+	Default       string `protobuf:"bytes,5,opt,name=default,proto3" json:"default,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1749,8 +1753,22 @@ func (x *InputDefinition) GetType() string {
 	return ""
 }
 
+func (x *InputDefinition) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+func (x *InputDefinition) GetDefault() string {
+	if x != nil {
+		return x.Default
+	}
+	return ""
+}
+
 // InputAssignment represents how input values are assigned.
-// For now, assigning values to inputs from event data / outputs is supported.
+// For now, assigning values to inputs from event data is supported.
 type InputAssignment struct {
 	state         protoimpl.MessageState     `protogen:"open.v1"`
 	Name          string                     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
@@ -1804,9 +1822,11 @@ func (x *InputAssignment) GetValueFrom() *InputAssignment_ValueFrom {
 }
 
 type Input struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// TODO: we need to support more types here,
+	// so this field needs to be dynamically typed
+	Value         string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1908,9 +1928,11 @@ func (x *OutputDefinition) GetRequired() bool {
 }
 
 type Output struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Name  string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// TODO: we need to support more types here,
+	// so this field needs to be dynamically typed
+	Value         string `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3578,7 +3600,6 @@ func (x *Connection_HeaderFilter) GetExpression() string {
 type InputAssignment_ValueFrom struct {
 	state         protoimpl.MessageState              `protogen:"open.v1"`
 	EventData     *InputAssignment_ValueFromEventData `protobuf:"bytes,1,opt,name=event_data,json=eventData,proto3" json:"event_data,omitempty"`
-	Output        *InputAssignment_ValueFromOutput    `protobuf:"bytes,2,opt,name=output,proto3" json:"output,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3616,13 +3637,6 @@ func (*InputAssignment_ValueFrom) Descriptor() ([]byte, []int) {
 func (x *InputAssignment_ValueFrom) GetEventData() *InputAssignment_ValueFromEventData {
 	if x != nil {
 		return x.EventData
-	}
-	return nil
-}
-
-func (x *InputAssignment_ValueFrom) GetOutput() *InputAssignment_ValueFromOutput {
-	if x != nil {
-		return x.Output
 	}
 	return nil
 }
@@ -3669,51 +3683,6 @@ func (*InputAssignment_ValueFromEventData) Descriptor() ([]byte, []int) {
 func (x *InputAssignment_ValueFromEventData) GetExpression() string {
 	if x != nil {
 		return x.Expression
-	}
-	return ""
-}
-
-// Used when defining an input from another stage's output.
-type InputAssignment_ValueFromOutput struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *InputAssignment_ValueFromOutput) Reset() {
-	*x = InputAssignment_ValueFromOutput{}
-	mi := &file_superplane_proto_msgTypes[54]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *InputAssignment_ValueFromOutput) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*InputAssignment_ValueFromOutput) ProtoMessage() {}
-
-func (x *InputAssignment_ValueFromOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[54]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use InputAssignment_ValueFromOutput.ProtoReflect.Descriptor instead.
-func (*InputAssignment_ValueFromOutput) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{22, 2}
-}
-
-func (x *InputAssignment_ValueFromOutput) GetName() string {
-	if x != nil {
-		return x.Name
 	}
 	return ""
 }
@@ -3844,25 +3813,24 @@ const file_superplane_proto_rawDesc = "" +
 	"\tsemaphore\x18\x04 \x01(\v2 .Superplane.SemaphoreRunTemplateR\tsemaphore\",\n" +
 	"\x04Type\x12\x10\n" +
 	"\fTYPE_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0eTYPE_SEMAPHORE\x10\x01\"[\n" +
+	"\x0eTYPE_SEMAPHORE\x10\x01\"\x91\x01\n" +
 	"\x0fInputDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x12\n" +
-	"\x04type\x18\x03 \x01(\tR\x04type\"\xea\x02\n" +
+	"\x04type\x18\x03 \x01(\tR\x04type\x12\x1a\n" +
+	"\brequired\x18\x04 \x01(\bR\brequired\x12\x18\n" +
+	"\adefault\x18\x05 \x01(\tR\adefault\"\xfd\x01\n" +
 	"\x0fInputAssignment\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12D\n" +
 	"\n" +
-	"value_from\x18\x02 \x01(\v2%.Superplane.InputAssignment.ValueFromR\tvalueFrom\x1a\x9f\x01\n" +
+	"value_from\x18\x02 \x01(\v2%.Superplane.InputAssignment.ValueFromR\tvalueFrom\x1aZ\n" +
 	"\tValueFrom\x12M\n" +
 	"\n" +
-	"event_data\x18\x01 \x01(\v2..Superplane.InputAssignment.ValueFromEventDataR\teventData\x12C\n" +
-	"\x06output\x18\x02 \x01(\v2+.Superplane.InputAssignment.ValueFromOutputR\x06output\x1a4\n" +
+	"event_data\x18\x01 \x01(\v2..Superplane.InputAssignment.ValueFromEventDataR\teventData\x1a4\n" +
 	"\x12ValueFromEventData\x12\x1e\n" +
 	"\n" +
 	"expression\x18\x01 \x01(\tR\n" +
-	"expression\x1a%\n" +
-	"\x0fValueFromOutput\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"1\n" +
+	"expression\"1\n" +
 	"\x05Input\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"B\n" +
@@ -4055,7 +4023,7 @@ func file_superplane_proto_rawDescGZIP() []byte {
 }
 
 var file_superplane_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_superplane_proto_msgTypes = make([]protoimpl.MessageInfo, 56)
+var file_superplane_proto_msgTypes = make([]protoimpl.MessageInfo, 55)
 var file_superplane_proto_goTypes = []any{
 	(Connection_Type)(0),                       // 0: Superplane.Connection.Type
 	(Connection_FilterType)(0),                 // 1: Superplane.Connection.FilterType
@@ -4120,16 +4088,15 @@ var file_superplane_proto_goTypes = []any{
 	(*Connection_HeaderFilter)(nil),            // 60: Superplane.Connection.HeaderFilter
 	(*InputAssignment_ValueFrom)(nil),          // 61: Superplane.InputAssignment.ValueFrom
 	(*InputAssignment_ValueFromEventData)(nil), // 62: Superplane.InputAssignment.ValueFromEventData
-	(*InputAssignment_ValueFromOutput)(nil),    // 63: Superplane.InputAssignment.ValueFromOutput
-	nil,                                        // 64: Superplane.SemaphoreRunTemplate.ParametersEntry
-	(*timestamp.Timestamp)(nil),                // 65: google.protobuf.Timestamp
+	nil,                         // 63: Superplane.SemaphoreRunTemplate.ParametersEntry
+	(*timestamp.Timestamp)(nil), // 64: google.protobuf.Timestamp
 }
 var file_superplane_proto_depIdxs = []int32{
 	11, // 0: Superplane.ListCanvasesResponse.canvases:type_name -> Superplane.Canvas
-	65, // 1: Superplane.Canvas.created_at:type_name -> google.protobuf.Timestamp
+	64, // 1: Superplane.Canvas.created_at:type_name -> google.protobuf.Timestamp
 	11, // 2: Superplane.CreateCanvasResponse.canvas:type_name -> Superplane.Canvas
 	11, // 3: Superplane.DescribeCanvasResponse.canvas:type_name -> Superplane.Canvas
-	65, // 4: Superplane.EventSource.created_at:type_name -> google.protobuf.Timestamp
+	64, // 4: Superplane.EventSource.created_at:type_name -> google.protobuf.Timestamp
 	24, // 5: Superplane.DescribeStageResponse.stage:type_name -> Superplane.Stage
 	16, // 6: Superplane.CreateEventSourceResponse.event_source:type_name -> Superplane.EventSource
 	16, // 7: Superplane.DescribeEventSourceResponse.event_source:type_name -> Superplane.EventSource
@@ -4137,7 +4104,7 @@ var file_superplane_proto_depIdxs = []int32{
 	58, // 9: Superplane.Connection.filters:type_name -> Superplane.Connection.Filter
 	2,  // 10: Superplane.Connection.filter_operator:type_name -> Superplane.Connection.FilterOperator
 	31, // 11: Superplane.Connection.inputs:type_name -> Superplane.InputAssignment
-	65, // 12: Superplane.Stage.created_at:type_name -> google.protobuf.Timestamp
+	64, // 12: Superplane.Stage.created_at:type_name -> google.protobuf.Timestamp
 	23, // 13: Superplane.Stage.connections:type_name -> Superplane.Connection
 	25, // 14: Superplane.Stage.conditions:type_name -> Superplane.Condition
 	29, // 15: Superplane.Stage.run_template:type_name -> Superplane.RunTemplate
@@ -4152,7 +4119,7 @@ var file_superplane_proto_depIdxs = []int32{
 	33, // 24: Superplane.RunTemplate.outputs:type_name -> Superplane.OutputDefinition
 	35, // 25: Superplane.RunTemplate.semaphore:type_name -> Superplane.SemaphoreRunTemplate
 	61, // 26: Superplane.InputAssignment.value_from:type_name -> Superplane.InputAssignment.ValueFrom
-	64, // 27: Superplane.SemaphoreRunTemplate.parameters:type_name -> Superplane.SemaphoreRunTemplate.ParametersEntry
+	63, // 27: Superplane.SemaphoreRunTemplate.parameters:type_name -> Superplane.SemaphoreRunTemplate.ParametersEntry
 	24, // 28: Superplane.CreateStageResponse.stage:type_name -> Superplane.Stage
 	23, // 29: Superplane.UpdateStageRequest.connections:type_name -> Superplane.Connection
 	25, // 30: Superplane.UpdateStageRequest.conditions:type_name -> Superplane.Condition
@@ -4166,60 +4133,59 @@ var file_superplane_proto_depIdxs = []int32{
 	0,  // 38: Superplane.StageEvent.source_type:type_name -> Superplane.Connection.Type
 	5,  // 39: Superplane.StageEvent.state:type_name -> Superplane.StageEvent.State
 	6,  // 40: Superplane.StageEvent.state_reason:type_name -> Superplane.StageEvent.StateReason
-	65, // 41: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
+	64, // 41: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
 	47, // 42: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
 	46, // 43: Superplane.StageEvent.execution:type_name -> Superplane.Execution
 	7,  // 44: Superplane.Execution.state:type_name -> Superplane.Execution.State
 	8,  // 45: Superplane.Execution.result:type_name -> Superplane.Execution.Result
-	65, // 46: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
-	65, // 47: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
-	65, // 48: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
+	64, // 46: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
+	64, // 47: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
+	64, // 48: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
 	32, // 49: Superplane.Execution.inputs:type_name -> Superplane.Input
 	34, // 50: Superplane.Execution.outputs:type_name -> Superplane.Output
-	65, // 51: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
+	64, // 51: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
 	45, // 52: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent
-	65, // 53: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 54: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 55: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 56: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 57: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 58: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 59: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
-	65, // 60: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 53: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 54: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 55: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 56: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 57: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 58: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 59: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
+	64, // 60: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
 	1,  // 61: Superplane.Connection.Filter.type:type_name -> Superplane.Connection.FilterType
 	59, // 62: Superplane.Connection.Filter.data:type_name -> Superplane.Connection.DataFilter
 	60, // 63: Superplane.Connection.Filter.header:type_name -> Superplane.Connection.HeaderFilter
 	62, // 64: Superplane.InputAssignment.ValueFrom.event_data:type_name -> Superplane.InputAssignment.ValueFromEventData
-	63, // 65: Superplane.InputAssignment.ValueFrom.output:type_name -> Superplane.InputAssignment.ValueFromOutput
-	9,  // 66: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
-	12, // 67: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
-	19, // 68: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
-	28, // 69: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
-	14, // 70: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
-	17, // 71: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
-	21, // 72: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
-	39, // 73: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
-	41, // 74: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
-	43, // 75: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
-	37, // 76: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
-	48, // 77: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
-	10, // 78: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
-	13, // 79: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
-	20, // 80: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
-	36, // 81: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
-	15, // 82: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
-	18, // 83: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
-	22, // 84: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
-	40, // 85: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
-	42, // 86: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
-	44, // 87: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
-	38, // 88: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
-	49, // 89: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
-	78, // [78:90] is the sub-list for method output_type
-	66, // [66:78] is the sub-list for method input_type
-	66, // [66:66] is the sub-list for extension type_name
-	66, // [66:66] is the sub-list for extension extendee
-	0,  // [0:66] is the sub-list for field type_name
+	9,  // 65: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
+	12, // 66: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
+	19, // 67: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
+	28, // 68: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
+	14, // 69: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
+	17, // 70: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
+	21, // 71: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
+	39, // 72: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
+	41, // 73: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
+	43, // 74: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
+	37, // 75: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
+	48, // 76: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
+	10, // 77: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
+	13, // 78: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
+	20, // 79: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
+	36, // 80: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
+	15, // 81: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
+	18, // 82: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
+	22, // 83: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
+	40, // 84: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
+	42, // 85: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
+	44, // 86: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
+	38, // 87: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
+	49, // 88: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
+	77, // [77:89] is the sub-list for method output_type
+	65, // [65:77] is the sub-list for method input_type
+	65, // [65:65] is the sub-list for extension type_name
+	65, // [65:65] is the sub-list for extension extendee
+	0,  // [0:65] is the sub-list for field type_name
 }
 
 func init() { file_superplane_proto_init() }
@@ -4233,7 +4199,7 @@ func file_superplane_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_superplane_proto_rawDesc), len(file_superplane_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   56,
+			NumMessages:   55,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

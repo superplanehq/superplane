@@ -23,6 +23,8 @@ type SuperplaneInputDefinition struct {
 	Name *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Type *string `json:"type,omitempty"`
+	Required *bool `json:"required,omitempty"`
+	Default *string `json:"default,omitempty"`
 }
 
 // NewSuperplaneInputDefinition instantiates a new SuperplaneInputDefinition object
@@ -138,6 +140,70 @@ func (o *SuperplaneInputDefinition) SetType(v string) {
 	o.Type = &v
 }
 
+// GetRequired returns the Required field value if set, zero value otherwise.
+func (o *SuperplaneInputDefinition) GetRequired() bool {
+	if o == nil || IsNil(o.Required) {
+		var ret bool
+		return ret
+	}
+	return *o.Required
+}
+
+// GetRequiredOk returns a tuple with the Required field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneInputDefinition) GetRequiredOk() (*bool, bool) {
+	if o == nil || IsNil(o.Required) {
+		return nil, false
+	}
+	return o.Required, true
+}
+
+// HasRequired returns a boolean if a field has been set.
+func (o *SuperplaneInputDefinition) HasRequired() bool {
+	if o != nil && !IsNil(o.Required) {
+		return true
+	}
+
+	return false
+}
+
+// SetRequired gets a reference to the given bool and assigns it to the Required field.
+func (o *SuperplaneInputDefinition) SetRequired(v bool) {
+	o.Required = &v
+}
+
+// GetDefault returns the Default field value if set, zero value otherwise.
+func (o *SuperplaneInputDefinition) GetDefault() string {
+	if o == nil || IsNil(o.Default) {
+		var ret string
+		return ret
+	}
+	return *o.Default
+}
+
+// GetDefaultOk returns a tuple with the Default field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneInputDefinition) GetDefaultOk() (*string, bool) {
+	if o == nil || IsNil(o.Default) {
+		return nil, false
+	}
+	return o.Default, true
+}
+
+// HasDefault returns a boolean if a field has been set.
+func (o *SuperplaneInputDefinition) HasDefault() bool {
+	if o != nil && !IsNil(o.Default) {
+		return true
+	}
+
+	return false
+}
+
+// SetDefault gets a reference to the given string and assigns it to the Default field.
+func (o *SuperplaneInputDefinition) SetDefault(v string) {
+	o.Default = &v
+}
+
 func (o SuperplaneInputDefinition) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -156,6 +222,12 @@ func (o SuperplaneInputDefinition) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
+	}
+	if !IsNil(o.Required) {
+		toSerialize["required"] = o.Required
+	}
+	if !IsNil(o.Default) {
+		toSerialize["default"] = o.Default
 	}
 	return toSerialize, nil
 }

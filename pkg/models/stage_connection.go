@@ -6,6 +6,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -32,16 +33,19 @@ type InputAssignment struct {
 }
 
 type InputAssignmentFrom struct {
-	Output    *InputAssgnimentFromOutput    `json:"output"`
 	EventData *InputAssignmentFromEventData `json:"event_data"`
 }
 
-type InputAssgnimentFromOutput struct {
-	Name string `json:"name"`
+type InputAssignmentFromEventData struct {
+	Expression string `json:"expression"`
 }
 
-type InputAssignmentFromEventData struct {
-	Name string `json:"name"`
+func (i *InputAssignment) GetValue(event *Event) (any, error) {
+	if i.ValueFrom.EventData != nil {
+		return event.EvaluateAnyExpression(i.ValueFrom.EventData.Expression)
+	}
+
+	return "", fmt.Errorf("unsupported input assignment type")
 }
 
 func (c *StageConnection) Accept(event *Event) (bool, error) {
@@ -159,6 +163,10 @@ func FindStageConnection(stageID uuid.UUID, sourceName string) (*StageConnection
 }
 
 func ListConnectionsForStage(stageID uuid.UUID) ([]StageConnection, error) {
+	return ListConnectionsForStageInTransaction(database.Conn(), stageID)
+}
+
+func ListConnectionsForStageInTransaction(tx *gorm.DB, stageID uuid.UUID) ([]StageConnection, error) {
 	var connections []StageConnection
 	err := database.Conn().
 		Where("stage_id = ?", stageID).
