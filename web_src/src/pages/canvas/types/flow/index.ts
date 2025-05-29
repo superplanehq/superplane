@@ -55,3 +55,14 @@ export {
   SuperplaneConditionType as ConditionType,
   SuperplaneRunTemplateType as RunTemplateType
 };
+
+export interface FlowEdge extends Edge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface LayoutedFlowData {
+  layoutedNodes: AllNodeType[];
+  flowEdges: FlowEdge[];
+}
