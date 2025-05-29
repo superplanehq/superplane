@@ -46,7 +46,17 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *spec, connections)
+	inputs, err := validateInputs(req.Inputs)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	inputMappings, err := validateInputMappings(req.InputMappings)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *spec, connections, inputs, inputMappings)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -148,6 +158,185 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 	}
 
 	return cs, nil
+}
+
+func validateInputs(in []*pb.InputDefinition) ([]models.InputDefinition, error) {
+	out := []models.InputDefinition{}
+	for _, input := range in {
+		inputDefinition := models.InputDefinition{
+			Name:        input.Name,
+			Description: input.Description,
+			Required:    input.Required,
+			Default:     input.Default,
+		}
+
+		err := inputDefinition.Validate()
+		if err != nil {
+			return nil, fmt.Errorf("invalid input definition: %v", err)
+		}
+
+		out = append(out, inputDefinition)
+	}
+
+	return out, nil
+}
+
+func validateInputMappings(in []*pb.InputMapping) ([]models.InputMapping, error) {
+	out := []models.InputMapping{}
+
+	for _, mapping := range in {
+		m := models.InputMapping{}
+
+		if mapping.When != nil {
+			when, err := validateInputMappingWhen(mapping.When)
+			if err != nil {
+				return nil, fmt.Errorf("invalid input mapping when: %v", err)
+			}
+
+			m.When = when
+		}
+
+		if len(mapping.Values) == 0 {
+			return nil, fmt.Errorf("invalid input mapping: no value definitions")
+		}
+
+		m.Values = []models.InputValueDefinition{}
+		for _, valueDefinition := range mapping.Values {
+			v, err := validateValueDefinition(valueDefinition)
+			if err != nil {
+				return nil, fmt.Errorf("invalid input mapping value definition: %v", err)
+			}
+
+			m.Values = append(m.Values, *v)
+		}
+
+		out = append(out, m)
+	}
+
+	return out, nil
+}
+
+func validateValueDefinition(in *pb.InputMapping_ValueDefinition) (*models.InputValueDefinition, error) {
+	if in.Name == "" {
+		return nil, fmt.Errorf("missing input name")
+	}
+
+	if in.ValueFrom == nil && in.Value == "" {
+		return nil, fmt.Errorf("value is not defined")
+	}
+
+	if in.ValueFrom != nil && in.Value != "" {
+		return nil, fmt.Errorf("cannot use value and valueFrom at the same time")
+	}
+
+	definition := &models.InputValueDefinition{Name: in.Name}
+	if in.Value != "" {
+		definition.Value = &in.Value
+	}
+
+	if in.ValueFrom != nil {
+		valueFrom, err := validateValueFrom(in.ValueFrom)
+		if err != nil {
+			return nil, fmt.Errorf("invalid valueFrom for %s: %v", in.Name, err)
+		}
+
+		definition.ValueFrom = valueFrom
+	}
+
+	return definition, nil
+}
+
+// TODO: should we use an enum here too?
+func validateValueFrom(in *pb.InputMapping_ValueFrom) (*models.InputValueFrom, error) {
+	if in.EventData == nil && in.LastExecution == nil {
+		return nil, fmt.Errorf("no source defined")
+	}
+
+	if in.EventData != nil && in.LastExecution != nil {
+		return nil, fmt.Errorf("cannot use multiple sources at the same time")
+	}
+
+	if in.EventData != nil {
+		eventData, err := validateValueFromEventData(in.EventData)
+		if err != nil {
+			return nil, fmt.Errorf("invalid event data: %v", err)
+		}
+
+		return &models.InputValueFrom{EventData: eventData}, nil
+	}
+
+	lastExecution, err := validateValueFromLastExecution(in.LastExecution)
+	if err != nil {
+		return nil, fmt.Errorf("invalid event data: %v", err)
+	}
+
+	return &models.InputValueFrom{LastExecution: lastExecution}, nil
+}
+
+func validateValueFromEventData(in *pb.InputMapping_ValueFromEventData) (*models.InputValueFromEventData, error) {
+	if in.Connection == "" {
+		return nil, fmt.Errorf("empty connection")
+	}
+
+	if in.Expression == "" {
+		return nil, fmt.Errorf("empty expression")
+	}
+
+	// TODO: validate connection exists
+
+	return &models.InputValueFromEventData{
+		Connection: in.Connection,
+		Expression: in.Expression,
+	}, nil
+}
+
+func validateValueFromLastExecution(in *pb.InputMapping_ValueFromLastExecution) (*models.InputValueFromLastExecution, error) {
+	if in.InputName == "" {
+		return nil, fmt.Errorf("empty input name")
+	}
+
+	// TODO: validate input exists
+
+	//
+	// Validate results list.
+	//
+	if len(in.Results) == 0 {
+		return nil, fmt.Errorf("empty results")
+	}
+
+	results := []string{}
+	for _, result := range in.Results {
+		r := protoToExecutionResult(result)
+		if r == "" {
+			return nil, fmt.Errorf("invalid execution result")
+		}
+
+		results = append(results, r)
+	}
+
+	return &models.InputValueFromLastExecution{
+		InputName: in.InputName,
+		Results:   results,
+	}, nil
+}
+
+// TODO: should we use an enum here too?
+func validateInputMappingWhen(in *pb.InputMapping_When) (*models.InputMappingWhen, error) {
+	if in.TriggeredBy == nil {
+		return nil, fmt.Errorf("missing triggered by")
+	}
+
+	if in.TriggeredBy.Connection == "" {
+		return nil, fmt.Errorf("empty connection name for triggered by condition")
+	}
+
+	// TODO: check if connection exists
+
+	return &models.InputMappingWhen{
+		TriggeredBy: &models.WhenTriggeredBy{
+			Connection: in.TriggeredBy.Connection,
+		},
+	}, nil
 }
 
 func validateConditions(conditions []*pb.Condition) ([]models.StageCondition, error) {

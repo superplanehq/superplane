@@ -28,6 +28,8 @@ type SuperplaneStage struct {
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
 	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
+	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
+	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
 }
 
 // NewSuperplaneStage instantiates a new SuperplaneStage object
@@ -271,6 +273,70 @@ func (o *SuperplaneStage) SetExecutor(v SuperplaneExecutorSpec) {
 	o.Executor = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetInputs() []SuperplaneInputDefinition {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInputDefinition
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStage) GetInputsOk() ([]SuperplaneInputDefinition, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInputDefinition and assigns it to the Inputs field.
+func (o *SuperplaneStage) SetInputs(v []SuperplaneInputDefinition) {
+	o.Inputs = v
+}
+
+// GetInputMappings returns the InputMappings field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetInputMappings() []SuperplaneInputMapping {
+	if o == nil || IsNil(o.InputMappings) {
+		var ret []SuperplaneInputMapping
+		return ret
+	}
+	return o.InputMappings
+}
+
+// GetInputMappingsOk returns a tuple with the InputMappings field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStage) GetInputMappingsOk() ([]SuperplaneInputMapping, bool) {
+	if o == nil || IsNil(o.InputMappings) {
+		return nil, false
+	}
+	return o.InputMappings, true
+}
+
+// HasInputMappings returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasInputMappings() bool {
+	if o != nil && !IsNil(o.InputMappings) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputMappings gets a reference to the given []SuperplaneInputMapping and assigns it to the InputMappings field.
+func (o *SuperplaneStage) SetInputMappings(v []SuperplaneInputMapping) {
+	o.InputMappings = v
+}
+
 func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -301,6 +367,12 @@ func (o SuperplaneStage) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Executor) {
 		toSerialize["executor"] = o.Executor
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
+	}
+	if !IsNil(o.InputMappings) {
+		toSerialize["inputMappings"] = o.InputMappings
 	}
 	return toSerialize, nil
 }

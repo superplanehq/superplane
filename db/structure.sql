@@ -165,7 +165,8 @@ CREATE TABLE public.stages (
     updated_by uuid,
     executor_spec jsonb NOT NULL,
     conditions jsonb,
-    use jsonb
+    inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
+    input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -428,7 +429,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250529175457	f
+20250529183103	f
 \.
 
 

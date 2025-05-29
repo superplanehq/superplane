@@ -44,7 +44,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}))
+		}, []models.InputDefinition{}, []models.InputMapping{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task")
 
@@ -103,7 +103,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceName: r.Stage.Name,
 				SourceType: models.SourceTypeStage,
 			},
-		}))
+		}, []models.InputDefinition{}, []models.InputMapping{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)

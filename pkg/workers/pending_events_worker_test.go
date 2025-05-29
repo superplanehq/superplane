@@ -42,7 +42,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 
@@ -51,7 +51,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -104,7 +104,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
@@ -115,7 +115,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 
@@ -168,7 +168,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 
@@ -186,7 +186,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{})
 
 		require.NoError(t, err)
 

@@ -27,8 +27,59 @@ type Stage struct {
 	CreatedBy uuid.UUID
 	UpdatedBy uuid.UUID
 
-	Conditions   datatypes.JSONSlice[StageCondition]
-	ExecutorSpec datatypes.JSONType[ExecutorSpec]
+	Conditions    datatypes.JSONSlice[StageCondition]
+	ExecutorSpec  datatypes.JSONType[ExecutorSpec]
+	Inputs        datatypes.JSONSlice[InputDefinition]
+	InputMappings datatypes.JSONSlice[InputMapping]
+}
+
+type InputDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Default     any    `json:"default"`
+}
+
+func (i *InputDefinition) Validate() error {
+	if i.Name == "" {
+		return fmt.Errorf("empty name")
+	}
+
+	return nil
+}
+
+type InputMapping struct {
+	When   *InputMappingWhen      `json:"when"`
+	Values []InputValueDefinition `json:"values"`
+}
+
+type InputMappingWhen struct {
+	TriggeredBy *WhenTriggeredBy `json:"triggered_by"`
+}
+
+type WhenTriggeredBy struct {
+	Connection string `json:"connection"`
+}
+
+type InputValueDefinition struct {
+	Name      string          `json:"name"`
+	ValueFrom *InputValueFrom `json:"value_from"`
+	Value     *string         `json:"value"`
+}
+
+type InputValueFrom struct {
+	EventData     *InputValueFromEventData     `json:"event_data"`
+	LastExecution *InputValueFromLastExecution `json:"last_execution"`
+}
+
+type InputValueFromEventData struct {
+	Connection string `json:"connection"`
+	Expression string `json:"expression"`
+}
+
+type InputValueFromLastExecution struct {
+	InputName string   `json:"input_name"`
+	Results   []string `json:"results"`
 }
 
 type StageCondition struct {

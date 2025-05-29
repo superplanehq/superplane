@@ -65,7 +65,17 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateStage(stage.ID.String(), req.RequesterId, conditions, *executor, connections)
+	inputs, err := validateInputs(req.Inputs)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	inputMappings, err := validateInputMappings(req.InputMappings)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
+	err = canvas.UpdateStage(stage.ID.String(), req.RequesterId, conditions, *executor, connections, inputs, inputMappings)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Errorf(codes.InvalidArgument, err.Error())

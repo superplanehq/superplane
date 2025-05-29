@@ -289,8 +289,9 @@ spec:
               expression: ref
         - name: TERRAFORM_VERSION
           valueFrom:
-            lastInputSet:
+            lastExecution:
               inputName: TERRAFORM_VERSION
+              result: [RESULT_FAILED, RESULT_PASSED]
 
     - when:
         triggeredBy:
@@ -298,8 +299,10 @@ spec:
       values:
         - name: DOCS_VERSION
           valueFrom:
-            lastInputSet:
+            lastExecution:
               inputName: DOCS_VERSION
+              result: [RESULT_FAILED, RESULT_PASSED]
+
         - name: TERRAFORM_VERSION
           valueFrom:
             eventData:

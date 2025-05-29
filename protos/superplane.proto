@@ -283,6 +283,49 @@ message Stage {
   repeated Connection connections = 5;
   repeated Condition conditions = 6;
   ExecutorSpec executor = 7;
+  repeated InputDefinition inputs = 8;
+  repeated InputMapping input_mappings = 9;
+}
+
+message InputDefinition {
+  string name = 1;
+  string description = 2;
+  bool required = 3;
+  string default = 4;
+}
+
+message InputMapping {
+  message When {
+    WhenTriggeredBy triggered_by = 1;
+  }
+
+  message WhenTriggeredBy {
+    string connection = 1;
+  }
+
+  message ValueDefinition {
+    string name = 1;
+    ValueFrom value_from = 2;
+    string value = 3;
+  }
+
+  message ValueFrom {
+    ValueFromEventData event_data = 1;
+    ValueFromLastExecution last_execution = 2;
+  }
+
+  message ValueFromEventData {
+    string connection = 1;
+    string expression = 2;
+  }
+
+  message ValueFromLastExecution {
+    string input_name = 1;
+    repeated Execution.Result results = 2;
+  }
+
+  repeated ValueDefinition values = 1;
+  When when = 2;
 }
 
 message Condition {
@@ -314,6 +357,8 @@ message CreateStageRequest {
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
   ExecutorSpec executor = 6;
+  repeated InputDefinition inputs = 7;
+  repeated InputMapping input_mappings = 8;
 }
 
 message ExecutorSpec {
@@ -347,6 +392,8 @@ message UpdateStageRequest {
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
   ExecutorSpec executor = 6;
+  repeated InputDefinition inputs = 7;
+  repeated InputMapping input_mappings = 8;
 }
 
 message UpdateStageResponse {

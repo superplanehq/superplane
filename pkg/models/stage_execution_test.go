@@ -16,7 +16,7 @@ func Test__StageExecution(t *testing.T) {
 	require.NoError(t, err)
 	source, err := canvas.CreateEventSource("gh", []byte("my-key"))
 	require.NoError(t, err)
-	require.NoError(t, canvas.CreateStage("stg-1", user.String(), []StageCondition{}, ExecutorSpec{}, []StageConnection{}))
+	require.NoError(t, canvas.CreateStage("stg-1", user.String(), []StageCondition{}, ExecutorSpec{}, []StageConnection{}, []InputDefinition{}, []InputMapping{}))
 	stage, err := canvas.FindStageByName("stg-1")
 	require.NoError(t, err)
 

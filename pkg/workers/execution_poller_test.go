@@ -35,7 +35,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	}
 
 	spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections)
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{})
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
