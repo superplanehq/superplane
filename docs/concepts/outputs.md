@@ -1,4 +1,8 @@
-Other than inputs, a stage can have outputs as well, which can be used as inputs by another stage when connecting to it:
+Other than inputs, a stage can push outputs from the execution. Those outputs can be used as inputs by another stage when connecting to it.
+
+### Definition
+
+The `outputs` field is how you define the stage outputs:
 
 ```yaml
 apiVersion: v1
@@ -7,80 +11,36 @@ metadata:
   name: stage-1
 spec:
 
-  connections:
-    - type: TYPE_EVENT_SOURCE
-      name: docs
-    - type: TYPE_EVENT_SOURCE
-      name: terraform
-
-  inputs:
-    - name: DOCS_VERSION
-      description: ""
-    - name: TERRAFORM_VERSION
-      description: ""
-
+  #
+  # The outputs field
+  #
   outputs:
     - name: VERSION
       required: true
       description: ""
     - name: URL
-      required: true
+      required: false
       description: ""
 
-  inputMappings:
-    - when:
-        triggeredBy:
-          connection: docs
-      values:
-        - name: DOCS_VERSION
-          valueFrom:
-            eventData:
-              connection: docs
-              expression: ref
-        - name: TERRAFORM_VERSION
-          valueFrom:
-            lastExecution:
-              result: [RESULT_FAILED, RESULT_PASSED]
-
-    - when:
-        triggeredBy:
-          connection: terraform
-      values:
-        - name: DOCS_VERSION
-          valueFrom:
-            lastExecution:
-              result: [RESULT_FAILED, RESULT_PASSED]
-
-        - name: TERRAFORM_VERSION
-          valueFrom:
-            eventData:
-              connection: terraform
-              expression: ref
-
-  secrets:
-    - name: API_TOKEN
-      valueFrom:
-        secret:
-          name: semaphore
-          key: API_TOKEN
-
-  executor:
-    type: TYPE_SEMAPHORE
-    semaphore:
-      organizationUrl: https://myorg.semaphoreci.com
-      apiToken: ${{ secrets.API_TOKEN }}
-      projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
-      taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
-      branch: main
-      pipelineFile: .semaphore/stage-1.yml
-      parameters:
-        - name: DOCS_VERSION
-          value: ${{ inputs.DOCS_VERSION }}
-        - name: TERRAFORM_VERSION
-          value: ${{ inputs.TERRAFORM_VERSION }}
 ```
 
-Then, I can use them as inputs in another stage:
+If a required output is not pushed from the execution, the execution is marked as failed, even if its underlying status is successful.
+
+### Pushing outputs from execution
+
+The `POST /api/v1/executions/{executionId}/outputs` is available for executions to push outputs.
+
+```
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $SEMAPHORE_STAGE_EXECUTION_TOKEN" \
+  --data '{"MY_OUTPUT":"hello"}' \
+  "$SUPERPLANE_URL/api/v1/delivery/executions/$SEMAPHORE_STAGE_EXECUTION_ID/outputs"
+```
+
+The `SEMAPHORE_STAGE_EXECUTION_ID` and `SEMAPHORE_STAGE_EXECUTION_TOKEN` values are passed by Superplane to the executor. For example, in the case of the Semaphore executor type, those values are passed in the `parameters` field in the Semaphore Task API.
+
+### Using outputs from one stage as input on another
 
 ```yaml
 apiVersion: v1
@@ -105,18 +65,11 @@ spec:
               connection: stage-1
               expression: outputs.VERSION
 
-  secrets:
-    - name: API_TOKEN
-      valueFrom:
-        secret:
-          name: semaphore
-          key: API_TOKEN
-
   executor:
     type: TYPE_SEMAPHORE
     semaphore:
       organizationUrl: https://myorg.semaphoreci.com
-      apiToken: ${{ secrets.API_TOKEN }}
+      apiToken: XXXX
       projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
       taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
       branch: main

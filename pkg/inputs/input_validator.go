@@ -61,10 +61,10 @@ func WithConnections(connections []*pb.Connection) func(*Validator) {
 }
 
 func (v *Validator) Validate() error {
-	return v.firstErrorOrNil(
-		v.checkInputs(),
-		v.checkOutputs(),
-		v.checkInputMappings(),
+	return v.executeUntilFirstError(
+		func() error { return v.checkInputs() },
+		func() error { return v.checkOutputs() },
+		func() error { return v.checkInputMappings() },
 	)
 }
 
@@ -103,14 +103,14 @@ func (v *Validator) checkOutputs() error {
 }
 
 func (v *Validator) checkInputMappings() error {
-	return v.firstErrorOrNil(
-		v.checkInputMappingSpecs(),
-		v.checkForValidWhenLessMapping(),
-		v.checkNoDuplicateMappingForConnection(),
-		v.checkAllInputsAreDefined(),
-		v.checkValidInputDefinitionReferences(),
-		v.checkNoDuplicateValueDefinitions(),
-		v.checkValidConnectionReferences(),
+	return v.executeUntilFirstError(
+		func() error { return v.checkInputMappingSpecs() },
+		func() error { return v.checkForValidWhenLessMapping() },
+		func() error { return v.checkNoDuplicateMappingForConnection() },
+		func() error { return v.checkAllInputsAreDefined() },
+		func() error { return v.checkValidInputDefinitionReferences() },
+		func() error { return v.checkNoDuplicateValueDefinitions() },
+		func() error { return v.checkValidConnectionReferences() },
 	)
 }
 
@@ -145,8 +145,8 @@ func (v *Validator) checkNoDuplicateMappingForConnection() error {
 func (v *Validator) checkAllInputsAreDefined() error {
 	for _, input := range v.Inputs {
 		for i, m := range v.InputMappings {
-			defined := slices.ContainsFunc(m.Values, func(v *pb.InputMapping_ValueDefinition) bool {
-				return v.Name == input.Name
+			defined := slices.ContainsFunc(m.Values, func(def *pb.InputMapping_ValueDefinition) bool {
+				return def.Name == input.Name
 			})
 
 			if !defined {
@@ -164,7 +164,7 @@ func (v *Validator) checkValidInputDefinitionReferences() error {
 		for valueDefIndex, valueDef := range mapping.Values {
 			validReference := slices.IndexFunc(v.Inputs, func(input *pb.InputDefinition) bool {
 				return input.Name == valueDef.Name
-			}) > 0
+			}) > -1
 
 			if !validReference {
 				return fmt.Errorf(
@@ -210,7 +210,7 @@ func (v *Validator) checkValidConnectionReferences() error {
 
 		// Check if all valueFrom.EventData.Connection references existing connections
 		for valueDefIndex, valueDef := range mapping.Values {
-			if valueDef.ValueFrom.EventData != nil {
+			if valueDef.ValueFrom != nil && valueDef.ValueFrom.EventData != nil {
 				connection := valueDef.ValueFrom.EventData.Connection
 				exists := slices.ContainsFunc(v.Connections, func(conn *pb.Connection) bool {
 					return conn.Name == connection
@@ -232,13 +232,14 @@ func (v *Validator) checkValidConnectionReferences() error {
 func (v *Validator) HasWhenLessMapping() bool {
 	return slices.IndexFunc(v.InputMappings, func(mapping *pb.InputMapping) bool {
 		return mapping.When == nil
-	}) > 0
+	}) > -1
 }
 
-func (v *Validator) firstErrorOrNil(errors ...error) error {
-	for _, e := range errors {
-		if e != nil {
-			return e
+func (v *Validator) executeUntilFirstError(fn ...func() error) error {
+	for _, f := range fn {
+		err := f()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -277,7 +278,7 @@ func (v *Validator) SerializeOutputs() []models.OutputDefinition {
 func (v *Validator) checkInputMappingSpecs() error {
 	for mappingIndex, mapping := range v.InputMappings {
 		if len(mapping.Values) == 0 {
-			return fmt.Errorf("input mapping [%d]: no value definitions", mappingIndex)
+			return fmt.Errorf("invalid mapping [%d]: no value definitions", mappingIndex)
 		}
 
 		if mapping.When != nil {
@@ -367,7 +368,7 @@ func validateValueFromLastExecution(in *pb.InputMapping_ValueFromLastExecution) 
 
 	for _, result := range in.Results {
 		if result == pb.Execution_RESULT_UNKNOWN {
-			return fmt.Errorf("invalid execution result")
+			return fmt.Errorf("invalid execution result %s", result)
 		}
 	}
 
