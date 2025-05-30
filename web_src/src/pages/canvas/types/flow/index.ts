@@ -14,13 +14,13 @@ export type AllNodeType = EventSourceNodeType | StageNodeType;
 export type EdgeType = Edge;
 
 // Event source node
-type LastEvent = { type: string; release: string; timestamp: string };
-
 export type EventSourceNodeData = {
   id: string;
   repoName: string;
   repoUrl: string;
-  lastEvent: LastEvent;
+  eventType: string;
+  release: string;
+  timestamp: string;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
@@ -55,3 +55,14 @@ export {
   SuperplaneConditionType as ConditionType,
   SuperplaneRunTemplateType as RunTemplateType
 };
+
+export interface FlowEdge extends Edge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface LayoutedFlowData {
+  layoutedNodes: AllNodeType[];
+  flowEdges: FlowEdge[];
+}
