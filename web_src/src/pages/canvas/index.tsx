@@ -5,6 +5,7 @@ import { useCanvasStore } from "./store/canvasStore";
 import { useSetupEventHandlers } from "./store/handlers/setup";
 import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents } from "@/api-client";
 import { StageWithEventQueue } from "./store/types";
+import { Sidebar } from "./components/SideBar";
 
 // No props needed as we'll get the ID from the URL params
 
@@ -12,7 +13,7 @@ export function Canvas() {
   
   // Get the canvas ID from the URL params
   const { id } = useParams<{ id: string }>();
-  const { initialize, markEventHandlersAsSetup } = useCanvasStore();
+  const { initialize, markEventHandlersAsSetup, selectedStage, cleanSelectedStage } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Custom hook for setting up event handlers - must be called at top level
@@ -120,6 +121,7 @@ export function Canvas() {
   return (
     <StrictMode>
         <FlowRenderer />
+        {selectedStage && <Sidebar selectedStage={selectedStage} onClose={() => cleanSelectedStage()} />}
     </StrictMode>
   );
 }
