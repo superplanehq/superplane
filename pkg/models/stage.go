@@ -37,31 +37,12 @@ type Stage struct {
 type InputDefinition struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-}
-
-func (i *InputDefinition) Validate() error {
-	if i.Name == "" {
-		return fmt.Errorf("empty name")
-	}
-
-	return nil
 }
 
 type OutputDefinition struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Required    bool   `json:"required"`
-	Default     any    `json:"default"`
-}
-
-func (i *OutputDefinition) Validate() error {
-	if i.Name == "" {
-		return fmt.Errorf("empty name")
-	}
-
-	return nil
 }
 
 type InputMapping struct {
@@ -94,8 +75,7 @@ type InputValueFromEventData struct {
 }
 
 type InputValueFromLastExecution struct {
-	InputName string   `json:"input_name"`
-	Results   []string `json:"results"`
+	Results []string `json:"results"`
 }
 
 type StageCondition struct {

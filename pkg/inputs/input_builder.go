@@ -7,27 +7,19 @@ import (
 	"gorm.io/gorm"
 )
 
-//
-// Right now, the builder assumes that the input mappings are not ambiguous and are properly defined.
-// TODO: move the validations here instead of having them in pkg/grpc/actions.
-// When validating, check:
-// - connection names point to existing connections
-// - input names point to existing input definitions
-// - if input is specified, there must be a input mapping for it
-// - cannot have multiple mappings with the same when.triggeredBy.connection
-// - if there is a mapping with no `when`, len(inputMappings) must be 1
-//
-
-type InputBuilder struct {
+// InputBuilder assumes that the input mappings are not ambiguous and are properly defined.
+// See InputValidator to see how the inputs and outputs are validated.
+type Builder struct {
 	stage models.Stage
 }
 
-func NewBuilder(stage models.Stage) *InputBuilder {
-	return &InputBuilder{stage: stage}
+func NewBuilder(stage models.Stage) *Builder {
+	return &Builder{stage: stage}
 }
 
-// Build() assumes that the input definitions and mappings were previously validated.
-func (b *InputBuilder) Build(tx *gorm.DB, event *models.Event) (map[string]any, error) {
+// Build() assumes that the input definitions and mappings
+// were previously validated with InputValidator.Validate().
+func (b *Builder) Build(tx *gorm.DB, event *models.Event) (map[string]any, error) {
 	//
 	// If the stage doesn't define any inputs, there's nothing for us to do here.
 	//
@@ -59,26 +51,17 @@ func (b *InputBuilder) Build(tx *gorm.DB, event *models.Event) (map[string]any, 
 		//
 		// Value found, just assign it, and proceed to the next input.
 		//
-		if err == nil {
-			inputs[valueDefinition.Name] = value
-			continue
+		if err != nil {
+			return nil, fmt.Errorf("could not find value for required input %s: %v", inputDefinition.Name, err)
 		}
 
-		//
-		// Value not found, so we need to check if we could use a default here.
-		//
-		if !inputDefinition.Required {
-			inputs[valueDefinition.Name] = inputDefinition.Default
-			continue
-		}
-
-		return nil, fmt.Errorf("could not find value for required input %s: %v", inputDefinition.Name, err)
+		inputs[valueDefinition.Name] = value
 	}
 
 	return inputs, nil
 }
 
-func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]models.InputValueDefinition, error) {
+func (b *Builder) getValueDefinitionsForSource(event *models.Event) ([]models.InputValueDefinition, error) {
 	for _, mapping := range b.stage.InputMappings {
 
 		//
@@ -103,7 +86,7 @@ func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]mode
 	return nil, fmt.Errorf("error finding value definitions for source %s", event.SourceName)
 }
 
-func (b *InputBuilder) getValueDefinition(valueDefinitions []models.InputValueDefinition, inputName string) (*models.InputValueDefinition, error) {
+func (b *Builder) getValueDefinition(valueDefinitions []models.InputValueDefinition, inputName string) (*models.InputValueDefinition, error) {
 	for _, valueDefinition := range valueDefinitions {
 		if valueDefinition.Name == inputName {
 			return &valueDefinition, nil
@@ -117,7 +100,7 @@ func (b *InputBuilder) getValueDefinition(valueDefinitions []models.InputValueDe
 	return nil, fmt.Errorf("value definition not found for input %s", inputName)
 }
 
-func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.InputValueDefinition, event *models.Event) (any, error) {
+func (b *Builder) getValue(tx *gorm.DB, valueDefinition *models.InputValueDefinition, event *models.Event) (any, error) {
 	//
 	// If value is defined statically, just return it.
 	//
@@ -151,7 +134,7 @@ func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.InputValueD
 	return nil, fmt.Errorf("error determining value for %v", valueDefinition)
 }
 
-func (b *InputBuilder) getValueFromMap(m map[string]any, inputName string) (any, error) {
+func (b *Builder) getValueFromMap(m map[string]any, inputName string) (any, error) {
 	for k, v := range m {
 		if k == inputName {
 			return v, nil

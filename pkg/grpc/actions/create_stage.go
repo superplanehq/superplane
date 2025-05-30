@@ -10,6 +10,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -36,6 +37,18 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
+	inputValidator := inputs.NewValidator(
+		inputs.WithInputs(req.Inputs),
+		inputs.WithOutputs(req.Outputs),
+		inputs.WithInputMappings(req.InputMappings),
+		inputs.WithConnections(req.Connections),
+	)
+
+	err = inputValidator.Validate()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
 	connections, err := validateConnections(canvas, req.Connections)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -46,30 +59,15 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	inputs, err := validateInputs(req.Inputs)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	inputMappings, err := validateInputMappings(req.InputMappings)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	outputs, err := validateOutputs(req.Outputs)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
 	err = canvas.CreateStage(
 		req.Name,
 		req.RequesterId,
 		conditions,
 		*spec,
 		connections,
-		inputs,
-		inputMappings,
-		outputs,
+		inputValidator.SerializeInputs(),
+		inputValidator.SerializeInputMappings(),
+		inputValidator.SerializeOutputs(),
 	)
 
 	if err != nil {
@@ -85,7 +83,14 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, err
 	}
 
-	serialized, err := serializeStage(*stage, req.Connections)
+	serialized, err := serializeStage(
+		*stage,
+		req.Connections,
+		req.Inputs,
+		req.Outputs,
+		req.InputMappings,
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -173,206 +178,6 @@ func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 	}
 
 	return cs, nil
-}
-
-func validateOutputs(in []*pb.OutputDefinition) ([]models.OutputDefinition, error) {
-	out := []models.OutputDefinition{}
-	for _, input := range in {
-		outputDefinition := models.OutputDefinition{
-			Name:        input.Name,
-			Description: input.Description,
-			Required:    input.Required,
-			Default:     input.Default,
-		}
-
-		err := outputDefinition.Validate()
-		if err != nil {
-			return nil, fmt.Errorf("invalid input definition: %v", err)
-		}
-
-		out = append(out, outputDefinition)
-	}
-
-	return out, nil
-}
-
-func validateInputs(in []*pb.InputDefinition) ([]models.InputDefinition, error) {
-	out := []models.InputDefinition{}
-	for _, input := range in {
-		inputDefinition := models.InputDefinition{
-			Name:        input.Name,
-			Description: input.Description,
-			Required:    input.Required,
-			Default:     input.Default,
-		}
-
-		err := inputDefinition.Validate()
-		if err != nil {
-			return nil, fmt.Errorf("invalid input definition: %v", err)
-		}
-
-		out = append(out, inputDefinition)
-	}
-
-	return out, nil
-}
-
-func validateInputMappings(in []*pb.InputMapping) ([]models.InputMapping, error) {
-	out := []models.InputMapping{}
-
-	for _, mapping := range in {
-		m := models.InputMapping{}
-
-		if mapping.When != nil {
-			when, err := validateInputMappingWhen(mapping.When)
-			if err != nil {
-				return nil, fmt.Errorf("invalid input mapping when: %v", err)
-			}
-
-			m.When = when
-		}
-
-		if len(mapping.Values) == 0 {
-			return nil, fmt.Errorf("invalid input mapping: no value definitions")
-		}
-
-		m.Values = []models.InputValueDefinition{}
-		for _, valueDefinition := range mapping.Values {
-			v, err := validateValueDefinition(valueDefinition)
-			if err != nil {
-				return nil, fmt.Errorf("invalid input mapping value definition: %v", err)
-			}
-
-			m.Values = append(m.Values, *v)
-		}
-
-		out = append(out, m)
-	}
-
-	return out, nil
-}
-
-func validateValueDefinition(in *pb.InputMapping_ValueDefinition) (*models.InputValueDefinition, error) {
-	if in.Name == "" {
-		return nil, fmt.Errorf("missing input name")
-	}
-
-	if in.ValueFrom == nil && in.Value == "" {
-		return nil, fmt.Errorf("value is not defined")
-	}
-
-	if in.ValueFrom != nil && in.Value != "" {
-		return nil, fmt.Errorf("cannot use value and valueFrom at the same time")
-	}
-
-	definition := &models.InputValueDefinition{Name: in.Name}
-	if in.Value != "" {
-		definition.Value = &in.Value
-	}
-
-	if in.ValueFrom != nil {
-		valueFrom, err := validateValueFrom(in.ValueFrom)
-		if err != nil {
-			return nil, fmt.Errorf("invalid valueFrom for %s: %v", in.Name, err)
-		}
-
-		definition.ValueFrom = valueFrom
-	}
-
-	return definition, nil
-}
-
-// TODO: should we use an enum here too?
-func validateValueFrom(in *pb.InputMapping_ValueFrom) (*models.InputValueFrom, error) {
-	if in.EventData == nil && in.LastExecution == nil {
-		return nil, fmt.Errorf("no source defined")
-	}
-
-	if in.EventData != nil && in.LastExecution != nil {
-		return nil, fmt.Errorf("cannot use multiple sources at the same time")
-	}
-
-	if in.EventData != nil {
-		eventData, err := validateValueFromEventData(in.EventData)
-		if err != nil {
-			return nil, fmt.Errorf("invalid event data: %v", err)
-		}
-
-		return &models.InputValueFrom{EventData: eventData}, nil
-	}
-
-	lastExecution, err := validateValueFromLastExecution(in.LastExecution)
-	if err != nil {
-		return nil, fmt.Errorf("invalid event data: %v", err)
-	}
-
-	return &models.InputValueFrom{LastExecution: lastExecution}, nil
-}
-
-func validateValueFromEventData(in *pb.InputMapping_ValueFromEventData) (*models.InputValueFromEventData, error) {
-	if in.Connection == "" {
-		return nil, fmt.Errorf("empty connection")
-	}
-
-	if in.Expression == "" {
-		return nil, fmt.Errorf("empty expression")
-	}
-
-	// TODO: validate connection exists
-
-	return &models.InputValueFromEventData{
-		Connection: in.Connection,
-		Expression: in.Expression,
-	}, nil
-}
-
-func validateValueFromLastExecution(in *pb.InputMapping_ValueFromLastExecution) (*models.InputValueFromLastExecution, error) {
-	if in.InputName == "" {
-		return nil, fmt.Errorf("empty input name")
-	}
-
-	// TODO: validate input exists
-
-	//
-	// Validate results list.
-	//
-	if len(in.Results) == 0 {
-		return nil, fmt.Errorf("empty results")
-	}
-
-	results := []string{}
-	for _, result := range in.Results {
-		r := protoToExecutionResult(result)
-		if r == "" {
-			return nil, fmt.Errorf("invalid execution result")
-		}
-
-		results = append(results, r)
-	}
-
-	return &models.InputValueFromLastExecution{
-		InputName: in.InputName,
-		Results:   results,
-	}, nil
-}
-
-// TODO: should we use an enum here too?
-func validateInputMappingWhen(in *pb.InputMapping_When) (*models.InputMappingWhen, error) {
-	if in.TriggeredBy == nil {
-		return nil, fmt.Errorf("missing triggered by")
-	}
-
-	if in.TriggeredBy.Connection == "" {
-		return nil, fmt.Errorf("empty connection name for triggered by condition")
-	}
-
-	// TODO: check if connection exists
-
-	return &models.InputMappingWhen{
-		TriggeredBy: &models.WhenTriggeredBy{
-			Connection: in.TriggeredBy.Connection,
-		},
-	}, nil
 }
 
 func validateConditions(conditions []*pb.Condition) ([]models.StageCondition, error) {
@@ -644,7 +449,13 @@ func protoToConnectionType(t pb.Connection_Type) string {
 	}
 }
 
-func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage, error) {
+func serializeStage(
+	stage models.Stage,
+	connections []*pb.Connection,
+	inputs []*pb.InputDefinition,
+	outputs []*pb.OutputDefinition,
+	inputMappings []*pb.InputMapping,
+) (*pb.Stage, error) {
 	executor, err := serializeExecutorSpec(stage.ExecutorSpec.Data())
 	if err != nil {
 		return nil, err
@@ -663,19 +474,31 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 		Conditions:    conditions,
 		Connections:   connections,
 		Executor:      executor,
-		Inputs:        serializeInputs(stage.Inputs),
-		InputMappings: serializeInputMappings(stage.InputMappings),
+		Inputs:        inputs,
+		Outputs:       outputs,
+		InputMappings: inputMappings,
 	}, nil
 }
 
 func serializeInputs(in []models.InputDefinition) []*pb.InputDefinition {
 	out := []*pb.InputDefinition{}
-	for _, inputDefinition := range in {
+	for _, def := range in {
 		out = append(out, &pb.InputDefinition{
-			Name:        inputDefinition.Name,
-			Description: inputDefinition.Description,
-			Required:    inputDefinition.Required,
-			Default:     inputDefinition.Default.(string),
+			Name:        def.Name,
+			Description: def.Description,
+		})
+	}
+
+	return out
+}
+
+func serializeOutputs(in []models.OutputDefinition) []*pb.OutputDefinition {
+	out := []*pb.OutputDefinition{}
+	for _, def := range in {
+		out = append(out, &pb.OutputDefinition{
+			Name:        def.Name,
+			Description: def.Description,
+			Required:    def.Required,
 		})
 	}
 
@@ -684,45 +507,42 @@ func serializeInputs(in []models.InputDefinition) []*pb.InputDefinition {
 
 func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
 	out := []*pb.InputMapping{}
-	for _, mapping := range in {
-		m := &pb.InputMapping{
+	for _, m := range in {
+		mapping := &pb.InputMapping{
 			Values: []*pb.InputMapping_ValueDefinition{},
 		}
 
-		for _, valueDefinition := range mapping.Values {
-			def := &pb.InputMapping_ValueDefinition{
-				Name:      valueDefinition.Name,
-				ValueFrom: serializeValueFrom(valueDefinition.ValueFrom),
+		for _, valueDef := range m.Values {
+			v := &pb.InputMapping_ValueDefinition{
+				Name: valueDef.Name,
 			}
 
-			if valueDefinition.Value != nil {
-				def.Value = *valueDefinition.Value
+			if valueDef.Value != nil {
+				v.Value = *valueDef.Value
 			}
 
-			if valueDefinition.ValueFrom != nil {
-				def.ValueFrom = serializeValueFrom(valueDefinition.ValueFrom)
+			if valueDef.ValueFrom != nil {
+				v.ValueFrom = serializeValueFrom(*valueDef.ValueFrom)
 			}
 
-			m.Values = append(m.Values, def)
+			mapping.Values = append(mapping.Values, v)
 		}
 
-		if mapping.When != nil {
-			m.When = &pb.InputMapping_When{
-				TriggeredBy: &pb.InputMapping_WhenTriggeredBy{Connection: mapping.When.TriggeredBy.Connection},
+		if m.When != nil {
+			mapping.When = &pb.InputMapping_When{
+				TriggeredBy: &pb.InputMapping_WhenTriggeredBy{
+					Connection: mapping.When.TriggeredBy.Connection,
+				},
 			}
 		}
 
-		out = append(out, m)
+		out = append(out, mapping)
 	}
 
 	return out
 }
 
-func serializeValueFrom(in *models.InputValueFrom) *pb.InputMapping_ValueFrom {
-	if in == nil {
-		return nil
-	}
-
+func serializeValueFrom(in models.InputValueFrom) *pb.InputMapping_ValueFrom {
 	if in.EventData != nil {
 		return &pb.InputMapping_ValueFrom{
 			EventData: &pb.InputMapping_ValueFromEventData{
@@ -734,14 +554,13 @@ func serializeValueFrom(in *models.InputValueFrom) *pb.InputMapping_ValueFrom {
 
 	if in.LastExecution != nil {
 		results := []pb.Execution_Result{}
-		for _, result := range in.LastExecution.Results {
-			results = append(results, executionResultToProto(result))
+		for _, r := range in.LastExecution.Results {
+			results = append(results, executionResultToProto(r))
 		}
 
 		return &pb.InputMapping_ValueFrom{
 			LastExecution: &pb.InputMapping_ValueFromLastExecution{
-				InputName: in.LastExecution.InputName,
-				Results:   results,
+				Results: results,
 			},
 		}
 	}
@@ -822,7 +641,14 @@ func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb
 			return nil, err
 		}
 
-		stage, err := serializeStage(stage, serialized)
+		stage, err := serializeStage(
+			stage,
+			serialized,
+			serializeInputs(stage.Inputs),
+			serializeOutputs(stage.Outputs),
+			serializeInputMappings(stage.InputMappings),
+		)
+
 		if err != nil {
 			return nil, err
 		}

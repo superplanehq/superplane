@@ -6,6 +6,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -55,6 +56,18 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
+	inputValidator := inputs.NewValidator(
+		inputs.WithInputs(req.Inputs),
+		inputs.WithOutputs(req.Outputs),
+		inputs.WithInputMappings(req.InputMappings),
+		inputs.WithConnections(req.Connections),
+	)
+
+	err = inputValidator.Validate()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+	}
+
 	connections, err := validateConnections(canvas, req.Connections)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
@@ -65,30 +78,15 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Errorf(codes.InvalidArgument, err.Error())
 	}
 
-	inputs, err := validateInputs(req.Inputs)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	inputMappings, err := validateInputMappings(req.InputMappings)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
-	outputs, err := validateOutputs(req.Outputs)
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
-	}
-
 	err = canvas.UpdateStage(
 		stage.ID.String(),
 		req.RequesterId,
 		conditions,
 		*executor,
 		connections,
-		inputs,
-		inputMappings,
-		outputs,
+		inputValidator.SerializeInputs(),
+		inputValidator.SerializeInputMappings(),
+		inputValidator.SerializeOutputs(),
 	)
 
 	if err != nil {
@@ -104,7 +102,14 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, err
 	}
 
-	serialized, err := serializeStage(*stage, req.Connections)
+	serialized, err := serializeStage(
+		*stage,
+		req.Connections,
+		req.Inputs,
+		req.Outputs,
+		req.InputMappings,
+	)
+
 	if err != nil {
 		return nil, err
 	}

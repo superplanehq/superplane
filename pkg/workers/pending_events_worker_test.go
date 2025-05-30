@@ -44,8 +44,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputDefinition{
 			{
-				Name:     "VERSION",
-				Required: true,
+				Name: "VERSION",
 			},
 		}, []models.InputMapping{
 			{
@@ -72,8 +71,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputDefinition{
 			{
-				Name:     "VERSION",
-				Required: true,
+				Name: "VERSION",
 			},
 		}, []models.InputMapping{
 			{
@@ -146,8 +144,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputDefinition{
 			{
-				Name:     "VERSION",
-				Required: true,
+				Name: "VERSION",
 			},
 		}, []models.InputMapping{
 			{
@@ -181,8 +178,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputDefinition{
 			{
-				Name:     "VERSION",
-				Required: true,
+				Name: "VERSION",
 			},
 		}, []models.InputMapping{
 			{

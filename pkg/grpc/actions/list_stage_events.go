@@ -212,17 +212,6 @@ func executionStateToProto(state string) pb.Execution_State {
 	}
 }
 
-func protoToExecutionResult(result pb.Execution_Result) string {
-	switch result {
-	case pb.Execution_RESULT_FAILED:
-		return models.StageExecutionResultFailed
-	case pb.Execution_RESULT_PASSED:
-		return models.StageExecutionResultPassed
-	default:
-		return ""
-	}
-}
-
 func executionResultToProto(result string) pb.Execution_Result {
 	switch result {
 	case models.StageExecutionResultFailed:

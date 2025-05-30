@@ -15,10 +15,8 @@ spec:
 
   inputs:
     - name: DOCS_VERSION
-      required: true
       description: ""
     - name: TERRAFORM_VERSION
-      required: true
       description: ""
 
   outputs:
@@ -42,7 +40,6 @@ spec:
         - name: TERRAFORM_VERSION
           valueFrom:
             lastExecution:
-              inputName: TERRAFORM_VERSION
               result: [RESULT_FAILED, RESULT_PASSED]
 
     - when:
@@ -52,7 +49,6 @@ spec:
         - name: DOCS_VERSION
           valueFrom:
             lastExecution:
-              inputName: DOCS_VERSION
               result: [RESULT_FAILED, RESULT_PASSED]
 
         - name: TERRAFORM_VERSION
@@ -99,7 +95,6 @@ spec:
 
   inputs:
     - name: VERSION
-      required: true
       description: ""
 
   inputMappings:

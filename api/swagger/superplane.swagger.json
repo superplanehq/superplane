@@ -645,9 +645,6 @@
     "InputMappingValueFromLastExecution": {
       "type": "object",
       "properties": {
-        "inputName": {
-          "type": "string"
-        },
         "results": {
           "type": "array",
           "items": {
@@ -1011,12 +1008,6 @@
         },
         "description": {
           "type": "string"
-        },
-        "required": {
-          "type": "boolean"
-        },
-        "default": {
-          "type": "string"
         }
       }
     },
@@ -1105,9 +1096,6 @@
         },
         "required": {
           "type": "boolean"
-        },
-        "default": {
-          "type": "string"
         }
       }
     },

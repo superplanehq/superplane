@@ -1397,7 +1397,6 @@ type OutputDefinition struct {
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
-	Default       string                 `protobuf:"bytes,4,opt,name=default,proto3" json:"default,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1453,19 +1452,10 @@ func (x *OutputDefinition) GetRequired() bool {
 	return false
 }
 
-func (x *OutputDefinition) GetDefault() string {
-	if x != nil {
-		return x.Default
-	}
-	return ""
-}
-
 type InputDefinition struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
-	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
-	Default       string                 `protobuf:"bytes,4,opt,name=default,proto3" json:"default,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1510,20 +1500,6 @@ func (x *InputDefinition) GetName() string {
 func (x *InputDefinition) GetDescription() string {
 	if x != nil {
 		return x.Description
-	}
-	return ""
-}
-
-func (x *InputDefinition) GetRequired() bool {
-	if x != nil {
-		return x.Required
-	}
-	return false
-}
-
-func (x *InputDefinition) GetDefault() string {
-	if x != nil {
-		return x.Default
 	}
 	return ""
 }
@@ -3810,8 +3786,7 @@ func (x *InputMapping_ValueFromEventData) GetExpression() string {
 
 type InputMapping_ValueFromLastExecution struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	InputName     string                 `protobuf:"bytes,1,opt,name=input_name,json=inputName,proto3" json:"input_name,omitempty"`
-	Results       []Execution_Result     `protobuf:"varint,2,rep,packed,name=results,proto3,enum=Superplane.Execution_Result" json:"results,omitempty"`
+	Results       []Execution_Result     `protobuf:"varint,1,rep,packed,name=results,proto3,enum=Superplane.Execution_Result" json:"results,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3844,13 +3819,6 @@ func (x *InputMapping_ValueFromLastExecution) ProtoReflect() protoreflect.Messag
 // Deprecated: Use InputMapping_ValueFromLastExecution.ProtoReflect.Descriptor instead.
 func (*InputMapping_ValueFromLastExecution) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{18, 5}
-}
-
-func (x *InputMapping_ValueFromLastExecution) GetInputName() string {
-	if x != nil {
-		return x.InputName
-	}
-	return ""
 }
 
 func (x *InputMapping_ValueFromLastExecution) GetResults() []Execution_Result {
@@ -4049,17 +4017,14 @@ const file_superplane_proto_rawDesc = "" +
 	"\x06inputs\x18\b \x03(\v2\x1b.Superplane.InputDefinitionR\x06inputs\x12?\n" +
 	"\x0einput_mappings\x18\t \x03(\v2\x18.Superplane.InputMappingR\rinputMappings\x126\n" +
 	"\aoutputs\x18\n" +
-	" \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\"~\n" +
+	" \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\"d\n" +
 	"\x10OutputDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
-	"\brequired\x18\x03 \x01(\bR\brequired\x12\x18\n" +
-	"\adefault\x18\x04 \x01(\tR\adefault\"}\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\"G\n" +
 	"\x0fInputDefinition\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
-	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
-	"\brequired\x18\x03 \x01(\bR\brequired\x12\x18\n" +
-	"\adefault\x18\x04 \x01(\tR\adefault\"\x84\x06\n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"\xe5\x05\n" +
 	"\fInputMapping\x12@\n" +
 	"\x06values\x18\x01 \x03(\v2(.Superplane.InputMapping.ValueDefinitionR\x06values\x121\n" +
 	"\x04when\x18\x02 \x01(\v2\x1d.Superplane.InputMapping.WhenR\x04when\x1aS\n" +
@@ -4084,11 +4049,9 @@ const file_superplane_proto_rawDesc = "" +
 	"connection\x12\x1e\n" +
 	"\n" +
 	"expression\x18\x02 \x01(\tR\n" +
-	"expression\x1ao\n" +
-	"\x16ValueFromLastExecution\x12\x1d\n" +
-	"\n" +
-	"input_name\x18\x01 \x01(\tR\tinputName\x126\n" +
-	"\aresults\x18\x02 \x03(\x0e2\x1c.Superplane.Execution.ResultR\aresults\"\x99\x02\n" +
+	"expression\x1aP\n" +
+	"\x16ValueFromLastExecution\x126\n" +
+	"\aresults\x18\x01 \x03(\x0e2\x1c.Superplane.Execution.ResultR\aresults\"\x99\x02\n" +
 	"\tCondition\x12.\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1a.Superplane.Condition.TypeR\x04type\x129\n" +
 	"\bapproval\x18\x02 \x01(\v2\x1d.Superplane.ConditionApprovalR\bapproval\x12@\n" +

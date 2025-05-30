@@ -38,13 +38,10 @@ spec:
     inputs:
       - name: DOCS_VERSION
         type: string
-        required: true
       - name: TERRAFORM_VERSION
         type: string
-        required: true
       - name: API_TOKEN
         type: string
-        required: true
 
     semaphore:
       organizationUrl: https://myorg.semaphoreci.com
@@ -100,9 +97,9 @@ spec:
 
     inputs:
       - name: DOCS_VERSION
-        required: true
+        description: ""
       - name: TERRAFORM_VERSION
-        required: true
+        description: ""
 
     semaphore:
       organizationUrl: https://myorg.semaphoreci.com
@@ -162,9 +159,9 @@ spec:
 
     inputs:
       - name: DOCS_VERSION
-        required: true
+        description: ""
       - name: TERRAFORM_VERSION
-        required: true
+        description: ""
 
     semaphore:
       organizationUrl: https://myorg.semaphoreci.com
@@ -205,14 +202,12 @@ spec:
   inputs:
     - name: DOCS_VERSION
       valueFrom:
-        required: true
         eventData:
           connection: docs
           expression: ref
 
     - name: TERRAFORM_VERSION
       valueFrom:
-        required: true
         eventData:
           connection: docs
           expression: ref
@@ -264,10 +259,8 @@ spec:
 
   inputs:
     - name: DOCS_VERSION
-      required: true
       description: ""
     - name: TERRAFORM_VERSION
-      required: true
       description: ""
 
   inputMappings:
@@ -283,7 +276,6 @@ spec:
         - name: TERRAFORM_VERSION
           valueFrom:
             lastExecution:
-              inputName: TERRAFORM_VERSION
               result: [RESULT_FAILED, RESULT_PASSED]
 
     - when:
@@ -293,7 +285,6 @@ spec:
         - name: DOCS_VERSION
           valueFrom:
             lastExecution:
-              inputName: DOCS_VERSION
               result: [RESULT_FAILED, RESULT_PASSED]
 
         - name: TERRAFORM_VERSION
