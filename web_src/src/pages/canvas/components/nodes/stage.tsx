@@ -4,6 +4,7 @@ import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css'; 
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
+import { SuperplaneExecution } from '@/api-client';
 // import { QueueState } from '../../types/flow';
 
 // Define the data type for the deployment card
@@ -11,11 +12,23 @@ import { StageNodeType } from '@/canvas/types/flow';
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showOverlay, setShowOverlay] = useState(false);
   
+  const pendingExecutions = useMemo(() =>
+    props.data.queues
+      ?.flatMap(event => event.execution as SuperplaneExecution)
+      .filter(execution => execution?.state === 'STATE_PENDING')
+      .sort((a, b) => new Date(a?.createdAt || '').getTime() - new Date(b?.createdAt || '').getTime()) || [],
+    [props.data.queues]
+  );
+
+  console.log(pendingExecutions)
+
   // Filter events by their state
   const pendingEvents = useMemo(() => 
     props.data.queues?.filter(event => event.state === 'STATE_PENDING') || [], 
     [props.data.queues]
   );
+
+  console.log('pending events', pendingEvents)
   
   const waitingEvents = useMemo(() => 
     props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [], 
@@ -90,6 +103,21 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         </div>
       </div>
       <div className="border-t border-gray-200 p-4">
+        {/* Executions Section */}
+        {pendingExecutions.length > 0 && (
+          <>
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Executions</h4>
+            {pendingExecutions.map((execution, index) => (
+              <div key={index} className="flex items-center p-2 bg-amber-50 rounded mb-1">
+                <div className="material-symbols-outlined text-amber-600 mr-2">pending</div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium">{new Date(execution?.createdAt || '').toLocaleString()}</div>
+                  <div className="text-xs text-gray-600">ID: {execution?.id!.substring(0, 8)}...</div>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
         {/* PENDING Queue Section */}
         <h4 className="text-sm font-medium text-gray-700 mb-2">Pending Runs</h4>
         { pendingEvents.length > 0 ? (
