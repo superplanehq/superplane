@@ -7,6 +7,7 @@ export interface CanvasState {
   stages: StageWithEventQueue[];
   event_sources: SuperplaneEventSource[];
   nodePositions: Record<string, { x: number, y: number }>;
+  selectedStage: StageWithEventQueue | null;
   
   // Actions
   initialize: (data: CanvasData) => void;
@@ -17,6 +18,8 @@ export interface CanvasState {
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  selectStage: (stageId: string) => void;
+  cleanSelectedStage: () => void;
   
   // State and action for event handlers setup
   eventHandlersSetup: boolean;

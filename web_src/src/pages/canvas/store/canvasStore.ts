@@ -19,6 +19,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   stages: [],
   event_sources: [],
   nodePositions: {},
+  selectedStage: null,
   
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
@@ -108,5 +109,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Mark event handlers as set up
   markEventHandlersAsSetup: () => {
     set({ eventHandlersSetup: true });
-  }
+  },
+
+  selectStage: (stageId: string) => {
+    set((state) => ({ selectedStage: state.stages.find(stage => stage.id === stageId) }));
+  },
+
+  cleanSelectedStage: () => {
+    set({ selectedStage: null });
+  },
 }));
