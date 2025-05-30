@@ -10,10 +10,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/resolver"
 )
 
 type PendingExecutionsWorker struct {
@@ -57,8 +57,13 @@ func (w *PendingExecutionsWorker) Tick() error {
 // There is an issue here where, if we are having issues updating the state of the execution in the database,
 // we might end up creating more executions than we should.
 func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution) error {
-	resolver := resolver.NewResolver(execution, stage.ExecutorSpec.Data())
-	spec, err := resolver.Resolve()
+	inputMap, err := execution.GetInputs()
+	if err != nil {
+		return fmt.Errorf("error finding inputs for execution: %v", err)
+	}
+
+	specBuilder := inputs.NewExecutorSpecBuilder(stage.ExecutorSpec.Data(), inputMap)
+	spec, err := specBuilder.Build()
 	if err != nil {
 		return fmt.Errorf("error resolving executor spec: %v", err)
 	}

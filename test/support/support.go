@@ -91,23 +91,35 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 }
 
 func CreateStageEvent(t *testing.T, source *models.EventSource, stage *models.Stage) *models.StageEvent {
-	return CreateStageEventWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+	return CreateStageEventWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{})
 }
 
-func CreateStageEventWithData(t *testing.T, source *models.EventSource, stage *models.Stage, data []byte, headers []byte) *models.StageEvent {
+func CreateStageEventWithData(t *testing.T,
+	source *models.EventSource,
+	stage *models.Stage,
+	data []byte,
+	headers []byte,
+	inputs map[string]any,
+) *models.StageEvent {
 	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
 	require.NoError(t, err)
-	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", map[string]any{})
+	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)
 	return stageEvent
 }
 
 func CreateExecution(t *testing.T, source *models.EventSource, stage *models.Stage) *models.StageExecution {
-	return CreateExecutionWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+	return CreateExecutionWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{})
 }
 
-func CreateExecutionWithData(t *testing.T, source *models.EventSource, stage *models.Stage, data []byte, headers []byte) *models.StageExecution {
-	event := CreateStageEventWithData(t, source, stage, data, headers)
+func CreateExecutionWithData(t *testing.T,
+	source *models.EventSource,
+	stage *models.Stage,
+	data []byte,
+	headers []byte,
+	inputs map[string]any,
+) *models.StageExecution {
+	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
 	execution, err := models.CreateStageExecution(stage.ID, event.ID)
 	require.NoError(t, err)
 	return execution

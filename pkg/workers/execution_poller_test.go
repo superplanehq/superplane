@@ -52,7 +52,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		// Create execution
 		//
 		workflowID := uuid.New().String()
-		execution := support.CreateExecutionWithData(t, r.Source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{},
+		)
+
 		require.NoError(t, execution.Start(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -107,7 +112,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		// Create execution
 		//
 		workflowID := uuid.New().String()
-		execution := support.CreateExecutionWithData(t, r.Source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{},
+		)
+
 		require.NoError(t, execution.Start(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)

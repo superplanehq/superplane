@@ -102,7 +102,7 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		return nil
 	}
 
-	err = w.enqueueEvent(logger, event, stages)
+	err = w.enqueueEvent(event, stages)
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Even
 	return filtered, nil
 }
 
-func (w *PendingEventsWorker) enqueueEvent(logger *log.Entry, event *models.Event, stages []models.Stage) error {
+func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, stage := range stages {
 			inputs, err := w.buildInputs(tx, event, stage)

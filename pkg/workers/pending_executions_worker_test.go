@@ -1,17 +1,14 @@
 package workers
 
 import (
-	"encoding/json"
 	"slices"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/encryptor"
-	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -87,9 +84,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
 		spec.Semaphore.Parameters = map[string]string{
-			"REF":             "${{ self.Conn('gh').ref }}",
-			"REF_TYPE":        "${{ self.Conn('gh').ref_type }}",
-			"STAGE_1_VERSION": "${{ self.Conn('stage-1').outputs.version }}",
+			"REF":      "${{ inputs.REF }}",
+			"REF_TYPE": "${{ inputs.REF_TYPE }}",
 		}
 
 		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
@@ -98,28 +94,47 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceName: r.Source.Name,
 				SourceType: models.SourceTypeEventSource,
 			},
+		}, []models.InputDefinition{
+			{Name: "REF"},
+			{Name: "REF_TYPE"},
+		}, []models.InputMapping{
 			{
-				SourceID:   r.Stage.ID,
-				SourceName: r.Stage.Name,
-				SourceType: models.SourceTypeStage,
+				Values: []models.InputValueDefinition{
+					{
+						Name: "REF",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+					{
+						Name: "REF_TYPE",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref_type",
+							},
+						},
+					},
+				},
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.OutputDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)
 
 		//
-		// Since we use the outputs of a stage in the executor spec for the execution,
-		// we need a previous event for that stage to be available, so we create it here.
-		//
-		data := createStageCompletionEvent(t, r, map[string]any{"version": "1.0.0"})
-		_, err = models.CreateEvent(r.Stage.ID, r.Stage.Name, models.SourceTypeStage, data, []byte(`{}`))
-		require.NoError(t, err)
-
-		//
 		// Create pending execution for a new event source event.
 		//
-		execution := support.CreateExecutionWithData(t, r.Source, stage, []byte(`{"ref_type":"branch","ref":"refs/heads/test"}`), []byte(`{}`))
+		execution := support.CreateExecutionWithData(
+			t, r.Source, stage,
+			[]byte(`{"ref_type":"branch","ref":"refs/heads/test"}`),
+			[]byte(`{}`),
+			map[string]any{"REF": "refs/heads/test", "REF_TYPE": "branch"},
+		)
+
 		testconsumer := testconsumer.New(amqpURL, ExecutionStartedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -142,9 +157,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		assert.Equal(t, "main", req.Spec.Branch)
 		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
-			"REF":             "refs/heads/test",
-			"REF_TYPE":        "branch",
-			"STAGE_1_VERSION": "1.0.0",
+			"REF":      "refs/heads/test",
+			"REF_TYPE": "branch",
 		})
 	})
 }
@@ -169,18 +183,4 @@ func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *m
 	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
 		return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
 	}))
-}
-
-func createStageCompletionEvent(t *testing.T, r *support.ResourceRegistry, outputs map[string]any) []byte {
-	e, err := events.NewStageExecutionCompletion(&models.StageExecution{
-		ID:      uuid.New(),
-		StageID: r.Stage.ID,
-		Result:  models.StageExecutionResultPassed,
-	}, outputs)
-
-	require.NoError(t, err)
-	data, err := json.Marshal(e)
-	require.NoError(t, err)
-
-	return data
 }

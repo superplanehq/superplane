@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -45,31 +44,22 @@ type StageExecution struct {
 	ReferenceID string
 }
 
-func (e *StageExecution) GetEventData() (map[string]any, error) {
-	var data struct {
-		Raw datatypes.JSON
-	}
+func (e *StageExecution) GetInputs() (map[string]any, error) {
+	var inputs datatypes.JSONType[map[string]any]
 
 	err := database.Conn().
 		Table("stage_executions").
-		Select("events.raw").
+		Select("stage_events.inputs").
 		Joins("inner join stage_events ON stage_executions.stage_event_id = stage_events.id").
-		Joins("inner join events ON stage_events.event_id = events.id").
 		Where("stage_executions.id = ?", e.ID).
-		Scan(&data).
+		Scan(&inputs).
 		Error
 
 	if err != nil {
 		return nil, fmt.Errorf("error finding event: %v", err)
 	}
 
-	var m map[string]any
-	err = json.Unmarshal(data.Raw, &m)
-	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling data: %v", err)
-	}
-
-	return m, nil
+	return inputs.Data(), nil
 }
 
 func (e *StageExecution) FindSource() (string, error) {
