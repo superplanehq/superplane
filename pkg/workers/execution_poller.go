@@ -73,6 +73,18 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		outputs := execution.Outputs.Data()
+
+		//
+		// Check if all required outputs were pushed.
+		// If any output wasn't pushed, mark the execution as failed.
+		//
+		missingOutputs := stage.MissingRequiredOutputs(outputs)
+		if len(missingOutputs) > 0 {
+			logger.Infof("Missing outputs %v - marking the execution as failed", missingOutputs)
+			result = models.StageExecutionResultFailed
+		}
+
 		if err := execution.FinishInTransaction(tx, result); err != nil {
 			logger.Errorf("Error updating execution state: %v", err)
 			return err
@@ -91,7 +103,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.
 		//
-		if err := w.createStageCompletionEvent(tx, execution, execution.Outputs.Data()); err != nil {
+		if err := w.createStageCompletionEvent(tx, execution, outputs); err != nil {
 			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
@@ -169,12 +181,12 @@ func (w *ExecutionPoller) resolveResultFromSemaphoreWorkflow(logger *log.Entry, 
 func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID string) (*semaphore.Pipeline, error) {
 	workflow, err := api.DescribeWorkflow(workflowID)
 	if err != nil {
-		return nil, fmt.Errorf("workflow %s not found", workflowID)
+		return nil, fmt.Errorf("error describing workflow %s: %v", workflowID, err)
 	}
 
 	pipeline, err := api.DescribePipeline(workflow.InitialPplID)
 	if err != nil {
-		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
+		return nil, fmt.Errorf("error describing pipeline %s: %v", workflow.InitialPplID, err)
 	}
 
 	return pipeline, nil

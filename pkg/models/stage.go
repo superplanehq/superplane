@@ -249,6 +249,21 @@ func (s *Stage) HasApprovalCondition() bool {
 	return false
 }
 
+func (s *Stage) MissingRequiredOutputs(outputs map[string]any) []string {
+	missing := []string{}
+	for _, outputDef := range s.Outputs {
+		if !outputDef.Required {
+			continue
+		}
+
+		if _, ok := outputs[outputDef.Name]; !ok {
+			missing = append(missing, outputDef.Name)
+		}
+	}
+
+	return missing
+}
+
 func (s *Stage) HasOutputDefinition(name string) bool {
 	for _, outputDefinition := range s.Outputs {
 		if outputDefinition.Name == name {
