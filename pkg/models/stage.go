@@ -317,25 +317,25 @@ func (s *Stage) FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
 }
 
 func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[string]any, error) {
-	var r datatypes.JSONType[map[string]any]
+	var event StageEvent
 
 	err := tx.
-		Table("stage_events").
-		Select("stage_events.inputs").
-		Joins("INNER JOIN stage_executions ON stage_executions.stage_event_id = stage_events.id").
-		Where("stage_events.stage_id = ?", s.ID).
-		Where("stage_events.source_type = ?", SourceTypeStage).
-		Where("stage_executions.state = ?", StageExecutionFinished).
-		Where("stage_executions.result IN ?", results).
-		Order("stage_executions.finished_at DESC").
-		First(&r).
+		Table("stage_events AS e").
+		Select("e.*").
+		Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = e.id").
+		Where("e.stage_id = ?", s.ID).
+		Where("ex.state = ?", StageExecutionFinished).
+		Where("ex.result IN ?", results).
+		Order("ex.finished_at DESC").
+		Limit(1).
+		First(&event).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return r.Data(), nil
+	return event.Inputs.Data(), nil
 }
 
 func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {

@@ -105,7 +105,7 @@ func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.InputValueD
 	// If value is defined statically, just return it.
 	//
 	if valueDefinition.Value != nil {
-		return valueDefinition.Value, nil
+		return *valueDefinition.Value, nil
 	}
 
 	//
