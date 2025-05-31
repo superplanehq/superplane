@@ -20,8 +20,7 @@ var _ MappedNullable = &InputMappingValueFromLastExecution{}
 
 // InputMappingValueFromLastExecution struct for InputMappingValueFromLastExecution
 type InputMappingValueFromLastExecution struct {
-	InputName *string `json:"inputName,omitempty"`
-	Result []ExecutionResult `json:"result,omitempty"`
+	Results []ExecutionResult `json:"results,omitempty"`
 }
 
 // NewInputMappingValueFromLastExecution instantiates a new InputMappingValueFromLastExecution object
@@ -41,68 +40,36 @@ func NewInputMappingValueFromLastExecutionWithDefaults() *InputMappingValueFromL
 	return &this
 }
 
-// GetInputName returns the InputName field value if set, zero value otherwise.
-func (o *InputMappingValueFromLastExecution) GetInputName() string {
-	if o == nil || IsNil(o.InputName) {
-		var ret string
-		return ret
-	}
-	return *o.InputName
-}
-
-// GetInputNameOk returns a tuple with the InputName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *InputMappingValueFromLastExecution) GetInputNameOk() (*string, bool) {
-	if o == nil || IsNil(o.InputName) {
-		return nil, false
-	}
-	return o.InputName, true
-}
-
-// HasInputName returns a boolean if a field has been set.
-func (o *InputMappingValueFromLastExecution) HasInputName() bool {
-	if o != nil && !IsNil(o.InputName) {
-		return true
-	}
-
-	return false
-}
-
-// SetInputName gets a reference to the given string and assigns it to the InputName field.
-func (o *InputMappingValueFromLastExecution) SetInputName(v string) {
-	o.InputName = &v
-}
-
-// GetResult returns the Result field value if set, zero value otherwise.
-func (o *InputMappingValueFromLastExecution) GetResult() []ExecutionResult {
-	if o == nil || IsNil(o.Result) {
+// GetResults returns the Results field value if set, zero value otherwise.
+func (o *InputMappingValueFromLastExecution) GetResults() []ExecutionResult {
+	if o == nil || IsNil(o.Results) {
 		var ret []ExecutionResult
 		return ret
 	}
-	return o.Result
+	return o.Results
 }
 
-// GetResultOk returns a tuple with the Result field value if set, nil otherwise
+// GetResultsOk returns a tuple with the Results field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueFromLastExecution) GetResultOk() ([]ExecutionResult, bool) {
-	if o == nil || IsNil(o.Result) {
+func (o *InputMappingValueFromLastExecution) GetResultsOk() ([]ExecutionResult, bool) {
+	if o == nil || IsNil(o.Results) {
 		return nil, false
 	}
-	return o.Result, true
+	return o.Results, true
 }
 
-// HasResult returns a boolean if a field has been set.
-func (o *InputMappingValueFromLastExecution) HasResult() bool {
-	if o != nil && !IsNil(o.Result) {
+// HasResults returns a boolean if a field has been set.
+func (o *InputMappingValueFromLastExecution) HasResults() bool {
+	if o != nil && !IsNil(o.Results) {
 		return true
 	}
 
 	return false
 }
 
-// SetResult gets a reference to the given []ExecutionResult and assigns it to the Result field.
-func (o *InputMappingValueFromLastExecution) SetResult(v []ExecutionResult) {
-	o.Result = v
+// SetResults gets a reference to the given []ExecutionResult and assigns it to the Results field.
+func (o *InputMappingValueFromLastExecution) SetResults(v []ExecutionResult) {
+	o.Results = v
 }
 
 func (o InputMappingValueFromLastExecution) MarshalJSON() ([]byte, error) {
@@ -115,11 +82,8 @@ func (o InputMappingValueFromLastExecution) MarshalJSON() ([]byte, error) {
 
 func (o InputMappingValueFromLastExecution) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.InputName) {
-		toSerialize["inputName"] = o.InputName
-	}
-	if !IsNil(o.Result) {
-		toSerialize["result"] = o.Result
+	if !IsNil(o.Results) {
+		toSerialize["results"] = o.Results
 	}
 	return toSerialize, nil
 }

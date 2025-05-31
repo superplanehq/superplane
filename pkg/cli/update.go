@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/goccy/go-yaml"
@@ -75,13 +76,21 @@ var updateCmd = &cobra.Command{
 			// so we just put something here until we have auth in this API.
 			request.SetRequesterId(uuid.NewString())
 
-			_, _, err = c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
+			response, httpResponse, err := c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
 				Body(request).
 				Execute()
 
-			Check(err)
+			if err != nil {
+				body, err := io.ReadAll(httpResponse.Body)
+				Check(err)
+				fmt.Printf("Error: %v", err)
+				fmt.Printf("HTTP Response: %s", string(body))
+				os.Exit(1)
+			}
 
-			fmt.Printf("Stage '%s' updated successfully.\n", stageID)
+			out, err := yaml.Marshal(response.Stage)
+			Check(err)
+			fmt.Printf("%s", string(out))
 
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))

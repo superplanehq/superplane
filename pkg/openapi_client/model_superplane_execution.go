@@ -28,6 +28,7 @@ type SuperplaneExecution struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
 }
 
 // NewSuperplaneExecution instantiates a new SuperplaneExecution object
@@ -279,6 +280,38 @@ func (o *SuperplaneExecution) SetFinishedAt(v time.Time) {
 	o.FinishedAt = &v
 }
 
+// GetOutputs returns the Outputs field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetOutputs() []SuperplaneOutputValue {
+	if o == nil || IsNil(o.Outputs) {
+		var ret []SuperplaneOutputValue
+		return ret
+	}
+	return o.Outputs
+}
+
+// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetOutputsOk() ([]SuperplaneOutputValue, bool) {
+	if o == nil || IsNil(o.Outputs) {
+		return nil, false
+	}
+	return o.Outputs, true
+}
+
+// HasOutputs returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasOutputs() bool {
+	if o != nil && !IsNil(o.Outputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetOutputs gets a reference to the given []SuperplaneOutputValue and assigns it to the Outputs field.
+func (o *SuperplaneExecution) SetOutputs(v []SuperplaneOutputValue) {
+	o.Outputs = v
+}
+
 func (o SuperplaneExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -309,6 +342,9 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.FinishedAt) {
 		toSerialize["finishedAt"] = o.FinishedAt
+	}
+	if !IsNil(o.Outputs) {
+		toSerialize["outputs"] = o.Outputs
 	}
 	return toSerialize, nil
 }

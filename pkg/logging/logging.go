@@ -68,6 +68,7 @@ func ForEvent(event *models.Event) *log.Entry {
 		log.Fields{
 			"id":          event.ID,
 			"source_id":   event.SourceID,
+			"source_name": event.SourceName,
 			"source_type": event.SourceType,
 		},
 	)

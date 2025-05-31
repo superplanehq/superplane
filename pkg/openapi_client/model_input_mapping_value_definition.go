@@ -22,6 +22,7 @@ var _ MappedNullable = &InputMappingValueDefinition{}
 type InputMappingValueDefinition struct {
 	Name *string `json:"name,omitempty"`
 	ValueFrom *InputMappingValueFrom `json:"valueFrom,omitempty"`
+	Value *string `json:"value,omitempty"`
 }
 
 // NewInputMappingValueDefinition instantiates a new InputMappingValueDefinition object
@@ -105,6 +106,38 @@ func (o *InputMappingValueDefinition) SetValueFrom(v InputMappingValueFrom) {
 	o.ValueFrom = &v
 }
 
+// GetValue returns the Value field value if set, zero value otherwise.
+func (o *InputMappingValueDefinition) GetValue() string {
+	if o == nil || IsNil(o.Value) {
+		var ret string
+		return ret
+	}
+	return *o.Value
+}
+
+// GetValueOk returns a tuple with the Value field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *InputMappingValueDefinition) GetValueOk() (*string, bool) {
+	if o == nil || IsNil(o.Value) {
+		return nil, false
+	}
+	return o.Value, true
+}
+
+// HasValue returns a boolean if a field has been set.
+func (o *InputMappingValueDefinition) HasValue() bool {
+	if o != nil && !IsNil(o.Value) {
+		return true
+	}
+
+	return false
+}
+
+// SetValue gets a reference to the given string and assigns it to the Value field.
+func (o *InputMappingValueDefinition) SetValue(v string) {
+	o.Value = &v
+}
+
 func (o InputMappingValueDefinition) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o InputMappingValueDefinition) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.ValueFrom) {
 		toSerialize["valueFrom"] = o.ValueFrom
+	}
+	if !IsNil(o.Value) {
+		toSerialize["value"] = o.Value
 	}
 	return toSerialize, nil
 }

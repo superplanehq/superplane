@@ -30,6 +30,7 @@ type SuperplaneStage struct {
 	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
 	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
 	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
+	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
 }
 
 // NewSuperplaneStage instantiates a new SuperplaneStage object
@@ -337,6 +338,38 @@ func (o *SuperplaneStage) SetInputMappings(v []SuperplaneInputMapping) {
 	o.InputMappings = v
 }
 
+// GetOutputs returns the Outputs field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetOutputs() []SuperplaneOutputDefinition {
+	if o == nil || IsNil(o.Outputs) {
+		var ret []SuperplaneOutputDefinition
+		return ret
+	}
+	return o.Outputs
+}
+
+// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStage) GetOutputsOk() ([]SuperplaneOutputDefinition, bool) {
+	if o == nil || IsNil(o.Outputs) {
+		return nil, false
+	}
+	return o.Outputs, true
+}
+
+// HasOutputs returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasOutputs() bool {
+	if o != nil && !IsNil(o.Outputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetOutputs gets a reference to the given []SuperplaneOutputDefinition and assigns it to the Outputs field.
+func (o *SuperplaneStage) SetOutputs(v []SuperplaneOutputDefinition) {
+	o.Outputs = v
+}
+
 func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -373,6 +406,9 @@ func (o SuperplaneStage) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.InputMappings) {
 		toSerialize["inputMappings"] = o.InputMappings
+	}
+	if !IsNil(o.Outputs) {
+		toSerialize["outputs"] = o.Outputs
 	}
 	return toSerialize, nil
 }

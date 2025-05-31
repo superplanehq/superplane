@@ -93,8 +93,8 @@ var createCmd = &cobra.Command{
 
 			fmt.Printf("Event Source '%s' created with ID '%s'.\n",
 				*response.EventSource.Name, *response.EventSource.Id)
-			fmt.Printf("API Key: %s\n", *response.Key)
-			fmt.Println("Save this key as it won't be shown again.")
+			fmt.Printf("Key: %s\n", *response.Key)
+			fmt.Println("! Save this key as it won't be shown again.")
 
 		case "Stage":
 			var yamlData map[string]any

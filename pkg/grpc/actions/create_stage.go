@@ -528,10 +528,10 @@ func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
 			mapping.Values = append(mapping.Values, v)
 		}
 
-		if m.When != nil {
+		if m.When != nil && m.When.TriggeredBy != nil {
 			mapping.When = &pb.InputMapping_When{
 				TriggeredBy: &pb.InputMapping_WhenTriggeredBy{
-					Connection: mapping.When.TriggeredBy.Connection,
+					Connection: m.When.TriggeredBy.Connection,
 				},
 			}
 		}

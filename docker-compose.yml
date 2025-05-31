@@ -19,6 +19,7 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
+      START_GRPC_GATEWAY: "yes"
       START_PENDING_EVENTS_WORKER: "yes"
       START_PENDING_STAGE_EVENTS_WORKER: "yes"
       START_TIME_WINDOW_WORKER: "yes"

@@ -24,6 +24,9 @@ type SuperplaneUpdateStageBody struct {
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
 	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
+	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
+	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
+	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
 }
 
 // NewSuperplaneUpdateStageBody instantiates a new SuperplaneUpdateStageBody object
@@ -171,6 +174,102 @@ func (o *SuperplaneUpdateStageBody) SetExecutor(v SuperplaneExecutorSpec) {
 	o.Executor = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetInputs() []SuperplaneInputDefinition {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInputDefinition
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetInputsOk() ([]SuperplaneInputDefinition, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInputDefinition and assigns it to the Inputs field.
+func (o *SuperplaneUpdateStageBody) SetInputs(v []SuperplaneInputDefinition) {
+	o.Inputs = v
+}
+
+// GetInputMappings returns the InputMappings field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetInputMappings() []SuperplaneInputMapping {
+	if o == nil || IsNil(o.InputMappings) {
+		var ret []SuperplaneInputMapping
+		return ret
+	}
+	return o.InputMappings
+}
+
+// GetInputMappingsOk returns a tuple with the InputMappings field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetInputMappingsOk() ([]SuperplaneInputMapping, bool) {
+	if o == nil || IsNil(o.InputMappings) {
+		return nil, false
+	}
+	return o.InputMappings, true
+}
+
+// HasInputMappings returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasInputMappings() bool {
+	if o != nil && !IsNil(o.InputMappings) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputMappings gets a reference to the given []SuperplaneInputMapping and assigns it to the InputMappings field.
+func (o *SuperplaneUpdateStageBody) SetInputMappings(v []SuperplaneInputMapping) {
+	o.InputMappings = v
+}
+
+// GetOutputs returns the Outputs field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetOutputs() []SuperplaneOutputDefinition {
+	if o == nil || IsNil(o.Outputs) {
+		var ret []SuperplaneOutputDefinition
+		return ret
+	}
+	return o.Outputs
+}
+
+// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetOutputsOk() ([]SuperplaneOutputDefinition, bool) {
+	if o == nil || IsNil(o.Outputs) {
+		return nil, false
+	}
+	return o.Outputs, true
+}
+
+// HasOutputs returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasOutputs() bool {
+	if o != nil && !IsNil(o.Outputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetOutputs gets a reference to the given []SuperplaneOutputDefinition and assigns it to the Outputs field.
+func (o *SuperplaneUpdateStageBody) SetOutputs(v []SuperplaneOutputDefinition) {
+	o.Outputs = v
+}
+
 func (o SuperplaneUpdateStageBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -192,6 +291,15 @@ func (o SuperplaneUpdateStageBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Executor) {
 		toSerialize["executor"] = o.Executor
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
+	}
+	if !IsNil(o.InputMappings) {
+		toSerialize["inputMappings"] = o.InputMappings
+	}
+	if !IsNil(o.Outputs) {
+		toSerialize["outputs"] = o.Outputs
 	}
 	return toSerialize, nil
 }

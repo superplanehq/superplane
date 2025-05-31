@@ -398,8 +398,11 @@ func (v *Validator) SerializeInputMappings() []models.InputMapping {
 		for _, valueDefinition := range mapping.Values {
 			def := models.InputValueDefinition{
 				Name:      valueDefinition.Name,
-				Value:     &valueDefinition.Value,
 				ValueFrom: serializeValueFrom(valueDefinition.ValueFrom),
+			}
+
+			if valueDefinition.Value != "" {
+				def.Value = &valueDefinition.Value
 			}
 
 			m.Values = append(m.Values, def)
