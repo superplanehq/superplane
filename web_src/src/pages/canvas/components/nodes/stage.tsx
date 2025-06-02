@@ -4,19 +4,21 @@ import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css'; 
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
+import { useCanvasStore } from '../../store/canvasStore';
 // import { QueueState } from '../../types/flow';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showOverlay, setShowOverlay] = useState(false);
-  
+  const { selectStage } = useCanvasStore()
+
   // Filter events by their state
   const pendingEvents = useMemo(() => 
     props.data.queues?.filter(event => event.state === 'STATE_PENDING') || [], 
     [props.data.queues]
   );
-  
+
   const waitingEvents = useMemo(() => 
     props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [], 
     [props.data.queues]
@@ -65,7 +67,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         </span>
         <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
         {/* Example action button (menu) */}
-        <button className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
+        <button onClick={() => selectStage(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
           <span className="material-symbols-outlined text-gray-500">more_vert</span>
         </button>
       </div>

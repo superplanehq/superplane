@@ -85,7 +85,7 @@ func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
-	
+
 	// Start the EventDistributer worker if enabled
 	if os.Getenv("START_EVENT_DISTRIBUTER") == "yes" {
 		log.Println("Starting Event Distributer Worker")
@@ -140,7 +140,13 @@ func main() {
 
 	log.SetLevel(log.DebugLevel)
 
-	encryptor := encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
+	var encryptorInstance encryptor.Encryptor
+	if os.Getenv("NO_ENCRYPTION") == "yes" {
+		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
+		encryptorInstance = encryptor.NewNoOpEncryptor()
+	} else {
+		encryptorInstance = encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
+	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -150,14 +156,14 @@ func main() {
 	jwtSigner := jwt.NewSigner(jwtSecret)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(encryptor, jwtSigner)
+		go startPublicAPI(encryptorInstance, jwtSigner)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(encryptor)
+		go startInternalAPI(encryptorInstance)
 	}
 
-	startWorkers(jwtSigner, encryptor)
+	startWorkers(jwtSigner, encryptorInstance)
 
 	log.Println("Superplane is UP.")
 

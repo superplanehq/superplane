@@ -4,6 +4,14 @@ import { CanvasState } from './types';
 import { SuperplaneCanvas, SuperplaneEventSource, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent } from '@/api-client';
 
+function generateFakeUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Create the store
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Initial state
@@ -11,6 +19,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   stages: [],
   event_sources: [],
   nodePositions: {},
+  selectedStage: null,
   
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
@@ -87,7 +96,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         eventId: stageEventId
       },
       body: {
-        requesterId: "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+        requesterId: generateFakeUUID(),
         // Both fields are optional, but the 'body' property itself is required
       }
     });
@@ -100,5 +109,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Mark event handlers as set up
   markEventHandlersAsSetup: () => {
     set({ eventHandlersSetup: true });
-  }
+  },
+
+  selectStage: (stageId: string) => {
+    set((state) => ({ selectedStage: state.stages.find(stage => stage.id === stageId) }));
+  },
+
+  cleanSelectedStage: () => {
+    set({ selectedStage: null });
+  },
 }));
