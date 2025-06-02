@@ -64,7 +64,7 @@ The `POST /outputs` is available for executions to push outputs.
 curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $SEMAPHORE_STAGE_EXECUTION_TOKEN" \
-  --data '{"MY_OUTPUT":"hello"}' \
+  --data "{\"execution_id\":$SEMAPHORE_STAGE_EXECUTION_ID,\"outputs\":{\"MY_OUTPUT\":\"hello\"}}" \
   "$SUPERPLANE_URL/api/v1/outputs"
 ```
 
