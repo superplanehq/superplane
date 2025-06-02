@@ -37,6 +37,61 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         </div>
       </div>
 
+      {/* Inputs */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-medium text-gray-900">Inputs</h3>
+        </div>
+        <div className="p-4">
+          {selectedStage.inputs && selectedStage.inputs.length > 0 ? (
+            <div className="space-y-3">
+              {selectedStage.inputs.map((input, index) => (
+                <div key={index} className="border border-gray-200 rounded p-3">
+                  <div className="font-medium text-gray-900 mb-1">
+                    {input.name || `Input ${index + 1}`}
+                  </div>
+                  {input.description && (
+                    <div className="text-sm text-gray-600">{input.description}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">No inputs configured</div>
+          )}
+        </div>
+      </div>
+
+      {/* Outputs */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-medium text-gray-900">Outputs</h3>
+        </div>
+        <div className="p-4">
+          {selectedStage.outputs && selectedStage.outputs.length > 0 ? (
+            <div className="space-y-3">
+              {selectedStage.outputs.map((output, index) => (
+                <div key={index} className="border border-gray-200 rounded p-3">
+                  <div className="flex justify-between items-start mb-1">
+                    <div className="font-medium text-gray-900">
+                      {output.name || `Output ${index + 1}`}
+                    </div>
+                    {output.required && (
+                      <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Required</span>
+                    )}
+                  </div>
+                  {output.description && (
+                    <div className="text-sm text-gray-600">{output.description}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">No outputs configured</div>
+          )}
+        </div>
+      </div>
+
       {/* Connections */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6">
         <div className="p-4 border-b border-gray-200">
@@ -133,7 +188,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No run template configured</div>
+            <div className="text-center py-4 text-gray-500 text-sm">No executor configured</div>
           )}
         </div>
       </div>
