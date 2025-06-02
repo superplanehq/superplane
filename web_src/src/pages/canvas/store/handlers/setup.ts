@@ -1,4 +1,4 @@
-import { useWebSocketEvent } from "../../hooks/useWebSocket";
+import { useWebSocketEvent } from "@/canvas/hooks/useWebSocketEvent";
 import { handleStageAdded } from "./stage_added";
 import { handleStageUpdated } from "./stage_updated";
 import { handleEventSourceAdded } from "./event_source_added";

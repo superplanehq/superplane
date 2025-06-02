@@ -73,7 +73,7 @@ func (h *Hub) registerClient(client *Client) {
 	h.canvasSubscriptions[client.canvasID][client] = true
 	log.Debugf("Client subscribed to canvas: %s", client.canvasID)
 
-	log.Debugf("New client registered, total clients: %d", len(h.clients))
+	log.Debugf("New client registered %v, total clients: %d", client, len(h.clients))
 }
 
 // unregisterClient removes a client from the hub
