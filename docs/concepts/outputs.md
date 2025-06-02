@@ -65,7 +65,7 @@ curl -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $SEMAPHORE_STAGE_EXECUTION_TOKEN" \
   --data '{"MY_OUTPUT":"hello"}' \
-  "$SUPERPLANE_URL/api/v1/executions/$SEMAPHORE_STAGE_EXECUTION_ID/outputs"
+  "$SUPERPLANE_URL/api/v1/outputs"
 ```
 
 The `SEMAPHORE_STAGE_EXECUTION_ID` and `SEMAPHORE_STAGE_EXECUTION_TOKEN` values are passed by Superplane to the executor. For example, in the case of the Semaphore executor type, those values are passed in the `parameters` field in the Semaphore Task API.
