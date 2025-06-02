@@ -42,7 +42,7 @@ export function Canvas() {
 
         // Fetch stages for the canvas
         const stagesResponse = await superplaneListStages({
-          path: { canvasId: id }
+          path: { canvasIdOrName: id }
         });
 
         // Check if stages data was fetched successfully
@@ -52,7 +52,7 @@ export function Canvas() {
 
         // Fetch event sources for the canvas
         const eventSourcesResponse = await superplaneListEventSources({
-          path: { canvasId: id }
+          path: { canvasIdOrName: id }
         });
 
         // Check if event sources data was fetched successfully
@@ -70,7 +70,7 @@ export function Canvas() {
         for (const stage of mappedStages) {
           // fetch stage events
           const stageEventsResponse = await superplaneListStageEvents({
-            path: { canvasId: id!, stageId: stage.id! }
+            path: { canvasIdOrName: id!, stageIdOrName: stage.id! }
           });
 
           stagesWithQueues.push({

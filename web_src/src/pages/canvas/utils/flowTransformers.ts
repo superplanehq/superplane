@@ -44,7 +44,7 @@ export const transformStagesToNodes = (
           queues: st.queue || [],
           connections: st.connections || [],
           conditions: st.conditions || [],
-          runTemplate: st.runTemplate,
+          executor: st.executor,
           approveStageEvent: (event: SuperplaneStageEvent) => {
               approveStageEvent(event.id!, st.id!);
           }

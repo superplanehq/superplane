@@ -103,31 +103,31 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         </div>
       </div>
 
-      {/* Run Template */}
+      {/* Executor */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Run Template</h3>
+          <h3 className="font-medium text-gray-900">Executor</h3>
         </div>
         <div className="p-4">
-          {selectedStage.runTemplate ? (
+          {selectedStage.executor ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium">Type</span>
-                <span className="text-gray-900">{selectedStage.runTemplate.type?.replace('TYPE_', '')}</span>
+                <span className="text-gray-900">{selectedStage.executor.type?.replace('TYPE_', '')}</span>
               </div>
-              {selectedStage.runTemplate.semaphore && (
+              {selectedStage.executor.semaphore && (
                 <>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Project ID</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.projectId}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.projectId}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Branch</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.branch}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.branch}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Pipeline File</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.pipelineFile}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.pipelineFile}</span>
                   </div>
                 </>
               )}
