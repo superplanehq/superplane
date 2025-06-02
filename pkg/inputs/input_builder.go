@@ -135,11 +135,9 @@ func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.InputValueD
 }
 
 func (b *InputBuilder) getValueFromMap(m map[string]any, inputName string) (any, error) {
-	for k, v := range m {
-		if k == inputName {
-			return v, nil
-		}
+	if value, exists := m[inputName]; exists {
+		return value, nil
 	}
 
-	return nil, fmt.Errorf("value for %s not found in map: %v", m, inputName)
+	return nil, fmt.Errorf("value for %s not found in map: %v", inputName, m)
 }
