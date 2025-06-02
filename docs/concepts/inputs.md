@@ -1,6 +1,4 @@
-Inputs let you define what your stage expects to receive from its connections, and how you use those values to compute the executor specification.
-
-For example, here's an example:
+Inputs let you define what your stage expects to receive from its connections, and how you use those values to compute the executor specification. Here's an example:
 
 ```yaml
 apiVersion: v1

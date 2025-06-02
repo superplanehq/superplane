@@ -13,6 +13,10 @@ import (
 
 var expressionRegex = regexp.MustCompile(`^\$\{\{(.*)\}\}$`)
 
+// ExecutorSpecBuilder takes an executor spec from the stage,
+// and a map of inputs, built by InputBuilder,
+// and returns the final executor spec used for creating the execution,
+// resolving the ${{ inputs.* }} expression that may be present in the executor spec.
 type ExecutorSpecBuilder struct {
 	spec   models.ExecutorSpec
 	inputs map[string]any

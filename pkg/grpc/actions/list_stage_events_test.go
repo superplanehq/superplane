@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	uuid "github.com/google/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -79,7 +78,6 @@ func Test__ListStageEvents(t *testing.T) {
 
 		execution, err = models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		logrus.Infof("Outputs: %v", execution.Outputs.Data())
 
 		res, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
