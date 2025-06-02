@@ -24,7 +24,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	err = ValidateUUIDs(req.StageIdOrName)
@@ -37,7 +37,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.InvalidArgument, "stage not found")
+			return nil, status.Error(codes.InvalidArgument, "stage not found")
 		}
 
 		return nil, err
@@ -45,7 +45,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 
 	states, err := validateStageEventStates(req.States)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	events, err := stage.ListEvents(states, []string{})

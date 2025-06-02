@@ -25,7 +25,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+			return nil, status.Error(codes.InvalidArgument, "canvas not found")
 		}
 
 		return nil, err
@@ -40,7 +40,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 	}
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.InvalidArgument, "stage not found")
+			return nil, status.Error(codes.InvalidArgument, "stage not found")
 		}
 
 		return nil, err
@@ -48,14 +48,14 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 
 	err = ValidateUUIDs(req.EventId, req.RequesterId)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid UUIDs")
+		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
 	logger := logging.ForStage(stage)
 	event, err := models.FindStageEventByID(req.EventId, req.StageIdOrName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.InvalidArgument, "event not found")
+			return nil, status.Error(codes.InvalidArgument, "event not found")
 		}
 
 		return nil, err
@@ -64,7 +64,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 	err = event.Approve(uuid.MustParse(req.RequesterId))
 	if err != nil {
 		if errors.Is(err, models.ErrEventAlreadyApprovedByRequester) {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		logger.Errorf("failed to approve event: %v", err)

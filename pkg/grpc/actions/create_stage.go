@@ -29,12 +29,12 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	spec, err := validateExecutorSpec(ctx, encryptor, req.Executor)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	inputValidator := inputs.NewValidator(
@@ -46,17 +46,17 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 
 	err = inputValidator.Validate()
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	connections, err := validateConnections(canvas, req.Connections)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	conditions, err := validateConditions(req.Conditions)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	err = canvas.CreateStage(
@@ -72,7 +72,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		return nil, err
