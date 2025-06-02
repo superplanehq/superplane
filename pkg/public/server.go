@@ -187,7 +187,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/executions/{executionID}/outputs", s.HandleExecutionOutputs).
+		HandleFunc(s.BasePath+"/outputs", s.HandleExecutionOutputs).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -230,20 +230,12 @@ func (s *Server) Close() {
 	}
 }
 
+type OutputsRequest struct {
+	ExecutionID string         `json:"execution_id"`
+	Outputs     map[string]any `json:"outputs"`
+}
+
 func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	executionID, err := uuid.Parse(vars["executionID"])
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
-
-	execution, err := models.FindExecutionByID(executionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
-
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
@@ -253,13 +245,6 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 	headerParts := strings.Split(authHeader, "Bearer ")
 	if len(headerParts) != 2 {
 		http.Error(w, "Malformed Authorization header", http.StatusUnauthorized)
-		return
-	}
-
-	token := headerParts[1]
-	err = s.jwt.Validate(token, execution.ID.String())
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
 		return
 	}
 
@@ -282,13 +267,39 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	var req OutputsRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		http.Error(w, "Error decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionID)
+	if err != nil {
+		http.Error(w, "execution not found", http.StatusNotFound)
+		return
+	}
+
+	token := headerParts[1]
+	err = s.jwt.Validate(token, req.ExecutionID)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	execution, err := models.FindExecutionByID(executionID)
+	if err != nil {
+		http.Error(w, "execution not found", http.StatusNotFound)
+		return
+	}
+
 	stage, err := models.FindStageByID(execution.StageID.String())
 	if err != nil {
 		http.Error(w, "error finding stage", http.StatusInternalServerError)
 		return
 	}
 
-	outputs, err := s.parseExecutionOutputs(stage, body)
+	outputs, err := s.parseExecutionOutputs(stage, req.Outputs)
 	if err != nil {
 		http.Error(w, "Error parsing outputs", http.StatusBadRequest)
 		return
@@ -303,13 +314,7 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) parseExecutionOutputs(stage *models.Stage, body []byte) (map[string]any, error) {
-	var outputs map[string]any
-	err := json.Unmarshal(body, &outputs)
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]any) (map[string]any, error) {
 	//
 	// We ignore outputs that were sent but are not defined in the stage.
 	//

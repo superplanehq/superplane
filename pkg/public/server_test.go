@@ -334,20 +334,26 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
-	validURL := "/executions/" + execution.ID.String() + "/outputs"
 	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
-	outputData, err := json.Marshal(&outputs)
-	require.NoError(t, err)
+
+	goodBody, _ := json.Marshal(&OutputsRequest{
+		ExecutionID: execution.ID.String(),
+		Outputs:     outputs,
+	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		invalidURL := "/executions/invalidsource/outputs"
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: "not-a-uuid",
+			Outputs:     outputs,
+		})
+
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        body,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -359,8 +365,8 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        goodBody,
 			contentType: "",
 			authToken:   validToken,
 		})
@@ -371,8 +377,8 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        goodBody,
 			contentType: "application/x-www-form-urlencoded",
 			authToken:   validToken,
 		})
@@ -380,25 +386,29 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		assert.Equal(t, 404, response.Code)
 	})
 
-	t.Run("event for execution that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/executions/" + uuid.New().String() + "/outputs"
+	t.Run("execution that does not exist -> 401", func(t *testing.T) {
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: uuid.NewString(),
+			Outputs:     outputs,
+		})
+
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        body,
 			contentType: "application/json",
 			authToken:   validToken,
 		})
 
-		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "execution not found\n", response.Body.String())
+		assert.Equal(t, 401, response.Code)
+		assert.Equal(t, "Invalid token\n", response.Body.String())
 	})
 
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        goodBody,
 			signature:   "",
 			authToken:   "",
 			contentType: "application/json",
@@ -411,8 +421,8 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        goodBody,
 			authToken:   "invalid",
 			contentType: "application/json",
 		})
@@ -424,8 +434,8 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        goodBody,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -438,15 +448,19 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	t.Run("output not defined in stage is ignored", func(t *testing.T) {
 		// 'time' output is not defined in the stage
-		outputsSent := map[string]any{"sha": "078fc8755c051", "time": 1748555264, "version": "v1.0.0"}
-		outputsExpected := map[string]any{"sha": "078fc8755c051", "version": "v1.0.0"}
-		outputData, err := json.Marshal(&outputsSent)
-		require.NoError(t, err)
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: execution.ID.String(),
+			Outputs: map[string]any{
+				"sha":     "078fc8755c051",
+				"time":    1748555264,
+				"version": "v1.0.0",
+			},
+		})
 
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        outputData,
+			path:        "/outputs",
+			body:        body,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -454,13 +468,13 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		assert.Equal(t, 200, response.Code)
 		execution, err := models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		assert.Equal(t, outputsExpected, execution.Outputs.Data())
+		assert.Equal(t, map[string]any{"sha": "078fc8755c051", "version": "v1.0.0"}, execution.Outputs.Data())
 	})
 
 	t.Run("outputs are limited to 4k", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/outputs",
 			body:        generateBigBody(t),
 			authToken:   validToken,
 			contentType: "application/json",

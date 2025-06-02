@@ -70,9 +70,28 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			r.User.String(),
 			conditions,
 			ExecutorSpec(),
-			[]models.StageConnection{},
-			[]models.InputDefinition{},
-			[]models.InputMapping{},
+			[]models.StageConnection{
+				{
+					SourceType: models.SourceTypeEventSource,
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+				},
+			},
+			[]models.InputDefinition{
+				{Name: "VERSION"},
+			},
+			[]models.InputMapping{
+				{
+					Values: []models.InputValueDefinition{
+						{Name: "VERSION", ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						}},
+					},
+				},
+			},
 			[]models.OutputDefinition{},
 		)
 
