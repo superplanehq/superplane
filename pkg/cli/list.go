@@ -99,6 +99,46 @@ var listStagesCmd = &cobra.Command{
 	},
 }
 
+var listSecretsCmd = &cobra.Command{
+	Use:     "secrets",
+	Short:   "List all secrets for a canvas",
+	Long:    `Retrieve a list of all secrets for the specified canvas`,
+	Aliases: []string{"secrets"},
+	Args:    cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+
+		c := DefaultClient()
+		response, _, err := c.SecretAPI.SuperplaneListSecrets(context.Background(), canvasIDOrName).Execute()
+		Check(err)
+
+		if len(response.Secrets) == 0 {
+			fmt.Println("No secrets found for this canvas.")
+			return
+		}
+
+		fmt.Printf("Found %d secrets:\n\n", len(response.Secrets))
+		for i, secret := range response.Secrets {
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *secret.Name, *secret.Id)
+			fmt.Printf("   Canvas: %s\n", *secret.CanvasId)
+			fmt.Printf("   Provider: %s\n", string(*secret.Provider))
+			fmt.Printf("   Created at: %s\n", *secret.CreatedAt)
+
+			if secret.Local != nil && secret.Local.Data != nil {
+				fmt.Println("   Values:")
+				for k, v := range *secret.Local.Data {
+					fmt.Printf("     %s = %s\n", k, v)
+				}
+			}
+
+			if i < len(response.Secrets)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 var listEventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "List stage events",
@@ -198,6 +238,11 @@ func init() {
 	listCmd.AddCommand(listStagesCmd)
 	listStagesCmd.Flags().String("canvas-id", "", "Canvas ID")
 	listStagesCmd.Flags().String("canvas-name", "", "Canvas name")
+
+	// Secrets command
+	listCmd.AddCommand(listSecretsCmd)
+	listSecretsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listSecretsCmd.Flags().String("canvas-name", "", "Canvas name")
 
 	// Events command
 	listCmd.AddCommand(listEventsCmd)

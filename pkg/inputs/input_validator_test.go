@@ -56,7 +56,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{},
+					Values: []*superplane.ValueDefinition{},
 				},
 			},
 			connections: []*superplane.Connection{},
@@ -68,7 +68,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "b"},
 					},
 				},
@@ -82,8 +82,8 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", Value: "c", ValueFrom: &superplane.InputMapping_ValueFrom{}},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", Value: "c", ValueFrom: &superplane.ValueFrom{}},
 					},
 				},
 			},
@@ -96,8 +96,8 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{}},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{}},
 					},
 				},
 			},
@@ -110,10 +110,10 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							EventData:     &superplane.InputMapping_ValueFromEventData{},
-							LastExecution: &superplane.InputMapping_ValueFromLastExecution{},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							EventData:     &superplane.ValueFromEventData{},
+							LastExecution: &superplane.ValueFromLastExecution{},
 						}},
 					},
 				},
@@ -127,9 +127,9 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							EventData: &superplane.InputMapping_ValueFromEventData{Connection: ""},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							EventData: &superplane.ValueFromEventData{Connection: ""},
 						}},
 					},
 				},
@@ -143,9 +143,9 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							EventData: &superplane.InputMapping_ValueFromEventData{Connection: "ok", Expression: ""},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							EventData: &superplane.ValueFromEventData{Connection: "ok", Expression: ""},
 						}},
 					},
 				},
@@ -159,9 +159,9 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							LastExecution: &superplane.InputMapping_ValueFromLastExecution{},
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							LastExecution: &superplane.ValueFromLastExecution{},
 						}},
 					},
 				},
@@ -175,9 +175,9 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							LastExecution: &superplane.InputMapping_ValueFromLastExecution{
+					Values: []*superplane.ValueDefinition{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							LastExecution: &superplane.ValueFromLastExecution{
 								Results: []superplane.Execution_Result{superplane.Execution_RESULT_UNKNOWN},
 							},
 						}},
@@ -193,7 +193,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "b"},
 					},
 					When: &superplane.InputMapping_When{},
@@ -208,7 +208,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a"},
 					},
 					When: &superplane.InputMapping_When{
@@ -227,7 +227,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
 					},
 					When: &superplane.InputMapping_When{
@@ -237,7 +237,7 @@ func Test__InputValidator(t *testing.T) {
 					},
 				},
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "b"},
 					},
 					When: &superplane.InputMapping_When{
@@ -258,7 +258,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
 					},
 				},
@@ -272,7 +272,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
 						{Name: "b", Value: "b"},
 						{Name: "c", Value: "c"},
@@ -288,7 +288,7 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
 						{Name: "b", Value: "b"},
 						{Name: "b", Value: "b"},
@@ -309,7 +309,7 @@ func Test__InputValidator(t *testing.T) {
 							Connection: "source-2",
 						},
 					},
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
 						{Name: "b", Value: "b"},
 					},
@@ -326,10 +326,10 @@ func Test__InputValidator(t *testing.T) {
 			inputs: []*superplane.InputDefinition{{Name: "a"}, {Name: "b"}},
 			inputMappings: []*superplane.InputMapping{
 				{
-					Values: []*superplane.InputMapping_ValueDefinition{
+					Values: []*superplane.ValueDefinition{
 						{Name: "a", Value: "a"},
-						{Name: "b", ValueFrom: &superplane.InputMapping_ValueFrom{
-							EventData: &superplane.InputMapping_ValueFromEventData{
+						{Name: "b", ValueFrom: &superplane.ValueFrom{
+							EventData: &superplane.ValueFromEventData{
 								Connection: "source-2",
 								Expression: "ref",
 							},

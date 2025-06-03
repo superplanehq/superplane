@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/encryptor"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -26,7 +26,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 	w := PendingExecutionsWorker{
 		JwtSigner: jwt.NewSigner("test"),
-		Encryptor: &encryptor.NoOpEncryptor{},
+		Encryptor: &crypto.NoOpEncryptor{},
 	}
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -41,7 +41,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task")
 
@@ -99,11 +99,11 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 			{Name: "REF_TYPE"},
 		}, []models.InputMapping{
 			{
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "REF",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref",
 							},
@@ -111,8 +111,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 					},
 					{
 						Name: "REF_TYPE",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref_type",
 							},
@@ -120,7 +120,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{}))
+		}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)

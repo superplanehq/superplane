@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneInputMapping{}
 
 // SuperplaneInputMapping struct for SuperplaneInputMapping
 type SuperplaneInputMapping struct {
-	Values []InputMappingValueDefinition `json:"values,omitempty"`
+	Values []SuperplaneValueDefinition `json:"values,omitempty"`
 	When *InputMappingWhen `json:"when,omitempty"`
 }
 
@@ -42,9 +42,9 @@ func NewSuperplaneInputMappingWithDefaults() *SuperplaneInputMapping {
 }
 
 // GetValues returns the Values field value if set, zero value otherwise.
-func (o *SuperplaneInputMapping) GetValues() []InputMappingValueDefinition {
+func (o *SuperplaneInputMapping) GetValues() []SuperplaneValueDefinition {
 	if o == nil || IsNil(o.Values) {
-		var ret []InputMappingValueDefinition
+		var ret []SuperplaneValueDefinition
 		return ret
 	}
 	return o.Values
@@ -52,7 +52,7 @@ func (o *SuperplaneInputMapping) GetValues() []InputMappingValueDefinition {
 
 // GetValuesOk returns a tuple with the Values field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneInputMapping) GetValuesOk() ([]InputMappingValueDefinition, bool) {
+func (o *SuperplaneInputMapping) GetValuesOk() ([]SuperplaneValueDefinition, bool) {
 	if o == nil || IsNil(o.Values) {
 		return nil, false
 	}
@@ -68,8 +68,8 @@ func (o *SuperplaneInputMapping) HasValues() bool {
 	return false
 }
 
-// SetValues gets a reference to the given []InputMappingValueDefinition and assigns it to the Values field.
-func (o *SuperplaneInputMapping) SetValues(v []InputMappingValueDefinition) {
+// SetValues gets a reference to the given []SuperplaneValueDefinition and assigns it to the Values field.
+func (o *SuperplaneInputMapping) SetValues(v []SuperplaneValueDefinition) {
 	o.Values = v
 }
 

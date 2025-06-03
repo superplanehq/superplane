@@ -18,14 +18,16 @@ var expressionRegex = regexp.MustCompile(`^\$\{\{(.*)\}\}$`)
 // and returns the final executor spec used for creating the execution,
 // resolving the ${{ inputs.* }} expression that may be present in the executor spec.
 type ExecutorSpecBuilder struct {
-	spec   models.ExecutorSpec
-	inputs map[string]any
+	spec    models.ExecutorSpec
+	inputs  map[string]any
+	secrets map[string]string
 }
 
-func NewExecutorSpecBuilder(spec models.ExecutorSpec, inputs map[string]any) *ExecutorSpecBuilder {
+func NewExecutorSpecBuilder(spec models.ExecutorSpec, inputs map[string]any, secrets map[string]string) *ExecutorSpecBuilder {
 	return &ExecutorSpecBuilder{
-		spec:   spec,
-		inputs: inputs,
+		spec:    spec,
+		inputs:  inputs,
+		secrets: secrets,
 	}
 }
 
@@ -40,29 +42,34 @@ func (r *ExecutorSpecBuilder) Build() (*models.ExecutorSpec, error) {
 
 func (r *ExecutorSpecBuilder) resolveSemaphoreExecutorSpec() (*models.ExecutorSpec, error) {
 	t := r.spec.Semaphore
-	projectID, err := r.resolveExpression(t.ProjectID)
+	token, err := r.ResolveExpression(t.APIToken)
 	if err != nil {
 		return nil, err
 	}
 
-	branch, err := r.resolveExpression(t.Branch)
+	projectID, err := r.ResolveExpression(t.ProjectID)
 	if err != nil {
 		return nil, err
 	}
 
-	pipelineFile, err := r.resolveExpression(t.PipelineFile)
+	branch, err := r.ResolveExpression(t.Branch)
 	if err != nil {
 		return nil, err
 	}
 
-	taskID, err := r.resolveExpression(t.TaskID)
+	pipelineFile, err := r.ResolveExpression(t.PipelineFile)
+	if err != nil {
+		return nil, err
+	}
+
+	taskID, err := r.ResolveExpression(t.TaskID)
 	if err != nil {
 		return nil, err
 	}
 
 	parameters := make(map[string]string, len(t.Parameters))
 	for k, v := range t.Parameters {
-		value, err := r.resolveExpression(v)
+		value, err := r.ResolveExpression(v)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +81,7 @@ func (r *ExecutorSpecBuilder) resolveSemaphoreExecutorSpec() (*models.ExecutorSp
 		Type: models.ExecutorSpecTypeSemaphore,
 		Semaphore: &models.SemaphoreExecutorSpec{
 			OrganizationURL: t.OrganizationURL,
-			APIToken:        t.APIToken,
+			APIToken:        token.(string),
 			ProjectID:       projectID.(string),
 			Branch:          branch.(string),
 			PipelineFile:    pipelineFile.(string),
@@ -84,7 +91,7 @@ func (r *ExecutorSpecBuilder) resolveSemaphoreExecutorSpec() (*models.ExecutorSp
 	}, nil
 }
 
-func (r *ExecutorSpecBuilder) resolveExpression(expression string) (any, error) {
+func (r *ExecutorSpecBuilder) ResolveExpression(expression string) (any, error) {
 	if expressionRegex.MatchString(expression) {
 		matches := expressionRegex.FindStringSubmatch(expression)
 		if len(matches) != 2 {
@@ -116,8 +123,9 @@ func (r *ExecutorSpecBuilder) _resolveExpression(expression string) (any, error)
 	defer cancel()
 
 	variables := map[string]any{
-		"ctx":    ctx,
-		"inputs": r.inputs,
+		"ctx":     ctx,
+		"inputs":  r.inputs,
+		"secrets": r.secrets,
 	}
 
 	program, err := expr.Compile(expression,

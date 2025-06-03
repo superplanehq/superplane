@@ -56,27 +56,52 @@ var getEventSourceCmd = &cobra.Command{
 }
 
 var getStageCmd = &cobra.Command{
-	Use:     "stage [ID]",
+	Use:     "stage [ID_OR_NAME]",
 	Short:   "Get stage details",
 	Long:    `Get details about a specific stage`,
 	Aliases: []string{"stages"},
 	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		id := args[0]
+		idOrName := args[0]
 
-		name, _ := cmd.Flags().GetString("name")
 		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneDescribeStage(
 			context.Background(),
 			canvasIDOrName,
-			id,
-		).Name(name).Execute()
+			idOrName,
+		).Name(idOrName).Execute()
 		Check(err)
 
 		out, err := yaml.Marshal(response.Stage)
+		Check(err)
+		fmt.Printf("%s", string(out))
+	},
+}
+
+var getSecretCmd = &cobra.Command{
+	Use:     "secret [ID_OR_NAME]",
+	Short:   "Get secret details",
+	Long:    `Get details about a specific secret`,
+	Aliases: []string{"secrets"},
+	Args:    cobra.ExactArgs(1),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		idOrName := args[0]
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+
+		c := DefaultClient()
+		response, _, err := c.SecretAPI.SuperplaneDescribeSecret(
+			context.Background(),
+			canvasIDOrName,
+			idOrName,
+		).Execute()
+
+		Check(err)
+
+		out, err := yaml.Marshal(response.Secret)
 		Check(err)
 		fmt.Printf("%s", string(out))
 	},
@@ -105,7 +130,11 @@ func init() {
 
 	// Stage command
 	getCmd.AddCommand(getStageCmd)
-	getStageCmd.Flags().String("name", "", "Name of the stage (alternative to ID)")
 	getStageCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
 	getStageCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
+
+	// Secret command
+	getCmd.AddCommand(getSecretCmd)
+	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
+	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
 }

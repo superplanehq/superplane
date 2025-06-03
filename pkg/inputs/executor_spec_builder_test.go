@@ -12,7 +12,7 @@ import (
 func Test__Resolve(t *testing.T) {
 	t.Run("no variables to resolve", func(t *testing.T) {
 		executorSpec := support.ExecutorSpec()
-		specBuilder := NewExecutorSpecBuilder(executorSpec, map[string]any{})
+		specBuilder := NewExecutorSpecBuilder(executorSpec, map[string]any{}, map[string]string{})
 		spec, err := specBuilder.Build()
 		require.NoError(t, err)
 		require.NotNil(t, spec)
@@ -27,7 +27,7 @@ func Test__Resolve(t *testing.T) {
 		}, spec.Semaphore.Parameters)
 	})
 
-	t.Run("with variables to resolve", func(t *testing.T) {
+	t.Run("with inputs and secrets to resolve", func(t *testing.T) {
 		inputs := map[string]any{
 			"BRANCH":     "hello",
 			"PROJECT_ID": "hello",
@@ -35,7 +35,12 @@ func Test__Resolve(t *testing.T) {
 			"PARAM_2":    "value2",
 		}
 
+		secrets := map[string]string{
+			"API_TOKEN": "XYZ",
+		}
+
 		executorSpec := support.ExecutorSpec()
+		executorSpec.Semaphore.APIToken = "${{ secrets.API_TOKEN }}"
 		executorSpec.Semaphore.Branch = "${{ inputs.BRANCH }}"
 		executorSpec.Semaphore.ProjectID = "${{ inputs.PROJECT_ID }}"
 		executorSpec.Semaphore.Parameters = map[string]string{
@@ -43,11 +48,12 @@ func Test__Resolve(t *testing.T) {
 			"PARAM_2": "${{ inputs.PARAM_2 }}",
 		}
 
-		specBuilder := NewExecutorSpecBuilder(executorSpec, inputs)
+		specBuilder := NewExecutorSpecBuilder(executorSpec, inputs, secrets)
 		spec, err := specBuilder.Build()
 		require.NoError(t, err)
 		require.NotNil(t, spec)
 		assert.Equal(t, models.ExecutorSpecTypeSemaphore, spec.Type)
+		assert.Equal(t, "XYZ", spec.Semaphore.APIToken)
 		assert.Equal(t, "hello", spec.Semaphore.ProjectID)
 		assert.Equal(t, "hello", spec.Semaphore.Branch)
 		assert.Equal(t, ".semaphore/run.yml", spec.Semaphore.PipelineFile)

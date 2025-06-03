@@ -1,12 +1,15 @@
 package models
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -32,6 +35,7 @@ type Stage struct {
 	Inputs        datatypes.JSONSlice[InputDefinition]
 	InputMappings datatypes.JSONSlice[InputMapping]
 	Outputs       datatypes.JSONSlice[OutputDefinition]
+	Secrets       datatypes.JSONSlice[ValueDefinition]
 }
 
 type InputDefinition struct {
@@ -46,8 +50,8 @@ type OutputDefinition struct {
 }
 
 type InputMapping struct {
-	When   *InputMappingWhen      `json:"when"`
-	Values []InputValueDefinition `json:"values"`
+	When   *InputMappingWhen `json:"when"`
+	Values []ValueDefinition `json:"values"`
 }
 
 type InputMappingWhen struct {
@@ -58,24 +62,30 @@ type WhenTriggeredBy struct {
 	Connection string `json:"connection"`
 }
 
-type InputValueDefinition struct {
-	Name      string          `json:"name"`
-	ValueFrom *InputValueFrom `json:"value_from"`
-	Value     *string         `json:"value"`
+type ValueDefinition struct {
+	Name      string               `json:"name"`
+	ValueFrom *ValueDefinitionFrom `json:"value_from"`
+	Value     *string              `json:"value"`
 }
 
-type InputValueFrom struct {
-	EventData     *InputValueFromEventData     `json:"event_data"`
-	LastExecution *InputValueFromLastExecution `json:"last_execution"`
+type ValueDefinitionFrom struct {
+	EventData     *ValueDefinitionFromEventData     `json:"event_data"`
+	LastExecution *ValueDefinitionFromLastExecution `json:"last_execution"`
+	Secret        *ValueDefinitionFromSecret        `json:"secret"`
 }
 
-type InputValueFromEventData struct {
+type ValueDefinitionFromEventData struct {
 	Connection string `json:"connection"`
 	Expression string `json:"expression"`
 }
 
-type InputValueFromLastExecution struct {
+type ValueDefinitionFromLastExecution struct {
 	Results []string `json:"results"`
+}
+
+type ValueDefinitionFromSecret struct {
+	Name string `json:"name"`
+	Key  string `json:"key"`
 }
 
 type StageCondition struct {
@@ -336,6 +346,37 @@ func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[stri
 	}
 
 	return event.Inputs.Data(), nil
+}
+
+func (s *Stage) FindSecrets(encryptor crypto.Encryptor) (map[string]string, error) {
+	secretMap := map[string]string{}
+	for _, secretDef := range s.Secrets {
+		secretName := secretDef.ValueFrom.Secret.Name
+		secret, err := FindSecretByName(s.CanvasID.String(), secretName)
+		if err != nil {
+			return nil, fmt.Errorf("error finding secret %s: %v", secretName, err)
+		}
+
+		provider, err := secrets.NewProvider(secret.Provider, secrets.Options{
+			CanvasID:   s.CanvasID,
+			Encryptor:  encryptor,
+			SecretName: secret.Name,
+			SecretData: secret.Data,
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
+		}
+
+		values, err := provider.Get(context.TODO())
+		if err != nil {
+			return nil, fmt.Errorf("error getting secret values for %s: %v", secretName, err)
+		}
+
+		secretMap[s.Name] = values[secretDef.ValueFrom.Secret.Key]
+	}
+
+	return secretMap, nil
 }
 
 func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {

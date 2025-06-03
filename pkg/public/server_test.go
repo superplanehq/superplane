@@ -18,8 +18,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -27,7 +27,7 @@ import (
 
 func Test__HealthCheckEndpoint(t *testing.T) {
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -42,7 +42,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	userID := uuid.New()
@@ -171,7 +171,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	userID := uuid.New()
@@ -323,14 +323,14 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
 		{Name: "version", Required: true},
 		{Name: "sha", Required: true},
-	})
+	}, []models.ValueDefinition{})
 
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
@@ -490,7 +490,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	checkSwaggerFiles(t)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -555,7 +555,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 func Test__GRPCGatewayRegistration(t *testing.T) {
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

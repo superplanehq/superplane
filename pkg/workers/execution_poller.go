@@ -1,28 +1,27 @@
 package workers
 
 import (
-	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
 type ExecutionPoller struct {
-	Encryptor encryptor.Encryptor
+	Encryptor crypto.Encryptor
 }
 
-func NewExecutionPoller(encryptor encryptor.Encryptor) *ExecutionPoller {
+func NewExecutionPoller(encryptor crypto.Encryptor) *ExecutionPoller {
 	return &ExecutionPoller{Encryptor: encryptor}
 }
 
@@ -132,15 +131,15 @@ func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *model
 	executor := stage.ExecutorSpec.Data()
 	switch executor.Type {
 	case models.ExecutorSpecTypeSemaphore:
-		t := executor.Semaphore
-		decoded, err := base64.StdEncoding.DecodeString(t.APIToken)
+		secretMap, err := stage.FindSecrets(w.Encryptor)
 		if err != nil {
 			return "", err
 		}
 
-		token, err := w.Encryptor.Decrypt(context.Background(), decoded, []byte(t.OrganizationURL))
+		builder := inputs.NewExecutorSpecBuilder(executor, map[string]any{}, secretMap)
+		token, err := builder.ResolveExpression(executor.Semaphore.APIToken)
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("error resolving finding API token: %v", err)
 		}
 
 		return w.resolveResultFromSemaphoreWorkflow(
@@ -148,7 +147,7 @@ func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *model
 			execution,
 			semaphore.NewSemaphoreAPI(
 				executor.Semaphore.OrganizationURL,
-				string(token),
+				token.(string),
 			),
 		)
 	default:

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -15,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	err := ValidateUUIDs(req.IdOrName)
 
 	var canvas *models.Canvas
@@ -51,7 +50,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Error(codes.InvalidArgument, "requester ID is invalid")
 	}
 
-	executor, err := validateExecutorSpec(ctx, encryptor, req.Executor)
+	executor, err := validateExecutorSpec(ctx, req.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -78,6 +77,11 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	secrets, err := validateSecrets(req.Secrets)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	err = canvas.UpdateStage(
 		stage.ID.String(),
 		req.RequesterId,
@@ -87,6 +91,7 @@ func UpdateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Upd
 		inputValidator.SerializeInputs(),
 		inputValidator.SerializeInputMappings(),
 		inputValidator.SerializeOutputs(),
+		secrets,
 	)
 
 	if err != nil {

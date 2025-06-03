@@ -48,11 +48,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputMapping{
 			{
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref",
 							},
@@ -60,7 +60,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{})
+		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 
@@ -75,11 +75,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputMapping{
 			{
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref",
 							},
@@ -87,7 +87,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{})
+		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -148,11 +148,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputMapping{
 			{
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref",
 							},
@@ -165,7 +165,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				Name:     "VERSION",
 				Required: true,
 			},
-		})
+		}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
@@ -182,11 +182,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}, []models.InputMapping{
 			{
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: firstStage.Name,
 								Expression: "outputs.VERSION",
 							},
@@ -194,7 +194,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{})
+		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 
@@ -247,7 +247,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 
@@ -265,7 +265,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 

@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the InputMappingValueDefinition type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &InputMappingValueDefinition{}
+// checks if the SuperplaneValueDefinition type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneValueDefinition{}
 
-// InputMappingValueDefinition struct for InputMappingValueDefinition
-type InputMappingValueDefinition struct {
+// SuperplaneValueDefinition struct for SuperplaneValueDefinition
+type SuperplaneValueDefinition struct {
 	Name *string `json:"name,omitempty"`
-	ValueFrom *InputMappingValueFrom `json:"valueFrom,omitempty"`
+	ValueFrom *SuperplaneValueFrom `json:"valueFrom,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// NewInputMappingValueDefinition instantiates a new InputMappingValueDefinition object
+// NewSuperplaneValueDefinition instantiates a new SuperplaneValueDefinition object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewInputMappingValueDefinition() *InputMappingValueDefinition {
-	this := InputMappingValueDefinition{}
+func NewSuperplaneValueDefinition() *SuperplaneValueDefinition {
+	this := SuperplaneValueDefinition{}
 	return &this
 }
 
-// NewInputMappingValueDefinitionWithDefaults instantiates a new InputMappingValueDefinition object
+// NewSuperplaneValueDefinitionWithDefaults instantiates a new SuperplaneValueDefinition object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewInputMappingValueDefinitionWithDefaults() *InputMappingValueDefinition {
-	this := InputMappingValueDefinition{}
+func NewSuperplaneValueDefinitionWithDefaults() *SuperplaneValueDefinition {
+	this := SuperplaneValueDefinition{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *InputMappingValueDefinition) GetName() string {
+func (o *SuperplaneValueDefinition) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -53,7 +53,7 @@ func (o *InputMappingValueDefinition) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueDefinition) GetNameOk() (*string, bool) {
+func (o *SuperplaneValueDefinition) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *InputMappingValueDefinition) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *InputMappingValueDefinition) HasName() bool {
+func (o *SuperplaneValueDefinition) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -70,14 +70,14 @@ func (o *InputMappingValueDefinition) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *InputMappingValueDefinition) SetName(v string) {
+func (o *SuperplaneValueDefinition) SetName(v string) {
 	o.Name = &v
 }
 
 // GetValueFrom returns the ValueFrom field value if set, zero value otherwise.
-func (o *InputMappingValueDefinition) GetValueFrom() InputMappingValueFrom {
+func (o *SuperplaneValueDefinition) GetValueFrom() SuperplaneValueFrom {
 	if o == nil || IsNil(o.ValueFrom) {
-		var ret InputMappingValueFrom
+		var ret SuperplaneValueFrom
 		return ret
 	}
 	return *o.ValueFrom
@@ -85,7 +85,7 @@ func (o *InputMappingValueDefinition) GetValueFrom() InputMappingValueFrom {
 
 // GetValueFromOk returns a tuple with the ValueFrom field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueDefinition) GetValueFromOk() (*InputMappingValueFrom, bool) {
+func (o *SuperplaneValueDefinition) GetValueFromOk() (*SuperplaneValueFrom, bool) {
 	if o == nil || IsNil(o.ValueFrom) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *InputMappingValueDefinition) GetValueFromOk() (*InputMappingValueFrom, 
 }
 
 // HasValueFrom returns a boolean if a field has been set.
-func (o *InputMappingValueDefinition) HasValueFrom() bool {
+func (o *SuperplaneValueDefinition) HasValueFrom() bool {
 	if o != nil && !IsNil(o.ValueFrom) {
 		return true
 	}
@@ -101,13 +101,13 @@ func (o *InputMappingValueDefinition) HasValueFrom() bool {
 	return false
 }
 
-// SetValueFrom gets a reference to the given InputMappingValueFrom and assigns it to the ValueFrom field.
-func (o *InputMappingValueDefinition) SetValueFrom(v InputMappingValueFrom) {
+// SetValueFrom gets a reference to the given SuperplaneValueFrom and assigns it to the ValueFrom field.
+func (o *SuperplaneValueDefinition) SetValueFrom(v SuperplaneValueFrom) {
 	o.ValueFrom = &v
 }
 
 // GetValue returns the Value field value if set, zero value otherwise.
-func (o *InputMappingValueDefinition) GetValue() string {
+func (o *SuperplaneValueDefinition) GetValue() string {
 	if o == nil || IsNil(o.Value) {
 		var ret string
 		return ret
@@ -117,7 +117,7 @@ func (o *InputMappingValueDefinition) GetValue() string {
 
 // GetValueOk returns a tuple with the Value field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueDefinition) GetValueOk() (*string, bool) {
+func (o *SuperplaneValueDefinition) GetValueOk() (*string, bool) {
 	if o == nil || IsNil(o.Value) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *InputMappingValueDefinition) GetValueOk() (*string, bool) {
 }
 
 // HasValue returns a boolean if a field has been set.
-func (o *InputMappingValueDefinition) HasValue() bool {
+func (o *SuperplaneValueDefinition) HasValue() bool {
 	if o != nil && !IsNil(o.Value) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *InputMappingValueDefinition) HasValue() bool {
 }
 
 // SetValue gets a reference to the given string and assigns it to the Value field.
-func (o *InputMappingValueDefinition) SetValue(v string) {
+func (o *SuperplaneValueDefinition) SetValue(v string) {
 	o.Value = &v
 }
 
-func (o InputMappingValueDefinition) MarshalJSON() ([]byte, error) {
+func (o SuperplaneValueDefinition) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o InputMappingValueDefinition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o InputMappingValueDefinition) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneValueDefinition) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -160,38 +160,38 @@ func (o InputMappingValueDefinition) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableInputMappingValueDefinition struct {
-	value *InputMappingValueDefinition
+type NullableSuperplaneValueDefinition struct {
+	value *SuperplaneValueDefinition
 	isSet bool
 }
 
-func (v NullableInputMappingValueDefinition) Get() *InputMappingValueDefinition {
+func (v NullableSuperplaneValueDefinition) Get() *SuperplaneValueDefinition {
 	return v.value
 }
 
-func (v *NullableInputMappingValueDefinition) Set(val *InputMappingValueDefinition) {
+func (v *NullableSuperplaneValueDefinition) Set(val *SuperplaneValueDefinition) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableInputMappingValueDefinition) IsSet() bool {
+func (v NullableSuperplaneValueDefinition) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableInputMappingValueDefinition) Unset() {
+func (v *NullableSuperplaneValueDefinition) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableInputMappingValueDefinition(val *InputMappingValueDefinition) *NullableInputMappingValueDefinition {
-	return &NullableInputMappingValueDefinition{value: val, isSet: true}
+func NewNullableSuperplaneValueDefinition(val *SuperplaneValueDefinition) *NullableSuperplaneValueDefinition {
+	return &NullableSuperplaneValueDefinition{value: val, isSet: true}
 }
 
-func (v NullableInputMappingValueDefinition) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneValueDefinition) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableInputMappingValueDefinition) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneValueDefinition) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
