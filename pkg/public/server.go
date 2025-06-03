@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -23,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -170,6 +170,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 
 	//
 	// Authenticated and validated routes.
@@ -218,7 +219,7 @@ func (s *Server) Serve(host string, port int) error {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Router),
+		Handler:      s.Router,
 	}
 
 	return s.httpServer.ListenAndServe()
