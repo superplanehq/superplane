@@ -483,8 +483,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.wsHub.NewClient(ws, canvasID)
+	client := s.wsHub.NewClient(ws, canvasID)
 	log.Infof("WebSocket client registered with hub")
+	// Wait for the client to disconnect
+	<- client.Done
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server

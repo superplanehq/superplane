@@ -3,6 +3,7 @@ import { CanvasData } from "../types";
 import { CanvasState } from './types';
 import { SuperplaneCanvas, SuperplaneEventSource, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent } from '@/api-client';
+import { ReadyState } from 'react-use-websocket';
 
 function generateFakeUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -20,6 +21,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   event_sources: [],
   nodePositions: {},
   selectedStage: null,
+  webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
   
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
@@ -117,5 +119,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   cleanSelectedStage: () => {
     set({ selectedStage: null });
+  },
+  
+  updateWebSocketConnectionStatus: (status) => {
+    set({ webSocketConnectionStatus: status });
   },
 }));

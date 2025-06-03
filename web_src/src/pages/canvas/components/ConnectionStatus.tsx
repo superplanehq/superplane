@@ -1,7 +1,9 @@
 
 import { useEffect, useState } from 'react';
 import { Panel } from '@xyflow/react';
-import { useWebSocketConnection } from '../hooks/useWebSocketEvent';
+import { useCanvasStore } from '@/canvas/store/canvasStore';
+import { ReadyState } from 'react-use-websocket';
+
 
 // Simple cn utility since we can't access @/lib/utils
 type ClassValue = string | boolean | undefined | null;
@@ -10,13 +12,13 @@ const cn = (...classes: ClassValue[]) => {
 };
 
 export const ConnectionStatus: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [autoHideTimer, setAutoHideTimer] = useState<NodeJS.Timeout | null>(null);
-  const { connectionStatus } = useWebSocketConnection(''); // Pass the actual canvasId here
+  const [isVisible, setIsVisible] = useState(true);
+  const [autoHideTimer, setAutoHideTimer] = useState<number | null>(null);
+  const { webSocketConnectionStatus } = useCanvasStore();
 
   // Handle auto-hide for connected state
   useEffect(() => {
-    if (connectionStatus === 'connected') {
+    if (webSocketConnectionStatus === ReadyState.OPEN) {
       setIsVisible(true);
       
       // Auto-hide after 3 seconds for connected state
@@ -26,10 +28,10 @@ export const ConnectionStatus: React.FC = () => {
       return () => {
         clearTimeout(timer);
       };
-    } else if (connectionStatus === 'disconnected') {
+    } else if (webSocketConnectionStatus === ReadyState.CLOSED) {
       setIsVisible(true);
     }
-  }, [connectionStatus]);
+  }, [webSocketConnectionStatus]);
   
   // Clean up timer on unmount
   useEffect(() => {
@@ -56,7 +58,7 @@ export const ConnectionStatus: React.FC = () => {
       icon: 'refresh',
       className: 'text-yellow-500 animate-spin',
     },
-  }[connectionStatus === 'connected' ? 'connected' : 'disconnected'];
+  }[webSocketConnectionStatus === ReadyState.OPEN ? 'connected' : webSocketConnectionStatus === ReadyState.CLOSED ? 'disconnected' : 'connecting'];
 
   if (!isVisible) return null;
 
