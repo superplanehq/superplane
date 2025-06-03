@@ -14,7 +14,7 @@ import (
 
 type SemaphoreExecutor struct {
 	execution models.StageExecution
-	template  *models.SemaphoreRunTemplate
+	template  *models.SemaphoreExecutorSpec
 	encryptor encryptor.Encryptor
 	jwtSigner *jwt.Signer
 }
@@ -64,7 +64,7 @@ func (s *SemaphoreStatus) Successful() bool {
 	return s.pipeline.Result == semaphore.PipelineResultPassed
 }
 
-func NewSemaphoreExecutor(execution models.StageExecution, template *models.SemaphoreRunTemplate, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
+func NewSemaphoreExecutor(execution models.StageExecution, template *models.SemaphoreExecutorSpec, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
 	return &SemaphoreExecutor{
 		execution: execution,
 		template:  template,

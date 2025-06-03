@@ -24,8 +24,8 @@ func HandleEventSourceCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Fetch complete event source information using gRPC
 	describeEventSourceResp, err := actions.DescribeEventSource(context.Background(), &pb.DescribeEventSourceRequest{
-		CanvasId: pbMsg.CanvasId,
-		Id:       pbMsg.SourceId,
+		CanvasIdOrName: pbMsg.CanvasId,
+		Id:             pbMsg.SourceId,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to describe event source: %w", err)

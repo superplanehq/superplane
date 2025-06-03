@@ -27,7 +27,7 @@ type EventSourceAPIService service
 type ApiSuperplaneCreateEventSourceRequest struct {
 	ctx context.Context
 	ApiService *EventSourceAPIService
-	canvasId string
+	canvasIdOrName string
 	body *SuperplaneCreateEventSourceBody
 }
 
@@ -43,17 +43,17 @@ func (r ApiSuperplaneCreateEventSourceRequest) Execute() (*SuperplaneCreateEvent
 /*
 SuperplaneCreateEventSource Create a new event source
 
-Creates a new event source for the specified canvas
+Creates a new event source for the specified canvas (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @return ApiSuperplaneCreateEventSourceRequest
 */
-func (a *EventSourceAPIService) SuperplaneCreateEventSource(ctx context.Context, canvasId string) ApiSuperplaneCreateEventSourceRequest {
+func (a *EventSourceAPIService) SuperplaneCreateEventSource(ctx context.Context, canvasIdOrName string) ApiSuperplaneCreateEventSourceRequest {
 	return ApiSuperplaneCreateEventSourceRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 	}
 }
 
@@ -72,8 +72,8 @@ func (a *EventSourceAPIService) SuperplaneCreateEventSourceExecute(r ApiSuperpla
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/event-sources"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/event-sources"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -149,7 +149,7 @@ func (a *EventSourceAPIService) SuperplaneCreateEventSourceExecute(r ApiSuperpla
 type ApiSuperplaneDescribeEventSourceRequest struct {
 	ctx context.Context
 	ApiService *EventSourceAPIService
-	canvasId string
+	canvasIdOrName string
 	id string
 	name *string
 }
@@ -166,18 +166,18 @@ func (r ApiSuperplaneDescribeEventSourceRequest) Execute() (*SuperplaneDescribeE
 /*
 SuperplaneDescribeEventSource Get event source details
 
-Returns the details of a specific event source
+Returns the details of a specific event source (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @param id
  @return ApiSuperplaneDescribeEventSourceRequest
 */
-func (a *EventSourceAPIService) SuperplaneDescribeEventSource(ctx context.Context, canvasId string, id string) ApiSuperplaneDescribeEventSourceRequest {
+func (a *EventSourceAPIService) SuperplaneDescribeEventSource(ctx context.Context, canvasIdOrName string, id string) ApiSuperplaneDescribeEventSourceRequest {
 	return ApiSuperplaneDescribeEventSourceRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 		id: id,
 	}
 }
@@ -197,8 +197,8 @@ func (a *EventSourceAPIService) SuperplaneDescribeEventSourceExecute(r ApiSuperp
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/event-sources/{id}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -273,7 +273,7 @@ func (a *EventSourceAPIService) SuperplaneDescribeEventSourceExecute(r ApiSuperp
 type ApiSuperplaneListEventSourcesRequest struct {
 	ctx context.Context
 	ApiService *EventSourceAPIService
-	canvasId string
+	canvasIdOrName string
 }
 
 func (r ApiSuperplaneListEventSourcesRequest) Execute() (*SuperplaneListEventSourcesResponse, *http.Response, error) {
@@ -283,17 +283,17 @@ func (r ApiSuperplaneListEventSourcesRequest) Execute() (*SuperplaneListEventSou
 /*
 SuperplaneListEventSources List event sources
 
-Returns a list of all event sources for the specified canvas
+Returns a list of all event sources for the specified canvas (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @return ApiSuperplaneListEventSourcesRequest
 */
-func (a *EventSourceAPIService) SuperplaneListEventSources(ctx context.Context, canvasId string) ApiSuperplaneListEventSourcesRequest {
+func (a *EventSourceAPIService) SuperplaneListEventSources(ctx context.Context, canvasIdOrName string) ApiSuperplaneListEventSourcesRequest {
 	return ApiSuperplaneListEventSourcesRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 	}
 }
 
@@ -312,8 +312,8 @@ func (a *EventSourceAPIService) SuperplaneListEventSourcesExecute(r ApiSuperplan
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/event-sources"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/event-sources"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

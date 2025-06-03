@@ -18,8 +18,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: uuid.New().String(),
-			Name:     r.Stage.Name,
+			CanvasIdOrName: uuid.New().String(),
+			Name:           r.Stage.Name,
 		})
 
 		s, ok := status.FromError(err)
@@ -30,7 +30,7 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("no name and no ID -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -41,8 +41,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     "does-not-exist",
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "does-not-exist",
 		})
 
 		s, ok := status.FromError(err)
@@ -53,8 +53,8 @@ func Test__DescribeStage(t *testing.T) {
 
 	t.Run("with name", func(t *testing.T) {
 		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     r.Stage.Name,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           r.Stage.Name,
 		})
 
 		require.NoError(t, err)
@@ -62,17 +62,19 @@ func Test__DescribeStage(t *testing.T) {
 		require.Equal(t, r.Stage.ID.String(), response.Stage.Id)
 		require.Equal(t, r.Canvas.ID.String(), response.Stage.CanvasId)
 		require.NotNil(t, response.Stage.CreatedAt)
-		require.NotNil(t, response.Stage.RunTemplate)
-		require.Len(t, response.Stage.Connections, 0)
+		require.NotNil(t, response.Stage.Executor)
+		require.Len(t, response.Stage.Connections, 1)
 		require.Len(t, response.Stage.Conditions, 1)
+		require.Len(t, response.Stage.Inputs, 1)
+		require.Len(t, response.Stage.InputMappings, 1)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, response.Stage.Conditions[0].Type)
 		assert.Equal(t, uint32(1), response.Stage.Conditions[0].Approval.Count)
 	})
 
 	t.Run("with ID", func(t *testing.T) {
 		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Id:       r.Stage.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Id:             r.Stage.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -81,8 +83,10 @@ func Test__DescribeStage(t *testing.T) {
 		require.Equal(t, r.Canvas.ID.String(), response.Stage.CanvasId)
 		require.NotNil(t, response.Stage.CreatedAt)
 		require.Len(t, response.Stage.Conditions, 1)
-		require.NotNil(t, response.Stage.RunTemplate)
-		require.Len(t, response.Stage.Connections, 0)
+		require.NotNil(t, response.Stage.Executor)
+		require.Len(t, response.Stage.Connections, 1)
+		require.Len(t, response.Stage.Inputs, 1)
+		require.Len(t, response.Stage.InputMappings, 1)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, response.Stage.Conditions[0].Type)
 		assert.Equal(t, uint32(1), response.Stage.Conditions[0].Approval.Count)
 	})

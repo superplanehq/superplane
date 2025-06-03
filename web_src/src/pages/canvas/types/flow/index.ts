@@ -2,8 +2,8 @@ import { Node, Edge } from "@xyflow/react";
 import { 
   SuperplaneStageEvent,
   SuperplaneStageEventState,
-  SuperplaneRunTemplate,
-  SuperplaneRunTemplateType,
+  SuperplaneExecutorSpec,
+  SuperplaneExecutorSpecType,
   SuperplaneConnection,
   ConnectionFilterOperator,
   SuperplaneCondition,
@@ -14,13 +14,13 @@ export type AllNodeType = EventSourceNodeType | StageNodeType;
 export type EdgeType = Edge;
 
 // Event source node
-type LastEvent = { type: string; release: string; timestamp: string };
-
 export type EventSourceNodeData = {
   id: string;
   repoName: string;
   repoUrl: string;
-  lastEvent: LastEvent;
+  eventType: string;
+  release: string;
+  timestamp: string;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
@@ -35,7 +35,7 @@ export type StageData = {
   queues: SuperplaneStageEvent[];
   connections: SuperplaneConnection[];
   conditions: SuperplaneCondition[];
-  runTemplate: SuperplaneRunTemplate;
+  executorSpec: SuperplaneExecutorSpec;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
 }
 
@@ -53,5 +53,16 @@ export {
   SuperplaneStageEventState as QueueState,
   ConnectionFilterOperator,
   SuperplaneConditionType as ConditionType,
-  SuperplaneRunTemplateType as RunTemplateType
+  SuperplaneExecutorSpecType as ExecutorSpecType
 };
+
+export interface FlowEdge extends Edge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface LayoutedFlowData {
+  layoutedNodes: AllNodeType[];
+  flowEdges: FlowEdge[];
+}

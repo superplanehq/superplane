@@ -66,7 +66,35 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1", r.User.String(), conditions, RunTemplate(), []models.StageConnection{})
+		err = r.Canvas.CreateStage("stage-1",
+			r.User.String(),
+			conditions,
+			ExecutorSpec(),
+			[]models.StageConnection{
+				{
+					SourceType: models.SourceTypeEventSource,
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+				},
+			},
+			[]models.InputDefinition{
+				{Name: "VERSION"},
+			},
+			[]models.InputMapping{
+				{
+					Values: []models.InputValueDefinition{
+						{Name: "VERSION", ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						}},
+					},
+				},
+			},
+			[]models.OutputDefinition{},
+		)
+
 		require.NoError(t, err)
 		r.Stage, err = r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)
@@ -82,36 +110,48 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 }
 
 func CreateStageEvent(t *testing.T, source *models.EventSource, stage *models.Stage) *models.StageEvent {
-	return CreateStageEventWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+	return CreateStageEventWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{})
 }
 
-func CreateStageEventWithData(t *testing.T, source *models.EventSource, stage *models.Stage, data []byte, headers []byte) *models.StageEvent {
+func CreateStageEventWithData(t *testing.T,
+	source *models.EventSource,
+	stage *models.Stage,
+	data []byte,
+	headers []byte,
+	inputs map[string]any,
+) *models.StageEvent {
 	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
 	require.NoError(t, err)
-	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "")
+	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)
 	return stageEvent
 }
 
 func CreateExecution(t *testing.T, source *models.EventSource, stage *models.Stage) *models.StageExecution {
-	return CreateExecutionWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+	return CreateExecutionWithData(t, source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{})
 }
 
-func CreateExecutionWithData(t *testing.T, source *models.EventSource, stage *models.Stage, data []byte, headers []byte) *models.StageExecution {
-	event := CreateStageEventWithData(t, source, stage, data, headers)
+func CreateExecutionWithData(t *testing.T,
+	source *models.EventSource,
+	stage *models.Stage,
+	data []byte,
+	headers []byte,
+	inputs map[string]any,
+) *models.StageExecution {
+	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
 	execution, err := models.CreateStageExecution(stage.ID, event.ID)
 	require.NoError(t, err)
 	return execution
 }
 
-func RunTemplate() models.RunTemplate {
-	return RunTemplateWithURL("http://localhost:8000")
+func ExecutorSpec() models.ExecutorSpec {
+	return ExecutorSpecWithURL("http://localhost:8000")
 }
 
-func RunTemplateWithURL(URL string) models.RunTemplate {
-	return models.RunTemplate{
-		Type: models.RunTemplateTypeSemaphore,
-		Semaphore: &models.SemaphoreRunTemplate{
+func ExecutorSpecWithURL(URL string) models.ExecutorSpec {
+	return models.ExecutorSpec{
+		Type: models.ExecutorSpecTypeSemaphore,
+		Semaphore: &models.SemaphoreExecutorSpec{
 			OrganizationURL: URL,
 			APIToken:        base64.StdEncoding.EncodeToString([]byte("token")),
 			ProjectID:       "demo-project",
@@ -126,10 +166,10 @@ func RunTemplateWithURL(URL string) models.RunTemplate {
 	}
 }
 
-func ProtoRunTemplate() *protos.RunTemplate {
-	return &protos.RunTemplate{
-		Type: protos.RunTemplate_TYPE_SEMAPHORE,
-		Semaphore: &protos.SemaphoreRunTemplate{
+func ProtoExecutor() *protos.ExecutorSpec {
+	return &protos.ExecutorSpec{
+		Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
+		Semaphore: &protos.ExecutorSpec_Semaphore{
 			OrganizationUrl: "http://localhost:8000",
 			ApiToken:        "test",
 			ProjectId:       "test",

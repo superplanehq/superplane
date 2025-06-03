@@ -41,6 +41,12 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
+    
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
   db:
     image: postgres:9.6
@@ -48,12 +54,26 @@ services:
       - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
+    restart: "on-failure"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
     container_name: "rabbitmq"
     ports:
       - 5672:5672
       - 15672:15672
+    restart: "on-failure"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres-data:
     driver: local

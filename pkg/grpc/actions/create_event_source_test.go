@@ -24,8 +24,8 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		req := &protos.CreateEventSourceRequest{
-			CanvasId: uuid.New().String(),
-			Name:     "test",
+			CanvasIdOrName: uuid.New().String(),
+			Name:           "test",
 		}
 
 		_, err := CreateEventSource(context.Background(), encryptor, req)
@@ -42,8 +42,8 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     "test",
+			CanvasIdOrName: r.Canvas.Name,
+			Name:           "test",
 		})
 
 		require.NoError(t, err)
@@ -59,8 +59,8 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("name already used -> error", func(t *testing.T) {
 		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     "test",
+			CanvasIdOrName: r.Canvas.Name,
+			Name:           "test",
 		})
 
 		s, ok := status.FromError(err)

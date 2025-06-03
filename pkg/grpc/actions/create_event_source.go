@@ -17,21 +17,23 @@ import (
 )
 
 func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	err := ValidateUUIDs(req.CanvasId)
+	err := ValidateUUIDs(req.CanvasIdOrName)
+	var canvas *models.Canvas
 	if err != nil {
-		return nil, err
+		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
+	} else {
+		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
 	}
 
-	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	logger := logging.ForCanvas(canvas)
 	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.Name)
 	if err != nil {
 		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
-		return nil, status.Errorf(codes.Internal, "error generating key")
+		return nil, status.Error(codes.Internal, "error generating key")
 	}
 
 	// TODO: Store key in secrethub secret and create a webhook notification
@@ -41,7 +43,7 @@ func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *
 	eventSource, err := canvas.CreateEventSource(req.Name, encryptedKey)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		log.Errorf("Error creating event source. Request: %v. Error: %v", req, err)

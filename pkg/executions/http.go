@@ -15,7 +15,7 @@ import (
 
 type HTTPExecutor struct {
 	execution models.StageExecution
-	template  *models.HTTPRunTemplate
+	template  *models.HTTPExecutorSpec
 	encryptor encryptor.Encryptor
 	jwtSigner *jwt.Signer
 }
@@ -50,7 +50,7 @@ func (s *HTTPStatus) Successful() bool {
 	return slices.Contains(s.statuses, s.res.StatusCode)
 }
 
-func NewHTTPExecutor(execution models.StageExecution, template *models.HTTPRunTemplate, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
+func NewHTTPExecutor(execution models.StageExecution, template *models.HTTPExecutorSpec, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
 	return &HTTPExecutor{
 		execution: execution,
 		template:  template,

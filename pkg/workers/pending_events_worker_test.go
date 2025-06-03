@@ -37,21 +37,57 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		})
+		}, []models.InputDefinition{
+			{
+				Name: "VERSION",
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		})
+		}, []models.InputDefinition{
+			{
+				Name: "VERSION",
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
@@ -85,12 +121,14 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, stage1Events, 1)
 		assert.Equal(t, r.Source.ID, stage1Events[0].SourceID)
+		assert.Equal(t, map[string]any{"VERSION": "v1"}, stage1Events[0].Inputs.Data())
 
 		stage2Events, err := stage2.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, stage2Events, 1)
 		assert.Equal(t, r.Source.ID, stage2Events[0].SourceID)
 		assert.True(t, testconsumer.HasReceivedMessage())
+		assert.Equal(t, map[string]any{"VERSION": "v1"}, stage1Events[0].Inputs.Data())
 	})
 
 	t.Run("stage completion event is processed", func(t *testing.T) {
@@ -99,10 +137,33 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
+			},
+		}, []models.InputDefinition{
+			{
+				Name: "VERSION",
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: r.Source.Name,
+								Expression: "ref",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{
+			{
+				Name:     "VERSION",
+				Required: true,
 			},
 		})
 
@@ -110,19 +171,37 @@ func Test__PendingEventsWorker(t *testing.T) {
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
 			},
-		})
+		}, []models.InputDefinition{
+			{
+				Name: "VERSION",
+			},
+		}, []models.InputMapping{
+			{
+				Values: []models.InputValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.InputValueFrom{
+							EventData: &models.InputValueFromEventData{
+								Connection: firstStage.Name,
+								Expression: "outputs.VERSION",
+							},
+						},
+					},
+				},
+			},
+		}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
 		//
 		// Simulating a stage completion event coming in for the first stage.
 		//
-		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"tags":{"VERSION":"v1"}}`), eventHeaders)
+		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -154,7 +233,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
@@ -168,11 +247,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.RunTemplate(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
@@ -186,7 +265,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		})
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
 
 		require.NoError(t, err)
 

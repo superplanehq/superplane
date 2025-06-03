@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	RunTemplateTypeSemaphore = "semaphore"
-	RunTemplateTypeHTTP      = "http"
+	ExecutorSpecTypeSemaphore = "semaphore"
+	ExecutorSpecTypeHTTP      = "http"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
@@ -28,8 +28,55 @@ type Stage struct {
 	CreatedBy uuid.UUID
 	UpdatedBy uuid.UUID
 
-	Conditions  datatypes.JSONSlice[StageCondition]
-	RunTemplate datatypes.JSONType[RunTemplate]
+	Conditions    datatypes.JSONSlice[StageCondition]
+	ExecutorSpec  datatypes.JSONType[ExecutorSpec]
+	Inputs        datatypes.JSONSlice[InputDefinition]
+	InputMappings datatypes.JSONSlice[InputMapping]
+	Outputs       datatypes.JSONSlice[OutputDefinition]
+}
+
+type InputDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type OutputDefinition struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+}
+
+type InputMapping struct {
+	When   *InputMappingWhen      `json:"when"`
+	Values []InputValueDefinition `json:"values"`
+}
+
+type InputMappingWhen struct {
+	TriggeredBy *WhenTriggeredBy `json:"triggered_by"`
+}
+
+type WhenTriggeredBy struct {
+	Connection string `json:"connection"`
+}
+
+type InputValueDefinition struct {
+	Name      string          `json:"name"`
+	ValueFrom *InputValueFrom `json:"value_from"`
+	Value     *string         `json:"value"`
+}
+
+type InputValueFrom struct {
+	EventData     *InputValueFromEventData     `json:"event_data"`
+	LastExecution *InputValueFromLastExecution `json:"last_execution"`
+}
+
+type InputValueFromEventData struct {
+	Connection string `json:"connection"`
+	Expression string `json:"expression"`
+}
+
+type InputValueFromLastExecution struct {
+	Results []string `json:"results"`
 }
 
 type StageCondition struct {
@@ -133,13 +180,13 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-type RunTemplate struct {
-	Type      string                `json:"type"`
-	Semaphore *SemaphoreRunTemplate `json:"semaphore,omitempty"`
-	HTTP      *HTTPRunTemplate      `json:"http,omitempty"`
+type ExecutorSpec struct {
+	Type      string                 `json:"type"`
+	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
+	HTTP      *HTTPExecutorSpec      `json:"http,omitempty"`
 }
 
-type SemaphoreRunTemplate struct {
+type SemaphoreExecutorSpec struct {
 	APIToken        string            `json:"api_token"`
 	OrganizationURL string            `json:"organization_url"`
 	ProjectID       string            `json:"project_id"`
@@ -149,7 +196,7 @@ type SemaphoreRunTemplate struct {
 	TaskID          string            `json:"task_id"`
 }
 
-type HTTPRunTemplate struct {
+type HTTPExecutorSpec struct {
 	URL           string             `json:"url"`
 	Payload       map[string]string  `json:"payload"`
 	Headers       map[string]string  `json:"headers"`
@@ -215,6 +262,31 @@ func (s *Stage) HasApprovalCondition() bool {
 	return false
 }
 
+func (s *Stage) MissingRequiredOutputs(outputs map[string]any) []string {
+	missing := []string{}
+	for _, outputDef := range s.Outputs {
+		if !outputDef.Required {
+			continue
+		}
+
+		if _, ok := outputs[outputDef.Name]; !ok {
+			missing = append(missing, outputDef.Name)
+		}
+	}
+
+	return missing
+}
+
+func (s *Stage) HasOutputDefinition(name string) bool {
+	for _, outputDefinition := range s.Outputs {
+		if outputDefinition.Name == name {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Stage) ListPendingEvents() ([]StageEvent, error) {
 	return s.ListEvents([]string{StageEventStatePending}, []string{})
 }
@@ -255,6 +327,28 @@ func (s *Stage) FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
 	}
 
 	return &execution, nil
+}
+
+func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[string]any, error) {
+	var event StageEvent
+
+	err := tx.
+		Table("stage_events AS e").
+		Select("e.*").
+		Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = e.id").
+		Where("e.stage_id = ?", s.ID).
+		Where("ex.state = ?", StageExecutionFinished).
+		Where("ex.result IN ?", results).
+		Order("ex.finished_at DESC").
+		Limit(1).
+		First(&event).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return event.Inputs.Data(), nil
 }
 
 func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {

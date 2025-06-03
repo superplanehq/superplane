@@ -26,15 +26,15 @@ export default function EventSourceNode( props : NodeProps<EventSourceNodeType>)
           <div className="bg-gray-50 border border-gray-200 rounded p-3">
             <div className="flex justify-between mb-1">
               <span className="text-sm text-gray-600">Event Type:</span>
-              <span className="text-sm font-medium">{props.data.lastEvent.type}</span>
+              <span className="text-sm font-medium">{props.data.eventType}</span>
             </div>
             <div className="flex justify-between mb-1">
               <span className="text-sm text-gray-600">Release:</span>
-              <span className="text-sm font-medium">{props.data.lastEvent.release}</span>
+              <span className="text-sm font-medium">{props.data.release}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-gray-600">Timestamp:</span>
-              <span className="text-sm font-medium">{props.data.lastEvent.timestamp}</span>
+              <span className="text-sm font-medium">{props.data.timestamp}</span>
             </div>
           </div>
         </div>

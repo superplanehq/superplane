@@ -36,19 +36,13 @@ type Status interface {
 	Successful() bool
 }
 
-func NewExecutor(execution models.StageExecution, runTemplate models.RunTemplate, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (Executor, error) {
-	resolver := NewTemplateResolver(execution, runTemplate)
-	template, err := resolver.Resolve()
-	if err != nil {
-		return nil, fmt.Errorf("error resolving run template: %v", err)
-	}
-
-	switch template.Type {
-	case models.RunTemplateTypeSemaphore:
-		return NewSemaphoreExecutor(execution, template.Semaphore, encryptor, jwtSigner)
-	case models.RunTemplateTypeHTTP:
-		return NewHTTPExecutor(execution, template.HTTP, encryptor, jwtSigner)
+func NewExecutor(execution models.StageExecution, spec models.ExecutorSpec, encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) (Executor, error) {
+	switch spec.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		return NewSemaphoreExecutor(execution, spec.Semaphore, encryptor, jwtSigner)
+	case models.ExecutorSpecTypeHTTP:
+		return NewHTTPExecutor(execution, spec.HTTP, encryptor, jwtSigner)
 	default:
-		return nil, fmt.Errorf("executor type %s not supported", template.Type)
+		return nil, fmt.Errorf("executor type %s not supported", spec.Type)
 	}
 }

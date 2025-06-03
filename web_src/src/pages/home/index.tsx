@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { SuperplaneCanvas } from '../../api-client'
+import { superplaneListCanvases } from '../../api-client/sdk.gen'
+import type { SuperplaneCanvas } from '../../api-client'
 
 // Home page component - displays list of canvases
 const HomePage = () => {
@@ -8,32 +9,25 @@ const HomePage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
-  // TODO: The API doesn't appear to have a direct method to list all canvases,
-  // so we're using mock data for now. In a real implementation, this would be 
-  // replaced with the appropriate API call.
   useEffect(() => {
-    // Simulate loading delay
     const fetchCanvases = async () => {
       try {
         setLoading(true)
-        // This is where we would call the API to fetch canvases
-        // Since there doesn't seem to be a direct method for listing all canvases,
-        // we're using mock data for now
+        setError(null)
         
-        // Mock data for demonstration
-        const mockCanvases: SuperplaneCanvas[] = [
-          { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Project Architecture', organizationId: 'org1' }
-        ]
+        // Call the API to fetch canvases
+        const response = await superplaneListCanvases()
         
-        // Simulate API delay
-        setTimeout(() => {
-          setCanvases(mockCanvases)
-          setLoading(false)
-        }, 500)
+        if (response.data) {
+          setCanvases(response.data.canvases || [])
+        } else {
+          throw new Error('No data received from API')
+        }
       } catch (err) {
-        setError('Failed to fetch canvases')
-        setLoading(false)
         console.error('Error fetching canvases:', err)
+        setError('Failed to fetch canvases. Please try again later.')
+      } finally {
+        setLoading(false)
       }
     }
     

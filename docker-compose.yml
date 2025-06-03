@@ -19,6 +19,7 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
+      START_GRPC_GATEWAY: "yes"
       START_PENDING_EVENTS_WORKER: "yes"
       START_PENDING_STAGE_EVENTS_WORKER: "yes"
       START_TIME_WINDOW_WORKER: "yes"
@@ -28,6 +29,7 @@ services:
       PUBLIC_API_BASE_PATH: /api/v1
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      NO_ENCRYPTION: "yes"
 
     ports:
       - 5173:5173
@@ -38,6 +40,12 @@ services:
     links:
       - db:db
       - rabbitmq:rabbitmq
+
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
@@ -50,6 +58,12 @@ services:
       - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: "the-cake-is-a-lie"
+    restart: "on-failure"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
   
   pgweb:
     image: sosedoff/pgweb
@@ -59,6 +73,9 @@ services:
       - 8081:8081
     links:
       - db:db
+    depends_on:
+      db:
+        condition: service_healthy
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
@@ -66,6 +83,13 @@ services:
     ports:
       - 5672:5672
       - 15672:15672
+    restart: "on-failure"
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
 volumes:
   repo-data:
     driver: local

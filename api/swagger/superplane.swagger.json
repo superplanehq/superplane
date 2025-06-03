@@ -81,10 +81,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/event-sources": {
+    "/api/v1/canvases/{canvasIdOrName}/event-sources": {
       "get": {
         "summary": "List event sources",
-        "description": "Returns a list of all event sources for the specified canvas",
+        "description": "Returns a list of all event sources for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_ListEventSources",
         "responses": {
           "200": {
@@ -102,7 +102,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -114,7 +114,7 @@
       },
       "post": {
         "summary": "Create a new event source",
-        "description": "Creates a new event source for the specified canvas",
+        "description": "Creates a new event source for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_CreateEventSource",
         "responses": {
           "200": {
@@ -132,7 +132,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -151,10 +151,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/event-sources/{id}": {
+    "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}": {
       "get": {
         "summary": "Get event source details",
-        "description": "Returns the details of a specific event source",
+        "description": "Returns the details of a specific event source (canvas can be referenced by ID or name)",
         "operationId": "Superplane_DescribeEventSource",
         "responses": {
           "200": {
@@ -172,7 +172,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -195,10 +195,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages": {
+    "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
-        "description": "Returns a list of all stages for the specified canvas",
+        "description": "Returns a list of all stages for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_ListStages",
         "responses": {
           "200": {
@@ -216,7 +216,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -228,7 +228,7 @@
       },
       "post": {
         "summary": "Create a new stage",
-        "description": "Creates a new stage for the specified canvas",
+        "description": "Creates a new stage for the specified canvas (can be referenced by ID or name)",
         "operationId": "Superplane_CreateStage",
         "responses": {
           "200": {
@@ -246,7 +246,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -265,10 +265,56 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{id}": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}": {
+      "patch": {
+        "summary": "Update a stage",
+        "description": "Updates the specified stage (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_UpdateStage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateStageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateStageBody"
+            }
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/stages/{id}": {
       "get": {
         "summary": "Get stage details",
-        "description": "Returns the details of a specific stage",
+        "description": "Returns the details of a specific stage (canvas can be referenced by ID or name)",
         "operationId": "Superplane_DescribeStage",
         "responses": {
           "200": {
@@ -286,7 +332,7 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -307,56 +353,12 @@
         "tags": [
           "Stage"
         ]
-      },
-      "patch": {
-        "summary": "Update a stage",
-        "description": "Updates the specified stage",
-        "operationId": "Superplane_UpdateStage",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateStageResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateStageBody"
-            }
-          }
-        ],
-        "tags": [
-          "Stage"
-        ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{stageId}/events": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events": {
       "get": {
         "summary": "List stage events",
-        "description": "Returns a list of events for the specified stage",
+        "description": "Returns a list of events for the specified stage (canvas can be referenced by ID or name)",
         "operationId": "Superplane_ListStageEvents",
         "responses": {
           "200": {
@@ -374,13 +376,13 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "stageId",
+            "name": "stageIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -426,10 +428,10 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasId}/stages/{stageId}/events/{eventId}/approve": {
+    "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/approve": {
       "post": {
         "summary": "Approve a stage event",
-        "description": "Approves the specified stage event",
+        "description": "Approves the specified stage event (canvas can be referenced by ID or name)",
         "operationId": "Superplane_ApproveStageEvent",
         "responses": {
           "200": {
@@ -447,13 +449,13 @@
         },
         "parameters": [
           {
-            "name": "canvasId",
+            "name": "canvasIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
           },
           {
-            "name": "stageId",
+            "name": "stageIdOrName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -574,6 +576,98 @@
         "RESULT_FAILED"
       ],
       "default": "RESULT_UNKNOWN"
+    },
+    "ExecutorSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pipelineFile": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "apiToken": {
+          "type": "string"
+        },
+        "organizationUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/InputMappingValueFrom"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueFrom": {
+      "type": "object",
+      "properties": {
+        "eventData": {
+          "$ref": "#/definitions/InputMappingValueFromEventData"
+        },
+        "lastExecution": {
+          "$ref": "#/definitions/InputMappingValueFromLastExecution"
+        }
+      }
+    },
+    "InputMappingValueFromEventData": {
+      "type": "object",
+      "properties": {
+        "connection": {
+          "type": "string"
+        },
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueFromLastExecution": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExecutionResult"
+          }
+        }
+      }
+    },
+    "InputMappingWhen": {
+      "type": "object",
+      "properties": {
+        "triggeredBy": {
+          "$ref": "#/definitions/InputMappingWhenTriggeredBy"
+        }
+      }
+    },
+    "InputMappingWhenTriggeredBy": {
+      "type": "object",
+      "properties": {
+        "connection": {
+          "type": "string"
+        }
+      }
     },
     "StageEventStateReason": {
       "type": "string",
@@ -765,8 +859,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },
@@ -846,6 +961,13 @@
         "finishedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputValue"
+          }
         }
       }
     },
@@ -858,6 +980,62 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneExecutorSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneExecutorSpecType"
+        },
+        "semaphore": {
+          "$ref": "#/definitions/ExecutorSpecSemaphore"
+        }
+      }
+    },
+    "SuperplaneExecutorSpecType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_SEMAPHORE"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
+    "SuperplaneInputDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneInputMapping": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/InputMappingValueDefinition"
+          }
+        },
+        "when": {
+          "$ref": "#/definitions/InputMappingWhen"
+        }
+      }
+    },
+    "SuperplaneInputValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
     },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
@@ -907,50 +1085,27 @@
         }
       }
     },
-    "SuperplaneRunTemplate": {
+    "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
-        "type": {
-          "$ref": "#/definitions/SuperplaneRunTemplateType"
+        "name": {
+          "type": "string"
         },
-        "semaphore": {
-          "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
         }
       }
     },
-    "SuperplaneRunTemplateType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE"
-      ],
-      "default": "TYPE_UNKNOWN"
-    },
-    "SuperplaneSemaphoreRunTemplate": {
+    "SuperplaneOutputValue": {
       "type": "object",
       "properties": {
-        "projectId": {
+        "name": {
           "type": "string"
         },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "apiToken": {
-          "type": "string"
-        },
-        "organizationUrl": {
+        "value": {
           "type": "string"
         }
       }
@@ -985,8 +1140,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },
@@ -1021,6 +1197,13 @@
         },
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputValue"
+          }
         }
       }
     },
@@ -1066,8 +1249,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },

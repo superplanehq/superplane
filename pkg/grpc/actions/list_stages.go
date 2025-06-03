@@ -6,17 +6,21 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
-	err := ValidateUUIDs(req.CanvasId)
+	err := ValidateUUIDs(req.CanvasIdOrName)
+	var canvas *models.Canvas
 	if err != nil {
-		return nil, err
+		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
+	} else {
+		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
 	}
 
-	canvas, err := models.FindCanvas(req.CanvasId)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
 	}
 
 	stages, err := canvas.ListStages()

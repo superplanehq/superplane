@@ -28,8 +28,8 @@ type EventAPIService service
 type ApiSuperplaneApproveStageEventRequest struct {
 	ctx context.Context
 	ApiService *EventAPIService
-	canvasId string
-	stageId string
+	canvasIdOrName string
+	stageIdOrName string
 	eventId string
 	body *SuperplaneApproveStageEventBody
 }
@@ -46,20 +46,20 @@ func (r ApiSuperplaneApproveStageEventRequest) Execute() (*SuperplaneApproveStag
 /*
 SuperplaneApproveStageEvent Approve a stage event
 
-Approves the specified stage event
+Approves the specified stage event (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @param stageId
+ @param canvasIdOrName
+ @param stageIdOrName
  @param eventId
  @return ApiSuperplaneApproveStageEventRequest
 */
-func (a *EventAPIService) SuperplaneApproveStageEvent(ctx context.Context, canvasId string, stageId string, eventId string) ApiSuperplaneApproveStageEventRequest {
+func (a *EventAPIService) SuperplaneApproveStageEvent(ctx context.Context, canvasIdOrName string, stageIdOrName string, eventId string) ApiSuperplaneApproveStageEventRequest {
 	return ApiSuperplaneApproveStageEventRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
-		stageId: stageId,
+		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
 		eventId: eventId,
 	}
 }
@@ -79,9 +79,9 @@ func (a *EventAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneAppr
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/stages/{stageId}/events/{eventId}/approve"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"stageId"+"}", url.PathEscape(parameterValueToString(r.stageId, "stageId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/approve"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -158,8 +158,8 @@ func (a *EventAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneAppr
 type ApiSuperplaneListStageEventsRequest struct {
 	ctx context.Context
 	ApiService *EventAPIService
-	canvasId string
-	stageId string
+	canvasIdOrName string
+	stageIdOrName string
 	states *[]string
 	stateReasons *[]string
 }
@@ -181,19 +181,19 @@ func (r ApiSuperplaneListStageEventsRequest) Execute() (*SuperplaneListStageEven
 /*
 SuperplaneListStageEvents List stage events
 
-Returns a list of events for the specified stage
+Returns a list of events for the specified stage (canvas can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
- @param stageId
+ @param canvasIdOrName
+ @param stageIdOrName
  @return ApiSuperplaneListStageEventsRequest
 */
-func (a *EventAPIService) SuperplaneListStageEvents(ctx context.Context, canvasId string, stageId string) ApiSuperplaneListStageEventsRequest {
+func (a *EventAPIService) SuperplaneListStageEvents(ctx context.Context, canvasIdOrName string, stageIdOrName string) ApiSuperplaneListStageEventsRequest {
 	return ApiSuperplaneListStageEventsRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
-		stageId: stageId,
+		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
 	}
 }
 
@@ -212,9 +212,9 @@ func (a *EventAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/stages/{stageId}/events"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"stageId"+"}", url.PathEscape(parameterValueToString(r.stageId, "stageId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

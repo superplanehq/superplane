@@ -30,21 +30,21 @@ var getCanvasCmd = &cobra.Command{
 }
 
 var getEventSourceCmd = &cobra.Command{
-	Use:     "event-source [CANVAS_ID] [ID]",
+	Use:     "event-source [ID]",
 	Short:   "Get event source details",
 	Long:    `Get details about a specific event source`,
 	Aliases: []string{"event-sources", "eventsource", "eventsources"},
-	Args:    cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
-		id := args[1]
+		id := args[0]
 		name, _ := cmd.Flags().GetString("name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneDescribeEventSource(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			id,
 		).Name(name).Execute()
 		Check(err)
@@ -56,21 +56,22 @@ var getEventSourceCmd = &cobra.Command{
 }
 
 var getStageCmd = &cobra.Command{
-	Use:     "stage [CANVAS_ID] [ID]",
+	Use:     "stage [ID]",
 	Short:   "Get stage details",
 	Long:    `Get details about a specific stage`,
 	Aliases: []string{"stages"},
-	Args:    cobra.ExactArgs(2),
+	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
-		id := args[1]
+		id := args[0]
+
 		name, _ := cmd.Flags().GetString("name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneDescribeStage(
 			context.Background(),
-			canvasID,
+			canvasIDOrName,
 			id,
 		).Name(name).Execute()
 		Check(err)
@@ -99,8 +100,12 @@ func init() {
 	// Event Source command
 	getCmd.AddCommand(getEventSourceCmd)
 	getEventSourceCmd.Flags().String("name", "", "Name of the event source (alternative to ID)")
+	getEventSourceCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
+	getEventSourceCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
 
 	// Stage command
 	getCmd.AddCommand(getStageCmd)
 	getStageCmd.Flags().String("name", "", "Name of the stage (alternative to ID)")
+	getStageCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
+	getStageCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
 }

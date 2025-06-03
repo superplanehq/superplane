@@ -24,13 +24,13 @@ func Test__DescribeEventSource(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Equal(t, "canvas not found", s.Message())
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasId: uuid.New().String(),
-			Id:       uuid.New().String(),
+			CanvasIdOrName: uuid.New().String(),
+			Id:             uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -41,8 +41,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Id:       uuid.New().String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Id:             uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -53,7 +53,7 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("no name and no ID -> error", func(t *testing.T) {
 		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -64,8 +64,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("using id", func(t *testing.T) {
 		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Id:       r.Source.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Id:             r.Source.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -79,8 +79,8 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("using name", func(t *testing.T) {
 		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasId: r.Canvas.ID.String(),
-			Name:     r.Source.Name,
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           r.Source.Name,
 		})
 
 		require.NoError(t, err)

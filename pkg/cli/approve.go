@@ -11,16 +11,17 @@ import (
 )
 
 var approveEventCmd = &cobra.Command{
-	Use:     "event [CANVAS_ID] [STAGE_ID] [EVENT_ID]",
+	Use:     "event [EVENT_ID]",
 	Short:   "Approve a stage event",
 	Long:    `Approve a pending stage event that requires approval.`,
 	Aliases: []string{"events"},
-	Args:    cobra.ExactArgs(3),
+	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasID := args[0]
-		stageID := args[1]
-		eventID := args[2]
+		eventID := args[0]
+
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
 
 		c := DefaultClient()
 
@@ -29,8 +30,8 @@ var approveEventCmd = &cobra.Command{
 
 		response, _, err := c.EventAPI.SuperplaneApproveStageEvent(
 			context.Background(),
-			canvasID,
-			stageID,
+			canvasIDOrName,
+			stageIDOrName,
 			eventID,
 		).Body(*request).Execute()
 		Check(err)
@@ -47,6 +48,11 @@ var approveCmd = &cobra.Command{
 }
 
 func init() {
+	approveEventCmd.Flags().String("canvas-id", "", "Canvas ID")
+	approveEventCmd.Flags().String("canvas-name", "", "Canvas name")
+	approveEventCmd.Flags().String("stage-id", "", "Stage ID")
+	approveEventCmd.Flags().String("stage-name", "", "Stage name")
+
 	RootCmd.AddCommand(approveCmd)
 	approveCmd.AddCommand(approveEventCmd)
 }

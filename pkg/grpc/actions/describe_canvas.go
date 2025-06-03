@@ -19,7 +19,14 @@ func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.Des
 		return nil, err
 	}
 
-	canvas, err := models.FindCanvas(req.Id)
+	var canvas *models.Canvas
+	if req.Name != "" {
+		canvas, err = models.FindCanvasByName(req.Name)
+
+	} else {
+		canvas, err = models.FindCanvasByID(req.Id)
+	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")

@@ -26,12 +26,12 @@ func Test__TimeWindowWorker(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, r.Canvas.CreateStage("stage-1", r.User.String(), conditions, support.RunTemplate(), []models.StageConnection{
+	require.NoError(t, r.Canvas.CreateStage("stage-1", r.User.String(), conditions, support.ExecutorSpec(), []models.StageConnection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,
 		},
-	}))
+	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
 
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)

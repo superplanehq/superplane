@@ -15,10 +15,10 @@ const (
 )
 
 type StageExecutionCompletion struct {
-	Type      string            `json:"type"`
-	Stage     *Stage            `json:"stage,omitempty"`
-	Execution *Execution        `json:"execution,omitempty"`
-	Tags      map[string]string `json:"tags,omitempty"`
+	Type      string         `json:"type"`
+	Stage     *Stage         `json:"stage,omitempty"`
+	Execution *Execution     `json:"execution,omitempty"`
+	Outputs   map[string]any `json:"outputs,omitempty"`
 }
 
 type Stage struct {
@@ -33,7 +33,7 @@ type Execution struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
-func NewStageExecutionCompletion(execution *models.StageExecution, tags map[string]string) (*StageExecutionCompletion, error) {
+func NewStageExecutionCompletion(execution *models.StageExecution, outputs map[string]any) (*StageExecutionCompletion, error) {
 	return &StageExecutionCompletion{
 		Type: StageExecutionCompletionType,
 		Stage: &Stage{
@@ -46,6 +46,6 @@ func NewStageExecutionCompletion(execution *models.StageExecution, tags map[stri
 			StartedAt:  execution.StartedAt,
 			FinishedAt: execution.FinishedAt,
 		},
-		Tags: tags,
+		Outputs: outputs,
 	}, nil
 }

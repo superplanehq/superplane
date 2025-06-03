@@ -39,6 +39,7 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
+	Inputs      datatypes.JSONType[map[string]any]
 }
 
 func (e *StageEvent) UpdateState(state, reason string) error {
@@ -112,11 +113,11 @@ func FindStageEventByID(id, stageID string) (*StageEvent, error) {
 	return &event, nil
 }
 
-func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
-	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason)
+func CreateStageEvent(stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
+	return CreateStageEventInTransaction(database.Conn(), stageID, event, state, stateReason, inputs)
 }
 
-func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string) (*StageEvent, error) {
+func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event, state, stateReason string, inputs map[string]any) (*StageEvent, error) {
 	now := time.Now()
 	stageEvent := StageEvent{
 		StageID:     stageID,
@@ -127,6 +128,7 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		State:       state,
 		StateReason: stateReason,
 		CreatedAt:   &now,
+		Inputs:      datatypes.NewJSONType(inputs),
 	}
 
 	err := tx.Create(&stageEvent).

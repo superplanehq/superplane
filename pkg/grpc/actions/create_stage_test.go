@@ -25,10 +25,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    uuid.New().String(),
-			Name:        "test",
-			RequesterId: r.User.String(),
-			RunTemplate: support.ProtoRunTemplate(),
+			CanvasIdOrName: uuid.New().String(),
+			Name:           "test",
+			RequesterId:    r.User.String(),
+			Executor:       support.ProtoExecutor(),
 		})
 
 		s, ok := status.FromError(err)
@@ -39,23 +39,23 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
 		})
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Equal(t, "canvas not found", s.Message())
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.Name,
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: "source-does-not-exist",
@@ -72,10 +72,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -95,10 +95,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -121,10 +121,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -149,10 +149,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -177,10 +177,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -206,10 +206,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: support.ProtoRunTemplate(),
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       support.ProtoExecutor(),
+			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -240,12 +240,12 @@ func Test__CreateStage(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		runTemplate := support.ProtoRunTemplate()
+		executor := support.ProtoExecutor()
 		res, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RunTemplate: runTemplate,
-			RequesterId: r.User.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			Executor:       executor,
+			RequesterId:    r.User.String(),
 			Conditions: []*protos.Condition{
 				{
 					Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
@@ -288,11 +288,11 @@ func Test__CreateStage(t *testing.T) {
 		assert.NotNil(t, res.Stage.CreatedAt)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.CanvasId)
 		assert.Equal(t, "test", res.Stage.Name)
-		assert.Equal(t, runTemplate.Type, res.Stage.RunTemplate.Type)
-		assert.Equal(t, runTemplate.Semaphore.Branch, res.Stage.RunTemplate.Semaphore.Branch)
-		assert.Equal(t, runTemplate.Semaphore.PipelineFile, res.Stage.RunTemplate.Semaphore.PipelineFile)
-		assert.Equal(t, runTemplate.Semaphore.OrganizationUrl, res.Stage.RunTemplate.Semaphore.OrganizationUrl)
-		assert.Equal(t, runTemplate.Semaphore.Parameters, res.Stage.RunTemplate.Semaphore.Parameters)
+		assert.Equal(t, executor.Type, res.Stage.Executor.Type)
+		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Executor.Semaphore.Branch)
+		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Executor.Semaphore.PipelineFile)
+		assert.Equal(t, executor.Semaphore.OrganizationUrl, res.Stage.Executor.Semaphore.OrganizationUrl)
+		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Executor.Semaphore.Parameters)
 
 		// Assert connections are correct
 		require.Len(t, res.Stage.Connections, 1)
@@ -312,10 +312,10 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
-			CanvasId:    r.Canvas.ID.String(),
-			Name:        "test",
-			RequesterId: r.User.String(),
-			RunTemplate: support.ProtoRunTemplate(),
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           "test",
+			RequesterId:    r.User.String(),
+			Executor:       support.ProtoExecutor(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
