@@ -13,7 +13,7 @@ const cn = (...classes: ClassValue[]) => {
 
 export const ConnectionStatus: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true);
-  const [autoHideTimer, setAutoHideTimer] = useState<number | null>(null);
+  const [autoHideTimer, setAutoHideTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const { webSocketConnectionStatus } = useCanvasStore();
 
   // Handle auto-hide for connected state
