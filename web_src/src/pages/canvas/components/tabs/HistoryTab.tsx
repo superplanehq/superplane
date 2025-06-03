@@ -129,7 +129,7 @@ export const HistoryTab = ({ allExecutions }: HistoryTabProps) => {
                   <div className="mt-4">
                     <h5 className="text-sm font-medium text-gray-900 mb-2">📤 Outputs</h5>
                     <div className="bg-white rounded-lg border p-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-2">
                         {execution.outputs.map((output, index) => (
                           <div key={index} className="bg-green-50 border border-green-200 rounded p-3">
                             <div className="text-sm font-medium text-green-900 mb-1">

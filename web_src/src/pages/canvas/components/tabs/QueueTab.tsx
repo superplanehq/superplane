@@ -41,13 +41,13 @@ export const QueueTab = ({
   const renderExecutionOutputs = (event: SuperplaneStageEvent) => {
     if (!event.execution?.outputs || event.execution.outputs.length === 0) {
       return (
-        <div className="text-xs text-gray-500 mt-2">No outputs</div>
+        <div className="text-xs text-gray-500 mt-2">No Execution outputs</div>
       );
     }
 
     return (
       <div className="mt-2">
-        <div className="text-xs font-medium text-gray-700 mb-1">Outputs:</div>
+        <div className="text-xs font-medium text-gray-700 mb-1">Execution Outputs:</div>
         <div className="space-y-1">
           {event.execution.outputs.map((output, index) => (
             <div key={index} className="text-xs bg-green-100 rounded px-2 py-1">
@@ -83,18 +83,22 @@ export const QueueTab = ({
 
     return (
       <div className="mt-2 flex flex-wrap gap-1 flex-col">
-        <span className="text-xs font-medium text-gray-500">Execution Status:</span>
-        <span className={`text-xs px-2 py-1 rounded ${getStateColor(execution.state || '')}`}>
-          {execution.state?.replace('STATE_', '')}
-        </span>
-        {execution.result && execution.result !== 'RESULT_UNKNOWN' && (
+        <div className="flex justify-center items-center gap-2 w-full text-center">
+          <span className="text-xs font-medium text-gray-500">Execution Status:</span>
+          <span className={`text-xs px-2 py-1 rounded ${getStateColor(execution.state || '')}`}>
+            {execution.state?.replace('STATE_', '')}
+          </span>
+          {execution.result && execution.result !== 'RESULT_UNKNOWN' && (
           <>
           <span className="text-xs font-medium text-gray-500">Execution Result:</span>
           <span className={`text-xs px-2 py-1 rounded ${getResultColor(execution.result)}`}>
             {execution.result?.replace('RESULT_', '')}
           </span>
           </>
-        )}
+          )}
+        </div>
+        
+        <div className="flex justify-center items-center gap-2 w-full text-center">
         {execution.startedAt && (
           <span className="text-xs text-gray-500">
             Started: {new Date(execution.startedAt).toLocaleTimeString()}
@@ -105,6 +109,7 @@ export const QueueTab = ({
             Finished: {new Date(execution.finishedAt).toLocaleTimeString()}
           </span>
         )}
+        </div>
       </div>
     );
   };
@@ -245,8 +250,8 @@ export const QueueTab = ({
                     </div>
                   </div>
                   {renderEventInputs(event)}
-                  {renderExecutionStatus(event)}
                   {event.execution?.state === 'STATE_FINISHED' && renderExecutionOutputs(event)}
+                  {renderExecutionStatus(event)}
                 </div>
               ))}
               {processedEvents.length > 10 && (
