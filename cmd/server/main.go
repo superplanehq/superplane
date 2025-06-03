@@ -14,10 +14,6 @@ import (
 )
 
 func startWorkers(jwtSigner *jwt.Signer, encryptor encryptor.Encryptor) {
-	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp: true,
-		TimestampFormat: time.StampMilli,
-	})
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
