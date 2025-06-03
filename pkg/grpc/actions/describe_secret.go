@@ -33,6 +33,10 @@ func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Des
 		secret, err = models.FindSecretByID(canvas.ID.String(), req.IdOrName)
 	}
 
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "secret not found")
+	}
+
 	s, err := serializeSecret(ctx, encryptor, *secret)
 	if err != nil {
 		return nil, err

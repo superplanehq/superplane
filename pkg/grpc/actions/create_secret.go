@@ -3,6 +3,7 @@ package actions
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -51,7 +52,11 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Creat
 
 	secret, err := models.CreateSecret(req.Secret.Name, provider, req.RequesterId, canvas.ID, data)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, models.ErrNameAlreadyUsed) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	s, err := serializeSecret(ctx, encryptor, *secret)

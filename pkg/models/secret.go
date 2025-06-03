@@ -28,6 +28,7 @@ func (s *Secret) UpdateData(data []byte) (*Secret, error) {
 	now := time.Now()
 
 	err := database.Conn().
+		Model(s).
 		Clauses(clause.Returning{}).
 		Where("id = ?", s.ID).
 		Update("data", data).

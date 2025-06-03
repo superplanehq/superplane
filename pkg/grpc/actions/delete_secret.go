@@ -22,6 +22,11 @@ func DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteS
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
+	err = ValidateUUIDs(req.RequesterId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid requester ID")
+	}
+
 	err = ValidateUUIDs(req.IdOrName)
 	var secret *models.Secret
 	if err != nil {
