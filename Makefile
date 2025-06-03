@@ -12,11 +12,12 @@ test.setup: openapi.spec.gen
 lint:
 	docker-compose run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
+TEST_PACKAGES := ./...
 test:
-	docker-compose run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
+	docker-compose run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.watch:
-	docker-compose run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="./..." -- -p 1
+	docker-compose run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 tidy:
 	docker-compose run --rm app go mod tidy
@@ -61,7 +62,7 @@ pb.gen:
 	docker-compose run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 
 openapi.spec.gen:
-	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client

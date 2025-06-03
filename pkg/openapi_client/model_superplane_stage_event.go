@@ -29,6 +29,7 @@ type SuperplaneStageEvent struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
+	Inputs []SuperplaneInputValue `json:"inputs,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -316,6 +317,38 @@ func (o *SuperplaneStageEvent) SetExecution(v SuperplaneExecution) {
 	o.Execution = &v
 }
 
+// GetInputs returns the Inputs field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetInputs() []SuperplaneInputValue {
+	if o == nil || IsNil(o.Inputs) {
+		var ret []SuperplaneInputValue
+		return ret
+	}
+	return o.Inputs
+}
+
+// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStageEvent) GetInputsOk() ([]SuperplaneInputValue, bool) {
+	if o == nil || IsNil(o.Inputs) {
+		return nil, false
+	}
+	return o.Inputs, true
+}
+
+// HasInputs returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasInputs() bool {
+	if o != nil && !IsNil(o.Inputs) {
+		return true
+	}
+
+	return false
+}
+
+// SetInputs gets a reference to the given []SuperplaneInputValue and assigns it to the Inputs field.
+func (o *SuperplaneStageEvent) SetInputs(v []SuperplaneInputValue) {
+	o.Inputs = v
+}
+
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -349,6 +382,9 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Execution) {
 		toSerialize["execution"] = o.Execution
+	}
+	if !IsNil(o.Inputs) {
+		toSerialize["inputs"] = o.Inputs
 	}
 	return toSerialize, nil
 }

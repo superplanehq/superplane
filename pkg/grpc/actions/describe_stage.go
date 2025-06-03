@@ -64,7 +64,14 @@ func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.Descr
 		return nil, err
 	}
 
-	serialized, err := serializeStage(*stage, conn)
+	serialized, err := serializeStage(
+		*stage,
+		conn,
+		serializeInputs(stage.Inputs),
+		serializeOutputs(stage.Outputs),
+		serializeInputMappings(stage.InputMappings),
+	)
+
 	if err != nil {
 		return nil, err
 	}

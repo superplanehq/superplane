@@ -577,6 +577,98 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "ExecutorSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pipelineFile": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "apiToken": {
+          "type": "string"
+        },
+        "organizationUrl": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/InputMappingValueFrom"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueFrom": {
+      "type": "object",
+      "properties": {
+        "eventData": {
+          "$ref": "#/definitions/InputMappingValueFromEventData"
+        },
+        "lastExecution": {
+          "$ref": "#/definitions/InputMappingValueFromLastExecution"
+        }
+      }
+    },
+    "InputMappingValueFromEventData": {
+      "type": "object",
+      "properties": {
+        "connection": {
+          "type": "string"
+        },
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
+    "InputMappingValueFromLastExecution": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExecutionResult"
+          }
+        }
+      }
+    },
+    "InputMappingWhen": {
+      "type": "object",
+      "properties": {
+        "triggeredBy": {
+          "$ref": "#/definitions/InputMappingWhenTriggeredBy"
+        }
+      }
+    },
+    "InputMappingWhenTriggeredBy": {
+      "type": "object",
+      "properties": {
+        "connection": {
+          "type": "string"
+        }
+      }
+    },
     "StageEventStateReason": {
       "type": "string",
       "enum": [
@@ -767,8 +859,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },
@@ -848,6 +961,13 @@
         "finishedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputValue"
+          }
         }
       }
     },
@@ -860,6 +980,62 @@
         "STATE_FINISHED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneExecutorSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneExecutorSpecType"
+        },
+        "semaphore": {
+          "$ref": "#/definitions/ExecutorSpecSemaphore"
+        }
+      }
+    },
+    "SuperplaneExecutorSpecType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_SEMAPHORE"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
+    "SuperplaneInputDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneInputMapping": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/InputMappingValueDefinition"
+          }
+        },
+        "when": {
+          "$ref": "#/definitions/InputMappingWhen"
+        }
+      }
+    },
+    "SuperplaneInputValue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
     },
     "SuperplaneListCanvasesResponse": {
       "type": "object",
@@ -909,50 +1085,27 @@
         }
       }
     },
-    "SuperplaneRunTemplate": {
+    "SuperplaneOutputDefinition": {
       "type": "object",
       "properties": {
-        "type": {
-          "$ref": "#/definitions/SuperplaneRunTemplateType"
+        "name": {
+          "type": "string"
         },
-        "semaphore": {
-          "$ref": "#/definitions/SuperplaneSemaphoreRunTemplate"
+        "description": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
         }
       }
     },
-    "SuperplaneRunTemplateType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE"
-      ],
-      "default": "TYPE_UNKNOWN"
-    },
-    "SuperplaneSemaphoreRunTemplate": {
+    "SuperplaneOutputValue": {
       "type": "object",
       "properties": {
-        "projectId": {
+        "name": {
           "type": "string"
         },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "apiToken": {
-          "type": "string"
-        },
-        "organizationUrl": {
+        "value": {
           "type": "string"
         }
       }
@@ -987,8 +1140,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },
@@ -1023,6 +1197,13 @@
         },
         "execution": {
           "$ref": "#/definitions/SuperplaneExecution"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputValue"
+          }
         }
       }
     },
@@ -1068,8 +1249,29 @@
             "$ref": "#/definitions/SuperplaneCondition"
           }
         },
-        "runTemplate": {
-          "$ref": "#/definitions/SuperplaneRunTemplate"
+        "executor": {
+          "$ref": "#/definitions/SuperplaneExecutorSpec"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputDefinition"
+          }
+        },
+        "inputMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneInputMapping"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
         }
       }
     },

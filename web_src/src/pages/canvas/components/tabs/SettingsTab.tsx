@@ -1,3 +1,4 @@
+import { InputMappingValueDefinition } from "@/api-client";
 import { StageWithEventQueue } from "../../store/types";
 
 interface SettingsTabProps {
@@ -5,6 +6,49 @@ interface SettingsTabProps {
 }
 
 export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
+  const getInputMapping = (inputName: string) => {
+    if (!selectedStage.inputMappings) return null;
+    
+    for (const mapping of selectedStage.inputMappings) {
+      const valueMapping = mapping.values?.find(v => v.name === inputName);
+      if (valueMapping) {
+        return {
+          mapping: valueMapping,
+          triggeredBy: mapping.when?.triggeredBy?.connection
+        };
+      }
+    }
+    return null;
+  };
+
+  const formatValueSource = (mapping: InputMappingValueDefinition) => {
+    if (mapping.value && mapping.value.trim() !== '') {
+      return {
+        type: 'Static Value',
+        source: mapping.value,
+        icon: '📝'
+      };
+    }
+    
+    if (mapping.valueFrom?.eventData?.connection) {
+      return {
+        type: 'From Connection',
+        source: `${mapping.valueFrom.eventData.connection}${mapping.valueFrom.eventData.expression ? ` → ${mapping.valueFrom.eventData.expression}` : ''}`,
+        icon: '🔗'
+      };
+    }
+    
+    if (mapping.valueFrom?.lastExecution?.results) {
+      return {
+        type: 'From Last Execution',
+        source: `Results: ${mapping.valueFrom.lastExecution.results.join(', ')}`,
+        icon: '⏮️'
+      };
+    }
+    
+    return null;
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -34,6 +78,114 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             <span className="text-gray-700 font-medium">Created</span>
             <span className="text-gray-900">{selectedStage.createdAt ? new Date(selectedStage.createdAt).toLocaleString() : 'N/A'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* Inputs */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-medium text-gray-900">Inputs</h3>
+        </div>
+        <div className="p-4">
+          {selectedStage.inputs && selectedStage.inputs.length > 0 ? (
+            <div className="space-y-4">
+              {selectedStage.inputs.map((input, index) => {
+                const inputMapping = getInputMapping(input.name || '');
+                const valueSource = inputMapping ? formatValueSource(inputMapping.mapping) : null;
+                
+                return (
+                  <div key={index} className="border border-gray-200 rounded-lg p-4">
+                    <div className="mb-3">
+                      <div className="font-medium text-gray-900 mb-1">
+                        {input.name || `Input ${index + 1}`}
+                      </div>
+                      {input.description && (
+                        <div className="text-sm text-gray-600 mb-2">{input.description}</div>
+                      )}
+                    </div>
+                    
+                    {/* Value Mapping */}
+                    {valueSource ? (
+                      <div className="bg-gray-50 rounded-lg p-3 border">
+                        <div className="flex items-start gap-2">
+                          <span className="text-lg">{valueSource.icon}</span>
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-700 mb-1">
+                              {valueSource.type}
+                            </div>
+                            <div className="text-sm text-gray-900 font-mono bg-white px-2 py-1 rounded border">
+                              {valueSource.source}
+                            </div>
+                            {inputMapping?.triggeredBy && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Triggered by: {inputMapping.triggeredBy}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-yellow-600">⚠️</span>
+                          <span className="text-sm text-yellow-800">No value mapping configured</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">No inputs configured</div>
+          )}
+        </div>
+      </div>
+
+      {/* Outputs */}
+      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+        <div className="p-4 border-b border-gray-200">
+          <h3 className="font-medium text-gray-900">Outputs</h3>
+        </div>
+        <div className="p-4">
+          {selectedStage.outputs && selectedStage.outputs.length > 0 ? (
+            <div className="space-y-4">
+              {selectedStage.outputs.map((output, index) => (
+                <div key={index} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="font-medium text-gray-900">
+                      {output.name || `Output ${index + 1}`}
+                    </div>
+                    <div className="flex gap-2">
+                      {output.required && (
+                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium">
+                          Required
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {output.description && (
+                    <div className="text-sm text-gray-600 mb-3">{output.description}</div>
+                  )}
+                  
+                  {/* Output Usage Info */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600">💡</span>
+                      <div className="text-sm text-blue-800 text-left">
+                        <div className="font-medium mb-1">Available for downstream stages</div>
+                        <div className="text-xs text-blue-600 font-mono">
+                          Reference: outputs.{output.name || `output_${index + 1}`}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 text-gray-500 text-sm">No outputs configured</div>
+          )}
         </div>
       </div>
 
@@ -103,37 +255,37 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         </div>
       </div>
 
-      {/* Run Template */}
+      {/* Executor */}
       <div className="bg-white rounded-lg border border-gray-200">
         <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Run Template</h3>
+          <h3 className="font-medium text-gray-900">Executor</h3>
         </div>
         <div className="p-4">
-          {selectedStage.runTemplate ? (
+          {selectedStage.executor ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium">Type</span>
-                <span className="text-gray-900">{selectedStage.runTemplate.type?.replace('TYPE_', '')}</span>
+                <span className="text-gray-900">{selectedStage.executor.type?.replace('TYPE_', '')}</span>
               </div>
-              {selectedStage.runTemplate.semaphore && (
+              {selectedStage.executor.semaphore && (
                 <>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Project ID</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.projectId}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.projectId}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Branch</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.branch}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.branch}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Pipeline File</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.runTemplate.semaphore.pipelineFile}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.pipelineFile}</span>
                   </div>
                 </>
               )}
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No run template configured</div>
+            <div className="text-center py-4 text-gray-500 text-sm">No executor configured</div>
           )}
         </div>
       </div>

@@ -93,8 +93,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // defined in @/api-client/api
     superplaneApproveStageEvent({
       path: {
-        canvasId: get().canvas.id!,
-        stageId: stageId,
+        canvasIdOrName: get().canvas.id!,
+        stageIdOrName: stageId,
         eventId: stageEventId
       },
       body: {

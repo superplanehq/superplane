@@ -1,6 +1,6 @@
 module github.com/superplanehq/superplane
 
-go 1.23.8
+go 1.24
 
 require (
 	github.com/expr-lang/expr v1.17.2

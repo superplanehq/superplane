@@ -34,8 +34,8 @@ const (
 	// Event payload can be up to 64k in size
 	MaxEventSize = 64 * 1024
 
-	// The size of a stage execution can be up to 4k
-	MaxExecutionTagsSize = 4 * 1024
+	// The size of the stage execution outputs can be up to 4k
+	MaxExecutionOutputsSize = 4 * 1024
 )
 
 type Server struct {
@@ -62,7 +62,7 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
-		upgrader:              &websocket.Upgrader{
+		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
 				// TODO: implement origin checking
@@ -71,8 +71,8 @@ func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath st
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		BasePath:              basePath,
-		wsHub:                 wsHub,
+		BasePath: basePath,
+		wsHub:    wsHub,
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -154,10 +154,10 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 		s.setupDevProxy(webBasePath)
 	} else {
 		log.Info("Running in production mode - serving static web assets")
-		
+
 		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
 		s.Router.PathPrefix(webBasePath).Handler(handler)
-		
+
 		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == webBasePath {
 				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
@@ -187,7 +187,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("POST")
 
 	authenticatedRoute.
-		HandleFunc(s.BasePath+"/executions/{executionID}/tags", s.HandleExecutionTags).
+		HandleFunc(s.BasePath+"/outputs", s.HandleExecutionOutputs).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -230,20 +230,12 @@ func (s *Server) Close() {
 	}
 }
 
-func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	executionID, err := uuid.Parse(vars["executionID"])
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
+type OutputsRequest struct {
+	ExecutionID string         `json:"execution_id"`
+	Outputs     map[string]any `json:"outputs"`
+}
 
-	execution, err := models.FindExecutionByID(executionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
-
+func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
@@ -256,14 +248,7 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := headerParts[1]
-	err = s.jwt.Validate(token, execution.ID.String())
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	r.Body = http.MaxBytesReader(w, r.Body, MaxExecutionTagsSize)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxExecutionOutputsSize)
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
@@ -271,7 +256,7 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(*http.MaxBytesError); ok {
 			http.Error(
 				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxExecutionTagsSize),
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxExecutionOutputsSize),
 				http.StatusRequestEntityTooLarge,
 			)
 
@@ -282,13 +267,64 @@ func (s *Server) HandleExecutionTags(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = execution.AddTags(body)
+	var req OutputsRequest
+	err = json.Unmarshal(body, &req)
 	if err != nil {
-		http.Error(w, "Error updating tags", http.StatusInternalServerError)
+		http.Error(w, "Error decoding request body", http.StatusBadRequest)
+		return
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionID)
+	if err != nil {
+		http.Error(w, "execution not found", http.StatusNotFound)
+		return
+	}
+
+	token := headerParts[1]
+	err = s.jwt.Validate(token, req.ExecutionID)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	execution, err := models.FindExecutionByID(executionID)
+	if err != nil {
+		http.Error(w, "execution not found", http.StatusNotFound)
+		return
+	}
+
+	stage, err := models.FindStageByID(execution.StageID.String())
+	if err != nil {
+		http.Error(w, "error finding stage", http.StatusInternalServerError)
+		return
+	}
+
+	outputs, err := s.parseExecutionOutputs(stage, req.Outputs)
+	if err != nil {
+		http.Error(w, "Error parsing outputs", http.StatusBadRequest)
+		return
+	}
+
+	err = execution.UpdateOutputs(outputs)
+	if err != nil {
+		http.Error(w, "Error updating outputs", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]any) (map[string]any, error) {
+	//
+	// We ignore outputs that were sent but are not defined in the stage.
+	//
+	for k := range outputs {
+		if !stage.HasOutputDefinition(k) {
+			delete(outputs, k)
+		}
+	}
+
+	return outputs, nil
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
@@ -468,12 +504,12 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
-	
+
 	// Extract the canvasId from the URL path variables
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
 	log.Infof("WebSocket connection for canvas ID: %s", canvasID)
-	
+
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {

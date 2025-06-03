@@ -52,19 +52,32 @@ func Test__ListStageEvents(t *testing.T) {
 	})
 
 	t.Run("stage with stage events - list", func(t *testing.T) {
-		// event without approval
+		// event without approval, no inputs
 		support.CreateStageEvent(t, r.Source, r.Stage)
 
-		// event with approval
+		// event with approval, with inputs
 		userID := uuid.New()
-		approvedEvent := support.CreateStageEvent(t, r.Source, r.Stage)
+		approvedEvent := support.CreateStageEventWithData(t, r.Source, r.Stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{
+			"VERSION": "v1",
+		})
+
 		require.NoError(t, approvedEvent.Approve(userID))
 
-		// event with execution
-		eventWithExecution := support.CreateStageEvent(t, r.Source, r.Stage)
+		// event with execution, inputs and outputs
+		eventWithExecution := support.CreateStageEventWithData(t, r.Source, r.Stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`), map[string]any{
+			"VERSION": "v1",
+		})
+
 		execution, err := models.CreateStageExecution(r.Stage.ID, eventWithExecution.ID)
 		require.NoError(t, err)
 		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
+		require.NoError(t, execution.UpdateOutputs(map[string]any{
+			"VERSION": "v1",
+			"VALUE_1": "value1",
+		}))
+
+		execution, err = models.FindExecutionByID(execution.ID)
+		require.NoError(t, err)
 
 		res, err := ListStageEvents(context.Background(), &protos.ListStageEventsRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
@@ -92,6 +105,12 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.Nil(t, e.Execution.StartedAt)
 		assert.Nil(t, e.Execution.FinishedAt)
 		require.Len(t, e.Approvals, 0)
+		require.Len(t, e.Inputs, 1)
+		assert.Equal(t, "VERSION", e.Inputs[0].Name)
+		assert.Equal(t, "v1", e.Inputs[0].Value)
+		require.Len(t, e.Execution.Outputs, 2)
+		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VERSION", Value: "v1"})
+		assert.Contains(t, e.Execution.Outputs, &protos.OutputValue{Name: "VALUE_1", Value: "value1"})
 
 		// event with approvals
 		e = res.Events[1]
@@ -105,6 +124,9 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.Equal(t, userID.String(), e.Approvals[0].ApprovedBy)
 		assert.NotEmpty(t, userID, e.Approvals[0].ApprovedAt)
 		require.Nil(t, e.Execution)
+		require.Len(t, e.Inputs, 1)
+		assert.Equal(t, "VERSION", e.Inputs[0].Name)
+		assert.Equal(t, "v1", e.Inputs[0].Value)
 
 		// event with no approvals
 		e = res.Events[2]
@@ -116,5 +138,6 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.Equal(t, protos.StageEvent_STATE_REASON_UNKNOWN, e.StateReason)
 		require.Len(t, e.Approvals, 0)
 		require.Nil(t, e.Execution)
+		require.Len(t, e.Inputs, 0)
 	})
 }

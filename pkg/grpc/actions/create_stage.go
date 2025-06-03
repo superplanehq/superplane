@@ -10,6 +10,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -28,28 +29,50 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	template, err := validateRunTemplate(ctx, encryptor, req.RunTemplate)
+	spec, err := validateExecutorSpec(ctx, encryptor, req.Executor)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	inputValidator := inputs.NewValidator(
+		inputs.WithInputs(req.Inputs),
+		inputs.WithOutputs(req.Outputs),
+		inputs.WithInputMappings(req.InputMappings),
+		inputs.WithConnections(req.Connections),
+	)
+
+	err = inputValidator.Validate()
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	connections, err := validateConnections(canvas, req.Connections)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	conditions, err := validateConditions(req.Conditions)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(req.Name, req.RequesterId, conditions, *template, connections)
+	err = canvas.CreateStage(
+		req.Name,
+		req.RequesterId,
+		conditions,
+		*spec,
+		connections,
+		inputValidator.SerializeInputs(),
+		inputValidator.SerializeInputMappings(),
+		inputValidator.SerializeOutputs(),
+	)
+
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
-			return nil, status.Errorf(codes.InvalidArgument, err.Error())
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
 		return nil, err
@@ -60,7 +83,14 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, err
 	}
 
-	serialized, err := serializeStage(*stage, req.Connections)
+	serialized, err := serializeStage(
+		*stage,
+		req.Connections,
+		req.Inputs,
+		req.Outputs,
+		req.InputMappings,
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -78,23 +108,23 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	return response, nil
 }
 
-func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in *pb.RunTemplate) (*models.RunTemplate, error) {
+func validateExecutorSpec(ctx context.Context, encryptor encryptor.Encryptor, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
 	if in == nil {
-		return nil, fmt.Errorf("missing run template")
+		return nil, fmt.Errorf("missing executor spec")
 	}
 
 	switch in.Type {
-	case pb.RunTemplate_TYPE_SEMAPHORE:
+	case pb.ExecutorSpec_TYPE_SEMAPHORE:
 		if in.Semaphore.OrganizationUrl == "" {
-			return nil, fmt.Errorf("missing organization URL")
+			return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
 		}
 
 		if in.Semaphore.ApiToken == "" {
-			return nil, fmt.Errorf("missing API token")
+			return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
 		}
 
 		if in.Semaphore.TaskId == "" {
-			return nil, fmt.Errorf("only triggering tasks is supported for now")
+			return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
 		}
 
 		token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
@@ -102,9 +132,9 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 			return nil, fmt.Errorf("error encrypting API token: %v", err)
 		}
 
-		return &models.RunTemplate{
-			Type: models.RunTemplateTypeSemaphore,
-			Semaphore: &models.SemaphoreRunTemplate{
+		return &models.ExecutorSpec{
+			Type: models.ExecutorSpecTypeSemaphore,
+			Semaphore: &models.SemaphoreExecutorSpec{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
 				APIToken:        base64.StdEncoding.EncodeToString(token),
 				ProjectID:       in.Semaphore.ProjectId,
@@ -116,7 +146,7 @@ func validateRunTemplate(ctx context.Context, encryptor encryptor.Encryptor, in 
 		}, nil
 
 	default:
-		return nil, errors.New("invalid run template type")
+		return nil, errors.New("invalid executor spec type")
 	}
 }
 
@@ -419,8 +449,14 @@ func protoToConnectionType(t pb.Connection_Type) string {
 	}
 }
 
-func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage, error) {
-	runTemplate, err := serializeRunTemplate(stage.RunTemplate.Data())
+func serializeStage(
+	stage models.Stage,
+	connections []*pb.Connection,
+	inputs []*pb.InputDefinition,
+	outputs []*pb.OutputDefinition,
+	inputMappings []*pb.InputMapping,
+) (*pb.Stage, error) {
+	executor, err := serializeExecutorSpec(stage.ExecutorSpec.Data())
 	if err != nil {
 		return nil, err
 	}
@@ -431,14 +467,105 @@ func serializeStage(stage models.Stage, connections []*pb.Connection) (*pb.Stage
 	}
 
 	return &pb.Stage{
-		Id:          stage.ID.String(),
-		Name:        stage.Name,
-		CanvasId:    stage.CanvasID.String(),
-		CreatedAt:   timestamppb.New(*stage.CreatedAt),
-		Conditions:  conditions,
-		Connections: connections,
-		RunTemplate: runTemplate,
+		Id:            stage.ID.String(),
+		Name:          stage.Name,
+		CanvasId:      stage.CanvasID.String(),
+		CreatedAt:     timestamppb.New(*stage.CreatedAt),
+		Conditions:    conditions,
+		Connections:   connections,
+		Executor:      executor,
+		Inputs:        inputs,
+		Outputs:       outputs,
+		InputMappings: inputMappings,
 	}, nil
+}
+
+func serializeInputs(in []models.InputDefinition) []*pb.InputDefinition {
+	out := []*pb.InputDefinition{}
+	for _, def := range in {
+		out = append(out, &pb.InputDefinition{
+			Name:        def.Name,
+			Description: def.Description,
+		})
+	}
+
+	return out
+}
+
+func serializeOutputs(in []models.OutputDefinition) []*pb.OutputDefinition {
+	out := []*pb.OutputDefinition{}
+	for _, def := range in {
+		out = append(out, &pb.OutputDefinition{
+			Name:        def.Name,
+			Description: def.Description,
+			Required:    def.Required,
+		})
+	}
+
+	return out
+}
+
+func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
+	out := []*pb.InputMapping{}
+	for _, m := range in {
+		mapping := &pb.InputMapping{
+			Values: []*pb.InputMapping_ValueDefinition{},
+		}
+
+		for _, valueDef := range m.Values {
+			v := &pb.InputMapping_ValueDefinition{
+				Name: valueDef.Name,
+			}
+
+			if valueDef.Value != nil {
+				v.Value = *valueDef.Value
+			}
+
+			if valueDef.ValueFrom != nil {
+				v.ValueFrom = serializeValueFrom(*valueDef.ValueFrom)
+			}
+
+			mapping.Values = append(mapping.Values, v)
+		}
+
+		if m.When != nil && m.When.TriggeredBy != nil {
+			mapping.When = &pb.InputMapping_When{
+				TriggeredBy: &pb.InputMapping_WhenTriggeredBy{
+					Connection: m.When.TriggeredBy.Connection,
+				},
+			}
+		}
+
+		out = append(out, mapping)
+	}
+
+	return out
+}
+
+func serializeValueFrom(in models.InputValueFrom) *pb.InputMapping_ValueFrom {
+	if in.EventData != nil {
+		return &pb.InputMapping_ValueFrom{
+			EventData: &pb.InputMapping_ValueFromEventData{
+				Connection: in.EventData.Connection,
+				Expression: in.EventData.Expression,
+			},
+		}
+	}
+
+	if in.LastExecution != nil {
+		results := []pb.Execution_Result{}
+		for _, r := range in.LastExecution.Results {
+			results = append(results, executionResultToProto(r))
+		}
+
+		return &pb.InputMapping_ValueFrom{
+			LastExecution: &pb.InputMapping_ValueFromLastExecution{
+				Results: results,
+			},
+		}
+	}
+
+	return nil
 }
 
 func serializeConditions(conditions []models.StageCondition) ([]*pb.Condition, error) {
@@ -481,23 +608,23 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	}
 }
 
-func serializeRunTemplate(runTemplate models.RunTemplate) (*pb.RunTemplate, error) {
-	switch runTemplate.Type {
-	case models.RunTemplateTypeSemaphore:
-		return &pb.RunTemplate{
-			Type: pb.RunTemplate_TYPE_SEMAPHORE,
-			Semaphore: &pb.SemaphoreRunTemplate{
-				OrganizationUrl: runTemplate.Semaphore.OrganizationURL,
-				ProjectId:       runTemplate.Semaphore.ProjectID,
-				Branch:          runTemplate.Semaphore.Branch,
-				PipelineFile:    runTemplate.Semaphore.PipelineFile,
-				Parameters:      runTemplate.Semaphore.Parameters,
-				TaskId:          runTemplate.Semaphore.TaskID,
+func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, error) {
+	switch executor.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		return &pb.ExecutorSpec{
+			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+			Semaphore: &pb.ExecutorSpec_Semaphore{
+				OrganizationUrl: executor.Semaphore.OrganizationURL,
+				ProjectId:       executor.Semaphore.ProjectID,
+				Branch:          executor.Semaphore.Branch,
+				PipelineFile:    executor.Semaphore.PipelineFile,
+				Parameters:      executor.Semaphore.Parameters,
+				TaskId:          executor.Semaphore.TaskID,
 			},
 		}, nil
 
 	default:
-		return nil, fmt.Errorf("invalid run template type: %s", runTemplate.Type)
+		return nil, fmt.Errorf("invalid executor spec type: %s", executor.Type)
 	}
 }
 
@@ -514,7 +641,14 @@ func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb
 			return nil, err
 		}
 
-		stage, err := serializeStage(stage, serialized)
+		stage, err := serializeStage(
+			stage,
+			serialized,
+			serializeInputs(stage.Inputs),
+			serializeOutputs(stage.Outputs),
+			serializeInputMappings(stage.InputMappings),
+		)
+
 		if err != nil {
 			return nil, err
 		}

@@ -3,24 +3,21 @@
   name: Build
   created_at: '2025-05-15T10:10:00Z'
   created_by: 6aa9a39c-9536-4902-a91c-0e19cf97b0b1
-  use: '{"from":["source_ref"],"tags":[{"name":"version","value_from":"data.version"}]}'
   conditions: '[{"type":"approval","approval":{"count":1}}]'
-  run_template: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"build","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'
+  executor_spec: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"build","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'
 
 - id: 7d2e892f-b65a-4d1c-a4c6-95cd5df0d423
   canvas_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
   name: Test
   created_at: '2025-05-15T10:15:00Z'
   created_by: 6aa9a39c-9536-4902-a91c-0e19cf97b0b1
-  use: '{"from":["source_ref"],"tags":[{"name":"version","value_from":"data.version"}]}'
   conditions: '[{"type":"approval","approval":{"count":1}}]'
-  run_template: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"test","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'
+  executor_spec: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"test","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'
 
 - id: 9f7b3c5a-8e2d-4f1b-9d0c-6a8e7c9b5a3d
   canvas_id: 3fa85f64-5717-4562-b3fc-2c963f66afa6
   name: Deploy
   created_at: '2025-05-15T10:20:00Z'
   created_by: 6aa9a39c-9536-4902-a91c-0e19cf97b0b1
-  use: '{"from":["source_ref"],"tags":[{"name":"version","value_from":"data.version"}]}'
   conditions: '[{"type":"approval","approval":{"count":2}},{"type":"time-window","time":{"start":"09:00","end":"17:00","week_days":["Monday","Tuesday","Wednesday","Thursday","Friday"]}}]'
-  run_template: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"deploy","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'
+  executor_spec: '{"type":"semaphore","semaphore":{"project_id":"demo-project-123","branch":"main","pipeline_file":"semaphore.yml","task_id":"deploy","parameters":{},"api_token":"demo-token","organization_url":"https://demo.semaphoreci.com"}}'

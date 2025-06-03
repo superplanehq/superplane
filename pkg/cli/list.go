@@ -137,6 +137,13 @@ var listEventsCmd = &cobra.Command{
 			fmt.Printf("   State: %s (%s)\n", *event.State, *event.StateReason)
 			fmt.Printf("   Created: %s\n", *event.CreatedAt)
 
+			if len(event.Inputs) > 0 {
+				fmt.Println("   Inputs:")
+				for _, input := range event.Inputs {
+					fmt.Printf("     * %s = %s\n", *input.Name, *input.Value)
+				}
+			}
+
 			if event.Execution != nil {
 				fmt.Println("   Execution:")
 				fmt.Printf("      ID: %s\n", *event.Execution.Id)
@@ -146,6 +153,12 @@ var listEventsCmd = &cobra.Command{
 				fmt.Printf("      Created at: %s\n", event.Execution.CreatedAt)
 				fmt.Printf("      Started at: %s\n", event.Execution.StartedAt)
 				fmt.Printf("      Finished at: %s\n", event.Execution.FinishedAt)
+				if len(event.Execution.Outputs) > 0 {
+					fmt.Println("      Outputs:")
+					for _, output := range event.Execution.Outputs {
+						fmt.Printf("        * %s = %s\n", *output.Name, *output.Value)
+					}
+				}
 			}
 
 			if len(event.Approvals) > 0 {

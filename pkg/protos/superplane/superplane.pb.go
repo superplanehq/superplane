@@ -217,53 +217,53 @@ func (x Condition_Type) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Condition_Type.Descriptor instead.
 func (Condition_Type) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{16, 0}
+	return file_superplane_proto_rawDescGZIP(), []int{19, 0}
 }
 
-type RunTemplate_Type int32
+type ExecutorSpec_Type int32
 
 const (
-	RunTemplate_TYPE_UNKNOWN   RunTemplate_Type = 0
-	RunTemplate_TYPE_SEMAPHORE RunTemplate_Type = 1
+	ExecutorSpec_TYPE_UNKNOWN   ExecutorSpec_Type = 0
+	ExecutorSpec_TYPE_SEMAPHORE ExecutorSpec_Type = 1
 )
 
-// Enum value maps for RunTemplate_Type.
+// Enum value maps for ExecutorSpec_Type.
 var (
-	RunTemplate_Type_name = map[int32]string{
+	ExecutorSpec_Type_name = map[int32]string{
 		0: "TYPE_UNKNOWN",
 		1: "TYPE_SEMAPHORE",
 	}
-	RunTemplate_Type_value = map[string]int32{
+	ExecutorSpec_Type_value = map[string]int32{
 		"TYPE_UNKNOWN":   0,
 		"TYPE_SEMAPHORE": 1,
 	}
 )
 
-func (x RunTemplate_Type) Enum() *RunTemplate_Type {
-	p := new(RunTemplate_Type)
+func (x ExecutorSpec_Type) Enum() *ExecutorSpec_Type {
+	p := new(ExecutorSpec_Type)
 	*p = x
 	return p
 }
 
-func (x RunTemplate_Type) String() string {
+func (x ExecutorSpec_Type) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (RunTemplate_Type) Descriptor() protoreflect.EnumDescriptor {
+func (ExecutorSpec_Type) Descriptor() protoreflect.EnumDescriptor {
 	return file_superplane_proto_enumTypes[4].Descriptor()
 }
 
-func (RunTemplate_Type) Type() protoreflect.EnumType {
+func (ExecutorSpec_Type) Type() protoreflect.EnumType {
 	return &file_superplane_proto_enumTypes[4]
 }
 
-func (x RunTemplate_Type) Number() protoreflect.EnumNumber {
+func (x ExecutorSpec_Type) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use RunTemplate_Type.Descriptor instead.
-func (RunTemplate_Type) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{20, 0}
+// Deprecated: Use ExecutorSpec_Type.Descriptor instead.
+func (ExecutorSpec_Type) EnumDescriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{23, 0}
 }
 
 type StageEvent_State int32
@@ -315,7 +315,7 @@ func (x StageEvent_State) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StageEvent_State.Descriptor instead.
 func (StageEvent_State) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{31, 0}
+	return file_superplane_proto_rawDescGZIP(), []int{33, 0}
 }
 
 type StageEvent_StateReason int32
@@ -376,7 +376,7 @@ func (x StageEvent_StateReason) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use StageEvent_StateReason.Descriptor instead.
 func (StageEvent_StateReason) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{31, 1}
+	return file_superplane_proto_rawDescGZIP(), []int{33, 1}
 }
 
 type Execution_State int32
@@ -428,7 +428,7 @@ func (x Execution_State) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Execution_State.Descriptor instead.
 func (Execution_State) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{32, 0}
+	return file_superplane_proto_rawDescGZIP(), []int{36, 0}
 }
 
 type Execution_Result int32
@@ -477,7 +477,7 @@ func (x Execution_Result) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use Execution_Result.Descriptor instead.
 func (Execution_Result) EnumDescriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{32, 1}
+	return file_superplane_proto_rawDescGZIP(), []int{36, 1}
 }
 
 type ListCanvasesRequest struct {
@@ -1284,7 +1284,10 @@ type Stage struct {
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Connections   []*Connection          `protobuf:"bytes,5,rep,name=connections,proto3" json:"connections,omitempty"`
 	Conditions    []*Condition           `protobuf:"bytes,6,rep,name=conditions,proto3" json:"conditions,omitempty"`
-	RunTemplate   *RunTemplate           `protobuf:"bytes,7,opt,name=run_template,json=runTemplate,proto3" json:"run_template,omitempty"`
+	Executor      *ExecutorSpec          `protobuf:"bytes,7,opt,name=executor,proto3" json:"executor,omitempty"`
+	Inputs        []*InputDefinition     `protobuf:"bytes,8,rep,name=inputs,proto3" json:"inputs,omitempty"`
+	InputMappings []*InputMapping        `protobuf:"bytes,9,rep,name=input_mappings,json=inputMappings,proto3" json:"input_mappings,omitempty"`
+	Outputs       []*OutputDefinition    `protobuf:"bytes,10,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1361,9 +1364,194 @@ func (x *Stage) GetConditions() []*Condition {
 	return nil
 }
 
-func (x *Stage) GetRunTemplate() *RunTemplate {
+func (x *Stage) GetExecutor() *ExecutorSpec {
 	if x != nil {
-		return x.RunTemplate
+		return x.Executor
+	}
+	return nil
+}
+
+func (x *Stage) GetInputs() []*InputDefinition {
+	if x != nil {
+		return x.Inputs
+	}
+	return nil
+}
+
+func (x *Stage) GetInputMappings() []*InputMapping {
+	if x != nil {
+		return x.InputMappings
+	}
+	return nil
+}
+
+func (x *Stage) GetOutputs() []*OutputDefinition {
+	if x != nil {
+		return x.Outputs
+	}
+	return nil
+}
+
+type OutputDefinition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutputDefinition) Reset() {
+	*x = OutputDefinition{}
+	mi := &file_superplane_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutputDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutputDefinition) ProtoMessage() {}
+
+func (x *OutputDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutputDefinition.ProtoReflect.Descriptor instead.
+func (*OutputDefinition) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *OutputDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *OutputDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *OutputDefinition) GetRequired() bool {
+	if x != nil {
+		return x.Required
+	}
+	return false
+}
+
+type InputDefinition struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputDefinition) Reset() {
+	*x = InputDefinition{}
+	mi := &file_superplane_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputDefinition) ProtoMessage() {}
+
+func (x *InputDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputDefinition.ProtoReflect.Descriptor instead.
+func (*InputDefinition) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *InputDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InputDefinition) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type InputMapping struct {
+	state         protoimpl.MessageState          `protogen:"open.v1"`
+	Values        []*InputMapping_ValueDefinition `protobuf:"bytes,1,rep,name=values,proto3" json:"values,omitempty"`
+	When          *InputMapping_When              `protobuf:"bytes,2,opt,name=when,proto3" json:"when,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping) Reset() {
+	*x = InputMapping{}
+	mi := &file_superplane_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping) ProtoMessage() {}
+
+func (x *InputMapping) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping.ProtoReflect.Descriptor instead.
+func (*InputMapping) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *InputMapping) GetValues() []*InputMapping_ValueDefinition {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
+func (x *InputMapping) GetWhen() *InputMapping_When {
+	if x != nil {
+		return x.When
 	}
 	return nil
 }
@@ -1379,7 +1567,7 @@ type Condition struct {
 
 func (x *Condition) Reset() {
 	*x = Condition{}
-	mi := &file_superplane_proto_msgTypes[16]
+	mi := &file_superplane_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1391,7 +1579,7 @@ func (x *Condition) String() string {
 func (*Condition) ProtoMessage() {}
 
 func (x *Condition) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[16]
+	mi := &file_superplane_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1404,7 +1592,7 @@ func (x *Condition) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Condition.ProtoReflect.Descriptor instead.
 func (*Condition) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{16}
+	return file_superplane_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *Condition) GetType() Condition_Type {
@@ -1437,7 +1625,7 @@ type ConditionApproval struct {
 
 func (x *ConditionApproval) Reset() {
 	*x = ConditionApproval{}
-	mi := &file_superplane_proto_msgTypes[17]
+	mi := &file_superplane_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1449,7 +1637,7 @@ func (x *ConditionApproval) String() string {
 func (*ConditionApproval) ProtoMessage() {}
 
 func (x *ConditionApproval) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[17]
+	mi := &file_superplane_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1462,7 +1650,7 @@ func (x *ConditionApproval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConditionApproval.ProtoReflect.Descriptor instead.
 func (*ConditionApproval) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{17}
+	return file_superplane_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *ConditionApproval) GetCount() uint32 {
@@ -1483,7 +1671,7 @@ type ConditionTimeWindow struct {
 
 func (x *ConditionTimeWindow) Reset() {
 	*x = ConditionTimeWindow{}
-	mi := &file_superplane_proto_msgTypes[18]
+	mi := &file_superplane_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1495,7 +1683,7 @@ func (x *ConditionTimeWindow) String() string {
 func (*ConditionTimeWindow) ProtoMessage() {}
 
 func (x *ConditionTimeWindow) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[18]
+	mi := &file_superplane_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1508,7 +1696,7 @@ func (x *ConditionTimeWindow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConditionTimeWindow.ProtoReflect.Descriptor instead.
 func (*ConditionTimeWindow) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{18}
+	return file_superplane_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *ConditionTimeWindow) GetStart() string {
@@ -1539,14 +1727,17 @@ type CreateStageRequest struct {
 	RequesterId    string                 `protobuf:"bytes,3,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	Connections    []*Connection          `protobuf:"bytes,4,rep,name=connections,proto3" json:"connections,omitempty"`
 	Conditions     []*Condition           `protobuf:"bytes,5,rep,name=conditions,proto3" json:"conditions,omitempty"`
-	RunTemplate    *RunTemplate           `protobuf:"bytes,6,opt,name=run_template,json=runTemplate,proto3" json:"run_template,omitempty"`
+	Executor       *ExecutorSpec          `protobuf:"bytes,6,opt,name=executor,proto3" json:"executor,omitempty"`
+	Inputs         []*InputDefinition     `protobuf:"bytes,7,rep,name=inputs,proto3" json:"inputs,omitempty"`
+	InputMappings  []*InputMapping        `protobuf:"bytes,8,rep,name=input_mappings,json=inputMappings,proto3" json:"input_mappings,omitempty"`
+	Outputs        []*OutputDefinition    `protobuf:"bytes,9,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateStageRequest) Reset() {
 	*x = CreateStageRequest{}
-	mi := &file_superplane_proto_msgTypes[19]
+	mi := &file_superplane_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1558,7 +1749,7 @@ func (x *CreateStageRequest) String() string {
 func (*CreateStageRequest) ProtoMessage() {}
 
 func (x *CreateStageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[19]
+	mi := &file_superplane_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1571,7 +1762,7 @@ func (x *CreateStageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStageRequest.ProtoReflect.Descriptor instead.
 func (*CreateStageRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{19}
+	return file_superplane_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *CreateStageRequest) GetName() string {
@@ -1609,36 +1800,57 @@ func (x *CreateStageRequest) GetConditions() []*Condition {
 	return nil
 }
 
-func (x *CreateStageRequest) GetRunTemplate() *RunTemplate {
+func (x *CreateStageRequest) GetExecutor() *ExecutorSpec {
 	if x != nil {
-		return x.RunTemplate
+		return x.Executor
 	}
 	return nil
 }
 
-type RunTemplate struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          RunTemplate_Type       `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.RunTemplate_Type" json:"type,omitempty"`
-	Semaphore     *SemaphoreRunTemplate  `protobuf:"bytes,2,opt,name=semaphore,proto3" json:"semaphore,omitempty"`
+func (x *CreateStageRequest) GetInputs() []*InputDefinition {
+	if x != nil {
+		return x.Inputs
+	}
+	return nil
+}
+
+func (x *CreateStageRequest) GetInputMappings() []*InputMapping {
+	if x != nil {
+		return x.InputMappings
+	}
+	return nil
+}
+
+func (x *CreateStageRequest) GetOutputs() []*OutputDefinition {
+	if x != nil {
+		return x.Outputs
+	}
+	return nil
+}
+
+type ExecutorSpec struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Type          ExecutorSpec_Type       `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.ExecutorSpec_Type" json:"type,omitempty"`
+	Semaphore     *ExecutorSpec_Semaphore `protobuf:"bytes,2,opt,name=semaphore,proto3" json:"semaphore,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RunTemplate) Reset() {
-	*x = RunTemplate{}
-	mi := &file_superplane_proto_msgTypes[20]
+func (x *ExecutorSpec) Reset() {
+	*x = ExecutorSpec{}
+	mi := &file_superplane_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RunTemplate) String() string {
+func (x *ExecutorSpec) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RunTemplate) ProtoMessage() {}
+func (*ExecutorSpec) ProtoMessage() {}
 
-func (x *RunTemplate) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[20]
+func (x *ExecutorSpec) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1649,115 +1861,23 @@ func (x *RunTemplate) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RunTemplate.ProtoReflect.Descriptor instead.
-func (*RunTemplate) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{20}
+// Deprecated: Use ExecutorSpec.ProtoReflect.Descriptor instead.
+func (*ExecutorSpec) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{23}
 }
 
-func (x *RunTemplate) GetType() RunTemplate_Type {
+func (x *ExecutorSpec) GetType() ExecutorSpec_Type {
 	if x != nil {
 		return x.Type
 	}
-	return RunTemplate_TYPE_UNKNOWN
+	return ExecutorSpec_TYPE_UNKNOWN
 }
 
-func (x *RunTemplate) GetSemaphore() *SemaphoreRunTemplate {
+func (x *ExecutorSpec) GetSemaphore() *ExecutorSpec_Semaphore {
 	if x != nil {
 		return x.Semaphore
 	}
 	return nil
-}
-
-type SemaphoreRunTemplate struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId       string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Branch          string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	PipelineFile    string                 `protobuf:"bytes,3,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
-	TaskId          string                 `protobuf:"bytes,4,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	Parameters      map[string]string      `protobuf:"bytes,5,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ApiToken        string                 `protobuf:"bytes,6,opt,name=api_token,json=apiToken,proto3" json:"api_token,omitempty"`
-	OrganizationUrl string                 `protobuf:"bytes,7,opt,name=organization_url,json=organizationUrl,proto3" json:"organization_url,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
-func (x *SemaphoreRunTemplate) Reset() {
-	*x = SemaphoreRunTemplate{}
-	mi := &file_superplane_proto_msgTypes[21]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SemaphoreRunTemplate) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SemaphoreRunTemplate) ProtoMessage() {}
-
-func (x *SemaphoreRunTemplate) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[21]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SemaphoreRunTemplate.ProtoReflect.Descriptor instead.
-func (*SemaphoreRunTemplate) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{21}
-}
-
-func (x *SemaphoreRunTemplate) GetProjectId() string {
-	if x != nil {
-		return x.ProjectId
-	}
-	return ""
-}
-
-func (x *SemaphoreRunTemplate) GetBranch() string {
-	if x != nil {
-		return x.Branch
-	}
-	return ""
-}
-
-func (x *SemaphoreRunTemplate) GetPipelineFile() string {
-	if x != nil {
-		return x.PipelineFile
-	}
-	return ""
-}
-
-func (x *SemaphoreRunTemplate) GetTaskId() string {
-	if x != nil {
-		return x.TaskId
-	}
-	return ""
-}
-
-func (x *SemaphoreRunTemplate) GetParameters() map[string]string {
-	if x != nil {
-		return x.Parameters
-	}
-	return nil
-}
-
-func (x *SemaphoreRunTemplate) GetApiToken() string {
-	if x != nil {
-		return x.ApiToken
-	}
-	return ""
-}
-
-func (x *SemaphoreRunTemplate) GetOrganizationUrl() string {
-	if x != nil {
-		return x.OrganizationUrl
-	}
-	return ""
 }
 
 type CreateStageResponse struct {
@@ -1769,7 +1889,7 @@ type CreateStageResponse struct {
 
 func (x *CreateStageResponse) Reset() {
 	*x = CreateStageResponse{}
-	mi := &file_superplane_proto_msgTypes[22]
+	mi := &file_superplane_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1781,7 +1901,7 @@ func (x *CreateStageResponse) String() string {
 func (*CreateStageResponse) ProtoMessage() {}
 
 func (x *CreateStageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[22]
+	mi := &file_superplane_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1794,7 +1914,7 @@ func (x *CreateStageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateStageResponse.ProtoReflect.Descriptor instead.
 func (*CreateStageResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{22}
+	return file_superplane_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *CreateStageResponse) GetStage() *Stage {
@@ -1811,14 +1931,17 @@ type UpdateStageRequest struct {
 	RequesterId    string                 `protobuf:"bytes,3,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	Connections    []*Connection          `protobuf:"bytes,4,rep,name=connections,proto3" json:"connections,omitempty"`
 	Conditions     []*Condition           `protobuf:"bytes,5,rep,name=conditions,proto3" json:"conditions,omitempty"`
-	RunTemplate    *RunTemplate           `protobuf:"bytes,6,opt,name=run_template,json=runTemplate,proto3" json:"run_template,omitempty"`
+	Executor       *ExecutorSpec          `protobuf:"bytes,6,opt,name=executor,proto3" json:"executor,omitempty"`
+	Inputs         []*InputDefinition     `protobuf:"bytes,7,rep,name=inputs,proto3" json:"inputs,omitempty"`
+	InputMappings  []*InputMapping        `protobuf:"bytes,8,rep,name=input_mappings,json=inputMappings,proto3" json:"input_mappings,omitempty"`
+	Outputs        []*OutputDefinition    `protobuf:"bytes,9,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateStageRequest) Reset() {
 	*x = UpdateStageRequest{}
-	mi := &file_superplane_proto_msgTypes[23]
+	mi := &file_superplane_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1830,7 +1953,7 @@ func (x *UpdateStageRequest) String() string {
 func (*UpdateStageRequest) ProtoMessage() {}
 
 func (x *UpdateStageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[23]
+	mi := &file_superplane_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1843,7 +1966,7 @@ func (x *UpdateStageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStageRequest.ProtoReflect.Descriptor instead.
 func (*UpdateStageRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{23}
+	return file_superplane_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *UpdateStageRequest) GetIdOrName() string {
@@ -1881,9 +2004,30 @@ func (x *UpdateStageRequest) GetConditions() []*Condition {
 	return nil
 }
 
-func (x *UpdateStageRequest) GetRunTemplate() *RunTemplate {
+func (x *UpdateStageRequest) GetExecutor() *ExecutorSpec {
 	if x != nil {
-		return x.RunTemplate
+		return x.Executor
+	}
+	return nil
+}
+
+func (x *UpdateStageRequest) GetInputs() []*InputDefinition {
+	if x != nil {
+		return x.Inputs
+	}
+	return nil
+}
+
+func (x *UpdateStageRequest) GetInputMappings() []*InputMapping {
+	if x != nil {
+		return x.InputMappings
+	}
+	return nil
+}
+
+func (x *UpdateStageRequest) GetOutputs() []*OutputDefinition {
+	if x != nil {
+		return x.Outputs
 	}
 	return nil
 }
@@ -1897,7 +2041,7 @@ type UpdateStageResponse struct {
 
 func (x *UpdateStageResponse) Reset() {
 	*x = UpdateStageResponse{}
-	mi := &file_superplane_proto_msgTypes[24]
+	mi := &file_superplane_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1909,7 +2053,7 @@ func (x *UpdateStageResponse) String() string {
 func (*UpdateStageResponse) ProtoMessage() {}
 
 func (x *UpdateStageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[24]
+	mi := &file_superplane_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1922,7 +2066,7 @@ func (x *UpdateStageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStageResponse.ProtoReflect.Descriptor instead.
 func (*UpdateStageResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{24}
+	return file_superplane_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *UpdateStageResponse) GetStage() *Stage {
@@ -1941,7 +2085,7 @@ type ListStagesRequest struct {
 
 func (x *ListStagesRequest) Reset() {
 	*x = ListStagesRequest{}
-	mi := &file_superplane_proto_msgTypes[25]
+	mi := &file_superplane_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1953,7 +2097,7 @@ func (x *ListStagesRequest) String() string {
 func (*ListStagesRequest) ProtoMessage() {}
 
 func (x *ListStagesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[25]
+	mi := &file_superplane_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1966,7 +2110,7 @@ func (x *ListStagesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStagesRequest.ProtoReflect.Descriptor instead.
 func (*ListStagesRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{25}
+	return file_superplane_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListStagesRequest) GetCanvasIdOrName() string {
@@ -1985,7 +2129,7 @@ type ListStagesResponse struct {
 
 func (x *ListStagesResponse) Reset() {
 	*x = ListStagesResponse{}
-	mi := &file_superplane_proto_msgTypes[26]
+	mi := &file_superplane_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1997,7 +2141,7 @@ func (x *ListStagesResponse) String() string {
 func (*ListStagesResponse) ProtoMessage() {}
 
 func (x *ListStagesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[26]
+	mi := &file_superplane_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2010,7 +2154,7 @@ func (x *ListStagesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStagesResponse.ProtoReflect.Descriptor instead.
 func (*ListStagesResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{26}
+	return file_superplane_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListStagesResponse) GetStages() []*Stage {
@@ -2029,7 +2173,7 @@ type ListEventSourcesRequest struct {
 
 func (x *ListEventSourcesRequest) Reset() {
 	*x = ListEventSourcesRequest{}
-	mi := &file_superplane_proto_msgTypes[27]
+	mi := &file_superplane_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2041,7 +2185,7 @@ func (x *ListEventSourcesRequest) String() string {
 func (*ListEventSourcesRequest) ProtoMessage() {}
 
 func (x *ListEventSourcesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[27]
+	mi := &file_superplane_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2054,7 +2198,7 @@ func (x *ListEventSourcesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventSourcesRequest.ProtoReflect.Descriptor instead.
 func (*ListEventSourcesRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{27}
+	return file_superplane_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListEventSourcesRequest) GetCanvasIdOrName() string {
@@ -2073,7 +2217,7 @@ type ListEventSourcesResponse struct {
 
 func (x *ListEventSourcesResponse) Reset() {
 	*x = ListEventSourcesResponse{}
-	mi := &file_superplane_proto_msgTypes[28]
+	mi := &file_superplane_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2085,7 +2229,7 @@ func (x *ListEventSourcesResponse) String() string {
 func (*ListEventSourcesResponse) ProtoMessage() {}
 
 func (x *ListEventSourcesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[28]
+	mi := &file_superplane_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2098,7 +2242,7 @@ func (x *ListEventSourcesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEventSourcesResponse.ProtoReflect.Descriptor instead.
 func (*ListEventSourcesResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{28}
+	return file_superplane_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListEventSourcesResponse) GetEventSources() []*EventSource {
@@ -2120,7 +2264,7 @@ type ListStageEventsRequest struct {
 
 func (x *ListStageEventsRequest) Reset() {
 	*x = ListStageEventsRequest{}
-	mi := &file_superplane_proto_msgTypes[29]
+	mi := &file_superplane_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2132,7 +2276,7 @@ func (x *ListStageEventsRequest) String() string {
 func (*ListStageEventsRequest) ProtoMessage() {}
 
 func (x *ListStageEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[29]
+	mi := &file_superplane_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2145,7 +2289,7 @@ func (x *ListStageEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStageEventsRequest.ProtoReflect.Descriptor instead.
 func (*ListStageEventsRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{29}
+	return file_superplane_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListStageEventsRequest) GetStageIdOrName() string {
@@ -2185,7 +2329,7 @@ type ListStageEventsResponse struct {
 
 func (x *ListStageEventsResponse) Reset() {
 	*x = ListStageEventsResponse{}
-	mi := &file_superplane_proto_msgTypes[30]
+	mi := &file_superplane_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2197,7 +2341,7 @@ func (x *ListStageEventsResponse) String() string {
 func (*ListStageEventsResponse) ProtoMessage() {}
 
 func (x *ListStageEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[30]
+	mi := &file_superplane_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2210,7 +2354,7 @@ func (x *ListStageEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListStageEventsResponse.ProtoReflect.Descriptor instead.
 func (*ListStageEventsResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{30}
+	return file_superplane_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ListStageEventsResponse) GetEvents() []*StageEvent {
@@ -2230,13 +2374,14 @@ type StageEvent struct {
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	Approvals     []*StageEventApproval  `protobuf:"bytes,7,rep,name=approvals,proto3" json:"approvals,omitempty"`
 	Execution     *Execution             `protobuf:"bytes,8,opt,name=execution,proto3" json:"execution,omitempty"`
+	Inputs        []*InputValue          `protobuf:"bytes,9,rep,name=inputs,proto3" json:"inputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StageEvent) Reset() {
 	*x = StageEvent{}
-	mi := &file_superplane_proto_msgTypes[31]
+	mi := &file_superplane_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2248,7 +2393,7 @@ func (x *StageEvent) String() string {
 func (*StageEvent) ProtoMessage() {}
 
 func (x *StageEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[31]
+	mi := &file_superplane_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2261,7 +2406,7 @@ func (x *StageEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageEvent.ProtoReflect.Descriptor instead.
 func (*StageEvent) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{31}
+	return file_superplane_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *StageEvent) GetId() string {
@@ -2320,6 +2465,117 @@ func (x *StageEvent) GetExecution() *Execution {
 	return nil
 }
 
+func (x *StageEvent) GetInputs() []*InputValue {
+	if x != nil {
+		return x.Inputs
+	}
+	return nil
+}
+
+type InputValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputValue) Reset() {
+	*x = InputValue{}
+	mi := &file_superplane_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputValue) ProtoMessage() {}
+
+func (x *InputValue) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputValue.ProtoReflect.Descriptor instead.
+func (*InputValue) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *InputValue) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InputValue) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type OutputValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutputValue) Reset() {
+	*x = OutputValue{}
+	mi := &file_superplane_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutputValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutputValue) ProtoMessage() {}
+
+func (x *OutputValue) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutputValue.ProtoReflect.Descriptor instead.
+func (*OutputValue) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *OutputValue) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *OutputValue) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
 type Execution struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -2329,13 +2585,14 @@ type Execution struct {
 	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	StartedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 	FinishedAt    *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
+	Outputs       []*OutputValue         `protobuf:"bytes,8,rep,name=outputs,proto3" json:"outputs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Execution) Reset() {
 	*x = Execution{}
-	mi := &file_superplane_proto_msgTypes[32]
+	mi := &file_superplane_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2347,7 +2604,7 @@ func (x *Execution) String() string {
 func (*Execution) ProtoMessage() {}
 
 func (x *Execution) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[32]
+	mi := &file_superplane_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2360,7 +2617,7 @@ func (x *Execution) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Execution.ProtoReflect.Descriptor instead.
 func (*Execution) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{32}
+	return file_superplane_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *Execution) GetId() string {
@@ -2412,6 +2669,13 @@ func (x *Execution) GetFinishedAt() *timestamp.Timestamp {
 	return nil
 }
 
+func (x *Execution) GetOutputs() []*OutputValue {
+	if x != nil {
+		return x.Outputs
+	}
+	return nil
+}
+
 type StageEventApproval struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ApprovedBy    string                 `protobuf:"bytes,1,opt,name=approved_by,json=approvedBy,proto3" json:"approved_by,omitempty"`
@@ -2422,7 +2686,7 @@ type StageEventApproval struct {
 
 func (x *StageEventApproval) Reset() {
 	*x = StageEventApproval{}
-	mi := &file_superplane_proto_msgTypes[33]
+	mi := &file_superplane_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2434,7 +2698,7 @@ func (x *StageEventApproval) String() string {
 func (*StageEventApproval) ProtoMessage() {}
 
 func (x *StageEventApproval) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[33]
+	mi := &file_superplane_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2447,7 +2711,7 @@ func (x *StageEventApproval) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageEventApproval.ProtoReflect.Descriptor instead.
 func (*StageEventApproval) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{33}
+	return file_superplane_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *StageEventApproval) GetApprovedBy() string {
@@ -2476,7 +2740,7 @@ type ApproveStageEventRequest struct {
 
 func (x *ApproveStageEventRequest) Reset() {
 	*x = ApproveStageEventRequest{}
-	mi := &file_superplane_proto_msgTypes[34]
+	mi := &file_superplane_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2488,7 +2752,7 @@ func (x *ApproveStageEventRequest) String() string {
 func (*ApproveStageEventRequest) ProtoMessage() {}
 
 func (x *ApproveStageEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[34]
+	mi := &file_superplane_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2501,7 +2765,7 @@ func (x *ApproveStageEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveStageEventRequest.ProtoReflect.Descriptor instead.
 func (*ApproveStageEventRequest) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{34}
+	return file_superplane_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ApproveStageEventRequest) GetStageIdOrName() string {
@@ -2541,7 +2805,7 @@ type ApproveStageEventResponse struct {
 
 func (x *ApproveStageEventResponse) Reset() {
 	*x = ApproveStageEventResponse{}
-	mi := &file_superplane_proto_msgTypes[35]
+	mi := &file_superplane_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2553,7 +2817,7 @@ func (x *ApproveStageEventResponse) String() string {
 func (*ApproveStageEventResponse) ProtoMessage() {}
 
 func (x *ApproveStageEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[35]
+	mi := &file_superplane_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2566,7 +2830,7 @@ func (x *ApproveStageEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveStageEventResponse.ProtoReflect.Descriptor instead.
 func (*ApproveStageEventResponse) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{35}
+	return file_superplane_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ApproveStageEventResponse) GetEvent() *StageEvent {
@@ -2587,7 +2851,7 @@ type StageCreated struct {
 
 func (x *StageCreated) Reset() {
 	*x = StageCreated{}
-	mi := &file_superplane_proto_msgTypes[36]
+	mi := &file_superplane_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2599,7 +2863,7 @@ func (x *StageCreated) String() string {
 func (*StageCreated) ProtoMessage() {}
 
 func (x *StageCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[36]
+	mi := &file_superplane_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2612,7 +2876,7 @@ func (x *StageCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageCreated.ProtoReflect.Descriptor instead.
 func (*StageCreated) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{36}
+	return file_superplane_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *StageCreated) GetCanvasId() string {
@@ -2647,7 +2911,7 @@ type StageUpdated struct {
 
 func (x *StageUpdated) Reset() {
 	*x = StageUpdated{}
-	mi := &file_superplane_proto_msgTypes[37]
+	mi := &file_superplane_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2659,7 +2923,7 @@ func (x *StageUpdated) String() string {
 func (*StageUpdated) ProtoMessage() {}
 
 func (x *StageUpdated) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[37]
+	mi := &file_superplane_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2672,7 +2936,7 @@ func (x *StageUpdated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageUpdated.ProtoReflect.Descriptor instead.
 func (*StageUpdated) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{37}
+	return file_superplane_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *StageUpdated) GetCanvasId() string {
@@ -2707,7 +2971,7 @@ type EventSourceCreated struct {
 
 func (x *EventSourceCreated) Reset() {
 	*x = EventSourceCreated{}
-	mi := &file_superplane_proto_msgTypes[38]
+	mi := &file_superplane_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2719,7 +2983,7 @@ func (x *EventSourceCreated) String() string {
 func (*EventSourceCreated) ProtoMessage() {}
 
 func (x *EventSourceCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[38]
+	mi := &file_superplane_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2732,7 +2996,7 @@ func (x *EventSourceCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EventSourceCreated.ProtoReflect.Descriptor instead.
 func (*EventSourceCreated) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{38}
+	return file_superplane_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *EventSourceCreated) GetCanvasId() string {
@@ -2768,7 +3032,7 @@ type StageEventCreated struct {
 
 func (x *StageEventCreated) Reset() {
 	*x = StageEventCreated{}
-	mi := &file_superplane_proto_msgTypes[39]
+	mi := &file_superplane_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2780,7 +3044,7 @@ func (x *StageEventCreated) String() string {
 func (*StageEventCreated) ProtoMessage() {}
 
 func (x *StageEventCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[39]
+	mi := &file_superplane_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2793,7 +3057,7 @@ func (x *StageEventCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageEventCreated.ProtoReflect.Descriptor instead.
 func (*StageEventCreated) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{39}
+	return file_superplane_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *StageEventCreated) GetCanvasId() string {
@@ -2836,7 +3100,7 @@ type StageEventApproved struct {
 
 func (x *StageEventApproved) Reset() {
 	*x = StageEventApproved{}
-	mi := &file_superplane_proto_msgTypes[40]
+	mi := &file_superplane_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2848,7 +3112,7 @@ func (x *StageEventApproved) String() string {
 func (*StageEventApproved) ProtoMessage() {}
 
 func (x *StageEventApproved) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[40]
+	mi := &file_superplane_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2861,7 +3125,7 @@ func (x *StageEventApproved) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageEventApproved.ProtoReflect.Descriptor instead.
 func (*StageEventApproved) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{40}
+	return file_superplane_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *StageEventApproved) GetCanvasId() string {
@@ -2905,7 +3169,7 @@ type StageExecutionCreated struct {
 
 func (x *StageExecutionCreated) Reset() {
 	*x = StageExecutionCreated{}
-	mi := &file_superplane_proto_msgTypes[41]
+	mi := &file_superplane_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2917,7 +3181,7 @@ func (x *StageExecutionCreated) String() string {
 func (*StageExecutionCreated) ProtoMessage() {}
 
 func (x *StageExecutionCreated) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[41]
+	mi := &file_superplane_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2930,7 +3194,7 @@ func (x *StageExecutionCreated) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageExecutionCreated.ProtoReflect.Descriptor instead.
 func (*StageExecutionCreated) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{41}
+	return file_superplane_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *StageExecutionCreated) GetCanvasId() string {
@@ -2981,7 +3245,7 @@ type StageExecutionStarted struct {
 
 func (x *StageExecutionStarted) Reset() {
 	*x = StageExecutionStarted{}
-	mi := &file_superplane_proto_msgTypes[42]
+	mi := &file_superplane_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2993,7 +3257,7 @@ func (x *StageExecutionStarted) String() string {
 func (*StageExecutionStarted) ProtoMessage() {}
 
 func (x *StageExecutionStarted) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[42]
+	mi := &file_superplane_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3006,7 +3270,7 @@ func (x *StageExecutionStarted) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageExecutionStarted.ProtoReflect.Descriptor instead.
 func (*StageExecutionStarted) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{42}
+	return file_superplane_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *StageExecutionStarted) GetCanvasId() string {
@@ -3057,7 +3321,7 @@ type StageExecutionFinished struct {
 
 func (x *StageExecutionFinished) Reset() {
 	*x = StageExecutionFinished{}
-	mi := &file_superplane_proto_msgTypes[43]
+	mi := &file_superplane_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3069,7 +3333,7 @@ func (x *StageExecutionFinished) String() string {
 func (*StageExecutionFinished) ProtoMessage() {}
 
 func (x *StageExecutionFinished) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[43]
+	mi := &file_superplane_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3082,7 +3346,7 @@ func (x *StageExecutionFinished) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StageExecutionFinished.ProtoReflect.Descriptor instead.
 func (*StageExecutionFinished) Descriptor() ([]byte, []int) {
-	return file_superplane_proto_rawDescGZIP(), []int{43}
+	return file_superplane_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *StageExecutionFinished) GetCanvasId() string {
@@ -3131,7 +3395,7 @@ type Connection_Filter struct {
 
 func (x *Connection_Filter) Reset() {
 	*x = Connection_Filter{}
-	mi := &file_superplane_proto_msgTypes[44]
+	mi := &file_superplane_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3143,7 +3407,7 @@ func (x *Connection_Filter) String() string {
 func (*Connection_Filter) ProtoMessage() {}
 
 func (x *Connection_Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[44]
+	mi := &file_superplane_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3189,7 +3453,7 @@ type Connection_DataFilter struct {
 
 func (x *Connection_DataFilter) Reset() {
 	*x = Connection_DataFilter{}
-	mi := &file_superplane_proto_msgTypes[45]
+	mi := &file_superplane_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3201,7 +3465,7 @@ func (x *Connection_DataFilter) String() string {
 func (*Connection_DataFilter) ProtoMessage() {}
 
 func (x *Connection_DataFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[45]
+	mi := &file_superplane_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3233,7 +3497,7 @@ type Connection_HeaderFilter struct {
 
 func (x *Connection_HeaderFilter) Reset() {
 	*x = Connection_HeaderFilter{}
-	mi := &file_superplane_proto_msgTypes[46]
+	mi := &file_superplane_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3245,7 +3509,7 @@ func (x *Connection_HeaderFilter) String() string {
 func (*Connection_HeaderFilter) ProtoMessage() {}
 
 func (x *Connection_HeaderFilter) ProtoReflect() protoreflect.Message {
-	mi := &file_superplane_proto_msgTypes[46]
+	mi := &file_superplane_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3264,6 +3528,394 @@ func (*Connection_HeaderFilter) Descriptor() ([]byte, []int) {
 func (x *Connection_HeaderFilter) GetExpression() string {
 	if x != nil {
 		return x.Expression
+	}
+	return ""
+}
+
+type InputMapping_When struct {
+	state         protoimpl.MessageState        `protogen:"open.v1"`
+	TriggeredBy   *InputMapping_WhenTriggeredBy `protobuf:"bytes,1,opt,name=triggered_by,json=triggeredBy,proto3" json:"triggered_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_When) Reset() {
+	*x = InputMapping_When{}
+	mi := &file_superplane_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_When) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_When) ProtoMessage() {}
+
+func (x *InputMapping_When) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_When.ProtoReflect.Descriptor instead.
+func (*InputMapping_When) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 0}
+}
+
+func (x *InputMapping_When) GetTriggeredBy() *InputMapping_WhenTriggeredBy {
+	if x != nil {
+		return x.TriggeredBy
+	}
+	return nil
+}
+
+type InputMapping_WhenTriggeredBy struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Connection    string                 `protobuf:"bytes,1,opt,name=connection,proto3" json:"connection,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_WhenTriggeredBy) Reset() {
+	*x = InputMapping_WhenTriggeredBy{}
+	mi := &file_superplane_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_WhenTriggeredBy) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_WhenTriggeredBy) ProtoMessage() {}
+
+func (x *InputMapping_WhenTriggeredBy) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_WhenTriggeredBy.ProtoReflect.Descriptor instead.
+func (*InputMapping_WhenTriggeredBy) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 1}
+}
+
+func (x *InputMapping_WhenTriggeredBy) GetConnection() string {
+	if x != nil {
+		return x.Connection
+	}
+	return ""
+}
+
+type InputMapping_ValueDefinition struct {
+	state         protoimpl.MessageState  `protogen:"open.v1"`
+	Name          string                  `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	ValueFrom     *InputMapping_ValueFrom `protobuf:"bytes,2,opt,name=value_from,json=valueFrom,proto3" json:"value_from,omitempty"`
+	Value         string                  `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_ValueDefinition) Reset() {
+	*x = InputMapping_ValueDefinition{}
+	mi := &file_superplane_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_ValueDefinition) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_ValueDefinition) ProtoMessage() {}
+
+func (x *InputMapping_ValueDefinition) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_ValueDefinition.ProtoReflect.Descriptor instead.
+func (*InputMapping_ValueDefinition) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 2}
+}
+
+func (x *InputMapping_ValueDefinition) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *InputMapping_ValueDefinition) GetValueFrom() *InputMapping_ValueFrom {
+	if x != nil {
+		return x.ValueFrom
+	}
+	return nil
+}
+
+func (x *InputMapping_ValueDefinition) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type InputMapping_ValueFrom struct {
+	state         protoimpl.MessageState               `protogen:"open.v1"`
+	EventData     *InputMapping_ValueFromEventData     `protobuf:"bytes,1,opt,name=event_data,json=eventData,proto3" json:"event_data,omitempty"`
+	LastExecution *InputMapping_ValueFromLastExecution `protobuf:"bytes,2,opt,name=last_execution,json=lastExecution,proto3" json:"last_execution,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_ValueFrom) Reset() {
+	*x = InputMapping_ValueFrom{}
+	mi := &file_superplane_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_ValueFrom) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_ValueFrom) ProtoMessage() {}
+
+func (x *InputMapping_ValueFrom) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_ValueFrom.ProtoReflect.Descriptor instead.
+func (*InputMapping_ValueFrom) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 3}
+}
+
+func (x *InputMapping_ValueFrom) GetEventData() *InputMapping_ValueFromEventData {
+	if x != nil {
+		return x.EventData
+	}
+	return nil
+}
+
+func (x *InputMapping_ValueFrom) GetLastExecution() *InputMapping_ValueFromLastExecution {
+	if x != nil {
+		return x.LastExecution
+	}
+	return nil
+}
+
+type InputMapping_ValueFromEventData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Connection    string                 `protobuf:"bytes,1,opt,name=connection,proto3" json:"connection,omitempty"`
+	Expression    string                 `protobuf:"bytes,2,opt,name=expression,proto3" json:"expression,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_ValueFromEventData) Reset() {
+	*x = InputMapping_ValueFromEventData{}
+	mi := &file_superplane_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_ValueFromEventData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_ValueFromEventData) ProtoMessage() {}
+
+func (x *InputMapping_ValueFromEventData) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_ValueFromEventData.ProtoReflect.Descriptor instead.
+func (*InputMapping_ValueFromEventData) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 4}
+}
+
+func (x *InputMapping_ValueFromEventData) GetConnection() string {
+	if x != nil {
+		return x.Connection
+	}
+	return ""
+}
+
+func (x *InputMapping_ValueFromEventData) GetExpression() string {
+	if x != nil {
+		return x.Expression
+	}
+	return ""
+}
+
+type InputMapping_ValueFromLastExecution struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Results       []Execution_Result     `protobuf:"varint,1,rep,packed,name=results,proto3,enum=Superplane.Execution_Result" json:"results,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InputMapping_ValueFromLastExecution) Reset() {
+	*x = InputMapping_ValueFromLastExecution{}
+	mi := &file_superplane_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InputMapping_ValueFromLastExecution) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InputMapping_ValueFromLastExecution) ProtoMessage() {}
+
+func (x *InputMapping_ValueFromLastExecution) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InputMapping_ValueFromLastExecution.ProtoReflect.Descriptor instead.
+func (*InputMapping_ValueFromLastExecution) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{18, 5}
+}
+
+func (x *InputMapping_ValueFromLastExecution) GetResults() []Execution_Result {
+	if x != nil {
+		return x.Results
+	}
+	return nil
+}
+
+type ExecutorSpec_Semaphore struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId       string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Branch          string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
+	PipelineFile    string                 `protobuf:"bytes,3,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
+	TaskId          string                 `protobuf:"bytes,4,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Parameters      map[string]string      `protobuf:"bytes,5,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ApiToken        string                 `protobuf:"bytes,6,opt,name=api_token,json=apiToken,proto3" json:"api_token,omitempty"`
+	OrganizationUrl string                 `protobuf:"bytes,7,opt,name=organization_url,json=organizationUrl,proto3" json:"organization_url,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ExecutorSpec_Semaphore) Reset() {
+	*x = ExecutorSpec_Semaphore{}
+	mi := &file_superplane_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ExecutorSpec_Semaphore) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ExecutorSpec_Semaphore) ProtoMessage() {}
+
+func (x *ExecutorSpec_Semaphore) ProtoReflect() protoreflect.Message {
+	mi := &file_superplane_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ExecutorSpec_Semaphore.ProtoReflect.Descriptor instead.
+func (*ExecutorSpec_Semaphore) Descriptor() ([]byte, []int) {
+	return file_superplane_proto_rawDescGZIP(), []int{23, 0}
+}
+
+func (x *ExecutorSpec_Semaphore) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetPipelineFile() string {
+	if x != nil {
+		return x.PipelineFile
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetTaskId() string {
+	if x != nil {
+		return x.TaskId
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetParameters() map[string]string {
+	if x != nil {
+		return x.Parameters
+	}
+	return nil
+}
+
+func (x *ExecutorSpec_Semaphore) GetApiToken() string {
+	if x != nil {
+		return x.ApiToken
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetOrganizationUrl() string {
+	if x != nil {
+		return x.OrganizationUrl
 	}
 	return ""
 }
@@ -3350,7 +4002,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02\"A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x01\"\xb0\x02\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x01\"\xd8\x03\n" +
 	"\x05Stage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
@@ -3360,8 +4012,46 @@ const file_superplane_proto_rawDesc = "" +
 	"\vconnections\x18\x05 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
 	"\n" +
 	"conditions\x18\x06 \x03(\v2\x15.Superplane.ConditionR\n" +
-	"conditions\x12:\n" +
-	"\frun_template\x18\a \x01(\v2\x17.Superplane.RunTemplateR\vrunTemplate\"\x99\x02\n" +
+	"conditions\x124\n" +
+	"\bexecutor\x18\a \x01(\v2\x18.Superplane.ExecutorSpecR\bexecutor\x123\n" +
+	"\x06inputs\x18\b \x03(\v2\x1b.Superplane.InputDefinitionR\x06inputs\x12?\n" +
+	"\x0einput_mappings\x18\t \x03(\v2\x18.Superplane.InputMappingR\rinputMappings\x126\n" +
+	"\aoutputs\x18\n" +
+	" \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\"d\n" +
+	"\x10OutputDefinition\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x1a\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\"G\n" +
+	"\x0fInputDefinition\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\"\xe5\x05\n" +
+	"\fInputMapping\x12@\n" +
+	"\x06values\x18\x01 \x03(\v2(.Superplane.InputMapping.ValueDefinitionR\x06values\x121\n" +
+	"\x04when\x18\x02 \x01(\v2\x1d.Superplane.InputMapping.WhenR\x04when\x1aS\n" +
+	"\x04When\x12K\n" +
+	"\ftriggered_by\x18\x01 \x01(\v2(.Superplane.InputMapping.WhenTriggeredByR\vtriggeredBy\x1a1\n" +
+	"\x0fWhenTriggeredBy\x12\x1e\n" +
+	"\n" +
+	"connection\x18\x01 \x01(\tR\n" +
+	"connection\x1a~\n" +
+	"\x0fValueDefinition\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12A\n" +
+	"\n" +
+	"value_from\x18\x02 \x01(\v2\".Superplane.InputMapping.ValueFromR\tvalueFrom\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\tR\x05value\x1a\xaf\x01\n" +
+	"\tValueFrom\x12J\n" +
+	"\n" +
+	"event_data\x18\x01 \x01(\v2+.Superplane.InputMapping.ValueFromEventDataR\teventData\x12V\n" +
+	"\x0elast_execution\x18\x02 \x01(\v2/.Superplane.InputMapping.ValueFromLastExecutionR\rlastExecution\x1aT\n" +
+	"\x12ValueFromEventData\x12\x1e\n" +
+	"\n" +
+	"connection\x18\x01 \x01(\tR\n" +
+	"connection\x12\x1e\n" +
+	"\n" +
+	"expression\x18\x02 \x01(\tR\n" +
+	"expression\x1aP\n" +
+	"\x16ValueFromLastExecution\x126\n" +
+	"\aresults\x18\x01 \x03(\x0e2\x1c.Superplane.Execution.ResultR\aresults\"\x99\x02\n" +
 	"\tCondition\x12.\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1a.Superplane.Condition.TypeR\x04type\x129\n" +
 	"\bapproval\x18\x02 \x01(\v2\x1d.Superplane.ConditionApprovalR\bapproval\x12@\n" +
@@ -3376,7 +4066,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x13ConditionTimeWindow\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\tR\x05start\x12\x10\n" +
 	"\x03end\x18\x02 \x01(\tR\x03end\x12\x1b\n" +
-	"\tweek_days\x18\x03 \x03(\tR\bweekDays\"\xa3\x02\n" +
+	"\tweek_days\x18\x03 \x03(\tR\bweekDays\"\xcb\x03\n" +
 	"\x12CreateStageRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12!\n" +
@@ -3384,30 +4074,33 @@ const file_superplane_proto_rawDesc = "" +
 	"\vconnections\x18\x04 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
 	"\n" +
 	"conditions\x18\x05 \x03(\v2\x15.Superplane.ConditionR\n" +
-	"conditions\x12:\n" +
-	"\frun_template\x18\x06 \x01(\v2\x17.Superplane.RunTemplateR\vrunTemplate\"\xad\x01\n" +
-	"\vRunTemplate\x120\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x1c.Superplane.RunTemplate.TypeR\x04type\x12>\n" +
-	"\tsemaphore\x18\x02 \x01(\v2 .Superplane.SemaphoreRunTemplateR\tsemaphore\",\n" +
-	"\x04Type\x12\x10\n" +
-	"\fTYPE_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0eTYPE_SEMAPHORE\x10\x01\"\xe4\x02\n" +
-	"\x14SemaphoreRunTemplate\x12\x1d\n" +
+	"conditions\x124\n" +
+	"\bexecutor\x18\x06 \x01(\v2\x18.Superplane.ExecutorSpecR\bexecutor\x123\n" +
+	"\x06inputs\x18\a \x03(\v2\x1b.Superplane.InputDefinitionR\x06inputs\x12?\n" +
+	"\x0einput_mappings\x18\b \x03(\v2\x18.Superplane.InputMappingR\rinputMappings\x126\n" +
+	"\aoutputs\x18\t \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\"\x8f\x04\n" +
+	"\fExecutorSpec\x121\n" +
+	"\x04type\x18\x01 \x01(\x0e2\x1d.Superplane.ExecutorSpec.TypeR\x04type\x12@\n" +
+	"\tsemaphore\x18\x02 \x01(\v2\".Superplane.ExecutorSpec.SemaphoreR\tsemaphore\x1a\xdb\x02\n" +
+	"\tSemaphore\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x16\n" +
 	"\x06branch\x18\x02 \x01(\tR\x06branch\x12#\n" +
 	"\rpipeline_file\x18\x03 \x01(\tR\fpipelineFile\x12\x17\n" +
-	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12P\n" +
+	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12R\n" +
 	"\n" +
-	"parameters\x18\x05 \x03(\v20.Superplane.SemaphoreRunTemplate.ParametersEntryR\n" +
+	"parameters\x18\x05 \x03(\v22.Superplane.ExecutorSpec.Semaphore.ParametersEntryR\n" +
 	"parameters\x12\x1b\n" +
 	"\tapi_token\x18\x06 \x01(\tR\bapiToken\x12)\n" +
 	"\x10organization_url\x18\a \x01(\tR\x0forganizationUrl\x1a=\n" +
 	"\x0fParametersEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\">\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\",\n" +
+	"\x04Type\x12\x10\n" +
+	"\fTYPE_UNKNOWN\x10\x00\x12\x12\n" +
+	"\x0eTYPE_SEMAPHORE\x10\x01\">\n" +
 	"\x13CreateStageResponse\x12'\n" +
-	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\xad\x02\n" +
+	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\xd5\x03\n" +
 	"\x12UpdateStageRequest\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12)\n" +
@@ -3416,8 +4109,11 @@ const file_superplane_proto_rawDesc = "" +
 	"\vconnections\x18\x04 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
 	"\n" +
 	"conditions\x18\x05 \x03(\v2\x15.Superplane.ConditionR\n" +
-	"conditions\x12:\n" +
-	"\frun_template\x18\x06 \x01(\v2\x17.Superplane.RunTemplateR\vrunTemplate\">\n" +
+	"conditions\x124\n" +
+	"\bexecutor\x18\x06 \x01(\v2\x18.Superplane.ExecutorSpecR\bexecutor\x123\n" +
+	"\x06inputs\x18\a \x03(\v2\x1b.Superplane.InputDefinitionR\x06inputs\x12?\n" +
+	"\x0einput_mappings\x18\b \x03(\v2\x18.Superplane.InputMappingR\rinputMappings\x126\n" +
+	"\aoutputs\x18\t \x03(\v2\x1c.Superplane.OutputDefinitionR\aoutputs\">\n" +
 	"\x13UpdateStageResponse\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\">\n" +
 	"\x11ListStagesRequest\x12)\n" +
@@ -3434,7 +4130,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xcb\x05\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xfb\x05\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -3446,7 +4142,8 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\tapprovals\x18\a \x03(\v2\x1e.Superplane.StageEventApprovalR\tapprovals\x123\n" +
-	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\"U\n" +
+	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x12.\n" +
+	"\x06inputs\x18\t \x03(\v2\x16.Superplane.InputValueR\x06inputs\"U\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
@@ -3459,7 +4156,14 @@ const file_superplane_proto_rawDesc = "" +
 	"\x16STATE_REASON_EXECUTION\x10\x03\x12\x1b\n" +
 	"\x17STATE_REASON_CONNECTION\x10\x04\x12\x1a\n" +
 	"\x16STATE_REASON_CANCELLED\x10\x05\x12\x1a\n" +
-	"\x16STATE_REASON_UNHEALTHY\x10\x06\"\xf4\x03\n" +
+	"\x16STATE_REASON_UNHEALTHY\x10\x06\"6\n" +
+	"\n" +
+	"InputValue\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"7\n" +
+	"\vOutputValue\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xa7\x04\n" +
 	"\tExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\freference_id\x18\x02 \x01(\tR\vreferenceId\x121\n" +
@@ -3470,7 +4174,8 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
 	"\vfinished_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"finishedAt\"T\n" +
+	"finishedAt\x121\n" +
+	"\aoutputs\x18\b \x03(\v2\x17.Superplane.OutputValueR\aoutputs\"T\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
@@ -3575,155 +4280,184 @@ func file_superplane_proto_rawDescGZIP() []byte {
 }
 
 var file_superplane_proto_enumTypes = make([]protoimpl.EnumInfo, 9)
-var file_superplane_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
+var file_superplane_proto_msgTypes = make([]protoimpl.MessageInfo, 59)
 var file_superplane_proto_goTypes = []any{
-	(Connection_Type)(0),                // 0: Superplane.Connection.Type
-	(Connection_FilterType)(0),          // 1: Superplane.Connection.FilterType
-	(Connection_FilterOperator)(0),      // 2: Superplane.Connection.FilterOperator
-	(Condition_Type)(0),                 // 3: Superplane.Condition.Type
-	(RunTemplate_Type)(0),               // 4: Superplane.RunTemplate.Type
-	(StageEvent_State)(0),               // 5: Superplane.StageEvent.State
-	(StageEvent_StateReason)(0),         // 6: Superplane.StageEvent.StateReason
-	(Execution_State)(0),                // 7: Superplane.Execution.State
-	(Execution_Result)(0),               // 8: Superplane.Execution.Result
-	(*ListCanvasesRequest)(nil),         // 9: Superplane.ListCanvasesRequest
-	(*ListCanvasesResponse)(nil),        // 10: Superplane.ListCanvasesResponse
-	(*Canvas)(nil),                      // 11: Superplane.Canvas
-	(*CreateCanvasRequest)(nil),         // 12: Superplane.CreateCanvasRequest
-	(*CreateCanvasResponse)(nil),        // 13: Superplane.CreateCanvasResponse
-	(*DescribeCanvasRequest)(nil),       // 14: Superplane.DescribeCanvasRequest
-	(*DescribeCanvasResponse)(nil),      // 15: Superplane.DescribeCanvasResponse
-	(*EventSource)(nil),                 // 16: Superplane.EventSource
-	(*DescribeStageRequest)(nil),        // 17: Superplane.DescribeStageRequest
-	(*DescribeStageResponse)(nil),       // 18: Superplane.DescribeStageResponse
-	(*CreateEventSourceRequest)(nil),    // 19: Superplane.CreateEventSourceRequest
-	(*CreateEventSourceResponse)(nil),   // 20: Superplane.CreateEventSourceResponse
-	(*DescribeEventSourceRequest)(nil),  // 21: Superplane.DescribeEventSourceRequest
-	(*DescribeEventSourceResponse)(nil), // 22: Superplane.DescribeEventSourceResponse
-	(*Connection)(nil),                  // 23: Superplane.Connection
-	(*Stage)(nil),                       // 24: Superplane.Stage
-	(*Condition)(nil),                   // 25: Superplane.Condition
-	(*ConditionApproval)(nil),           // 26: Superplane.ConditionApproval
-	(*ConditionTimeWindow)(nil),         // 27: Superplane.ConditionTimeWindow
-	(*CreateStageRequest)(nil),          // 28: Superplane.CreateStageRequest
-	(*RunTemplate)(nil),                 // 29: Superplane.RunTemplate
-	(*SemaphoreRunTemplate)(nil),        // 30: Superplane.SemaphoreRunTemplate
-	(*CreateStageResponse)(nil),         // 31: Superplane.CreateStageResponse
-	(*UpdateStageRequest)(nil),          // 32: Superplane.UpdateStageRequest
-	(*UpdateStageResponse)(nil),         // 33: Superplane.UpdateStageResponse
-	(*ListStagesRequest)(nil),           // 34: Superplane.ListStagesRequest
-	(*ListStagesResponse)(nil),          // 35: Superplane.ListStagesResponse
-	(*ListEventSourcesRequest)(nil),     // 36: Superplane.ListEventSourcesRequest
-	(*ListEventSourcesResponse)(nil),    // 37: Superplane.ListEventSourcesResponse
-	(*ListStageEventsRequest)(nil),      // 38: Superplane.ListStageEventsRequest
-	(*ListStageEventsResponse)(nil),     // 39: Superplane.ListStageEventsResponse
-	(*StageEvent)(nil),                  // 40: Superplane.StageEvent
-	(*Execution)(nil),                   // 41: Superplane.Execution
-	(*StageEventApproval)(nil),          // 42: Superplane.StageEventApproval
-	(*ApproveStageEventRequest)(nil),    // 43: Superplane.ApproveStageEventRequest
-	(*ApproveStageEventResponse)(nil),   // 44: Superplane.ApproveStageEventResponse
-	(*StageCreated)(nil),                // 45: Superplane.StageCreated
-	(*StageUpdated)(nil),                // 46: Superplane.StageUpdated
-	(*EventSourceCreated)(nil),          // 47: Superplane.EventSourceCreated
-	(*StageEventCreated)(nil),           // 48: Superplane.StageEventCreated
-	(*StageEventApproved)(nil),          // 49: Superplane.StageEventApproved
-	(*StageExecutionCreated)(nil),       // 50: Superplane.StageExecutionCreated
-	(*StageExecutionStarted)(nil),       // 51: Superplane.StageExecutionStarted
-	(*StageExecutionFinished)(nil),      // 52: Superplane.StageExecutionFinished
-	(*Connection_Filter)(nil),           // 53: Superplane.Connection.Filter
-	(*Connection_DataFilter)(nil),       // 54: Superplane.Connection.DataFilter
-	(*Connection_HeaderFilter)(nil),     // 55: Superplane.Connection.HeaderFilter
-	nil,                                 // 56: Superplane.SemaphoreRunTemplate.ParametersEntry
-	(*timestamp.Timestamp)(nil),         // 57: google.protobuf.Timestamp
+	(Connection_Type)(0),                        // 0: Superplane.Connection.Type
+	(Connection_FilterType)(0),                  // 1: Superplane.Connection.FilterType
+	(Connection_FilterOperator)(0),              // 2: Superplane.Connection.FilterOperator
+	(Condition_Type)(0),                         // 3: Superplane.Condition.Type
+	(ExecutorSpec_Type)(0),                      // 4: Superplane.ExecutorSpec.Type
+	(StageEvent_State)(0),                       // 5: Superplane.StageEvent.State
+	(StageEvent_StateReason)(0),                 // 6: Superplane.StageEvent.StateReason
+	(Execution_State)(0),                        // 7: Superplane.Execution.State
+	(Execution_Result)(0),                       // 8: Superplane.Execution.Result
+	(*ListCanvasesRequest)(nil),                 // 9: Superplane.ListCanvasesRequest
+	(*ListCanvasesResponse)(nil),                // 10: Superplane.ListCanvasesResponse
+	(*Canvas)(nil),                              // 11: Superplane.Canvas
+	(*CreateCanvasRequest)(nil),                 // 12: Superplane.CreateCanvasRequest
+	(*CreateCanvasResponse)(nil),                // 13: Superplane.CreateCanvasResponse
+	(*DescribeCanvasRequest)(nil),               // 14: Superplane.DescribeCanvasRequest
+	(*DescribeCanvasResponse)(nil),              // 15: Superplane.DescribeCanvasResponse
+	(*EventSource)(nil),                         // 16: Superplane.EventSource
+	(*DescribeStageRequest)(nil),                // 17: Superplane.DescribeStageRequest
+	(*DescribeStageResponse)(nil),               // 18: Superplane.DescribeStageResponse
+	(*CreateEventSourceRequest)(nil),            // 19: Superplane.CreateEventSourceRequest
+	(*CreateEventSourceResponse)(nil),           // 20: Superplane.CreateEventSourceResponse
+	(*DescribeEventSourceRequest)(nil),          // 21: Superplane.DescribeEventSourceRequest
+	(*DescribeEventSourceResponse)(nil),         // 22: Superplane.DescribeEventSourceResponse
+	(*Connection)(nil),                          // 23: Superplane.Connection
+	(*Stage)(nil),                               // 24: Superplane.Stage
+	(*OutputDefinition)(nil),                    // 25: Superplane.OutputDefinition
+	(*InputDefinition)(nil),                     // 26: Superplane.InputDefinition
+	(*InputMapping)(nil),                        // 27: Superplane.InputMapping
+	(*Condition)(nil),                           // 28: Superplane.Condition
+	(*ConditionApproval)(nil),                   // 29: Superplane.ConditionApproval
+	(*ConditionTimeWindow)(nil),                 // 30: Superplane.ConditionTimeWindow
+	(*CreateStageRequest)(nil),                  // 31: Superplane.CreateStageRequest
+	(*ExecutorSpec)(nil),                        // 32: Superplane.ExecutorSpec
+	(*CreateStageResponse)(nil),                 // 33: Superplane.CreateStageResponse
+	(*UpdateStageRequest)(nil),                  // 34: Superplane.UpdateStageRequest
+	(*UpdateStageResponse)(nil),                 // 35: Superplane.UpdateStageResponse
+	(*ListStagesRequest)(nil),                   // 36: Superplane.ListStagesRequest
+	(*ListStagesResponse)(nil),                  // 37: Superplane.ListStagesResponse
+	(*ListEventSourcesRequest)(nil),             // 38: Superplane.ListEventSourcesRequest
+	(*ListEventSourcesResponse)(nil),            // 39: Superplane.ListEventSourcesResponse
+	(*ListStageEventsRequest)(nil),              // 40: Superplane.ListStageEventsRequest
+	(*ListStageEventsResponse)(nil),             // 41: Superplane.ListStageEventsResponse
+	(*StageEvent)(nil),                          // 42: Superplane.StageEvent
+	(*InputValue)(nil),                          // 43: Superplane.InputValue
+	(*OutputValue)(nil),                         // 44: Superplane.OutputValue
+	(*Execution)(nil),                           // 45: Superplane.Execution
+	(*StageEventApproval)(nil),                  // 46: Superplane.StageEventApproval
+	(*ApproveStageEventRequest)(nil),            // 47: Superplane.ApproveStageEventRequest
+	(*ApproveStageEventResponse)(nil),           // 48: Superplane.ApproveStageEventResponse
+	(*StageCreated)(nil),                        // 49: Superplane.StageCreated
+	(*StageUpdated)(nil),                        // 50: Superplane.StageUpdated
+	(*EventSourceCreated)(nil),                  // 51: Superplane.EventSourceCreated
+	(*StageEventCreated)(nil),                   // 52: Superplane.StageEventCreated
+	(*StageEventApproved)(nil),                  // 53: Superplane.StageEventApproved
+	(*StageExecutionCreated)(nil),               // 54: Superplane.StageExecutionCreated
+	(*StageExecutionStarted)(nil),               // 55: Superplane.StageExecutionStarted
+	(*StageExecutionFinished)(nil),              // 56: Superplane.StageExecutionFinished
+	(*Connection_Filter)(nil),                   // 57: Superplane.Connection.Filter
+	(*Connection_DataFilter)(nil),               // 58: Superplane.Connection.DataFilter
+	(*Connection_HeaderFilter)(nil),             // 59: Superplane.Connection.HeaderFilter
+	(*InputMapping_When)(nil),                   // 60: Superplane.InputMapping.When
+	(*InputMapping_WhenTriggeredBy)(nil),        // 61: Superplane.InputMapping.WhenTriggeredBy
+	(*InputMapping_ValueDefinition)(nil),        // 62: Superplane.InputMapping.ValueDefinition
+	(*InputMapping_ValueFrom)(nil),              // 63: Superplane.InputMapping.ValueFrom
+	(*InputMapping_ValueFromEventData)(nil),     // 64: Superplane.InputMapping.ValueFromEventData
+	(*InputMapping_ValueFromLastExecution)(nil), // 65: Superplane.InputMapping.ValueFromLastExecution
+	(*ExecutorSpec_Semaphore)(nil),              // 66: Superplane.ExecutorSpec.Semaphore
+	nil,                                         // 67: Superplane.ExecutorSpec.Semaphore.ParametersEntry
+	(*timestamp.Timestamp)(nil),                 // 68: google.protobuf.Timestamp
 }
 var file_superplane_proto_depIdxs = []int32{
 	11, // 0: Superplane.ListCanvasesResponse.canvases:type_name -> Superplane.Canvas
-	57, // 1: Superplane.Canvas.created_at:type_name -> google.protobuf.Timestamp
+	68, // 1: Superplane.Canvas.created_at:type_name -> google.protobuf.Timestamp
 	11, // 2: Superplane.CreateCanvasResponse.canvas:type_name -> Superplane.Canvas
 	11, // 3: Superplane.DescribeCanvasResponse.canvas:type_name -> Superplane.Canvas
-	57, // 4: Superplane.EventSource.created_at:type_name -> google.protobuf.Timestamp
+	68, // 4: Superplane.EventSource.created_at:type_name -> google.protobuf.Timestamp
 	24, // 5: Superplane.DescribeStageResponse.stage:type_name -> Superplane.Stage
 	16, // 6: Superplane.CreateEventSourceResponse.event_source:type_name -> Superplane.EventSource
 	16, // 7: Superplane.DescribeEventSourceResponse.event_source:type_name -> Superplane.EventSource
 	0,  // 8: Superplane.Connection.type:type_name -> Superplane.Connection.Type
-	53, // 9: Superplane.Connection.filters:type_name -> Superplane.Connection.Filter
+	57, // 9: Superplane.Connection.filters:type_name -> Superplane.Connection.Filter
 	2,  // 10: Superplane.Connection.filter_operator:type_name -> Superplane.Connection.FilterOperator
-	57, // 11: Superplane.Stage.created_at:type_name -> google.protobuf.Timestamp
+	68, // 11: Superplane.Stage.created_at:type_name -> google.protobuf.Timestamp
 	23, // 12: Superplane.Stage.connections:type_name -> Superplane.Connection
-	25, // 13: Superplane.Stage.conditions:type_name -> Superplane.Condition
-	29, // 14: Superplane.Stage.run_template:type_name -> Superplane.RunTemplate
-	3,  // 15: Superplane.Condition.type:type_name -> Superplane.Condition.Type
-	26, // 16: Superplane.Condition.approval:type_name -> Superplane.ConditionApproval
-	27, // 17: Superplane.Condition.time_window:type_name -> Superplane.ConditionTimeWindow
-	23, // 18: Superplane.CreateStageRequest.connections:type_name -> Superplane.Connection
-	25, // 19: Superplane.CreateStageRequest.conditions:type_name -> Superplane.Condition
-	29, // 20: Superplane.CreateStageRequest.run_template:type_name -> Superplane.RunTemplate
-	4,  // 21: Superplane.RunTemplate.type:type_name -> Superplane.RunTemplate.Type
-	30, // 22: Superplane.RunTemplate.semaphore:type_name -> Superplane.SemaphoreRunTemplate
-	56, // 23: Superplane.SemaphoreRunTemplate.parameters:type_name -> Superplane.SemaphoreRunTemplate.ParametersEntry
-	24, // 24: Superplane.CreateStageResponse.stage:type_name -> Superplane.Stage
-	23, // 25: Superplane.UpdateStageRequest.connections:type_name -> Superplane.Connection
-	25, // 26: Superplane.UpdateStageRequest.conditions:type_name -> Superplane.Condition
-	29, // 27: Superplane.UpdateStageRequest.run_template:type_name -> Superplane.RunTemplate
-	24, // 28: Superplane.UpdateStageResponse.stage:type_name -> Superplane.Stage
-	24, // 29: Superplane.ListStagesResponse.stages:type_name -> Superplane.Stage
-	16, // 30: Superplane.ListEventSourcesResponse.event_sources:type_name -> Superplane.EventSource
-	5,  // 31: Superplane.ListStageEventsRequest.states:type_name -> Superplane.StageEvent.State
-	6,  // 32: Superplane.ListStageEventsRequest.state_reasons:type_name -> Superplane.StageEvent.StateReason
-	40, // 33: Superplane.ListStageEventsResponse.events:type_name -> Superplane.StageEvent
-	0,  // 34: Superplane.StageEvent.source_type:type_name -> Superplane.Connection.Type
-	5,  // 35: Superplane.StageEvent.state:type_name -> Superplane.StageEvent.State
-	6,  // 36: Superplane.StageEvent.state_reason:type_name -> Superplane.StageEvent.StateReason
-	57, // 37: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
-	42, // 38: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
-	41, // 39: Superplane.StageEvent.execution:type_name -> Superplane.Execution
-	7,  // 40: Superplane.Execution.state:type_name -> Superplane.Execution.State
-	8,  // 41: Superplane.Execution.result:type_name -> Superplane.Execution.Result
-	57, // 42: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
-	57, // 43: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
-	57, // 44: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
-	57, // 45: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
-	40, // 46: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent
-	57, // 47: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 48: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 49: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 50: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 51: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 52: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 53: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
-	57, // 54: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
-	1,  // 55: Superplane.Connection.Filter.type:type_name -> Superplane.Connection.FilterType
-	54, // 56: Superplane.Connection.Filter.data:type_name -> Superplane.Connection.DataFilter
-	55, // 57: Superplane.Connection.Filter.header:type_name -> Superplane.Connection.HeaderFilter
-	9,  // 58: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
-	12, // 59: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
-	19, // 60: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
-	28, // 61: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
-	14, // 62: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
-	17, // 63: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
-	21, // 64: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
-	34, // 65: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
-	36, // 66: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
-	38, // 67: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
-	32, // 68: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
-	43, // 69: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
-	10, // 70: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
-	13, // 71: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
-	20, // 72: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
-	31, // 73: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
-	15, // 74: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
-	18, // 75: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
-	22, // 76: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
-	35, // 77: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
-	37, // 78: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
-	39, // 79: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
-	33, // 80: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
-	44, // 81: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
-	70, // [70:82] is the sub-list for method output_type
-	58, // [58:70] is the sub-list for method input_type
-	58, // [58:58] is the sub-list for extension type_name
-	58, // [58:58] is the sub-list for extension extendee
-	0,  // [0:58] is the sub-list for field type_name
+	28, // 13: Superplane.Stage.conditions:type_name -> Superplane.Condition
+	32, // 14: Superplane.Stage.executor:type_name -> Superplane.ExecutorSpec
+	26, // 15: Superplane.Stage.inputs:type_name -> Superplane.InputDefinition
+	27, // 16: Superplane.Stage.input_mappings:type_name -> Superplane.InputMapping
+	25, // 17: Superplane.Stage.outputs:type_name -> Superplane.OutputDefinition
+	62, // 18: Superplane.InputMapping.values:type_name -> Superplane.InputMapping.ValueDefinition
+	60, // 19: Superplane.InputMapping.when:type_name -> Superplane.InputMapping.When
+	3,  // 20: Superplane.Condition.type:type_name -> Superplane.Condition.Type
+	29, // 21: Superplane.Condition.approval:type_name -> Superplane.ConditionApproval
+	30, // 22: Superplane.Condition.time_window:type_name -> Superplane.ConditionTimeWindow
+	23, // 23: Superplane.CreateStageRequest.connections:type_name -> Superplane.Connection
+	28, // 24: Superplane.CreateStageRequest.conditions:type_name -> Superplane.Condition
+	32, // 25: Superplane.CreateStageRequest.executor:type_name -> Superplane.ExecutorSpec
+	26, // 26: Superplane.CreateStageRequest.inputs:type_name -> Superplane.InputDefinition
+	27, // 27: Superplane.CreateStageRequest.input_mappings:type_name -> Superplane.InputMapping
+	25, // 28: Superplane.CreateStageRequest.outputs:type_name -> Superplane.OutputDefinition
+	4,  // 29: Superplane.ExecutorSpec.type:type_name -> Superplane.ExecutorSpec.Type
+	66, // 30: Superplane.ExecutorSpec.semaphore:type_name -> Superplane.ExecutorSpec.Semaphore
+	24, // 31: Superplane.CreateStageResponse.stage:type_name -> Superplane.Stage
+	23, // 32: Superplane.UpdateStageRequest.connections:type_name -> Superplane.Connection
+	28, // 33: Superplane.UpdateStageRequest.conditions:type_name -> Superplane.Condition
+	32, // 34: Superplane.UpdateStageRequest.executor:type_name -> Superplane.ExecutorSpec
+	26, // 35: Superplane.UpdateStageRequest.inputs:type_name -> Superplane.InputDefinition
+	27, // 36: Superplane.UpdateStageRequest.input_mappings:type_name -> Superplane.InputMapping
+	25, // 37: Superplane.UpdateStageRequest.outputs:type_name -> Superplane.OutputDefinition
+	24, // 38: Superplane.UpdateStageResponse.stage:type_name -> Superplane.Stage
+	24, // 39: Superplane.ListStagesResponse.stages:type_name -> Superplane.Stage
+	16, // 40: Superplane.ListEventSourcesResponse.event_sources:type_name -> Superplane.EventSource
+	5,  // 41: Superplane.ListStageEventsRequest.states:type_name -> Superplane.StageEvent.State
+	6,  // 42: Superplane.ListStageEventsRequest.state_reasons:type_name -> Superplane.StageEvent.StateReason
+	42, // 43: Superplane.ListStageEventsResponse.events:type_name -> Superplane.StageEvent
+	0,  // 44: Superplane.StageEvent.source_type:type_name -> Superplane.Connection.Type
+	5,  // 45: Superplane.StageEvent.state:type_name -> Superplane.StageEvent.State
+	6,  // 46: Superplane.StageEvent.state_reason:type_name -> Superplane.StageEvent.StateReason
+	68, // 47: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
+	46, // 48: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
+	45, // 49: Superplane.StageEvent.execution:type_name -> Superplane.Execution
+	43, // 50: Superplane.StageEvent.inputs:type_name -> Superplane.InputValue
+	7,  // 51: Superplane.Execution.state:type_name -> Superplane.Execution.State
+	8,  // 52: Superplane.Execution.result:type_name -> Superplane.Execution.Result
+	68, // 53: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
+	68, // 54: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
+	68, // 55: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
+	44, // 56: Superplane.Execution.outputs:type_name -> Superplane.OutputValue
+	68, // 57: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
+	42, // 58: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent
+	68, // 59: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 60: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 61: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 62: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 63: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 64: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 65: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
+	68, // 66: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 67: Superplane.Connection.Filter.type:type_name -> Superplane.Connection.FilterType
+	58, // 68: Superplane.Connection.Filter.data:type_name -> Superplane.Connection.DataFilter
+	59, // 69: Superplane.Connection.Filter.header:type_name -> Superplane.Connection.HeaderFilter
+	61, // 70: Superplane.InputMapping.When.triggered_by:type_name -> Superplane.InputMapping.WhenTriggeredBy
+	63, // 71: Superplane.InputMapping.ValueDefinition.value_from:type_name -> Superplane.InputMapping.ValueFrom
+	64, // 72: Superplane.InputMapping.ValueFrom.event_data:type_name -> Superplane.InputMapping.ValueFromEventData
+	65, // 73: Superplane.InputMapping.ValueFrom.last_execution:type_name -> Superplane.InputMapping.ValueFromLastExecution
+	8,  // 74: Superplane.InputMapping.ValueFromLastExecution.results:type_name -> Superplane.Execution.Result
+	67, // 75: Superplane.ExecutorSpec.Semaphore.parameters:type_name -> Superplane.ExecutorSpec.Semaphore.ParametersEntry
+	9,  // 76: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
+	12, // 77: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
+	19, // 78: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
+	31, // 79: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
+	14, // 80: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
+	17, // 81: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
+	21, // 82: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
+	36, // 83: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
+	38, // 84: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
+	40, // 85: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
+	34, // 86: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
+	47, // 87: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
+	10, // 88: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
+	13, // 89: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
+	20, // 90: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
+	33, // 91: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
+	15, // 92: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
+	18, // 93: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
+	22, // 94: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
+	37, // 95: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
+	39, // 96: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
+	41, // 97: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
+	35, // 98: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
+	48, // 99: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
+	88, // [88:100] is the sub-list for method output_type
+	76, // [76:88] is the sub-list for method input_type
+	76, // [76:76] is the sub-list for extension type_name
+	76, // [76:76] is the sub-list for extension extendee
+	0,  // [0:76] is the sub-list for field type_name
 }
 
 func init() { file_superplane_proto_init() }
@@ -3737,7 +4471,7 @@ func file_superplane_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_superplane_proto_rawDesc), len(file_superplane_proto_rawDesc)),
 			NumEnums:      9,
-			NumMessages:   48,
+			NumMessages:   59,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

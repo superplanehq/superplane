@@ -24,7 +24,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	err = ValidateUUIDs(req.StageIdOrName)
@@ -37,7 +37,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Errorf(codes.InvalidArgument, "stage not found")
+			return nil, status.Error(codes.InvalidArgument, "stage not found")
 		}
 
 		return nil, err
@@ -45,7 +45,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 
 	states, err := validateStageEventStates(req.States)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	events, err := stage.ListEvents(states, []string{})
@@ -127,6 +127,7 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
+		Inputs:      []*pb.InputValue{},
 	}
 
 	//
@@ -138,6 +139,13 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	}
 
 	e.Execution = execution
+
+	//
+	// Add inputs
+	//
+	for k, v := range in.Inputs.Data() {
+		e.Inputs = append(e.Inputs, &pb.InputValue{Name: k, Value: v.(string)})
+	}
 
 	//
 	// Add approvals
@@ -173,6 +181,7 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		State:       executionStateToProto(execution.State),
 		Result:      executionResultToProto(execution.Result),
 		CreatedAt:   timestamppb.New(*execution.CreatedAt),
+		Outputs:     []*pb.OutputValue{},
 	}
 
 	if execution.StartedAt != nil {
@@ -181,6 +190,10 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 
 	if execution.FinishedAt != nil {
 		e.FinishedAt = timestamppb.New(*execution.FinishedAt)
+	}
+
+	for k, v := range execution.Outputs.Data() {
+		e.Outputs = append(e.Outputs, &pb.OutputValue{Name: k, Value: v.(string)})
 	}
 
 	return e, nil
@@ -199,8 +212,8 @@ func executionStateToProto(state string) pb.Execution_State {
 	}
 }
 
-func executionResultToProto(state string) pb.Execution_Result {
-	switch state {
+func executionResultToProto(result string) pb.Execution_Result {
+	switch result {
 	case models.StageExecutionResultFailed:
 		return pb.Execution_RESULT_FAILED
 	case models.StageExecutionResultPassed:

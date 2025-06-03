@@ -133,19 +133,30 @@ func (c *Canvas) ListStages() ([]Stage, error) {
 	return stages, nil
 }
 
-func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
+func (c *Canvas) CreateStage(
+	name, createdBy string,
+	conditions []StageCondition,
+	executorSpec ExecutorSpec,
+	connections []StageConnection,
+	inputs []InputDefinition,
+	inputMappings []InputMapping,
+	outputs []OutputDefinition,
+) error {
 	now := time.Now()
 	ID := uuid.New()
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		stage := &Stage{
-			ID:          ID,
-			CanvasID:    c.ID,
-			Name:        name,
-			Conditions:  datatypes.NewJSONSlice(conditions),
-			CreatedAt:   &now,
-			CreatedBy:   uuid.Must(uuid.Parse(createdBy)),
-			RunTemplate: datatypes.NewJSONType(template),
+			ID:            ID,
+			CanvasID:      c.ID,
+			Name:          name,
+			Conditions:    datatypes.NewJSONSlice(conditions),
+			CreatedAt:     &now,
+			CreatedBy:     uuid.Must(uuid.Parse(createdBy)),
+			ExecutorSpec:  datatypes.NewJSONType(executorSpec),
+			Inputs:        datatypes.NewJSONSlice(inputs),
+			InputMappings: datatypes.NewJSONSlice(inputMappings),
+			Outputs:       datatypes.NewJSONSlice(outputs),
 		}
 
 		err := tx.Clauses(clause.Returning{}).Create(&stage).Error
@@ -170,7 +181,15 @@ func (c *Canvas) CreateStage(name, createdBy string, conditions []StageCondition
 	})
 }
 
-func (c *Canvas) UpdateStage(id, requesterID string, conditions []StageCondition, template RunTemplate, connections []StageConnection) error {
+func (c *Canvas) UpdateStage(
+	id, requesterID string,
+	conditions []StageCondition,
+	executorSpec ExecutorSpec,
+	connections []StageConnection,
+	inputs []InputDefinition,
+	inputMappings []InputMapping,
+	outputs []OutputDefinition,
+) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("stage_id = ?", id).Delete(&StageConnection{}).Error; err != nil {
 			return fmt.Errorf("failed to delete existing connections: %v", err)
@@ -188,8 +207,11 @@ func (c *Canvas) UpdateStage(id, requesterID string, conditions []StageCondition
 			Where("id = ?", id).
 			Update("updated_at", now).
 			Update("updated_by", requesterID).
-			Update("run_template", datatypes.NewJSONType(template)).
+			Update("executor_spec", datatypes.NewJSONType(executorSpec)).
 			Update("conditions", datatypes.NewJSONSlice(conditions)).
+			Update("inputs", datatypes.NewJSONSlice(inputs)).
+			Update("input_mappings", datatypes.NewJSONSlice(inputMappings)).
+			Update("outputs", datatypes.NewJSONSlice(outputs)).
 			Error
 
 		if err != nil {

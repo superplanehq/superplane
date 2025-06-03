@@ -34,8 +34,8 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	runTemplate := support.RunTemplateWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, runTemplate, connections)
+	spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
@@ -52,7 +52,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		// Create execution
 		//
 		workflowID := uuid.New().String()
-		execution := support.CreateExecutionWithData(t, r.Source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{},
+		)
+
 		require.NoError(t, execution.Start(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -100,6 +105,62 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.True(t, testconsumer.HasReceivedMessage())
 	})
 
+	t.Run("missing required output -> execution fails", func(t *testing.T) {
+		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
+
+		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
+		err = r.Canvas.CreateStage("stage-with-output", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
+			{
+				SourceID:   r.Source.ID,
+				SourceName: r.Source.Name,
+				SourceType: models.SourceTypeEventSource,
+			},
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
+			{Name: "MY_OUTPUT", Required: true},
+		})
+
+		require.NoError(t, err)
+		stageWithOutput, err := r.Canvas.FindStageByName("stage-with-output")
+		require.NoError(t, err)
+
+		//
+		// Create execution
+		//
+		workflowID := uuid.New().String()
+		execution := support.CreateExecutionWithData(t, r.Source, stageWithOutput,
+			[]byte(`{}`),
+			[]byte(`{}`),
+			map[string]any{},
+		)
+
+		require.NoError(t, execution.Start(workflowID))
+
+		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		//
+		// Mock passed result and tick worker
+		//
+		pipelineID := uuid.New().String()
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Verify execution eventually goes to the finished state, with result = failed,
+		// even though the semaphore pipeline passed.
+		//
+		require.Eventually(t, func() bool {
+			e, err := models.FindExecutionByID(execution.ID)
+			if err != nil {
+				return false
+			}
+
+			return e.State == models.StageExecutionFinished && e.Result == models.StageExecutionResultFailed
+		}, 5*time.Second, 200*time.Millisecond)
+	})
+
 	t.Run("passed pipeline -> execution passes", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
@@ -107,7 +168,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		// Create execution
 		//
 		workflowID := uuid.New().String()
-		execution := support.CreateExecutionWithData(t, r.Source, stage, []byte(`{"ref":"v1"}`), []byte(`{"ref":"v1"}`))
+		execution := support.CreateExecutionWithData(t, r.Source, stage,
+			[]byte(`{"ref":"v1"}`),
+			[]byte(`{"ref":"v1"}`),
+			map[string]any{},
+		)
+
 		require.NoError(t, execution.Start(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)

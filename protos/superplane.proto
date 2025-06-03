@@ -282,7 +282,54 @@ message Stage {
   google.protobuf.Timestamp created_at = 4;
   repeated Connection connections = 5;
   repeated Condition conditions = 6;
-  RunTemplate run_template = 7;
+  ExecutorSpec executor = 7;
+  repeated InputDefinition inputs = 8;
+  repeated InputMapping input_mappings = 9;
+  repeated OutputDefinition outputs = 10;
+}
+
+message OutputDefinition {
+  string name = 1;
+  string description = 2;
+  bool required = 3;
+}
+
+message InputDefinition {
+  string name = 1;
+  string description = 2;
+}
+
+message InputMapping {
+  message When {
+    WhenTriggeredBy triggered_by = 1;
+  }
+
+  message WhenTriggeredBy {
+    string connection = 1;
+  }
+
+  message ValueDefinition {
+    string name = 1;
+    ValueFrom value_from = 2;
+    string value = 3;
+  }
+
+  message ValueFrom {
+    ValueFromEventData event_data = 1;
+    ValueFromLastExecution last_execution = 2;
+  }
+
+  message ValueFromEventData {
+    string connection = 1;
+    string expression = 2;
+  }
+
+  message ValueFromLastExecution {
+    repeated Execution.Result results = 1;
+  }
+
+  repeated ValueDefinition values = 1;
+  When when = 2;
 }
 
 message Condition {
@@ -313,27 +360,30 @@ message CreateStageRequest {
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
-  RunTemplate run_template = 6;
+  ExecutorSpec executor = 6;
+  repeated InputDefinition inputs = 7;
+  repeated InputMapping input_mappings = 8;
+  repeated OutputDefinition outputs = 9;
 }
 
-message RunTemplate {
+message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_SEMAPHORE = 1;
   }
 
-  Type type = 1;
-  SemaphoreRunTemplate semaphore = 2;
-}
+  message Semaphore {
+    string project_id = 1;
+    string branch = 2;
+    string pipeline_file = 3;
+    string task_id = 4;
+    map<string, string> parameters = 5;
+    string api_token = 6;
+    string organization_url = 7;
+  }
 
-message SemaphoreRunTemplate {
-  string project_id = 1;
-  string branch = 2;
-  string pipeline_file = 3;
-  string task_id = 4;
-  map<string, string> parameters = 5;
-  string api_token = 6;
-  string organization_url = 7;
+  Type type = 1;
+  Semaphore semaphore = 2;
 }
 
 message CreateStageResponse {
@@ -346,7 +396,10 @@ message UpdateStageRequest {
   string requester_id = 3;
   repeated Connection connections = 4;
   repeated Condition conditions = 5;
-  RunTemplate run_template = 6;
+  ExecutorSpec executor = 6;
+  repeated InputDefinition inputs = 7;
+  repeated InputMapping input_mappings = 8;
+  repeated OutputDefinition outputs = 9;
 }
 
 message UpdateStageResponse {
@@ -406,6 +459,17 @@ message StageEvent {
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
+  repeated InputValue inputs = 9;
+}
+
+message InputValue {
+  string name = 1;
+  string value = 2;
+}
+
+message OutputValue {
+  string name = 1;
+  string value = 2;
 }
 
 message Execution {
@@ -429,6 +493,7 @@ message Execution {
   google.protobuf.Timestamp created_at = 5;
   google.protobuf.Timestamp started_at = 6;
   google.protobuf.Timestamp finished_at = 7;
+  repeated OutputValue outputs = 8;
 }
 
 message StageEventApproval {

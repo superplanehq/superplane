@@ -73,10 +73,16 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		tags, err := w.processExecutionTags(tx, logger, execution, result)
-		if err != nil {
-			logger.Errorf("Error processing execution tags: %v", err)
-			return err
+		outputs := execution.Outputs.Data()
+
+		//
+		// Check if all required outputs were pushed.
+		// If any output wasn't pushed, mark the execution as failed.
+		//
+		missingOutputs := stage.MissingRequiredOutputs(outputs)
+		if len(missingOutputs) > 0 {
+			logger.Infof("Missing outputs %v - marking the execution as failed", missingOutputs)
+			result = models.StageExecutionResultFailed
 		}
 
 		if err := execution.FinishInTransaction(tx, result); err != nil {
@@ -97,7 +103,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.
 		//
-		if err := w.createStageCompletionEvent(tx, execution, tags); err != nil {
+		if err := w.createStageCompletionEvent(tx, execution, outputs); err != nil {
 			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
@@ -123,10 +129,10 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 }
 
 func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *models.Stage, execution *models.StageExecution) (string, error) {
-	template := stage.RunTemplate.Data()
-	switch template.Type {
-	case models.RunTemplateTypeSemaphore:
-		t := template.Semaphore
+	executor := stage.ExecutorSpec.Data()
+	switch executor.Type {
+	case models.ExecutorSpecTypeSemaphore:
+		t := executor.Semaphore
 		decoded, err := base64.StdEncoding.DecodeString(t.APIToken)
 		if err != nil {
 			return "", err
@@ -141,12 +147,12 @@ func (w *ExecutionPoller) resolveExecutionResult(logger *log.Entry, stage *model
 			logger,
 			execution,
 			semaphore.NewSemaphoreAPI(
-				template.Semaphore.OrganizationURL,
+				executor.Semaphore.OrganizationURL,
 				string(token),
 			),
 		)
 	default:
-		return "", fmt.Errorf("run template %s not supported", template.Type)
+		return "", fmt.Errorf("executor %s not supported", executor.Type)
 	}
 }
 
@@ -175,24 +181,24 @@ func (w *ExecutionPoller) resolveResultFromSemaphoreWorkflow(logger *log.Entry, 
 func (w *ExecutionPoller) findPipeline(api *semaphore.Semaphore, workflowID string) (*semaphore.Pipeline, error) {
 	workflow, err := api.DescribeWorkflow(workflowID)
 	if err != nil {
-		return nil, fmt.Errorf("workflow %s not found", workflowID)
+		return nil, fmt.Errorf("error describing workflow %s: %v", workflowID, err)
 	}
 
 	pipeline, err := api.DescribePipeline(workflow.InitialPplID)
 	if err != nil {
-		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
+		return nil, fmt.Errorf("error describing pipeline %s: %v", workflow.InitialPplID, err)
 	}
 
 	return pipeline, nil
 }
 
-func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, tags map[string]string) error {
+func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, outputs map[string]any) error {
 	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
 	if err != nil {
 		return err
 	}
 
-	e, err := events.NewStageExecutionCompletion(execution, tags)
+	e, err := events.NewStageExecutionCompletion(execution, outputs)
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
@@ -208,20 +214,4 @@ func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *mod
 	}
 
 	return nil
-}
-
-func (w *ExecutionPoller) processExecutionTags(tx *gorm.DB, logger *log.Entry, execution *models.StageExecution, result string) (map[string]string, error) {
-	tags := map[string]string{}
-
-	//
-	// Include extra tags from execution, if any.
-	//
-	if execution.Tags != nil {
-		err := json.Unmarshal(execution.Tags, &tags)
-		if err != nil {
-			return nil, fmt.Errorf("error adding tags from execution: %v", err)
-		}
-	}
-
-	return tags, nil
 }

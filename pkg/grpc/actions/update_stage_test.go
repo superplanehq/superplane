@@ -20,11 +20,11 @@ func Test__UpdateStage(t *testing.T) {
 	encryptor := &encryptor.NoOpEncryptor{}
 
 	// Create a stage first that we'll update in tests
-	runTemplate := support.ProtoRunTemplate()
+	executor := support.ProtoExecutor()
 	stage, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		Name:           "test-update-stage",
-		RunTemplate:    runTemplate,
+		Executor:       executor,
 		RequesterId:    r.User.String(),
 		Conditions: []*protos.Condition{
 			{
@@ -103,7 +103,7 @@ func Test__UpdateStage(t *testing.T) {
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			Connections: []*protos.Connection{
 				{
 					Name: "source-does-not-exist",
@@ -123,7 +123,7 @@ func Test__UpdateStage(t *testing.T) {
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			Connections: []*protos.Connection{
 				{
 					Name: r.Source.Name,
@@ -150,7 +150,7 @@ func Test__UpdateStage(t *testing.T) {
 		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RunTemplate:    support.ProtoRunTemplate(),
+			Executor:       support.ProtoExecutor(),
 			RequesterId:    r.User.String(),
 			Connections: []*protos.Connection{
 				{
@@ -174,9 +174,9 @@ func Test__UpdateStage(t *testing.T) {
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
-			RunTemplate: &protos.RunTemplate{
-				Type: protos.RunTemplate_TYPE_SEMAPHORE,
-				Semaphore: &protos.SemaphoreRunTemplate{
+			Executor: &protos.ExecutorSpec{
+				Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
+				Semaphore: &protos.ExecutorSpec_Semaphore{
 					OrganizationUrl: "http://localhost:8000",
 					ApiToken:        "test",
 					ProjectId:       "test-2",
@@ -225,13 +225,13 @@ func Test__UpdateStage(t *testing.T) {
 		assert.Equal(t, "test == 42", res.Stage.Connections[0].Filters[0].Data.Expression)
 		assert.Equal(t, "status == 'active'", res.Stage.Connections[0].Filters[1].Data.Expression)
 
-		// Run template is updated
-		assert.Equal(t, protos.RunTemplate_TYPE_SEMAPHORE, res.Stage.RunTemplate.Type)
-		assert.Equal(t, "task-2", res.Stage.RunTemplate.Semaphore.TaskId)
-		assert.Equal(t, "test-2", res.Stage.RunTemplate.Semaphore.ProjectId)
-		assert.Equal(t, "other", res.Stage.RunTemplate.Semaphore.Branch)
-		assert.Equal(t, ".semaphore/other.yml", res.Stage.RunTemplate.Semaphore.PipelineFile)
-		assert.Equal(t, "http://localhost:8000", res.Stage.RunTemplate.Semaphore.OrganizationUrl)
+		// Executor spec is updated
+		assert.Equal(t, protos.ExecutorSpec_TYPE_SEMAPHORE, res.Stage.Executor.Type)
+		assert.Equal(t, "task-2", res.Stage.Executor.Semaphore.TaskId)
+		assert.Equal(t, "test-2", res.Stage.Executor.Semaphore.ProjectId)
+		assert.Equal(t, "other", res.Stage.Executor.Semaphore.Branch)
+		assert.Equal(t, ".semaphore/other.yml", res.Stage.Executor.Semaphore.PipelineFile)
+		assert.Equal(t, "http://localhost:8000", res.Stage.Executor.Semaphore.OrganizationUrl)
 
 		// Conditions are updated
 		require.Empty(t, res.Stage.Conditions)

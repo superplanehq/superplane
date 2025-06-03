@@ -310,25 +310,50 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	})
 }
 
-func Test__HandleExecutionTags(t *testing.T) {
-	r := support.Setup(t)
+func Test__HandleExecutionOutputs(t *testing.T) {
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source: true,
+	})
+
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		{
+			SourceID:   r.Source.ID,
+			SourceType: models.SourceTypeEventSource,
+		},
+	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
+		{Name: "version", Required: true},
+		{Name: "sha", Required: true},
+	})
+
+	require.NoError(t, err)
+	stage, err := r.Canvas.FindStageByName("stage-1")
+	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")
 	server, err := NewServer(&encryptor.NoOpEncryptor{}, signer, "")
 	require.NoError(t, err)
 
-	execution := support.CreateExecution(t, r.Source, r.Stage)
-	validURL := "/executions/" + execution.ID.String() + "/tags"
+	execution := support.CreateExecution(t, r.Source, stage)
 	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
-	tags := []byte(`{"version":"1.0.0","sha":"078fc8755c051"}`)
+
+	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
+
+	goodBody, _ := json.Marshal(&OutputsRequest{
+		ExecutionID: execution.ID.String(),
+		Outputs:     outputs,
+	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		invalidURL := "/executions/invalidsource/tags"
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: "not-a-uuid",
+			Outputs:     outputs,
+		})
+
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        body,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -340,8 +365,8 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        goodBody,
 			contentType: "",
 			authToken:   validToken,
 		})
@@ -352,8 +377,8 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        goodBody,
 			contentType: "application/x-www-form-urlencoded",
 			authToken:   validToken,
 		})
@@ -361,25 +386,29 @@ func Test__HandleExecutionTags(t *testing.T) {
 		assert.Equal(t, 404, response.Code)
 	})
 
-	t.Run("event for execution that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/executions/" + uuid.New().String() + "/tags"
+	t.Run("execution that does not exist -> 401", func(t *testing.T) {
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: uuid.NewString(),
+			Outputs:     outputs,
+		})
+
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        body,
 			contentType: "application/json",
 			authToken:   validToken,
 		})
 
-		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "execution not found\n", response.Body.String())
+		assert.Equal(t, 401, response.Code)
+		assert.Equal(t, "Invalid token\n", response.Body.String())
 	})
 
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        goodBody,
 			signature:   "",
 			authToken:   "",
 			contentType: "application/json",
@@ -392,8 +421,8 @@ func Test__HandleExecutionTags(t *testing.T) {
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        goodBody,
 			authToken:   "invalid",
 			contentType: "application/json",
 		})
@@ -402,11 +431,11 @@ func Test__HandleExecutionTags(t *testing.T) {
 		assert.Equal(t, "Invalid token\n", response.Body.String())
 	})
 
-	t.Run("proper request -> 200 and tags are saved in execution", func(t *testing.T) {
+	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
-			body:        tags,
+			path:        "/outputs",
+			body:        goodBody,
 			authToken:   validToken,
 			contentType: "application/json",
 		})
@@ -414,13 +443,38 @@ func Test__HandleExecutionTags(t *testing.T) {
 		assert.Equal(t, 200, response.Code)
 		execution, err := models.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		compareJSONB(t, tags, []byte(execution.Tags))
+		assert.Equal(t, outputs, execution.Outputs.Data())
 	})
 
-	t.Run("tags are limited to 4k", func(t *testing.T) {
+	t.Run("output not defined in stage is ignored", func(t *testing.T) {
+		// 'time' output is not defined in the stage
+		body, _ := json.Marshal(&OutputsRequest{
+			ExecutionID: execution.ID.String(),
+			Outputs: map[string]any{
+				"sha":     "078fc8755c051",
+				"time":    1748555264,
+				"version": "v1.0.0",
+			},
+		})
+
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/outputs",
+			body:        body,
+			authToken:   validToken,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, 200, response.Code)
+		execution, err := models.FindExecutionByID(execution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, map[string]any{"sha": "078fc8755c051", "version": "v1.0.0"}, execution.Outputs.Data())
+	})
+
+	t.Run("outputs are limited to 4k", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/outputs",
 			body:        generateBigBody(t),
 			authToken:   validToken,
 			contentType: "application/json",
@@ -595,18 +649,4 @@ func generateBigBody(t *testing.T) []byte {
 	_, err := rand.Read(b)
 	require.NoError(t, err)
 	return b
-}
-
-func compareJSONB(t *testing.T, a, b []byte) {
-	var dataA map[string]any
-	err := json.Unmarshal(a, &dataA)
-	require.NoError(t, err)
-
-	var dataB map[string]any
-	err = json.Unmarshal(b, &dataB)
-	require.NoError(t, err)
-
-	for k, v := range dataA {
-		assert.Equal(t, v, dataB[k])
-	}
 }
