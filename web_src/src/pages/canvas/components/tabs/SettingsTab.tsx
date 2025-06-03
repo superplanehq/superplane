@@ -11,8 +11,8 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
     
     const mappings = [];
     for (const mapping of selectedStage.inputMappings) {
-      const valueMapping = mapping.values?.find(v => v.name === inputName);
-      if (valueMapping) {
+      const valueMappings = mapping.values?.filter(v => v.name === inputName) || [];
+      for (const valueMapping of valueMappings) {
         mappings.push({
           mapping: valueMapping,
           triggeredBy: mapping.when?.triggeredBy?.connection || 'Unknown'
