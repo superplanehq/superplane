@@ -36,7 +36,7 @@ spec:
 
 ### Other secret providers
 
-NOTE: to be implemented later.
+NOTE: to be implemented once SuperPlane is an OIDC provider.
 
 #### Vault
 
