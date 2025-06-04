@@ -386,7 +386,7 @@ func (s *Stage) FindSecrets(encryptor crypto.Encryptor) (map[string]string, erro
 			return nil, fmt.Errorf("error getting secret values for %s: %v", secretName, err)
 		}
 
-		secretMap[s.Name] = values[secretDef.ValueFrom.Secret.Key]
+		secretMap[secretDef.Name] = values[secretDef.ValueFrom.Secret.Key]
 	}
 
 	return secretMap, nil
