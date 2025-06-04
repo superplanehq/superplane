@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -21,10 +20,8 @@ const StageCreatedRoutingKey = "stage-created"
 func Test__CreateStage(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
-	encryptor := &encryptor.NoOpEncryptor{}
-
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Name:           "test",
 			RequesterId:    r.User.String(),
@@ -38,7 +35,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -51,7 +48,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -71,7 +68,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -94,7 +91,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -120,7 +117,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -148,7 +145,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -176,7 +173,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -205,7 +202,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       support.ProtoExecutor(),
@@ -241,7 +238,7 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		executor := support.ProtoExecutor()
-		res, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		res, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			Executor:       executor,
@@ -311,7 +308,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+		_, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Name:           "test",
 			RequesterId:    r.User.String(),

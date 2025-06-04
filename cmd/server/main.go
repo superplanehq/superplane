@@ -6,14 +6,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/encryptor"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor encryptor.Encryptor) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -68,12 +68,12 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor encryptor.Encryptor) {
 	}
 }
 
-func startInternalAPI(encryptor encryptor.Encryptor) {
+func startInternalAPI(encryptor crypto.Encryptor) {
 	log.Println("Starting Internal API")
 	grpc.RunServer(encryptor, 50051)
 }
 
-func startPublicAPI(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer) {
+func startPublicAPI(encryptor crypto.Encryptor, jwtSigner *jwt.Signer) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
@@ -143,12 +143,12 @@ func main() {
 
 	log.SetLevel(log.DebugLevel)
 
-	var encryptorInstance encryptor.Encryptor
+	var encryptorInstance crypto.Encryptor
 	if os.Getenv("NO_ENCRYPTION") == "yes" {
 		log.Warn("NO_ENCRYPTION is set to yes, using NoOpEncryptor")
-		encryptorInstance = encryptor.NewNoOpEncryptor()
+		encryptorInstance = crypto.NewNoOpEncryptor()
 	} else {
-		encryptorInstance = encryptor.NewAESGCMEncryptor([]byte(encryptionKey))
+		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")

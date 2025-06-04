@@ -31,7 +31,7 @@ func Test__TimeWindowWorker(t *testing.T) {
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,
 		},
-	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)

@@ -145,7 +145,7 @@ func (v *Validator) checkNoDuplicateMappingForConnection() error {
 func (v *Validator) checkAllInputsAreDefined() error {
 	for _, input := range v.Inputs {
 		for i, m := range v.InputMappings {
-			defined := slices.ContainsFunc(m.Values, func(def *pb.InputMapping_ValueDefinition) bool {
+			defined := slices.ContainsFunc(m.Values, func(def *pb.ValueDefinition) bool {
 				return def.Name == input.Name
 			})
 
@@ -299,7 +299,7 @@ func (v *Validator) checkInputMappingSpecs() error {
 	return nil
 }
 
-func validateValueDefinition(in *pb.InputMapping_ValueDefinition) error {
+func validateValueDefinition(in *pb.ValueDefinition) error {
 	if in.Name == "" {
 		return fmt.Errorf("missing input name")
 	}
@@ -323,7 +323,7 @@ func validateValueDefinition(in *pb.InputMapping_ValueDefinition) error {
 }
 
 // TODO: should we use an enum here too?
-func validateValueFrom(in *pb.InputMapping_ValueFrom) error {
+func validateValueFrom(in *pb.ValueFrom) error {
 	if in.EventData == nil && in.LastExecution == nil {
 		return fmt.Errorf("no source defined")
 	}
@@ -349,7 +349,7 @@ func validateValueFrom(in *pb.InputMapping_ValueFrom) error {
 	return nil
 }
 
-func validateValueFromEventData(in *pb.InputMapping_ValueFromEventData) error {
+func validateValueFromEventData(in *pb.ValueFromEventData) error {
 	if in.Connection == "" {
 		return fmt.Errorf("empty connection")
 	}
@@ -361,7 +361,7 @@ func validateValueFromEventData(in *pb.InputMapping_ValueFromEventData) error {
 	return nil
 }
 
-func validateValueFromLastExecution(in *pb.InputMapping_ValueFromLastExecution) error {
+func validateValueFromLastExecution(in *pb.ValueFromLastExecution) error {
 	if len(in.Results) == 0 {
 		return fmt.Errorf("empty results")
 	}
@@ -392,11 +392,11 @@ func (v *Validator) SerializeInputMappings() []models.InputMapping {
 	mappings := []models.InputMapping{}
 	for _, mapping := range v.InputMappings {
 		m := models.InputMapping{
-			Values: []models.InputValueDefinition{},
+			Values: []models.ValueDefinition{},
 		}
 
 		for _, valueDefinition := range mapping.Values {
-			def := models.InputValueDefinition{
+			def := models.ValueDefinition{
 				Name:      valueDefinition.Name,
 				ValueFrom: serializeValueFrom(valueDefinition.ValueFrom),
 			}
@@ -420,14 +420,14 @@ func (v *Validator) SerializeInputMappings() []models.InputMapping {
 	return mappings
 }
 
-func serializeValueFrom(in *pb.InputMapping_ValueFrom) *models.InputValueFrom {
+func serializeValueFrom(in *pb.ValueFrom) *models.ValueDefinitionFrom {
 	if in == nil {
 		return nil
 	}
 
 	if in.EventData != nil {
-		return &models.InputValueFrom{
-			EventData: &models.InputValueFromEventData{
+		return &models.ValueDefinitionFrom{
+			EventData: &models.ValueDefinitionFromEventData{
 				Connection: in.EventData.Connection,
 				Expression: in.EventData.Expression,
 			},
@@ -445,8 +445,8 @@ func serializeValueFrom(in *pb.InputMapping_ValueFrom) *models.InputValueFrom {
 			}
 		}
 
-		return &models.InputValueFrom{
-			LastExecution: &models.InputValueFromLastExecution{
+		return &models.ValueDefinitionFrom{
+			LastExecution: &models.ValueDefinitionFromLastExecution{
 				Results: results,
 			},
 		}

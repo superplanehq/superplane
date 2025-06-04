@@ -18,7 +18,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -40,7 +39,7 @@ const (
 
 type Server struct {
 	httpServer            *http.Server
-	encryptor             encryptor.Encryptor
+	encryptor             crypto.Encryptor
 	jwt                   *jwt.Signer
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -54,7 +53,7 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 

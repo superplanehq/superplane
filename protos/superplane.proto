@@ -47,6 +47,18 @@ service Superplane {
       tags: "Canvas";
     };
   }
+
+  rpc CreateSecret(CreateSecretRequest) returns (CreateSecretResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/secrets"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas secret";
+      description: "Creates a new canvas secret";
+      tags: "Secret";
+    };
+  }
   
   rpc CreateEventSource(CreateEventSourceRequest) returns (CreateEventSourceResponse) {
     option (google.api.http) = {
@@ -105,6 +117,17 @@ service Superplane {
     };
   }
 
+  rpc DescribeSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get secret details";
+      description: "Returns the details of a specific secret (canvas can be referenced by ID or name)";
+      tags: "Secret";
+    };
+  }
+
   rpc ListStages(ListStagesRequest) returns (ListStagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/stages"
@@ -127,6 +150,17 @@ service Superplane {
     };
   }
   
+  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/secrets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List secrets";
+      description: "Returns a list of all secrets for the specified canvas (can be referenced by ID or name)";
+      tags: "Secret";
+    };
+  }
+
   rpc ListStageEvents(ListStageEventsRequest) returns (ListStageEventsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events"
@@ -150,6 +184,18 @@ service Superplane {
     };
   }
   
+  rpc UpdateSecret(UpdateSecretRequest) returns (UpdateSecretResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Updates a secret";
+      description: "Updates the specified secret (can be referenced by ID or name)";
+      tags: "Secret";
+    };
+  }
+
   rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve"
@@ -159,6 +205,17 @@ service Superplane {
       summary: "Approve a stage event";
       description: "Approves the specified stage event (canvas can be referenced by ID or name)";
       tags: "Event";
+    };
+  }
+
+  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Deletes a canvas secret";
+      description: "Deletes the specified canvas secret";
+      tags: "Secret";
     };
   }
 }
@@ -221,6 +278,73 @@ message CreateEventSourceResponse {
   EventSource event_source = 1;
   string key = 2;
 }
+
+message Secret {
+  enum Provider {
+    PROVIDER_UNKNOWN = 0;
+    PROVIDER_LOCAL = 1;
+  }
+
+  //
+  // Local secrets are stored and managed by SuperPlane itself.
+  //
+  message Local {
+    map<string, string> data = 1;
+  }
+
+  string id = 1;
+  string name = 2;
+  string canvas_id = 3;
+  google.protobuf.Timestamp created_at = 4;
+  Provider provider = 5;
+  Local local = 6;
+}
+
+message CreateSecretRequest {
+  string canvas_id_or_name = 1;
+  string requester_id = 2;
+  Secret secret = 3;
+}
+
+message CreateSecretResponse {
+  Secret secret = 1;
+}
+
+message UpdateSecretRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+  string requester_id = 3;
+  Secret secret = 4;
+}
+
+message UpdateSecretResponse {
+  Secret secret = 1;
+}
+
+message DescribeSecretRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DescribeSecretResponse {
+  Secret secret = 1;
+}
+
+message ListSecretsRequest {
+  string canvas_id_or_name = 1;
+}
+
+message ListSecretsResponse {
+  repeated Secret secrets = 1;
+}
+
+message DeleteSecretRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+  string requester_id = 3;
+}
+
+message DeleteSecretResponse {}
 
 message DescribeEventSourceRequest {
   string id = 1;
@@ -286,6 +410,7 @@ message Stage {
   repeated InputDefinition inputs = 8;
   repeated InputMapping input_mappings = 9;
   repeated OutputDefinition outputs = 10;
+  repeated ValueDefinition secrets = 11;
 }
 
 message OutputDefinition {
@@ -308,28 +433,34 @@ message InputMapping {
     string connection = 1;
   }
 
-  message ValueDefinition {
-    string name = 1;
-    ValueFrom value_from = 2;
-    string value = 3;
-  }
-
-  message ValueFrom {
-    ValueFromEventData event_data = 1;
-    ValueFromLastExecution last_execution = 2;
-  }
-
-  message ValueFromEventData {
-    string connection = 1;
-    string expression = 2;
-  }
-
-  message ValueFromLastExecution {
-    repeated Execution.Result results = 1;
-  }
-
   repeated ValueDefinition values = 1;
   When when = 2;
+}
+
+message ValueDefinition {
+  string name = 1;
+  ValueFrom value_from = 2;
+  string value = 3;
+}
+
+message ValueFrom {
+  ValueFromEventData event_data = 1;
+  ValueFromLastExecution last_execution = 2;
+  ValueFromSecret secret = 3;
+}
+
+message ValueFromEventData {
+  string connection = 1;
+  string expression = 2;
+}
+
+message ValueFromLastExecution {
+  repeated Execution.Result results = 1;
+}
+
+message ValueFromSecret {
+  string name = 1;
+  string key = 2;
 }
 
 message Condition {
@@ -364,6 +495,7 @@ message CreateStageRequest {
   repeated InputDefinition inputs = 7;
   repeated InputMapping input_mappings = 8;
   repeated OutputDefinition outputs = 9;
+  repeated ValueDefinition secrets = 10;
 }
 
 message ExecutorSpec {
@@ -400,6 +532,7 @@ message UpdateStageRequest {
   repeated InputDefinition inputs = 7;
   repeated InputMapping input_mappings = 8;
   repeated OutputDefinition outputs = 9;
+  repeated ValueDefinition secrets = 10;
 }
 
 message UpdateStageResponse {

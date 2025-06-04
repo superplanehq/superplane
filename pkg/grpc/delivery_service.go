@@ -3,16 +3,16 @@ package grpc
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/encryptor"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 )
 
 type DeliveryService struct {
-	encryptor encryptor.Encryptor
+	encryptor crypto.Encryptor
 }
 
-func NewDeliveryService(encryptor encryptor.Encryptor) *DeliveryService {
+func NewDeliveryService(encryptor crypto.Encryptor) *DeliveryService {
 	return &DeliveryService{
 		encryptor: encryptor,
 	}
@@ -35,7 +35,7 @@ func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.Descr
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return actions.CreateStage(ctx, s.encryptor, req)
+	return actions.CreateStage(ctx, req)
 }
 
 func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -43,7 +43,7 @@ func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeSta
 }
 
 func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return actions.UpdateStage(ctx, s.encryptor, req)
+	return actions.UpdateStage(ctx, req)
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
@@ -64,4 +64,24 @@ func (s *DeliveryService) ListCanvases(ctx context.Context, req *pb.ListCanvases
 
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	return actions.ListStageEvents(ctx, req)
+}
+
+func (s *DeliveryService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
+	return actions.CreateSecret(ctx, s.encryptor, req)
+}
+
+func (s *DeliveryService) UpdateSecret(ctx context.Context, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
+	return actions.UpdateSecret(ctx, s.encryptor, req)
+}
+
+func (s *DeliveryService) DescribeSecret(ctx context.Context, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
+	return actions.DescribeSecret(ctx, s.encryptor, req)
+}
+
+func (s *DeliveryService) ListSecrets(ctx context.Context, req *pb.ListSecretsRequest) (*pb.ListSecretsResponse, error) {
+	return actions.ListSecrets(ctx, s.encryptor, req)
+}
+
+func (s *DeliveryService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
+	return actions.DeleteSecret(ctx, req)
 }

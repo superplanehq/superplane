@@ -195,6 +195,200 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/secrets": {
+      "get": {
+        "summary": "List secrets",
+        "description": "Returns a list of all secrets for the specified canvas (can be referenced by ID or name)",
+        "operationId": "Superplane_ListSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListSecretsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "post": {
+        "summary": "Create a new canvas secret",
+        "description": "Creates a new canvas secret",
+        "operationId": "Superplane_CreateSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateSecretBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}": {
+      "get": {
+        "summary": "Get secret details",
+        "description": "Returns the details of a specific secret (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DescribeSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a canvas secret",
+        "description": "Deletes the specified canvas secret",
+        "operationId": "Superplane_DeleteSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "requesterId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a secret",
+        "description": "Updates the specified secret (can be referenced by ID or name)",
+        "operationId": "Superplane_UpdateSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateSecretBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
@@ -606,53 +800,6 @@
         }
       }
     },
-    "InputMappingValueDefinition": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "valueFrom": {
-          "$ref": "#/definitions/InputMappingValueFrom"
-        },
-        "value": {
-          "type": "string"
-        }
-      }
-    },
-    "InputMappingValueFrom": {
-      "type": "object",
-      "properties": {
-        "eventData": {
-          "$ref": "#/definitions/InputMappingValueFromEventData"
-        },
-        "lastExecution": {
-          "$ref": "#/definitions/InputMappingValueFromLastExecution"
-        }
-      }
-    },
-    "InputMappingValueFromEventData": {
-      "type": "object",
-      "properties": {
-        "connection": {
-          "type": "string"
-        },
-        "expression": {
-          "type": "string"
-        }
-      }
-    },
-    "InputMappingValueFromLastExecution": {
-      "type": "object",
-      "properties": {
-        "results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ExecutionResult"
-          }
-        }
-      }
-    },
     "InputMappingWhen": {
       "type": "object",
       "properties": {
@@ -668,6 +815,26 @@
           "type": "string"
         }
       }
+    },
+    "SecretLocal": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Local secrets are stored and managed by SuperPlane itself."
+    },
+    "SecretProvider": {
+      "type": "string",
+      "enum": [
+        "PROVIDER_UNKNOWN",
+        "PROVIDER_LOCAL"
+      ],
+      "default": "PROVIDER_UNKNOWN"
     },
     "StageEventStateReason": {
       "type": "string",
@@ -836,6 +1003,25 @@
         }
       }
     },
+    "SuperplaneCreateSecretBody": {
+      "type": "object",
+      "properties": {
+        "requesterId": {
+          "type": "string"
+        },
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        }
+      }
+    },
+    "SuperplaneCreateSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        }
+      }
+    },
     "SuperplaneCreateStageBody": {
       "type": "object",
       "properties": {
@@ -882,6 +1068,13 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputDefinition"
           }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneValueDefinition"
+          }
         }
       }
     },
@@ -892,6 +1085,9 @@
           "$ref": "#/definitions/SuperplaneStage"
         }
       }
+    },
+    "SuperplaneDeleteSecretResponse": {
+      "type": "object"
     },
     "SuperplaneDescribeCanvasResponse": {
       "type": "object",
@@ -906,6 +1102,14 @@
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
+        }
+      }
+    },
+    "SuperplaneDescribeSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
         }
       }
     },
@@ -1018,7 +1222,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/InputMappingValueDefinition"
+            "$ref": "#/definitions/SuperplaneValueDefinition"
           }
         },
         "when": {
@@ -1057,6 +1261,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventSource"
+          }
+        }
+      }
+    },
+    "SuperplaneListSecretsResponse": {
+      "type": "object",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneSecret"
           }
         }
       }
@@ -1107,6 +1323,30 @@
         },
         "value": {
           "type": "string"
+        }
+      }
+    },
+    "SuperplaneSecret": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "provider": {
+          "$ref": "#/definitions/SecretProvider"
+        },
+        "local": {
+          "$ref": "#/definitions/SecretLocal"
         }
       }
     },
@@ -1162,6 +1402,13 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputDefinition"
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneValueDefinition"
           }
         }
       }
@@ -1229,6 +1476,25 @@
       ],
       "default": "STATE_UNKNOWN"
     },
+    "SuperplaneUpdateSecretBody": {
+      "type": "object",
+      "properties": {
+        "requesterId": {
+          "type": "string"
+        },
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        }
+      }
+    },
+    "SuperplaneUpdateSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        }
+      }
+    },
     "SuperplaneUpdateStageBody": {
       "type": "object",
       "properties": {
@@ -1272,6 +1538,13 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputDefinition"
           }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneValueDefinition"
+          }
         }
       }
     },
@@ -1280,6 +1553,67 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
+        }
+      }
+    },
+    "SuperplaneValueDefinition": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "valueFrom": {
+          "$ref": "#/definitions/SuperplaneValueFrom"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneValueFrom": {
+      "type": "object",
+      "properties": {
+        "eventData": {
+          "$ref": "#/definitions/SuperplaneValueFromEventData"
+        },
+        "lastExecution": {
+          "$ref": "#/definitions/SuperplaneValueFromLastExecution"
+        },
+        "secret": {
+          "$ref": "#/definitions/SuperplaneValueFromSecret"
+        }
+      }
+    },
+    "SuperplaneValueFromEventData": {
+      "type": "object",
+      "properties": {
+        "connection": {
+          "type": "string"
+        },
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneValueFromLastExecution": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExecutionResult"
+          }
+        }
+      }
+    },
+    "SuperplaneValueFromSecret": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
         }
       }
     },

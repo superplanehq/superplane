@@ -82,9 +82,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 			[]models.InputMapping{
 				{
-					Values: []models.InputValueDefinition{
-						{Name: "VERSION", ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+					Values: []models.ValueDefinition{
+						{Name: "VERSION", ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
 								Expression: "ref",
 							},
@@ -93,6 +93,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 				},
 			},
 			[]models.OutputDefinition{},
+			[]models.ValueDefinition{},
 		)
 
 		require.NoError(t, err)

@@ -6,7 +6,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,7 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
 	err := ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -75,7 +74,7 @@ func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 	}
 }
 
-func genNewEventSourceKey(ctx context.Context, encryptor encryptor.Encryptor, name string) (string, []byte, error) {
+func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name string) (string, []byte, error) {
 	plainKey, _ := crypto.Base64String(32)
 	encrypted, err := encryptor.Encrypt(ctx, []byte(plainKey), []byte(name))
 	if err != nil {

@@ -1,14 +1,12 @@
 package workers
 
 import (
-	"context"
-	"encoding/base64"
 	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
-	"github.com/superplanehq/superplane/pkg/encryptor"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -18,7 +16,7 @@ import (
 
 type PendingExecutionsWorker struct {
 	JwtSigner *jwt.Signer
-	Encryptor encryptor.Encryptor
+	Encryptor crypto.Encryptor
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -62,7 +60,12 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	specBuilder := inputs.NewExecutorSpecBuilder(stage.ExecutorSpec.Data(), inputMap)
+	secrets, err := stage.FindSecrets(w.Encryptor)
+	if err != nil {
+		return fmt.Errorf("error finding secrets for execution: %v", err)
+	}
+
+	specBuilder := inputs.NewExecutorSpecBuilder(stage.ExecutorSpec.Data(), inputMap, secrets)
 	spec, err := specBuilder.Build()
 	if err != nil {
 		return fmt.Errorf("error resolving executor spec: %v", err)
@@ -107,11 +110,7 @@ func (w *PendingExecutionsWorker) StartExecution(logger *log.Entry, stage *model
 }
 
 func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage *models.Stage, execution models.StageExecution, spec *models.SemaphoreExecutorSpec) (string, error) {
-	api, err := w.newSemaphoreAPI(spec)
-	if err != nil {
-		return "", err
-	}
-
+	api := semaphore.NewSemaphoreAPI(spec.OrganizationURL, spec.APIToken)
 	parameters, err := w.buildParameters(execution, spec.Parameters)
 	if err != nil {
 		return "", fmt.Errorf("error building parameters: %v", err)
@@ -129,20 +128,6 @@ func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage 
 
 	logger.Infof("Semaphore task triggered - workflow=%s", workflowID)
 	return workflowID, nil
-}
-
-func (w *PendingExecutionsWorker) newSemaphoreAPI(spec *models.SemaphoreExecutorSpec) (*semaphore.Semaphore, error) {
-	token, err := base64.StdEncoding.DecodeString(spec.APIToken)
-	if err != nil {
-		return nil, err
-	}
-
-	t, err := w.Encryptor.Decrypt(context.Background(), token, []byte(spec.OrganizationURL))
-	if err != nil {
-		return nil, err
-	}
-
-	return semaphore.NewSemaphoreAPI(spec.OrganizationURL, string(t)), nil
 }
 
 // TODO

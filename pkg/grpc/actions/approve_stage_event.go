@@ -52,7 +52,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 	}
 
 	logger := logging.ForStage(stage)
-	event, err := models.FindStageEventByID(req.EventId, req.StageIdOrName)
+	event, err := models.FindStageEventByID(req.EventId, stage.ID.String())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.InvalidArgument, "event not found")

@@ -61,7 +61,7 @@ func (b *InputBuilder) Build(tx *gorm.DB, event *models.Event) (map[string]any, 
 	return inputs, nil
 }
 
-func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]models.InputValueDefinition, error) {
+func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]models.ValueDefinition, error) {
 	for _, mapping := range b.stage.InputMappings {
 
 		//
@@ -86,7 +86,7 @@ func (b *InputBuilder) getValueDefinitionsForSource(event *models.Event) ([]mode
 	return nil, fmt.Errorf("error finding value definitions for source %s", event.SourceName)
 }
 
-func (b *InputBuilder) getValueDefinition(valueDefinitions []models.InputValueDefinition, inputName string) (*models.InputValueDefinition, error) {
+func (b *InputBuilder) getValueDefinition(valueDefinitions []models.ValueDefinition, inputName string) (*models.ValueDefinition, error) {
 	for _, valueDefinition := range valueDefinitions {
 		if valueDefinition.Name == inputName {
 			return &valueDefinition, nil
@@ -100,7 +100,7 @@ func (b *InputBuilder) getValueDefinition(valueDefinitions []models.InputValueDe
 	return nil, fmt.Errorf("value definition not found for input %s", inputName)
 }
 
-func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.InputValueDefinition, event *models.Event) (any, error) {
+func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.ValueDefinition, event *models.Event) (any, error) {
 	//
 	// If value is defined statically, just return it.
 	//
