@@ -107,7 +107,7 @@ dev.setup: db.test.create db.migrate dev.fixtures.clear dev.fixtures
 dev.console: dev.setup
 	docker compose run --rm --service-ports app /bin/bash 
 
-dev.server: dev.setup
+dev.server: 
 	docker compose run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
 
 dev.fixtures:

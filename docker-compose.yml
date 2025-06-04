@@ -26,6 +26,9 @@ services:
       START_STAGE_EVENT_APPROVED_CONSUMER: "yes"
       START_EXECUTIONS_POLLER: "yes"
       START_PENDING_EXECUTIONS_WORKER: "yes"
+      START_WEB_SERVER: "yes"
+      START_EVENT_DISTRIBUTER: "yes"
+      WEB_BASE_PATH: "/app"
       PUBLIC_API_BASE_PATH: /api/v1
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
