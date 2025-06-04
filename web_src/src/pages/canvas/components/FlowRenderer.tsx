@@ -10,6 +10,7 @@ import { useFlowHandlers } from "../hooks/useFlowHandlers";
 import { useFlowData } from "../hooks/useFlowData";
 import { useAutoLayout } from "../hooks/useAutoLayout";
 import { FlowControls } from "./FlowControls";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 export const nodeTypes = {
   deploymentCard: StageNode,
@@ -62,6 +63,7 @@ export const FlowRenderer: React.FC = () => {
         />
         <Background />
         <FlowDevTools />
+        <ConnectionStatus />
       </ReactFlow>
     </div>
   );

@@ -11,5 +11,8 @@ export const elk = new Elk({
     "elk.edgeRouting": "SPLINES",
     "elk.layered.spacing.nodeNodeBetweenLayers": "100",
     "elk.spacing.nodeNode": "100",
+    "elk.separateConnectedComponents": "true",
+    "elk.spacing.componentComponent": "50",
+    "elk.componentArrangement": "TOPDOWN",
   },
 });

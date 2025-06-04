@@ -1,11 +1,8 @@
 import { useState, ReactNode, useMemo } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import Tippy from '@tippyjs/react';
-import 'tippy.js/dist/tippy.css'; 
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-// import { QueueState } from '../../types/flow';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
@@ -29,30 +26,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     [props.data.queues]
   );
   
-  const handleAction = (action: string) => {
-    if (action === 'code') setShowOverlay(true);
-  };
   return (
     <div className={`bg-white roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
-      {props.selected && (
-        <div className="absolute -top-10 left-1/2 -translate-x-1/2 flex gap-2 bg-white shadow-lg br4 px-3 py-2 border z-10">
-          <Tippy content="View code for this stage" placement="top">
-            <button className="hover:bg-gray-100 p-2 br4" title="View Code" onClick={() => handleAction('code')}>
-              <span className="material-icons" style={{fontSize:20}}>code</span>
-            </button>
-          </Tippy>
-          <Tippy content="Edit triggers for this stage" placement="top">
-            <button className="hover:bg-gray-100 p-2 br4" title="Edit Triggers" onClick={() => handleAction('edit')}>
-              <span className="material-icons" style={{fontSize:20}}>bolt</span>
-            </button>
-          </Tippy>
-          <Tippy content="Start a run for this stage" placement="top">
-            <button className="hover:bg-gray-100 p-2 br4" title="Start Run" onClick={() => handleAction('run')}>
-              <span className="material-icons" style={{fontSize:20}}>play_arrow</span>
-            </button>
-          </Tippy>
-        </div>
-      )}
       {/* Modal overlay for View Code */}
       <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>

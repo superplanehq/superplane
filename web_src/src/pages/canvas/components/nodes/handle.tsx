@@ -1,8 +1,20 @@
 import { Handle, Position, useReactFlow } from '@xyflow/react';
-import Tippy from '@tippyjs/react';
-import 'tippy.js/dist/tippy.css';
-import 'tippy.js/themes/light.css';
-import { useEffect, useState, CSSProperties } from 'react';
+import {
+  useFloating,
+  autoUpdate,
+  offset,
+  flip,
+  shift,
+  arrow,
+  useHover,
+  useFocus,
+  useDismiss,
+  useRole,
+  useInteractions,
+  FloatingPortal,
+  FloatingArrow
+} from '@floating-ui/react';
+import { useEffect, useState, CSSProperties, useRef } from 'react';
 import { HandleProps } from '@/canvas/types/flow';
 import { SuperplaneConnection, SuperplaneCondition, SuperplaneConditionTimeWindow, SuperplaneConditionApproval } from '@/api-client/types.gen';
 
@@ -49,6 +61,37 @@ function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handle
   // Access ReactFlow instance to get zoom level
   const { getZoom } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState(1);
+  // State for controlling tooltip visibility
+  const [isOpen, setIsOpen] = useState(false);
+  const arrowRef = useRef(null);
+  
+  // Setup floating-ui
+  const { refs, floatingStyles, context } = useFloating({
+    placement: 'left',
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    middleware: [
+      offset(10 * (1 / zoomLevel)), 
+      flip(), 
+      shift({padding: 5}),
+      arrow({element: arrowRef})
+    ],
+    whileElementsMounted: autoUpdate,
+    strategy: 'fixed'
+  });
+  
+  // Setup interaction hooks
+  const hover = useHover(context, { move: false });
+  const focus = useFocus(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: 'tooltip' });
+  
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    hover,
+    focus,
+    dismiss,
+    role
+  ]);
   
   // Update zoom level when it changes
   useEffect(() => {
@@ -67,47 +110,45 @@ function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handle
     };
   }, [getZoom]);
 
-    // Create style for scaling the tooltip content
-    const tooltipStyle = {
-      transform: `scale(${1 / zoomLevel})`,
-      transformOrigin: 'center bottom'
-    };
+  // Create style for scaling the tooltip content
+  const tooltipStyle = {
+    transform: `scale(${1 / zoomLevel})`,
+    transformOrigin: 'center left'
+  };
 
-return (
-  <div className="custom-handle-container">
-    {/* Use Tippy directly on the Handle component */}
-    <Tippy
-      content={<div style={tooltipStyle}><TooltipContent connections={connections} conditions={conditions} /></div>}
-      interactive={true}
-      placement="left"
-      appendTo={document.body} // This is critical - render to body
-      theme="light"
-      maxWidth={320 * (1 / zoomLevel)} // Scale max width with zoom
-      arrow={true}
-      offset={[0, 10 * (1 / zoomLevel)]} // Scale offset with zoom
-      zIndex={1000}
-      popperOptions={{
-        strategy: 'fixed', // This is crucial for React Flow
-        modifiers: [
-          {
-            name: 'preventOverflow',
-            options: {
-              boundary: document.body
-            }
-          }
-        ]
-      }}
-    >
+  return (
+    <div className="custom-handle-container">
       <Handle
-          type="target"
-          position={Position.Left}
-          id="target"
-          style={handleStyle}
-          className="custom-bar-handle !bg-blue-500"
-        />
-    </Tippy>
-  </div>
-);
+        ref={refs.setReference}
+        type="target"
+        position={Position.Left}
+        id="target"
+        style={handleStyle}
+        className="custom-bar-handle !bg-blue-500"
+        {...getReferenceProps()}
+      />
+      
+      {isOpen && (
+        <FloatingPortal>
+          <div
+            ref={refs.setFloating}
+            style={{
+              ...floatingStyles,
+              zIndex: 1000,
+              maxWidth: 320 * (1 / zoomLevel)
+            }}
+            className="bg-white shadow-md rounded z-50 border border-gray-200"
+            {...getFloatingProps()}
+          >
+            <FloatingArrow ref={arrowRef} context={context} className="fill-white" />
+            <div style={tooltipStyle}>
+              <TooltipContent connections={connections} conditions={conditions} />
+            </div>
+          </div>
+        </FloatingPortal>
+      )}
+    </div>
+  );
 }
 
 
