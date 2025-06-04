@@ -1,6 +1,8 @@
 import { CanvasData } from "../types";
 import { SuperplaneCanvas, SuperplaneStage, SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { ReadyState } from "react-use-websocket";
+import { AllNodeType, EdgeType } from "../types/flow";
+import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
 
 // Define the store state type
 export interface CanvasState {
@@ -23,10 +25,39 @@ export interface CanvasState {
   selectStage: (stageId: string) => void;
   cleanSelectedStage: () => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
-  
-  // State and action for event handlers setup
-  eventHandlersSetup: boolean;
-  markEventHandlersAsSetup: () => void;
+
+  // flow fields
+  nodes: AllNodeType[];
+  edges: EdgeType[];
+  handleDragging:
+  | {
+      source: string | undefined;
+      sourceHandle: string | undefined;
+      target: string | undefined;
+      targetHandle: string | undefined;
+      type: string;
+      color: string;
+    }
+  | undefined;
+  // flow actions
+  syncToReactFlow: () => void;
+  fitViewNode: (nodeId: string) => void;
+  onNodesChange: OnNodesChange<AllNodeType>;
+  onEdgesChange: OnEdgesChange<EdgeType>;
+  onConnect: (connection: Connection) => void;
+  setNodes: (nodes: AllNodeType[]) => void;
+  setHandleDragging: (
+    data:
+      | {
+          source: string | undefined;
+          sourceHandle: string | undefined;
+          target: string | undefined;
+          targetHandle: string | undefined;
+          type: string;
+          color: string;
+        }
+      | undefined,
+  ) => void;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>}

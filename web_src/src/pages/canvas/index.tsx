@@ -2,7 +2,7 @@ import { StrictMode, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
-import { useSetupEventHandlers } from "./store/handlers/setup";
+import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
 import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents } from "@/api-client";
 import { StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
@@ -12,11 +12,11 @@ import { Sidebar } from "./components/SideBar";
 export function Canvas() {
   // Get the canvas ID from the URL params
   const { id } = useParams<{ id: string }>();
-  const { initialize, markEventHandlersAsSetup, selectedStage, cleanSelectedStage, approveStageEvent } = useCanvasStore();
+  const { initialize, selectedStage, cleanSelectedStage, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Custom hook for setting up event handlers - must be called at top level
-  useSetupEventHandlers(id!);
+  useWebsocketEvents(id!);
 
   useEffect(() => {
     // Return early if no ID is available
@@ -94,8 +94,6 @@ export function Canvas() {
 
         initialize(initialData);
 
-        // Mark event handlers as ready to be set up
-        markEventHandlersAsSetup();
         setIsLoading(false);
 
         // No cleanup function needed here, it will be handled by the useSetupEventHandlers hook
@@ -107,7 +105,7 @@ export function Canvas() {
     };
 
     fetchCanvasData();
-  }, [id, initialize, markEventHandlersAsSetup]);
+  }, [id, initialize]);
 
   if (isLoading) {
     return <div className="loading-state">Loading canvas...</div>;

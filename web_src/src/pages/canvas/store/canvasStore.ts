@@ -4,6 +4,10 @@ import { CanvasState } from './types';
 import { SuperplaneCanvas, SuperplaneEventSource, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
+import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
+import { AllNodeType, EdgeType } from '../types/flow';
+import { transformEventSourcesToNodes, transformStagesToNodes, transformToEdges, applyGridLayout } from '../utils/flowTransformers';
+import { useAutoLayout } from '../hooks/useAutoLayout';
 
 function generateFakeUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -22,6 +26,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodePositions: {},
   selectedStage: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
+
+  // reactflow state
+  nodes: [],
+  edges: [],
+  handleDragging: undefined,
+
   
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
@@ -32,6 +42,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       event_sources: data.event_sources || [],
       nodePositions: {},
     });
+    get().syncToReactFlow();
     console.log("Canvas initialized with stages:", data.stages?.length || 0);
   },
   
@@ -43,6 +54,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         queue: []
       }]
     }));
+    get().syncToReactFlow();
   },
   
   updateStage: (stage: SuperplaneStage) => {
@@ -51,13 +63,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       stages: state.stages.map((s) => s.id === stage.id ? {
         ...stage, queue: s.queue} : s)
     }));
+    get().syncToReactFlow();
   },
   
   addEventSource: (eventSource: SuperplaneEventSource) => {
-    console.log("Adding event source:", eventSource);
     set((state) => ({
       event_sources: [...state.event_sources, eventSource]
     }));
+    get().syncToReactFlow();
   },
   
   updateEventSource: (eventSource: SuperplaneEventSource) => {
@@ -67,6 +80,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         es.id === eventSource.id ? eventSource : es
       )
     }));
+    get().syncToReactFlow();
   },
   
   updateCanvas: (newCanvas: Partial<SuperplaneCanvas>) => {
@@ -77,7 +91,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
   
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => {
-    console.log("Updating node position:", nodeId, position);
+    // console.log("Updating node position:", nodeId, position);
     set((state) => ({
       nodePositions: {
         ...state.nodePositions,
@@ -104,15 +118,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
   
-  // This is a flag that indicates whether event handlers have been set up
-  // The actual setup will be done in a React component using the useSetupEventHandlers hook
-  eventHandlersSetup: false,
-  
-  // Mark event handlers as set up
-  markEventHandlersAsSetup: () => {
-    set({ eventHandlersSetup: true });
-  },
-
   selectStage: (stageId: string) => {
     set((state) => ({ selectedStage: state.stages.find(stage => stage.id === stageId) }));
   },
@@ -123,5 +128,93 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   
   updateWebSocketConnectionStatus: (status) => {
     set({ webSocketConnectionStatus: status });
+  },
+
+  syncToReactFlow: () => {
+    const { stages, event_sources, nodePositions, approveStageEvent } = get();
+
+    // Use the transformer functions from flowTransformers.ts
+    const stageNodes = transformStagesToNodes(stages, nodePositions, approveStageEvent);
+    const eventSourceNodes = transformEventSourcesToNodes(event_sources, nodePositions);
+    
+    // Get edges based on connections
+    const edges = transformToEdges(stages, event_sources);
+    
+    set({
+        nodes: [...stageNodes, ...eventSourceNodes],
+        edges
+    });
+},
+
+
+  onNodesChange: (changes) => {
+    set({
+      nodes: applyNodeChanges(changes, get().nodes) as AllNodeType[],
+    });
+  },
+
+  onEdgesChange: (changes) => {
+    set({
+      edges: applyEdgeChanges(changes, get().edges) as EdgeType[],
+    });
+  },
+
+  setNodes: (update: AllNodeType[]) => {
+    set({ nodes: update });
+  },
+
+  // Edge operations
+  onConnect: (connection: Connection) => {
+    // Create a new edge when a connection is made
+    const newEdge: EdgeType = {
+      id: `e-${connection.source}-${connection.target}-${Math.floor(Math.random() * 1000)}`,
+      source: connection.source || '',
+      target: connection.target || '',
+      sourceHandle: connection.sourceHandle || undefined,
+      targetHandle: connection.targetHandle || undefined,
+      type: 'smoothstep',
+      animated: true
+    };
+    
+    set({
+      edges: [...get().edges, newEdge],
+    });
+  },
+
+  // Flow utilities
+  cleanFlow: () => {
+    set({ nodes: [], edges: [] });
+  },
+
+  unselectAll: () => {
+    set({
+      nodes: get().nodes.map(node => ({ ...node, selected: false })),
+      edges: get().edges.map(edge => ({ ...edge, selected: false })),
+    });
+  },
+
+  getFlow: () => {
+    const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
+    return { 
+      nodes: get().nodes, 
+      edges: get().edges, 
+      viewport: defaultViewport // Note: you might want to store the actual viewport from React Flow
+    };
+  },
+
+  getNodePosition: (nodeId: string) => {
+    const node = get().nodes.find(n => n.id === nodeId);
+    return node?.position || { x: 0, y: 0 };
+  },
+
+  // Handle dragging state for connections
+  setHandleDragging: (data) => {
+    set({ handleDragging: data });
+  },
+
+  // Initialization with default properties
+  fitViewNode: (nodeId: string) => {
+    // Will be replaced when setReactFlowInstance is called
+    console.warn('fitViewNode called before ReactFlow instance was set', nodeId);
   },
 }));

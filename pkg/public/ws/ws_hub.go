@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"io"
+	"net"
 	"sync"
 	"time"
 
@@ -177,6 +179,7 @@ func (c *Client) writePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
+			log.Infof("Sending message %s", string(message))
 
 			w, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
@@ -184,11 +187,11 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			n := len(c.send)
-			for i := 0; i < n; i++ {
+			// n := len(c.send)
+			// for i := 0; i < n; i++ {
 				// w.Write([]byte("\n"))
-				w.Write(<-c.send)
-			}
+				// w.Write(<-c.send)
+			// }
 
 			if err := w.Close(); err != nil {
 				return
@@ -205,10 +208,10 @@ func (c *Client) writePump() {
 // readPump pumps messages from the websocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
-		log.Warn("Client readPump exiting, it will close conn")
 		c.hub.unregister <- c
 		close(c.Done)
 		c.conn.Close()
+		log.Info("WebSocket connection closed and resources cleaned up")
 	}()
 
 	c.conn.SetReadLimit(1024 * 1024) // 1MB max message size
@@ -223,7 +226,19 @@ func (c *Client) readPump() {
 		_, message, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Errorf("Websocket error: %v", err)
+				log.Errorf("Unexpected WebSocket closure: %v", err)
+			} else if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+				// Normal closure cases
+				log.Info("WebSocket closed normally")
+			} else if err == io.EOF {
+				// EOF is common when the client disconnects without sending a close frame
+				log.Info("WebSocket connection EOF")
+			} else if ne, ok := err.(*net.OpError); ok {
+				// Handle network operation errors
+				log.Warnf("WebSocket network error: %v", ne)
+			} else {
+				// Catch any other errors
+				log.Warnf("WebSocket read error: %v", err)
 			}
 			break
 		}
@@ -231,7 +246,6 @@ func (c *Client) readPump() {
 		// Handle client messages
 		c.handleMessage(message)
 	}
-	log.Error("Client readPump exiting, it will close conn")
 }
 
 // handleMessage processes incoming messages from clients

@@ -80,26 +80,3 @@ export const transformToEdges = (
     })
   );
 };
-
-export const applyGridLayout = (
-  nodes: AllNodeType[],
-  nodePositions: NodePositions
-): AllNodeType[] => {
-  return nodes.map((node, index) => {
-    if (nodePositions[node.id]) {
-      return node;
-    }
-    
-    const cols = Math.ceil(Math.sqrt(nodes.length));
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    
-    return {
-      ...node,
-      position: {
-        x: col * (DEFAULT_WIDTH + LAYOUT_SPACING.GRID_OFFSET),
-        y: row * (DEFAULT_HEIGHT + LAYOUT_SPACING.GRID_OFFSET)
-      }
-    };
-  });
-};

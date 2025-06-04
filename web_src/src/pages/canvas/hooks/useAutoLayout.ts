@@ -3,19 +3,20 @@ import { Edge } from "@xyflow/react";
 import { ElkNode, ElkExtendedEdge } from "elkjs";
 import { elk } from "../utils/layoutConfig";
 import { DEFAULT_WIDTH, DEFAULT_HEIGHT } from "../utils/constants";
-import { useFlowStore } from "../store/flowStore";
 import { useCanvasStore } from "../store/canvasStore";
 import { AllNodeType } from "../types/flow";
 
 export const useAutoLayout = () => {
-  const { setNodes } = useFlowStore();
-  const { updateNodePosition } = useCanvasStore();
+  const updateNodePosition  = useCanvasStore((state) => state.updateNodePosition);
+  const setNodes = useCanvasStore((state) => state.setNodes);
 
   const applyElkAutoLayout = useCallback(async (
     layoutedNodes: AllNodeType[],
     flowEdges: Edge[]
   ) => {
     if (layoutedNodes.length === 0) return;
+
+    console.log("Applying ELK auto-layout, nodes: ", layoutedNodes.length, " edges: ", flowEdges.length);
 
     const elkNodes: ElkNode[] = layoutedNodes.map((node) => ({
       id: node.id,

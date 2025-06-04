@@ -40,6 +40,7 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 			"name":          describeStageResp.Stage.Name,
 			"created_at":    describeStageResp.Stage.CreatedAt,
 			"conditions":    describeStageResp.Stage.Conditions,
+			"connections":   describeStageResp.Stage.Connections,
 			"executor_spec": describeStageResp.Stage.Executor,
 		},
 	}
