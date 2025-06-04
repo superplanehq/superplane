@@ -12,3 +12,4 @@ docker compose up -d
 For more information:
 - [Local development](./docs/local-development.md)
 - [CLI](./docs/cli.md)
+- [Tunnels](./docs/tunnels.md)

@@ -6,7 +6,7 @@ test.setup: export DB_NAME=superplane_test
 test.setup:
 	docker-compose $(DOCKER_COMPOSE_OPTS) build
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
-	-$(MAKE) db.test.create
+	$(MAKE) db.test.create
 	$(MAKE) db.test.migrate
 
 lint:
@@ -31,15 +31,15 @@ DB_PASSWORD=the-cake-is-a-lie
 
 db.test.create: export DB_NAME=superplane_test
 db.test.create:
-	db.create
+	$(MAKE) db.create
 
 db.test.migrate: export DB_NAME=superplane_test
 db.test.migrate:
-	db.migrate
+	$(MAKE) db.migrate
 
 db.test.delete: export DB_NAME=superplane_test
 db.test.delete:
-	db.delete
+	$(MAKE) db.delete
 
 db.create:
 	-docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
@@ -119,9 +119,9 @@ dev.setup: export TARGET=dev
 dev.setup: db.create db.migrate
 
 dev.console: export TARGET=dev
-dev.console: dev.setup
+dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash 
 
 dev.server: export TARGET=dev
-dev.server: dev.setup
+dev.server:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
