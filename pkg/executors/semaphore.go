@@ -37,12 +37,12 @@ func (r *SemaphoreResponse) Id() string {
 	return r.wfID
 }
 
-func (s *SemaphoreResponse) Successful() bool {
-	if s.pipeline == nil {
+func (r *SemaphoreResponse) Successful() bool {
+	if r.pipeline == nil {
 		return false
 	}
 
-	return s.pipeline.Result == semaphore.PipelineResultPassed
+	return r.pipeline.Result == semaphore.PipelineResultPassed
 }
 
 func NewSemaphoreExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
