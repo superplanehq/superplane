@@ -1,5 +1,6 @@
 import { CanvasData } from "../types";
 import { SuperplaneCanvas, SuperplaneStage, SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
+import { ReadyState } from "react-use-websocket";
 
 // Define the store state type
 export interface CanvasState {
@@ -8,6 +9,7 @@ export interface CanvasState {
   event_sources: SuperplaneEventSource[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStage: StageWithEventQueue | null;
+  webSocketConnectionStatus: ReadyState;
   
   // Actions
   initialize: (data: CanvasData) => void;
@@ -20,6 +22,7 @@ export interface CanvasState {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   selectStage: (stageId: string) => void;
   cleanSelectedStage: () => void;
+  updateWebSocketConnectionStatus: (status: ReadyState) => void;
   
   // State and action for event handlers setup
   eventHandlersSetup: boolean;

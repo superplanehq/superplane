@@ -28,6 +28,7 @@ type SuperplaneCreateStageBody struct {
 	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
 	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
 	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
+	Secrets []SuperplaneValueDefinition `json:"secrets,omitempty"`
 }
 
 // NewSuperplaneCreateStageBody instantiates a new SuperplaneCreateStageBody object
@@ -303,6 +304,38 @@ func (o *SuperplaneCreateStageBody) SetOutputs(v []SuperplaneOutputDefinition) {
 	o.Outputs = v
 }
 
+// GetSecrets returns the Secrets field value if set, zero value otherwise.
+func (o *SuperplaneCreateStageBody) GetSecrets() []SuperplaneValueDefinition {
+	if o == nil || IsNil(o.Secrets) {
+		var ret []SuperplaneValueDefinition
+		return ret
+	}
+	return o.Secrets
+}
+
+// GetSecretsOk returns a tuple with the Secrets field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneCreateStageBody) GetSecretsOk() ([]SuperplaneValueDefinition, bool) {
+	if o == nil || IsNil(o.Secrets) {
+		return nil, false
+	}
+	return o.Secrets, true
+}
+
+// HasSecrets returns a boolean if a field has been set.
+func (o *SuperplaneCreateStageBody) HasSecrets() bool {
+	if o != nil && !IsNil(o.Secrets) {
+		return true
+	}
+
+	return false
+}
+
+// SetSecrets gets a reference to the given []SuperplaneValueDefinition and assigns it to the Secrets field.
+func (o *SuperplaneCreateStageBody) SetSecrets(v []SuperplaneValueDefinition) {
+	o.Secrets = v
+}
+
 func (o SuperplaneCreateStageBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -336,6 +369,9 @@ func (o SuperplaneCreateStageBody) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Outputs) {
 		toSerialize["outputs"] = o.Outputs
+	}
+	if !IsNil(o.Secrets) {
+		toSerialize["secrets"] = o.Secrets
 	}
 	return toSerialize, nil
 }

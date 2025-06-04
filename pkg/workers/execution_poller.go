@@ -6,10 +6,10 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
-	"github.com/superplanehq/superplane/pkg/executions"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,10 +17,10 @@ import (
 )
 
 type ExecutionPoller struct {
-	Encryptor encryptor.Encryptor
+	Encryptor crypto.Encryptor
 }
 
-func NewExecutionPoller(encryptor encryptor.Encryptor) *ExecutionPoller {
+func NewExecutionPoller(encryptor crypto.Encryptor) *ExecutionPoller {
 	return &ExecutionPoller{Encryptor: encryptor}
 }
 
@@ -60,13 +60,23 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
-	spec := stage.ExecutorSpec.Data()
-	executor, err := executions.NewExecutor(*execution, spec, w.Encryptor, nil)
+	secrets, err := stage.FindSecrets(w.Encryptor)
 	if err != nil {
 		return err
 	}
 
-	status, err := executor.AsyncCheck(execution.ReferenceID)
+	s := stage.ExecutorSpec.Data()
+	executor, err := executors.NewExecutor(s.Type, *execution, nil)
+	if err != nil {
+		return err
+	}
+
+	spec, err := executor.BuildSpec(s, map[string]any{}, secrets)
+	if err != nil {
+		return err
+	}
+
+	status, err := executor.Check(*spec, execution.ReferenceID)
 	if err != nil {
 		return err
 	}

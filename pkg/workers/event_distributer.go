@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
 )
@@ -84,9 +85,15 @@ func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string,
 	for {
 		log.Infof("Connecting to RabbitMQ queue %s for %s events", queueName, routingKey)
 		
+		logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
+			"consumer":   "event_distributer",
+			"route_handler": routingKey,
+		}))
+
 		// Create a new consumer
 		consumer := tackle.NewConsumer()
-		
+		consumer.SetLogger(logger)
+
 		// Start the consumer with appropriate options
 		err := consumer.Start(&tackle.Options{
 			URL:            amqpURL,

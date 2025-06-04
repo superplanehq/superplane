@@ -1,7 +1,6 @@
 package ws
 
 import (
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -9,11 +8,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+    writeWait = 10 * time.Second       // Time allowed to write a message
+    pongWait  = 20 * time.Second       // Must receive pong within 20s
+    pingPeriod = 10 * time.Second      // Ping every 10s
+)
+
 // Client represents a connected websocket client
 type Client struct {
 	hub      *Hub
 	conn     *websocket.Conn
 	send     chan []byte
+	Done     chan struct{}
 	canvasID string // Which canvas this client is watching
 }
 
@@ -73,7 +79,7 @@ func (h *Hub) registerClient(client *Client) {
 	h.canvasSubscriptions[client.canvasID][client] = true
 	log.Debugf("Client subscribed to canvas: %s", client.canvasID)
 
-	log.Debugf("New client registered, total clients: %d", len(h.clients))
+	log.Debugf("New client registered %v, total clients: %d", client, len(h.clients))
 }
 
 // unregisterClient removes a client from the hub
@@ -139,7 +145,8 @@ func (h *Hub) NewClient(conn *websocket.Conn, canvasID string) *Client {
 	client := &Client{
 		hub:      h,
 		conn:     conn,
-		send:     make(chan []byte, 256),
+		send:     make(chan []byte, 4096),
+		Done:     make(chan struct{}),
 		canvasID: canvasID,
 	}
 
@@ -155,7 +162,7 @@ func (h *Hub) NewClient(conn *websocket.Conn, canvasID string) *Client {
 
 // writePump pumps messages from the hub to the websocket connection
 func (c *Client) writePump() {
-	ticker := time.NewTicker(60 * time.Second)
+	ticker := time.NewTicker(pingPeriod)
 	defer func() {
 		ticker.Stop()
 		c.conn.Close()
@@ -164,7 +171,7 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -177,10 +184,9 @@ func (c *Client) writePump() {
 			}
 			w.Write(message)
 
-			// Add queued chat messages to the current websocket message
 			n := len(c.send)
 			for i := 0; i < n; i++ {
-				w.Write([]byte("\n"))
+				// w.Write([]byte("\n"))
 				w.Write(<-c.send)
 			}
 
@@ -188,7 +194,7 @@ func (c *Client) writePump() {
 				return
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
@@ -199,14 +205,16 @@ func (c *Client) writePump() {
 // readPump pumps messages from the websocket connection to the hub
 func (c *Client) readPump() {
 	defer func() {
+		log.Warn("Client readPump exiting, it will close conn")
 		c.hub.unregister <- c
+		close(c.Done)
 		c.conn.Close()
 	}()
 
 	c.conn.SetReadLimit(1024 * 1024) // 1MB max message size
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
 		return nil
 	})
 
@@ -223,28 +231,12 @@ func (c *Client) readPump() {
 		// Handle client messages
 		c.handleMessage(message)
 	}
+	log.Error("Client readPump exiting, it will close conn")
 }
 
 // handleMessage processes incoming messages from clients
 func (c *Client) handleMessage(message []byte) {
-	// Handle client messages, e.g., subscribing to canvas updates
-	var data map[string]interface{}
-	if err := json.Unmarshal(message, &data); err != nil {
-		log.Errorf("Error unmarshaling client message: %v", err)
-		return
-	}
-
-	// Example of handling a message. Extend as needed.
-	if msgType, ok := data["type"].(string); ok {
-		switch msgType {
-		case "ping":
-			// Handle ping messages
-			response := map[string]interface{}{
-				"type":      "pong",
-				"timestamp": time.Now().Unix(),
-			}
-			responseJSON, _ := json.Marshal(response)
-			c.send <- responseJSON
-		}
-	}
+	// Handle client messages
+	log.Infof("Received message: %s", string(message))
+	return
 }

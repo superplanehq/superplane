@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the InputMappingValueFromEventData type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &InputMappingValueFromEventData{}
+// checks if the SuperplaneValueFromEventData type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneValueFromEventData{}
 
-// InputMappingValueFromEventData struct for InputMappingValueFromEventData
-type InputMappingValueFromEventData struct {
+// SuperplaneValueFromEventData struct for SuperplaneValueFromEventData
+type SuperplaneValueFromEventData struct {
 	Connection *string `json:"connection,omitempty"`
 	Expression *string `json:"expression,omitempty"`
 }
 
-// NewInputMappingValueFromEventData instantiates a new InputMappingValueFromEventData object
+// NewSuperplaneValueFromEventData instantiates a new SuperplaneValueFromEventData object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewInputMappingValueFromEventData() *InputMappingValueFromEventData {
-	this := InputMappingValueFromEventData{}
+func NewSuperplaneValueFromEventData() *SuperplaneValueFromEventData {
+	this := SuperplaneValueFromEventData{}
 	return &this
 }
 
-// NewInputMappingValueFromEventDataWithDefaults instantiates a new InputMappingValueFromEventData object
+// NewSuperplaneValueFromEventDataWithDefaults instantiates a new SuperplaneValueFromEventData object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewInputMappingValueFromEventDataWithDefaults() *InputMappingValueFromEventData {
-	this := InputMappingValueFromEventData{}
+func NewSuperplaneValueFromEventDataWithDefaults() *SuperplaneValueFromEventData {
+	this := SuperplaneValueFromEventData{}
 	return &this
 }
 
 // GetConnection returns the Connection field value if set, zero value otherwise.
-func (o *InputMappingValueFromEventData) GetConnection() string {
+func (o *SuperplaneValueFromEventData) GetConnection() string {
 	if o == nil || IsNil(o.Connection) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *InputMappingValueFromEventData) GetConnection() string {
 
 // GetConnectionOk returns a tuple with the Connection field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueFromEventData) GetConnectionOk() (*string, bool) {
+func (o *SuperplaneValueFromEventData) GetConnectionOk() (*string, bool) {
 	if o == nil || IsNil(o.Connection) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *InputMappingValueFromEventData) GetConnectionOk() (*string, bool) {
 }
 
 // HasConnection returns a boolean if a field has been set.
-func (o *InputMappingValueFromEventData) HasConnection() bool {
+func (o *SuperplaneValueFromEventData) HasConnection() bool {
 	if o != nil && !IsNil(o.Connection) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *InputMappingValueFromEventData) HasConnection() bool {
 }
 
 // SetConnection gets a reference to the given string and assigns it to the Connection field.
-func (o *InputMappingValueFromEventData) SetConnection(v string) {
+func (o *SuperplaneValueFromEventData) SetConnection(v string) {
 	o.Connection = &v
 }
 
 // GetExpression returns the Expression field value if set, zero value otherwise.
-func (o *InputMappingValueFromEventData) GetExpression() string {
+func (o *SuperplaneValueFromEventData) GetExpression() string {
 	if o == nil || IsNil(o.Expression) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *InputMappingValueFromEventData) GetExpression() string {
 
 // GetExpressionOk returns a tuple with the Expression field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *InputMappingValueFromEventData) GetExpressionOk() (*string, bool) {
+func (o *SuperplaneValueFromEventData) GetExpressionOk() (*string, bool) {
 	if o == nil || IsNil(o.Expression) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *InputMappingValueFromEventData) GetExpressionOk() (*string, bool) {
 }
 
 // HasExpression returns a boolean if a field has been set.
-func (o *InputMappingValueFromEventData) HasExpression() bool {
+func (o *SuperplaneValueFromEventData) HasExpression() bool {
 	if o != nil && !IsNil(o.Expression) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *InputMappingValueFromEventData) HasExpression() bool {
 }
 
 // SetExpression gets a reference to the given string and assigns it to the Expression field.
-func (o *InputMappingValueFromEventData) SetExpression(v string) {
+func (o *SuperplaneValueFromEventData) SetExpression(v string) {
 	o.Expression = &v
 }
 
-func (o InputMappingValueFromEventData) MarshalJSON() ([]byte, error) {
+func (o SuperplaneValueFromEventData) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o InputMappingValueFromEventData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o InputMappingValueFromEventData) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneValueFromEventData) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Connection) {
 		toSerialize["connection"] = o.Connection
@@ -124,38 +124,38 @@ func (o InputMappingValueFromEventData) ToMap() (map[string]interface{}, error) 
 	return toSerialize, nil
 }
 
-type NullableInputMappingValueFromEventData struct {
-	value *InputMappingValueFromEventData
+type NullableSuperplaneValueFromEventData struct {
+	value *SuperplaneValueFromEventData
 	isSet bool
 }
 
-func (v NullableInputMappingValueFromEventData) Get() *InputMappingValueFromEventData {
+func (v NullableSuperplaneValueFromEventData) Get() *SuperplaneValueFromEventData {
 	return v.value
 }
 
-func (v *NullableInputMappingValueFromEventData) Set(val *InputMappingValueFromEventData) {
+func (v *NullableSuperplaneValueFromEventData) Set(val *SuperplaneValueFromEventData) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableInputMappingValueFromEventData) IsSet() bool {
+func (v NullableSuperplaneValueFromEventData) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableInputMappingValueFromEventData) Unset() {
+func (v *NullableSuperplaneValueFromEventData) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableInputMappingValueFromEventData(val *InputMappingValueFromEventData) *NullableInputMappingValueFromEventData {
-	return &NullableInputMappingValueFromEventData{value: val, isSet: true}
+func NewNullableSuperplaneValueFromEventData(val *SuperplaneValueFromEventData) *NullableSuperplaneValueFromEventData {
+	return &NullableSuperplaneValueFromEventData{value: val, isSet: true}
 }
 
-func (v NullableInputMappingValueFromEventData) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneValueFromEventData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableInputMappingValueFromEventData) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneValueFromEventData) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

@@ -13,16 +13,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
 	"github.com/superplanehq/superplane/pkg/web/assets"
@@ -40,7 +39,7 @@ const (
 
 type Server struct {
 	httpServer            *http.Server
-	encryptor             encryptor.Encryptor
+	encryptor             crypto.Encryptor
 	jwt                   *jwt.Signer
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -54,7 +53,7 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor encryptor.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
@@ -170,6 +169,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
+	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 
 	//
 	// Authenticated and validated routes.
@@ -218,7 +218,7 @@ func (s *Server) Serve(host string, port int) error {
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
-		Handler:      handlers.LoggingHandler(os.Stdout, s.Router),
+		Handler:      s.Router,
 	}
 
 	return s.httpServer.ListenAndServe()
@@ -519,8 +519,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.wsHub.NewClient(ws, canvasID)
+	client := s.wsHub.NewClient(ws, canvasID)
 	log.Infof("WebSocket client registered with hub")
+	// Wait for the client to disconnect
+	<- client.Done
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server

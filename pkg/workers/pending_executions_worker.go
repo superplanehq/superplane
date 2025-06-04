@@ -5,11 +5,10 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryptor"
-	"github.com/superplanehq/superplane/pkg/executions"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,7 +16,7 @@ import (
 
 type PendingExecutionsWorker struct {
 	JwtSigner *jwt.Signer
-	Encryptor encryptor.Encryptor
+	Encryptor crypto.Encryptor
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -61,27 +60,31 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	specBuilder := inputs.NewExecutorSpecBuilder(stage.ExecutorSpec.Data(), inputMap)
-	spec, err := specBuilder.Build()
+	secrets, err := stage.FindSecrets(w.Encryptor)
 	if err != nil {
-		return fmt.Errorf("error resolving executor spec: %v", err)
+		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	executor, err := executions.NewExecutor(execution, *spec, w.Encryptor, w.JwtSigner)
+	executor, err := executors.NewExecutor(stage.ExecutorSpec.Data().Type, execution, w.JwtSigner)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}
 
-	resource, err := executor.Execute()
+	spec, err := executor.BuildSpec(stage.ExecutorSpec.Data(), inputMap, secrets)
+	if err != nil {
+		return fmt.Errorf("error building spec: %v", err)
+	}
+
+	response, err := executor.Execute(*spec)
 	if err != nil {
 		return fmt.Errorf("executor Execute() error: %v", err)
 	}
 
-	if resource.Async() {
-		return w.handleAsyncResource(logger, resource, stage, execution)
+	if response.Finished() {
+		return w.handleAsyncResource(logger, response, stage, execution)
 	}
 
-	err = w.handleSyncResource(resource, execution)
+	err = w.handleSyncResource(response, execution)
 	if err != nil {
 		return err
 	}
@@ -89,22 +92,16 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
-// TODO: better logging and error reporting
-func (w *PendingExecutionsWorker) handleSyncResource(resource executions.Resource, execution models.StageExecution) error {
-	status, err := resource.Check()
-	if err != nil {
-		return err
-	}
-
-	if status.Successful() {
+func (w *PendingExecutionsWorker) handleSyncResource(response executors.Response, execution models.StageExecution) error {
+	if response.Successful() {
 		return execution.FinishInTransaction(database.Conn(), models.StageExecutionResultPassed)
 	}
 
 	return execution.FinishInTransaction(database.Conn(), models.StageExecutionResultFailed)
 }
 
-func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, resource executions.Resource, stage *models.Stage, execution models.StageExecution) error {
-	err := execution.Start(resource.AsyncId())
+func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {
+	err := execution.Start(response.Id())
 	if err != nil {
 		return fmt.Errorf("error moving execution to started state: %v", err)
 	}
@@ -114,7 +111,7 @@ func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, resourc
 		return fmt.Errorf("error publishing execution started message: %v", err)
 	}
 
-	logger.Infof("Started execution %s", resource.AsyncId())
+	logger.Infof("Started execution %s", response.Id())
 
 	return nil
 }

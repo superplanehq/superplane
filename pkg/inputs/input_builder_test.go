@@ -30,7 +30,7 @@ func Test__InputBuilder(t *testing.T) {
 			Inputs: []models.InputDefinition{{Name: "VERSION"}},
 			InputMappings: []models.InputMapping{
 				{
-					Values: []models.InputValueDefinition{
+					Values: []models.ValueDefinition{
 						{
 							Name:  "VERSION",
 							Value: strAsPointer("static"),
@@ -51,11 +51,11 @@ func Test__InputBuilder(t *testing.T) {
 			Inputs: []models.InputDefinition{{Name: "VERSION"}},
 			InputMappings: []models.InputMapping{
 				{
-					Values: []models.InputValueDefinition{
+					Values: []models.ValueDefinition{
 						{
 							Name: "VERSION",
-							ValueFrom: &models.InputValueFrom{
-								EventData: &models.InputValueFromEventData{
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
 									Connection: "github",
 									Expression: "ref",
 								},
@@ -106,11 +106,11 @@ func Test__InputBuilder(t *testing.T) {
 						Connection: docsSource.Name,
 					},
 				},
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "DOCS_VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: "docs",
 								Expression: "ref",
 							},
@@ -118,8 +118,8 @@ func Test__InputBuilder(t *testing.T) {
 					},
 					{
 						Name: "TF_VERSION",
-						ValueFrom: &models.InputValueFrom{
-							LastExecution: &models.InputValueFromLastExecution{
+						ValueFrom: &models.ValueDefinitionFrom{
+							LastExecution: &models.ValueDefinitionFromLastExecution{
 								Results: []string{"passed"},
 							},
 						},
@@ -132,19 +132,19 @@ func Test__InputBuilder(t *testing.T) {
 						Connection: tfSource.Name,
 					},
 				},
-				Values: []models.InputValueDefinition{
+				Values: []models.ValueDefinition{
 					{
 						Name: "DOCS_VERSION",
-						ValueFrom: &models.InputValueFrom{
-							LastExecution: &models.InputValueFromLastExecution{
+						ValueFrom: &models.ValueDefinitionFrom{
+							LastExecution: &models.ValueDefinitionFromLastExecution{
 								Results: []string{"passed"},
 							},
 						},
 					},
 					{
 						Name: "TF_VERSION",
-						ValueFrom: &models.InputValueFrom{
-							EventData: &models.InputValueFromEventData{
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
 								Connection: "docs",
 								Expression: "ref",
 							},
@@ -152,7 +152,7 @@ func Test__InputBuilder(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{})
+		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 		stage, err := r.Canvas.FindStageByName("stage-1")

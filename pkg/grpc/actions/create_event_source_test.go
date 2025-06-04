@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/encryptor"
+	"github.com/superplanehq/superplane/pkg/crypto"
+
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -20,7 +21,7 @@ const EventSourceCreatedRoutingKey = "event-source-created"
 
 func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
-	encryptor := &encryptor.NoOpEncryptor{}
+	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		req := &protos.CreateEventSourceRequest{

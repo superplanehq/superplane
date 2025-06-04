@@ -59,6 +59,61 @@ var createCmd = &cobra.Command{
 
 			fmt.Printf("Canvas '%s' created with ID '%s'.\n", *canvas.Canvas.Name, *canvas.Canvas.Id)
 
+		case "Secret":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the name from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]any)
+			if !ok {
+				Fail("Invalid Secret YAML: metadata section missing")
+			}
+
+			name, ok := metadata["name"].(string)
+			if !ok {
+				Fail("Invalid Secret YAML: name field missing")
+			}
+
+			canvasID, ok := metadata["canvasId"].(string)
+			if !ok {
+				Fail("Invalid Secret YAML: canvasId field missing")
+			}
+
+			spec, ok := yamlData["spec"].(map[string]any)
+			if !ok {
+				Fail("Invalid Secret YAML: spec section missing")
+			}
+
+			// Prepare request
+			specData, err := json.Marshal(spec)
+			Check(err)
+
+			var secret openapi_client.SuperplaneSecret
+			err = json.Unmarshal(specData, &secret)
+			Check(err)
+
+			request := openapi_client.NewSuperplaneCreateSecretBody()
+			secret.SetName(name)
+			request.SetSecret(secret)
+			request.SetRequesterId(uuid.NewString())
+
+			// Send request
+			response, httpResponse, err := c.SecretAPI.SuperplaneCreateSecret(context.Background(), canvasID).
+				Body(*request).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.Secret)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
 		case "EventSource":
 			// Parse YAML to map
 			var yamlData map[string]any

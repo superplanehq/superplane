@@ -2,13 +2,11 @@ package actions
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"sort"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -19,7 +17,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
@@ -32,7 +30,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	spec, err := validateExecutorSpec(ctx, encryptor, req.Executor)
+	spec, err := validateExecutorSpec(ctx, req.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -59,6 +57,11 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	secrets, err := validateSecrets(req.Secrets)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	err = canvas.CreateStage(
 		req.Name,
 		req.RequesterId,
@@ -68,6 +71,7 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 		inputValidator.SerializeInputs(),
 		inputValidator.SerializeInputMappings(),
 		inputValidator.SerializeOutputs(),
+		secrets,
 	)
 
 	if err != nil {
@@ -108,7 +112,37 @@ func CreateStage(ctx context.Context, encryptor encryptor.Encryptor, req *pb.Cre
 	return response, nil
 }
 
-func validateExecutorSpec(ctx context.Context, encryptor encryptor.Encryptor, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
+func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error) {
+	out := []models.ValueDefinition{}
+	for _, s := range in {
+		if s.Name == "" {
+			return nil, fmt.Errorf("empty name")
+		}
+
+		if s.ValueFrom == nil || s.ValueFrom.Secret == nil {
+			return nil, fmt.Errorf("missing secret")
+		}
+
+		if s.ValueFrom.Secret.Name == "" || s.ValueFrom.Secret.Key == "" {
+			return nil, fmt.Errorf("missing secret name or key")
+		}
+
+		out = append(out, models.ValueDefinition{
+			Name:  s.Name,
+			Value: nil,
+			ValueFrom: &models.ValueDefinitionFrom{
+				Secret: &models.ValueDefinitionFromSecret{
+					Name: s.ValueFrom.Secret.Name,
+					Key:  s.ValueFrom.Secret.Key,
+				},
+			},
+		})
+	}
+
+	return out, nil
+}
+
+func validateExecutorSpec(ctx context.Context, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
 	if in == nil {
 		return nil, fmt.Errorf("missing executor spec")
 	}
@@ -127,16 +161,11 @@ func validateExecutorSpec(ctx context.Context, encryptor encryptor.Encryptor, in
 			return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
 		}
 
-		token, err := encryptor.Encrypt(ctx, []byte(in.Semaphore.ApiToken), []byte(in.Semaphore.OrganizationUrl))
-		if err != nil {
-			return nil, fmt.Errorf("error encrypting API token: %v", err)
-		}
-
 		return &models.ExecutorSpec{
 			Type: models.ExecutorSpecTypeSemaphore,
 			Semaphore: &models.SemaphoreExecutorSpec{
 				OrganizationURL: in.Semaphore.OrganizationUrl,
-				APIToken:        base64.StdEncoding.EncodeToString(token),
+				APIToken:        in.Semaphore.ApiToken,
 				ProjectID:       in.Semaphore.ProjectId,
 				Branch:          in.Semaphore.Branch,
 				PipelineFile:    in.Semaphore.PipelineFile,
@@ -466,6 +495,11 @@ func serializeStage(
 		return nil, err
 	}
 
+	secrets := []*pb.ValueDefinition{}
+	for _, valueDef := range stage.Secrets {
+		secrets = append(secrets, serializeValueDefinition(valueDef))
+	}
+
 	return &pb.Stage{
 		Id:            stage.ID.String(),
 		Name:          stage.Name,
@@ -477,6 +511,7 @@ func serializeStage(
 		Inputs:        inputs,
 		Outputs:       outputs,
 		InputMappings: inputMappings,
+		Secrets:       secrets,
 	}, nil
 }
 
@@ -509,23 +544,11 @@ func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
 	out := []*pb.InputMapping{}
 	for _, m := range in {
 		mapping := &pb.InputMapping{
-			Values: []*pb.InputMapping_ValueDefinition{},
+			Values: []*pb.ValueDefinition{},
 		}
 
 		for _, valueDef := range m.Values {
-			v := &pb.InputMapping_ValueDefinition{
-				Name: valueDef.Name,
-			}
-
-			if valueDef.Value != nil {
-				v.Value = *valueDef.Value
-			}
-
-			if valueDef.ValueFrom != nil {
-				v.ValueFrom = serializeValueFrom(*valueDef.ValueFrom)
-			}
-
-			mapping.Values = append(mapping.Values, v)
+			mapping.Values = append(mapping.Values, serializeValueDefinition(valueDef))
 		}
 
 		if m.When != nil && m.When.TriggeredBy != nil {
@@ -542,10 +565,26 @@ func serializeInputMappings(in []models.InputMapping) []*pb.InputMapping {
 	return out
 }
 
-func serializeValueFrom(in models.InputValueFrom) *pb.InputMapping_ValueFrom {
+func serializeValueDefinition(in models.ValueDefinition) *pb.ValueDefinition {
+	v := &pb.ValueDefinition{
+		Name: in.Name,
+	}
+
+	if in.Value != nil {
+		v.Value = *in.Value
+	}
+
+	if in.ValueFrom != nil {
+		v.ValueFrom = serializeValueFrom(*in.ValueFrom)
+	}
+
+	return v
+}
+
+func serializeValueFrom(in models.ValueDefinitionFrom) *pb.ValueFrom {
 	if in.EventData != nil {
-		return &pb.InputMapping_ValueFrom{
-			EventData: &pb.InputMapping_ValueFromEventData{
+		return &pb.ValueFrom{
+			EventData: &pb.ValueFromEventData{
 				Connection: in.EventData.Connection,
 				Expression: in.EventData.Expression,
 			},
@@ -558,9 +597,18 @@ func serializeValueFrom(in models.InputValueFrom) *pb.InputMapping_ValueFrom {
 			results = append(results, executionResultToProto(r))
 		}
 
-		return &pb.InputMapping_ValueFrom{
-			LastExecution: &pb.InputMapping_ValueFromLastExecution{
+		return &pb.ValueFrom{
+			LastExecution: &pb.ValueFromLastExecution{
 				Results: results,
+			},
+		}
+	}
+
+	if in.Secret != nil {
+		return &pb.ValueFrom{
+			Secret: &pb.ValueFromSecret{
+				Name: in.Secret.Name,
+				Key:  in.Secret.Key,
 			},
 		}
 	}
@@ -615,6 +663,7 @@ func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, erro
 			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: &pb.ExecutorSpec_Semaphore{
 				OrganizationUrl: executor.Semaphore.OrganizationURL,
+				ApiToken:        executor.Semaphore.APIToken,
 				ProjectId:       executor.Semaphore.ProjectID,
 				Branch:          executor.Semaphore.Branch,
 				PipelineFile:    executor.Semaphore.PipelineFile,

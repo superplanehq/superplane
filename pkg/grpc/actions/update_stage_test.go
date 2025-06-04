@@ -7,7 +7,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -17,11 +16,9 @@ import (
 func Test__UpdateStage(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
-	encryptor := &encryptor.NoOpEncryptor{}
-
 	// Create a stage first that we'll update in tests
 	executor := support.ProtoExecutor()
-	stage, err := CreateStage(context.Background(), encryptor, &protos.CreateStageRequest{
+	stage, err := CreateStage(context.Background(), &protos.CreateStageRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		Name:           "test-update-stage",
 		Executor:       executor,
@@ -61,7 +58,7 @@ func Test__UpdateStage(t *testing.T) {
 	stageID := stage.Stage.Id
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       "invalid-uuid",
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
@@ -74,7 +71,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       uuid.NewString(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
@@ -87,7 +84,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("missing requester ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -99,7 +96,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
@@ -119,7 +116,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),
@@ -147,7 +144,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Executor:       support.ProtoExecutor(),
@@ -170,7 +167,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage is updated", func(t *testing.T) {
-		res, err := UpdateStage(context.Background(), encryptor, &protos.UpdateStageRequest{
+		res, err := UpdateStage(context.Background(), &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    r.User.String(),

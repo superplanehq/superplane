@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/encryptor"
 	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -35,12 +35,12 @@ func Test__ExecutionPoller(t *testing.T) {
 	}
 
 	spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{})
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 	require.NoError(t, err)
 	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
 
-	encryptor := &encryptor.NoOpEncryptor{}
+	encryptor := &crypto.NoOpEncryptor{}
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
 	w := NewExecutionPoller(encryptor)
@@ -117,7 +117,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			},
 		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
 			{Name: "MY_OUTPUT", Required: true},
-		})
+		}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
 		stageWithOutput, err := r.Canvas.FindStageByName("stage-with-output")

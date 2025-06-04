@@ -24,9 +24,16 @@ type StageEventApprovedConsumer struct {
 }
 
 func NewStageEventApprovedConsumer(rabbitMQURL string) *StageEventApprovedConsumer {
+	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
+		"consumer": "stage_event_approved",
+	}))
+
+	consumer := tackle.NewConsumer()
+	consumer.SetLogger(logger)
+
 	return &StageEventApprovedConsumer{
 		RabbitMQURL: rabbitMQURL,
-		Consumer:    tackle.NewConsumer(),
+		Consumer:    consumer,
 	}
 }
 

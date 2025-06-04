@@ -32,7 +32,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-no-approval-1")
 		require.NoError(t, err)
@@ -77,7 +77,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-with-approval-1")
 		require.NoError(t, err)
@@ -110,7 +110,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-with-approval-2")
 		require.NoError(t, err)
@@ -163,7 +163,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-with-time-window")
 		require.NoError(t, err)
@@ -212,7 +212,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-with-time-window-2")
 		require.NoError(t, err)
@@ -255,7 +255,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}))
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
 		stage, err := r.Canvas.FindStageByName("stage-no-approval-3")
 		require.NoError(t, err)

@@ -1,4 +1,4 @@
-package executions
+package executors
 
 import (
 	"context"
@@ -18,12 +18,13 @@ type Executor interface {
 	Name() string
 	BuildSpec(models.ExecutorSpec, map[string]any, map[string]string) (*models.ExecutorSpec, error)
 	Execute(models.ExecutorSpec) (Response, error)
-	Check(models.ExecutorSpec, string)
+	Check(models.ExecutorSpec, string) (Response, error)
 }
 
 type Response interface {
 	Finished() bool
 	Successful() bool
+	Id() string
 }
 
 func NewExecutor(specType string, execution models.StageExecution, jwtSigner *jwt.Signer) (Executor, error) {
