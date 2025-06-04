@@ -41,11 +41,22 @@ db.test.delete: export DB_NAME=superplane_test
 db.test.delete:
 	$(MAKE) db.delete
 
+db.dev.create: export DB_NAME=superplane_dev
+db.dev.create:
+	$(MAKE) db.create
+
+db.dev.migrate: export DB_NAME=superplane_dev
+db.dev.migrate:
+	$(MAKE) db.migrate
+
+db.dev.delete: export DB_NAME=superplane_dev
+db.dev.delete:
+	$(MAKE) db.delete
+
 db.create:
 	-docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
-db.migration.create: TARGET=dev
 db.migration.create:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app mkdir -p db/migrations
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
@@ -115,13 +126,10 @@ image.push:
 # Dev environment helpers
 #
 
-dev.setup: export TARGET=dev
-dev.setup: db.create db.migrate
+dev.setup: db.dev.create db.dev.migrate
 
-dev.console: export TARGET=dev
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash 
 
-dev.server: export TARGET=dev
 dev.server:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
