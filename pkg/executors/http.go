@@ -18,8 +18,8 @@ type HTTPExecutor struct {
 }
 
 type HTTPResponse struct {
-	statuses []int
-	res      *http.Response
+	statusCodes []uint32
+	res         *http.Response
 }
 
 func (s *HTTPResponse) Finished() bool {
@@ -27,7 +27,7 @@ func (s *HTTPResponse) Finished() bool {
 }
 
 func (s *HTTPResponse) Successful() bool {
-	return slices.Contains(s.statuses, s.res.StatusCode)
+	return slices.Contains(s.statusCodes, uint32(s.res.StatusCode))
 }
 
 func (s *HTTPResponse) Id() string {
@@ -45,11 +45,12 @@ func (e *HTTPExecutor) Name() string {
 	return models.ExecutorSpecTypeHTTP
 }
 
+// TODO: lots of duplication in this function since all these functions,
+// regardless of executor type, will do is iterate over all "resolvable" fields,
+// and resolve them. If we had a function that worked on map[string]any,
+// we can remove this from the interface, and then Execute()
+// can just convert the map[string]any back into the structure it is expecting.
 func (e *HTTPExecutor) BuildSpec(spec models.ExecutorSpec, inputs map[string]any, secrets map[string]string) (*models.ExecutorSpec, error) {
-	if spec.Type != e.Name() {
-		return nil, fmt.Errorf("wrong spec type")
-	}
-
 	URL, err := resolveExpression(spec.HTTP.URL, inputs, secrets)
 	if err != nil {
 		return nil, err
@@ -81,6 +82,9 @@ func (e *HTTPExecutor) BuildSpec(spec models.ExecutorSpec, inputs map[string]any
 			URL:     URL.(string),
 			Payload: payload,
 			Headers: headers,
+			ResponsePolicy: &models.HTTPResponsePolicy{
+				StatusCodes: spec.HTTP.ResponsePolicy.StatusCodes,
+			},
 		},
 	}, nil
 }
@@ -105,12 +109,13 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 		req.Header.Set(k, v)
 	}
 
+	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 
-	return &HTTPResponse{res: res, statuses: spec.HTTP.SuccessPolicy.Statuses}, nil
+	return &HTTPResponse{res: res, statusCodes: spec.HTTP.ResponsePolicy.StatusCodes}, nil
 }
 
 func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
@@ -119,16 +124,19 @@ func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, err
 
 func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec) (map[string]string, error) {
 	payload := map[string]string{
-		"SEMAPHORE_STAGE_ID":           e.execution.StageID.String(),
-		"SEMAPHORE_STAGE_EXECUTION_ID": e.execution.ID.String(),
+		"stageId":          e.execution.StageID.String(),
+		"stageExecutionId": e.execution.ID.String(),
 	}
 
+	// TODO: not sure we need this
+	// We could somehow define outputs from the response body
 	token, err := e.jwtSigner.Generate(e.execution.ID.String(), 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("error generating tags token: %v", err)
 	}
 
-	payload["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = token
+	payload["stageExecutionToken"] = token
+
 	for key, value := range spec.Payload {
 		payload[key] = value
 	}

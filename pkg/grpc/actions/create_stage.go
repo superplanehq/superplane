@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 
 	uuid "github.com/google/uuid"
@@ -149,34 +150,84 @@ func validateExecutorSpec(ctx context.Context, in *pb.ExecutorSpec) (*models.Exe
 
 	switch in.Type {
 	case pb.ExecutorSpec_TYPE_SEMAPHORE:
-		if in.Semaphore.OrganizationUrl == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
-		}
-
-		if in.Semaphore.ApiToken == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
-		}
-
-		if in.Semaphore.TaskId == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
-		}
-
-		return &models.ExecutorSpec{
-			Type: models.ExecutorSpecTypeSemaphore,
-			Semaphore: &models.SemaphoreExecutorSpec{
-				OrganizationURL: in.Semaphore.OrganizationUrl,
-				APIToken:        in.Semaphore.ApiToken,
-				ProjectID:       in.Semaphore.ProjectId,
-				Branch:          in.Semaphore.Branch,
-				PipelineFile:    in.Semaphore.PipelineFile,
-				Parameters:      in.Semaphore.Parameters,
-				TaskID:          in.Semaphore.TaskId,
-			},
-		}, nil
-
+		return validateSemaphoreExecutorSpec(in)
+	case pb.ExecutorSpec_TYPE_HTTP:
+		return validateHTTPExecutorSpec(in)
 	default:
 		return nil, errors.New("invalid executor spec type")
 	}
+}
+
+func validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
+	if in.Http == nil {
+		return nil, fmt.Errorf("invalid HTTP executor spec: missing HTTP executor spec")
+	}
+
+	if in.Http.Url == "" {
+		return nil, fmt.Errorf("invalid HTTP executor spec: missing URL")
+	}
+
+	headers := in.Http.Headers
+	if headers == nil {
+		headers = map[string]string{}
+	}
+
+	payload := in.Http.Payload
+	if payload == nil {
+		payload = map[string]string{}
+	}
+
+	var responsePolicy *models.HTTPResponsePolicy
+	if in.Http.ResponsePolicy == nil {
+		responsePolicy = &models.HTTPResponsePolicy{
+			StatusCodes: []uint32{http.StatusOK},
+		}
+	} else {
+		responsePolicy = &models.HTTPResponsePolicy{
+			StatusCodes: in.Http.ResponsePolicy.StatusCodes,
+		}
+	}
+
+	return &models.ExecutorSpec{
+		Type: models.ExecutorSpecTypeHTTP,
+		HTTP: &models.HTTPExecutorSpec{
+			URL:            in.Http.Url,
+			Headers:        headers,
+			Payload:        payload,
+			ResponsePolicy: responsePolicy,
+		},
+	}, nil
+}
+
+func validateSemaphoreExecutorSpec(in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
+	if in.Semaphore == nil {
+		return nil, fmt.Errorf("invalid semaphore executor spec: missing semaphore executor spec")
+	}
+
+	if in.Semaphore.OrganizationUrl == "" {
+		return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
+	}
+
+	if in.Semaphore.ApiToken == "" {
+		return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
+	}
+
+	if in.Semaphore.TaskId == "" {
+		return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
+	}
+
+	return &models.ExecutorSpec{
+		Type: models.ExecutorSpecTypeSemaphore,
+		Semaphore: &models.SemaphoreExecutorSpec{
+			OrganizationURL: in.Semaphore.OrganizationUrl,
+			APIToken:        in.Semaphore.ApiToken,
+			ProjectID:       in.Semaphore.ProjectId,
+			Branch:          in.Semaphore.Branch,
+			PipelineFile:    in.Semaphore.PipelineFile,
+			Parameters:      in.Semaphore.Parameters,
+			TaskID:          in.Semaphore.TaskId,
+		},
+	}, nil
 }
 
 func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.StageConnection, error) {
@@ -658,6 +709,18 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 
 func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, error) {
 	switch executor.Type {
+	case models.ExecutorSpecTypeHTTP:
+		return &pb.ExecutorSpec{
+			Type: pb.ExecutorSpec_TYPE_HTTP,
+			Http: &pb.ExecutorSpec_HTTP{
+				Url:     executor.HTTP.URL,
+				Headers: executor.HTTP.Headers,
+				Payload: executor.HTTP.Payload,
+				ResponsePolicy: &pb.ExecutorSpec_HTTPResponsePolicy{
+					StatusCodes: executor.HTTP.ResponsePolicy.StatusCodes,
+				},
+			},
+		}, nil
 	case models.ExecutorSpecTypeSemaphore:
 		return &pb.ExecutorSpec{
 			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,

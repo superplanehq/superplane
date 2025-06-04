@@ -207,14 +207,14 @@ type SemaphoreExecutorSpec struct {
 }
 
 type HTTPExecutorSpec struct {
-	URL           string             `json:"url"`
-	Payload       map[string]string  `json:"payload"`
-	Headers       map[string]string  `json:"headers"`
-	SuccessPolicy *HTTPSuccessPolicy `json:"success_policy"`
+	URL            string              `json:"url"`
+	Payload        map[string]string   `json:"payload"`
+	Headers        map[string]string   `json:"headers"`
+	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
 }
 
-type HTTPSuccessPolicy struct {
-	Statuses []int
+type HTTPResponsePolicy struct {
+	StatusCodes []uint32 `json:"status_codes"`
 }
 
 func FindStageByID(id string) (*Stage, error) {
