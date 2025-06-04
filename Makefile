@@ -102,17 +102,10 @@ image.push:
 # Dev environment helpers
 #
 
-dev.setup: db.test.create db.migrate dev.fixtures.clear dev.fixtures
+dev.setup: db.test.create db.migrate
 
 dev.console: dev.setup
 	docker compose run --rm --service-ports app /bin/bash 
 
-dev.server: 
+dev.server: dev.setup
 	docker compose run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
-
-dev.fixtures:
-	docker compose run --rm app go run cmd/fixtures/main.go
-
-# Clear seed data from the database
-dev.fixtures.clear:
-	docker compose run --rm -e APP_ENV=development -e CLEAR_ONLY=true app go run cmd/fixtures/main.go
