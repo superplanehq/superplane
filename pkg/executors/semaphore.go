@@ -15,47 +15,33 @@ type SemaphoreExecutor struct {
 }
 
 type SemaphoreResponse struct {
-	api  *semaphore.Semaphore
-	wfID string
+	wfID     string
+	pipeline *semaphore.Pipeline
 }
 
 // Since a Semaphore execution creates a Semaphore pipeline,
 // and a Semaphore pipeline is not finished after the HTTP API call completes,
 // we need to monitor the state of the created pipeline.
 // That makes the Semaphore executor type async.
-func (r *SemaphoreResponse) Async() bool {
-	return true
+func (r *SemaphoreResponse) Finished() bool {
+	if r.pipeline == nil {
+		return false
+	}
+
+	return r.pipeline.State == semaphore.PipelineStateDone
 }
 
 // The API call to run a pipeline gives me back a workflow ID,
 // so we use that ID as the unique identifier here.
-func (r *SemaphoreResponse) AsyncId() string {
+func (r *SemaphoreResponse) Id() string {
 	return r.wfID
 }
 
-func (r *SemaphoreResponse) Check() (Status, error) {
-	workflow, err := r.api.DescribeWorkflow(r.wfID)
-	if err != nil {
-		return nil, fmt.Errorf("workflow %s not found", r.wfID)
+func (s *SemaphoreResponse) Successful() bool {
+	if s.pipeline == nil {
+		return false
 	}
 
-	pipeline, err := r.api.DescribePipeline(workflow.InitialPplID)
-	if err != nil {
-		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
-	}
-
-	return &SemaphoreStatus{pipeline: pipeline}, nil
-}
-
-type SemaphoreStatus struct {
-	pipeline *semaphore.Pipeline
-}
-
-func (s *SemaphoreStatus) Finished() bool {
-	return s.pipeline.State == semaphore.PipelineStateDone
-}
-
-func (s *SemaphoreStatus) Successful() bool {
 	return s.pipeline.Result == semaphore.PipelineResultPassed
 }
 
@@ -137,6 +123,21 @@ func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec) (Response, error) 
 	return e.triggerSemaphoreTask(spec)
 }
 
+func (e *SemaphoreExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
+	api := semaphore.NewSemaphoreAPI(spec.Semaphore.OrganizationURL, string(spec.Semaphore.APIToken))
+	workflow, err := api.DescribeWorkflow(id)
+	if err != nil {
+		return nil, fmt.Errorf("workflow %s not found", id)
+	}
+
+	pipeline, err := api.DescribePipeline(workflow.InitialPplID)
+	if err != nil {
+		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
+	}
+
+	return &SemaphoreResponse{wfID: id, pipeline: pipeline}, nil
+}
+
 func (e *SemaphoreExecutor) triggerSemaphoreTask(spec models.ExecutorSpec) (Response, error) {
 	api := semaphore.NewSemaphoreAPI(spec.Semaphore.OrganizationURL, string(spec.Semaphore.APIToken))
 	parameters, err := e.buildParameters(spec.Semaphore.Parameters)
@@ -154,16 +155,9 @@ func (e *SemaphoreExecutor) triggerSemaphoreTask(spec models.ExecutorSpec) (Resp
 		return nil, err
 	}
 
-	return &SemaphoreResponse{api: api, wfID: workflowID}, nil
+	return &SemaphoreResponse{wfID: workflowID, pipeline: nil}, nil
 }
 
-// TODO
-// How should we pass these SEMAPHORE_* parameters to the job?
-// SEMAPHORE_STAGE_ID and SEMAPHORE_STAGE_EXECUTION_ID are not sensitive values,
-// but currently, if the task does not define a parameter, it is ignored.
-//
-// Additionally, SEMAPHORE_STAGE_EXECUTION_TOKEN is sensitive,
-// so if we pass it here, it will be visible in UI / API responses.
 func (e *SemaphoreExecutor) buildParameters(parameters map[string]string) ([]semaphore.TaskTriggerParameter, error) {
 	parameterValues := []semaphore.TaskTriggerParameter{
 		{Name: "SEMAPHORE_STAGE_ID", Value: e.execution.StageID.String()},

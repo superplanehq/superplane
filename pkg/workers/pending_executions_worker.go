@@ -81,23 +81,25 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	}
 
 	if response.Finished() {
-		return w.handleAsyncResource(logger, response, stage, execution)
+		return w.handleSyncResource(logger, response, execution, stage)
 	}
 
-	err = w.handleSyncResource(response, execution)
+	return w.handleAsyncResource(logger, response, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
+	result := models.StageExecutionResultFailed
+	if response.Successful() {
+		result = models.StageExecutionResultPassed
+	}
+
+	logger.Infof("Finished execution: %s", result)
+	err := execution.FinishInTransaction(database.Conn(), result)
 	if err != nil {
 		return err
 	}
 
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
-}
-
-func (w *PendingExecutionsWorker) handleSyncResource(response executors.Response, execution models.StageExecution) error {
-	if response.Successful() {
-		return execution.FinishInTransaction(database.Conn(), models.StageExecutionResultPassed)
-	}
-
-	return execution.FinishInTransaction(database.Conn(), models.StageExecutionResultFailed)
 }
 
 func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {

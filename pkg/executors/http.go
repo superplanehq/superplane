@@ -30,6 +30,10 @@ func (s *HTTPResponse) Successful() bool {
 	return slices.Contains(s.statuses, s.res.StatusCode)
 }
 
+func (s *HTTPResponse) Id() string {
+	return ""
+}
+
 func NewHTTPExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
 	return &HTTPExecutor{
 		execution: execution,
@@ -107,6 +111,10 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 	}
 
 	return &HTTPResponse{res: res, statuses: spec.HTTP.SuccessPolicy.Statuses}, nil
+}
+
+func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
+	return nil, nil
 }
 
 func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec) (map[string]string, error) {
