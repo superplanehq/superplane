@@ -1,17 +1,20 @@
 package workers
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type PendingExecutionsWorker struct {
@@ -75,6 +78,11 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error building spec: %v", err)
 	}
 
+	err = execution.Start()
+	if err != nil {
+		return fmt.Errorf("error moving execution to started state: %v", err)
+	}
+
 	response, err := executor.Execute(*spec)
 	if err != nil {
 		return fmt.Errorf("executor Execute() error: %v", err)
@@ -93,17 +101,27 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 		result = models.StageExecutionResultPassed
 	}
 
+	database.Conn().Transaction(func(tx *gorm.DB) error {
+		err := execution.FinishInTransaction(tx, result)
+		if err != nil {
+			return err
+		}
+
+		if err := w.createStageCompletionEvent(tx, execution, stage); err != nil {
+			logger.Errorf("Error creating stage completion event: %v", err)
+			return err
+		}
+
+		return nil
+	})
+
 	logger.Infof("Finished execution: %s", result)
-	err := execution.FinishInTransaction(database.Conn(), result)
-	if err != nil {
-		return err
-	}
 
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
 func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {
-	err := execution.Start(response.Id())
+	err := execution.StartWithReferenceID(response.Id())
 	if err != nil {
 		return fmt.Errorf("error moving execution to started state: %v", err)
 	}
@@ -114,6 +132,25 @@ func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, respons
 	}
 
 	logger.Infof("Started execution %s", response.Id())
+
+	return nil
+}
+
+func (w *PendingExecutionsWorker) createStageCompletionEvent(tx *gorm.DB, execution models.StageExecution, stage *models.Stage) error {
+	e, err := events.NewStageExecutionCompletion(&execution, map[string]any{})
+	if err != nil {
+		return fmt.Errorf("error creating stage completion event: %v", err)
+	}
+
+	raw, err := json.Marshal(&e)
+	if err != nil {
+		return fmt.Errorf("error marshaling event: %v", err)
+	}
+
+	_, err = models.CreateEventInTransaction(tx, execution.StageID, stage.Name, models.SourceTypeStage, raw, []byte(`{}`))
+	if err != nil {
+		return fmt.Errorf("error creating event: %v", err)
+	}
 
 	return nil
 }

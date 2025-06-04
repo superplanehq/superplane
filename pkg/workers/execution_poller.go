@@ -111,15 +111,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 			return err
 		}
 
-		err = models.UpdateStageEventsInTransaction(
-			tx, []string{execution.StageEventID.String()}, models.StageEventStateProcessed, "",
-		)
-
-		if err != nil {
-			logger.Errorf("Error updating stage event state: %v", err)
-			return err
-		}
-
 		//
 		// Lastly, since the stage for this execution might be connected to other stages,
 		// we create a new event for the completion of this stage.

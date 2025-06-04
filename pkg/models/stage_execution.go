@@ -79,7 +79,17 @@ func (e *StageExecution) FindSource() (string, error) {
 	return sourceName, nil
 }
 
-func (e *StageExecution) Start(referenceID string) error {
+func (e *StageExecution) Start() error {
+	now := time.Now()
+
+	return database.Conn().Model(e).
+		Update("state", StageExecutionStarted).
+		Update("started_at", &now).
+		Update("updated_at", &now).
+		Error
+}
+
+func (e *StageExecution) StartWithReferenceID(referenceID string) error {
 	now := time.Now()
 
 	return database.Conn().Model(e).
@@ -93,13 +103,33 @@ func (e *StageExecution) Start(referenceID string) error {
 func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 	now := time.Now()
 
-	return tx.Model(e).
+	//
+	// Update execution state.
+	//
+	err := tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("result", result).
 		Update("state", StageExecutionFinished).
 		Update("updated_at", &now).
 		Update("finished_at", &now).
 		Error
+
+	if err != nil {
+		return err
+	}
+
+	//
+	// Update stage event state.
+	//
+	err = UpdateStageEventsInTransaction(
+		tx, []string{e.StageEventID.String()}, StageEventStateProcessed, "",
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {

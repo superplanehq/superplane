@@ -58,7 +58,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
@@ -133,7 +133,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
@@ -174,7 +174,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
