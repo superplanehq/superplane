@@ -4,8 +4,8 @@ DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 
 test.setup: export DB_NAME=superplane_test
 test.setup:
-	docker-compose build
-	docker-compose run --rm app go get ./...
+	docker-compose $(DOCKER_COMPOSE_OPTS) build
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
 	-$(MAKE) db.test.create
 	$(MAKE) db.test.migrate
 
