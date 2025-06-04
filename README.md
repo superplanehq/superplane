@@ -1,6 +1,14 @@
-# superplane
+# SuperPlane
 
-## running locally
+To start the application locally, run:
 
-Easiest way to start the dev environment is with `make dev.server`, this will start the golang app with air and serve the web app with vite. You will get some initial data from the fixtures.
+```bash
+make db.create
+make db.migrate
+docker compose build
+docker compose up -d
+```
 
+For more information:
+- [Local development](./docs/local-development.md)
+- [CLI](./docs/cli.md)

@@ -3,16 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runner
+      target: dev
 
     tty: true
 
+    command: go run cmd/server/main.go
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
       DB_NAME: "superplane"
       DB_USERNAME: "postgres"
       POSTGRES_DB_SSL: "false"
+      APP_ENV: development
       APPLICATION_NAME: "superplane"
       DB_PASSWORD: "the-cake-is-a-lie"
       RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
@@ -35,6 +37,8 @@ services:
       NO_ENCRYPTION: "yes"
 
     ports:
+      - 5173:5173
+      - 4173:4173
       - 8000:8000
       - 50051:50051
 
@@ -48,6 +52,11 @@ services:
       rabbitmq:
         condition: service_healthy
 
+    volumes:
+      - go-pkg-cache:/go
+      - .:/app
+      - /tmp:/tmp
+
   db:
     image: postgres:17.5
     volumes:
@@ -60,6 +69,18 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+  
+  pgweb:
+    image: sosedoff/pgweb
+    environment:
+      DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane?sslmode=disable"
+    ports:
+      - 8081:8081
+    links:
+      - db:db
+    depends_on:
+      db:
+        condition: service_healthy
 
   rabbitmq:
     image: rabbitmq:3.8.17-management-alpine
@@ -75,5 +96,11 @@ services:
       retries: 5
 
 volumes:
+  repo-data:
+    driver: local
+
+  go-pkg-cache:
+    driver: local
+
   postgres-data:
     driver: local

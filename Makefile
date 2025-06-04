@@ -1,26 +1,26 @@
 .PHONY: lint test
 
-APP_NAME=superplane
-APP_ENV=prod
+DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
 
-test.setup: openapi.spec.gen
+test.setup: export DB_NAME=superplane_test
+test.setup:
 	docker-compose build
 	docker-compose run --rm app go get ./...
 	-$(MAKE) db.test.create
-	$(MAKE) db.migrate
+	$(MAKE) db.test.migrate
 
 lint:
-	docker-compose run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
 TEST_PACKAGES := ./...
 test:
-	docker-compose run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.watch:
-	docker-compose run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 tidy:
-	docker-compose run --rm app go mod tidy
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
 
 #
 # Database
@@ -29,27 +29,40 @@ tidy:
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 
+db.test.create: export DB_NAME=superplane_test
 db.test.create:
-	-docker-compose run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	docker-compose run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	db.create
 
+db.test.migrate: export DB_NAME=superplane_test
+db.test.migrate:
+	db.migrate
+
+db.test.delete: export DB_NAME=superplane_test
+db.test.delete:
+	db.delete
+
+db.create:
+	-docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+
+db.migration.create: TARGET=dev
 db.migration.create:
-	docker-compose run --rm app mkdir -p db/migrations
-	docker-compose run --rm app migrate create -ext sql -dir db/migrations $(NAME)
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app mkdir -p db/migrations
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
 db.migrate:
 	rm -f db/structure.sql
-	docker-compose run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
 	# echo dump schema to db/structure.sql
-	docker-compose run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	docker-compose run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
-db.test.console:
-	docker-compose run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
+db.console:
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
-db.test.delete:
-	docker-compose run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
+db.delete:
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 #
 # Protobuf compilation
@@ -58,11 +71,11 @@ db.test.delete:
 MODULES := superplane
 REST_API_MODULES := superplane
 pb.gen:
-	docker-compose run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	docker-compose run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 
 openapi.spec.gen:
-	docker-compose run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen:
 	rm -rf pkg/openapi_client
@@ -102,17 +115,13 @@ image.push:
 # Dev environment helpers
 #
 
-dev.setup: db.test.create db.migrate dev.fixtures.clear dev.fixtures
+dev.setup: export TARGET=dev
+dev.setup: db.create db.migrate
 
+dev.console: export TARGET=dev
 dev.console: dev.setup
-	docker compose run --rm --service-ports app /bin/bash 
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash 
 
+dev.server: export TARGET=dev
 dev.server: dev.setup
-	docker compose run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
-
-dev.fixtures:
-	docker compose run --rm app go run cmd/fixtures/main.go
-
-# Clear seed data from the database
-dev.fixtures.clear:
-	docker compose run --rm -e APP_ENV=development -e CLEAR_ONLY=true app go run cmd/fixtures/main.go
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 
