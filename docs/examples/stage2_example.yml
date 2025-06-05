@@ -19,8 +19,20 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: "$.DEPLOY_URL" # Only trigger on main branch
+            expression: "DEPLOY_URL != null" # Check if DEPLOY_URL exists and is not null
 
+      # Filters can be combined using AND (default) or OR
+      filterOperator: FILTER_OPERATOR_AND
+    - type: TYPE_EVENT_SOURCE
+      name: github-webhook # Reference to the event source defined earlier
+      # Optional filters can be defined to determine when this stage should be triggered
+      filters:
+        - type: FILTER_TYPE_DATA
+          data:
+            expression: "ref == 'refs/heads/main'" # Only trigger on main branch
+        - type: FILTER_TYPE_HEADER
+          header:
+            expression: "headers['X-GitHub-Event'] == 'push'" # Only trigger on push events
       # Filters can be combined using AND (default) or OR
       filterOperator: FILTER_OPERATOR_AND
 
@@ -41,9 +53,20 @@ spec:
           valueFrom:
             eventData:
               connection: deploy-to-staging
-              expression: "$.DEPLOY_URL"
+              expression: "DEPLOY_URL"
         - name: ENVIRONMENT
           value: "production" # Static value
+    - when:
+        triggeredBy:
+          connection: github-webhook
+      values:
+        - name: VERSION
+          valueFrom:
+            eventData:
+              connection: github-webhook
+              expression: "after[0:7]" # Use first 7 chars of commit SHA
+        - name: ENVIRONMENT
+          value: "staging" # Static value
 
   # Define the outputs this stage produces
   outputs:

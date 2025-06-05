@@ -19,10 +19,10 @@ spec:
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: "$.ref == 'refs/heads/main'"  # Only trigger on main branch
+            expression: "ref == 'refs/heads/main'"  # Only trigger on main branch
         - type: FILTER_TYPE_HEADER
           header:
-            expression: "$.X-GitHub-Event == 'push'"  # Only trigger on push events
+            expression: "headers['X-GitHub-Event'] == 'push'"  # Only trigger on push events
       # Filters can be combined using AND (default) or OR
       filterOperator: FILTER_OPERATOR_AND
 
@@ -35,15 +35,12 @@ spec:
 
   # Define how inputs should be mapped based on what triggered the stage
   inputMappings:
-    - when:
-        triggeredBy:
-          connection: github-webhook
-      values:
+    - values:
         - name: VERSION
           valueFrom:
             eventData:
               connection: github-webhook
-              expression: "$.after.substring(0, 7)"  # Use first 7 chars of commit SHA
+              expression: "after.substring(0, 7)"  # Use first 7 chars of commit SHA
         - name: ENVIRONMENT
           value: "production"  # Static value
 
