@@ -9,7 +9,7 @@ The CLI accepts YAMLs to define the resources for your superplane. The examples 
 
 ### Build
 
-> **Warning**
+> [!WARNING]
 > In order to build the CLI, you need Go 1.24 installed on your machine.
 
 ```bash
