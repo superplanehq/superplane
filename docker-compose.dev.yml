@@ -11,7 +11,7 @@ services:
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
-      DB_NAME: "superplane"
+      DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
       POSTGRES_DB_SSL: "false"
       APP_ENV: development

@@ -40,7 +40,7 @@ test.down:
 	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 test:
-	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e DB_NAME=superplane_test app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.watch:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
@@ -56,6 +56,7 @@ dev.setup:
 
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up -d
+	docker compose $(DOCKER_COMPOSE_OPTS) logs app -f
 
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
