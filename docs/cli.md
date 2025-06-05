@@ -5,7 +5,7 @@
 - [List events](#list-events)
 - [Approve events](#approve-events)
 
-The CLI accepts YAMLs to define the resources for your superplane. The examples in the [docs/examples](./docs/examples) folder should have you covered on what those YAMLs look like.
+The CLI accepts YAMLs to define the resources for your superplane. The examples in the [docs/examples](./examples) folder should have you covered on what those YAMLs look like.
 
 ### Build
 
