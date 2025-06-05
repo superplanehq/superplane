@@ -33,6 +33,10 @@ export default defineConfig(({ command }: { command: string} ) => {
     port: 5173,
     strictPort: true,
     host: true,
+    watch: {
+      usePolling: true,
+      interval: 1000,
+    },
     proxy: {
       "/api": {
         target: "http://localhost:8000",

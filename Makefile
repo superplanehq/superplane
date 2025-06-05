@@ -15,10 +15,7 @@ setup:
 	docker compose -f docker-compose.yml build
 
 start:
-	docker compose -f docker-compose.yml up -d
-
-down:
-	docker compose -f docker-compose.yml down --remove-orphans
+	docker compose -f docker-compose.yml up
 
 #
 # Targets for test environment
@@ -55,14 +52,10 @@ dev.setup:
 	docker compose $(DOCKER_COMPOSE_OPTS) build
 
 dev.start:
-	docker compose $(DOCKER_COMPOSE_OPTS) up -d
-	docker compose $(DOCKER_COMPOSE_OPTS) logs app -f
+	docker compose $(DOCKER_COMPOSE_OPTS) up
 
 dev.console:
 	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
-
-dev.down:
-	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
 #
 # Database target helpers

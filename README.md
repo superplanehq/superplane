@@ -14,12 +14,6 @@ And the application should be running.
 - The API will be available at `http://localhost:8000/api/v1`
 - The API docs will be available at `http://localhost:8000/api/v1/docs`
 
-To stop the application, run:
-
-```bash
-make down
-```
-
 For more information:
 - [CLI](./docs/cli.md)
 - [Local development](./docs/local-development.md)
