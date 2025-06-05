@@ -84,7 +84,15 @@ func (a *AuthService) CheckPermission(userID, resource, action string) (bool, er
 }
 
 func (a *AuthService) CheckCanvasPermission(userID, canvasID, action string) (bool, error) {
-	// Check if user has any canvas roles for this canvas and if those roles have the required permission
+	resource := fmt.Sprintf("canvas:%s", canvasID)
+	allowed, err := a.enforcer.Enforce(userID, resource, action)
+	if err != nil {
+		return false, fmt.Errorf("permission check failed: %w", err)
+	}
+	if allowed {
+		return true, nil
+	}
+
 	canvasRoles := []string{
 		RoleCanvasOwner,
 		RoleCanvasAdmin,
@@ -94,15 +102,12 @@ func (a *AuthService) CheckCanvasPermission(userID, canvasID, action string) (bo
 	}
 
 	for _, role := range canvasRoles {
-		resourceRole := fmt.Sprintf("%s:%s", role, canvasID)
-		hasRole, err := a.enforcer.HasRoleForUser(userID, resourceRole)
+		hasRole, err := a.enforcer.HasRoleForUser(userID, fmt.Sprintf("%s:%s", role, canvasID))
 		if err != nil {
 			continue
 		}
 		if hasRole {
-			// Check if this role has permission for the canvas resource
-			// This will use Casbin's built-in role hierarchy through the base role
-			roleAllowed, err := a.enforcer.Enforce(role, ResourceCanvas, action)
+			roleAllowed, err := a.enforcer.Enforce(role, "canvas", action)
 			if err != nil {
 				continue
 			}
@@ -121,8 +126,6 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, action string) 
 }
 
 func (a *AuthService) AssignRole(userID, role, resourceID string) error {
-	log.Infof("Assigning role %s to user %s for resource %s", role, userID, resourceID)
-
 	if resourceID == "" {
 		_, err := a.enforcer.AddRoleForUser(userID, role)
 		if err != nil {
