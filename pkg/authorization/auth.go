@@ -57,6 +57,7 @@ func NewAuthService() (*AuthService, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
+	enforcer.EnableAutoSave(true)
 
 	if err := enforcer.LoadPolicy(); err != nil {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
@@ -83,15 +84,7 @@ func (a *AuthService) CheckPermission(userID, resource, action string) (bool, er
 }
 
 func (a *AuthService) CheckCanvasPermission(userID, canvasID, action string) (bool, error) {
-	resource := fmt.Sprintf("canvas:%s", canvasID)
-	allowed, err := a.enforcer.Enforce(userID, resource, action)
-	if err != nil {
-		return false, fmt.Errorf("permission check failed: %w", err)
-	}
-	if allowed {
-		return true, nil
-	}
-
+	// Check if user has any canvas roles for this canvas and if those roles have the required permission
 	canvasRoles := []string{
 		RoleCanvasOwner,
 		RoleCanvasAdmin,
@@ -101,12 +94,15 @@ func (a *AuthService) CheckCanvasPermission(userID, canvasID, action string) (bo
 	}
 
 	for _, role := range canvasRoles {
-		hasRole, err := a.enforcer.HasRoleForUser(userID, fmt.Sprintf("%s:%s", role, canvasID))
+		resourceRole := fmt.Sprintf("%s:%s", role, canvasID)
+		hasRole, err := a.enforcer.HasRoleForUser(userID, resourceRole)
 		if err != nil {
 			continue
 		}
 		if hasRole {
-			roleAllowed, err := a.enforcer.Enforce(role, "canvas", action)
+			// Check if this role has permission for the canvas resource
+			// This will use Casbin's built-in role hierarchy through the base role
+			roleAllowed, err := a.enforcer.Enforce(role, ResourceCanvas, action)
 			if err != nil {
 				continue
 			}
@@ -125,6 +121,8 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, action string) 
 }
 
 func (a *AuthService) AssignRole(userID, role, resourceID string) error {
+	log.Infof("Assigning role %s to user %s for resource %s", role, userID, resourceID)
+
 	if resourceID == "" {
 		_, err := a.enforcer.AddRoleForUser(userID, role)
 		if err != nil {
@@ -138,7 +136,7 @@ func (a *AuthService) AssignRole(userID, role, resourceID string) error {
 		}
 	}
 
-	return a.enforcer.SavePolicy()
+	return nil
 }
 
 func (a *AuthService) RemoveRole(userID, role, resourceID string) error {
@@ -155,7 +153,7 @@ func (a *AuthService) RemoveRole(userID, role, resourceID string) error {
 		}
 	}
 
-	return a.enforcer.SavePolicy()
+	return nil
 }
 
 func (a *AuthService) GetUserRoles(userID string) ([]string, error) {
@@ -204,7 +202,7 @@ func (a *AuthService) AddPermission(role, resource, action string) error {
 	if err != nil {
 		return fmt.Errorf("failed to add permission: %w", err)
 	}
-	return a.enforcer.SavePolicy()
+	return err
 }
 
 func (a *AuthService) RemovePermission(role, resource, action string) error {
@@ -212,7 +210,7 @@ func (a *AuthService) RemovePermission(role, resource, action string) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove permission: %w", err)
 	}
-	return a.enforcer.SavePolicy()
+	return err
 }
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
@@ -269,26 +267,41 @@ func (a *AuthService) initializeDefaultPolicies() error {
 	}
 
 	canvasPolicies := [][]string{
+		// Canvas Owner - should have ALL permissions
+		{RoleCanvasOwner, ResourceCanvas, ActionRead},
+		{RoleCanvasOwner, ResourceCanvas, ActionWrite},
+		{RoleCanvasOwner, ResourceCanvas, ActionCreate},
+		{RoleCanvasOwner, ResourceCanvas, ActionDelete},
 		{RoleCanvasOwner, ResourceCanvas, ActionAdmin},
 		{RoleCanvasOwner, ResourceStage, ActionAdmin},
 		{RoleCanvasOwner, ResourceExecution, ActionAdmin},
 		{RoleCanvasOwner, ResourceEventSource, ActionAdmin},
 
+		// Canvas Admin - inherits from developer + admin permissions
+		{RoleCanvasAdmin, ResourceCanvas, ActionRead},
 		{RoleCanvasAdmin, ResourceCanvas, ActionWrite},
+		{RoleCanvasAdmin, ResourceCanvas, ActionAdmin},
 		{RoleCanvasAdmin, ResourceStage, ActionWrite},
 		{RoleCanvasAdmin, ResourceExecution, ActionWrite},
 		{RoleCanvasAdmin, ResourceEventSource, ActionWrite},
 
+		// Canvas Developer - can write stages and create executions
 		{RoleCanvasDeveloper, ResourceCanvas, ActionRead},
+		{RoleCanvasDeveloper, ResourceCanvas, ActionWrite},
+		{RoleCanvasDeveloper, ResourceStage, ActionRead},
 		{RoleCanvasDeveloper, ResourceStage, ActionWrite},
+		{RoleCanvasDeveloper, ResourceExecution, ActionRead},
 		{RoleCanvasDeveloper, ResourceExecution, ActionCreate},
 		{RoleCanvasDeveloper, ResourceEventSource, ActionRead},
 
+		// Canvas Contributor - can create executions
 		{RoleCanvasContributor, ResourceCanvas, ActionRead},
 		{RoleCanvasContributor, ResourceStage, ActionRead},
+		{RoleCanvasContributor, ResourceExecution, ActionRead},
 		{RoleCanvasContributor, ResourceExecution, ActionCreate},
 		{RoleCanvasContributor, ResourceEventSource, ActionRead},
 
+		// Canvas Viewer - read only
 		{RoleCanvasViewer, ResourceCanvas, ActionRead},
 		{RoleCanvasViewer, ResourceStage, ActionRead},
 		{RoleCanvasViewer, ResourceExecution, ActionRead},
@@ -323,7 +336,7 @@ func (a *AuthService) initializeDefaultPolicies() error {
 		}
 	}
 
-	return a.enforcer.SavePolicy()
+	return err
 }
 
 func (a *AuthService) GetEnforcer() *casbin.Enforcer {
