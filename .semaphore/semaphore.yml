@@ -10,8 +10,6 @@ blocks:
       env_vars:
         - name: DOCKER_BUILDKIT
           value: "1"
-        - name: APP_ENV
-          value: prod
       prologue:
         commands:
           - checkout

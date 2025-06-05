@@ -1,8 +1,0 @@
-- id: 9a8b7c6d-5e4f-4e2d-9f0a-9b8c7d6e5f4a
-  source_id: c0d3b5e7-a561-48e3-9c23-d1c5e4cb1034
-  source_name: GitHub Webhooks
-  source_type: event_source
-  state: processed
-  received_at: "2025-05-15T10:55:00Z"
-  raw: '{"action":"opened","pull_request":{"number":123,"title":"Feature: Add new functionality","base":{"ref":"main"},"head":{"ref":"feature/new-functionality"}},"version":"1.0.0"}'
-  headers: '{"X-GitHub-Event":"pull_request","X-GitHub-Delivery":"72d3162e-cc78-11e3-81ab-4c9367dc0958","Content-Type":"application/json"}'
