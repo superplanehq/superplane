@@ -9,11 +9,12 @@ The CLI accepts YAMLs to define the resources for your superplane. The examples 
 
 ### Build
 
-> [!WARNING]
-> In order to build the CLI, you need Go 1.24 installed on your machine.
-
 ```bash
-make cli.build
+# Building for Mac ARMs
+make cli.build OS=darwin ARCH=arm64
+
+# Building for Linux x86_64
+make cli.build OS=linux ARCH=amd64
 ```
 
 This will build the CLI binary in `build/cli`.

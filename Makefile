@@ -115,7 +115,7 @@ openapi.client.gen:
 #
 
 cli.build:
-	go build -o build/cli cmd/cli/main.go
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app go build -o build/cli cmd/cli/main.go
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
