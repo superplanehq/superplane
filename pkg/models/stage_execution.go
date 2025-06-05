@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -100,7 +101,13 @@ func (e *StageExecution) StartWithReferenceID(referenceID string) error {
 		Error
 }
 
-func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
+func (e *StageExecution) Finish(stage *Stage, result string) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return e.FinishInTransaction(tx, stage, result)
+	})
+}
+
+func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result string) error {
 	now := time.Now()
 
 	//
@@ -127,6 +134,24 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, result string) error {
 
 	if err != nil {
 		return err
+	}
+
+	//
+	// Create stage execution completion event
+	//
+	event, err := NewStageExecutionCompletion(e, e.Outputs.Data())
+	if err != nil {
+		return fmt.Errorf("error creating stage completion event: %v", err)
+	}
+
+	raw, err := json.Marshal(&event)
+	if err != nil {
+		return fmt.Errorf("error marshaling event: %v", err)
+	}
+
+	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, raw, []byte(`{}`))
+	if err != nil {
+		return fmt.Errorf("error creating event: %v", err)
 	}
 
 	return nil

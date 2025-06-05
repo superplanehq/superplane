@@ -4,13 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
+
+const MaxHTTPResponseSize = 8 * 1024
 
 type HTTPExecutor struct {
 	execution models.StageExecution
@@ -18,20 +20,37 @@ type HTTPExecutor struct {
 }
 
 type HTTPResponse struct {
-	statusCodes []uint32
-	res         *http.Response
+	statusCode   int
+	body         []byte
+	allowedCodes []uint32
 }
 
-func (s *HTTPResponse) Finished() bool {
+func (r *HTTPResponse) Finished() bool {
 	return true
 }
 
-func (s *HTTPResponse) Successful() bool {
-	return slices.Contains(s.statusCodes, uint32(s.res.StatusCode))
+func (r *HTTPResponse) Successful() bool {
+	return slices.Contains(r.allowedCodes, uint32(r.statusCode))
 }
 
-func (s *HTTPResponse) Id() string {
+func (r *HTTPResponse) Id() string {
 	return ""
+}
+
+func (r *HTTPResponse) Outputs() map[string]any {
+	var response map[string]any
+	err := json.Unmarshal(r.body, &response)
+	if err != nil {
+		return map[string]any{}
+	}
+
+	if v, ok := response["outputs"]; ok {
+		if outputs, ok := v.(map[string]any); ok {
+			return outputs
+		}
+	}
+
+	return nil
 }
 
 func NewHTTPExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
@@ -71,7 +90,19 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 		return nil, err
 	}
 
-	return &HTTPResponse{res: res, statusCodes: spec.HTTP.ResponsePolicy.StatusCodes}, nil
+	defer res.Body.Close()
+
+	reader := io.LimitReader(res.Body, MaxHTTPResponseSize)
+	body, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %v", err)
+	}
+
+	return &HTTPResponse{
+		statusCode:   res.StatusCode,
+		allowedCodes: spec.HTTP.ResponsePolicy.StatusCodes,
+		body:         body,
+	}, nil
 }
 
 func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
@@ -80,18 +111,9 @@ func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, err
 
 func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec) (map[string]string, error) {
 	payload := map[string]string{
-		"stageId":          e.execution.StageID.String(),
-		"stageExecutionId": e.execution.ID.String(),
+		"stageId":     e.execution.StageID.String(),
+		"executionId": e.execution.ID.String(),
 	}
-
-	// TODO: not sure we need this
-	// We could somehow define outputs from the response body
-	token, err := e.jwtSigner.Generate(e.execution.ID.String(), 24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("error generating tags token: %v", err)
-	}
-
-	payload["stageExecutionToken"] = token
 
 	for key, value := range spec.Payload {
 		payload[key] = value

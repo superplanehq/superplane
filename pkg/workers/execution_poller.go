@@ -1,14 +1,11 @@
 package workers
 
 import (
-	"encoding/json"
-	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -112,17 +109,8 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 			result = models.StageExecutionResultFailed
 		}
 
-		if err := execution.FinishInTransaction(tx, result); err != nil {
+		if err := execution.FinishInTransaction(tx, stage, result); err != nil {
 			logger.Errorf("Error updating execution state: %v", err)
-			return err
-		}
-
-		//
-		// Lastly, since the stage for this execution might be connected to other stages,
-		// we create a new event for the completion of this stage.
-		//
-		if err := w.createStageCompletionEvent(tx, execution, outputs); err != nil {
-			logger.Errorf("Error creating stage completion event: %v", err)
 			return err
 		}
 
@@ -138,30 +126,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), execution).Publish()
 	if err != nil {
 		logger.Errorf("Error publishing execution finished message: %v", err)
-	}
-
-	return nil
-}
-
-func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, outputs map[string]any) error {
-	stage, err := models.FindStageByIDInTransaction(tx, execution.StageID.String())
-	if err != nil {
-		return err
-	}
-
-	e, err := events.NewStageExecutionCompletion(execution, outputs)
-	if err != nil {
-		return fmt.Errorf("error creating stage completion event: %v", err)
-	}
-
-	raw, err := json.Marshal(&e)
-	if err != nil {
-		return fmt.Errorf("error marshaling event: %v", err)
-	}
-
-	_, err = models.CreateEventInTransaction(tx, execution.StageID, stage.Name, models.SourceTypeStage, raw, []byte(`{}`))
-	if err != nil {
-		return fmt.Errorf("error creating event: %v", err)
 	}
 
 	return nil

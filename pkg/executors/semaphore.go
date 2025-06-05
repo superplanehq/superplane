@@ -45,6 +45,11 @@ func (r *SemaphoreResponse) Successful() bool {
 	return r.pipeline.Result == semaphore.PipelineResultPassed
 }
 
+// Outputs for Semaphore executions are sent via the /outputs API.
+func (r *SemaphoreResponse) Outputs() map[string]any {
+	return nil
+}
+
 func NewSemaphoreExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
 	return &SemaphoreExecutor{
 		execution: execution,
