@@ -1,0 +1,67 @@
+kind: Stage
+metadata:
+  name: deploy-to-staging
+  canvasId: my-application-canvas  # Reference to the canvas this stage belongs to
+spec:
+  # Define secrets that will be available to the executor
+  secrets:
+    - name: DEPLOY_TOKEN
+      valueFrom:
+        secret:
+          name: api-credentials  # Reference to the secret defined earlier
+          key: api-key  # The specific key from that secret
+
+  # Define connections to event sources or other stages
+  connections:
+    - type: TYPE_EVENT_SOURCE
+      name: github-webhook  # Reference to the event source defined earlier
+      # Optional filters can be defined to determine when this stage should be triggered
+      filters:
+        - type: FILTER_TYPE_DATA
+          data:
+            expression: "ref == 'refs/heads/main'"  # Only trigger on main branch
+        - type: FILTER_TYPE_HEADER
+          header:
+            expression: "headers['X-GitHub-Event'] == 'push'"  # Only trigger on push events
+      # Filters can be combined using AND (default) or OR
+      filterOperator: FILTER_OPERATOR_AND
+
+  # Define inputs that the stage requires
+  inputs:
+    - name: VERSION
+      description: "Version to deploy"
+    - name: ENVIRONMENT
+      description: "Target environment"
+
+  # Define how inputs should be mapped based on what triggered the stage
+  inputMappings:
+    - values:
+        - name: VERSION
+          valueFrom:
+            eventData:
+              connection: github-webhook
+              expression: "after.substring(0, 7)"  # Use first 7 chars of commit SHA
+        - name: ENVIRONMENT
+          value: "production"  # Static value
+
+  # Define the outputs this stage produces
+  outputs:
+    - name: DEPLOY_URL
+      description: "URL to the deployed application"
+      required: true
+
+  # Define the executor that will run the stage
+  executor:
+    type: TYPE_SEMAPHORE
+    semaphore:
+      organizationUrl: https://myorg.semaphoreci.com
+      apiToken: ${{ secrets.DEPLOY_TOKEN }}
+      projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
+      taskId: fd67cfb1-e06c-4896-a517-c648f878330a
+      branch: main
+      pipelineFile: .semaphore/deploy.yml
+      parameters:
+        - name: VERSION
+          value: ${{ inputs.VERSION }}
+        - name: ENVIRONMENT
+          value: ${{ inputs.ENVIRONMENT }}

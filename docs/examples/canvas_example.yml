@@ -1,0 +1,5 @@
+kind: Canvas
+metadata:
+  name: my-application-canvas
+  # Canvas is a top-level construct that groups other resources
+  # No additional specific fields required besides name
