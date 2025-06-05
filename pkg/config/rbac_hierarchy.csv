@@ -1,3 +1,0 @@
-g,org_viewer,org_contributor,org:{ORG_ID}
-g,org_contributor,org_admin,org:{ORG_ID}
-g,org_admin,org_owner,org:{ORG_ID}
