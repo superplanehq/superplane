@@ -7,6 +7,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/executors"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
@@ -63,7 +64,12 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {
 		log.Println("Starting Pending Stage Events Worker")
 
-		w := workers.PendingExecutionsWorker{JwtSigner: jwtSigner, Encryptor: encryptor}
+		w := workers.PendingExecutionsWorker{
+			JwtSigner:   jwtSigner,
+			Encryptor:   encryptor,
+			SpecBuilder: executors.SpecBuilder{},
+		}
+
 		go w.Start()
 	}
 }
@@ -132,7 +138,7 @@ func startPublicAPI(encryptor crypto.Encryptor, jwtSigner *jwt.Signer) {
 
 func main() {
 	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:    true,
+		FullTimestamp:   true,
 		TimestampFormat: time.StampMilli,
 	})
 

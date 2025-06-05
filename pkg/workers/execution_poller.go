@@ -17,11 +17,15 @@ import (
 )
 
 type ExecutionPoller struct {
-	Encryptor crypto.Encryptor
+	Encryptor   crypto.Encryptor
+	SpecBuilder executors.SpecBuilder
 }
 
 func NewExecutionPoller(encryptor crypto.Encryptor) *ExecutionPoller {
-	return &ExecutionPoller{Encryptor: encryptor}
+	return &ExecutionPoller{
+		Encryptor:   encryptor,
+		SpecBuilder: executors.SpecBuilder{},
+	}
 }
 
 func (w *ExecutionPoller) Start() error {
@@ -60,18 +64,22 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
+	inputMap, err := execution.GetInputs()
+	if err != nil {
+		return err
+	}
+
 	secrets, err := stage.FindSecrets(w.Encryptor)
 	if err != nil {
 		return err
 	}
 
-	s := stage.ExecutorSpec.Data()
-	executor, err := executors.NewExecutor(s.Type, *execution, nil)
+	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	spec, err := executor.BuildSpec(s, map[string]any{}, secrets)
+	executor, err := executors.NewExecutor(spec.Type, *execution, nil)
 	if err != nil {
 		return err
 	}
@@ -90,8 +98,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	if status.Successful() {
 		result = models.StageExecutionResultPassed
 	}
-
-	logger.Infof("Finished with result: %s", result)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		outputs := execution.Outputs.Data()
@@ -124,20 +130,17 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return nil
 	})
 
-	if err == nil {
-		stage, err := models.FindStageByID(execution.StageID.String())
-		if err != nil {
-			logger.Errorf("Error finding stage for execution: %v", err)
-			return err
-		}
-
-		err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), execution).Publish()
-		if err != nil {
-			logger.Errorf("Error publishing execution finished message: %v", err)
-		}
+	if err != nil {
+		return err
 	}
 
-	return err
+	logger.Infof("Finished with result: %s", result)
+	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), execution).Publish()
+	if err != nil {
+		logger.Errorf("Error publishing execution finished message: %v", err)
+	}
+
+	return nil
 }
 
 func (w *ExecutionPoller) createStageCompletionEvent(tx *gorm.DB, execution *models.StageExecution, outputs map[string]any) error {

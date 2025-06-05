@@ -56,61 +56,6 @@ func (e *SemaphoreExecutor) Name() string {
 	return models.ExecutorSpecTypeSemaphore
 }
 
-func (e *SemaphoreExecutor) BuildSpec(spec models.ExecutorSpec, inputs map[string]any, secrets map[string]string) (*models.ExecutorSpec, error) {
-	orgURL, err := resolveExpression(spec.Semaphore.OrganizationURL, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	token, err := resolveExpression(spec.Semaphore.APIToken, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	projectID, err := resolveExpression(spec.Semaphore.ProjectID, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	branch, err := resolveExpression(spec.Semaphore.Branch, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	pipelineFile, err := resolveExpression(spec.Semaphore.PipelineFile, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	taskID, err := resolveExpression(spec.Semaphore.TaskID, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	parameters := make(map[string]string, len(spec.Semaphore.Parameters))
-	for k, v := range spec.Semaphore.Parameters {
-		value, err := resolveExpression(v, inputs, secrets)
-		if err != nil {
-			return nil, err
-		}
-
-		parameters[k] = value.(string)
-	}
-
-	return &models.ExecutorSpec{
-		Type: models.ExecutorSpecTypeSemaphore,
-		Semaphore: &models.SemaphoreExecutorSpec{
-			OrganizationURL: orgURL.(string),
-			APIToken:        token.(string),
-			ProjectID:       projectID.(string),
-			Branch:          branch.(string),
-			PipelineFile:    pipelineFile.(string),
-			TaskID:          taskID.(string),
-			Parameters:      parameters,
-		},
-	}, nil
-}
-
 func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 	//
 	// For now, only task runs are supported,

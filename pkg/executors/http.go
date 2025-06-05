@@ -45,50 +45,6 @@ func (e *HTTPExecutor) Name() string {
 	return models.ExecutorSpecTypeHTTP
 }
 
-// TODO: lots of duplication in this function since all these functions,
-// regardless of executor type, will do is iterate over all "resolvable" fields,
-// and resolve them. If we had a function that worked on map[string]any,
-// we can remove this from the interface, and then Execute()
-// can just convert the map[string]any back into the structure it is expecting.
-func (e *HTTPExecutor) BuildSpec(spec models.ExecutorSpec, inputs map[string]any, secrets map[string]string) (*models.ExecutorSpec, error) {
-	URL, err := resolveExpression(spec.HTTP.URL, inputs, secrets)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := make(map[string]string, len(spec.HTTP.Payload))
-	for k, v := range spec.HTTP.Payload {
-		value, err := resolveExpression(v, inputs, secrets)
-		if err != nil {
-			return nil, err
-		}
-
-		payload[k] = value.(string)
-	}
-
-	headers := make(map[string]string, len(spec.HTTP.Headers))
-	for k, v := range spec.HTTP.Headers {
-		value, err := resolveExpression(v, inputs, secrets)
-		if err != nil {
-			return nil, err
-		}
-
-		headers[k] = value.(string)
-	}
-
-	return &models.ExecutorSpec{
-		Type: spec.Type,
-		HTTP: &models.HTTPExecutorSpec{
-			URL:     URL.(string),
-			Payload: payload,
-			Headers: headers,
-			ResponsePolicy: &models.HTTPResponsePolicy{
-				StatusCodes: spec.HTTP.ResponsePolicy.StatusCodes,
-			},
-		},
-	}, nil
-}
-
 func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 	payload, err := e.buildPayload(spec.HTTP)
 	if err != nil {

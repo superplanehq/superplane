@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -25,8 +26,9 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	defer r.Close()
 
 	w := PendingExecutionsWorker{
-		JwtSigner: jwt.NewSigner("test"),
-		Encryptor: &crypto.NoOpEncryptor{},
+		JwtSigner:   jwt.NewSigner("test"),
+		Encryptor:   &crypto.NoOpEncryptor{},
+		SpecBuilder: executors.SpecBuilder{},
 	}
 
 	amqpURL, _ := config.RabbitMQURL()

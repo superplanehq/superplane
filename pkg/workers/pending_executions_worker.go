@@ -18,8 +18,9 @@ import (
 )
 
 type PendingExecutionsWorker struct {
-	JwtSigner *jwt.Signer
-	Encryptor crypto.Encryptor
+	JwtSigner   *jwt.Signer
+	Encryptor   crypto.Encryptor
+	SpecBuilder executors.SpecBuilder
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -68,14 +69,14 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	executor, err := executors.NewExecutor(stage.ExecutorSpec.Data().Type, execution, w.JwtSigner)
+	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
 	if err != nil {
-		return fmt.Errorf("error creating executor: %v", err)
+		return err
 	}
 
-	spec, err := executor.BuildSpec(stage.ExecutorSpec.Data(), inputMap, secrets)
+	executor, err := executors.NewExecutor(spec.Type, execution, w.JwtSigner)
 	if err != nil {
-		return fmt.Errorf("error building spec: %v", err)
+		return fmt.Errorf("error creating executor: %v", err)
 	}
 
 	err = execution.Start()

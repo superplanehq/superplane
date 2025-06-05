@@ -3,7 +3,7 @@
 APP_NAME=superplane
 APP_ENV=prod
 
-test.setup: openapi.spec.gen
+test.setup:
 	docker-compose build
 	docker-compose run --rm app go get ./...
 	-$(MAKE) db.test.create
