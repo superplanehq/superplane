@@ -1,57 +1,71 @@
 .PHONY: lint test
 
+DB_NAME=superplane
+DB_PASSWORD=the-cake-is-a-lie
 DOCKER_COMPOSE_OPTS=-f docker-compose.dev.yml
+TEST_PACKAGES := ./...
 
-test.setup: export DB_NAME=superplane_test
-test.setup:
-	docker-compose $(DOCKER_COMPOSE_OPTS) build
-	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
-	$(MAKE) db.test.create
-	$(MAKE) db.test.migrate
+#
+# Targets for prod-like environment
+#
+
+setup:
+	$(MAKE) db.create DOCKER_COMPOSE_OPTS="-f docker-compose.yml"
+	$(MAKE) db.migrate DOCKER_COMPOSE_OPTS="-f docker-compose.yml"
+	docker compose -f docker-compose.yml build
+
+start:
+	docker compose -f docker-compose.yml up -d
+
+down:
+	docker compose -f docker-compose.yml down --remove-orphans
+
+#
+# Targets for test environment
+#
 
 lint:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app revive -formatter friendly -config lint.toml ./...
 
-TEST_PACKAGES := ./...
+tidy:
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
+
+test.setup:
+	docker-compose $(DOCKER_COMPOSE_OPTS) build
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go get ./...
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
+test.down:
+	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
+
 test:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
 test.watch:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app gotestsum --watch --format short-verbose --junitfile junit-report.xml --packages="$(TEST_PACKAGES)" -- -p 1
 
-tidy:
-	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm app go mod tidy
-
 #
-# Database
+# Targets for dev environment
 #
 
-DB_NAME=superplane
-DB_PASSWORD=the-cake-is-a-lie
+dev.setup:
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+	docker compose $(DOCKER_COMPOSE_OPTS) build
 
-db.test.create: export DB_NAME=superplane_test
-db.test.create:
-	$(MAKE) db.create
+dev.start:
+	docker compose $(DOCKER_COMPOSE_OPTS) up -d
 
-db.test.migrate: export DB_NAME=superplane_test
-db.test.migrate:
-	$(MAKE) db.migrate
+dev.console:
+	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash
 
-db.test.delete: export DB_NAME=superplane_test
-db.test.delete:
-	$(MAKE) db.delete
+dev.down:
+	docker compose $(DOCKER_COMPOSE_OPTS) down --remove-orphans
 
-db.dev.create: export DB_NAME=superplane_dev
-db.dev.create:
-	$(MAKE) db.create
-
-db.dev.migrate: export DB_NAME=superplane_dev
-db.dev.migrate:
-	$(MAKE) db.migrate
-
-db.dev.delete: export DB_NAME=superplane_dev
-db.dev.delete:
-	$(MAKE) db.delete
+#
+# Database target helpers
+#
 
 db.create:
 	-docker-compose $(DOCKER_COMPOSE_OPTS) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
@@ -121,15 +135,3 @@ image.auth:
 image.push:
 	docker tag $(IMAGE):$(IMAGE_TAG) $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
 	docker push $(REGISTRY_HOST)/$(IMAGE):$(IMAGE_TAG)
-
-#
-# Dev environment helpers
-#
-
-dev.setup: db.dev.create db.dev.migrate
-
-dev.console:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app /bin/bash 
-
-dev.server:
-	docker compose $(DOCKER_COMPOSE_OPTS) run --rm --service-ports app sh -c "air & cd web_src && npm run dev" 

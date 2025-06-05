@@ -11,5 +11,5 @@ We use [air](https://github.com/air-verse/air) and [vite](https://github.com/vit
 
 ```bash
 make dev.setup
-make dev.server
+make dev.start
 ```

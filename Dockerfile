@@ -57,6 +57,7 @@ WORKDIR /app
 FROM base AS dev
 
 COPY test test
+COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
 
 WORKDIR /app
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest

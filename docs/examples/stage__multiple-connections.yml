@@ -1,30 +1,41 @@
 kind: Stage
 metadata:
-  name: deploy-to-staging
-  canvasId: my-application-canvas  # Reference to the canvas this stage belongs to
+  name: deploy-to-production
+  canvasId: my-application-canvas-id
 spec:
+
   # Define secrets that will be available to the executor
   secrets:
     - name: DEPLOY_TOKEN
       valueFrom:
         secret:
-          name: api-credentials  # Reference to the secret defined earlier
-          key: api-key  # The specific key from that secret
+          name: api-credentials # Reference to the secret defined earlier
+          key: api-key          # The specific key from that secret
 
   # Define connections to event sources or other stages
   connections:
-    - type: TYPE_EVENT_SOURCE
-      name: github-webhook  # Reference to the event source defined earlier
-      # Optional filters can be defined to determine when this stage should be triggered
+    - type: TYPE_STAGE
+      name: deploy-to-staging             # Reference to another stage
+      filterOperator: FILTER_OPERATOR_AND # Filters can be combined using AND (default) or OR
+
+      # Only trigger this stage if the previous stage passed
       filters:
         - type: FILTER_TYPE_DATA
           data:
-            expression: "ref == 'refs/heads/main'"  # Only trigger on main branch
+            expression: "execution.result == 'passed'"
+
+    - type: TYPE_EVENT_SOURCE
+      name: github-webhook
+      filterOperator: FILTER_OPERATOR_AND
+
+      # Only trigger on main branch and on push events
+      filters:
+        - type: FILTER_TYPE_DATA
+          data:
+            expression: "ref == 'refs/heads/main'"
         - type: FILTER_TYPE_HEADER
           header:
-            expression: "headers['X-GitHub-Event'] == 'push'"  # Only trigger on push events
-      # Filters can be combined using AND (default) or OR
-      filterOperator: FILTER_OPERATOR_AND
+            expression: "headers['X-GitHub-Event'] == 'push'"
 
   # Define inputs that the stage requires
   inputs:
@@ -35,14 +46,28 @@ spec:
 
   # Define how inputs should be mapped based on what triggered the stage
   inputMappings:
-    - values:
+    - when:
+        triggeredBy:
+          connection: deploy-to-staging
+      values:
+        - name: VERSION
+          valueFrom:
+            eventData:
+              connection: deploy-to-staging
+              expression: "DEPLOY_URL"
+        - name: ENVIRONMENT
+          value: "production" # Static value
+    - when:
+        triggeredBy:
+          connection: github-webhook
+      values:
         - name: VERSION
           valueFrom:
             eventData:
               connection: github-webhook
-              expression: "after.substring(0, 7)"  # Use first 7 chars of commit SHA
+              expression: "commit_sha[0:7]" # Use first 7 chars of commit SHA
         - name: ENVIRONMENT
-          value: "production"  # Static value
+          value: "staging" # Static value
 
   # Define the outputs this stage produces
   outputs:

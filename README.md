@@ -1,15 +1,26 @@
 # SuperPlane
 
-To start the application locally, run:
+## Starting the application locally
+
+Run:
 
 ```bash
-make db.create
-make db.migrate
-docker compose build
-docker compose up -d
+make setup
+make start
+```
+
+And the application should be running.
+- The UI will be available at `http://localhost:8000/app`
+- The API will be available at `http://localhost:8000/api/v1`
+- The API docs will be available at `http://localhost:8000/api/v1/docs`
+
+To stop the application, run:
+
+```bash
+make down
 ```
 
 For more information:
-- [Local development](./docs/local-development.md)
 - [CLI](./docs/cli.md)
+- [Local development](./docs/local-development.md)
 - [Tunnels](./docs/tunnels.md)

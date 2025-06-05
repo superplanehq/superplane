@@ -7,7 +7,7 @@ services:
 
     tty: true
 
-    command: go run cmd/server/main.go
+    command: bash /app/docker-entrypoint.dev.sh
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
