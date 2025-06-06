@@ -103,16 +103,25 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 }
 
 func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
-	result := models.StageExecutionResultFailed
-	if response.Successful() {
-		result = models.StageExecutionResultPassed
-	}
-
 	outputs := response.Outputs()
 	if len(outputs) > 0 {
 		if err := execution.UpdateOutputs(outputs); err != nil {
 			return fmt.Errorf("error setting outputs: %v", err)
 		}
+	}
+
+	result := models.StageExecutionResultFailed
+	if response.Successful() {
+		result = models.StageExecutionResultPassed
+	}
+
+	//
+	// Check if all required outputs were received.
+	//
+	missingOutputs := stage.MissingRequiredOutputs(outputs)
+	if len(missingOutputs) > 0 {
+		logger.Infof("Execution has missing outputs %v - marking the execution as failed", missingOutputs)
+		result = models.StageExecutionResultFailed
 	}
 
 	err := execution.Finish(stage, result)

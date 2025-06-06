@@ -4,7 +4,7 @@ You may not always want to create GitHub webhooks or Semaphore notifications to 
 export SOURCE_ID="<YOUR_SOURCE_ID>"
 export SOURCE_KEY="<YOUR_SOURCE_KEY>"
 export EVENT="{\"ref\":\"v1.0\",\"ref_type\":\"tag\"}"
-export SIGNATURE=$(echo -n "$EVENT" | openssl dgst -sha256 -hmac "$SOURCE_KEY")
+export SIGNATURE=$(echo -n "$EVENT" | openssl dgst -sha256 -hmac "$SOURCE_KEY" | awk '{print $2}')
 
 curl -X POST \
   -H "X-Hub-Signature-256: sha256=$SIGNATURE" \
