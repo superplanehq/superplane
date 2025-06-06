@@ -4,17 +4,20 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 )
 
 type DeliveryService struct {
-	encryptor crypto.Encryptor
+	encryptor     crypto.Encryptor
+	specValidator executors.SpecValidator
 }
 
 func NewDeliveryService(encryptor crypto.Encryptor) *DeliveryService {
 	return &DeliveryService{
-		encryptor: encryptor,
+		encryptor:     encryptor,
+		specValidator: executors.SpecValidator{},
 	}
 }
 
@@ -35,7 +38,7 @@ func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.Descr
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return actions.CreateStage(ctx, req)
+	return actions.CreateStage(ctx, s.specValidator, req)
 }
 
 func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -43,7 +46,7 @@ func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeSta
 }
 
 func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return actions.UpdateStage(ctx, req)
+	return actions.UpdateStage(ctx, s.specValidator, req)
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {

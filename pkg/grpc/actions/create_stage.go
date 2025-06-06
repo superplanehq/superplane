@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"sort"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
@@ -31,7 +31,7 @@ func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateSta
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	spec, err := validateExecutorSpec(ctx, req.Executor)
+	spec, err := specValidator.Validate(req.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -141,93 +141,6 @@ func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error)
 	}
 
 	return out, nil
-}
-
-func validateExecutorSpec(ctx context.Context, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
-	if in == nil {
-		return nil, fmt.Errorf("missing executor spec")
-	}
-
-	switch in.Type {
-	case pb.ExecutorSpec_TYPE_SEMAPHORE:
-		return validateSemaphoreExecutorSpec(in)
-	case pb.ExecutorSpec_TYPE_HTTP:
-		return validateHTTPExecutorSpec(in)
-	default:
-		return nil, errors.New("invalid executor spec type")
-	}
-}
-
-func validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
-	if in.Http == nil {
-		return nil, fmt.Errorf("invalid HTTP executor spec: missing HTTP executor spec")
-	}
-
-	if in.Http.Url == "" {
-		return nil, fmt.Errorf("invalid HTTP executor spec: missing URL")
-	}
-
-	headers := in.Http.Headers
-	if headers == nil {
-		headers = map[string]string{}
-	}
-
-	payload := in.Http.Payload
-	if payload == nil {
-		payload = map[string]string{}
-	}
-
-	var responsePolicy *models.HTTPResponsePolicy
-	if in.Http.ResponsePolicy == nil {
-		responsePolicy = &models.HTTPResponsePolicy{
-			StatusCodes: []uint32{http.StatusOK},
-		}
-	} else {
-		responsePolicy = &models.HTTPResponsePolicy{
-			StatusCodes: in.Http.ResponsePolicy.StatusCodes,
-		}
-	}
-
-	return &models.ExecutorSpec{
-		Type: models.ExecutorSpecTypeHTTP,
-		HTTP: &models.HTTPExecutorSpec{
-			URL:            in.Http.Url,
-			Headers:        headers,
-			Payload:        payload,
-			ResponsePolicy: responsePolicy,
-		},
-	}, nil
-}
-
-func validateSemaphoreExecutorSpec(in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
-	if in.Semaphore == nil {
-		return nil, fmt.Errorf("invalid semaphore executor spec: missing semaphore executor spec")
-	}
-
-	if in.Semaphore.OrganizationUrl == "" {
-		return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
-	}
-
-	if in.Semaphore.ApiToken == "" {
-		return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
-	}
-
-	if in.Semaphore.TaskId == "" {
-		return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
-	}
-
-	return &models.ExecutorSpec{
-		Type: models.ExecutorSpecTypeSemaphore,
-		Semaphore: &models.SemaphoreExecutorSpec{
-			OrganizationURL: in.Semaphore.OrganizationUrl,
-			APIToken:        in.Semaphore.ApiToken,
-			ProjectID:       in.Semaphore.ProjectId,
-			Branch:          in.Semaphore.Branch,
-			PipelineFile:    in.Semaphore.PipelineFile,
-			Parameters:      in.Semaphore.Parameters,
-			TaskID:          in.Semaphore.TaskId,
-		},
-	}, nil
 }
 
 func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.StageConnection, error) {

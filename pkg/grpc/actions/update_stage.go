@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -14,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	err := ValidateUUIDs(req.IdOrName)
 
 	var canvas *models.Canvas
@@ -50,7 +51,7 @@ func UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateSta
 		return nil, status.Error(codes.InvalidArgument, "requester ID is invalid")
 	}
 
-	executor, err := validateExecutorSpec(ctx, req.Executor)
+	executor, err := specValidator.Validate(req.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
