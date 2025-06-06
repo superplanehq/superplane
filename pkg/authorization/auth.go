@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/casbin/casbin/v2"
 	gormadapter "github.com/casbin/gorm-adapter/v3"
@@ -98,27 +99,123 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 }
 
 func (a *AuthService) CreateGroup(orgID string, groupName string, role string) error {
+	validRoles := []string{RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner}
+	if !contains(validRoles, role) {
+		return fmt.Errorf("invalid role %s for organization", role)
+	}
+
+	domain := fmt.Sprintf("org:%s", orgID)
+
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(groupName, role, domain)
+	if err != nil {
+		return fmt.Errorf("failed to create group: %w", err)
+	}
+
+	if !ruleAdded {
+		return fmt.Errorf("group %s already exists with role %s in organization %s", groupName, role, orgID)
+	}
+
+	log.Infof("Created group %s with role %s in organization %s", groupName, role, orgID)
 	return nil
 }
 
 func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) error {
+	domain := fmt.Sprintf("org:%s", orgID)
+
+	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, group)
+	if err != nil {
+		return fmt.Errorf("failed to check group existence: %w", err)
+	}
+
+	groupExists := false
+	for _, g := range groups {
+		if g[2] == domain {
+			groupExists = true
+			break
+		}
+	}
+
+	if !groupExists {
+		return fmt.Errorf("group %s does not exist in organization %s", group, orgID)
+	}
+
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(userID, group, domain)
+	if err != nil {
+		return fmt.Errorf("failed to add user to group: %w", err)
+	}
+
+	if !ruleAdded {
+		log.Infof("user %s is already a member of group %s", userID, group)
+	}
+
 	return nil
 }
 
 func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group string) error {
+	domain := fmt.Sprintf("org:%s", orgID)
+
+	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(userID, group, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove user from group: %w", err)
+	}
+
+	if !ruleRemoved {
+		return fmt.Errorf("user %s is not a member of group %s", userID, group)
+	}
+
 	return nil
 }
 
 func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error) {
-	return nil, nil
+	domain := fmt.Sprintf("org:%s", orgID)
+	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, group)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get group users: %w", err)
+	}
+
+	var users []string
+	for _, policy := range policies {
+		if policy[2] == domain {
+			users = append(users, policy[0])
+		}
+	}
+
+	return users, nil
 }
 
 func (a *AuthService) GetGroups(orgID string) ([]string, error) {
-	return nil, nil
+	domain := fmt.Sprintf("org:%s", orgID)
+	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups: %w", err)
+	}
+
+	groupMap := make(map[string]bool)
+
+	for _, policy := range policies {
+		// Check if this is a group (not a user) by checking if it has users assigned to it
+		groupPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(1, policy[0])
+		for _, gp := range groupPolicies {
+			if gp[2] == domain {
+				groupMap[policy[0]] = true
+				break
+			}
+		}
+	}
+
+	groups := make([]string, 0, len(groupMap))
+	for group := range groupMap {
+		groups = append(groups, group)
+	}
+
+	return groups, nil
 }
 
 func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error) {
-	return nil, nil
+	domain := fmt.Sprintf("org:%s", orgID)
+	roles := a.enforcer.GetRolesForUserInDomain(group, domain)
+
+	return roles, nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
@@ -194,7 +291,7 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 }
 
 func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
-	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, userID, "", "org_viewer")
+	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -202,13 +299,15 @@ func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) 
 	orgIDs := make([]string, len(orgs))
 	prefixLen := len("org:")
 	for i, org := range orgs {
-		orgIDs[i] = org[2][prefixLen:]
+		if strings.HasPrefix(org[2], "org:") {
+			orgIDs[i] = org[2][prefixLen:]
+		}
 	}
 	return orgIDs, nil
 }
 
 func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
-	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, userID, "", "canvas_viewer")
+	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +315,9 @@ func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, err
 	canvasIDs := make([]string, len(canvases))
 	prefixLen := len("canvas:")
 	for i, canvas := range canvases {
-		canvasIDs[i] = canvas[2][prefixLen:]
+		if strings.HasPrefix(canvas[2], "canvas:") {
+			canvasIDs[i] = canvas[2][prefixLen:]
+		}
 	}
 	return canvasIDs, nil
 }
