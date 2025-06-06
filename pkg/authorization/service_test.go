@@ -277,6 +277,10 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		roles, err := authService.GetUserRolesForOrg(userID, orgID)
 		require.NoError(t, err)
 		assert.Contains(t, roles, RoleOrgAdmin)
+		// Check permissions
+		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
 
 		// Remove role
 		err = authService.RemoveRole(userID, RoleOrgAdmin, orgID, DomainOrg)
@@ -286,6 +290,10 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		roles, err = authService.GetUserRolesForOrg(userID, orgID)
 		require.NoError(t, err)
 		assert.NotContains(t, roles, RoleOrgAdmin)
+		// Check permissions
+		allowed, err = authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
+		require.NoError(t, err)
+		assert.False(t, allowed)
 	})
 
 	t.Run("get users for role", func(t *testing.T) {

@@ -5,7 +5,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -367,17 +366,6 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 	return a.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
-}
-
-func (a *AuthService) Middleware() func(next http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// ctx := r.Context()
-			// userID := ctx.Value("userID").(string)
-			// TODO: implement middleware once authentication is implemented
-			next.ServeHTTP(w, r)
-		})
-	}
 }
 
 func (a *AuthService) EnableCache(enable bool) {
