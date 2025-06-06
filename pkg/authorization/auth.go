@@ -85,14 +85,14 @@ func NewAuthService() (*AuthService, error) {
 }
 
 func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error) {
-	return a.CheckPermission(userID, canvasID, DomainCanvas, resource, action)
+	return a.checkPermission(userID, canvasID, DomainCanvas, resource, action)
 }
 
 func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
-	return a.CheckPermission(userID, orgID, DomainOrg, resource, action)
+	return a.checkPermission(userID, orgID, DomainOrg, resource, action)
 }
 
-func (a *AuthService) CheckPermission(userID, domainID, domainType, resource, action string) (bool, error) {
+func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	return a.enforcer.Enforce(userID, domain, resource, action)
 }
@@ -157,16 +157,22 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 	return nil
 }
 
-func (a *AuthService) GetUserRoles(userID string) ([]string, error) {
-	return a.enforcer.GetImplicitRolesForUser(userID)
+func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
+	orgDomain := fmt.Sprintf("org:%s", orgID)
+	roles, err := a.enforcer.GetUsersForRole(role, orgDomain)
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
 }
 
-func (a *AuthService) GetUsersForRole(role string) ([]string, error) {
-	return a.enforcer.GetImplicitUsersForRole(role)
-}
-
-func (a *AuthService) GetCanvasUsers(canvasID string) (map[string][]string, error) {
-	return nil, nil
+func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]string, error) {
+	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
+	roles, err := a.enforcer.GetUsersForRole(role, canvasDomain)
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
 }
 
 func (a *AuthService) SetupOrganizationRoles(orgID string) error {
@@ -187,18 +193,68 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	return nil
 }
 
+func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
+	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, userID, "", "org_viewer")
+	if err != nil {
+		return nil, err
+	}
+
+	orgIDs := make([]string, len(orgs))
+	prefixLen := len("org:")
+	for i, org := range orgs {
+		orgIDs[i] = org[2][prefixLen:]
+	}
+	return orgIDs, nil
+}
+
+func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
+	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, userID, "", "canvas_viewer")
+	if err != nil {
+		return nil, err
+	}
+
+	canvasIDs := make([]string, len(canvases))
+	prefixLen := len("canvas:")
+	for i, canvas := range canvases {
+		canvasIDs[i] = canvas[2][prefixLen:]
+	}
+	return canvasIDs, nil
+}
+
+func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]string, error) {
+	orgDomain := fmt.Sprintf("org:%s", orgID)
+	roles, err := a.enforcer.GetImplicitRolesForUser(userID, orgDomain)
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
+}
+
+func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]string, error) {
+	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
+	roles, err := a.enforcer.GetImplicitRolesForUser(userID, canvasDomain)
+	if err != nil {
+		return nil, err
+	}
+	return roles, nil
+}
+
 func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	domain := fmt.Sprintf("canvas:%s", canvasID)
 
 	for _, policy := range a.canvasPolicyTemplates {
 		if policy[0] == "g" {
 			// g,lower_role,higher_role,canvas:{CANVAS_ID}
-			a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
+			_, err := a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return fmt.Errorf("failed to add grouping policy: %w", err)
+			}
 		} else if policy[0] == "p" {
 			// p,role,canvas:{CANVAS_ID},resource,action
-			a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
-		} else {
-			return fmt.Errorf("unknown policy type: %s", policy[0])
+			_, err := a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return fmt.Errorf("failed to add policy: %w", err)
+			}
 		}
 	}
 
@@ -209,35 +265,11 @@ func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 	return a.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
 }
 
-func (a *AuthService) GetEnforcer() *casbin.CachedEnforcer {
-	return a.enforcer
-}
-
 func (a *AuthService) Middleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// userID := extractUserIDFromRequest(r)
-			// if userID == "" {
-			// 	http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			// 	return
-			// }
-
-			// resource := determineResource(r.URL.Path)
-			// action := mapHTTPMethodToAction(r.Method)
-
-			// allowed, err := a.CheckPermission(userID, resource, action)
-			// if err != nil {
-			// 	log.Errorf("Authorization check failed: %v", err)
-			// 	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			// 	return
-			// }
-
-			// if !allowed {
-			// 	http.Error(w, "Forbidden", http.StatusForbidden)
-			// 	return
-			// }
-
-			// next.ServeHTTP(w, r)
+			// TODO: implement middleware once authentication is implemented
+			next.ServeHTTP(w, r)
 		})
 	}
 }

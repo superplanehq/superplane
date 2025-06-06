@@ -60,45 +60,8 @@ CREATE TABLE public.casbin_rule (
     v2 character varying(100),
     v3 character varying(100),
     v4 character varying(100),
-    v5 character varying(100),
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    v5 character varying(100)
 );
-
-
---
--- Name: TABLE casbin_rule; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON TABLE public.casbin_rule IS 'Casbin RBAC policies and role assignments';
-
-
---
--- Name: COLUMN casbin_rule.ptype; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.casbin_rule.ptype IS 'Policy type: p for policy, g for grouping (roles)';
-
-
---
--- Name: COLUMN casbin_rule.v0; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.casbin_rule.v0 IS 'Subject (user or role)';
-
-
---
--- Name: COLUMN casbin_rule.v1; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.casbin_rule.v1 IS 'Object (resource) or parent role';
-
-
---
--- Name: COLUMN casbin_rule.v2; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON COLUMN public.casbin_rule.v2 IS 'Action (permission) - only for policy type p';
 
 
 --

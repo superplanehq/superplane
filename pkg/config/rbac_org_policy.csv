@@ -1,5 +1,5 @@
-g,org_viewer,org_admin,org:{ORG_ID},
-g,org_admin,org_owner,org:{ORG_ID},
+g,org_owner,org_admin,org:{ORG_ID},
+g,org_admin,org_viewer,org:{ORG_ID},
 p,org_viewer,org:{ORG_ID},canvas,read
 p,org_admin,org:{ORG_ID},canvas,create
 p,org_admin,org:{ORG_ID},canvas,update

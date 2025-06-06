@@ -1,9 +1,8 @@
-g,canvas_viewer,canvas_admin,canvas:{CANVAS_ID},
-g,canvas_admin,canvas_owner,canvas:{CANVAS_ID},
+g,canvas_owner,canvas_admin,canvas:{CANVAS_ID},
+g,canvas_admin,canvas_viewer,canvas:{CANVAS_ID},
 p,canvas_viewer,canvas:{CANVAS_ID},eventsource,read
 p,canvas_viewer,canvas:{CANVAS_ID},stage,read
 p,canvas_viewer,canvas:{CANVAS_ID},stageevent,read
-p,canvas_viewer,canvas:{CANVAS_ID},canvas,read
 p,canvas_admin,canvas:{CANVAS_ID},eventsource,create
 p,canvas_admin,canvas:{CANVAS_ID},eventsource,update
 p,canvas_admin,canvas:{CANVAS_ID},eventsource,delete
@@ -11,7 +10,5 @@ p,canvas_admin,canvas:{CANVAS_ID},stage,create
 p,canvas_admin,canvas:{CANVAS_ID},stage,update
 p,canvas_admin,canvas:{CANVAS_ID},stage,delete
 p,canvas_admin,canvas:{CANVAS_ID},stageevent,approve
-p,canvas_admin,canvas:{CANVAS_ID},canvas,update
 p,canvas_admin,canvas:{CANVAS_ID},member,invite
-p,canvas_owner,canvas:{CANVAS_ID},canvas,delete
 p,canvas_owner,canvas:{CANVAS_ID},member,remove
