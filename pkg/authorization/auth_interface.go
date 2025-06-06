@@ -1,34 +1,32 @@
 package authorization
 
-import (
-	"net/http"
+type AuthorizationServiceInterface interface {
+	// Permission checking
+	CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error)
+	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)
 
-	"github.com/casbin/casbin/v2"
-)
+	// Group management
+	CreateGroup(orgID string, groupName string, role string) error
+	AddUserToGroup(orgID string, userID string, group string) error
+	RemoveUserFromGroup(orgID string, userID string, group string) error
+	GetGroupUsers(orgID string, group string) ([]string, error)
+	GetGroups(orgID string) ([]string, error)
+	GetGroupRoles(orgID string, group string) ([]string, error)
 
-// AuthorizationService defines the interface for authorization operations
-type AuthorizationService interface {
-	// Permission checking methods
-	CheckPermission(userID, resource, action string) (bool, error)
-	CheckCanvasPermission(userID, canvasID, action string) (bool, error)
-	CheckOrganizationPermission(userID, orgID, action string) (bool, error)
+	// Role management
+	AssignRole(userID, role, domainID string, domainType string) error
+	RemoveRole(userID, role, domainID string, domainType string) error
+	GetOrgUsersForRole(role string, orgID string) ([]string, error)
+	GetCanvasUsersForRole(role string, canvasID string) ([]string, error)
 
-	// Role management methods
-	AssignRole(userID, role, resourceID string) error
-	RemoveRole(userID, role, resourceID string) error
-	GetUserRoles(userID string) ([]string, error)
-	GetUsersForRole(role string) ([]string, error)
-	GetCanvasUsers(canvasID string) (map[string][]string, error)
-
-	// Permission management methods
-	AddPermission(role, resource, action string) error
-	RemovePermission(role, resource, action string) error
-
-	// Convenience methods
+	// Setup methods
+	SetupOrganizationRoles(orgID string) error
+	SetupCanvasRoles(canvasID string) error
 	CreateOrganizationOwner(userID, orgID string) error
-	InviteUserToCanvas(userID, canvasID, role string) error
 
-	// Middleware and utility methods
-	Middleware() func(next http.Handler) http.Handler
-	GetEnforcer() *casbin.Enforcer
+	// User access queries
+	GetAccessibleOrgsForUser(userID string) ([]string, error)
+	GetAccessibleCanvasesForUser(userID string) ([]string, error)
+	GetUserRolesForOrg(userID string, orgID string) ([]string, error)
+	GetUserRolesForCanvas(userID string, canvasID string) ([]string, error)
 }

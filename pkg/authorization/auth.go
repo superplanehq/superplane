@@ -32,6 +32,9 @@ const (
 	DomainOrg    = "org"
 )
 
+// implements AuthorizationServiceInterface
+var _ AuthorizationServiceInterface = (*AuthService)(nil)
+
 type AuthService struct {
 	enforcer              *casbin.CachedEnforcer
 	db                    *gorm.DB
