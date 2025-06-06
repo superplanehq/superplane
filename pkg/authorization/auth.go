@@ -372,10 +372,16 @@ func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 func (a *AuthService) Middleware() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// ctx := r.Context()
+			// userID := ctx.Value("userID").(string)
 			// TODO: implement middleware once authentication is implemented
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func (a *AuthService) EnableCache(enable bool) {
+	a.enforcer.EnableCache(enable)
 }
 
 func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
