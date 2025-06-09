@@ -502,6 +502,7 @@ message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_SEMAPHORE = 1;
+    TYPE_HTTP = 2;
   }
 
   message Semaphore {
@@ -514,8 +515,20 @@ message ExecutorSpec {
     string organization_url = 7;
   }
 
+  message HTTP {
+    string url = 1;
+    map<string, string> headers = 2;
+    map<string, string> payload = 3;
+    HTTPResponsePolicy response_policy = 4;
+  }
+
+  message HTTPResponsePolicy {
+    repeated uint32 status_codes = 1;
+  }
+
   Type type = 1;
   Semaphore semaphore = 2;
+  HTTP http = 3;
 }
 
 message CreateStageResponse {

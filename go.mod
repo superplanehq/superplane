@@ -5,6 +5,7 @@ go 1.24
 require (
 	github.com/expr-lang/expr v1.17.2
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/goccy/go-yaml v1.17.1
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/protobuf v1.5.4

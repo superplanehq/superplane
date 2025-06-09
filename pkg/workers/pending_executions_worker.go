@@ -5,18 +5,18 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type PendingExecutionsWorker struct {
-	JwtSigner *jwt.Signer
-	Encryptor crypto.Encryptor
+	JwtSigner   *jwt.Signer
+	Encryptor   crypto.Encryptor
+	SpecBuilder executors.SpecBuilder
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -65,18 +65,77 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	specBuilder := inputs.NewExecutorSpecBuilder(stage.ExecutorSpec.Data(), inputMap, secrets)
-	spec, err := specBuilder.Build()
+	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
 	if err != nil {
-		return fmt.Errorf("error resolving executor spec: %v", err)
+		return err
 	}
 
-	executionID, err := w.StartExecution(logger, stage, execution, *spec)
+	executor, err := executors.NewExecutor(spec.Type, execution, w.JwtSigner)
 	if err != nil {
-		return fmt.Errorf("error starting execution: %v", err)
+		return fmt.Errorf("error creating executor: %v", err)
 	}
 
-	err = execution.Start(executionID)
+	err = execution.Start()
+	if err != nil {
+		return fmt.Errorf("error moving execution to started state: %v", err)
+	}
+
+	//
+	// If we get an error calling the executor, we fail the execution.
+	//
+	response, err := executor.Execute(*spec)
+	if err != nil {
+		logger.Errorf("Error calling executor: %v - failing execution", err)
+		err := execution.Finish(stage, models.StageExecutionResultFailed)
+		if err != nil {
+			return fmt.Errorf("error moving execution to failed state: %v", err)
+		}
+
+		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+
+	}
+
+	if response.Finished() {
+		return w.handleSyncResource(logger, response, execution, stage)
+	}
+
+	return w.handleAsyncResource(logger, response, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
+	outputs := response.Outputs()
+	if len(outputs) > 0 {
+		if err := execution.UpdateOutputs(outputs); err != nil {
+			return fmt.Errorf("error setting outputs: %v", err)
+		}
+	}
+
+	result := models.StageExecutionResultFailed
+	if response.Successful() {
+		result = models.StageExecutionResultPassed
+	}
+
+	//
+	// Check if all required outputs were received.
+	//
+	missingOutputs := stage.MissingRequiredOutputs(outputs)
+	if len(missingOutputs) > 0 {
+		logger.Infof("Execution has missing outputs %v - marking the execution as failed", missingOutputs)
+		result = models.StageExecutionResultFailed
+	}
+
+	err := execution.Finish(stage, result)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Finished execution: %s", result)
+
+	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+}
+
+func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {
+	err := execution.StartWithReferenceID(response.Id())
 	if err != nil {
 		return fmt.Errorf("error moving execution to started state: %v", err)
 	}
@@ -86,79 +145,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error publishing execution started message: %v", err)
 	}
 
-	logger.Infof("Started execution %s", executionID)
+	logger.Infof("Started execution %s", response.Id())
 
 	return nil
-}
-
-// TODO: implement some retry and give up mechanism
-func (w *PendingExecutionsWorker) StartExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution, spec models.ExecutorSpec) (string, error) {
-	switch spec.Type {
-	case models.ExecutorSpecTypeSemaphore:
-		//
-		// For now, only task runs are supported,
-		// until the workflow API is updated to support parameters.
-		//
-		if spec.Semaphore.TaskID == "" {
-			return "", fmt.Errorf("only task runs are supported")
-		}
-
-		return w.TriggerSemaphoreTask(logger, stage, execution, spec.Semaphore)
-	default:
-		return "", fmt.Errorf("unknown executor spec type")
-	}
-}
-
-func (w *PendingExecutionsWorker) TriggerSemaphoreTask(logger *log.Entry, stage *models.Stage, execution models.StageExecution, spec *models.SemaphoreExecutorSpec) (string, error) {
-	api := semaphore.NewSemaphoreAPI(spec.OrganizationURL, spec.APIToken)
-	parameters, err := w.buildParameters(execution, spec.Parameters)
-	if err != nil {
-		return "", fmt.Errorf("error building parameters: %v", err)
-	}
-
-	workflowID, err := api.TriggerTask(spec.ProjectID, spec.TaskID, semaphore.TaskTriggerSpec{
-		Branch:       spec.Branch,
-		PipelineFile: spec.PipelineFile,
-		Parameters:   parameters,
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	logger.Infof("Semaphore task triggered - workflow=%s", workflowID)
-	return workflowID, nil
-}
-
-// TODO
-// How should we pass these SEMAPHORE_* parameters to the job?
-// SEMAPHORE_STAGE_ID and SEMAPHORE_STAGE_EXECUTION_ID are not sensitive values,
-// but currently, if the task does not define a parameter, it is ignored.
-//
-// Additionally, SEMAPHORE_STAGE_EXECUTION_TOKEN is sensitive,
-// so if we pass it here, it will be visible in UI / API responses.
-func (w *PendingExecutionsWorker) buildParameters(execution models.StageExecution, parameters map[string]string) ([]semaphore.TaskTriggerParameter, error) {
-	parameterValues := []semaphore.TaskTriggerParameter{
-		{Name: "SEMAPHORE_STAGE_ID", Value: execution.StageID.String()},
-		{Name: "SEMAPHORE_STAGE_EXECUTION_ID", Value: execution.ID.String()},
-	}
-
-	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("error generating outputs token: %v", err)
-	}
-
-	parameterValues = append(parameterValues, semaphore.TaskTriggerParameter{
-		Name:  "SEMAPHORE_STAGE_EXECUTION_TOKEN",
-		Value: token,
-	})
-
-	for key, value := range parameters {
-		parameterValues = append(parameterValues, semaphore.TaskTriggerParameter{
-			Name:  key,
-			Value: value,
-		})
-	}
-
-	return parameterValues, nil
 }

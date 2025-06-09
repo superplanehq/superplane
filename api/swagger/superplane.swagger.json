@@ -771,6 +771,41 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "ExecutorSpecHTTP": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "responsePolicy": {
+          "$ref": "#/definitions/ExecutorSpecHTTPResponsePolicy"
+        }
+      }
+    },
+    "ExecutorSpecHTTPResponsePolicy": {
+      "type": "object",
+      "properties": {
+        "statusCodes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
     "ExecutorSpecSemaphore": {
       "type": "object",
       "properties": {
@@ -1193,6 +1228,9 @@
         },
         "semaphore": {
           "$ref": "#/definitions/ExecutorSpecSemaphore"
+        },
+        "http": {
+          "$ref": "#/definitions/ExecutorSpecHTTP"
         }
       }
     },
@@ -1200,7 +1238,8 @@
       "type": "string",
       "enum": [
         "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE"
+        "TYPE_SEMAPHORE",
+        "TYPE_HTTP"
       ],
       "default": "TYPE_UNKNOWN"
     },

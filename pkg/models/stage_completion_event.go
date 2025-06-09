@@ -1,9 +1,7 @@
-package events
+package models
 
 import (
 	"time"
-
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 //
@@ -15,17 +13,17 @@ const (
 )
 
 type StageExecutionCompletion struct {
-	Type      string         `json:"type"`
-	Stage     *Stage         `json:"stage,omitempty"`
-	Execution *Execution     `json:"execution,omitempty"`
-	Outputs   map[string]any `json:"outputs,omitempty"`
+	Type      string            `json:"type"`
+	Stage     *StageInEvent     `json:"stage,omitempty"`
+	Execution *ExecutionInEvent `json:"execution,omitempty"`
+	Outputs   map[string]any    `json:"outputs,omitempty"`
 }
 
-type Stage struct {
+type StageInEvent struct {
 	ID string `json:"id"`
 }
 
-type Execution struct {
+type ExecutionInEvent struct {
 	ID         string     `json:"id"`
 	Result     string     `json:"result"`
 	CreatedAt  *time.Time `json:"created_at,omitempty"`
@@ -33,13 +31,13 @@ type Execution struct {
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
-func NewStageExecutionCompletion(execution *models.StageExecution, outputs map[string]any) (*StageExecutionCompletion, error) {
+func NewStageExecutionCompletion(execution *StageExecution, outputs map[string]any) (*StageExecutionCompletion, error) {
 	return &StageExecutionCompletion{
 		Type: StageExecutionCompletionType,
-		Stage: &Stage{
+		Stage: &StageInEvent{
 			ID: execution.StageID.String(),
 		},
-		Execution: &Execution{
+		Execution: &ExecutionInEvent{
 			ID:         execution.ID.String(),
 			Result:     execution.Result,
 			CreatedAt:  execution.CreatedAt,

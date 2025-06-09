@@ -16,6 +16,7 @@ import (
 
 const (
 	ExecutorSpecTypeSemaphore = "semaphore"
+	ExecutorSpecTypeHTTP      = "http"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
@@ -192,6 +193,7 @@ type ApprovalCondition struct {
 type ExecutorSpec struct {
 	Type      string                 `json:"type"`
 	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
+	HTTP      *HTTPExecutorSpec      `json:"http,omitempty"`
 }
 
 type SemaphoreExecutorSpec struct {
@@ -202,6 +204,17 @@ type SemaphoreExecutorSpec struct {
 	PipelineFile    string            `json:"pipeline_file"`
 	Parameters      map[string]string `json:"parameters"`
 	TaskID          string            `json:"task_id"`
+}
+
+type HTTPExecutorSpec struct {
+	URL            string              `json:"url"`
+	Payload        map[string]string   `json:"payload"`
+	Headers        map[string]string   `json:"headers"`
+	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
+}
+
+type HTTPResponsePolicy struct {
+	StatusCodes []uint32 `json:"status_codes"`
 }
 
 func FindStageByID(id string) (*Stage, error) {
@@ -373,7 +386,7 @@ func (s *Stage) FindSecrets(encryptor crypto.Encryptor) (map[string]string, erro
 			return nil, fmt.Errorf("error getting secret values for %s: %v", secretName, err)
 		}
 
-		secretMap[s.Name] = values[secretDef.ValueFrom.Secret.Key]
+		secretMap[secretDef.Name] = values[secretDef.ValueFrom.Secret.Key]
 	}
 
 	return secretMap, nil

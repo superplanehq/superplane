@@ -162,7 +162,7 @@ func Test__InputBuilder(t *testing.T) {
 		// Mock a completed previous execution of the stage
 		//
 		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
-		execution.FinishInTransaction(database.Conn(), models.StageExecutionResultPassed)
+		execution.Finish(stage, models.StageExecutionResultPassed)
 
 		//
 		// Build inputs from docs source event

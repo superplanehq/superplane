@@ -12,6 +12,8 @@ model_connection_filter_operator.go
 model_connection_filter_type.go
 model_connection_header_filter.go
 model_execution_result.go
+model_executor_spec_http.go
+model_executor_spec_http_response_policy.go
 model_executor_spec_semaphore.go
 model_input_mapping_when.go
 model_input_mapping_when_triggered_by.go
