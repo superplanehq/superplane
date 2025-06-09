@@ -12,7 +12,7 @@ export function handleEventSourceAdded(
   console.log('Event source added event received:', payload);
   
   // Check if event source already exists
-  const existingSource = state.event_sources.find((es: SuperplaneEventSource) => es.id === payload.id);
+  const existingSource = state.event_sources.find((es: SuperplaneEventSource) => es.metadata!.id === payload.metadata!.id);
   if (existingSource) {
     state.updateEventSource(payload);
   } else {

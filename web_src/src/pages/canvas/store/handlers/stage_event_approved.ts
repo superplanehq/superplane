@@ -19,7 +19,7 @@ export function handleStageEventApproved(
     // add the new event to the array
   
   // Check if stage already exists
-  const existingStage = state.stages.find((s: StageWithEventQueue) => s.id === event.stage_id);
+  const existingStage = state.stages.find((s: StageWithEventQueue) => s.metadata!.id === event.stage_id);
   if (existingStage) {
     const queue = existingStage.queue.filter((q: SuperplaneStageEvent) => q.id !== event.id);
     queue.push(event);

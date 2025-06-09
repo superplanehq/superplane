@@ -23,12 +23,14 @@ type SuperplaneExecutorSpecType string
 const (
 	SUPERPLANEEXECUTORSPECTYPE_TYPE_UNKNOWN SuperplaneExecutorSpecType = "TYPE_UNKNOWN"
 	SUPERPLANEEXECUTORSPECTYPE_TYPE_SEMAPHORE SuperplaneExecutorSpecType = "TYPE_SEMAPHORE"
+	SUPERPLANEEXECUTORSPECTYPE_TYPE_HTTP SuperplaneExecutorSpecType = "TYPE_HTTP"
 )
 
 // All allowed values of SuperplaneExecutorSpecType enum
 var AllowedSuperplaneExecutorSpecTypeEnumValues = []SuperplaneExecutorSpecType{
 	"TYPE_UNKNOWN",
 	"TYPE_SEMAPHORE",
+	"TYPE_HTTP",
 }
 
 func (v *SuperplaneExecutorSpecType) UnmarshalJSON(src []byte) error {

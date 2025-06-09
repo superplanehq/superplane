@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneCreateCanvasRequest{}
 
 // SuperplaneCreateCanvasRequest struct for SuperplaneCreateCanvasRequest
 type SuperplaneCreateCanvasRequest struct {
-	Name *string `json:"name,omitempty"`
+	Canvas *SuperplaneCanvas `json:"canvas,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
 }
 
@@ -41,36 +41,36 @@ func NewSuperplaneCreateCanvasRequestWithDefaults() *SuperplaneCreateCanvasReque
 	return &this
 }
 
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneCreateCanvasRequest) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
+// GetCanvas returns the Canvas field value if set, zero value otherwise.
+func (o *SuperplaneCreateCanvasRequest) GetCanvas() SuperplaneCanvas {
+	if o == nil || IsNil(o.Canvas) {
+		var ret SuperplaneCanvas
 		return ret
 	}
-	return *o.Name
+	return *o.Canvas
 }
 
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// GetCanvasOk returns a tuple with the Canvas field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneCreateCanvasRequest) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
+func (o *SuperplaneCreateCanvasRequest) GetCanvasOk() (*SuperplaneCanvas, bool) {
+	if o == nil || IsNil(o.Canvas) {
 		return nil, false
 	}
-	return o.Name, true
+	return o.Canvas, true
 }
 
-// HasName returns a boolean if a field has been set.
-func (o *SuperplaneCreateCanvasRequest) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
+// HasCanvas returns a boolean if a field has been set.
+func (o *SuperplaneCreateCanvasRequest) HasCanvas() bool {
+	if o != nil && !IsNil(o.Canvas) {
 		return true
 	}
 
 	return false
 }
 
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneCreateCanvasRequest) SetName(v string) {
-	o.Name = &v
+// SetCanvas gets a reference to the given SuperplaneCanvas and assigns it to the Canvas field.
+func (o *SuperplaneCreateCanvasRequest) SetCanvas(v SuperplaneCanvas) {
+	o.Canvas = &v
 }
 
 // GetRequesterId returns the RequesterId field value if set, zero value otherwise.
@@ -115,8 +115,8 @@ func (o SuperplaneCreateCanvasRequest) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneCreateCanvasRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
+	if !IsNil(o.Canvas) {
+		toSerialize["canvas"] = o.Canvas
 	}
 	if !IsNil(o.RequesterId) {
 		toSerialize["requesterId"] = o.RequesterId

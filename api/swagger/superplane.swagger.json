@@ -771,6 +771,41 @@
       ],
       "default": "RESULT_UNKNOWN"
     },
+    "ExecutorSpecHTTP": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "responsePolicy": {
+          "$ref": "#/definitions/ExecutorSpecHTTPResponsePolicy"
+        }
+      }
+    },
+    "ExecutorSpecHTTPResponsePolicy": {
+      "type": "object",
+      "properties": {
+        "statusCodes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
     "ExecutorSpecSemaphore": {
       "type": "object",
       "properties": {
@@ -866,6 +901,15 @@
       }
     },
     "SuperplaneCanvas": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneCanvasMetadata",
+          "title": "No spec needed for Canvas as per the YAML example"
+        }
+      }
+    },
+    "SuperplaneCanvasMetadata": {
       "type": "object",
       "properties": {
         "id": {
@@ -965,8 +1009,8 @@
     "SuperplaneCreateCanvasRequest": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
+        "canvas": {
+          "$ref": "#/definitions/SuperplaneCanvas"
         },
         "requesterId": {
           "type": "string"
@@ -984,8 +1028,8 @@
     "SuperplaneCreateEventSourceBody": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
+        "eventSource": {
+          "$ref": "#/definitions/SuperplaneEventSource"
         },
         "requesterId": {
           "type": "string"
@@ -1006,11 +1050,11 @@
     "SuperplaneCreateSecretBody": {
       "type": "object",
       "properties": {
-        "requesterId": {
-          "type": "string"
-        },
         "secret": {
           "$ref": "#/definitions/SuperplaneSecret"
+        },
+        "requesterId": {
+          "type": "string"
         }
       }
     },
@@ -1025,56 +1069,11 @@
     "SuperplaneCreateStageBody": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
+        "stage": {
+          "$ref": "#/definitions/SuperplaneStage"
         },
         "requesterId": {
           "type": "string"
-        },
-        "connections": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConnection"
-          }
-        },
-        "conditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneCondition"
-          }
-        },
-        "executor": {
-          "$ref": "#/definitions/SuperplaneExecutorSpec"
-        },
-        "inputs": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneInputDefinition"
-          }
-        },
-        "inputMappings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneInputMapping"
-          }
-        },
-        "outputs": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneOutputDefinition"
-          }
-        },
-        "secrets": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneValueDefinition"
-          }
         }
       }
     },
@@ -1124,6 +1123,17 @@
     "SuperplaneEventSource": {
       "type": "object",
       "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneEventSourceMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/SuperplaneEventSourceSpec"
+        }
+      }
+    },
+    "SuperplaneEventSourceMetadata": {
+      "type": "object",
+      "properties": {
         "id": {
           "type": "string"
         },
@@ -1138,6 +1148,10 @@
           "format": "date-time"
         }
       }
+    },
+    "SuperplaneEventSourceSpec": {
+      "type": "object",
+      "title": "No additional configuration needed as per the YAML example"
     },
     "SuperplaneExecution": {
       "type": "object",
@@ -1193,6 +1207,9 @@
         },
         "semaphore": {
           "$ref": "#/definitions/ExecutorSpecSemaphore"
+        },
+        "http": {
+          "$ref": "#/definitions/ExecutorSpecHTTP"
         }
       }
     },
@@ -1200,7 +1217,8 @@
       "type": "string",
       "enum": [
         "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE"
+        "TYPE_SEMAPHORE",
+        "TYPE_HTTP"
       ],
       "default": "TYPE_UNKNOWN"
     },
@@ -1329,28 +1347,15 @@
     "SuperplaneSecret": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneSecretMetadata"
         },
-        "name": {
-          "type": "string"
-        },
-        "canvasId": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "provider": {
-          "$ref": "#/definitions/SecretProvider"
-        },
-        "local": {
-          "$ref": "#/definitions/SecretLocal"
+        "spec": {
+          "$ref": "#/definitions/SuperplaneSecretSpec"
         }
       }
     },
-    "SuperplaneStage": {
+    "SuperplaneSecretMetadata": {
       "type": "object",
       "properties": {
         "id": {
@@ -1365,51 +1370,28 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneSecretSpec": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/SecretProvider"
         },
-        "connections": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneConnection"
-          }
+        "local": {
+          "$ref": "#/definitions/SecretLocal"
+        }
+      }
+    },
+    "SuperplaneStage": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneStageMetadata"
         },
-        "conditions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneCondition"
-          }
-        },
-        "executor": {
-          "$ref": "#/definitions/SuperplaneExecutorSpec"
-        },
-        "inputs": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneInputDefinition"
-          }
-        },
-        "inputMappings": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneInputMapping"
-          }
-        },
-        "outputs": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneOutputDefinition"
-          }
-        },
-        "secrets": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneValueDefinition"
-          }
+        "spec": {
+          "$ref": "#/definitions/SuperplaneStageSpec"
         }
       }
     },
@@ -1476,31 +1458,27 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneUpdateSecretBody": {
+    "SuperplaneStageMetadata": {
       "type": "object",
       "properties": {
-        "requesterId": {
+        "id": {
           "type": "string"
         },
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
+        "name": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
-    "SuperplaneUpdateSecretResponse": {
+    "SuperplaneStageSpec": {
       "type": "object",
       "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
-        }
-      }
-    },
-    "SuperplaneUpdateStageBody": {
-      "type": "object",
-      "properties": {
-        "requesterId": {
-          "type": "string"
-        },
         "connections": {
           "type": "array",
           "items": {
@@ -1545,6 +1523,36 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneValueDefinition"
           }
+        }
+      }
+    },
+    "SuperplaneUpdateSecretBody": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        },
+        "requesterId": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneUpdateSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SuperplaneSecret"
+        }
+      }
+    },
+    "SuperplaneUpdateStageBody": {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "$ref": "#/definitions/SuperplaneStage"
+        },
+        "requesterId": {
+          "type": "string"
         }
       }
     },

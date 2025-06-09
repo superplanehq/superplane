@@ -52,19 +52,19 @@ COPY web_src web_src
 COPY protos protos
 COPY api/swagger api/swagger
 
-RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
-RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
-RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
-RUN go install github.com/air-verse/air@latest
-
 WORKDIR /app
 
 FROM base AS dev
 
 COPY test test
+COPY docker-entrypoint.dev.sh /app/docker-entrypoint.dev.sh
 
 WORKDIR /app
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@latest
+RUN go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@latest
+RUN go install github.com/air-verse/air@latest
 RUN go install github.com/mgechev/revive@v1.8.0
 RUN go install gotest.tools/gotestsum@v1.12.1
 

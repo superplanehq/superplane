@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -17,7 +18,19 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+	if req.Stage == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage is required")
+	}
+	
+	if req.Stage.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage.metadata is required")
+	}
+	
+	if req.Stage.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage.spec is required")
+	}
+	
 	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
@@ -30,16 +43,16 @@ func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateSta
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	spec, err := validateExecutorSpec(ctx, req.Executor)
+	spec, err := specValidator.Validate(req.Stage.Spec.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	inputValidator := inputs.NewValidator(
-		inputs.WithInputs(req.Inputs),
-		inputs.WithOutputs(req.Outputs),
-		inputs.WithInputMappings(req.InputMappings),
-		inputs.WithConnections(req.Connections),
+		inputs.WithInputs(req.Stage.Spec.Inputs),
+		inputs.WithOutputs(req.Stage.Spec.Outputs),
+		inputs.WithInputMappings(req.Stage.Spec.InputMappings),
+		inputs.WithConnections(req.Stage.Spec.Connections),
 	)
 
 	err = inputValidator.Validate()
@@ -47,23 +60,23 @@ func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateSta
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Connections)
+	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	conditions, err := validateConditions(req.Conditions)
+	conditions, err := validateConditions(req.Stage.Spec.Conditions)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Secrets)
+	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	err = canvas.CreateStage(
-		req.Name,
+		req.Stage.Metadata.Name,
 		req.RequesterId,
 		conditions,
 		*spec,
@@ -82,17 +95,17 @@ func CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateSta
 		return nil, err
 	}
 
-	stage, err := canvas.FindStageByName(req.Name)
+	stage, err := canvas.FindStageByName(req.Stage.Metadata.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	serialized, err := serializeStage(
 		*stage,
-		req.Connections,
-		req.Inputs,
-		req.Outputs,
-		req.InputMappings,
+		req.Stage.Spec.Connections,
+		req.Stage.Spec.Inputs,
+		req.Stage.Spec.Outputs,
+		req.Stage.Spec.InputMappings,
 	)
 
 	if err != nil {
@@ -140,43 +153,6 @@ func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error)
 	}
 
 	return out, nil
-}
-
-func validateExecutorSpec(ctx context.Context, in *pb.ExecutorSpec) (*models.ExecutorSpec, error) {
-	if in == nil {
-		return nil, fmt.Errorf("missing executor spec")
-	}
-
-	switch in.Type {
-	case pb.ExecutorSpec_TYPE_SEMAPHORE:
-		if in.Semaphore.OrganizationUrl == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: missing organization URL")
-		}
-
-		if in.Semaphore.ApiToken == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
-		}
-
-		if in.Semaphore.TaskId == "" {
-			return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
-		}
-
-		return &models.ExecutorSpec{
-			Type: models.ExecutorSpecTypeSemaphore,
-			Semaphore: &models.SemaphoreExecutorSpec{
-				OrganizationURL: in.Semaphore.OrganizationUrl,
-				APIToken:        in.Semaphore.ApiToken,
-				ProjectID:       in.Semaphore.ProjectId,
-				Branch:          in.Semaphore.Branch,
-				PipelineFile:    in.Semaphore.PipelineFile,
-				Parameters:      in.Semaphore.Parameters,
-				TaskID:          in.Semaphore.TaskId,
-			},
-		}, nil
-
-	default:
-		return nil, errors.New("invalid executor spec type")
-	}
 }
 
 func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.StageConnection, error) {
@@ -501,17 +477,21 @@ func serializeStage(
 	}
 
 	return &pb.Stage{
-		Id:            stage.ID.String(),
-		Name:          stage.Name,
-		CanvasId:      stage.CanvasID.String(),
-		CreatedAt:     timestamppb.New(*stage.CreatedAt),
-		Conditions:    conditions,
-		Connections:   connections,
-		Executor:      executor,
-		Inputs:        inputs,
-		Outputs:       outputs,
-		InputMappings: inputMappings,
-		Secrets:       secrets,
+		Metadata: &pb.Stage_Metadata{
+			Id:        stage.ID.String(),
+			Name:      stage.Name,
+			CanvasId:  stage.CanvasID.String(),
+			CreatedAt: timestamppb.New(*stage.CreatedAt),
+		},
+		Spec: &pb.Stage_Spec{
+			Conditions:    conditions,
+			Connections:   connections,
+			Executor:      executor,
+			Inputs:        inputs,
+			Outputs:       outputs,
+			InputMappings: inputMappings,
+			Secrets:       secrets,
+		},
 	}, nil
 }
 
@@ -658,6 +638,18 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 
 func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, error) {
 	switch executor.Type {
+	case models.ExecutorSpecTypeHTTP:
+		return &pb.ExecutorSpec{
+			Type: pb.ExecutorSpec_TYPE_HTTP,
+			Http: &pb.ExecutorSpec_HTTP{
+				Url:     executor.HTTP.URL,
+				Headers: executor.HTTP.Headers,
+				Payload: executor.HTTP.Payload,
+				ResponsePolicy: &pb.ExecutorSpec_HTTPResponsePolicy{
+					StatusCodes: executor.HTTP.ResponsePolicy.StatusCodes,
+				},
+			},
+		}, nil
 	case models.ExecutorSpecTypeSemaphore:
 		return &pb.ExecutorSpec{
 			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,

@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/events"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -58,7 +57,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
@@ -95,7 +94,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
 		e, err := unmarshalCompletionEvent(list[0].Raw)
 		require.NoError(t, err)
-		assert.Equal(t, events.StageExecutionCompletionType, e.Type)
+		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.StageExecutionResultFailed, e.Execution.Result)
@@ -133,7 +132,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
@@ -174,7 +173,7 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.Start(workflowID))
+		require.NoError(t, execution.StartWithReferenceID(workflowID))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
@@ -211,7 +210,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
 		e, err := unmarshalCompletionEvent(list[0].Raw)
 		require.NoError(t, err)
-		assert.Equal(t, events.StageExecutionCompletionType, e.Type)
+		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.StageExecutionResultPassed, e.Execution.Result)
@@ -222,8 +221,8 @@ func Test__ExecutionPoller(t *testing.T) {
 	})
 }
 
-func unmarshalCompletionEvent(raw []byte) (*events.StageExecutionCompletion, error) {
-	e := events.StageExecutionCompletion{}
+func unmarshalCompletionEvent(raw []byte) (*models.StageExecutionCompletion, error) {
+	e := models.StageExecutionCompletion{}
 	err := json.Unmarshal(raw, &e)
 	if err != nil {
 		return nil, err

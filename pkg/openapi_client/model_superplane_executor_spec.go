@@ -22,6 +22,7 @@ var _ MappedNullable = &SuperplaneExecutorSpec{}
 type SuperplaneExecutorSpec struct {
 	Type *SuperplaneExecutorSpecType `json:"type,omitempty"`
 	Semaphore *ExecutorSpecSemaphore `json:"semaphore,omitempty"`
+	Http *ExecutorSpecHTTP `json:"http,omitempty"`
 }
 
 // NewSuperplaneExecutorSpec instantiates a new SuperplaneExecutorSpec object
@@ -109,6 +110,38 @@ func (o *SuperplaneExecutorSpec) SetSemaphore(v ExecutorSpecSemaphore) {
 	o.Semaphore = &v
 }
 
+// GetHttp returns the Http field value if set, zero value otherwise.
+func (o *SuperplaneExecutorSpec) GetHttp() ExecutorSpecHTTP {
+	if o == nil || IsNil(o.Http) {
+		var ret ExecutorSpecHTTP
+		return ret
+	}
+	return *o.Http
+}
+
+// GetHttpOk returns a tuple with the Http field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutorSpec) GetHttpOk() (*ExecutorSpecHTTP, bool) {
+	if o == nil || IsNil(o.Http) {
+		return nil, false
+	}
+	return o.Http, true
+}
+
+// HasHttp returns a boolean if a field has been set.
+func (o *SuperplaneExecutorSpec) HasHttp() bool {
+	if o != nil && !IsNil(o.Http) {
+		return true
+	}
+
+	return false
+}
+
+// SetHttp gets a reference to the given ExecutorSpecHTTP and assigns it to the Http field.
+func (o *SuperplaneExecutorSpec) SetHttp(v ExecutorSpecHTTP) {
+	o.Http = &v
+}
+
 func (o SuperplaneExecutorSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -124,6 +157,9 @@ func (o SuperplaneExecutorSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Semaphore) {
 		toSerialize["semaphore"] = o.Semaphore
+	}
+	if !IsNil(o.Http) {
+		toSerialize["http"] = o.Http
 	}
 	return toSerialize, nil
 }

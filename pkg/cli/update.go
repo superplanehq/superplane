@@ -129,10 +129,17 @@ var updateStageCmd = &cobra.Command{
 			}
 		}
 
-		// Create update request
+		// Create update request with nested structure
 		request := openapi_client.NewSuperplaneUpdateStageBody()
 		request.SetRequesterId(requesterID)
 
+		// Create stage with spec
+		stage := openapi_client.NewSuperplaneStage()
+		
+		// Create stage spec
+		stageSpec := openapi_client.NewSuperplaneStageSpec()
+		
+		// Parse connections if present
 		if len(connections) > 0 {
 			connJSON, err := json.Marshal(connections)
 			Check(err)
@@ -141,8 +148,15 @@ var updateStageCmd = &cobra.Command{
 			err = json.Unmarshal(connJSON, &apiConnections)
 			Check(err)
 
-			request.SetConnections(apiConnections)
+			// Set connections in spec
+			stageSpec.SetConnections(apiConnections)
 		}
+		
+		// Set spec in stage
+		stage.SetSpec(*stageSpec)
+		
+		// Set stage in request
+		request.SetStage(*stage)
 
 		c := DefaultClient()
 		_, _, err = c.StageAPI.SuperplaneUpdateStage(

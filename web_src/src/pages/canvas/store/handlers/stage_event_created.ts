@@ -13,7 +13,7 @@ export function handleStageEventCreated(
   console.log('Stage event created event received:', payload);
   
   // Check if stage already exists
-  const existingStage = state.stages.find((s: StageWithEventQueue) => s.id === payload.stage_id);
+  const existingStage = state.stages.find((s: StageWithEventQueue) => s.metadata!.id === payload.stage_id);
   if (existingStage) {
     const queues = existingStage.queue.filter((q: SuperplaneStageEvent) => q.id !== payload.id);
     queues.push(payload);

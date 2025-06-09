@@ -138,7 +138,7 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 		logging.ForStage(stage).Errorf("failed to publish execution created message: %v", err)
 	}
 
-	logging.ForStage(stage).Infof("Started execution %s", execution.ID)
+	logging.ForStage(stage).Infof("Created execution %s", execution.ID)
 	return nil
 }
 

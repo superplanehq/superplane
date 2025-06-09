@@ -20,8 +20,8 @@ var _ MappedNullable = &SuperplaneCreateSecretBody{}
 
 // SuperplaneCreateSecretBody struct for SuperplaneCreateSecretBody
 type SuperplaneCreateSecretBody struct {
-	RequesterId *string `json:"requesterId,omitempty"`
 	Secret *SuperplaneSecret `json:"secret,omitempty"`
+	RequesterId *string `json:"requesterId,omitempty"`
 }
 
 // NewSuperplaneCreateSecretBody instantiates a new SuperplaneCreateSecretBody object
@@ -39,38 +39,6 @@ func NewSuperplaneCreateSecretBody() *SuperplaneCreateSecretBody {
 func NewSuperplaneCreateSecretBodyWithDefaults() *SuperplaneCreateSecretBody {
 	this := SuperplaneCreateSecretBody{}
 	return &this
-}
-
-// GetRequesterId returns the RequesterId field value if set, zero value otherwise.
-func (o *SuperplaneCreateSecretBody) GetRequesterId() string {
-	if o == nil || IsNil(o.RequesterId) {
-		var ret string
-		return ret
-	}
-	return *o.RequesterId
-}
-
-// GetRequesterIdOk returns a tuple with the RequesterId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneCreateSecretBody) GetRequesterIdOk() (*string, bool) {
-	if o == nil || IsNil(o.RequesterId) {
-		return nil, false
-	}
-	return o.RequesterId, true
-}
-
-// HasRequesterId returns a boolean if a field has been set.
-func (o *SuperplaneCreateSecretBody) HasRequesterId() bool {
-	if o != nil && !IsNil(o.RequesterId) {
-		return true
-	}
-
-	return false
-}
-
-// SetRequesterId gets a reference to the given string and assigns it to the RequesterId field.
-func (o *SuperplaneCreateSecretBody) SetRequesterId(v string) {
-	o.RequesterId = &v
 }
 
 // GetSecret returns the Secret field value if set, zero value otherwise.
@@ -105,6 +73,38 @@ func (o *SuperplaneCreateSecretBody) SetSecret(v SuperplaneSecret) {
 	o.Secret = &v
 }
 
+// GetRequesterId returns the RequesterId field value if set, zero value otherwise.
+func (o *SuperplaneCreateSecretBody) GetRequesterId() string {
+	if o == nil || IsNil(o.RequesterId) {
+		var ret string
+		return ret
+	}
+	return *o.RequesterId
+}
+
+// GetRequesterIdOk returns a tuple with the RequesterId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneCreateSecretBody) GetRequesterIdOk() (*string, bool) {
+	if o == nil || IsNil(o.RequesterId) {
+		return nil, false
+	}
+	return o.RequesterId, true
+}
+
+// HasRequesterId returns a boolean if a field has been set.
+func (o *SuperplaneCreateSecretBody) HasRequesterId() bool {
+	if o != nil && !IsNil(o.RequesterId) {
+		return true
+	}
+
+	return false
+}
+
+// SetRequesterId gets a reference to the given string and assigns it to the RequesterId field.
+func (o *SuperplaneCreateSecretBody) SetRequesterId(v string) {
+	o.RequesterId = &v
+}
+
 func (o SuperplaneCreateSecretBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -115,11 +115,11 @@ func (o SuperplaneCreateSecretBody) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneCreateSecretBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.RequesterId) {
-		toSerialize["requesterId"] = o.RequesterId
-	}
 	if !IsNil(o.Secret) {
 		toSerialize["secret"] = o.Secret
+	}
+	if !IsNil(o.RequesterId) {
+		toSerialize["requesterId"] = o.RequesterId
 	}
 	return toSerialize, nil
 }

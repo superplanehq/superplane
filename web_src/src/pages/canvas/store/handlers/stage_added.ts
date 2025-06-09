@@ -13,7 +13,7 @@ export function handleStageAdded(
   console.log('Stage added event received:', payload);
   
   // Check if stage already exists
-  const existingStage = state.stages.find((s: StageWithEventQueue) => s.id === payload.id);
+  const existingStage = state.stages.find((s: StageWithEventQueue) => s.metadata!.id === payload.metadata!.id);
   if (existingStage) {
     state.updateStage(payload);
   } else {

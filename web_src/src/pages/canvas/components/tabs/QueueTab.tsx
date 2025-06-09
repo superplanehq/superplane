@@ -209,7 +209,7 @@ export const QueueTab = ({
                       )}
                     </div>
                     <button 
-                      onClick={() => approveStageEvent(event.id!, selectedStage.id!)} 
+                      onClick={() => approveStageEvent(event.id!, selectedStage.metadata!.id!)} 
                       style={{ backgroundColor: '#2563eb' }}
                       className="text-xs text-white px-3 py-1 rounded transition-colors bg-blue-600 hover:bg-blue-700"
                     >

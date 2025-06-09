@@ -13,7 +13,6 @@ package openapi_client
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // checks if the SuperplaneStage type satisfies the MappedNullable interface at compile time
@@ -21,17 +20,8 @@ var _ MappedNullable = &SuperplaneStage{}
 
 // SuperplaneStage struct for SuperplaneStage
 type SuperplaneStage struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	CanvasId *string `json:"canvasId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	Connections []SuperplaneConnection `json:"connections,omitempty"`
-	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
-	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
-	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
-	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
-	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
-	Secrets []SuperplaneValueDefinition `json:"secrets,omitempty"`
+	Metadata *SuperplaneStageMetadata `json:"metadata,omitempty"`
+	Spec *SuperplaneStageSpec `json:"spec,omitempty"`
 }
 
 // NewSuperplaneStage instantiates a new SuperplaneStage object
@@ -51,356 +41,68 @@ func NewSuperplaneStageWithDefaults() *SuperplaneStage {
 	return &this
 }
 
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
+// GetMetadata returns the Metadata field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetMetadata() SuperplaneStageMetadata {
+	if o == nil || IsNil(o.Metadata) {
+		var ret SuperplaneStageMetadata
 		return ret
 	}
-	return *o.Id
+	return *o.Metadata
 }
 
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
+func (o *SuperplaneStage) GetMetadataOk() (*SuperplaneStageMetadata, bool) {
+	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
-	return o.Id, true
+	return o.Metadata, true
 }
 
-// HasId returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
+// HasMetadata returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasMetadata() bool {
+	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
 
 	return false
 }
 
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *SuperplaneStage) SetId(v string) {
-	o.Id = &v
+// SetMetadata gets a reference to the given SuperplaneStageMetadata and assigns it to the Metadata field.
+func (o *SuperplaneStage) SetMetadata(v SuperplaneStageMetadata) {
+	o.Metadata = &v
 }
 
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *SuperplaneStage) GetSpec() SuperplaneStageSpec {
+	if o == nil || IsNil(o.Spec) {
+		var ret SuperplaneStageSpec
 		return ret
 	}
-	return *o.Name
+	return *o.Spec
 }
 
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
+func (o *SuperplaneStage) GetSpecOk() (*SuperplaneStageSpec, bool) {
+	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
-	return o.Name, true
+	return o.Spec, true
 }
 
-// HasName returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
+// HasSpec returns a boolean if a field has been set.
+func (o *SuperplaneStage) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
 
 	return false
 }
 
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneStage) SetName(v string) {
-	o.Name = &v
-}
-
-// GetCanvasId returns the CanvasId field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetCanvasId() string {
-	if o == nil || IsNil(o.CanvasId) {
-		var ret string
-		return ret
-	}
-	return *o.CanvasId
-}
-
-// GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetCanvasIdOk() (*string, bool) {
-	if o == nil || IsNil(o.CanvasId) {
-		return nil, false
-	}
-	return o.CanvasId, true
-}
-
-// HasCanvasId returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasCanvasId() bool {
-	if o != nil && !IsNil(o.CanvasId) {
-		return true
-	}
-
-	return false
-}
-
-// SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
-func (o *SuperplaneStage) SetCanvasId(v string) {
-	o.CanvasId = &v
-}
-
-// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetCreatedAt() time.Time {
-	if o == nil || IsNil(o.CreatedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.CreatedAt
-}
-
-// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetCreatedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CreatedAt) {
-		return nil, false
-	}
-	return o.CreatedAt, true
-}
-
-// HasCreatedAt returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasCreatedAt() bool {
-	if o != nil && !IsNil(o.CreatedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *SuperplaneStage) SetCreatedAt(v time.Time) {
-	o.CreatedAt = &v
-}
-
-// GetConnections returns the Connections field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetConnections() []SuperplaneConnection {
-	if o == nil || IsNil(o.Connections) {
-		var ret []SuperplaneConnection
-		return ret
-	}
-	return o.Connections
-}
-
-// GetConnectionsOk returns a tuple with the Connections field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetConnectionsOk() ([]SuperplaneConnection, bool) {
-	if o == nil || IsNil(o.Connections) {
-		return nil, false
-	}
-	return o.Connections, true
-}
-
-// HasConnections returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasConnections() bool {
-	if o != nil && !IsNil(o.Connections) {
-		return true
-	}
-
-	return false
-}
-
-// SetConnections gets a reference to the given []SuperplaneConnection and assigns it to the Connections field.
-func (o *SuperplaneStage) SetConnections(v []SuperplaneConnection) {
-	o.Connections = v
-}
-
-// GetConditions returns the Conditions field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetConditions() []SuperplaneCondition {
-	if o == nil || IsNil(o.Conditions) {
-		var ret []SuperplaneCondition
-		return ret
-	}
-	return o.Conditions
-}
-
-// GetConditionsOk returns a tuple with the Conditions field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetConditionsOk() ([]SuperplaneCondition, bool) {
-	if o == nil || IsNil(o.Conditions) {
-		return nil, false
-	}
-	return o.Conditions, true
-}
-
-// HasConditions returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasConditions() bool {
-	if o != nil && !IsNil(o.Conditions) {
-		return true
-	}
-
-	return false
-}
-
-// SetConditions gets a reference to the given []SuperplaneCondition and assigns it to the Conditions field.
-func (o *SuperplaneStage) SetConditions(v []SuperplaneCondition) {
-	o.Conditions = v
-}
-
-// GetExecutor returns the Executor field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetExecutor() SuperplaneExecutorSpec {
-	if o == nil || IsNil(o.Executor) {
-		var ret SuperplaneExecutorSpec
-		return ret
-	}
-	return *o.Executor
-}
-
-// GetExecutorOk returns a tuple with the Executor field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetExecutorOk() (*SuperplaneExecutorSpec, bool) {
-	if o == nil || IsNil(o.Executor) {
-		return nil, false
-	}
-	return o.Executor, true
-}
-
-// HasExecutor returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasExecutor() bool {
-	if o != nil && !IsNil(o.Executor) {
-		return true
-	}
-
-	return false
-}
-
-// SetExecutor gets a reference to the given SuperplaneExecutorSpec and assigns it to the Executor field.
-func (o *SuperplaneStage) SetExecutor(v SuperplaneExecutorSpec) {
-	o.Executor = &v
-}
-
-// GetInputs returns the Inputs field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetInputs() []SuperplaneInputDefinition {
-	if o == nil || IsNil(o.Inputs) {
-		var ret []SuperplaneInputDefinition
-		return ret
-	}
-	return o.Inputs
-}
-
-// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetInputsOk() ([]SuperplaneInputDefinition, bool) {
-	if o == nil || IsNil(o.Inputs) {
-		return nil, false
-	}
-	return o.Inputs, true
-}
-
-// HasInputs returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasInputs() bool {
-	if o != nil && !IsNil(o.Inputs) {
-		return true
-	}
-
-	return false
-}
-
-// SetInputs gets a reference to the given []SuperplaneInputDefinition and assigns it to the Inputs field.
-func (o *SuperplaneStage) SetInputs(v []SuperplaneInputDefinition) {
-	o.Inputs = v
-}
-
-// GetInputMappings returns the InputMappings field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetInputMappings() []SuperplaneInputMapping {
-	if o == nil || IsNil(o.InputMappings) {
-		var ret []SuperplaneInputMapping
-		return ret
-	}
-	return o.InputMappings
-}
-
-// GetInputMappingsOk returns a tuple with the InputMappings field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetInputMappingsOk() ([]SuperplaneInputMapping, bool) {
-	if o == nil || IsNil(o.InputMappings) {
-		return nil, false
-	}
-	return o.InputMappings, true
-}
-
-// HasInputMappings returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasInputMappings() bool {
-	if o != nil && !IsNil(o.InputMappings) {
-		return true
-	}
-
-	return false
-}
-
-// SetInputMappings gets a reference to the given []SuperplaneInputMapping and assigns it to the InputMappings field.
-func (o *SuperplaneStage) SetInputMappings(v []SuperplaneInputMapping) {
-	o.InputMappings = v
-}
-
-// GetOutputs returns the Outputs field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetOutputs() []SuperplaneOutputDefinition {
-	if o == nil || IsNil(o.Outputs) {
-		var ret []SuperplaneOutputDefinition
-		return ret
-	}
-	return o.Outputs
-}
-
-// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetOutputsOk() ([]SuperplaneOutputDefinition, bool) {
-	if o == nil || IsNil(o.Outputs) {
-		return nil, false
-	}
-	return o.Outputs, true
-}
-
-// HasOutputs returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasOutputs() bool {
-	if o != nil && !IsNil(o.Outputs) {
-		return true
-	}
-
-	return false
-}
-
-// SetOutputs gets a reference to the given []SuperplaneOutputDefinition and assigns it to the Outputs field.
-func (o *SuperplaneStage) SetOutputs(v []SuperplaneOutputDefinition) {
-	o.Outputs = v
-}
-
-// GetSecrets returns the Secrets field value if set, zero value otherwise.
-func (o *SuperplaneStage) GetSecrets() []SuperplaneValueDefinition {
-	if o == nil || IsNil(o.Secrets) {
-		var ret []SuperplaneValueDefinition
-		return ret
-	}
-	return o.Secrets
-}
-
-// GetSecretsOk returns a tuple with the Secrets field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneStage) GetSecretsOk() ([]SuperplaneValueDefinition, bool) {
-	if o == nil || IsNil(o.Secrets) {
-		return nil, false
-	}
-	return o.Secrets, true
-}
-
-// HasSecrets returns a boolean if a field has been set.
-func (o *SuperplaneStage) HasSecrets() bool {
-	if o != nil && !IsNil(o.Secrets) {
-		return true
-	}
-
-	return false
-}
-
-// SetSecrets gets a reference to the given []SuperplaneValueDefinition and assigns it to the Secrets field.
-func (o *SuperplaneStage) SetSecrets(v []SuperplaneValueDefinition) {
-	o.Secrets = v
+// SetSpec gets a reference to the given SuperplaneStageSpec and assigns it to the Spec field.
+func (o *SuperplaneStage) SetSpec(v SuperplaneStageSpec) {
+	o.Spec = &v
 }
 
 func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
@@ -413,38 +115,11 @@ func (o SuperplaneStage) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneStage) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
+	if !IsNil(o.Metadata) {
+		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.CanvasId) {
-		toSerialize["canvasId"] = o.CanvasId
-	}
-	if !IsNil(o.CreatedAt) {
-		toSerialize["createdAt"] = o.CreatedAt
-	}
-	if !IsNil(o.Connections) {
-		toSerialize["connections"] = o.Connections
-	}
-	if !IsNil(o.Conditions) {
-		toSerialize["conditions"] = o.Conditions
-	}
-	if !IsNil(o.Executor) {
-		toSerialize["executor"] = o.Executor
-	}
-	if !IsNil(o.Inputs) {
-		toSerialize["inputs"] = o.Inputs
-	}
-	if !IsNil(o.InputMappings) {
-		toSerialize["inputMappings"] = o.InputMappings
-	}
-	if !IsNil(o.Outputs) {
-		toSerialize["outputs"] = o.Outputs
-	}
-	if !IsNil(o.Secrets) {
-		toSerialize["secrets"] = o.Secrets
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
 	}
 	return toSerialize, nil
 }

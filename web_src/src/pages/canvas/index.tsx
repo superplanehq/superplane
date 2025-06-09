@@ -70,7 +70,7 @@ export function Canvas() {
         for (const stage of mappedStages) {
           // fetch stage events
           const stageEventsResponse = await superplaneListStageEvents({
-            path: { canvasIdOrName: id!, stageIdOrName: stage.id! }
+            path: { canvasIdOrName: id!, stageIdOrName: stage.metadata!.id! }
           });
 
           stagesWithQueues.push({
