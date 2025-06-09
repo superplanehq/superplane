@@ -46,9 +46,7 @@ export function useWebsocketEvents(canvasId: string): void {
     if (!lastJsonMessage) return;
 
     const { event, payload } = lastJsonMessage;
-    
-    console.log('Processing WebSocket event:', event);
-    
+
     // Declare variables outside of case statements to avoid lexical declaration errors
     let newEventPayload: EventMap['new_stage_event'];
     let stageWithNewEvent: StageWithEventQueue | undefined;

@@ -179,19 +179,12 @@ func (c *Client) writePump() {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			log.Infof("Sending message %s", string(message))
 
 			w, err := c.conn.NextWriter(websocket.TextMessage)
 			if err != nil {
 				return
 			}
 			w.Write(message)
-
-			// n := len(c.send)
-			// for i := 0; i < n; i++ {
-				// w.Write([]byte("\n"))
-				// w.Write(<-c.send)
-			// }
 
 			if err := w.Close(); err != nil {
 				return
@@ -211,7 +204,6 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		close(c.Done)
 		c.conn.Close()
-		log.Info("WebSocket connection closed and resources cleaned up")
 	}()
 
 	c.conn.SetReadLimit(1024 * 1024) // 1MB max message size
