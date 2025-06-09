@@ -20,6 +20,21 @@ export type ConnectionHeaderFilter = {
 
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
+export type ExecutorSpecHttp = {
+    url?: string;
+    headers?: {
+        [key: string]: string;
+    };
+    payload?: {
+        [key: string]: string;
+    };
+    responsePolicy?: ExecutorSpecHttpResponsePolicy;
+};
+
+export type ExecutorSpecHttpResponsePolicy = {
+    statusCodes?: Array<number>;
+};
+
 export type ExecutorSpecSemaphore = {
     projectId?: string;
     branch?: string;
@@ -32,26 +47,6 @@ export type ExecutorSpecSemaphore = {
     organizationUrl?: string;
 };
 
-export type InputMappingValueDefinition = {
-    name?: string;
-    valueFrom?: InputMappingValueFrom;
-    value?: string;
-};
-
-export type InputMappingValueFrom = {
-    eventData?: InputMappingValueFromEventData;
-    lastExecution?: InputMappingValueFromLastExecution;
-};
-
-export type InputMappingValueFromEventData = {
-    connection?: string;
-    expression?: string;
-};
-
-export type InputMappingValueFromLastExecution = {
-    results?: Array<ExecutionResult>;
-};
-
 export type InputMappingWhen = {
     triggeredBy?: InputMappingWhenTriggeredBy;
 };
@@ -59,6 +54,17 @@ export type InputMappingWhen = {
 export type InputMappingWhenTriggeredBy = {
     connection?: string;
 };
+
+/**
+ * Local secrets are stored and managed by SuperPlane itself.
+ */
+export type SecretLocal = {
+    data?: {
+        [key: string]: string;
+    };
+};
+
+export type SecretProvider = 'PROVIDER_UNKNOWN' | 'PROVIDER_LOCAL';
 
 export type StageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
 
@@ -71,6 +77,10 @@ export type SuperplaneApproveStageEventResponse = {
 };
 
 export type SuperplaneCanvas = {
+    metadata?: SuperplaneCanvasMetadata;
+};
+
+export type SuperplaneCanvasMetadata = {
     id?: string;
     name?: string;
     createdBy?: string;
@@ -105,7 +115,7 @@ export type SuperplaneConnection = {
 export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE';
 
 export type SuperplaneCreateCanvasRequest = {
-    name?: string;
+    canvas?: SuperplaneCanvas;
     requesterId?: string;
 };
 
@@ -114,7 +124,7 @@ export type SuperplaneCreateCanvasResponse = {
 };
 
 export type SuperplaneCreateEventSourceBody = {
-    name?: string;
+    eventSource?: SuperplaneEventSource;
     requesterId?: string;
 };
 
@@ -123,19 +133,26 @@ export type SuperplaneCreateEventSourceResponse = {
     key?: string;
 };
 
-export type SuperplaneCreateStageBody = {
-    name?: string;
+export type SuperplaneCreateSecretBody = {
+    secret?: SuperplaneSecret;
     requesterId?: string;
-    connections?: Array<SuperplaneConnection>;
-    conditions?: Array<SuperplaneCondition>;
-    executor?: SuperplaneExecutorSpec;
-    inputs?: Array<SuperplaneInputDefinition>;
-    inputMappings?: Array<SuperplaneInputMapping>;
-    outputs?: Array<SuperplaneOutputDefinition>;
+};
+
+export type SuperplaneCreateSecretResponse = {
+    secret?: SuperplaneSecret;
+};
+
+export type SuperplaneCreateStageBody = {
+    stage?: SuperplaneStage;
+    requesterId?: string;
 };
 
 export type SuperplaneCreateStageResponse = {
     stage?: SuperplaneStage;
+};
+
+export type SuperplaneDeleteSecretResponse = {
+    [key: string]: unknown;
 };
 
 export type SuperplaneDescribeCanvasResponse = {
@@ -146,15 +163,28 @@ export type SuperplaneDescribeEventSourceResponse = {
     eventSource?: SuperplaneEventSource;
 };
 
+export type SuperplaneDescribeSecretResponse = {
+    secret?: SuperplaneSecret;
+};
+
 export type SuperplaneDescribeStageResponse = {
     stage?: SuperplaneStage;
 };
 
 export type SuperplaneEventSource = {
+    metadata?: SuperplaneEventSourceMetadata;
+    spec?: SuperplaneEventSourceSpec;
+};
+
+export type SuperplaneEventSourceMetadata = {
     id?: string;
     name?: string;
     canvasId?: string;
     createdAt?: string;
+};
+
+export type SuperplaneEventSourceSpec = {
+    [key: string]: unknown;
 };
 
 export type SuperplaneExecution = {
@@ -173,9 +203,10 @@ export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STAT
 export type SuperplaneExecutorSpec = {
     type?: SuperplaneExecutorSpecType;
     semaphore?: ExecutorSpecSemaphore;
+    http?: ExecutorSpecHttp;
 };
 
-export type SuperplaneExecutorSpecType = 'TYPE_UNKNOWN' | 'TYPE_SEMAPHORE';
+export type SuperplaneExecutorSpecType = 'TYPE_UNKNOWN' | 'TYPE_SEMAPHORE' | 'TYPE_HTTP';
 
 export type SuperplaneInputDefinition = {
     name?: string;
@@ -183,7 +214,7 @@ export type SuperplaneInputDefinition = {
 };
 
 export type SuperplaneInputMapping = {
-    values?: Array<InputMappingValueDefinition>;
+    values?: Array<SuperplaneValueDefinition>;
     when?: InputMappingWhen;
 };
 
@@ -198,6 +229,10 @@ export type SuperplaneListCanvasesResponse = {
 
 export type SuperplaneListEventSourcesResponse = {
     eventSources?: Array<SuperplaneEventSource>;
+};
+
+export type SuperplaneListSecretsResponse = {
+    secrets?: Array<SuperplaneSecret>;
 };
 
 export type SuperplaneListStageEventsResponse = {
@@ -219,17 +254,26 @@ export type SuperplaneOutputValue = {
     value?: string;
 };
 
-export type SuperplaneStage = {
+export type SuperplaneSecret = {
+    metadata?: SuperplaneSecretMetadata;
+    spec?: SuperplaneSecretSpec;
+};
+
+export type SuperplaneSecretMetadata = {
     id?: string;
     name?: string;
     canvasId?: string;
     createdAt?: string;
-    connections?: Array<SuperplaneConnection>;
-    conditions?: Array<SuperplaneCondition>;
-    executor?: SuperplaneExecutorSpec;
-    inputs?: Array<SuperplaneInputDefinition>;
-    inputMappings?: Array<SuperplaneInputMapping>;
-    outputs?: Array<SuperplaneOutputDefinition>;
+};
+
+export type SuperplaneSecretSpec = {
+    provider?: SecretProvider;
+    local?: SecretLocal;
+};
+
+export type SuperplaneStage = {
+    metadata?: SuperplaneStageMetadata;
+    spec?: SuperplaneStageSpec;
 };
 
 export type SuperplaneStageEvent = {
@@ -251,18 +295,65 @@ export type SuperplaneStageEventApproval = {
 
 export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED';
 
-export type SuperplaneUpdateStageBody = {
-    requesterId?: string;
+export type SuperplaneStageMetadata = {
+    id?: string;
+    name?: string;
+    canvasId?: string;
+    createdAt?: string;
+};
+
+export type SuperplaneStageSpec = {
     connections?: Array<SuperplaneConnection>;
     conditions?: Array<SuperplaneCondition>;
     executor?: SuperplaneExecutorSpec;
     inputs?: Array<SuperplaneInputDefinition>;
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
+    secrets?: Array<SuperplaneValueDefinition>;
+};
+
+export type SuperplaneUpdateSecretBody = {
+    secret?: SuperplaneSecret;
+    requesterId?: string;
+};
+
+export type SuperplaneUpdateSecretResponse = {
+    secret?: SuperplaneSecret;
+};
+
+export type SuperplaneUpdateStageBody = {
+    stage?: SuperplaneStage;
+    requesterId?: string;
 };
 
 export type SuperplaneUpdateStageResponse = {
     stage?: SuperplaneStage;
+};
+
+export type SuperplaneValueDefinition = {
+    name?: string;
+    valueFrom?: SuperplaneValueFrom;
+    value?: string;
+};
+
+export type SuperplaneValueFrom = {
+    eventData?: SuperplaneValueFromEventData;
+    lastExecution?: SuperplaneValueFromLastExecution;
+    secret?: SuperplaneValueFromSecret;
+};
+
+export type SuperplaneValueFromEventData = {
+    connection?: string;
+    expression?: string;
+};
+
+export type SuperplaneValueFromLastExecution = {
+    results?: Array<ExecutionResult>;
+};
+
+export type SuperplaneValueFromSecret = {
+    name?: string;
+    key?: string;
 };
 
 export type ProtobufAny = {
@@ -409,6 +500,146 @@ export type SuperplaneDescribeEventSourceResponses = {
 };
 
 export type SuperplaneDescribeEventSourceResponse2 = SuperplaneDescribeEventSourceResponses[keyof SuperplaneDescribeEventSourceResponses];
+
+export type SuperplaneListSecretsData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/secrets';
+};
+
+export type SuperplaneListSecretsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneListSecretsError = SuperplaneListSecretsErrors[keyof SuperplaneListSecretsErrors];
+
+export type SuperplaneListSecretsResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneListSecretsResponse;
+};
+
+export type SuperplaneListSecretsResponse2 = SuperplaneListSecretsResponses[keyof SuperplaneListSecretsResponses];
+
+export type SuperplaneCreateSecretData = {
+    body: SuperplaneCreateSecretBody;
+    path: {
+        canvasIdOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/secrets';
+};
+
+export type SuperplaneCreateSecretErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneCreateSecretError = SuperplaneCreateSecretErrors[keyof SuperplaneCreateSecretErrors];
+
+export type SuperplaneCreateSecretResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneCreateSecretResponse;
+};
+
+export type SuperplaneCreateSecretResponse2 = SuperplaneCreateSecretResponses[keyof SuperplaneCreateSecretResponses];
+
+export type SuperplaneDeleteSecretData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: {
+        requesterId?: string;
+    };
+    url: '/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}';
+};
+
+export type SuperplaneDeleteSecretErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneDeleteSecretError = SuperplaneDeleteSecretErrors[keyof SuperplaneDeleteSecretErrors];
+
+export type SuperplaneDeleteSecretResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDeleteSecretResponse;
+};
+
+export type SuperplaneDeleteSecretResponse2 = SuperplaneDeleteSecretResponses[keyof SuperplaneDeleteSecretResponses];
+
+export type SuperplaneDescribeSecretData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}';
+};
+
+export type SuperplaneDescribeSecretErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneDescribeSecretError = SuperplaneDescribeSecretErrors[keyof SuperplaneDescribeSecretErrors];
+
+export type SuperplaneDescribeSecretResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeSecretResponse;
+};
+
+export type SuperplaneDescribeSecretResponse2 = SuperplaneDescribeSecretResponses[keyof SuperplaneDescribeSecretResponses];
+
+export type SuperplaneUpdateSecretData = {
+    body: SuperplaneUpdateSecretBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}';
+};
+
+export type SuperplaneUpdateSecretErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneUpdateSecretError = SuperplaneUpdateSecretErrors[keyof SuperplaneUpdateSecretErrors];
+
+export type SuperplaneUpdateSecretResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateSecretResponse;
+};
+
+export type SuperplaneUpdateSecretResponse2 = SuperplaneUpdateSecretResponses[keyof SuperplaneUpdateSecretResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;

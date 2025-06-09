@@ -24,9 +24,9 @@ var listCanvasesCmd = &cobra.Command{
 		}
 
 		for i, canvas := range response.Canvases {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *canvas.Name, *canvas.Id)
-			fmt.Printf("   Created at: %s\n", *canvas.CreatedAt)
-			fmt.Printf("   Created by: %s\n", *canvas.CreatedBy)
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *canvas.GetMetadata().Name, *canvas.GetMetadata().Id)
+			fmt.Printf("   Created at: %s\n", *canvas.GetMetadata().CreatedAt)
+			fmt.Printf("   Created by: %s\n", *canvas.GetMetadata().CreatedBy)
 
 			if i < len(response.Canvases)-1 {
 				fmt.Println()
@@ -56,9 +56,9 @@ var listEventSourcesCmd = &cobra.Command{
 
 		fmt.Printf("Found %d event sources:\n\n", len(response.EventSources))
 		for i, es := range response.EventSources {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *es.Name, *es.Id)
-			fmt.Printf("   Canvas: %s\n", *es.CanvasId)
-			fmt.Printf("   Created at: %s\n", *es.CreatedAt)
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *es.GetMetadata().Name, *es.GetMetadata().Id)
+			fmt.Printf("   Canvas: %s\n", *es.GetMetadata().CanvasId)
+			fmt.Printf("   Created at: %s\n", *es.GetMetadata().CreatedAt)
 
 			if i < len(response.EventSources)-1 {
 				fmt.Println()
@@ -88,9 +88,9 @@ var listStagesCmd = &cobra.Command{
 
 		fmt.Printf("Found %d stages:\n\n", len(response.Stages))
 		for i, stage := range response.Stages {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *stage.Name, *stage.Id)
-			fmt.Printf("   Canvas: %s\n", *stage.CanvasId)
-			fmt.Printf("   Created at: %s\n", *stage.CreatedAt)
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *stage.GetMetadata().Name, *stage.GetMetadata().Id)
+			fmt.Printf("   Canvas: %s\n", *stage.GetMetadata().CanvasId)
+			fmt.Printf("   Created at: %s\n", *stage.GetMetadata().CreatedAt)
 
 			if i < len(response.Stages)-1 {
 				fmt.Println()
@@ -120,14 +120,14 @@ var listSecretsCmd = &cobra.Command{
 
 		fmt.Printf("Found %d secrets:\n\n", len(response.Secrets))
 		for i, secret := range response.Secrets {
-			fmt.Printf("%d. %s (ID: %s)\n", i+1, *secret.Name, *secret.Id)
-			fmt.Printf("   Canvas: %s\n", *secret.CanvasId)
-			fmt.Printf("   Provider: %s\n", string(*secret.Provider))
-			fmt.Printf("   Created at: %s\n", *secret.CreatedAt)
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *secret.GetMetadata().Name, *secret.GetMetadata().Id)
+			fmt.Printf("   Canvas: %s\n", *secret.GetMetadata().CanvasId)
+			fmt.Printf("   Provider: %s\n", string(*secret.GetSpec().Provider))
+			fmt.Printf("   Created at: %s\n", *secret.GetMetadata().CreatedAt)
 
-			if secret.Local != nil && secret.Local.Data != nil {
+			if secret.GetSpec().Local != nil && secret.GetSpec().Local.Data != nil {
 				fmt.Println("   Values:")
-				for k, v := range *secret.Local.Data {
+				for k, v := range *secret.GetSpec().Local.Data {
 					fmt.Printf("     %s = %s\n", k, v)
 				}
 			}

@@ -105,7 +105,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
       }}
     >
       {/* Sidebar Header */}
-      <SidebarHeader stageName={selectedStage.name || ''} onClose={onClose} />
+      <SidebarHeader stageName={selectedStage.metadata!.name || ''} onClose={onClose} />
 
       {/* Sidebar Tabs */}
       <SidebarTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />

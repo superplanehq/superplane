@@ -20,14 +20,8 @@ var _ MappedNullable = &SuperplaneUpdateStageBody{}
 
 // SuperplaneUpdateStageBody struct for SuperplaneUpdateStageBody
 type SuperplaneUpdateStageBody struct {
+	Stage *SuperplaneStage `json:"stage,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
-	Connections []SuperplaneConnection `json:"connections,omitempty"`
-	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
-	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
-	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
-	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
-	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
-	Secrets []SuperplaneValueDefinition `json:"secrets,omitempty"`
 }
 
 // NewSuperplaneUpdateStageBody instantiates a new SuperplaneUpdateStageBody object
@@ -45,6 +39,38 @@ func NewSuperplaneUpdateStageBody() *SuperplaneUpdateStageBody {
 func NewSuperplaneUpdateStageBodyWithDefaults() *SuperplaneUpdateStageBody {
 	this := SuperplaneUpdateStageBody{}
 	return &this
+}
+
+// GetStage returns the Stage field value if set, zero value otherwise.
+func (o *SuperplaneUpdateStageBody) GetStage() SuperplaneStage {
+	if o == nil || IsNil(o.Stage) {
+		var ret SuperplaneStage
+		return ret
+	}
+	return *o.Stage
+}
+
+// GetStageOk returns a tuple with the Stage field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneUpdateStageBody) GetStageOk() (*SuperplaneStage, bool) {
+	if o == nil || IsNil(o.Stage) {
+		return nil, false
+	}
+	return o.Stage, true
+}
+
+// HasStage returns a boolean if a field has been set.
+func (o *SuperplaneUpdateStageBody) HasStage() bool {
+	if o != nil && !IsNil(o.Stage) {
+		return true
+	}
+
+	return false
+}
+
+// SetStage gets a reference to the given SuperplaneStage and assigns it to the Stage field.
+func (o *SuperplaneUpdateStageBody) SetStage(v SuperplaneStage) {
+	o.Stage = &v
 }
 
 // GetRequesterId returns the RequesterId field value if set, zero value otherwise.
@@ -79,230 +105,6 @@ func (o *SuperplaneUpdateStageBody) SetRequesterId(v string) {
 	o.RequesterId = &v
 }
 
-// GetConnections returns the Connections field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetConnections() []SuperplaneConnection {
-	if o == nil || IsNil(o.Connections) {
-		var ret []SuperplaneConnection
-		return ret
-	}
-	return o.Connections
-}
-
-// GetConnectionsOk returns a tuple with the Connections field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetConnectionsOk() ([]SuperplaneConnection, bool) {
-	if o == nil || IsNil(o.Connections) {
-		return nil, false
-	}
-	return o.Connections, true
-}
-
-// HasConnections returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasConnections() bool {
-	if o != nil && !IsNil(o.Connections) {
-		return true
-	}
-
-	return false
-}
-
-// SetConnections gets a reference to the given []SuperplaneConnection and assigns it to the Connections field.
-func (o *SuperplaneUpdateStageBody) SetConnections(v []SuperplaneConnection) {
-	o.Connections = v
-}
-
-// GetConditions returns the Conditions field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetConditions() []SuperplaneCondition {
-	if o == nil || IsNil(o.Conditions) {
-		var ret []SuperplaneCondition
-		return ret
-	}
-	return o.Conditions
-}
-
-// GetConditionsOk returns a tuple with the Conditions field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetConditionsOk() ([]SuperplaneCondition, bool) {
-	if o == nil || IsNil(o.Conditions) {
-		return nil, false
-	}
-	return o.Conditions, true
-}
-
-// HasConditions returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasConditions() bool {
-	if o != nil && !IsNil(o.Conditions) {
-		return true
-	}
-
-	return false
-}
-
-// SetConditions gets a reference to the given []SuperplaneCondition and assigns it to the Conditions field.
-func (o *SuperplaneUpdateStageBody) SetConditions(v []SuperplaneCondition) {
-	o.Conditions = v
-}
-
-// GetExecutor returns the Executor field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetExecutor() SuperplaneExecutorSpec {
-	if o == nil || IsNil(o.Executor) {
-		var ret SuperplaneExecutorSpec
-		return ret
-	}
-	return *o.Executor
-}
-
-// GetExecutorOk returns a tuple with the Executor field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetExecutorOk() (*SuperplaneExecutorSpec, bool) {
-	if o == nil || IsNil(o.Executor) {
-		return nil, false
-	}
-	return o.Executor, true
-}
-
-// HasExecutor returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasExecutor() bool {
-	if o != nil && !IsNil(o.Executor) {
-		return true
-	}
-
-	return false
-}
-
-// SetExecutor gets a reference to the given SuperplaneExecutorSpec and assigns it to the Executor field.
-func (o *SuperplaneUpdateStageBody) SetExecutor(v SuperplaneExecutorSpec) {
-	o.Executor = &v
-}
-
-// GetInputs returns the Inputs field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetInputs() []SuperplaneInputDefinition {
-	if o == nil || IsNil(o.Inputs) {
-		var ret []SuperplaneInputDefinition
-		return ret
-	}
-	return o.Inputs
-}
-
-// GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetInputsOk() ([]SuperplaneInputDefinition, bool) {
-	if o == nil || IsNil(o.Inputs) {
-		return nil, false
-	}
-	return o.Inputs, true
-}
-
-// HasInputs returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasInputs() bool {
-	if o != nil && !IsNil(o.Inputs) {
-		return true
-	}
-
-	return false
-}
-
-// SetInputs gets a reference to the given []SuperplaneInputDefinition and assigns it to the Inputs field.
-func (o *SuperplaneUpdateStageBody) SetInputs(v []SuperplaneInputDefinition) {
-	o.Inputs = v
-}
-
-// GetInputMappings returns the InputMappings field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetInputMappings() []SuperplaneInputMapping {
-	if o == nil || IsNil(o.InputMappings) {
-		var ret []SuperplaneInputMapping
-		return ret
-	}
-	return o.InputMappings
-}
-
-// GetInputMappingsOk returns a tuple with the InputMappings field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetInputMappingsOk() ([]SuperplaneInputMapping, bool) {
-	if o == nil || IsNil(o.InputMappings) {
-		return nil, false
-	}
-	return o.InputMappings, true
-}
-
-// HasInputMappings returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasInputMappings() bool {
-	if o != nil && !IsNil(o.InputMappings) {
-		return true
-	}
-
-	return false
-}
-
-// SetInputMappings gets a reference to the given []SuperplaneInputMapping and assigns it to the InputMappings field.
-func (o *SuperplaneUpdateStageBody) SetInputMappings(v []SuperplaneInputMapping) {
-	o.InputMappings = v
-}
-
-// GetOutputs returns the Outputs field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetOutputs() []SuperplaneOutputDefinition {
-	if o == nil || IsNil(o.Outputs) {
-		var ret []SuperplaneOutputDefinition
-		return ret
-	}
-	return o.Outputs
-}
-
-// GetOutputsOk returns a tuple with the Outputs field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetOutputsOk() ([]SuperplaneOutputDefinition, bool) {
-	if o == nil || IsNil(o.Outputs) {
-		return nil, false
-	}
-	return o.Outputs, true
-}
-
-// HasOutputs returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasOutputs() bool {
-	if o != nil && !IsNil(o.Outputs) {
-		return true
-	}
-
-	return false
-}
-
-// SetOutputs gets a reference to the given []SuperplaneOutputDefinition and assigns it to the Outputs field.
-func (o *SuperplaneUpdateStageBody) SetOutputs(v []SuperplaneOutputDefinition) {
-	o.Outputs = v
-}
-
-// GetSecrets returns the Secrets field value if set, zero value otherwise.
-func (o *SuperplaneUpdateStageBody) GetSecrets() []SuperplaneValueDefinition {
-	if o == nil || IsNil(o.Secrets) {
-		var ret []SuperplaneValueDefinition
-		return ret
-	}
-	return o.Secrets
-}
-
-// GetSecretsOk returns a tuple with the Secrets field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneUpdateStageBody) GetSecretsOk() ([]SuperplaneValueDefinition, bool) {
-	if o == nil || IsNil(o.Secrets) {
-		return nil, false
-	}
-	return o.Secrets, true
-}
-
-// HasSecrets returns a boolean if a field has been set.
-func (o *SuperplaneUpdateStageBody) HasSecrets() bool {
-	if o != nil && !IsNil(o.Secrets) {
-		return true
-	}
-
-	return false
-}
-
-// SetSecrets gets a reference to the given []SuperplaneValueDefinition and assigns it to the Secrets field.
-func (o *SuperplaneUpdateStageBody) SetSecrets(v []SuperplaneValueDefinition) {
-	o.Secrets = v
-}
-
 func (o SuperplaneUpdateStageBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -313,29 +115,11 @@ func (o SuperplaneUpdateStageBody) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneUpdateStageBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.Stage) {
+		toSerialize["stage"] = o.Stage
+	}
 	if !IsNil(o.RequesterId) {
 		toSerialize["requesterId"] = o.RequesterId
-	}
-	if !IsNil(o.Connections) {
-		toSerialize["connections"] = o.Connections
-	}
-	if !IsNil(o.Conditions) {
-		toSerialize["conditions"] = o.Conditions
-	}
-	if !IsNil(o.Executor) {
-		toSerialize["executor"] = o.Executor
-	}
-	if !IsNil(o.Inputs) {
-		toSerialize["inputs"] = o.Inputs
-	}
-	if !IsNil(o.InputMappings) {
-		toSerialize["inputMappings"] = o.InputMappings
-	}
-	if !IsNil(o.Outputs) {
-		toSerialize["outputs"] = o.Outputs
-	}
-	if !IsNil(o.Secrets) {
-		toSerialize["secrets"] = o.Secrets
 	}
 	return toSerialize, nil
 }

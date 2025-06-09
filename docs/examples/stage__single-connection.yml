@@ -1,7 +1,8 @@
+apiVersion: v1
 kind: Stage
 metadata:
   name: deploy-to-staging
-  canvasId: my-application-canvas-id
+  canvasId: c2181c55-64ac-41ba-8925-0eaf0357b3f6 
 spec:
 
   # Define secrets that will be available to the executor
@@ -66,8 +67,3 @@ spec:
       taskId: fd67cfb1-e06c-4896-a517-c648f878330a
       branch: main
       pipelineFile: .semaphore/deploy.yml
-      parameters:
-        - name: VERSION
-          value: ${{ inputs.VERSION }}
-        - name: ENVIRONMENT
-          value: ${{ inputs.ENVIRONMENT }}

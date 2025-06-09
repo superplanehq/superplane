@@ -17,8 +17,9 @@ func Test__ListCanvases(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Len(t, res.Canvases, 1)
-	assert.Equal(t, r.Canvas.ID.String(), res.Canvases[0].Id)
-	assert.Equal(t, r.Canvas.Name, res.Canvases[0].Name)
-	assert.Equal(t, r.Canvas.CreatedBy.String(), res.Canvases[0].CreatedBy)
-	assert.NotNil(t, res.Canvases[0].CreatedAt)
+	require.NotNil(t, res.Canvases[0].Metadata)
+	assert.Equal(t, r.Canvas.ID.String(), res.Canvases[0].Metadata.Id)
+	assert.Equal(t, r.Canvas.Name, res.Canvases[0].Metadata.Name)
+	assert.Equal(t, r.Canvas.CreatedBy.String(), res.Canvases[0].Metadata.CreatedBy)
+	assert.NotNil(t, res.Canvases[0].Metadata.CreatedAt)
 }
