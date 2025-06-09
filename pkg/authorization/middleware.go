@@ -18,6 +18,14 @@ var (
 	stageEventApprovePattern = regexp.MustCompile(`^canvases/([^/]+)/stages/[^/]+/events/[^/]+/approve$`)
 )
 
+// define custom types to avoid context key warnings
+type contextKey string
+
+const (
+	userIDKey contextKey = "userID"
+	orgIDKey  contextKey = "orgID"
+)
+
 type resourceInfo struct {
 	resourceType string // "canvas", "eventsource", "stage", "stageevent"
 	action       string // "create", "read", "update", "delete", "approve"
@@ -132,13 +140,13 @@ func AuthorizationMiddleware(authService AuthorizationServiceInterface) func(nex
 
 			ctx := r.Context()
 
-			userID, ok := ctx.Value("userID").(string)
+			userID, ok := ctx.Value(userIDKey).(string)
 			if !ok || userID == "" {
 				http.Error(w, "Unauthorized: missing user ID", http.StatusUnauthorized)
 				return
 			}
 
-			orgID, _ := ctx.Value("orgID").(string)
+			orgID, _ := ctx.Value(orgIDKey).(string)
 
 			info, err := parseAPIPath(r.URL.Path, r.Method)
 			if err != nil {

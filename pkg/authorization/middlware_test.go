@@ -13,14 +13,6 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-// define custom types to avoid context key warnings
-type contextKey string
-
-const (
-	userIDKey contextKey = "userID"
-	orgIDKey  contextKey = "orgID"
-)
-
 func createTestRequest(method, path string, userID, orgID string) *http.Request {
 	req := httptest.NewRequest(method, path, nil)
 	ctx := context.WithValue(req.Context(), userIDKey, userID)
