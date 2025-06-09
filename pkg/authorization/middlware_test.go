@@ -13,11 +13,19 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
+// define custom types to avoid context key warnings
+type contextKey string
+
+const (
+	userIDKey contextKey = "userID"
+	orgIDKey  contextKey = "orgID"
+)
+
 func createTestRequest(method, path string, userID, orgID string) *http.Request {
 	req := httptest.NewRequest(method, path, nil)
-	ctx := context.WithValue(req.Context(), "userID", userID)
+	ctx := context.WithValue(req.Context(), userIDKey, userID)
 	if orgID != "" {
-		ctx = context.WithValue(ctx, "orgID", orgID)
+		ctx = context.WithValue(ctx, orgIDKey, orgID)
 	}
 	return req.WithContext(ctx)
 }
@@ -77,8 +85,8 @@ func Test__AuthorizationMiddleware_MissingUserID(t *testing.T) {
 		context context.Context
 	}{
 		{"no userID in context", context.Background()},
-		{"empty userID", context.WithValue(context.Background(), "userID", "")},
-		{"non-string userID", context.WithValue(context.Background(), "userID", 123)},
+		{"empty userID", context.WithValue(context.Background(), userIDKey, "")},
+		{"non-string userID", context.WithValue(context.Background(), userIDKey, 123)},
 	}
 
 	for _, tt := range tests {
