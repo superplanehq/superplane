@@ -27,6 +27,27 @@ type AuthorizationServiceInterface interface {
 	// User access queries
 	GetAccessibleOrgsForUser(userID string) ([]string, error)
 	GetAccessibleCanvasesForUser(userID string) ([]string, error)
-	GetUserRolesForOrg(userID string, orgID string) ([]string, error)
-	GetUserRolesForCanvas(userID string, canvasID string) ([]string, error)
+	GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error)
+	GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error)
+
+	GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error)
+	GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error)
+	GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error)
+	GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error)
+}
+
+type RoleDefinition struct {
+	Name         string
+	DomainType   string
+	Description  string
+	Permissions  []*Permission
+	InheritsFrom *RoleDefinition
+	Readonly     bool
+}
+
+type Permission struct {
+	Resource    string
+	Action      string
+	Description string
+	DomainType  string
 }

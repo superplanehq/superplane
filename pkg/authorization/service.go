@@ -324,21 +324,41 @@ func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, err
 	return canvasIDs, nil
 }
 
-func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]string, error) {
+func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := fmt.Sprintf("org:%s", orgID)
-	roles, err := a.enforcer.GetImplicitRolesForUser(userID, orgDomain)
+	roleNames, err := a.enforcer.GetImplicitRolesForUser(userID, orgDomain)
 	if err != nil {
 		return nil, err
 	}
+
+	roles := make([]*RoleDefinition, 0, len(roleNames))
+	for _, roleName := range roleNames {
+		roleDef, err := a.GetRoleDefinition(roleName, DomainOrg, orgID)
+		if err != nil {
+			continue
+		}
+		roles = append(roles, roleDef)
+	}
+
 	return roles, nil
 }
 
-func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]string, error) {
+func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error) {
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	roles, err := a.enforcer.GetImplicitRolesForUser(userID, canvasDomain)
+	roleNames, err := a.enforcer.GetImplicitRolesForUser(userID, canvasDomain)
 	if err != nil {
 		return nil, err
 	}
+
+	roles := make([]*RoleDefinition, 0, len(roleNames))
+	for _, roleName := range roleNames {
+		roleDef, err := a.GetRoleDefinition(roleName, DomainCanvas, canvasID)
+		if err != nil {
+			continue
+		}
+		roles = append(roles, roleDef)
+	}
+
 	return roles, nil
 }
 
@@ -362,6 +382,81 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	}
 
 	return nil
+}
+
+func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	if !a.roleExistsInDomain(roleName, domain) {
+		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	}
+
+	roleDefinition := &RoleDefinition{
+		Name:        roleName,
+		DomainType:  domainType,
+		Description: a.getRoleDescription(roleName),
+		Permissions: a.getRolePermissions(roleName, domain, domainType),
+		Readonly:    true,
+	}
+
+	inheritedRole := a.getInheritedRole(roleName, domain, domainType)
+	if inheritedRole != nil {
+		roleDefinition.InheritsFrom = inheritedRole
+	}
+
+	return roleDefinition, nil
+}
+
+func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	roles, err := a.getRolesFromPolicies(domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get roles for domain %s: %w", domain, err)
+	}
+
+	roleDefinitions := make([]*RoleDefinition, 0, len(roles))
+	for _, roleName := range roles {
+		roleDef, err := a.GetRoleDefinition(roleName, domainType, domainID)
+		if err != nil {
+			continue
+		}
+		roleDefinitions = append(roleDefinitions, roleDef)
+	}
+
+	return roleDefinitions, nil
+}
+
+func (a *AuthService) GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	if !a.roleExistsInDomain(roleName, domain) {
+		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	}
+
+	return a.getRolePermissions(roleName, domain, domainType), nil
+}
+
+func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	if !a.roleExistsInDomain(roleName, domain) {
+		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	}
+
+	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(roleName, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get role hierarchy: %w", err)
+	}
+
+	hierarchy := []string{roleName}
+	for _, role := range implicitRoles {
+		if role != roleName {
+			hierarchy = append(hierarchy, role)
+		}
+	}
+
+	return hierarchy, nil
 }
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
@@ -391,6 +486,149 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 	}
 
 	return policies, nil
+}
+
+func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
+	roles, err := a.getRolesFromPolicies(domain)
+	log.Infof("roles: %v", roles)
+	if err != nil {
+		return false
+	}
+
+	for _, role := range roles {
+		if role == roleName {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
+	permissions, err := a.enforcer.GetImplicitPermissionsForUser(roleName, domain)
+	if err != nil {
+		return []*Permission{}
+	}
+
+	rolePermissions := make([]*Permission, 0, len(permissions))
+	for _, permission := range permissions {
+		if len(permission) >= 4 {
+			rolePermissions = append(rolePermissions, &Permission{
+				Resource:    permission[2],
+				Action:      permission[3],
+				Description: generatePermissionDescription(permission[2], permission[3]),
+				DomainType:  domainType,
+			})
+		}
+	}
+
+	return rolePermissions
+}
+
+func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *RoleDefinition {
+	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(roleName, domain)
+	if err != nil || len(implicitRoles) == 0 {
+		return nil
+	}
+
+	for _, inheritedRoleName := range implicitRoles {
+		if inheritedRoleName != roleName {
+			return &RoleDefinition{
+				Name:        inheritedRoleName,
+				DomainType:  domainType,
+				Description: a.getRoleDescription(inheritedRoleName),
+				Permissions: a.getRolePermissions(inheritedRoleName, domain, domainType),
+				Readonly:    true,
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
+	roleSet := make(map[string]bool)
+
+	// Get all policies where the domain matches (position 1 in policy)
+	policies, err := a.enforcer.GetFilteredPolicy(1, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filtered policy: %w", err)
+	}
+	for _, policy := range policies {
+		if len(policy) >= 2 {
+			// policy format: [role, domain, resource, action]
+			roleName := policy[0]
+			roleSet[roleName] = true
+		}
+	}
+
+	// Also get roles from grouping policies (inheritance)
+	groupingPolicies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filtered grouping policy: %w", err)
+	}
+	for _, policy := range groupingPolicies {
+		if len(policy) >= 3 {
+			// grouping policy format: [lower_role, higher_role, domain]
+			lowerRole := policy[0]
+			higherRole := policy[1]
+			roleSet[lowerRole] = true
+			roleSet[higherRole] = true
+		}
+	}
+
+	roles := make([]string, 0, len(roleSet))
+	for role := range roleSet {
+		roles = append(roles, role)
+	}
+
+	return roles, nil
+}
+
+func (a *AuthService) getRoleDescription(roleName string) string {
+	descriptions := map[string]string{
+		RoleOrgViewer:    "Read-only access to organization resources",
+		RoleOrgAdmin:     "Full management access to organization resources including canvases and users",
+		RoleOrgOwner:     "Complete control over the organization including settings and deletion",
+		RoleCanvasViewer: "Read-only access to canvas resources",
+		RoleCanvasAdmin:  "Full management access to canvas resources including stages and events",
+		RoleCanvasOwner:  "Complete control over the canvas including member management",
+	}
+
+	if description, exists := descriptions[roleName]; exists {
+		return description
+	}
+	return fmt.Sprintf("Role: %s", roleName)
+}
+
+func generatePermissionDescription(resource, action string) string {
+	actionDescriptions := map[string]string{
+		"read":    "View",
+		"create":  "Create",
+		"update":  "Modify",
+		"delete":  "Delete",
+		"invite":  "Invite",
+		"remove":  "Remove",
+		"approve": "Approve",
+	}
+
+	resourceDescriptions := map[string]string{
+		"canvas":      "canvas",
+		"user":        "user",
+		"org":         "organization",
+		"eventsource": "event source",
+		"stage":       "stage",
+		"stageevent":  "stage event",
+		"member":      "member",
+	}
+
+	actionDesc, actionExists := actionDescriptions[action]
+	resourceDesc, resourceExists := resourceDescriptions[resource]
+
+	if actionExists && resourceExists {
+		return fmt.Sprintf("%s %s", actionDesc, resourceDesc)
+	}
+
+	return fmt.Sprintf("%s %s", action, resource)
 }
 
 func contains(slice []string, item string) bool {
