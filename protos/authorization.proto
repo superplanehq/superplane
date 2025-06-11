@@ -129,7 +129,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List accessible organizations";
       description: "Returns a list of organizations the user has access to";
-      tags: "Organization";
+      tags: "Authorization";
     };
   }
 
@@ -144,7 +144,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List accessible canvases";
       description: "Returns a list of canvases the user has access to";
-      tags: "Canvas";
+      tags: "Authorization";
     };
   }
 
@@ -175,7 +175,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create group";
       description: "Creates a new group within an organization with a specific role";
-      tags: "Group";
+      tags: "Authorization";
     };
   }
 
@@ -191,7 +191,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Add user to group";
       description: "Adds a user to an organization group";
-      tags: "Group";
+      tags: "Authorization";
     };
   }
 
@@ -206,7 +206,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from group";
       description: "Removes a user from an organization group";
-      tags: "Group";
+      tags: "Authorization";
     };
   }
 
@@ -221,7 +221,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization groups";
       description: "Returns a list of groups within an organization";
-      tags: "Group";
+      tags: "Authorization";
     };
   }
 
@@ -236,7 +236,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get group users";
       description: "Returns users that belong to a specific group";
-      tags: "Group";
+      tags: "Authorization";
     };
   }
 
@@ -251,7 +251,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization users for role";
       description: "Returns users that have a specific role within an organization";
-      tags: "Organization";
+      tags: "Authorization";
     };
   }
 
@@ -266,7 +266,7 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas users for role";
       description: "Returns users that have a specific role within a canvas";
-      tags: "Canvas";
+      tags: "Authorization";
     };
   }
 }

@@ -1988,7 +1988,7 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x022\xc8#\n" +
+	"\x12DOMAIN_TYPE_CANVAS\x10\x022\x80$\n" +
 	"\rAuthorization\x12\x97\x02\n" +
 	"\x0fCheckPermission\x120.Superplane.Authorization.CheckPermissionRequest\x1a1.Superplane.Authorization.CheckPermissionResponse\"\x9e\x01\x92Au\n" +
 	"\rAuthorization\x12\x10Check permission\x1aRChecks if a user has permission to perform an action on a resource within a domain\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/authorization/check\x12\xa4\x02\n" +
@@ -2004,27 +2004,27 @@ const file_authorization_proto_rawDesc = "" +
 	"\rAuthorization\x12\n" +
 	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/authorization/roles\x12\x97\x02\n" +
 	"\fDescribeRole\x12-.Superplane.Authorization.DescribeRoleRequest\x1a..Superplane.Authorization.DescribeRoleResponse\"\xa7\x01\x92Ax\n" +
-	"\rAuthorization\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02&\x12$/api/v1/authorization/roles/describe\x12\xc5\x02\n" +
-	"\x1bListAccessibleOrganizations\x12<.Superplane.Authorization.ListAccessibleOrganizationsRequest\x1a=.Superplane.Authorization.ListAccessibleOrganizationsResponse\"\xa8\x01\x92Ae\n" +
-	"\fOrganization\x12\x1dList accessible organizations\x1a6Returns a list of organizations the user has access to\x82\xd3\xe4\x93\x02:\x128/api/v1/authorization/organizations/accessible/{user_id}\x12\xa1\x02\n" +
-	"\x16ListAccessibleCanvases\x127.Superplane.Authorization.ListAccessibleCanvasesRequest\x1a8.Superplane.Authorization.ListAccessibleCanvasesResponse\"\x93\x01\x92AU\n" +
-	"\x06Canvas\x12\x18List accessible canvases\x1a1Returns a list of canvases the user has access to\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/canvases/accessible/{user_id}\x12\xfc\x01\n" +
+	"\rAuthorization\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02&\x12$/api/v1/authorization/roles/describe\x12\xc6\x02\n" +
+	"\x1bListAccessibleOrganizations\x12<.Superplane.Authorization.ListAccessibleOrganizationsRequest\x1a=.Superplane.Authorization.ListAccessibleOrganizationsResponse\"\xa9\x01\x92Af\n" +
+	"\rAuthorization\x12\x1dList accessible organizations\x1a6Returns a list of organizations the user has access to\x82\xd3\xe4\x93\x02:\x128/api/v1/authorization/organizations/accessible/{user_id}\x12\xa8\x02\n" +
+	"\x16ListAccessibleCanvases\x127.Superplane.Authorization.ListAccessibleCanvasesRequest\x1a8.Superplane.Authorization.ListAccessibleCanvasesResponse\"\x9a\x01\x92A\\\n" +
+	"\rAuthorization\x12\x18List accessible canvases\x1a1Returns a list of canvases the user has access to\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/canvases/accessible/{user_id}\x12\xfc\x01\n" +
 	"\fGetUserRoles\x12-.Superplane.Authorization.GetUserRolesRequest\x1a..Superplane.Authorization.GetUserRolesResponse\"\x8c\x01\x92AV\n" +
-	"\rAuthorization\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02-\x12+/api/v1/authorization/users/{user_id}/roles\x12\x84\x02\n" +
-	"\vCreateGroup\x12,.Superplane.Authorization.CreateGroupRequest\x1a-.Superplane.Authorization.CreateGroupResponse\"\x97\x01\x92AV\n" +
-	"\x05Group\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x028:\x01*\"3/api/v1/authorization/organizations/{org_id}/groups\x12\x8a\x02\n" +
-	"\x0eAddUserToGroup\x12/.Superplane.Authorization.AddUserToGroupRequest\x1a0.Superplane.Authorization.AddUserToGroupResponse\"\x94\x01\x92A@\n" +
-	"\x05Group\x12\x11Add user to group\x1a$Adds a user to an organization group\x82\xd3\xe4\x93\x02K:\x01*\"F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xaa\x02\n" +
-	"\x13RemoveUserFromGroup\x124.Superplane.Authorization.RemoveUserFromGroupRequest\x1a5.Superplane.Authorization.RemoveUserFromGroupResponse\"\xa5\x01\x92AJ\n" +
-	"\x05Group\x12\x16Remove user from group\x1a)Removes a user from an organization group\x82\xd3\xe4\x93\x02R*P/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}\x12\x9e\x02\n" +
-	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x90\x01\x92AR\n" +
-	"\x05Group\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/organizations/{org_id}/groups\x12\x8b\x02\n" +
-	"\rGetGroupUsers\x12..Superplane.Authorization.GetGroupUsersRequest\x1a/.Superplane.Authorization.GetGroupUsersResponse\"\x98\x01\x92AG\n" +
-	"\x05Group\x12\x0fGet group users\x1a-Returns users that belong to a specific group\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xda\x02\n" +
-	"\x1cListOrganizationUsersForRole\x12=.Superplane.Authorization.ListOrganizationUsersForRoleRequest\x1a>.Superplane.Authorization.ListOrganizationUsersForRoleResponse\"\xba\x01\x92Ap\n" +
-	"\fOrganization\x12 List organization users for role\x1a>Returns users that have a specific role within an organization\x82\xd3\xe4\x93\x02A\x12?/api/v1/authorization/organizations/{org_id}/roles/{role}/users\x12\xb3\x02\n" +
-	"\x16ListCanvasUsersForRole\x127.Superplane.Authorization.ListCanvasUsersForRoleRequest\x1a8.Superplane.Authorization.ListCanvasUsersForRoleResponse\"\xa5\x01\x92A]\n" +
-	"\x06Canvas\x12\x1aList canvas users for role\x1a7Returns users that have a specific role within a canvas\x82\xd3\xe4\x93\x02?\x12=/api/v1/authorization/canvases/{canvas_id}/roles/{role}/usersB\xe3\x01\x92A\xa2\x01\x12x\n" +
+	"\rAuthorization\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02-\x12+/api/v1/authorization/users/{user_id}/roles\x12\x8c\x02\n" +
+	"\vCreateGroup\x12,.Superplane.Authorization.CreateGroupRequest\x1a-.Superplane.Authorization.CreateGroupResponse\"\x9f\x01\x92A^\n" +
+	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x028:\x01*\"3/api/v1/authorization/organizations/{org_id}/groups\x12\x92\x02\n" +
+	"\x0eAddUserToGroup\x12/.Superplane.Authorization.AddUserToGroupRequest\x1a0.Superplane.Authorization.AddUserToGroupResponse\"\x9c\x01\x92AH\n" +
+	"\rAuthorization\x12\x11Add user to group\x1a$Adds a user to an organization group\x82\xd3\xe4\x93\x02K:\x01*\"F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xb2\x02\n" +
+	"\x13RemoveUserFromGroup\x124.Superplane.Authorization.RemoveUserFromGroupRequest\x1a5.Superplane.Authorization.RemoveUserFromGroupResponse\"\xad\x01\x92AR\n" +
+	"\rAuthorization\x12\x16Remove user from group\x1a)Removes a user from an organization group\x82\xd3\xe4\x93\x02R*P/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}\x12\xa6\x02\n" +
+	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x98\x01\x92AZ\n" +
+	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/organizations/{org_id}/groups\x12\x93\x02\n" +
+	"\rGetGroupUsers\x12..Superplane.Authorization.GetGroupUsersRequest\x1a/.Superplane.Authorization.GetGroupUsersResponse\"\xa0\x01\x92AO\n" +
+	"\rAuthorization\x12\x0fGet group users\x1a-Returns users that belong to a specific group\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xdb\x02\n" +
+	"\x1cListOrganizationUsersForRole\x12=.Superplane.Authorization.ListOrganizationUsersForRoleRequest\x1a>.Superplane.Authorization.ListOrganizationUsersForRoleResponse\"\xbb\x01\x92Aq\n" +
+	"\rAuthorization\x12 List organization users for role\x1a>Returns users that have a specific role within an organization\x82\xd3\xe4\x93\x02A\x12?/api/v1/authorization/organizations/{org_id}/roles/{role}/users\x12\xba\x02\n" +
+	"\x16ListCanvasUsersForRole\x127.Superplane.Authorization.ListCanvasUsersForRoleRequest\x1a8.Superplane.Authorization.ListCanvasUsersForRoleResponse\"\xac\x01\x92Ad\n" +
+	"\rAuthorization\x12\x1aList canvas users for role\x1a7Returns users that have a specific role within a canvas\x82\xd3\xe4\x93\x02?\x12=/api/v1/authorization/canvases/{canvas_id}/roles/{role}/usersB\xe3\x01\x92A\xa2\x01\x12x\n" +
 	"\x1cSuperplane Authorization API\x12,API for the Superplane Authorization service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
 

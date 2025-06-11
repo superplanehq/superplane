@@ -56,7 +56,7 @@
           }
         ],
         "tags": [
-          "Canvas"
+          "Authorization"
         ]
       }
     },
@@ -94,7 +94,7 @@
           }
         ],
         "tags": [
-          "Canvas"
+          "Authorization"
         ]
       }
     },
@@ -160,7 +160,7 @@
           }
         ],
         "tags": [
-          "Organization"
+          "Authorization"
         ]
       }
     },
@@ -192,7 +192,7 @@
           }
         ],
         "tags": [
-          "Group"
+          "Authorization"
         ]
       },
       "post": {
@@ -230,7 +230,7 @@
           }
         ],
         "tags": [
-          "Group"
+          "Authorization"
         ]
       }
     },
@@ -268,7 +268,7 @@
           }
         ],
         "tags": [
-          "Group"
+          "Authorization"
         ]
       },
       "post": {
@@ -312,7 +312,7 @@
           }
         ],
         "tags": [
-          "Group"
+          "Authorization"
         ]
       }
     },
@@ -356,7 +356,7 @@
           }
         ],
         "tags": [
-          "Group"
+          "Authorization"
         ]
       }
     },
@@ -394,7 +394,7 @@
           }
         ],
         "tags": [
-          "Organization"
+          "Authorization"
         ]
       }
     },
