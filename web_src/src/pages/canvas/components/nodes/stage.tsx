@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
+import { SuperplaneExecution } from '@/api-client';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
@@ -25,9 +26,33 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     props.data.queues?.filter(event => event.state === 'STATE_PROCESSED') || [], 
     [props.data.queues]
   );
+
+  const allFinishedExecutions = useMemo(() =>
+    props.data.queues
+        ?.flatMap(event => event.execution as SuperplaneExecution)
+        .filter(execution => execution?.finishedAt)
+        .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
+      [props.data.queues]
+    );
+
+  const outputs = useMemo(() => {
+    const lastFinishedExecution = allFinishedExecutions.at(0);
+
+    return props.data.outputs.map(output => {
+      const executionOutput = lastFinishedExecution?.outputs?.find(
+        executionOutput => executionOutput.name === output.name
+      )
+      return {
+        key: output.name,
+        value: executionOutput?.value || '—',
+        required: !!output.required
+      }
+    })
+  }, [props.data.outputs, allFinishedExecutions])
+
   
   return (
-    <div className={`bg-white roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
+    <div className={`bg-white min-w-90 roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
       {/* Modal overlay for View Code */}
       <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>
@@ -52,18 +77,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           <span className="text-xs text-gray-500">{props.data.timestamp}</span>
         </div>
         <div className="flex flex-wrap gap-1 mb-3">
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            code: {props.data.labels && props.data.labels[0] ? props.data.labels[0] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            image: {props.data.labels && props.data.labels[1] ? props.data.labels[1] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            terraform: {props.data.labels && props.data.labels[2] ? props.data.labels[2] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            type: {props.data.labels && props.data.labels[3] ? props.data.labels[3] : '—'}
-          </span>
+        {
+          outputs.map(output => (
+            <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2 max-w-50 truncate">
+              {output.key}: {output.value}
+            </span>
+          ))
+        }
         </div>
       </div>
       <div className="border-t border-gray-200 p-4">

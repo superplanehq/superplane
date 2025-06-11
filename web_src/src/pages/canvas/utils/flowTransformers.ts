@@ -54,6 +54,8 @@ export const transformStagesToNodes = (
           queues: st.queue || [],
         connections: st.spec?.connections || [],
         conditions: st.spec?.conditions || [],
+        outputs: st.spec?.outputs || [],
+        inputs: st.spec?.inputs || [],
         executor: st.spec?.executor,
           approveStageEvent: (event: SuperplaneStageEvent) => {
             approveStageEvent(event.id!, st.metadata?.id || '');
