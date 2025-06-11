@@ -441,6 +441,12 @@
               "DOMAIN_TYPE_CANVAS"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -513,6 +519,12 @@
               "DOMAIN_TYPE_CANVAS"
             ],
             "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           },
           {
             "name": "orgRole",
@@ -1651,9 +1663,6 @@
           }
         },
         "inheritedRole": {
-          "$ref": "#/definitions/AuthorizationRole"
-        },
-        "mapsTo": {
           "$ref": "#/definitions/AuthorizationRole"
         },
         "readonly": {

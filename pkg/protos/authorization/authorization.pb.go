@@ -707,6 +707,7 @@ func (*RoleAssignment_CanvasRole) isRoleAssignment_Role() {}
 type ListRolesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DomainType    DomainType             `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                 `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -746,6 +747,13 @@ func (x *ListRolesRequest) GetDomainType() DomainType {
 		return x.DomainType
 	}
 	return DomainType_DOMAIN_TYPE_UNSPECIFIED
+}
+
+func (x *ListRolesRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
 }
 
 type ListRolesResponse struct {
@@ -795,6 +803,7 @@ func (x *ListRolesResponse) GetRoles() []*Role {
 type DescribeRoleRequest struct {
 	state      protoimpl.MessageState `protogen:"open.v1"`
 	DomainType DomainType             `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId   string                 `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	// Types that are valid to be assigned to Role:
 	//
 	//	*DescribeRoleRequest_OrgRole
@@ -841,6 +850,13 @@ func (x *DescribeRoleRequest) GetDomainType() DomainType {
 	return DomainType_DOMAIN_TYPE_UNSPECIFIED
 }
 
+func (x *DescribeRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
 func (x *DescribeRoleRequest) GetRole() isDescribeRoleRequest_Role {
 	if x != nil {
 		return x.Role
@@ -871,11 +887,11 @@ type isDescribeRoleRequest_Role interface {
 }
 
 type DescribeRoleRequest_OrgRole struct {
-	OrgRole OrganizationRole `protobuf:"varint,2,opt,name=org_role,json=orgRole,proto3,enum=Superplane.Authorization.OrganizationRole,oneof"`
+	OrgRole OrganizationRole `protobuf:"varint,3,opt,name=org_role,json=orgRole,proto3,enum=Superplane.Authorization.OrganizationRole,oneof"`
 }
 
 type DescribeRoleRequest_CanvasRole struct {
-	CanvasRole CanvasRole `protobuf:"varint,3,opt,name=canvas_role,json=canvasRole,proto3,enum=Superplane.Authorization.CanvasRole,oneof"`
+	CanvasRole CanvasRole `protobuf:"varint,4,opt,name=canvas_role,json=canvasRole,proto3,enum=Superplane.Authorization.CanvasRole,oneof"`
 }
 
 func (*DescribeRoleRequest_OrgRole) isDescribeRoleRequest_Role() {}
@@ -1988,8 +2004,7 @@ type Role struct {
 	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
 	Permissions   []*Permission          `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	InheritedRole *Role                  `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
-	MapsTo        *Role                  `protobuf:"bytes,6,opt,name=maps_to,json=mapsTo,proto3" json:"maps_to,omitempty"`
-	Readonly      bool                   `protobuf:"varint,7,opt,name=readonly,proto3" json:"readonly,omitempty"`
+	Readonly      bool                   `protobuf:"varint,6,opt,name=readonly,proto3" json:"readonly,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2055,13 +2070,6 @@ func (x *Role) GetPermissions() []*Permission {
 func (x *Role) GetInheritedRole() *Role {
 	if x != nil {
 		return x.InheritedRole
-	}
-	return nil
-}
-
-func (x *Role) GetMapsTo() *Role {
-	if x != nil {
-		return x.MapsTo
 	}
 	return nil
 }
@@ -2181,17 +2189,19 @@ const file_authorization_proto_rawDesc = "" +
 	"\borg_role\x18\x03 \x01(\x0e2*.Superplane.Authorization.OrganizationRoleH\x00R\aorgRole\x12G\n" +
 	"\vcanvas_role\x18\x04 \x01(\x0e2$.Superplane.Authorization.CanvasRoleH\x00R\n" +
 	"canvasRoleB\x06\n" +
-	"\x04role\"Y\n" +
+	"\x04role\"v\n" +
 	"\x10ListRolesRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
-	"domainType\"I\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"I\n" +
 	"\x11ListRolesResponse\x124\n" +
-	"\x05roles\x18\x01 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"\xf6\x01\n" +
+	"\x05roles\x18\x01 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"\x93\x02\n" +
 	"\x13DescribeRoleRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
-	"domainType\x12G\n" +
-	"\borg_role\x18\x02 \x01(\x0e2*.Superplane.Authorization.OrganizationRoleH\x00R\aorgRole\x12G\n" +
-	"\vcanvas_role\x18\x03 \x01(\x0e2$.Superplane.Authorization.CanvasRoleH\x00R\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12G\n" +
+	"\borg_role\x18\x03 \x01(\x0e2*.Superplane.Authorization.OrganizationRoleH\x00R\aorgRole\x12G\n" +
+	"\vcanvas_role\x18\x04 \x01(\x0e2$.Superplane.Authorization.CanvasRoleH\x00R\n" +
 	"canvasRoleB\x06\n" +
 	"\x04role\"J\n" +
 	"\x14DescribeRoleResponse\x122\n" +
@@ -2258,16 +2268,15 @@ const file_authorization_proto_rawDesc = "" +
 	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x128\n" +
 	"\x04role\x18\x02 \x01(\x0e2$.Superplane.Authorization.CanvasRoleR\x04role\";\n" +
 	"\x1eListCanvasUsersForRoleResponse\x12\x19\n" +
-	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\xe7\x02\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\xae\x02\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x12F\n" +
 	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12E\n" +
-	"\x0einherited_role\x18\x05 \x01(\v2\x1e.Superplane.Authorization.RoleR\rinheritedRole\x127\n" +
-	"\amaps_to\x18\x06 \x01(\v2\x1e.Superplane.Authorization.RoleR\x06mapsTo\x12\x1a\n" +
-	"\breadonly\x18\a \x01(\bR\breadonly\"\xa9\x01\n" +
+	"\x0einherited_role\x18\x05 \x01(\v2\x1e.Superplane.Authorization.RoleR\rinheritedRole\x12\x1a\n" +
+	"\breadonly\x18\x06 \x01(\bR\breadonly\"\xa9\x01\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
@@ -2413,45 +2422,44 @@ var file_authorization_proto_depIdxs = []int32{
 	0,  // 23: Superplane.Authorization.Role.domain_type:type_name -> Superplane.Authorization.DomainType
 	38, // 24: Superplane.Authorization.Role.permissions:type_name -> Superplane.Authorization.Permission
 	37, // 25: Superplane.Authorization.Role.inherited_role:type_name -> Superplane.Authorization.Role
-	37, // 26: Superplane.Authorization.Role.maps_to:type_name -> Superplane.Authorization.Role
-	0,  // 27: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
-	3,  // 28: Superplane.Authorization.Authorization.CheckPermission:input_type -> Superplane.Authorization.CheckPermissionRequest
-	5,  // 29: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
-	7,  // 30: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
-	9,  // 31: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
-	12, // 32: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
-	14, // 33: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
-	16, // 34: Superplane.Authorization.Authorization.ListAccessibleOrganizations:input_type -> Superplane.Authorization.ListAccessibleOrganizationsRequest
-	18, // 35: Superplane.Authorization.Authorization.ListAccessibleCanvases:input_type -> Superplane.Authorization.ListAccessibleCanvasesRequest
-	20, // 36: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
-	23, // 37: Superplane.Authorization.Authorization.CreateGroup:input_type -> Superplane.Authorization.CreateGroupRequest
-	25, // 38: Superplane.Authorization.Authorization.AddUserToGroup:input_type -> Superplane.Authorization.AddUserToGroupRequest
-	27, // 39: Superplane.Authorization.Authorization.RemoveUserFromGroup:input_type -> Superplane.Authorization.RemoveUserFromGroupRequest
-	29, // 40: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
-	31, // 41: Superplane.Authorization.Authorization.GetGroupUsers:input_type -> Superplane.Authorization.GetGroupUsersRequest
-	33, // 42: Superplane.Authorization.Authorization.ListOrganizationUsersForRole:input_type -> Superplane.Authorization.ListOrganizationUsersForRoleRequest
-	35, // 43: Superplane.Authorization.Authorization.ListCanvasUsersForRole:input_type -> Superplane.Authorization.ListCanvasUsersForRoleRequest
-	4,  // 44: Superplane.Authorization.Authorization.CheckPermission:output_type -> Superplane.Authorization.CheckPermissionResponse
-	6,  // 45: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
-	8,  // 46: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
-	10, // 47: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
-	13, // 48: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
-	15, // 49: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
-	17, // 50: Superplane.Authorization.Authorization.ListAccessibleOrganizations:output_type -> Superplane.Authorization.ListAccessibleOrganizationsResponse
-	19, // 51: Superplane.Authorization.Authorization.ListAccessibleCanvases:output_type -> Superplane.Authorization.ListAccessibleCanvasesResponse
-	21, // 52: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
-	24, // 53: Superplane.Authorization.Authorization.CreateGroup:output_type -> Superplane.Authorization.CreateGroupResponse
-	26, // 54: Superplane.Authorization.Authorization.AddUserToGroup:output_type -> Superplane.Authorization.AddUserToGroupResponse
-	28, // 55: Superplane.Authorization.Authorization.RemoveUserFromGroup:output_type -> Superplane.Authorization.RemoveUserFromGroupResponse
-	30, // 56: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
-	32, // 57: Superplane.Authorization.Authorization.GetGroupUsers:output_type -> Superplane.Authorization.GetGroupUsersResponse
-	34, // 58: Superplane.Authorization.Authorization.ListOrganizationUsersForRole:output_type -> Superplane.Authorization.ListOrganizationUsersForRoleResponse
-	36, // 59: Superplane.Authorization.Authorization.ListCanvasUsersForRole:output_type -> Superplane.Authorization.ListCanvasUsersForRoleResponse
-	44, // [44:60] is the sub-list for method output_type
-	28, // [28:44] is the sub-list for method input_type
-	28, // [28:28] is the sub-list for extension type_name
-	28, // [28:28] is the sub-list for extension extendee
-	0,  // [0:28] is the sub-list for field type_name
+	0,  // 26: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
+	3,  // 27: Superplane.Authorization.Authorization.CheckPermission:input_type -> Superplane.Authorization.CheckPermissionRequest
+	5,  // 28: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
+	7,  // 29: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
+	9,  // 30: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
+	12, // 31: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
+	14, // 32: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
+	16, // 33: Superplane.Authorization.Authorization.ListAccessibleOrganizations:input_type -> Superplane.Authorization.ListAccessibleOrganizationsRequest
+	18, // 34: Superplane.Authorization.Authorization.ListAccessibleCanvases:input_type -> Superplane.Authorization.ListAccessibleCanvasesRequest
+	20, // 35: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
+	23, // 36: Superplane.Authorization.Authorization.CreateGroup:input_type -> Superplane.Authorization.CreateGroupRequest
+	25, // 37: Superplane.Authorization.Authorization.AddUserToGroup:input_type -> Superplane.Authorization.AddUserToGroupRequest
+	27, // 38: Superplane.Authorization.Authorization.RemoveUserFromGroup:input_type -> Superplane.Authorization.RemoveUserFromGroupRequest
+	29, // 39: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
+	31, // 40: Superplane.Authorization.Authorization.GetGroupUsers:input_type -> Superplane.Authorization.GetGroupUsersRequest
+	33, // 41: Superplane.Authorization.Authorization.ListOrganizationUsersForRole:input_type -> Superplane.Authorization.ListOrganizationUsersForRoleRequest
+	35, // 42: Superplane.Authorization.Authorization.ListCanvasUsersForRole:input_type -> Superplane.Authorization.ListCanvasUsersForRoleRequest
+	4,  // 43: Superplane.Authorization.Authorization.CheckPermission:output_type -> Superplane.Authorization.CheckPermissionResponse
+	6,  // 44: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
+	8,  // 45: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
+	10, // 46: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
+	13, // 47: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
+	15, // 48: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
+	17, // 49: Superplane.Authorization.Authorization.ListAccessibleOrganizations:output_type -> Superplane.Authorization.ListAccessibleOrganizationsResponse
+	19, // 50: Superplane.Authorization.Authorization.ListAccessibleCanvases:output_type -> Superplane.Authorization.ListAccessibleCanvasesResponse
+	21, // 51: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
+	24, // 52: Superplane.Authorization.Authorization.CreateGroup:output_type -> Superplane.Authorization.CreateGroupResponse
+	26, // 53: Superplane.Authorization.Authorization.AddUserToGroup:output_type -> Superplane.Authorization.AddUserToGroupResponse
+	28, // 54: Superplane.Authorization.Authorization.RemoveUserFromGroup:output_type -> Superplane.Authorization.RemoveUserFromGroupResponse
+	30, // 55: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
+	32, // 56: Superplane.Authorization.Authorization.GetGroupUsers:output_type -> Superplane.Authorization.GetGroupUsersResponse
+	34, // 57: Superplane.Authorization.Authorization.ListOrganizationUsersForRole:output_type -> Superplane.Authorization.ListOrganizationUsersForRoleResponse
+	36, // 58: Superplane.Authorization.Authorization.ListCanvasUsersForRole:output_type -> Superplane.Authorization.ListCanvasUsersForRoleResponse
+	43, // [43:59] is the sub-list for method output_type
+	27, // [27:43] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_authorization_proto_init() }
