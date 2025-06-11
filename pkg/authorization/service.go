@@ -42,12 +42,16 @@ type AuthService struct {
 }
 
 func NewAuthService() (*AuthService, error) {
+	modelPath := os.Getenv("RBAC_MODEL_PATH")
+	orgPolicyPath := os.Getenv("RBAC_ORG_POLICY_PATH")
+	canvasPolicyPath := os.Getenv("RBAC_CANVAS_POLICY_PATH")
+
 	adapter, err := gormadapter.NewAdapterByDB(database.Conn())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin adapter: %w", err)
 	}
 
-	enforcer, err := casbin.NewCachedEnforcer("../config/rbac_model.conf", adapter)
+	enforcer, err := casbin.NewCachedEnforcer(modelPath, adapter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create casbin enforcer: %w", err)
 	}
@@ -58,11 +62,11 @@ func NewAuthService() (*AuthService, error) {
 		return nil, fmt.Errorf("failed to load policies: %w", err)
 	}
 
-	orgPoliciesCsv, err := os.ReadFile("../config/rbac_org_policy.csv")
+	orgPoliciesCsv, err := os.ReadFile(orgPolicyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read org policies: %w", err)
 	}
-	canvasPoliciesCsv, err := os.ReadFile("../config/rbac_canvas_policy.csv")
+	canvasPoliciesCsv, err := os.ReadFile(canvasPolicyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read canvas policies: %w", err)
 	}

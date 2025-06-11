@@ -1,7 +1,10 @@
 package actions
 
 import (
+	"testing"
+
 	uuid "github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
@@ -75,4 +78,11 @@ func convertDomainTypeToProto(domainType string) pb.DomainType {
 	default:
 		return pb.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
+}
+
+func setupTestAuthService(t *testing.T) authorization.AuthorizationServiceInterface {
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+	return authService
 }
