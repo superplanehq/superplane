@@ -1,7 +1,7 @@
 import { SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { DEFAULT_WIDTH, DEFAULT_HEIGHT, LAYOUT_SPACING } from "./constants";
 import { AllNodeType, EdgeType } from "../types/flow";
-import { StageWithEventQueue } from "../store/types";
+import { EventSourceWithEvents, StageWithEventQueue } from "../store/types";
 
 
 interface NodePositions {
@@ -9,23 +9,32 @@ interface NodePositions {
 }
 
 export const transformEventSourcesToNodes = (
-  eventSources: SuperplaneEventSource[],
+  eventSources: EventSourceWithEvents[],
   nodePositions: NodePositions
 ): AllNodeType[] => {
-  return eventSources.map((es, idx) => ({
-    id: es.metadata?.id || '',
-    type: 'githubIntegration',
-    data: {
-      id: es.metadata?.name || '',
-      repoName: "repo/name",
-      repoUrl: "repo/url",
-      eventType: 'push',
-      release: 'v1.0.0',
-      timestamp: '2023-01-01T00:00:00'
-    },
-    position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
-    draggable: true
-  }) as unknown as AllNodeType);
+  return eventSources.map((es, idx) => {
+    const lastEvent = es.events && es.events.length > 0 
+      ? es.events.sort((a, b) => {
+          const timeA = new Date(a.createdAt || 0).getTime();
+          const timeB = new Date(b.createdAt || 0).getTime();
+          return timeB - timeA;
+        })[0]
+      : null;
+    
+    const lastEventTimestamp = lastEvent?.createdAt || 'n/a';
+    
+    return ({
+      id: es.metadata?.id || '',
+      type: 'githubIntegration',
+      data: {
+        id: es.metadata?.name || '',
+        name: es.metadata?.name,
+        timestamp: lastEventTimestamp
+      },
+      position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
+      draggable: true
+    }) as unknown as AllNodeType;
+  });
 };
 
 export const transformStagesToNodes = (

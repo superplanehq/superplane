@@ -3,8 +3,8 @@ import { useParams } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useSetupEventHandlers } from "./store/handlers/setup";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents } from "@/api-client";
-import { StageWithEventQueue } from "./store/types";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent } from "@/api-client";
+import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 
 // No props needed as we'll get the ID from the URL params
@@ -35,7 +35,6 @@ export function Canvas() {
           path: { id }
         });
 
-        // Check if canvas data was fetched successfully
         if (!canvasResponse.data?.canvas) {
           throw new Error('Failed to fetch canvas data');
         }
@@ -62,43 +61,60 @@ export function Canvas() {
 
         // Use the API stages directly with minimal adaptation
         const mappedStages = stagesResponse.data?.stages || [];
-
-        // Initialize queues array for each stage (for the real-time events)
-        // Using for...of to properly handle async/await
+        
+        // Collect all events from all stages
+        const allEvents: SuperplaneStageEvent[] = [];
         const stagesWithQueues: StageWithEventQueue[] = [];
 
+        // Fetch events for each stage
         for (const stage of mappedStages) {
-          // fetch stage events
           const stageEventsResponse = await superplaneListStageEvents({
             path: { canvasIdOrName: id!, stageIdOrName: stage.metadata!.id! }
           });
 
+          const stageEvents = stageEventsResponse.data?.events || [];
+          
+          // Add events to the collection
+          allEvents.push(...stageEvents);
+
           stagesWithQueues.push({
             ...stage,
-            queue: stageEventsResponse.data?.events || [] // Add stage events from API
+            queue: stageEvents
           });
         }
 
-        // Use the API event sources directly
-        const mappedEventSources = eventSourcesResponse.data?.eventSources || [];
+        // Group events by source ID
+        const eventsBySourceId = allEvents.reduce((acc, event) => {
+          const sourceId = event.sourceId;
+          if (sourceId) {
+            if (!acc[sourceId]) {
+              acc[sourceId] = [];
+            }
+            acc[sourceId].push(event);
+          }
+          return acc;
+        }, {} as Record<string, SuperplaneStageEvent[]>);
+
+        // Assign events to their corresponding event sources
+        const eventSourcesWithEvents: EventSourceWithEvents[] = (eventSourcesResponse.data?.eventSources || []).map(eventSource => ({
+          ...eventSource,
+          events: eventSource.metadata?.id ? eventsBySourceId[eventSource.metadata.id] : []
+        }));
 
         // Initialize the store with the mapped data
         const initialData = {
           canvas: canvasResponse.data?.canvas || {},
           stages: stagesWithQueues,
-          event_sources: mappedEventSources,
+          event_sources: eventSourcesWithEvents,
           handleEvent: () => { },
           removeHandleEvent: () => { },
           pushEvent: () => { },
         };
 
         initialize(initialData);
-
-        // Mark event handlers as ready to be set up
         markEventHandlersAsSetup();
         setIsLoading(false);
 
-        // No cleanup function needed here, it will be handled by the useSetupEventHandlers hook
       } catch (err) {
         console.error('Error fetching canvas data:', err);
         setError('Failed to load canvas data');

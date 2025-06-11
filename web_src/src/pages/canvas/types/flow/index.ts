@@ -16,10 +16,7 @@ export type EdgeType = Edge;
 // Event source node
 export type EventSourceNodeData = {
   id: string;
-  repoName: string;
-  repoUrl: string;
-  eventType: string;
-  release: string;
+  name: string;
   timestamp: string;
 }
 

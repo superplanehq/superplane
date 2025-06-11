@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
-import { CanvasState } from './types';
-import { SuperplaneCanvas, SuperplaneEventSource, SuperplaneStage } from "@/api-client/types.gen";
+import { CanvasState, EventSourceWithEvents } from './types';
+import { SuperplaneCanvas, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
 
@@ -53,14 +53,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
   },
   
-  addEventSource: (eventSource: SuperplaneEventSource) => {
+  addEventSource: (eventSource: EventSourceWithEvents) => {
     console.log("Adding event source:", eventSource);
     set((state) => ({
       event_sources: [...state.event_sources, eventSource]
     }));
   },
   
-  updateEventSource: (eventSource: SuperplaneEventSource) => {
+  updateEventSource: (eventSource: EventSourceWithEvents) => {
     console.log("Updating event source:", eventSource);
     set((state) => ({
       event_sources: state.event_sources.map(es => 
