@@ -2,6 +2,7 @@ import { SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.
 import { DEFAULT_WIDTH, DEFAULT_HEIGHT, LAYOUT_SPACING } from "./constants";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { EventSourceWithEvents, StageWithEventQueue } from "../store/types";
+import { ConnectionLineType, MarkerType } from "@xyflow/react";
 
 
 interface NodePositions {
@@ -77,14 +78,15 @@ export const transformToEdges = (
         eventSources.find((es) => es.metadata?.name === conn.name) ||
         stages.find((s) => s.metadata?.name === conn.name);
       const sourceId = sourceObj?.metadata?.id ?? conn.name;
-      
+      const strokeColor = isEvent ? '#FF0000' : '#000000';
       return { 
         id: `e-${conn.name}-${st.metadata?.id}`, 
         source: sourceId, 
         target: st.metadata?.id || '', 
-        type: "smoothstep", 
+        type: ConnectionLineType.Bezier, 
         animated: true, 
-        style: isEvent ? { stroke: '#FF0000', strokeWidth: 2 } : undefined 
+        style: { stroke: strokeColor, strokeWidth: 4 },
+        markerEnd: { type: MarkerType.Arrow, color: strokeColor, strokeWidth: 2 }
       } as EdgeType;
     })
   );
