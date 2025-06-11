@@ -10,33 +10,31 @@ import (
 )
 
 func DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest, authService authorization.AuthorizationServiceInterface) (*pb.DescribeRoleResponse, error) {
-	// Validate domain type and role
 	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var role *pb.Role
-	var roleStr string
+	if req.DomainId == "" {
+		return nil, status.Error(codes.InvalidArgument, "domain ID must be specified")
+	}
 
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		if req.GetOrgRole() == pb.OrganizationRole_ORG_ROLE_UNSPECIFIED {
-			return nil, status.Error(codes.InvalidArgument, "organization role must be specified")
-		}
-		roleStr = convertOrgRoleToString(req.GetOrgRole())
-		role = buildOrgRole(roleStr, req.DomainType)
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		if req.GetCanvasRole() == pb.CanvasRole_CANVAS_ROLE_UNSPECIFIED {
-			return nil, status.Error(codes.InvalidArgument, "canvas role must be specified")
-		}
-		roleStr = convertCanvasRoleToString(req.GetCanvasRole())
-		role = buildCanvasRole(roleStr, req.DomainType)
-	default:
+	domainType := convertDomainType(req.DomainType)
+	if domainType == "" {
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
-	if role == nil {
+	if req.Role == "" {
+		return nil, status.Error(codes.InvalidArgument, "invalid role specified")
+	}
+
+	roleDefinition, err := authService.GetRoleDefinition(req.Role, domainType, req.DomainId)
+	if err != nil {
 		return nil, status.Error(codes.NotFound, "role not found")
+	}
+
+	role, err := convertRoleDefinitionToProto(roleDefinition, authService, req.DomainId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to convert role definition")
 	}
 
 	return &pb.DescribeRoleResponse{

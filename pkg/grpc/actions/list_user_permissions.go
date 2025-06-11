@@ -20,7 +20,7 @@ func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var roles []string
+	var roles []*authorization.RoleDefinition
 	switch req.DomainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		roles, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
@@ -37,10 +37,15 @@ func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest
 	permissionSet := make(map[string]*pb.Permission)
 
 	for _, role := range roles {
-		rolePermissions := getRolePermissions(role, req.DomainType)
+		rolePermissions := role.Permissions
+
 		for _, perm := range rolePermissions {
 			key := fmt.Sprintf("%s:%s", perm.Resource, perm.Action)
-			permissionSet[key] = perm
+			permissionSet[key] = &pb.Permission{
+				Resource:   perm.Resource,
+				Action:     perm.Action,
+				DomainType: req.DomainType,
+			}
 		}
 	}
 

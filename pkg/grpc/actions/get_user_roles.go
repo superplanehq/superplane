@@ -19,12 +19,12 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var roleStrings []string
+	var roles []*authorization.RoleDefinition
 	switch req.DomainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		roleStrings, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
+		roles, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
 	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		roleStrings, err = authService.GetUserRolesForCanvas(req.UserId, req.DomainId)
+		roles, err = authService.GetUserRolesForCanvas(req.UserId, req.DomainId)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
@@ -33,30 +33,19 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		return nil, status.Error(codes.Internal, "failed to get user roles")
 	}
 
-	var roles []*pb.UserRole
-	for _, roleStr := range roleStrings {
-		userRole := &pb.UserRole{}
-
-		switch req.DomainType {
-		case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-			orgRole := convertStringToOrgRole(roleStr)
-			if orgRole != pb.OrganizationRole_ORG_ROLE_UNSPECIFIED {
-				userRole.Role = &pb.UserRole_OrgRole{OrgRole: orgRole}
-				roles = append(roles, userRole)
-			}
-		case pb.DomainType_DOMAIN_TYPE_CANVAS:
-			canvasRole := convertStringToCanvasRole(roleStr)
-			if canvasRole != pb.CanvasRole_CANVAS_ROLE_UNSPECIFIED {
-				userRole.Role = &pb.UserRole_CanvasRole{CanvasRole: canvasRole}
-				roles = append(roles, userRole)
-			}
+	var rolesProto []*pb.Role
+	for _, role := range roles {
+		roleProto, err := convertRoleDefinitionToProto(role, authService, req.DomainId)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to convert role definition")
 		}
+		rolesProto = append(rolesProto, roleProto)
 	}
 
 	return &pb.GetUserRolesResponse{
 		UserId:     req.UserId,
 		DomainType: req.DomainType,
 		DomainId:   req.DomainId,
-		Roles:      roles,
+		Roles:      rolesProto,
 	}, nil
 }

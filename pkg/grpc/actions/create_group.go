@@ -20,22 +20,19 @@ func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService au
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	if req.Role == pb.OrganizationRole_ORG_ROLE_UNSPECIFIED {
+	if req.Role == "" {
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
-	roleStr := convertOrgRoleToString(req.Role)
-	if roleStr == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid role")
-	}
+	// TODO: once orgs are implemented, check if the org exists
 
-	err = authService.CreateGroup(req.OrgId, req.GroupName, roleStr)
+	err = authService.CreateGroup(req.OrgId, req.GroupName, req.Role)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s: %v", req.GroupName, roleStr, err)
+		log.Errorf("failed to create group %s with role %s: %v", req.GroupName, req.Role, err)
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
-	log.Infof("created group %s with role %s in organization %s", req.GroupName, roleStr, req.OrgId)
+	log.Infof("created group %s with role %s in organization %s", req.GroupName, req.Role, req.OrgId)
 
 	return &pb.CreateGroupResponse{}, nil
 }

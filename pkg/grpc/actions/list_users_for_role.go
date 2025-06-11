@@ -15,11 +15,7 @@ func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationU
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}
 
-	if req.Role == pb.OrganizationRole_ORG_ROLE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
-	}
-
-	roleStr := req.GetRole().String()
+	roleStr := req.GetRole()
 	if roleStr == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
@@ -40,11 +36,7 @@ func ListCanvasUsersForRole(ctx context.Context, req *pb.ListCanvasUsersForRoleR
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}
 
-	if req.Role == pb.CanvasRole_CANVAS_ROLE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
-	}
-
-	roleStr := req.GetRole().String()
+	roleStr := req.GetRole()
 	if roleStr == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}

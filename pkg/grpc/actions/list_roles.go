@@ -14,23 +14,27 @@ func ListRoles(ctx context.Context, req *pb.ListRolesRequest, authService author
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var roles []*pb.Role
+	if req.DomainId == "" {
+		return nil, status.Error(codes.InvalidArgument, "domain ID must be specified")
+	}
 
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		roles = []*pb.Role{
-			buildOrgRole(authorization.RoleOrgViewer, req.DomainType),
-			buildOrgRole(authorization.RoleOrgAdmin, req.DomainType),
-			buildOrgRole(authorization.RoleOrgOwner, req.DomainType),
-		}
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		roles = []*pb.Role{
-			buildCanvasRole(authorization.RoleCanvasViewer, req.DomainType),
-			buildCanvasRole(authorization.RoleCanvasAdmin, req.DomainType),
-			buildCanvasRole(authorization.RoleCanvasOwner, req.DomainType),
-		}
-	default:
+	domainType := convertDomainType(req.DomainType)
+	if domainType == "" {
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	}
+
+	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, req.DomainId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to retrieve role definitions")
+	}
+
+	roles := make([]*pb.Role, len(roleDefinitions))
+	for i, roleDef := range roleDefinitions {
+		role, err := convertRoleDefinitionToProto(roleDef, authService, req.DomainId)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to convert role definition")
+		}
+		roles[i] = role
 	}
 
 	return &pb.ListRolesResponse{

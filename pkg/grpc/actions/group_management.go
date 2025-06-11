@@ -10,18 +10,15 @@ import (
 )
 
 func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.AuthorizationServiceInterface) (*pb.AddUserToGroupResponse, error) {
-	// Validate UUIDs
 	err := ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	// Validate required fields
 	if req.GroupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	// Add user to group
 	err = authService.AddUserToGroup(req.OrgId, req.UserId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to add user to group")
@@ -31,18 +28,15 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 }
 
 func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest, authService authorization.AuthorizationServiceInterface) (*pb.RemoveUserFromGroupResponse, error) {
-	// Validate UUIDs
 	err := ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	// Validate required fields
 	if req.GroupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	// Remove user from group
 	err = authService.RemoveUserFromGroup(req.OrgId, req.UserId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove user from group")
@@ -52,13 +46,11 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 }
 
 func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListOrganizationGroupsResponse, error) {
-	// Validate UUID
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}
 
-	// Get groups
 	groups, err := authService.GetGroups(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get organization groups")
@@ -70,18 +62,15 @@ func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsR
 }
 
 func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.AuthorizationServiceInterface) (*pb.GetGroupUsersResponse, error) {
-	// Validate UUID
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}
 
-	// Validate required fields
 	if req.GroupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	// Get group users
 	userIDs, err := authService.GetGroupUsers(req.OrgId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group users")
