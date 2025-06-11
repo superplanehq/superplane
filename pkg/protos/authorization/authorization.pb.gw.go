@@ -612,7 +612,6 @@ func request_Authorization_ListOrganizationUsersForRole_0(ctx context.Context, m
 	var (
 		protoReq ListOrganizationUsersForRoleRequest
 		metadata runtime.ServerMetadata
-		e        int32
 		err      error
 	)
 	io.Copy(io.Discard, req.Body)
@@ -628,11 +627,10 @@ func request_Authorization_ListOrganizationUsersForRole_0(ctx context.Context, m
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "role")
 	}
-	e, err = runtime.Enum(val, OrganizationRole_value)
+	protoReq.Role, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "role", err)
 	}
-	protoReq.Role = OrganizationRole(e)
 	msg, err := client.ListOrganizationUsersForRole(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -641,7 +639,6 @@ func local_request_Authorization_ListOrganizationUsersForRole_0(ctx context.Cont
 	var (
 		protoReq ListOrganizationUsersForRoleRequest
 		metadata runtime.ServerMetadata
-		e        int32
 		err      error
 	)
 	val, ok := pathParams["org_id"]
@@ -656,11 +653,10 @@ func local_request_Authorization_ListOrganizationUsersForRole_0(ctx context.Cont
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "role")
 	}
-	e, err = runtime.Enum(val, OrganizationRole_value)
+	protoReq.Role, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "role", err)
 	}
-	protoReq.Role = OrganizationRole(e)
 	msg, err := server.ListOrganizationUsersForRole(ctx, &protoReq)
 	return msg, metadata, err
 }
@@ -669,7 +665,6 @@ func request_Authorization_ListCanvasUsersForRole_0(ctx context.Context, marshal
 	var (
 		protoReq ListCanvasUsersForRoleRequest
 		metadata runtime.ServerMetadata
-		e        int32
 		err      error
 	)
 	io.Copy(io.Discard, req.Body)
@@ -685,11 +680,10 @@ func request_Authorization_ListCanvasUsersForRole_0(ctx context.Context, marshal
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "role")
 	}
-	e, err = runtime.Enum(val, CanvasRole_value)
+	protoReq.Role, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "role", err)
 	}
-	protoReq.Role = CanvasRole(e)
 	msg, err := client.ListCanvasUsersForRole(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -698,7 +692,6 @@ func local_request_Authorization_ListCanvasUsersForRole_0(ctx context.Context, m
 	var (
 		protoReq ListCanvasUsersForRoleRequest
 		metadata runtime.ServerMetadata
-		e        int32
 		err      error
 	)
 	val, ok := pathParams["canvas_id"]
@@ -713,11 +706,10 @@ func local_request_Authorization_ListCanvasUsersForRole_0(ctx context.Context, m
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "role")
 	}
-	e, err = runtime.Enum(val, CanvasRole_value)
+	protoReq.Role, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "role", err)
 	}
-	protoReq.Role = CanvasRole(e)
 	msg, err := server.ListCanvasUsersForRole(ctx, &protoReq)
 	return msg, metadata, err
 }

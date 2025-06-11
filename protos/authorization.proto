@@ -316,10 +316,7 @@ message RemoveRoleResponse {}
 message RoleAssignment {
   DomainType domain_type = 1;
   string domain_id = 2;
-  oneof role {
-    OrganizationRole org_role = 3;
-    CanvasRole canvas_role = 4;
-  }
+  string role = 3;
 }
 
 // Role discovery messages
@@ -335,10 +332,7 @@ message ListRolesResponse {
 message DescribeRoleRequest {
   DomainType domain_type = 1;
   string domain_id = 2;
-  oneof role {
-    OrganizationRole org_role = 3;
-    CanvasRole canvas_role = 4;
-  }
+  string role = 3;
 }
 
 message DescribeRoleResponse {
@@ -373,21 +367,14 @@ message GetUserRolesResponse {
   string user_id = 1;
   DomainType domain_type = 2;
   string domain_id = 3;
-  repeated UserRole roles = 4;
-}
-
-message UserRole {
-  oneof role {
-    OrganizationRole org_role = 1;
-    CanvasRole canvas_role = 2;
-  }
+  repeated Role roles = 4;
 }
 
 // Group management messages
 message CreateGroupRequest {
   string org_id = 1;
   string group_name = 2;
-  OrganizationRole role = 3;
+  string role = 3;
 }
 
 message CreateGroupResponse {}
@@ -428,7 +415,7 @@ message GetGroupUsersResponse {
 // Users for role messages
 message ListOrganizationUsersForRoleRequest {
   string org_id = 1;
-  OrganizationRole role = 2;
+  string role = 2;
 }
 
 message ListOrganizationUsersForRoleResponse {
@@ -437,7 +424,7 @@ message ListOrganizationUsersForRoleResponse {
 
 message ListCanvasUsersForRoleRequest {
   string canvas_id = 1;
-  CanvasRole role = 2;
+  string role = 2;
 }
 
 message ListCanvasUsersForRoleResponse {
@@ -448,17 +435,14 @@ message ListCanvasUsersForRoleResponse {
 message Role {
   string name = 1;
   DomainType domain_type = 2;
-  string description = 3;
-  repeated Permission permissions = 4;
-  Role inherited_role = 5;
-  bool readonly = 6;
+  repeated Permission permissions = 3;
+  Role inherited_role = 4;
 }
 
 message Permission {
   string resource = 1;
   string action = 2;
-  string description = 3;
-  DomainType domain_type = 4;
+  DomainType domain_type = 3;
 }
 
 // Enums
@@ -466,18 +450,4 @@ enum DomainType {
   DOMAIN_TYPE_UNSPECIFIED = 0;
   DOMAIN_TYPE_ORGANIZATION = 1;
   DOMAIN_TYPE_CANVAS = 2;
-}
-
-enum OrganizationRole {
-  ORG_ROLE_UNSPECIFIED = 0;
-  ORG_VIEWER = 1;
-  ORG_ADMIN = 2;
-  ORG_OWNER = 3;
-}
-
-enum CanvasRole {
-  CANVAS_ROLE_UNSPECIFIED = 0;
-  CANVAS_VIEWER = 1;
-  CANVAS_ADMIN = 2;
-  CANVAS_OWNER = 3;
 }

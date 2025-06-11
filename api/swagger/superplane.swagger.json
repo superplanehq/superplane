@@ -90,13 +90,7 @@
             "name": "role",
             "in": "path",
             "required": true,
-            "type": "string",
-            "enum": [
-              "CANVAS_ROLE_UNSPECIFIED",
-              "CANVAS_VIEWER",
-              "CANVAS_ADMIN",
-              "CANVAS_OWNER"
-            ]
+            "type": "string"
           }
         ],
         "tags": [
@@ -396,13 +390,7 @@
             "name": "role",
             "in": "path",
             "required": true,
-            "type": "string",
-            "enum": [
-              "ORG_ROLE_UNSPECIFIED",
-              "ORG_VIEWER",
-              "ORG_ADMIN",
-              "ORG_OWNER"
-            ]
+            "type": "string"
           }
         ],
         "tags": [
@@ -527,30 +515,10 @@
             "type": "string"
           },
           {
-            "name": "orgRole",
+            "name": "role",
             "in": "query",
             "required": false,
-            "type": "string",
-            "enum": [
-              "ORG_ROLE_UNSPECIFIED",
-              "ORG_VIEWER",
-              "ORG_ADMIN",
-              "ORG_OWNER"
-            ],
-            "default": "ORG_ROLE_UNSPECIFIED"
-          },
-          {
-            "name": "canvasRole",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "CANVAS_ROLE_UNSPECIFIED",
-              "CANVAS_VIEWER",
-              "CANVAS_ADMIN",
-              "CANVAS_OWNER"
-            ],
-            "default": "CANVAS_ROLE_UNSPECIFIED"
+            "type": "string"
           }
         ],
         "tags": [
@@ -1407,16 +1375,6 @@
     "AuthorizationAssignRoleResponse": {
       "type": "object"
     },
-    "AuthorizationCanvasRole": {
-      "type": "string",
-      "enum": [
-        "CANVAS_ROLE_UNSPECIFIED",
-        "CANVAS_VIEWER",
-        "CANVAS_ADMIN",
-        "CANVAS_OWNER"
-      ],
-      "default": "CANVAS_ROLE_UNSPECIFIED"
-    },
     "AuthorizationCheckPermissionRequest": {
       "type": "object",
       "properties": {
@@ -1453,7 +1411,7 @@
           "type": "string"
         },
         "role": {
-          "$ref": "#/definitions/AuthorizationOrganizationRole"
+          "type": "string"
         }
       },
       "title": "Group management messages"
@@ -1506,7 +1464,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/AuthorizationUserRole"
+            "$ref": "#/definitions/AuthorizationRole"
           }
         }
       }
@@ -1599,16 +1557,6 @@
         }
       }
     },
-    "AuthorizationOrganizationRole": {
-      "type": "string",
-      "enum": [
-        "ORG_ROLE_UNSPECIFIED",
-        "ORG_VIEWER",
-        "ORG_ADMIN",
-        "ORG_OWNER"
-      ],
-      "default": "ORG_ROLE_UNSPECIFIED"
-    },
     "AuthorizationPermission": {
       "type": "object",
       "properties": {
@@ -1616,9 +1564,6 @@
           "type": "string"
         },
         "action": {
-          "type": "string"
-        },
-        "description": {
           "type": "string"
         },
         "domainType": {
@@ -1652,9 +1597,6 @@
         "domainType": {
           "$ref": "#/definitions/AuthorizationDomainType"
         },
-        "description": {
-          "type": "string"
-        },
         "permissions": {
           "type": "array",
           "items": {
@@ -1664,9 +1606,6 @@
         },
         "inheritedRole": {
           "$ref": "#/definitions/AuthorizationRole"
-        },
-        "readonly": {
-          "type": "boolean"
         }
       },
       "title": "Core data structures"
@@ -1680,22 +1619,8 @@
         "domainId": {
           "type": "string"
         },
-        "orgRole": {
-          "$ref": "#/definitions/AuthorizationOrganizationRole"
-        },
-        "canvasRole": {
-          "$ref": "#/definitions/AuthorizationCanvasRole"
-        }
-      }
-    },
-    "AuthorizationUserRole": {
-      "type": "object",
-      "properties": {
-        "orgRole": {
-          "$ref": "#/definitions/AuthorizationOrganizationRole"
-        },
-        "canvasRole": {
-          "$ref": "#/definitions/AuthorizationCanvasRole"
+        "role": {
+          "type": "string"
         }
       }
     },
