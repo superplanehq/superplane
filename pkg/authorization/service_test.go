@@ -856,7 +856,6 @@ func Test__AuthService_GetRoleDefinition(t *testing.T) {
 		for _, perm := range role.Permissions {
 			assert.NotEmpty(t, perm.Resource)
 			assert.NotEmpty(t, perm.Action)
-			assert.NotEmpty(t, perm.Description)
 			assert.Equal(t, DomainOrg, perm.DomainType)
 		}
 	})
@@ -983,7 +982,6 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		for _, perm := range viewerPermissions {
 			assert.Equal(t, "read", perm.Action)
 			assert.Equal(t, DomainOrg, perm.DomainType)
-			assert.NotEmpty(t, perm.Description)
 		}
 
 		// Test org admin permissions (should include viewer permissions + more)
@@ -997,7 +995,6 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		for _, perm := range adminPermissions {
 			actions[perm.Action] = true
 			assert.Equal(t, DomainOrg, perm.DomainType)
-			assert.NotEmpty(t, perm.Description)
 		}
 		assert.True(t, actions["read"], "Admin should have read permissions")
 
@@ -1018,7 +1015,6 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		for _, perm := range viewerPermissions {
 			assert.Equal(t, "read", perm.Action)
 			assert.Equal(t, DomainCanvas, perm.DomainType)
-			assert.NotEmpty(t, perm.Description)
 		}
 
 		// Test canvas admin permissions

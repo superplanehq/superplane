@@ -46,8 +46,7 @@ type RoleDefinition struct {
 }
 
 type Permission struct {
-	Resource    string
-	Action      string
-	Description string
-	DomainType  string
+	Resource   string
+	Action     string
+	DomainType string
 }

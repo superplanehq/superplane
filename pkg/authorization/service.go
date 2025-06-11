@@ -101,7 +101,8 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, actio
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	return a.enforcer.Enforce(userID, domain, resource, action)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
 func (a *AuthService) CreateGroup(orgID string, groupName string, role string) error {
@@ -111,8 +112,10 @@ func (a *AuthService) CreateGroup(orgID string, groupName string, role string) e
 	}
 
 	domain := fmt.Sprintf("org:%s", orgID)
+	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	prefixedRole := fmt.Sprintf("role:%s", role)
 
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(groupName, role, domain)
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}
@@ -127,8 +130,10 @@ func (a *AuthService) CreateGroup(orgID string, groupName string, role string) e
 
 func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
+	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
-	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, group)
+	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
 		return fmt.Errorf("failed to check group existence: %w", err)
 	}
@@ -145,7 +150,7 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 		return fmt.Errorf("group %s does not exist in organization %s", group, orgID)
 	}
 
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(userID, group, domain)
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add user to group: %w", err)
 	}
@@ -159,8 +164,10 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 
 func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
+	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
-	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(userID, group, domain)
+	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove user from group: %w", err)
 	}
@@ -174,16 +181,17 @@ func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group str
 
 func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error) {
 	domain := fmt.Sprintf("org:%s", orgID)
-	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, group)
+	prefixedGroupName := fmt.Sprintf("group:%s", group)
+
+	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get group users: %w", err)
 	}
 
 	var users []string
 	for _, policy := range policies {
-		if policy[2] == domain {
-			users = append(users, policy[0])
-		}
+		unprefixedUserID := strings.TrimPrefix(policy[0], "user:")
+		users = append(users, unprefixedUserID)
 	}
 
 	return users, nil
@@ -199,13 +207,9 @@ func (a *AuthService) GetGroups(orgID string) ([]string, error) {
 	groupMap := make(map[string]bool)
 
 	for _, policy := range policies {
-		// Check if this is a group (not a user) by checking if it has users assigned to it
-		groupPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(1, policy[0])
-		for _, gp := range groupPolicies {
-			if gp[2] == domain {
-				groupMap[policy[0]] = true
-				break
-			}
+		if strings.HasPrefix(policy[0], "group:") {
+			groupName := policy[0][len("group:"):]
+			groupMap[groupName] = true
 		}
 	}
 
@@ -219,9 +223,15 @@ func (a *AuthService) GetGroups(orgID string) ([]string, error) {
 
 func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error) {
 	domain := fmt.Sprintf("org:%s", orgID)
-	roles := a.enforcer.GetRolesForUserInDomain(group, domain)
-
-	return roles, nil
+	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
+	unprefixedRoles := []string{}
+	for _, role := range roles {
+		if strings.HasPrefix(role, "role:") {
+			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "role:"))
+		}
+	}
+	return unprefixedRoles, nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
@@ -236,7 +246,9 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 		}
 	}
 
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(userID, role, fmt.Sprintf("%s:%s", domainType, domainID))
+	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, fmt.Sprintf("%s:%s", domainType, domainID))
 	if err != nil {
 		return fmt.Errorf("failed to add role: %w", err)
 	}
@@ -250,7 +262,9 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 
 func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(userID, role, domain)
+	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
 	}
@@ -261,21 +275,37 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 }
 
 func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
+	prefixedRole := fmt.Sprintf("role:%s", role)
 	orgDomain := fmt.Sprintf("org:%s", orgID)
-	roles, err := a.enforcer.GetUsersForRole(role, orgDomain)
+	users, err := a.enforcer.GetUsersForRole(prefixedRole, orgDomain)
 	if err != nil {
 		return nil, err
 	}
-	return roles, nil
+
+	unprefixedUsers := []string{}
+	for _, user := range users {
+		if strings.HasPrefix(user, "user:") {
+			unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "user:"))
+		}
+	}
+	return unprefixedUsers, nil
 }
 
 func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]string, error) {
+	prefixedRole := fmt.Sprintf("role:%s", role)
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	roles, err := a.enforcer.GetUsersForRole(role, canvasDomain)
+	users, err := a.enforcer.GetUsersForRole(prefixedRole, canvasDomain)
 	if err != nil {
 		return nil, err
 	}
-	return roles, nil
+
+	unprefixedUsers := []string{}
+	for _, user := range users {
+		if strings.HasPrefix(user, "user:") {
+			unprefixedUsers = append(unprefixedUsers, strings.TrimPrefix(user, "user:"))
+		}
+	}
+	return unprefixedUsers, nil
 }
 
 func (a *AuthService) SetupOrganizationRoles(orgID string) error {
@@ -297,32 +327,34 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 }
 
 func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
-	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, userID)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
 	}
 
-	orgIDs := make([]string, len(orgs))
+	orgIDs := []string{}
 	prefixLen := len("org:")
-	for i, org := range orgs {
+	for _, org := range orgs {
 		if strings.HasPrefix(org[2], "org:") {
-			orgIDs[i] = org[2][prefixLen:]
+			orgIDs = append(orgIDs, org[2][prefixLen:])
 		}
 	}
 	return orgIDs, nil
 }
 
 func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
-	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, userID)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
 	}
 
-	canvasIDs := make([]string, len(canvases))
+	canvasIDs := []string{}
 	prefixLen := len("canvas:")
-	for i, canvas := range canvases {
+	for _, canvas := range canvases {
 		if strings.HasPrefix(canvas[2], "canvas:") {
-			canvasIDs[i] = canvas[2][prefixLen:]
+			canvasIDs = append(canvasIDs, canvas[2][prefixLen:])
 		}
 	}
 	return canvasIDs, nil
@@ -330,13 +362,21 @@ func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, err
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := fmt.Sprintf("org:%s", orgID)
-	roleNames, err := a.enforcer.GetImplicitRolesForUser(userID, orgDomain)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {
 		return nil, err
 	}
 
-	roles := make([]*RoleDefinition, 0, len(roleNames))
+	unprefixedRoleNames := []string{}
 	for _, roleName := range roleNames {
+		if strings.HasPrefix(roleName, "role:") {
+			unprefixedRoleNames = append(unprefixedRoleNames, strings.TrimPrefix(roleName, "role:"))
+		}
+	}
+
+	roles := []*RoleDefinition{}
+	for _, roleName := range unprefixedRoleNames {
 		roleDef, err := a.GetRoleDefinition(roleName, DomainOrg, orgID)
 		if err != nil {
 			continue
@@ -349,13 +389,21 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error) {
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	roleNames, err := a.enforcer.GetImplicitRolesForUser(userID, canvasDomain)
+	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, canvasDomain)
 	if err != nil {
 		return nil, err
 	}
 
-	roles := make([]*RoleDefinition, 0, len(roleNames))
+	unprefixedRoleNames := []string{}
 	for _, roleName := range roleNames {
+		if strings.HasPrefix(roleName, "role:") {
+			unprefixedRoleNames = append(unprefixedRoleNames, strings.TrimPrefix(roleName, "role:"))
+		}
+	}
+
+	roles := []*RoleDefinition{}
+	for _, roleName := range unprefixedRoleNames {
 		roleDef, err := a.GetRoleDefinition(roleName, DomainCanvas, canvasID)
 		if err != nil {
 			continue
@@ -419,7 +467,7 @@ func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) 
 		return nil, fmt.Errorf("failed to get roles for domain %s: %w", domain, err)
 	}
 
-	roleDefinitions := make([]*RoleDefinition, 0, len(roles))
+	roleDefinitions := []*RoleDefinition{}
 	for _, roleName := range roles {
 		roleDef, err := a.GetRoleDefinition(roleName, domainType, domainID)
 		if err != nil {
@@ -493,14 +541,23 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 }
 
 func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
-	roles, err := a.getRolesFromPolicies(domain)
-	log.Infof("roles: %v", roles)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+
+	// Check both sides of grouping policy due to inheritance definition
+	leftRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+
 	if err != nil {
 		return false
 	}
 
-	for _, role := range roles {
-		if role == roleName {
+	rightRoles, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedRoleName, domain)
+
+	if err != nil {
+		return false
+	}
+
+	for _, role := range append(leftRoles, rightRoles...) {
+		if role[0] == prefixedRoleName || role[1] == prefixedRoleName {
 			return true
 		}
 	}
@@ -508,7 +565,8 @@ func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 }
 
 func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
-	permissions, err := a.enforcer.GetImplicitPermissionsForUser(roleName, domain)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	permissions, err := a.enforcer.GetImplicitPermissionsForUser(prefixedRoleName, domain)
 	if err != nil {
 		return []*Permission{}
 	}
@@ -517,10 +575,9 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 	for _, permission := range permissions {
 		if len(permission) >= 4 {
 			rolePermissions = append(rolePermissions, &Permission{
-				Resource:    permission[2],
-				Action:      permission[3],
-				Description: generatePermissionDescription(permission[2], permission[3]),
-				DomainType:  domainType,
+				Resource:   permission[2],
+				Action:     permission[3],
+				DomainType: domainType,
 			})
 		}
 	}
@@ -529,18 +586,20 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 }
 
 func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *RoleDefinition {
-	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(roleName, domain)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
 	if err != nil || len(implicitRoles) == 0 {
 		return nil
 	}
 
 	for _, inheritedRoleName := range implicitRoles {
-		if inheritedRoleName != roleName {
+		if inheritedRoleName != prefixedRoleName {
+			unprefixedRoleName := strings.TrimPrefix(inheritedRoleName, "role:")
 			return &RoleDefinition{
-				Name:        inheritedRoleName,
+				Name:        unprefixedRoleName,
 				DomainType:  domainType,
-				Description: a.getRoleDescription(inheritedRoleName),
-				Permissions: a.getRolePermissions(inheritedRoleName, domain, domainType),
+				Description: a.getRoleDescription(unprefixedRoleName),
+				Permissions: a.getRolePermissions(unprefixedRoleName, domain, domainType),
 				Readonly:    true,
 			}
 		}
@@ -582,7 +641,9 @@ func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
 
 	roles := make([]string, 0, len(roleSet))
 	for role := range roleSet {
-		roles = append(roles, role)
+		if strings.HasPrefix(role, "role:") {
+			roles = append(roles, strings.TrimPrefix(role, "role:"))
+		}
 	}
 
 	return roles, nil
@@ -602,37 +663,6 @@ func (a *AuthService) getRoleDescription(roleName string) string {
 		return description
 	}
 	return fmt.Sprintf("Role: %s", roleName)
-}
-
-func generatePermissionDescription(resource, action string) string {
-	actionDescriptions := map[string]string{
-		"read":    "View",
-		"create":  "Create",
-		"update":  "Modify",
-		"delete":  "Delete",
-		"invite":  "Invite",
-		"remove":  "Remove",
-		"approve": "Approve",
-	}
-
-	resourceDescriptions := map[string]string{
-		"canvas":      "canvas",
-		"user":        "user",
-		"org":         "organization",
-		"eventsource": "event source",
-		"stage":       "stage",
-		"stageevent":  "stage event",
-		"member":      "member",
-	}
-
-	actionDesc, actionExists := actionDescriptions[action]
-	resourceDesc, resourceExists := resourceDescriptions[resource]
-
-	if actionExists && resourceExists {
-		return fmt.Sprintf("%s %s", actionDesc, resourceDesc)
-	}
-
-	return fmt.Sprintf("%s %s", action, resource)
 }
 
 func contains(slice []string, item string) bool {
