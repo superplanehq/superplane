@@ -22,7 +22,7 @@ export const transformEventSourcesToNodes = (
         })[0]
       : null;
     
-    const lastEventTimestamp = lastEvent?.createdAt || 'n/a';
+    const lastEventTimestamp = new Date(lastEvent?.createdAt || '').toLocaleString() || 'n/a';
     
     return ({
       id: es.metadata?.id || '',
