@@ -62,7 +62,7 @@ service Authorization {
   //
   rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
     option (google.api.http) = {
-      post: "/api/v1/authorization/roles/assign"
+      patch: "/api/v1/authorization/roles/assign"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -78,7 +78,7 @@ service Authorization {
   //
   rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse) {
     option (google.api.http) = {
-      post: "/api/v1/authorization/roles/remove"
+      patch: "/api/v1/authorization/roles/remove"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -185,7 +185,7 @@ service Authorization {
   //
   rpc AddUserToGroup(AddUserToGroupRequest) returns (AddUserToGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users"
+      patch: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -201,7 +201,7 @@ service Authorization {
   //
   rpc RemoveUserFromGroup(RemoveUserFromGroupRequest) returns (RemoveUserFromGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}"
+      patch: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from group";

@@ -1996,10 +1996,10 @@ const file_authorization_proto_rawDesc = "" +
 	"\rAuthorization\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x023\x121/api/v1/authorization/users/{user_id}/permissions\x12\xf1\x01\n" +
 	"\n" +
 	"AssignRole\x12+.Superplane.Authorization.AssignRoleRequest\x1a,.Superplane.Authorization.AssignRoleResponse\"\x87\x01\x92AW\n" +
-	"\rAuthorization\x12\vAssign role\x1a9Assigns a role to a user within an organization or canvas\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/authorization/roles/assign\x12\xf3\x01\n" +
+	"\rAuthorization\x12\vAssign role\x1a9Assigns a role to a user within an organization or canvas\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1/authorization/roles/assign\x12\xf3\x01\n" +
 	"\n" +
 	"RemoveRole\x12+.Superplane.Authorization.RemoveRoleRequest\x1a,.Superplane.Authorization.RemoveRoleResponse\"\x89\x01\x92AY\n" +
-	"\rAuthorization\x12\vRemove role\x1a;Removes a role from a user within an organization or canvas\x82\xd3\xe4\x93\x02':\x01*\"\"/api/v1/authorization/roles/remove\x12\x83\x02\n" +
+	"\rAuthorization\x12\vRemove role\x1a;Removes a role from a user within an organization or canvas\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1/authorization/roles/remove\x12\x83\x02\n" +
 	"\tListRoles\x12*.Superplane.Authorization.ListRolesRequest\x1a+.Superplane.Authorization.ListRolesResponse\"\x9c\x01\x92Av\n" +
 	"\rAuthorization\x12\n" +
 	"List roles\x1aYReturns available roles for a specific domain type with their permissions and inheritance\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/authorization/roles\x12\x97\x02\n" +
@@ -2014,9 +2014,9 @@ const file_authorization_proto_rawDesc = "" +
 	"\vCreateGroup\x12,.Superplane.Authorization.CreateGroupRequest\x1a-.Superplane.Authorization.CreateGroupResponse\"\x9f\x01\x92A^\n" +
 	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x028:\x01*\"3/api/v1/authorization/organizations/{org_id}/groups\x12\x92\x02\n" +
 	"\x0eAddUserToGroup\x12/.Superplane.Authorization.AddUserToGroupRequest\x1a0.Superplane.Authorization.AddUserToGroupResponse\"\x9c\x01\x92AH\n" +
-	"\rAuthorization\x12\x11Add user to group\x1a$Adds a user to an organization group\x82\xd3\xe4\x93\x02K:\x01*\"F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xb2\x02\n" +
+	"\rAuthorization\x12\x11Add user to group\x1a$Adds a user to an organization group\x82\xd3\xe4\x93\x02K:\x01*2F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xb2\x02\n" +
 	"\x13RemoveUserFromGroup\x124.Superplane.Authorization.RemoveUserFromGroupRequest\x1a5.Superplane.Authorization.RemoveUserFromGroupResponse\"\xad\x01\x92AR\n" +
-	"\rAuthorization\x12\x16Remove user from group\x1a)Removes a user from an organization group\x82\xd3\xe4\x93\x02R*P/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}\x12\xa6\x02\n" +
+	"\rAuthorization\x12\x16Remove user from group\x1a)Removes a user from an organization group\x82\xd3\xe4\x93\x02R2P/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}\x12\xa6\x02\n" +
 	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x98\x01\x92AZ\n" +
 	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/organizations/{org_id}/groups\x12\x93\x02\n" +
 	"\rGetGroupUsers\x12..Superplane.Authorization.GetGroupUsersRequest\x1a/.Superplane.Authorization.GetGroupUsersResponse\"\xa0\x01\x92AO\n" +

@@ -271,7 +271,7 @@
           "Authorization"
         ]
       },
-      "post": {
+      "patch": {
         "summary": "Add user to group",
         "description": "Adds a user to an organization group",
         "operationId": "Authorization_AddUserToGroup",
@@ -317,7 +317,7 @@
       }
     },
     "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users/{userId}": {
-      "delete": {
+      "patch": {
         "summary": "Remove user from group",
         "description": "Removes a user from an organization group",
         "operationId": "Authorization_RemoveUserFromGroup",
@@ -443,7 +443,7 @@
       }
     },
     "/api/v1/authorization/roles/assign": {
-      "post": {
+      "patch": {
         "summary": "Assign role",
         "description": "Assigns a role to a user within an organization or canvas",
         "operationId": "Authorization_AssignRole",
@@ -527,7 +527,7 @@
       }
     },
     "/api/v1/authorization/roles/remove": {
-      "post": {
+      "patch": {
         "summary": "Remove role",
         "description": "Removes a role from a user within an organization or canvas",
         "operationId": "Authorization_RemoveRole",
