@@ -1,4 +1,4 @@
-import { InputMappingValueDefinition } from "@/api-client";
+import { SuperplaneValueDefinition } from "@/api-client";
 import { StageWithEventQueue } from "../../store/types";
 
 interface SettingsTabProps {
@@ -7,10 +7,10 @@ interface SettingsTabProps {
 
 export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   const getAllInputMappings = (inputName: string) => {
-    if (!selectedStage.inputMappings) return [];
+    if (!selectedStage.spec!.inputMappings) return [];
     
     const mappings = [];
-    for (const mapping of selectedStage.inputMappings) {
+    for (const mapping of selectedStage.spec!.inputMappings) {
       const valueMappings = mapping.values?.filter(v => v.name === inputName) || [];
       for (const valueMapping of valueMappings) {
         mappings.push({
@@ -22,7 +22,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
     return mappings;
   };
 
-  const formatValueSource = (mapping: InputMappingValueDefinition) => {
+  const formatValueSource = (mapping: SuperplaneValueDefinition) => {
     if (mapping.value && mapping.value.trim() !== '') {
       return {
         type: 'Static Value',
@@ -65,19 +65,19 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
         <div className="p-4 space-y-4">
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-700 font-medium">Stage Name</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.name}</span>
+            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.name}</span>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-700 font-medium">Stage ID</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.id?.substring(0, 16)}...</span>
+            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.id?.substring(0, 16)}...</span>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-700 font-medium">Canvas ID</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.canvasId?.substring(0, 16)}...</span>
+            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.canvasId?.substring(0, 16)}...</span>
           </div>
           <div className="flex justify-between items-center py-2">
             <span className="text-gray-700 font-medium">Created</span>
-            <span className="text-gray-900">{selectedStage.createdAt ? new Date(selectedStage.createdAt).toLocaleString() : 'N/A'}</span>
+            <span className="text-gray-900">{selectedStage.metadata!.createdAt ? new Date(selectedStage.metadata!.createdAt).toLocaleString() : 'N/A'}</span>
           </div>
         </div>
       </div>
@@ -88,9 +88,9 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <h3 className="font-medium text-gray-900">Inputs</h3>
         </div>
         <div className="p-4">
-          {selectedStage.inputs && selectedStage.inputs.length > 0 ? (
+          {selectedStage.spec!.inputs && selectedStage.spec!.inputs.length > 0 ? (
             <div className="space-y-4">
-              {selectedStage.inputs.map((input, index) => {
+              {selectedStage.spec!.inputs.map((input, index) => {
                 const inputMappings = getAllInputMappings(input.name || '');
                 
                 return (
@@ -155,9 +155,9 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <h3 className="font-medium text-gray-900">Outputs</h3>
         </div>
         <div className="p-4">
-          {selectedStage.outputs && selectedStage.outputs.length > 0 ? (
+          {selectedStage.spec!.outputs && selectedStage.spec!.outputs.length > 0 ? (
             <div className="space-y-4">
-              {selectedStage.outputs.map((output, index) => (
+              {selectedStage.spec!.outputs.map((output, index) => (
                 <div key={index} className="border border-gray-200 rounded-lg p-4">
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-medium text-gray-900">
@@ -202,9 +202,9 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <h3 className="font-medium text-gray-900">Connections</h3>
         </div>
         <div className="p-4">
-          {selectedStage.connections && selectedStage.connections.length > 0 ? (
+          {selectedStage.spec!.connections && selectedStage.spec!.connections.length > 0 ? (
             <div className="space-y-3">
-              {selectedStage.connections.map((connection, index) => (
+              {selectedStage.spec!.connections.map((connection, index) => (
                 <div key={index} className="border border-gray-200 rounded p-3">
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-medium text-gray-900">
@@ -234,9 +234,9 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <h3 className="font-medium text-gray-900">Conditions</h3>
         </div>
         <div className="p-4">
-          {selectedStage.conditions && selectedStage.conditions.length > 0 ? (
+          {selectedStage.spec!.conditions && selectedStage.spec!.conditions.length > 0 ? (
             <div className="space-y-3">
-              {selectedStage.conditions.map((condition, index) => (
+              {selectedStage.spec!.conditions.map((condition, index) => (
                 <div key={index} className="border border-gray-200 rounded p-3">
                   <div className="flex justify-between items-start mb-2">
                     <div className="font-medium text-gray-900">
@@ -268,25 +268,25 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <h3 className="font-medium text-gray-900">Executor</h3>
         </div>
         <div className="p-4">
-          {selectedStage.executor ? (
+          {selectedStage.spec!.executor ? (
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-700 font-medium">Type</span>
-                <span className="text-gray-900">{selectedStage.executor.type?.replace('TYPE_', '')}</span>
+                <span className="text-gray-900">{selectedStage.spec!.executor!.type?.replace('TYPE_', '')}</span>
               </div>
-              {selectedStage.executor.semaphore && (
+              {selectedStage.spec!.executor!.semaphore && (
                 <>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Project ID</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.projectId}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.projectId}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Branch</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.branch}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.branch}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-700 font-medium">Pipeline File</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.executor.semaphore.pipelineFile}</span>
+                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.pipelineFile}</span>
                   </div>
                 </>
               )}

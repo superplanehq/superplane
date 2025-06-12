@@ -51,16 +51,20 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "requester ID is invalid")
 	}
 
-	executor, err := specValidator.Validate(req.Executor)
+	if req.Stage == nil || req.Stage.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
+	}
+
+	executor, err := specValidator.Validate(req.Stage.Spec.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	inputValidator := inputs.NewValidator(
-		inputs.WithInputs(req.Inputs),
-		inputs.WithOutputs(req.Outputs),
-		inputs.WithInputMappings(req.InputMappings),
-		inputs.WithConnections(req.Connections),
+		inputs.WithInputs(req.Stage.Spec.Inputs),
+		inputs.WithOutputs(req.Stage.Spec.Outputs),
+		inputs.WithInputMappings(req.Stage.Spec.InputMappings),
+		inputs.WithConnections(req.Stage.Spec.Connections),
 	)
 
 	err = inputValidator.Validate()
@@ -68,17 +72,17 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Connections)
+	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	conditions, err := validateConditions(req.Conditions)
+	conditions, err := validateConditions(req.Stage.Spec.Conditions)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Secrets)
+	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -110,10 +114,10 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 
 	serialized, err := serializeStage(
 		*stage,
-		req.Connections,
-		req.Inputs,
-		req.Outputs,
-		req.InputMappings,
+		req.Stage.Spec.Connections,
+		req.Stage.Spec.Inputs,
+		req.Stage.Spec.Outputs,
+		req.Stage.Spec.InputMappings,
 	)
 
 	if err != nil {

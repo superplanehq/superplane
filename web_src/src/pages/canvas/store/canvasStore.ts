@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
-import { CanvasState } from './types';
-import { SuperplaneCanvas, SuperplaneEventSource, SuperplaneStage } from "@/api-client/types.gen";
+import { CanvasState, EventSourceWithEvents } from './types';
+import { SuperplaneCanvas, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
-import { transformEventSourcesToNodes, transformStagesToNodes, transformToEdges, applyGridLayout } from '../utils/flowTransformers';
-import { useAutoLayout } from '../hooks/useAutoLayout';
+import { transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
 function generateFakeUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -60,24 +59,24 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   updateStage: (stage: SuperplaneStage) => {
     console.log("Updating stage:", stage);
     set((state) => ({
-      stages: state.stages.map((s) => s.id === stage.id ? {
+      stages: state.stages.map((s) => s.metadata!.id === stage.metadata!.id ? {
         ...stage, queue: s.queue} : s)
     }));
     get().syncToReactFlow();
   },
   
-  addEventSource: (eventSource: SuperplaneEventSource) => {
+  addEventSource: (eventSource: EventSourceWithEvents) => {
     set((state) => ({
       event_sources: [...state.event_sources, eventSource]
     }));
     get().syncToReactFlow();
   },
   
-  updateEventSource: (eventSource: SuperplaneEventSource) => {
+  updateEventSource: (eventSource: EventSourceWithEvents) => {
     console.log("Updating event source:", eventSource);
     set((state) => ({
       event_sources: state.event_sources.map(es => 
-        es.id === eventSource.id ? eventSource : es
+        es.metadata!.id === eventSource.metadata!.id ? eventSource : es
       )
     }));
     get().syncToReactFlow();
@@ -107,7 +106,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // defined in @/api-client/api
     superplaneApproveStageEvent({
       path: {
-        canvasIdOrName: get().canvas.id!,
+        canvasIdOrName: get().canvas.metadata!.id!,
         stageIdOrName: stageId,
         eventId: stageEventId
       },
@@ -119,7 +118,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
   
   selectStage: (stageId: string) => {
-    set((state) => ({ selectedStage: state.stages.find(stage => stage.id === stageId) }));
+    set((state) => ({ selectedStage: state.stages.find(stage => stage.metadata!.id === stageId) }));
   },
 
   cleanSelectedStage: () => {

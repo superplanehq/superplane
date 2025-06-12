@@ -1,7 +1,7 @@
 kind: Stage
 metadata:
   name: deploy-to-production
-  canvasId: my-application-canvas-id
+  canvasId: c2181c55-64ac-41ba-8925-0eaf0357b3f6
 spec:
 
   # Define secrets that will be available to the executor

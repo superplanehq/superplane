@@ -31,11 +31,15 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Creat
 		return nil, status.Error(codes.InvalidArgument, "missing secret")
 	}
 
-	if req.Secret.Name == "" {
+	if req.Secret.Metadata == nil || req.Secret.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "empty secret name")
 	}
 
-	provider := protoToSecretProvider(req.Secret.Provider)
+	if req.Secret.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
+	}
+
+	provider := protoToSecretProvider(req.Secret.Spec.Provider)
 	if provider == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid provider")
 	}
@@ -50,7 +54,7 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Creat
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secret, err := models.CreateSecret(req.Secret.Name, provider, req.RequesterId, canvas.ID, data)
+	secret, err := models.CreateSecret(req.Secret.Metadata.Name, provider, req.RequesterId, canvas.ID, data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -86,18 +90,21 @@ func secretProviderToProto(provider string) pb.Secret_Provider {
 }
 
 func prepareSecretData(ctx context.Context, encryptor crypto.Encryptor, secret *pb.Secret) ([]byte, error) {
-	switch secret.Provider {
+	if secret.Spec == nil {
+		return nil, fmt.Errorf("missing secret spec")
+	}
+	switch secret.Spec.Provider {
 	case pb.Secret_PROVIDER_LOCAL:
-		if secret.Local == nil || secret.Local.Data == nil {
+		if secret.Spec.Local == nil || secret.Spec.Local.Data == nil {
 			return nil, fmt.Errorf("missing data")
 		}
 
-		data, err := json.Marshal(secret.Local.Data)
+		data, err := json.Marshal(secret.Spec.Local.Data)
 		if err != nil {
 			return nil, err
 		}
 
-		encrypted, err := encryptor.Encrypt(ctx, data, []byte(secret.Name))
+		encrypted, err := encryptor.Encrypt(ctx, data, []byte(secret.Metadata.Name))
 		if err != nil {
 			return nil, err
 		}
