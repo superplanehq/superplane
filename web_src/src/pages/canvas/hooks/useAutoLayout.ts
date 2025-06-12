@@ -46,7 +46,6 @@ export const useAutoLayout = () => {
             y: elkNode.y - (nodeElement?.offsetHeight || 0) / 2,
           };
 
-
           return {
             ...node,
             position: newPosition,
