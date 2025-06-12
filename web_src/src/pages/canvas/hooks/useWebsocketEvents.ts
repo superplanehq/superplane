@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
-import { StageWithEventQueue } from '../store/types';
+import { EventSourceWithEvents, StageWithEventQueue } from '../store/types';
 import { SuperplaneStageEvent } from '@/api-client/types.gen';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
@@ -15,7 +15,9 @@ export function useWebsocketEvents(canvasId: string): void {
   // Get store access methods directly within the hook
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
   const stages = useCanvasStore((s) => s.stages);
+  const eventSources = useCanvasStore((s) => s.event_sources);
   const updateStage = useCanvasStore((s) => s.updateStage);
+  const updateEventSource = useCanvasStore((s) => s.updateEventSource);
   const addStage = useCanvasStore((s) => s.addStage);
   const addEventSource = useCanvasStore((s) => s.addEventSource);
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
@@ -54,6 +56,8 @@ export function useWebsocketEvents(canvasId: string): void {
     let approvedEventPayload: EventMap['stage_event_approved'];
     let stageWithApprovedEvent: StageWithEventQueue | undefined;
     let updatedEvents: Array<SuperplaneStageEvent>;
+    let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
+    let updatedEventSource: EventSourceWithEvents;
     
     // Route the event to the appropriate handler
     switch (event) {
@@ -73,6 +77,8 @@ export function useWebsocketEvents(canvasId: string): void {
         // For stage events, we need to get the current stage first
         newEventPayload = payload as EventMap['new_stage_event'];
         stageWithNewEvent = stages.find(s => s.metadata!.id === newEventPayload.stage_id);
+        eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === newEventPayload.source_id);
+
         if (stageWithNewEvent) {
           // Add the event to the stage's event queue
           updatedStage = {
@@ -83,6 +89,19 @@ export function useWebsocketEvents(canvasId: string): void {
         } else {
           console.warn(`Stage not found for new event: ${newEventPayload.stage_id}`);
         }
+
+        if (eventSourceWithNewEvent) {
+          // Add the event to the event source's event queue
+          updatedEventSource = {
+            ...eventSourceWithNewEvent,
+            events: [...(eventSourceWithNewEvent.events || []), newEventPayload]
+          };
+          updateEventSource(updatedEventSource);
+
+        } else {
+          console.warn(`Event source not found for new event: ${newEventPayload.source_id}`);
+        }
+
         break;
       case 'stage_event_approved':
         approvedEventPayload = payload as EventMap['stage_event_approved'];
@@ -107,5 +126,5 @@ export function useWebsocketEvents(canvasId: string): void {
     }
 
 
-  }, [lastJsonMessage]);
+  }, [lastJsonMessage, addEventSource, addStage, updateCanvas, updateStage]);
 }

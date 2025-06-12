@@ -36,6 +36,7 @@ func HandleStageEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 		"id":        pbMsg.EventId,
 		"stage_id":  pbMsg.StageId,
 		"canvas_id": pbMsg.CanvasId,
+		"source_id": pbMsg.SourceId,
 		"timestamp": pbMsg.Timestamp.AsTime(),
 	}
 

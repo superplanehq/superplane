@@ -7,8 +7,8 @@ export type EventMap = {
     stage_updated: SuperplaneStage;
     event_source_added: EventSourceWithEvents;
     canvas_updated: SuperplaneCanvas;
-    new_stage_event: EventWithStage;
-    stage_event_approved: EventWithStage;
+    new_stage_event: EventWithStageAndSource;
+    stage_event_approved: EventWithStageAndSource;
 };
   
 export type ServerEvent = {
@@ -19,4 +19,4 @@ export type ServerEvent = {
   }[keyof EventMap]; // Discriminated union
   
 
-export type EventWithStage = SuperplaneStageEvent & { stage_id: string };
+export type EventWithStageAndSource = SuperplaneStageEvent & { stage_id: string; source_id: string };

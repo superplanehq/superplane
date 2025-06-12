@@ -142,10 +142,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     const nodes = options?.autoLayout ?
       await autoLayoutNodes(unlayoutedNodes, edges) :
       unlayoutedNodes;
+    const newNodePositions = nodes.reduce((acc, node) => {
+      acc[node.id] = node.position;
+      return acc;
+    }, {} as Record<string, { x: number; y: number }>);
     
     set({
         nodes,
-        edges
+        edges,
+        nodePositions: newNodePositions
     });
 },
 

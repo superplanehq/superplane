@@ -30,6 +30,7 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 
 	stageID, _ := rawMsg["stage_id"].(string)
 	canvasID, _ := rawMsg["canvas_id"].(string)
+	sourceID, _ := rawMsg["source_id"].(string)
 
 	// Since we don't have access to the actual gRPC service anymore,
 	// we'll just use the raw message data we received
@@ -37,6 +38,7 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 		"id":        eventID,
 		"stage_id":  stageID,
 		"canvas_id": canvasID,
+		"source_id": sourceID,
 		"approved":  true,
 	}
 

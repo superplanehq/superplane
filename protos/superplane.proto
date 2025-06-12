@@ -697,14 +697,16 @@ message StageEventCreated {
   string canvas_id = 1;
   string stage_id = 2;
   string event_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
+  string source_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
 }
 
 message StageEventApproved {
   string canvas_id = 1;
   string stage_id = 2;
   string event_id = 3;
-  google.protobuf.Timestamp timestamp = 4;
+  string source_id = 4;
+  google.protobuf.Timestamp timestamp = 5;
 }
 
 message StageExecutionCreated {

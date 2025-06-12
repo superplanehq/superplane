@@ -30,7 +30,7 @@ export const transformEventSourcesToNodes = (
       id: es.metadata?.id || '',
       type: 'githubIntegration',
       data: {
-        id: es.metadata?.name || '',
+        id: es.metadata?.id || '',
         name: es.metadata?.name,
         timestamp: lastEventTimestamp
       },

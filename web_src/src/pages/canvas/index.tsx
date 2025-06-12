@@ -63,7 +63,7 @@ export function Canvas() {
         const mappedStages = stagesResponse.data?.stages || [];
         
         // Collect all events from all stages
-        const allEvents: SuperplaneStageEvent[] = [];
+        const allEvents: Record<string, SuperplaneStageEvent> = {};
         const stagesWithQueues: StageWithEventQueue[] = [];
 
         // Fetch events for each stage
@@ -75,7 +75,9 @@ export function Canvas() {
           const stageEvents = stageEventsResponse.data?.events || [];
           
           // Add events to the collection
-          allEvents.push(...stageEvents);
+          for (const event of stageEvents) {
+            allEvents[event.id!] = event;
+          }
 
           stagesWithQueues.push({
             ...stage,
@@ -84,7 +86,7 @@ export function Canvas() {
         }
 
         // Group events by source ID
-        const eventsBySourceId = allEvents.reduce((acc, event) => {
+        const eventsBySourceId = Object.values(allEvents).reduce((acc, event) => {
           const sourceId = event.sourceId;
           if (sourceId) {
             if (!acc[sourceId]) {
