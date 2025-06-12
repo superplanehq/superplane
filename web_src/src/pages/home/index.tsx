@@ -60,11 +60,11 @@ const HomePage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {canvases.map((canvas) => (
-            <div key={canvas.id} className="border rounded-lg p-5 hover:shadow-md transition-shadow flex flex-col">
-              <h2 className="text-xl font-semibold mb-3">{canvas.name}</h2>
+            <div key={canvas.metadata!.id} className="border rounded-lg p-5 hover:shadow-md transition-shadow flex flex-col">
+              <h2 className="text-xl font-semibold mb-3">{canvas.metadata!.name}</h2>
               <div className="mt-auto">
                 <Link 
-                  to={`canvas/${canvas.id}`}
+                  to={`canvas/${canvas.metadata!.id}`}
                   className="inline-flex items-center text-sm font-medium text-indigo-600 hover:text-indigo-800 transition-colors group"
                 >
                   <span>Open Canvas</span>

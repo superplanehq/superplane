@@ -9,7 +9,7 @@ export const elk = new Elk({
     "elk.spacing": "80",
     "elk.spacing.individual": "80",
     "elk.edgeRouting": "SPLINES",
-    "elk.layered.spacing.nodeNodeBetweenLayers": "100",
+    "elk.layered.spacing.nodeNodeBetweenLayers": "250",
     "elk.spacing.nodeNode": "100",
     "elk.separateConnectedComponents": "true",
     "elk.spacing.componentComponent": "50",

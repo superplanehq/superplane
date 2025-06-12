@@ -59,10 +59,10 @@ func Test__ListSecrets(t *testing.T) {
 		require.Len(t, response.Secrets, 1)
 
 		secret := response.Secrets[0]
-		assert.NotEmpty(t, secret.Id)
-		assert.NotEmpty(t, secret.CreatedAt)
-		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, secret.Provider)
-		require.NotNil(t, secret.Local)
-		require.Equal(t, map[string]string{"test": "***"}, secret.Local.Data)
+		assert.NotEmpty(t, secret.Metadata.Id)
+		assert.NotEmpty(t, secret.Metadata.CreatedAt)
+		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, secret.Spec.Provider)
+		require.NotNil(t, secret.Spec.Local)
+		require.Equal(t, map[string]string{"test": "***"}, secret.Spec.Local.Data)
 	})
 }

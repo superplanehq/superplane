@@ -13,7 +13,6 @@ package openapi_client
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // checks if the SuperplaneEventSource type satisfies the MappedNullable interface at compile time
@@ -21,10 +20,8 @@ var _ MappedNullable = &SuperplaneEventSource{}
 
 // SuperplaneEventSource struct for SuperplaneEventSource
 type SuperplaneEventSource struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	CanvasId *string `json:"canvasId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	Metadata *SuperplaneEventSourceMetadata `json:"metadata,omitempty"`
+	Spec map[string]interface{} `json:"spec,omitempty"`
 }
 
 // NewSuperplaneEventSource instantiates a new SuperplaneEventSource object
@@ -44,132 +41,68 @@ func NewSuperplaneEventSourceWithDefaults() *SuperplaneEventSource {
 	return &this
 }
 
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *SuperplaneEventSource) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
+// GetMetadata returns the Metadata field value if set, zero value otherwise.
+func (o *SuperplaneEventSource) GetMetadata() SuperplaneEventSourceMetadata {
+	if o == nil || IsNil(o.Metadata) {
+		var ret SuperplaneEventSourceMetadata
 		return ret
 	}
-	return *o.Id
+	return *o.Metadata
 }
 
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSource) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
+func (o *SuperplaneEventSource) GetMetadataOk() (*SuperplaneEventSourceMetadata, bool) {
+	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
-	return o.Id, true
+	return o.Metadata, true
 }
 
-// HasId returns a boolean if a field has been set.
-func (o *SuperplaneEventSource) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
+// HasMetadata returns a boolean if a field has been set.
+func (o *SuperplaneEventSource) HasMetadata() bool {
+	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
 
 	return false
 }
 
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *SuperplaneEventSource) SetId(v string) {
-	o.Id = &v
+// SetMetadata gets a reference to the given SuperplaneEventSourceMetadata and assigns it to the Metadata field.
+func (o *SuperplaneEventSource) SetMetadata(v SuperplaneEventSourceMetadata) {
+	o.Metadata = &v
 }
 
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneEventSource) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *SuperplaneEventSource) GetSpec() map[string]interface{} {
+	if o == nil || IsNil(o.Spec) {
+		var ret map[string]interface{}
 		return ret
 	}
-	return *o.Name
+	return o.Spec
 }
 
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSource) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
-		return nil, false
+func (o *SuperplaneEventSource) GetSpecOk() (map[string]interface{}, bool) {
+	if o == nil || IsNil(o.Spec) {
+		return map[string]interface{}{}, false
 	}
-	return o.Name, true
+	return o.Spec, true
 }
 
-// HasName returns a boolean if a field has been set.
-func (o *SuperplaneEventSource) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
+// HasSpec returns a boolean if a field has been set.
+func (o *SuperplaneEventSource) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
 
 	return false
 }
 
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneEventSource) SetName(v string) {
-	o.Name = &v
-}
-
-// GetCanvasId returns the CanvasId field value if set, zero value otherwise.
-func (o *SuperplaneEventSource) GetCanvasId() string {
-	if o == nil || IsNil(o.CanvasId) {
-		var ret string
-		return ret
-	}
-	return *o.CanvasId
-}
-
-// GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneEventSource) GetCanvasIdOk() (*string, bool) {
-	if o == nil || IsNil(o.CanvasId) {
-		return nil, false
-	}
-	return o.CanvasId, true
-}
-
-// HasCanvasId returns a boolean if a field has been set.
-func (o *SuperplaneEventSource) HasCanvasId() bool {
-	if o != nil && !IsNil(o.CanvasId) {
-		return true
-	}
-
-	return false
-}
-
-// SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
-func (o *SuperplaneEventSource) SetCanvasId(v string) {
-	o.CanvasId = &v
-}
-
-// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *SuperplaneEventSource) GetCreatedAt() time.Time {
-	if o == nil || IsNil(o.CreatedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.CreatedAt
-}
-
-// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneEventSource) GetCreatedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CreatedAt) {
-		return nil, false
-	}
-	return o.CreatedAt, true
-}
-
-// HasCreatedAt returns a boolean if a field has been set.
-func (o *SuperplaneEventSource) HasCreatedAt() bool {
-	if o != nil && !IsNil(o.CreatedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *SuperplaneEventSource) SetCreatedAt(v time.Time) {
-	o.CreatedAt = &v
+// SetSpec gets a reference to the given map[string]interface{} and assigns it to the Spec field.
+func (o *SuperplaneEventSource) SetSpec(v map[string]interface{}) {
+	o.Spec = v
 }
 
 func (o SuperplaneEventSource) MarshalJSON() ([]byte, error) {
@@ -182,17 +115,11 @@ func (o SuperplaneEventSource) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneEventSource) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
+	if !IsNil(o.Metadata) {
+		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.CanvasId) {
-		toSerialize["canvasId"] = o.CanvasId
-	}
-	if !IsNil(o.CreatedAt) {
-		toSerialize["createdAt"] = o.CreatedAt
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
 	}
 	return toSerialize, nil
 }
