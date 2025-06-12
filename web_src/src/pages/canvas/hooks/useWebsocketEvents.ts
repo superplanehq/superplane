@@ -72,7 +72,7 @@ export function useWebsocketEvents(canvasId: string): void {
       case 'new_stage_event':
         // For stage events, we need to get the current stage first
         newEventPayload = payload as EventMap['new_stage_event'];
-        stageWithNewEvent = stages.find(s => s.id === newEventPayload.stage_id);
+        stageWithNewEvent = stages.find(s => s.metadata!.id === newEventPayload.stage_id);
         if (stageWithNewEvent) {
           // Add the event to the stage's event queue
           updatedStage = {
@@ -86,7 +86,7 @@ export function useWebsocketEvents(canvasId: string): void {
         break;
       case 'stage_event_approved':
         approvedEventPayload = payload as EventMap['stage_event_approved'];
-        stageWithApprovedEvent = stages.find(s => s.id === approvedEventPayload.stage_id);
+        stageWithApprovedEvent = stages.find(s => s.metadata!.id === approvedEventPayload.stage_id);
         if (stageWithApprovedEvent) {
           // Update the event status in the stage's event queue
           updatedEvents = stageWithApprovedEvent.queue?.map((eventItem: SuperplaneStageEvent) => 

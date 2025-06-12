@@ -6,7 +6,7 @@ import { superplaneApproveStageEvent } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
-import { transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
+import { autoLayoutNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
 function generateFakeUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -41,7 +41,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       event_sources: data.event_sources || [],
       nodePositions: {},
     });
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout: true });
     console.log("Canvas initialized with stages:", data.stages?.length || 0);
   },
   
@@ -129,7 +129,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ webSocketConnectionStatus: status });
   },
 
-  syncToReactFlow: () => {
+  syncToReactFlow: async (options?: { autoLayout?: boolean }) => {
     const { stages, event_sources, nodePositions, approveStageEvent } = get();
 
     // Use the transformer functions from flowTransformers.ts
@@ -138,9 +138,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     
     // Get edges based on connections
     const edges = transformToEdges(stages, event_sources);
+    const unlayoutedNodes = [...stageNodes, ...eventSourceNodes];
+    const nodes = options?.autoLayout ?
+      await autoLayoutNodes(unlayoutedNodes, edges) :
+      unlayoutedNodes;
     
     set({
-        nodes: [...stageNodes, ...eventSourceNodes],
+        nodes,
         edges
     });
 },

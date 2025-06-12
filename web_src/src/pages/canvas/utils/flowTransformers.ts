@@ -1,8 +1,10 @@
 import { SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
-import { DEFAULT_WIDTH, DEFAULT_HEIGHT, LAYOUT_SPACING } from "./constants";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { EventSourceWithEvents, StageWithEventQueue } from "../store/types";
-import { ConnectionLineType, MarkerType } from "@xyflow/react";
+import { ConnectionLineType, Edge, MarkerType } from "@xyflow/react";
+import { DEFAULT_HEIGHT, DEFAULT_WIDTH } from "./constants";
+import { ElkExtendedEdge, ElkNode } from "elkjs";
+import { elk } from "./layoutConfig";
 
 
 interface NodePositions {
@@ -91,4 +93,53 @@ export const transformToEdges = (
       } as EdgeType;
     })
   );
+};
+
+export const autoLayoutNodes = async (
+  nodes: AllNodeType[],
+  edges: Edge[]
+) => {
+  const elkNodes: ElkNode[] = nodes.map((node) => ({
+    id: node.id,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+  }));
+
+  const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
+    id: edge.id,
+    sources: [edge.source],
+    targets: [edge.target],
+  }));
+
+  try {
+    const layoutedGraph = await elk.layout({
+      id: "root",
+      children: elkNodes,
+      edges: elkEdges,
+    });
+
+    const newNodes = nodes.map((node) => {
+      const elkNode = layoutedGraph.children?.find((n) => n.id === node.id);
+      const nodeElement: HTMLDivElement | null = document.querySelector(`[data-id="${node.id}"]`);
+
+      if (elkNode?.x !== undefined && elkNode?.y !== undefined) {
+        const newPosition = {
+          x: elkNode.x + Math.random() / 1000,
+          y: elkNode.y - (nodeElement?.offsetHeight || 0) / 2,
+        };
+
+        return {
+          ...node,
+          position: newPosition,
+        };
+      }
+
+      return node;
+    });
+
+    return newNodes;
+  } catch (error) {
+    console.error('ELK auto-layout failed:', error);
+    return nodes;
+  }
 };
