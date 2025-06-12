@@ -1,4 +1,4 @@
-import type { CanvasState } from "../types";
+import type { CanvasState, EventSourceWithEvents } from "../types";
 import { SuperplaneEventSource } from "@/api-client";
 
 /**
@@ -6,13 +6,13 @@ import { SuperplaneEventSource } from "@/api-client";
  * Manages adding or updating event sources based on incoming events
  */
 export function handleEventSourceAdded(
-  payload: SuperplaneEventSource,
+  payload: EventSourceWithEvents,
   state: Pick<CanvasState, 'event_sources' | 'addEventSource' | 'updateEventSource'>
 ): void {
   console.log('Event source added event received:', payload);
   
   // Check if event source already exists
-  const existingSource = state.event_sources.find((es: SuperplaneEventSource) => es.id === payload.id);
+  const existingSource = state.event_sources.find((es: SuperplaneEventSource) => es.metadata!.id === payload.metadata!.id);
   if (existingSource) {
     state.updateEventSource(payload);
   } else {

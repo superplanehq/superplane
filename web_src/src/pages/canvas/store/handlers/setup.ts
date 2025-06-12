@@ -72,5 +72,6 @@ export function useSetupEventHandlers(canvasId: string): void {
       default:
         console.warn('Unhandled event type:', event);
     }
-  }, [lastJsonMessage, store]);
+  // do not add store to the dependency array, or you will get an infinite loop
+  }, [lastJsonMessage]);
 }

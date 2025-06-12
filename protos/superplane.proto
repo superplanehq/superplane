@@ -227,14 +227,19 @@ message ListCanvasesResponse {
 }
 
 message Canvas {
-  string id = 1;
-  string name = 2;
-  string created_by = 3;
-  google.protobuf.Timestamp created_at = 4;
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string created_by = 3;
+    google.protobuf.Timestamp created_at = 4;
+  }
+
+  Metadata metadata = 1;
+  // No spec needed for Canvas as per the YAML example
 }
 
 message CreateCanvasRequest {
-  string name = 1;
+  Canvas canvas = 1;
   string requester_id = 2;
 }
 
@@ -252,10 +257,19 @@ message DescribeCanvasResponse {
 }
 
 message EventSource {
-  string id = 1;
-  string name = 2;
-  string canvas_id = 3;
-  google.protobuf.Timestamp created_at = 4;
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string canvas_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+  }
+
+  message Spec {
+    // No additional configuration needed as per the YAML example
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message DescribeStageRequest {
@@ -269,9 +283,9 @@ message DescribeStageResponse {
 }
 
 message CreateEventSourceRequest {
-  string name = 1;
-  string canvas_id_or_name = 2;
-  string requester_id = 3;
+  EventSource event_source = 1;
+  string requester_id = 2;
+  string canvas_id_or_name = 3;
 }
 
 message CreateEventSourceResponse {
@@ -292,18 +306,26 @@ message Secret {
     map<string, string> data = 1;
   }
 
-  string id = 1;
-  string name = 2;
-  string canvas_id = 3;
-  google.protobuf.Timestamp created_at = 4;
-  Provider provider = 5;
-  Local local = 6;
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string canvas_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+  }
+
+  message Spec {
+    Provider provider = 1;
+    Local local = 2;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message CreateSecretRequest {
-  string canvas_id_or_name = 1;
+  Secret secret = 1;
   string requester_id = 2;
-  Secret secret = 3;
+  string canvas_id_or_name = 3;
 }
 
 message CreateSecretResponse {
@@ -311,10 +333,10 @@ message CreateSecretResponse {
 }
 
 message UpdateSecretRequest {
-  string canvas_id_or_name = 1;
+  Secret secret = 1;
   string id_or_name = 2;
-  string requester_id = 3;
-  Secret secret = 4;
+  string canvas_id_or_name = 3;
+  string requester_id = 4;
 }
 
 message UpdateSecretResponse {
@@ -400,17 +422,25 @@ message Connection {
 }
 
 message Stage {
-  string id = 1;
-  string name = 2;
-  string canvas_id = 3;
-  google.protobuf.Timestamp created_at = 4;
-  repeated Connection connections = 5;
-  repeated Condition conditions = 6;
-  ExecutorSpec executor = 7;
-  repeated InputDefinition inputs = 8;
-  repeated InputMapping input_mappings = 9;
-  repeated OutputDefinition outputs = 10;
-  repeated ValueDefinition secrets = 11;
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string canvas_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+  }
+
+  message Spec {
+    repeated Connection connections = 1;
+    repeated Condition conditions = 2;
+    ExecutorSpec executor = 3;
+    repeated InputDefinition inputs = 4;
+    repeated InputMapping input_mappings = 5;
+    repeated OutputDefinition outputs = 6;
+    repeated ValueDefinition secrets = 7;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message OutputDefinition {
@@ -486,16 +516,9 @@ message ConditionTimeWindow {
 }
 
 message CreateStageRequest {
-  string name = 1;
-  string canvas_id_or_name = 2;
-  string requester_id = 3;
-  repeated Connection connections = 4;
-  repeated Condition conditions = 5;
-  ExecutorSpec executor = 6;
-  repeated InputDefinition inputs = 7;
-  repeated InputMapping input_mappings = 8;
-  repeated OutputDefinition outputs = 9;
-  repeated ValueDefinition secrets = 10;
+  Stage stage = 1;
+  string requester_id = 2;
+  string canvas_id_or_name = 3;
 }
 
 message ExecutorSpec {
@@ -536,16 +559,10 @@ message CreateStageResponse {
 }
 
 message UpdateStageRequest {
-  string id_or_name = 1;
-  string canvas_id_or_name = 2;
-  string requester_id = 3;
-  repeated Connection connections = 4;
-  repeated Condition conditions = 5;
-  ExecutorSpec executor = 6;
-  repeated InputDefinition inputs = 7;
-  repeated InputMapping input_mappings = 8;
-  repeated OutputDefinition outputs = 9;
-  repeated ValueDefinition secrets = 10;
+  Stage stage = 1;
+  string id_or_name = 2;
+  string canvas_id_or_name = 3;
+  string requester_id = 4;
 }
 
 message UpdateStageResponse {

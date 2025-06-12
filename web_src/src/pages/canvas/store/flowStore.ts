@@ -2,7 +2,7 @@
 // and manages the state of the displayed flow
 
 import { create } from 'zustand';
-import { applyNodeChanges, applyEdgeChanges, Connection, Viewport } from '@xyflow/react';
+import { applyNodeChanges, applyEdgeChanges, Connection, Viewport, ConnectionLineType, MarkerType } from '@xyflow/react';
 import { FlowStoreType } from '../types/zustand';
 import { AllNodeType, EdgeType } from '../types/flow';
 
@@ -87,8 +87,10 @@ export const useFlowStore = create<FlowStoreType>((set, get) => ({
       target: connection.target || '',
       sourceHandle: connection.sourceHandle,
       targetHandle: connection.targetHandle,
-      type: 'smoothstep',
-      animated: true
+      type: ConnectionLineType.Bezier,
+      animated: true,
+      style: { stroke: '#000000', strokeWidth: 4 },
+      markerEnd: { type: MarkerType.Arrow, color: '#000000', strokeWidth: 2 }
     };
     
     set({

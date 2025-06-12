@@ -71,10 +71,10 @@ func Test__DescribeEventSource(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
-		assert.Equal(t, r.Source.ID.String(), response.EventSource.Id)
-		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
-		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.CreatedAt.AsTime())
-		assert.Equal(t, r.Source.Name, response.EventSource.Name)
+		assert.Equal(t, r.Source.ID.String(), response.EventSource.Metadata.Id)
+		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
+		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.Metadata.CreatedAt.AsTime())
+		assert.Equal(t, r.Source.Name, response.EventSource.Metadata.Name)
 	})
 
 	t.Run("using name", func(t *testing.T) {
@@ -86,9 +86,9 @@ func Test__DescribeEventSource(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
-		assert.Equal(t, r.Source.ID.String(), response.EventSource.Id)
-		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
-		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.CreatedAt.AsTime())
-		assert.Equal(t, r.Source.Name, response.EventSource.Name)
+		assert.Equal(t, r.Source.ID.String(), response.EventSource.Metadata.Id)
+		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
+		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.Metadata.CreatedAt.AsTime())
+		assert.Equal(t, r.Source.Name, response.EventSource.Metadata.Name)
 	})
 }

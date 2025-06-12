@@ -44,11 +44,15 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Updat
 		return nil, status.Error(codes.InvalidArgument, "missing secret")
 	}
 
-	if req.Secret.Name == "" {
+	if req.Secret.Metadata == nil || req.Secret.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "empty secret name")
 	}
 
-	provider := protoToSecretProvider(req.Secret.Provider)
+	if req.Secret.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
+	}
+
+	provider := protoToSecretProvider(req.Secret.Spec.Provider)
 	if provider != secret.Provider {
 		return nil, status.Error(codes.InvalidArgument, "cannot update provider")
 	}

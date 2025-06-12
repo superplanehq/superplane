@@ -13,7 +13,6 @@ package openapi_client
 
 import (
 	"encoding/json"
-	"time"
 )
 
 // checks if the SuperplaneSecret type satisfies the MappedNullable interface at compile time
@@ -21,12 +20,8 @@ var _ MappedNullable = &SuperplaneSecret{}
 
 // SuperplaneSecret struct for SuperplaneSecret
 type SuperplaneSecret struct {
-	Id *string `json:"id,omitempty"`
-	Name *string `json:"name,omitempty"`
-	CanvasId *string `json:"canvasId,omitempty"`
-	CreatedAt *time.Time `json:"createdAt,omitempty"`
-	Provider *SecretProvider `json:"provider,omitempty"`
-	Local *SecretLocal `json:"local,omitempty"`
+	Metadata *SuperplaneSecretMetadata `json:"metadata,omitempty"`
+	Spec *SuperplaneSecretSpec `json:"spec,omitempty"`
 }
 
 // NewSuperplaneSecret instantiates a new SuperplaneSecret object
@@ -35,8 +30,6 @@ type SuperplaneSecret struct {
 // will change when the set of required properties is changed
 func NewSuperplaneSecret() *SuperplaneSecret {
 	this := SuperplaneSecret{}
-	var provider SecretProvider = SECRETPROVIDER_PROVIDER_UNKNOWN
-	this.Provider = &provider
 	return &this
 }
 
@@ -45,201 +38,71 @@ func NewSuperplaneSecret() *SuperplaneSecret {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneSecretWithDefaults() *SuperplaneSecret {
 	this := SuperplaneSecret{}
-	var provider SecretProvider = SECRETPROVIDER_PROVIDER_UNKNOWN
-	this.Provider = &provider
 	return &this
 }
 
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
+// GetMetadata returns the Metadata field value if set, zero value otherwise.
+func (o *SuperplaneSecret) GetMetadata() SuperplaneSecretMetadata {
+	if o == nil || IsNil(o.Metadata) {
+		var ret SuperplaneSecretMetadata
 		return ret
 	}
-	return *o.Id
+	return *o.Metadata
 }
 
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
+// GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
+func (o *SuperplaneSecret) GetMetadataOk() (*SuperplaneSecretMetadata, bool) {
+	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
-	return o.Id, true
+	return o.Metadata, true
 }
 
-// HasId returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
+// HasMetadata returns a boolean if a field has been set.
+func (o *SuperplaneSecret) HasMetadata() bool {
+	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
 
 	return false
 }
 
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *SuperplaneSecret) SetId(v string) {
-	o.Id = &v
+// SetMetadata gets a reference to the given SuperplaneSecretMetadata and assigns it to the Metadata field.
+func (o *SuperplaneSecret) SetMetadata(v SuperplaneSecretMetadata) {
+	o.Metadata = &v
 }
 
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
+// GetSpec returns the Spec field value if set, zero value otherwise.
+func (o *SuperplaneSecret) GetSpec() SuperplaneSecretSpec {
+	if o == nil || IsNil(o.Spec) {
+		var ret SuperplaneSecretSpec
 		return ret
 	}
-	return *o.Name
+	return *o.Spec
 }
 
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
+// GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
+func (o *SuperplaneSecret) GetSpecOk() (*SuperplaneSecretSpec, bool) {
+	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
-	return o.Name, true
+	return o.Spec, true
 }
 
-// HasName returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
+// HasSpec returns a boolean if a field has been set.
+func (o *SuperplaneSecret) HasSpec() bool {
+	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
 
 	return false
 }
 
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneSecret) SetName(v string) {
-	o.Name = &v
-}
-
-// GetCanvasId returns the CanvasId field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetCanvasId() string {
-	if o == nil || IsNil(o.CanvasId) {
-		var ret string
-		return ret
-	}
-	return *o.CanvasId
-}
-
-// GetCanvasIdOk returns a tuple with the CanvasId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetCanvasIdOk() (*string, bool) {
-	if o == nil || IsNil(o.CanvasId) {
-		return nil, false
-	}
-	return o.CanvasId, true
-}
-
-// HasCanvasId returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasCanvasId() bool {
-	if o != nil && !IsNil(o.CanvasId) {
-		return true
-	}
-
-	return false
-}
-
-// SetCanvasId gets a reference to the given string and assigns it to the CanvasId field.
-func (o *SuperplaneSecret) SetCanvasId(v string) {
-	o.CanvasId = &v
-}
-
-// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetCreatedAt() time.Time {
-	if o == nil || IsNil(o.CreatedAt) {
-		var ret time.Time
-		return ret
-	}
-	return *o.CreatedAt
-}
-
-// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetCreatedAtOk() (*time.Time, bool) {
-	if o == nil || IsNil(o.CreatedAt) {
-		return nil, false
-	}
-	return o.CreatedAt, true
-}
-
-// HasCreatedAt returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasCreatedAt() bool {
-	if o != nil && !IsNil(o.CreatedAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *SuperplaneSecret) SetCreatedAt(v time.Time) {
-	o.CreatedAt = &v
-}
-
-// GetProvider returns the Provider field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetProvider() SecretProvider {
-	if o == nil || IsNil(o.Provider) {
-		var ret SecretProvider
-		return ret
-	}
-	return *o.Provider
-}
-
-// GetProviderOk returns a tuple with the Provider field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetProviderOk() (*SecretProvider, bool) {
-	if o == nil || IsNil(o.Provider) {
-		return nil, false
-	}
-	return o.Provider, true
-}
-
-// HasProvider returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasProvider() bool {
-	if o != nil && !IsNil(o.Provider) {
-		return true
-	}
-
-	return false
-}
-
-// SetProvider gets a reference to the given SecretProvider and assigns it to the Provider field.
-func (o *SuperplaneSecret) SetProvider(v SecretProvider) {
-	o.Provider = &v
-}
-
-// GetLocal returns the Local field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetLocal() SecretLocal {
-	if o == nil || IsNil(o.Local) {
-		var ret SecretLocal
-		return ret
-	}
-	return *o.Local
-}
-
-// GetLocalOk returns a tuple with the Local field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetLocalOk() (*SecretLocal, bool) {
-	if o == nil || IsNil(o.Local) {
-		return nil, false
-	}
-	return o.Local, true
-}
-
-// HasLocal returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasLocal() bool {
-	if o != nil && !IsNil(o.Local) {
-		return true
-	}
-
-	return false
-}
-
-// SetLocal gets a reference to the given SecretLocal and assigns it to the Local field.
-func (o *SuperplaneSecret) SetLocal(v SecretLocal) {
-	o.Local = &v
+// SetSpec gets a reference to the given SuperplaneSecretSpec and assigns it to the Spec field.
+func (o *SuperplaneSecret) SetSpec(v SuperplaneSecretSpec) {
+	o.Spec = &v
 }
 
 func (o SuperplaneSecret) MarshalJSON() ([]byte, error) {
@@ -252,23 +115,11 @@ func (o SuperplaneSecret) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneSecret) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
+	if !IsNil(o.Metadata) {
+		toSerialize["metadata"] = o.Metadata
 	}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.CanvasId) {
-		toSerialize["canvasId"] = o.CanvasId
-	}
-	if !IsNil(o.CreatedAt) {
-		toSerialize["createdAt"] = o.CreatedAt
-	}
-	if !IsNil(o.Provider) {
-		toSerialize["provider"] = o.Provider
-	}
-	if !IsNil(o.Local) {
-		toSerialize["local"] = o.Local
+	if !IsNil(o.Spec) {
+		toSerialize["spec"] = o.Spec
 	}
 	return toSerialize, nil
 }

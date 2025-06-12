@@ -72,12 +72,16 @@ func Test__UpdateSecret(t *testing.T) {
 			IdOrName:       "test",
 			RequesterId:    uuid.NewString(),
 			Secret: &protos.Secret{
-				Name:     "test",
-				Provider: protos.Secret_PROVIDER_LOCAL,
-				Local: &protos.Secret_Local{
-					Data: map[string]string{
-						"test":  "test",
-						"test2": "test2",
+				Metadata: &protos.Secret_Metadata{
+					Name: "test",
+				},
+				Spec: &protos.Secret_Spec{
+					Provider: protos.Secret_PROVIDER_LOCAL,
+					Local: &protos.Secret_Local{
+						Data: map[string]string{
+							"test":  "test",
+							"test2": "test2",
+						},
 					},
 				},
 			},
@@ -87,10 +91,10 @@ func Test__UpdateSecret(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)
-		assert.NotEmpty(t, response.Secret.Id)
-		assert.NotEmpty(t, response.Secret.CreatedAt)
-		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, response.Secret.Provider)
-		require.NotNil(t, response.Secret.Local)
-		require.Equal(t, map[string]string{"test": "***", "test2": "***"}, response.Secret.Local.Data)
+		assert.NotEmpty(t, response.Secret.Metadata.Id)
+		assert.NotEmpty(t, response.Secret.Metadata.CreatedAt)
+		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, response.Secret.Spec.Provider)
+		require.NotNil(t, response.Secret.Spec.Local)
+		require.Equal(t, map[string]string{"test": "***", "test2": "***"}, response.Secret.Spec.Local.Data)
 	})
 }

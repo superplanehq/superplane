@@ -56,7 +56,7 @@ export const GeneralTab = ({
           emptyMessage="No events waiting for approval"
           emptyIcon="hourglass_empty"
           onApprove={approveStageEvent}
-          stageId={selectedStage.id}
+          stageId={selectedStage.metadata!.id}
         />
       )}
 

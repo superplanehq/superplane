@@ -1,7 +1,8 @@
+apiVersion: v1
 kind: EventSource
 metadata:
   name: github-webhook
-  canvasId: my-application-canvas  # Reference to the canvas this event source belongs to
+  canvasId: c2181c55-64ac-41ba-8925-0eaf0357b3f6  # Reference to the canvas this event source belongs to
 spec:
   # An event source doesn't need additional configuration in its spec
   # It provides a webhook endpoint that can be used to trigger stages

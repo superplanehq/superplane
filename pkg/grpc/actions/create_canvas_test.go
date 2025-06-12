@@ -18,23 +18,37 @@ func Test__CreateCanvas(t *testing.T) {
 	user := uuid.New()
 
 	t.Run("name still not used -> canvas is created", func(t *testing.T) {
+		// Create a Canvas with nested metadata structure
+		canvas := &protos.Canvas{
+			Metadata: &protos.Canvas_Metadata{
+				Name: "test",
+			},
+		}
+
 		response, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
 			RequesterId: user.String(),
-			Name:        "test",
+			Canvas:      canvas,
 		})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
-		assert.NotEmpty(t, response.Canvas.Id)
-		assert.NotEmpty(t, response.Canvas.CreatedAt)
-		assert.Equal(t, "test", response.Canvas.Name)
+		assert.NotEmpty(t, response.Canvas.Metadata.Id)
+		assert.NotEmpty(t, response.Canvas.Metadata.CreatedAt)
+		assert.Equal(t, "test", response.Canvas.Metadata.Name)
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
+		// Create a Canvas with nested metadata structure
+		canvas := &protos.Canvas{
+			Metadata: &protos.Canvas_Metadata{
+				Name: "test",
+			},
+		}
+
 		_, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
 			RequesterId: user.String(),
-			Name:        "test",
+			Canvas:      canvas,
 		})
 
 		s, ok := status.FromError(err)

@@ -45,8 +45,8 @@ func Test__ListEventSources(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)
-		assert.Equal(t, r.Source.ID.String(), res.EventSources[0].Id)
-		assert.Equal(t, r.Canvas.ID.String(), res.EventSources[0].CanvasId)
-		assert.NotEmpty(t, res.EventSources[0].CreatedAt)
+		assert.Equal(t, r.Source.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, r.Canvas.ID.String(), res.EventSources[0].Metadata.CanvasId)
+		assert.NotEmpty(t, res.EventSources[0].Metadata.CreatedAt)
 	})
 }

@@ -29,7 +29,12 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	}
 
 	logger := logging.ForCanvas(canvas)
-	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.Name)
+	// Extract name from EventSource metadata
+	if req.EventSource == nil || req.EventSource.Metadata == nil || req.EventSource.Metadata.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "event source name is required")
+	}
+
+	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.EventSource.Metadata.Name)
 	if err != nil {
 		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
 		return nil, status.Error(codes.Internal, "error generating key")
@@ -39,7 +44,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	// using Notifications API for semaphore event sources. This webhook should point
 	// to the created secret, as designed in the API.
 
-	eventSource, err := canvas.CreateEventSource(req.Name, encryptedKey)
+	eventSource, err := canvas.CreateEventSource(req.EventSource.Metadata.Name, encryptedKey)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -67,10 +72,13 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 
 func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 	return &pb.EventSource{
-		Id:        eventSource.ID.String(),
-		Name:      eventSource.Name,
-		CanvasId:  eventSource.CanvasID.String(),
-		CreatedAt: timestamppb.New(*eventSource.CreatedAt),
+		Metadata: &pb.EventSource_Metadata{
+			Id:        eventSource.ID.String(),
+			Name:      eventSource.Name,
+			CanvasId:  eventSource.CanvasID.String(),
+			CreatedAt: timestamppb.New(*eventSource.CreatedAt),
+		},
+		Spec: &pb.EventSource_Spec{},
 	}
 }
 
