@@ -24,16 +24,9 @@ func Test__CreateEventSource(t *testing.T) {
 	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		// Create EventSource with nested metadata structure
-		eventSource := &protos.EventSource{
-			Metadata: &protos.EventSource_Metadata{
-				Name: "test",
-			},
-		}
-		
 		req := &protos.CreateEventSourceRequest{
 			CanvasIdOrName: uuid.New().String(),
-			EventSource:    eventSource,
+			Name:           "test",
 		}
 
 		_, err := CreateEventSource(context.Background(), encryptor, req)
@@ -49,40 +42,26 @@ func Test__CreateEventSource(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		// Create EventSource with nested metadata structure
-		eventSource := &protos.EventSource{
-			Metadata: &protos.EventSource_Metadata{
-				Name: "test",
-			},
-		}
-		
 		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+			Name:           "test",
 		})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
-		assert.NotEmpty(t, response.EventSource.Metadata.Id)
-		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
+		assert.NotEmpty(t, response.EventSource.Id)
+		assert.NotEmpty(t, response.EventSource.CreatedAt)
 		assert.NotEmpty(t, response.Key)
-		assert.Equal(t, "test", response.EventSource.Metadata.Name)
-		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
+		assert.Equal(t, "test", response.EventSource.Name)
+		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.CanvasId)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
-		// Create EventSource with nested metadata structure
-		eventSource := &protos.EventSource{
-			Metadata: &protos.EventSource_Metadata{
-				Name: "test",
-			},
-		}
-		
 		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+			Name:           "test",
 		})
 
 		s, ok := status.FromError(err)

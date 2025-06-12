@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect } from "react";
 import { ReactFlow, Background } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 
@@ -8,7 +8,6 @@ import { FlowDevTools } from './devtools';
 import { useCanvasStore } from "../store/canvasStore";
 import { useFlowHandlers } from "../hooks/useFlowHandlers";
 import { useAutoLayout } from "../hooks/useAutoLayout";
-import { useFlowTransformation } from "../hooks/useFlowTransformation";
 import { FlowControls } from "./FlowControls";
 import { ConnectionStatus } from "./ConnectionStatus";
 
@@ -25,50 +24,15 @@ export const FlowRenderer: React.FC = () => {
   const onConnect = useCanvasStore((state) => state.onConnect);
 
   const { applyElkAutoLayout } = useAutoLayout();
-  const { updateNodesAndEdges } = useFlowTransformation();
   const { onNodeDragStop, onInit } = useFlowHandlers();
-  
-  const prevDataRef = useRef<{
-    nodeCount: number;
-    edgeCount: number;
-    nodeIds: string;
-    edgeIds: string;
-  }>({
-    nodeCount: 0,
-    edgeCount: 0,
-    nodeIds: '',
-    edgeIds: ''
-  });
-
-  const currentNodeIds = useMemo(() => nodes.map(n => n.id).sort().join('|'), [nodes]);
-  const currentEdgeIds = useMemo(() => edges.map(e => e.id).sort().join('|'), [edges]);
+  const [firstAutoLayout, setFirstAutoLayout] = React.useState(true);
   
   useEffect(() => {
-    const hasDataChanged = 
-      prevDataRef.current.nodeCount !== nodes.length ||
-      prevDataRef.current.edgeCount !== edges.length ||
-      prevDataRef.current.nodeIds !== currentNodeIds ||
-      prevDataRef.current.edgeIds !== currentEdgeIds;
-
-    if (hasDataChanged && (nodes.length > 0 || edges.length > 0)) {
-      updateNodesAndEdges(nodes);
-
-      prevDataRef.current = {
-        nodeCount: nodes.length,
-        edgeCount: edges.length,
-        nodeIds: currentNodeIds,
-        edgeIds: currentEdgeIds
-      };
+    if (firstAutoLayout) {
+      setFirstAutoLayout(false);
+      applyElkAutoLayout(nodes, edges);
     }
-  }, [
-    nodes.length, 
-    edges.length, 
-    currentNodeIds, 
-    currentEdgeIds,
-    updateNodesAndEdges,
-    nodes, 
-    edges
-  ]);
+  }, [applyElkAutoLayout, nodes, edges, firstAutoLayout]);
 
   return (
     <div style={{ width: "100vw", height: "100vh", minWidth: 0, minHeight: 0 }}>

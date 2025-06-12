@@ -20,12 +20,7 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateC
 		return nil, err
 	}
 
-	// Extract name from the Canvas metadata
-	if req.Canvas == nil || req.Canvas.Metadata == nil || req.Canvas.Metadata.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
-	}
-
-	canvas, err := models.CreateCanvas(requesterID, req.Canvas.Metadata.Name)
+	canvas, err := models.CreateCanvas(requesterID, req.Name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -35,14 +30,11 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateC
 		return nil, err
 	}
 
-	// Create response using nested structure
 	response := &pb.CreateCanvasResponse{
 		Canvas: &pb.Canvas{
-			Metadata: &pb.Canvas_Metadata{
-				Id:        canvas.ID.String(),
-				Name:      canvas.Name,
-				CreatedAt: timestamppb.New(*canvas.CreatedAt),
-			},
+			Id:        canvas.ID.String(),
+			Name:      canvas.Name,
+			CreatedAt: timestamppb.New(*canvas.CreatedAt),
 		},
 	}
 

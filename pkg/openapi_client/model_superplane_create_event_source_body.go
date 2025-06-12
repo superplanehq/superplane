@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneCreateEventSourceBody{}
 
 // SuperplaneCreateEventSourceBody struct for SuperplaneCreateEventSourceBody
 type SuperplaneCreateEventSourceBody struct {
-	EventSource *SuperplaneEventSource `json:"eventSource,omitempty"`
+	Name *string `json:"name,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
 }
 
@@ -41,36 +41,36 @@ func NewSuperplaneCreateEventSourceBodyWithDefaults() *SuperplaneCreateEventSour
 	return &this
 }
 
-// GetEventSource returns the EventSource field value if set, zero value otherwise.
-func (o *SuperplaneCreateEventSourceBody) GetEventSource() SuperplaneEventSource {
-	if o == nil || IsNil(o.EventSource) {
-		var ret SuperplaneEventSource
+// GetName returns the Name field value if set, zero value otherwise.
+func (o *SuperplaneCreateEventSourceBody) GetName() string {
+	if o == nil || IsNil(o.Name) {
+		var ret string
 		return ret
 	}
-	return *o.EventSource
+	return *o.Name
 }
 
-// GetEventSourceOk returns a tuple with the EventSource field value if set, nil otherwise
+// GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneCreateEventSourceBody) GetEventSourceOk() (*SuperplaneEventSource, bool) {
-	if o == nil || IsNil(o.EventSource) {
+func (o *SuperplaneCreateEventSourceBody) GetNameOk() (*string, bool) {
+	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
-	return o.EventSource, true
+	return o.Name, true
 }
 
-// HasEventSource returns a boolean if a field has been set.
-func (o *SuperplaneCreateEventSourceBody) HasEventSource() bool {
-	if o != nil && !IsNil(o.EventSource) {
+// HasName returns a boolean if a field has been set.
+func (o *SuperplaneCreateEventSourceBody) HasName() bool {
+	if o != nil && !IsNil(o.Name) {
 		return true
 	}
 
 	return false
 }
 
-// SetEventSource gets a reference to the given SuperplaneEventSource and assigns it to the EventSource field.
-func (o *SuperplaneCreateEventSourceBody) SetEventSource(v SuperplaneEventSource) {
-	o.EventSource = &v
+// SetName gets a reference to the given string and assigns it to the Name field.
+func (o *SuperplaneCreateEventSourceBody) SetName(v string) {
+	o.Name = &v
 }
 
 // GetRequesterId returns the RequesterId field value if set, zero value otherwise.
@@ -115,8 +115,8 @@ func (o SuperplaneCreateEventSourceBody) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneCreateEventSourceBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.EventSource) {
-		toSerialize["eventSource"] = o.EventSource
+	if !IsNil(o.Name) {
+		toSerialize["name"] = o.Name
 	}
 	if !IsNil(o.RequesterId) {
 		toSerialize["requesterId"] = o.RequesterId

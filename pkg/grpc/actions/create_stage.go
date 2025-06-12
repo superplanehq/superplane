@@ -19,18 +19,6 @@ import (
 )
 
 func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	if req.Stage == nil {
-		return nil, status.Error(codes.InvalidArgument, "stage is required")
-	}
-	
-	if req.Stage.Metadata == nil {
-		return nil, status.Error(codes.InvalidArgument, "stage.metadata is required")
-	}
-	
-	if req.Stage.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "stage.spec is required")
-	}
-	
 	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
@@ -43,16 +31,16 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	spec, err := specValidator.Validate(req.Stage.Spec.Executor)
+	spec, err := specValidator.Validate(req.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	inputValidator := inputs.NewValidator(
-		inputs.WithInputs(req.Stage.Spec.Inputs),
-		inputs.WithOutputs(req.Stage.Spec.Outputs),
-		inputs.WithInputMappings(req.Stage.Spec.InputMappings),
-		inputs.WithConnections(req.Stage.Spec.Connections),
+		inputs.WithInputs(req.Inputs),
+		inputs.WithOutputs(req.Outputs),
+		inputs.WithInputMappings(req.InputMappings),
+		inputs.WithConnections(req.Connections),
 	)
 
 	err = inputValidator.Validate()
@@ -60,23 +48,23 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
+	connections, err := validateConnections(canvas, req.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	conditions, err := validateConditions(req.Stage.Spec.Conditions)
+	conditions, err := validateConditions(req.Conditions)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
+	secrets, err := validateSecrets(req.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	err = canvas.CreateStage(
-		req.Stage.Metadata.Name,
+		req.Name,
 		req.RequesterId,
 		conditions,
 		*spec,
@@ -95,17 +83,17 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, err
 	}
 
-	stage, err := canvas.FindStageByName(req.Stage.Metadata.Name)
+	stage, err := canvas.FindStageByName(req.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	serialized, err := serializeStage(
 		*stage,
-		req.Stage.Spec.Connections,
-		req.Stage.Spec.Inputs,
-		req.Stage.Spec.Outputs,
-		req.Stage.Spec.InputMappings,
+		req.Connections,
+		req.Inputs,
+		req.Outputs,
+		req.InputMappings,
 	)
 
 	if err != nil {
@@ -477,21 +465,17 @@ func serializeStage(
 	}
 
 	return &pb.Stage{
-		Metadata: &pb.Stage_Metadata{
-			Id:        stage.ID.String(),
-			Name:      stage.Name,
-			CanvasId:  stage.CanvasID.String(),
-			CreatedAt: timestamppb.New(*stage.CreatedAt),
-		},
-		Spec: &pb.Stage_Spec{
-			Conditions:    conditions,
-			Connections:   connections,
-			Executor:      executor,
-			Inputs:        inputs,
-			Outputs:       outputs,
-			InputMappings: inputMappings,
-			Secrets:       secrets,
-		},
+		Id:            stage.ID.String(),
+		Name:          stage.Name,
+		CanvasId:      stage.CanvasID.String(),
+		CreatedAt:     timestamppb.New(*stage.CreatedAt),
+		Conditions:    conditions,
+		Connections:   connections,
+		Executor:      executor,
+		Inputs:        inputs,
+		Outputs:       outputs,
+		InputMappings: inputMappings,
+		Secrets:       secrets,
 	}, nil
 }
 

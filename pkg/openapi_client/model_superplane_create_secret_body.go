@@ -20,8 +20,8 @@ var _ MappedNullable = &SuperplaneCreateSecretBody{}
 
 // SuperplaneCreateSecretBody struct for SuperplaneCreateSecretBody
 type SuperplaneCreateSecretBody struct {
-	Secret *SuperplaneSecret `json:"secret,omitempty"`
 	RequesterId *string `json:"requesterId,omitempty"`
+	Secret *SuperplaneSecret `json:"secret,omitempty"`
 }
 
 // NewSuperplaneCreateSecretBody instantiates a new SuperplaneCreateSecretBody object
@@ -39,38 +39,6 @@ func NewSuperplaneCreateSecretBody() *SuperplaneCreateSecretBody {
 func NewSuperplaneCreateSecretBodyWithDefaults() *SuperplaneCreateSecretBody {
 	this := SuperplaneCreateSecretBody{}
 	return &this
-}
-
-// GetSecret returns the Secret field value if set, zero value otherwise.
-func (o *SuperplaneCreateSecretBody) GetSecret() SuperplaneSecret {
-	if o == nil || IsNil(o.Secret) {
-		var ret SuperplaneSecret
-		return ret
-	}
-	return *o.Secret
-}
-
-// GetSecretOk returns a tuple with the Secret field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneCreateSecretBody) GetSecretOk() (*SuperplaneSecret, bool) {
-	if o == nil || IsNil(o.Secret) {
-		return nil, false
-	}
-	return o.Secret, true
-}
-
-// HasSecret returns a boolean if a field has been set.
-func (o *SuperplaneCreateSecretBody) HasSecret() bool {
-	if o != nil && !IsNil(o.Secret) {
-		return true
-	}
-
-	return false
-}
-
-// SetSecret gets a reference to the given SuperplaneSecret and assigns it to the Secret field.
-func (o *SuperplaneCreateSecretBody) SetSecret(v SuperplaneSecret) {
-	o.Secret = &v
 }
 
 // GetRequesterId returns the RequesterId field value if set, zero value otherwise.
@@ -105,6 +73,38 @@ func (o *SuperplaneCreateSecretBody) SetRequesterId(v string) {
 	o.RequesterId = &v
 }
 
+// GetSecret returns the Secret field value if set, zero value otherwise.
+func (o *SuperplaneCreateSecretBody) GetSecret() SuperplaneSecret {
+	if o == nil || IsNil(o.Secret) {
+		var ret SuperplaneSecret
+		return ret
+	}
+	return *o.Secret
+}
+
+// GetSecretOk returns a tuple with the Secret field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneCreateSecretBody) GetSecretOk() (*SuperplaneSecret, bool) {
+	if o == nil || IsNil(o.Secret) {
+		return nil, false
+	}
+	return o.Secret, true
+}
+
+// HasSecret returns a boolean if a field has been set.
+func (o *SuperplaneCreateSecretBody) HasSecret() bool {
+	if o != nil && !IsNil(o.Secret) {
+		return true
+	}
+
+	return false
+}
+
+// SetSecret gets a reference to the given SuperplaneSecret and assigns it to the Secret field.
+func (o *SuperplaneCreateSecretBody) SetSecret(v SuperplaneSecret) {
+	o.Secret = &v
+}
+
 func (o SuperplaneCreateSecretBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -115,11 +115,11 @@ func (o SuperplaneCreateSecretBody) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneCreateSecretBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Secret) {
-		toSerialize["secret"] = o.Secret
-	}
 	if !IsNil(o.RequesterId) {
 		toSerialize["requesterId"] = o.RequesterId
+	}
+	if !IsNil(o.Secret) {
+		toSerialize["secret"] = o.Secret
 	}
 	return toSerialize, nil
 }

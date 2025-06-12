@@ -49,25 +49,21 @@ func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Des
 
 func serializeSecret(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (*pb.Secret, error) {
 	s := &pb.Secret{
-		Metadata: &pb.Secret_Metadata{
-			Id:        secret.ID.String(),
-			Name:      secret.Name,
-			CanvasId:  secret.CanvasID.String(),
-			CreatedAt: timestamppb.New(*secret.CreatedAt),
-		},
-		Spec: &pb.Secret_Spec{
-			Provider: secretProviderToProto(secret.Provider),
-		},
+		Id:        secret.ID.String(),
+		Name:      secret.Name,
+		CanvasId:  secret.CanvasID.String(),
+		Provider:  secretProviderToProto(secret.Provider),
+		CreatedAt: timestamppb.New(*secret.CreatedAt),
 	}
 
-	switch s.Spec.Provider {
+	switch s.Provider {
 	case pb.Secret_PROVIDER_LOCAL:
 		local, err := serializeLocalSecretData(ctx, encryptor, secret)
 		if err != nil {
 			return nil, err
 		}
 
-		s.Spec.Local = local
+		s.Local = local
 		return s, nil
 
 	default:

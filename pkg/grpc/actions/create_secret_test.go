@@ -22,15 +22,11 @@ func Test__CreateSecret(t *testing.T) {
 		req := &protos.CreateSecretRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+				Name:     "test",
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
@@ -47,15 +43,11 @@ func Test__CreateSecret(t *testing.T) {
 		req := &protos.CreateSecretRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+				Name:     "test",
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
@@ -73,15 +65,11 @@ func Test__CreateSecret(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    uuid.NewString(),
 			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+				Name:     "test",
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
@@ -91,11 +79,11 @@ func Test__CreateSecret(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)
-		assert.NotEmpty(t, response.Secret.Metadata.Id)
-		assert.NotEmpty(t, response.Secret.Metadata.CreatedAt)
-		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, response.Secret.Spec.Provider)
-		require.NotNil(t, response.Secret.Spec.Local)
-		require.Equal(t, map[string]string{"test": "***"}, response.Secret.Spec.Local.Data)
+		assert.NotEmpty(t, response.Secret.Id)
+		assert.NotEmpty(t, response.Secret.CreatedAt)
+		assert.Equal(t, protos.Secret_PROVIDER_LOCAL, response.Secret.Provider)
+		require.NotNil(t, response.Secret.Local)
+		require.Equal(t, map[string]string{"test": "***"}, response.Secret.Local.Data)
 	})
 
 	t.Run("name already used", func(t *testing.T) {
@@ -103,15 +91,11 @@ func Test__CreateSecret(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			RequesterId:    uuid.NewString(),
 			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+				Name:     "test",
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
