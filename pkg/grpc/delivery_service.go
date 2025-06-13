@@ -6,9 +6,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
+	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/secrets"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
+	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 )
@@ -34,11 +34,11 @@ func (s *DeliveryService) DescribeCanvas(ctx context.Context, req *pb.DescribeCa
 }
 
 func (s *DeliveryService) CreateEventSource(ctx context.Context, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	return event_sources.CreateEventSource(ctx, s.encryptor, req)
+	return eventsources.CreateEventSource(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
-	return event_sources.DescribeEventSource(ctx, req)
+	return eventsources.DescribeEventSource(ctx, req)
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
@@ -54,11 +54,11 @@ func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRe
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	return stage_events.ApproveStageEvent(ctx, req)
+	return stageevents.ApproveStageEvent(ctx, req)
 }
 
 func (s *DeliveryService) ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	return event_sources.ListEventSources(ctx, req)
+	return eventsources.ListEventSources(ctx, req)
 }
 
 func (s *DeliveryService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
@@ -70,7 +70,7 @@ func (s *DeliveryService) ListCanvases(ctx context.Context, req *pb.ListCanvases
 }
 
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	return stage_events.ListStageEvents(ctx, req)
+	return stageevents.ListStageEvents(ctx, req)
 }
 
 func (s *DeliveryService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {

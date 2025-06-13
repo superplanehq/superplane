@@ -1,4 +1,4 @@
-package stage_events
+package stageevents
 
 import (
 	"context"

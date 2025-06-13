@@ -1,4 +1,4 @@
-package event_sources
+package eventsources
 
 import (
 	"context"
