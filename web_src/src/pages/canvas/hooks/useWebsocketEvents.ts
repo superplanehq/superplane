@@ -51,6 +51,8 @@ export function useWebsocketEvents(canvasId: string): void {
     // Declare variables outside of case statements to avoid lexical declaration errors
     let newEventPayload: EventMap['new_stage_event'];
     let approvedEventPayload: EventMap['stage_event_approved'];
+    let executionFinishedPayload: EventMap['execution_finished']
+    let executionStartedPayload: EventMap['execution_started']
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
     let updatedEventSource: EventSourceWithEvents;
     
@@ -93,6 +95,14 @@ export function useWebsocketEvents(canvasId: string): void {
       case 'stage_event_approved':
         approvedEventPayload = payload as EventMap['stage_event_approved'];
         syncStageEvents(canvasId, approvedEventPayload.stage_id);
+        break;
+      case 'execution_finished':
+        executionFinishedPayload = payload as EventMap['execution_finished'];
+        syncStageEvents(canvasId, executionFinishedPayload.stage_id);
+        break;
+      case 'execution_started':
+        executionStartedPayload = payload as EventMap['execution_started'];
+        syncStageEvents(canvasId, executionStartedPayload.stage_id);
         break;
       default:
         console.warn('Unhandled event type:', event);
