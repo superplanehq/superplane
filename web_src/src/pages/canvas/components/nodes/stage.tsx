@@ -27,13 +27,23 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     [props.data.queues]
   );
 
+  const allExecutions = useMemo(() => 
+    props.data.queues?.flatMap(event => event.execution as SuperplaneExecution)
+      .filter(execution => execution)
+      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [], 
+    [props.data.queues]
+  );
+
   const allFinishedExecutions = useMemo(() =>
-    props.data.queues
-        ?.flatMap(event => event.execution as SuperplaneExecution)
+    allExecutions
         .filter(execution => execution?.finishedAt)
-        .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-      [props.data.queues]
-    );
+    , [allExecutions]
+  );
+
+  const executionRunning = useMemo(() => 
+    allExecutions.some(execution => execution.state === 'STATE_STARTED'), 
+    [allExecutions]
+  );
 
   const outputs = useMemo(() => {
     const lastFinishedExecution = allFinishedExecutions.at(0);
@@ -121,8 +131,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 <div className="text-xs text-gray-600">ID: {waitingEvents[0].id!.substring(0, 8)}...</div>
               </div>
               <button 
-                onClick={() => props.data.approveStageEvent(waitingEvents[0])}
-                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={() => !executionRunning && props.data.approveStageEvent(waitingEvents[0])}
+                disabled={executionRunning}
+                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
               >
                 Approve
               </button>
