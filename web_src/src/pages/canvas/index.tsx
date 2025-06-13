@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
@@ -12,11 +12,13 @@ import { Sidebar } from "./components/SideBar";
 export function Canvas() {
   // Get the canvas ID from the URL params
   const { id } = useParams<{ id: string }>();
-  const { initialize, selectedStage, cleanSelectedStage, approveStageEvent } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, stages, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(id!);
+
+  const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
   useEffect(() => {
     // Return early if no ID is available
@@ -137,7 +139,7 @@ export function Canvas() {
   return (
     <StrictMode>
       <FlowRenderer />
-      {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStage()} />}
+      {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
     </StrictMode>
   );
 }

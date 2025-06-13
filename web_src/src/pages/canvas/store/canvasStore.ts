@@ -23,7 +23,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   stages: [],
   event_sources: [],
   nodePositions: {},
-  selectedStage: null,
+  selectedStageId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
 
   // reactflow state
@@ -118,12 +118,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     });
   },
 
-  selectStage: (stageId: string) => {
-    set((state) => ({ selectedStage: state.stages.find(stage => stage.metadata!.id === stageId) }));
+  selectStageId: (stageId: string) => {
+    set({ selectedStageId: stageId });
   },
 
-  cleanSelectedStage: () => {
-    set({ selectedStage: null });
+  cleanSelectedStageId: () => {
+    set({ selectedStageId: null });
   },
 
   updateWebSocketConnectionStatus: (status) => {

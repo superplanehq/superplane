@@ -9,7 +9,7 @@ import { SuperplaneExecution } from '@/api-client';
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showOverlay, setShowOverlay] = useState(false);
-  const { selectStage } = useCanvasStore()
+  const { selectStageId } = useCanvasStore()
 
   // Filter events by their state
   const pendingEvents = useMemo(() => 
@@ -67,7 +67,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         </span>
         <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
         {/* Example action button (menu) */}
-        <button onClick={() => selectStage(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
+        <button onClick={() => selectStageId(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
           <span className="material-symbols-outlined text-gray-500">more_vert</span>
         </button>
       </div>

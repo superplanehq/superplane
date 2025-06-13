@@ -10,7 +10,7 @@ export interface CanvasState {
   stages: StageWithEventQueue[];
   event_sources: EventSourceWithEvents[];
   nodePositions: Record<string, { x: number, y: number }>;
-  selectedStage: StageWithEventQueue | null;
+  selectedStageId: string | null;
   webSocketConnectionStatus: ReadyState;
   
   // Actions
@@ -22,8 +22,8 @@ export interface CanvasState {
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  selectStage: (stageId: string) => void;
-  cleanSelectedStage: () => void;
+  selectStageId: (stageId: string) => void;
+  cleanSelectedStageId: () => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
 
