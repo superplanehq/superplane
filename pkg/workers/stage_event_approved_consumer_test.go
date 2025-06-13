@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
@@ -38,7 +38,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event once
 	//
-	_, err := actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
+	_, err := stageevents.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),
@@ -59,7 +59,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event again
 	//
-	_, err = actions.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
+	_, err = stageevents.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),

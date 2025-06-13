@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/proto"
@@ -23,7 +23,7 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	// Fetch complete stage information using gRPC
-	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
+	describeStageResp, err := stages.DescribeStage(context.Background(), &pb.DescribeStageRequest{
 		CanvasIdOrName: pbMsg.CanvasId,
 		Id:             pbMsg.StageId,
 	})

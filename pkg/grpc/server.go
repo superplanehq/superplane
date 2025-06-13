@@ -7,8 +7,10 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	authorizationProtos "github.com/superplanehq/superplane/pkg/protos/authorization"
+	superplaneProtos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
@@ -56,7 +58,15 @@ func RunServer(encryptor crypto.Encryptor, port int) {
 	// Initialize services exposed by this server.
 	//
 	service := NewDeliveryService(encryptor)
-	protos.RegisterSuperplaneServer(grpcServer, service)
+	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
+
+	authService, err := authorization.NewAuthService()
+	if err != nil {
+		log.Fatalf("failed to create auth service: %v", err)
+	}
+
+	server := NewAuthorizationServer(authService)
+	authorizationProtos.RegisterAuthorizationServer(grpcServer, server)
 
 	reflection.Register(grpcServer)
 

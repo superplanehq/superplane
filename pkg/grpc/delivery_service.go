@@ -5,7 +5,11 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
+	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/secrets"
+	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 )
 
@@ -22,69 +26,69 @@ func NewDeliveryService(encryptor crypto.Encryptor) *DeliveryService {
 }
 
 func (s *DeliveryService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
-	return actions.CreateCanvas(ctx, req)
+	return canvases.CreateCanvas(ctx, req)
 }
 
 func (s *DeliveryService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
-	return actions.DescribeCanvas(ctx, req)
+	return canvases.DescribeCanvas(ctx, req)
 }
 
 func (s *DeliveryService) CreateEventSource(ctx context.Context, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	return actions.CreateEventSource(ctx, s.encryptor, req)
+	return eventsources.CreateEventSource(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
-	return actions.DescribeEventSource(ctx, req)
+	return eventsources.DescribeEventSource(ctx, req)
 }
 
 func (s *DeliveryService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return actions.CreateStage(ctx, s.specValidator, req)
+	return stages.CreateStage(ctx, s.specValidator, req)
 }
 
 func (s *DeliveryService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
-	return actions.DescribeStage(ctx, req)
+	return stages.DescribeStage(ctx, req)
 }
 
 func (s *DeliveryService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return actions.UpdateStage(ctx, s.specValidator, req)
+	return stages.UpdateStage(ctx, s.specValidator, req)
 }
 
 func (s *DeliveryService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	return actions.ApproveStageEvent(ctx, req)
+	return stageevents.ApproveStageEvent(ctx, req)
 }
 
 func (s *DeliveryService) ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	return actions.ListEventSources(ctx, req)
+	return eventsources.ListEventSources(ctx, req)
 }
 
 func (s *DeliveryService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
-	return actions.ListStages(ctx, req)
+	return stages.ListStages(ctx, req)
 }
 
 func (s *DeliveryService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
-	return actions.ListCanvases(ctx, req)
+	return canvases.ListCanvases(ctx, req)
 }
 
 func (s *DeliveryService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	return actions.ListStageEvents(ctx, req)
+	return stageevents.ListStageEvents(ctx, req)
 }
 
 func (s *DeliveryService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
-	return actions.CreateSecret(ctx, s.encryptor, req)
+	return secrets.CreateSecret(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) UpdateSecret(ctx context.Context, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
-	return actions.UpdateSecret(ctx, s.encryptor, req)
+	return secrets.UpdateSecret(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DescribeSecret(ctx context.Context, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
-	return actions.DescribeSecret(ctx, s.encryptor, req)
+	return secrets.DescribeSecret(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) ListSecrets(ctx context.Context, req *pb.ListSecretsRequest) (*pb.ListSecretsResponse, error) {
-	return actions.ListSecrets(ctx, s.encryptor, req)
+	return secrets.ListSecrets(ctx, s.encryptor, req)
 }
 
 func (s *DeliveryService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
-	return actions.DeleteSecret(ctx, req)
+	return secrets.DeleteSecret(ctx, req)
 }

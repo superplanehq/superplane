@@ -20,7 +20,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbSup "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -88,7 +89,12 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
 
-	err := pb.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err := pbSup.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbAuth.RegisterAuthorizationHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -104,15 +110,20 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	// This is necessary because it is not possible to use the current router with
 	// runtime Mux. Runtime mux has no specification for the added paths and it the only
 	// supported tool for grpc-gateway.
-	s.Router.PathPrefix("/api/v1/canvases").Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.Router.PathPrefix("/api/v1/canvases").Handler(s.grpcGatewayHandler(grpcGatewayMux))
+	s.Router.PathPrefix("/api/v1/authorization").Handler(s.grpcGatewayHandler(grpcGatewayMux))
+
+	return nil
+}
+
+func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := new(http.Request)
 		*r2 = *r
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		grpcGatewayMux.ServeHTTP(w, r2)
-	}))
-
-	return nil
+	})
 }
 
 // RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
@@ -522,7 +533,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	client := s.wsHub.NewClient(ws, canvasID)
 	log.Infof("WebSocket client registered with hub")
 	// Wait for the client to disconnect
-	<- client.Done
+	<-client.Done
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server

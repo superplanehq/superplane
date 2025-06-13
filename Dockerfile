@@ -51,6 +51,7 @@ COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY web_src web_src
 COPY protos protos
 COPY api/swagger api/swagger
+COPY rbac rbac
 
 WORKDIR /app
 
@@ -106,6 +107,7 @@ COPY --from=builder --chown=nobody:root /app/docker-entrypoint.sh /app/docker-en
 COPY --from=builder --chown=nobody:root /app/db/migrations /app/db/migrations
 COPY --from=builder --chown=nobody:root /app/pkg/web/assets/dist /app/pkg/web/assets/dist
 COPY --from=builder --chown=nobody:root /app/api/swagger /app/api/swagger
+COPY --from=builder --chown=nobody:root /app/rbac /app/rbac
 
 USER nobody
 

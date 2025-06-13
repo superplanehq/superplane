@@ -1,0 +1,14 @@
+g,role:canvas_owner,role:canvas_admin,canvas:{CANVAS_ID},
+g,role:canvas_admin,role:canvas_viewer,canvas:{CANVAS_ID},
+p,role:canvas_viewer,canvas:{CANVAS_ID},eventsource,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},stage,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},stageevent,read
+p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,create
+p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,update
+p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,delete
+p,role:canvas_admin,canvas:{CANVAS_ID},stage,create
+p,role:canvas_admin,canvas:{CANVAS_ID},stage,update
+p,role:canvas_admin,canvas:{CANVAS_ID},stage,delete
+p,role:canvas_admin,canvas:{CANVAS_ID},stageevent,approve
+p,role:canvas_admin,canvas:{CANVAS_ID},member,invite
+p,role:canvas_owner,canvas:{CANVAS_ID},member,remove
