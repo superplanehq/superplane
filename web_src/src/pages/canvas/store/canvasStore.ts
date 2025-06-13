@@ -2,14 +2,14 @@ import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, EventSourceWithEvents } from './types';
 import { SuperplaneCanvas, SuperplaneStage } from "@/api-client/types.gen";
-import { superplaneApproveStageEvent } from '@/api-client';
+import { superplaneApproveStageEvent, superplaneListStageEvents } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
 import { autoLayoutNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
 function generateFakeUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
@@ -31,7 +31,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   edges: [],
   handleDragging: undefined,
 
-  
+
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
     console.log("Initializing Canvas with data:", data);
@@ -44,7 +44,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
     console.log("Canvas initialized with stages:", data.stages?.length || 0);
   },
-  
+
   addStage: (stage: SuperplaneStage) => {
     console.log("Adding stage:", stage);
     set((state) => ({
@@ -55,40 +55,41 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     }));
     get().syncToReactFlow();
   },
-  
+
   updateStage: (stage: SuperplaneStage) => {
     console.log("Updating stage:", stage);
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stage.metadata!.id ? {
-        ...stage, queue: s.queue} : s)
+        ...stage, queue: s.queue
+      } : s)
     }));
     get().syncToReactFlow();
   },
-  
+
   addEventSource: (eventSource: EventSourceWithEvents) => {
     set((state) => ({
       event_sources: [...state.event_sources, eventSource]
     }));
     get().syncToReactFlow();
   },
-  
+
   updateEventSource: (eventSource: EventSourceWithEvents) => {
     console.log("Updating event source:", eventSource);
     set((state) => ({
-      event_sources: state.event_sources.map(es => 
+      event_sources: state.event_sources.map(es =>
         es.metadata!.id === eventSource.metadata!.id ? eventSource : es
       )
     }));
     get().syncToReactFlow();
   },
-  
+
   updateCanvas: (newCanvas: Partial<SuperplaneCanvas>) => {
     console.log("Updating canvas:", newCanvas);
     set((state) => ({
       canvas: { ...state.canvas, ...newCanvas }
     }));
   },
-  
+
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => {
     // console.log("Updating node position:", nodeId, position);
     set((state) => ({
@@ -101,7 +102,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   approveStageEvent: (stageEventId: string, stageId: string) => {
     console.log("[client action] Approving stage event:", stageEventId);
-    
+
     // use post request to approve stage event
     // defined in @/api-client/api
     superplaneApproveStageEvent({
@@ -116,7 +117,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       }
     });
   },
-  
+
   selectStage: (stageId: string) => {
     set((state) => ({ selectedStage: state.stages.find(stage => stage.metadata!.id === stageId) }));
   },
@@ -124,9 +125,31 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   cleanSelectedStage: () => {
     set({ selectedStage: null });
   },
-  
+
   updateWebSocketConnectionStatus: (status) => {
     set({ webSocketConnectionStatus: status });
+  },
+
+  syncStageEvents: async (canvasId: string, stageId: string) => {
+    const { stages } = get();
+    const updatingStage = stages.find(stage => stage.metadata!.id === stageId);
+
+    if (!updatingStage) {
+      return;
+    }
+
+    const stageEventsResponse = await superplaneListStageEvents({
+      path: {
+        canvasIdOrName: canvasId,
+        stageIdOrName: stageId
+      }
+    });
+    set((state) => ({
+      stages: state.stages.map((s) => s.metadata!.id === stageId ? {
+        ...updatingStage,
+        queue: stageEventsResponse.data?.events || []
+      } : s)
+    }));
   },
 
   syncToReactFlow: async (options?: { autoLayout?: boolean }) => {
@@ -135,7 +158,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     // Use the transformer functions from flowTransformers.ts
     const stageNodes = transformStagesToNodes(stages, nodePositions, approveStageEvent);
     const eventSourceNodes = transformEventSourcesToNodes(event_sources, nodePositions);
-    
+
     // Get edges based on connections
     const edges = transformToEdges(stages, event_sources);
     const unlayoutedNodes = [...stageNodes, ...eventSourceNodes];
@@ -146,13 +169,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       acc[node.id] = node.position;
       return acc;
     }, {} as Record<string, { x: number; y: number }>);
-    
+
     set({
-        nodes,
-        edges,
-        nodePositions: newNodePositions
+      nodes,
+      edges,
+      nodePositions: newNodePositions
     });
-},
+  },
 
 
   onNodesChange: (changes) => {
@@ -183,7 +206,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       type: 'smoothstep',
       animated: true
     };
-    
+
     set({
       edges: [...get().edges, newEdge],
     });
@@ -203,9 +226,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   getFlow: () => {
     const defaultViewport: Viewport = { x: 0, y: 0, zoom: 1 };
-    return { 
-      nodes: get().nodes, 
-      edges: get().edges, 
+    return {
+      nodes: get().nodes,
+      edges: get().edges,
       viewport: defaultViewport // Note: you might want to store the actual viewport from React Flow
     };
   },

@@ -25,6 +25,7 @@ export interface CanvasState {
   selectStage: (stageId: string) => void;
   cleanSelectedStage: () => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
+  syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
 
   // flow fields
   nodes: AllNodeType[];
