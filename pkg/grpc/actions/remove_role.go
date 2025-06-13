@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService authorization.AuthorizationServiceInterface) (*pb.RemoveRoleResponse, error) {
+func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
 	err := ValidateUUIDs(req.UserId, req.RoleAssignment.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")

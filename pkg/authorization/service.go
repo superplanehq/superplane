@@ -31,8 +31,8 @@ const (
 	DomainOrg    = "org"
 )
 
-// implements AuthorizationServiceInterface
-var _ AuthorizationServiceInterface = (*AuthService)(nil)
+// implements Authorization
+var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
 	enforcer              *casbin.CachedEnforcer

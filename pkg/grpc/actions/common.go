@@ -33,7 +33,7 @@ func convertDomainType(domainType pb.DomainType) string {
 	}
 }
 
-func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.AuthorizationServiceInterface, domainID string) (*pb.Role, error) {
+func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string) (*pb.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
 	role := &pb.Role{
@@ -80,7 +80,7 @@ func convertDomainTypeToProto(domainType string) pb.DomainType {
 	}
 }
 
-func setupTestAuthService(t *testing.T) authorization.AuthorizationServiceInterface {
+func setupTestAuthService(t *testing.T) authorization.Authorization {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 	authService.EnableCache(false)

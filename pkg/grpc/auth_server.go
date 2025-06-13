@@ -10,10 +10,10 @@ import (
 
 type AuthorizationServer struct {
 	pb.UnimplementedAuthorizationServer
-	authService authorization.AuthorizationServiceInterface
+	authService authorization.Authorization
 }
 
-func NewAuthorizationServer(authService authorization.AuthorizationServiceInterface) *AuthorizationServer {
+func NewAuthorizationServer(authService authorization.Authorization) *AuthorizationServer {
 	return &AuthorizationServer{
 		authService: authService,
 	}

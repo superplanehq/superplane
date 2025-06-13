@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func CheckPermission(ctx context.Context, req *pb.CheckPermissionRequest, authService authorization.AuthorizationServiceInterface) (*pb.CheckPermissionResponse, error) {
+func CheckPermission(ctx context.Context, req *pb.CheckPermissionRequest, authService authorization.Authorization) (*pb.CheckPermissionResponse, error) {
 	err := ValidateUUIDs(req.UserId, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")

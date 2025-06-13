@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListAccessibleCanvases(ctx context.Context, req *pb.ListAccessibleCanvasesRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListAccessibleCanvasesResponse, error) {
+func ListAccessibleCanvases(ctx context.Context, req *pb.ListAccessibleCanvasesRequest, authService authorization.Authorization) (*pb.ListAccessibleCanvasesResponse, error) {
 	err := ValidateUUIDs(req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user ID")

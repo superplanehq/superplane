@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService authorization.AuthorizationServiceInterface) (*pb.CreateGroupResponse, error) {
+func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")

@@ -1,6 +1,6 @@
 package authorization
 
-type AuthorizationServiceInterface interface {
+type Authorization interface {
 	// Permission checking
 	CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error)
 	CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error)

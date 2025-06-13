@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListAccessibleOrganizations(ctx context.Context, req *pb.ListAccessibleOrganizationsRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListAccessibleOrganizationsResponse, error) {
+func ListAccessibleOrganizations(ctx context.Context, req *pb.ListAccessibleOrganizationsRequest, authService authorization.Authorization) (*pb.ListAccessibleOrganizationsResponse, error) {
 	err := ValidateUUIDs(req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user ID")

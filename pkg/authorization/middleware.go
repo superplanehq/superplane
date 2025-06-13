@@ -115,7 +115,7 @@ func parseAPIPath(path string, method string) (*resourceInfo, error) {
 	return nil, fmt.Errorf("unrecognized API path: %s", path)
 }
 
-func checkPermission(authService AuthorizationServiceInterface, userID string, info *resourceInfo) (bool, error) {
+func checkPermission(authService Authorization, userID string, info *resourceInfo) (bool, error) {
 	if info.domainType == DomainOrg {
 		if info.orgID == "" {
 			return false, fmt.Errorf("organization ID required")
@@ -130,7 +130,7 @@ func checkPermission(authService AuthorizationServiceInterface, userID string, i
 }
 
 // AuthorizationMiddleware returns an HTTP middleware that checks authorization
-func AuthorizationMiddleware(authService AuthorizationServiceInterface) func(next http.Handler) http.Handler {
+func AuthorizationMiddleware(authService Authorization) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !strings.HasPrefix(r.URL.Path, "/api/v1/") {

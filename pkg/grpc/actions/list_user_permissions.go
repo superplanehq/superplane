@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListUserPermissionsResponse, error) {
+func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest, authService authorization.Authorization) (*pb.ListUserPermissionsResponse, error) {
 	err := ValidateUUIDs(req.UserId, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")

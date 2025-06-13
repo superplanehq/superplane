@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListRoles(ctx context.Context, req *pb.ListRolesRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListRolesResponse, error) {
+func ListRoles(ctx context.Context, req *pb.ListRolesRequest, authService authorization.Authorization) (*pb.ListRolesResponse, error) {
 	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}

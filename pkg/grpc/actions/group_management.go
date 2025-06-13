@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.AuthorizationServiceInterface) (*pb.AddUserToGroupResponse, error) {
+func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.Authorization) (*pb.AddUserToGroupResponse, error) {
 	err := ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
@@ -27,7 +27,7 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 	return &pb.AddUserToGroupResponse{}, nil
 }
 
-func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest, authService authorization.AuthorizationServiceInterface) (*pb.RemoveUserFromGroupResponse, error) {
+func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest, authService authorization.Authorization) (*pb.RemoveUserFromGroupResponse, error) {
 	err := ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
@@ -45,7 +45,7 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 	return &pb.RemoveUserFromGroupResponse{}, nil
 }
 
-func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListOrganizationGroupsResponse, error) {
+func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest, authService authorization.Authorization) (*pb.ListOrganizationGroupsResponse, error) {
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -61,7 +61,7 @@ func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsR
 	}, nil
 }
 
-func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.AuthorizationServiceInterface) (*pb.GetGroupUsersResponse, error) {
+func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.Authorization) (*pb.GetGroupUsersResponse, error) {
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")

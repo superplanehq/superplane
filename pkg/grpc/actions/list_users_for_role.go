@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationUsersForRoleRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListOrganizationUsersForRoleResponse, error) {
+func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationUsersForRoleRequest, authService authorization.Authorization) (*pb.ListOrganizationUsersForRoleResponse, error) {
 	err := ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
@@ -30,7 +30,7 @@ func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationU
 	}, nil
 }
 
-func ListCanvasUsersForRole(ctx context.Context, req *pb.ListCanvasUsersForRoleRequest, authService authorization.AuthorizationServiceInterface) (*pb.ListCanvasUsersForRoleResponse, error) {
+func ListCanvasUsersForRole(ctx context.Context, req *pb.ListCanvasUsersForRoleRequest, authService authorization.Authorization) (*pb.ListCanvasUsersForRoleResponse, error) {
 	err := ValidateUUIDs(req.CanvasId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")

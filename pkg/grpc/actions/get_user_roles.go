@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService authorization.AuthorizationServiceInterface) (*pb.GetUserRolesResponse, error) {
+func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService authorization.Authorization) (*pb.GetUserRolesResponse, error) {
 	err := ValidateUUIDs(req.UserId, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
