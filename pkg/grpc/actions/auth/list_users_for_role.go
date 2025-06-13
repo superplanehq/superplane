@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationUsersForRoleRequest, authService authorization.Authorization) (*pb.ListOrganizationUsersForRoleResponse, error) {
-	err := ValidateUUIDs(req.OrgId)
+	err := actions.ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}
@@ -31,7 +32,7 @@ func ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationU
 }
 
 func ListCanvasUsersForRole(ctx context.Context, req *pb.ListCanvasUsersForRoleRequest, authService authorization.Authorization) (*pb.ListCanvasUsersForRoleResponse, error) {
-	err := ValidateUUIDs(req.CanvasId)
+	err := actions.ValidateUUIDs(req.CanvasId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas ID")
 	}

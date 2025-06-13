@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -16,7 +17,7 @@ import (
 )
 
 func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	err := ValidateUUIDs(req.IdOrName)
+	err := actions.ValidateUUIDs(req.IdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -29,7 +30,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = ValidateUUIDs(req.IdOrName)
+	err = actions.ValidateUUIDs(req.IdOrName)
 	var stage *models.Stage
 	if err != nil {
 		stage, err = canvas.FindStageByName(req.IdOrName)
@@ -45,7 +46,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, err
 	}
 
-	err = ValidateUUIDs(req.RequesterId)
+	err = actions.ValidateUUIDs(req.RequesterId)
 
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "requester ID is invalid")

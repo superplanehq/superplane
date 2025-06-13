@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.Authorization) (*pb.AddUserToGroupResponse, error) {
-	err := ValidateUUIDs(req.OrgId, req.UserId)
+	err := actions.ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -28,7 +29,7 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 }
 
 func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest, authService authorization.Authorization) (*pb.RemoveUserFromGroupResponse, error) {
-	err := ValidateUUIDs(req.OrgId, req.UserId)
+	err := actions.ValidateUUIDs(req.OrgId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -46,7 +47,7 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 }
 
 func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest, authService authorization.Authorization) (*pb.ListOrganizationGroupsResponse, error) {
-	err := ValidateUUIDs(req.OrgId)
+	err := actions.ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}
@@ -62,7 +63,7 @@ func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsR
 }
 
 func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.Authorization) (*pb.GetGroupUsersResponse, error) {
-	err := ValidateUUIDs(req.OrgId)
+	err := actions.ValidateUUIDs(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
 	}

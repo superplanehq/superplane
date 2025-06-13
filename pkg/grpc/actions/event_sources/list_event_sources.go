@@ -3,6 +3,7 @@ package event_sources
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -10,7 +11,7 @@ import (
 )
 
 func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {

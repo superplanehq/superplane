@@ -4,13 +4,14 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func CheckPermission(ctx context.Context, req *pb.CheckPermissionRequest, authService authorization.Authorization) (*pb.CheckPermissionResponse, error) {
-	err := ValidateUUIDs(req.UserId, req.DomainId)
+	err := actions.ValidateUUIDs(req.UserId, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}

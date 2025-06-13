@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -15,7 +16,7 @@ import (
 )
 
 func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {

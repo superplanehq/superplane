@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -11,7 +12,7 @@ import (
 )
 
 func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
@@ -23,12 +24,12 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Updat
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = ValidateUUIDs(req.RequesterId)
+	err = actions.ValidateUUIDs(req.RequesterId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid requester ID")
 	}
 
-	err = ValidateUUIDs(req.IdOrName)
+	err = actions.ValidateUUIDs(req.IdOrName)
 	var secret *models.Secret
 	if err != nil {
 		secret, err = models.FindSecretByName(canvas.ID.String(), req.IdOrName)

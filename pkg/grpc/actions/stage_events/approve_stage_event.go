@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,7 +16,7 @@ import (
 )
 
 func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -31,7 +32,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
-	err = ValidateUUIDs(req.StageIdOrName)
+	err = actions.ValidateUUIDs(req.StageIdOrName)
 	var stage *models.Stage
 	if err != nil {
 		stage, err = canvas.FindStageByName(req.StageIdOrName)
@@ -46,7 +47,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
-	err = ValidateUUIDs(req.EventId, req.RequesterId)
+	err = actions.ValidateUUIDs(req.EventId, req.RequesterId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}

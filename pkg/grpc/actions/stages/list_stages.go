@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -11,7 +12,7 @@ import (
 )
 
 func ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)

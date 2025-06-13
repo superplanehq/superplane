@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -14,7 +15,7 @@ import (
 )
 
 func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
-	err := ValidateUUIDs(req.Id)
+	err := actions.ValidateUUIDs(req.Id)
 	if err != nil {
 		return nil, err
 	}

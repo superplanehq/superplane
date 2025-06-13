@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -14,7 +15,7 @@ import (
 )
 
 func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 
 	var canvas *models.Canvas
 	if err != nil {
@@ -27,7 +28,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = ValidateUUIDs(req.StageIdOrName)
+	err = actions.ValidateUUIDs(req.StageIdOrName)
 	var stage *models.Stage
 	if err != nil {
 		stage, err = canvas.FindStageByName(req.StageIdOrName)
@@ -179,7 +180,7 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		Id:          execution.ID.String(),
 		ReferenceId: execution.ReferenceID,
 		State:       executionStateToProto(execution.State),
-		Result:      executionResultToProto(execution.Result),
+		Result:      actions.ExecutionResultToProto(execution.Result),
 		CreatedAt:   timestamppb.New(*execution.CreatedAt),
 		Outputs:     []*pb.OutputValue{},
 	}
@@ -209,17 +210,6 @@ func executionStateToProto(state string) pb.Execution_State {
 		return pb.Execution_STATE_FINISHED
 	default:
 		return pb.Execution_STATE_UNKNOWN
-	}
-}
-
-func executionResultToProto(result string) pb.Execution_Result {
-	switch result {
-	case models.StageExecutionResultFailed:
-		return pb.Execution_RESULT_FAILED
-	case models.StageExecutionResultPassed:
-		return pb.Execution_RESULT_PASSED
-	default:
-		return pb.Execution_RESULT_UNKNOWN
 	}
 }
 

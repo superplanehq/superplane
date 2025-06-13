@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
@@ -13,7 +14,7 @@ import (
 )
 
 func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
-	err := ValidateUUIDs(req.CanvasIdOrName)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
@@ -25,7 +26,7 @@ func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Des
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = ValidateUUIDs(req.IdOrName)
+	err = actions.ValidateUUIDs(req.IdOrName)
 	var secret *models.Secret
 	if err != nil {
 		secret, err = models.FindSecretByName(canvas.ID.String(), req.IdOrName)

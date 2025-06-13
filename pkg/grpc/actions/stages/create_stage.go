@@ -8,6 +8,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -31,7 +32,7 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "stage.spec is required")
 	}
 
-	err := ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
+	err := actions.ValidateUUIDs(req.CanvasIdOrName, req.RequesterId)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
@@ -574,7 +575,7 @@ func serializeValueFrom(in models.ValueDefinitionFrom) *pb.ValueFrom {
 	if in.LastExecution != nil {
 		results := []pb.Execution_Result{}
 		for _, r := range in.LastExecution.Results {
-			results = append(results, executionResultToProto(r))
+			results = append(results, actions.ExecutionResultToProto(r))
 		}
 
 		return &pb.ValueFrom{
