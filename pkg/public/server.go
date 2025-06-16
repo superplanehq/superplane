@@ -1,4 +1,3 @@
-// pkg/public/server.go - Updated to integrate multi-provider authentication
 package public
 
 import (
