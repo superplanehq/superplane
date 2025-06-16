@@ -30,7 +30,7 @@ type AuthenticationUser struct {
 	AvatarURL        string                   `json:"avatar_url"`
 	AccessToken      string                   `json:"access_token"`
 	CreatedAt        time.Time                `json:"created_at"`
-	RepoHostAccounts []models.RepoHostAccount `json:"repo_host_accounts,omitempty"`
+	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
 }
 
 type ProviderConfig struct {
@@ -191,7 +191,7 @@ func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *h
 	})
 
 	if r.Header.Get("Accept") == "application/json" {
-		repoAccounts, _ := dbUser.GetRepoHostAccounts()
+		accountProviders, _ := dbUser.GetAccountProviders()
 		authUser := AuthenticationUser{
 			ID:               dbUser.ID.String(),
 			Email:            dbUser.Email,
@@ -199,7 +199,7 @@ func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *h
 			AvatarURL:        dbUser.AvatarURL,
 			AccessToken:      token,
 			CreatedAt:        dbUser.CreatedAt,
-			RepoHostAccounts: repoAccounts,
+			AccountProviders: accountProviders,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -219,13 +219,13 @@ func (a *AuthenticationHandler) handleDisconnectProvider(w http.ResponseWriter, 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
 
-	repoAccount, err := user.GetRepoHostAccount(provider)
+	accountProvider, err := user.GetAccountProvider(provider)
 	if err != nil {
 		http.Error(w, "Provider account not found", http.StatusNotFound)
 		return
 	}
 
-	if err := repoAccount.Delete(); err != nil {
+	if err := accountProvider.Delete(); err != nil {
 		log.Errorf("Error deleting repo host account: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -268,10 +268,10 @@ func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	repoAccounts, err := user.GetRepoHostAccounts()
+	accountProviders, err := user.GetAccountProviders()
 	if err != nil {
 		log.Errorf("Error getting repo host accounts: %v", err)
-		repoAccounts = []models.RepoHostAccount{}
+		accountProviders = []models.AccountProvider{}
 	}
 
 	authUser := AuthenticationUser{
@@ -280,7 +280,7 @@ func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request)
 		Name:             user.Name,
 		AvatarURL:        user.AvatarURL,
 		CreatedAt:        user.CreatedAt,
-		RepoHostAccounts: repoAccounts,
+		AccountProviders: accountProviders,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -311,24 +311,24 @@ func (a *AuthenticationHandler) handleLoginPage(w http.ResponseWriter, r *http.R
 	t.Execute(w, data)
 }
 
-func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.RepoHostAccount, error) {
-	repoAccount, err := models.FindRepoHostAccountByProviderID(gothUser.Provider, gothUser.UserID)
+func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.AccountProvider, error) {
+	accountProvider, err := models.FindAccountProviderByProviderID(gothUser.Provider, gothUser.UserID)
 	if err == nil {
-		repoAccount.Username = gothUser.NickName
-		repoAccount.Email = gothUser.Email
-		repoAccount.Name = gothUser.Name
-		repoAccount.AvatarURL = gothUser.AvatarURL
-		repoAccount.AccessToken = gothUser.AccessToken
-		repoAccount.RefreshToken = gothUser.RefreshToken
+		accountProvider.Username = gothUser.NickName
+		accountProvider.Email = gothUser.Email
+		accountProvider.Name = gothUser.Name
+		accountProvider.AvatarURL = gothUser.AvatarURL
+		accountProvider.AccessToken = gothUser.AccessToken
+		accountProvider.RefreshToken = gothUser.RefreshToken
 		if gothUser.ExpiresAt != (time.Time{}) {
-			repoAccount.TokenExpiresAt = &gothUser.ExpiresAt
+			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
 		}
 
-		if err := repoAccount.Update(); err != nil {
+		if err := accountProvider.Update(); err != nil {
 			return nil, nil, err
 		}
 
-		user, err := models.FindUserByID(repoAccount.UserID.String())
+		user, err := models.FindUserByID(accountProvider.UserID.String())
 		if err != nil {
 			return nil, nil, err
 		}
@@ -338,7 +338,7 @@ func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (
 		user.AvatarURL = gothUser.AvatarURL
 		user.Update()
 
-		return user, repoAccount, nil
+		return user, accountProvider, nil
 	}
 
 	user, err := models.FindUserByEmail(gothUser.Email)
@@ -358,7 +358,7 @@ func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (
 		user.Update()
 	}
 
-	repoAccount = &models.RepoHostAccount{
+	accountProvider = &models.AccountProvider{
 		UserID:       user.ID,
 		Provider:     gothUser.Provider,
 		ProviderID:   gothUser.UserID,
@@ -371,14 +371,14 @@ func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (
 	}
 
 	if gothUser.ExpiresAt != (time.Time{}) {
-		repoAccount.TokenExpiresAt = &gothUser.ExpiresAt
+		accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
 	}
 
-	if err := repoAccount.Create(); err != nil {
+	if err := accountProvider.Create(); err != nil {
 		return nil, nil, err
 	}
 
-	return user, repoAccount, nil
+	return user, accountProvider, nil
 }
 
 func (a *AuthenticationHandler) getUserFromRequest(r *http.Request) (*models.User, error) {

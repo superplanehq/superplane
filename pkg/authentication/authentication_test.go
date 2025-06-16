@@ -48,8 +48,8 @@ func createTestUser(t *testing.T) *models.User {
 	return user
 }
 
-func createTestRepoHostAccount(t *testing.T, userID uuid.UUID) *models.RepoHostAccount {
-	account := &models.RepoHostAccount{
+func createTestAccountProvider(t *testing.T, userID uuid.UUID) *models.AccountProvider {
+	account := &models.AccountProvider{
 		UserID:      userID,
 		Provider:    "github",
 		ProviderID:  "12345",
@@ -87,7 +87,7 @@ func TestAuthenticationHandler_Me_Unauthorized(t *testing.T) {
 func TestAuthenticationHandler_Me_WithValidToken(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
-	createTestRepoHostAccount(t, user.ID)
+	createTestAccountProvider(t, user.ID)
 
 	token, err := handler.jwtSigner.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)
@@ -108,14 +108,14 @@ func TestAuthenticationHandler_Me_WithValidToken(t *testing.T) {
 
 	assert.Equal(t, user.Email, authUser.Email)
 	assert.Equal(t, user.Name, authUser.Name)
-	assert.Len(t, authUser.RepoHostAccounts, 1)
-	assert.Equal(t, "github", authUser.RepoHostAccounts[0].Provider)
+	assert.Len(t, authUser.AccountProviders, 1)
+	assert.Equal(t, "github", authUser.AccountProviders[0].Provider)
 }
 
 func TestAuthenticationHandler_DisconnectProvider(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
-	account := createTestRepoHostAccount(t, user.ID)
+	account := createTestAccountProvider(t, user.ID)
 
 	token, err := handler.jwtSigner.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)
@@ -131,7 +131,7 @@ func TestAuthenticationHandler_DisconnectProvider(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Verify account was deleted
-	_, err = models.FindRepoHostAccountByID(account.ID.String())
+	_, err = models.FindAccountProviderByID(account.ID.String())
 	assert.Error(t, err)
 }
 

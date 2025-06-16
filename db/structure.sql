@@ -79,10 +79,10 @@ CREATE TABLE public.events (
 
 
 --
--- Name: repo_host_accounts; Type: TABLE; Schema: public; Owner: -
+-- Name: account_providers; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.repo_host_accounts (
+CREATE TABLE public.account_providers (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
     provider character varying(50) NOT NULL,
@@ -265,27 +265,27 @@ ALTER TABLE ONLY public.events
 
 
 --
--- Name: repo_host_accounts repo_host_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.repo_host_accounts
-    ADD CONSTRAINT repo_host_accounts_pkey PRIMARY KEY (id);
-
-
---
--- Name: repo_host_accounts repo_host_accounts_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.repo_host_accounts
-    ADD CONSTRAINT repo_host_accounts_provider_provider_id_key UNIQUE (provider, provider_id);
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
 
 
 --
--- Name: repo_host_accounts repo_host_accounts_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.repo_host_accounts
-    ADD CONSTRAINT repo_host_accounts_user_id_provider_key UNIQUE (user_id, provider);
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
+
+
+--
+-- Name: account_providers account_providers_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
 
 
 --
@@ -393,17 +393,17 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: idx_repo_host_accounts_provider; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_providers_provider; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_repo_host_accounts_provider ON public.repo_host_accounts USING btree (provider);
+CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
 
 
 --
--- Name: idx_repo_host_accounts_user_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_providers_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_repo_host_accounts_user_id ON public.repo_host_accounts USING btree (user_id);
+CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
 
 
 --
@@ -485,11 +485,11 @@ ALTER TABLE ONLY public.event_sources
 
 
 --
--- Name: repo_host_accounts repo_host_accounts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.repo_host_accounts
-    ADD CONSTRAINT repo_host_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --

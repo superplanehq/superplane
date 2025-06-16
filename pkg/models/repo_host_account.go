@@ -8,8 +8,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// RepoHostAccount represents a user's account on a repository hosting provider
-type RepoHostAccount struct {
+// AccountProvider represents a user's account on a repository hosting provider
+type AccountProvider struct {
 	ID             uuid.UUID  `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	UserID         uuid.UUID  `json:"user_id" gorm:"type:uuid;not null;index"`
 	Provider       string     `json:"provider" gorm:"not null"`
@@ -27,27 +27,27 @@ type RepoHostAccount struct {
 	User *User `json:"user,omitempty" gorm:"foreignKey:UserID"`
 }
 
-func (rha *RepoHostAccount) BeforeCreate(tx *gorm.DB) error {
+func (rha *AccountProvider) BeforeCreate(tx *gorm.DB) error {
 	if rha.ID == uuid.Nil {
 		rha.ID = uuid.New()
 	}
 	return nil
 }
 
-func (rha *RepoHostAccount) Create() error {
+func (rha *AccountProvider) Create() error {
 	return database.Conn().Create(rha).Error
 }
 
-func (rha *RepoHostAccount) Update() error {
+func (rha *AccountProvider) Update() error {
 	return database.Conn().Save(rha).Error
 }
 
-func (rha *RepoHostAccount) Delete() error {
+func (rha *AccountProvider) Delete() error {
 	return database.Conn().Delete(rha).Error
 }
 
-func FindRepoHostAccountByID(id string) (*RepoHostAccount, error) {
-	var account RepoHostAccount
+func FindAccountProviderByID(id string) (*AccountProvider, error) {
+	var account AccountProvider
 	accountUUID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, err
@@ -57,32 +57,32 @@ func FindRepoHostAccountByID(id string) (*RepoHostAccount, error) {
 	return &account, err
 }
 
-func FindRepoHostAccountByProviderID(provider, providerID string) (*RepoHostAccount, error) {
-	var account RepoHostAccount
+func FindAccountProviderByProviderID(provider, providerID string) (*AccountProvider, error) {
+	var account AccountProvider
 	err := database.Conn().Where("provider = ? AND provider_id = ?", provider, providerID).First(&account).Error
 	return &account, err
 }
 
-func FindRepoHostAccountsByUserID(userID uuid.UUID) ([]RepoHostAccount, error) {
-	var accounts []RepoHostAccount
+func FindAccountProvidersByUserID(userID uuid.UUID) ([]AccountProvider, error) {
+	var accounts []AccountProvider
 	err := database.Conn().Where("user_id = ?", userID).Find(&accounts).Error
 	return accounts, err
 }
 
-func FindRepoHostAccountByUserAndProvider(userID uuid.UUID, provider string) (*RepoHostAccount, error) {
-	var account RepoHostAccount
+func FindAccountProviderByUserAndProvider(userID uuid.UUID, provider string) (*AccountProvider, error) {
+	var account AccountProvider
 	err := database.Conn().Where("user_id = ? AND provider = ?", userID, provider).First(&account).Error
 	return &account, err
 }
 
-func (rha *RepoHostAccount) IsTokenExpired() bool {
+func (rha *AccountProvider) IsTokenExpired() bool {
 	if rha.TokenExpiresAt == nil {
 		return false
 	}
 	return time.Now().After(*rha.TokenExpiresAt)
 }
 
-func (rha *RepoHostAccount) NeedsRefresh() bool {
+func (rha *AccountProvider) NeedsRefresh() bool {
 	if rha.TokenExpiresAt == nil {
 		return false
 	}

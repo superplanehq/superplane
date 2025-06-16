@@ -16,7 +16,7 @@ type User struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	RepoHostAccounts []RepoHostAccount `json:"repo_host_accounts,omitempty" gorm:"foreignKey:UserID"`
+	AccountProviders []AccountProvider `json:"account_providers,omitempty" gorm:"foreignKey:UserID"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
@@ -51,15 +51,15 @@ func FindUserByEmail(email string) (*User, error) {
 	return &user, err
 }
 
-func (u *User) GetRepoHostAccounts() ([]RepoHostAccount, error) {
-	return FindRepoHostAccountsByUserID(u.ID)
+func (u *User) GetAccountProviders() ([]AccountProvider, error) {
+	return FindAccountProvidersByUserID(u.ID)
 }
 
-func (u *User) GetRepoHostAccount(provider string) (*RepoHostAccount, error) {
-	return FindRepoHostAccountByUserAndProvider(u.ID, provider)
+func (u *User) GetAccountProvider(provider string) (*AccountProvider, error) {
+	return FindAccountProviderByUserAndProvider(u.ID, provider)
 }
 
-func (u *User) HasRepoHostAccount(provider string) bool {
-	_, err := u.GetRepoHostAccount(provider)
+func (u *User) HasAccountProvider(provider string) bool {
+	_, err := u.GetAccountProvider(provider)
 	return err == nil
 }

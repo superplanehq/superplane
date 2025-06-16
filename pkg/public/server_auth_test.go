@@ -39,7 +39,7 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 	require.NoError(t, user.Create())
 
 	// Create test repo host account
-	account := &models.RepoHostAccount{
+	account := &models.AccountProvider{
 		UserID:      user.ID,
 		Provider:    "github",
 		ProviderID:  "12345",
@@ -103,7 +103,7 @@ func TestServer_AuthMe_WithToken(t *testing.T) {
 
 	assert.Equal(t, user.Email, authUser.Email)
 	assert.Equal(t, user.Name, authUser.Name)
-	assert.Len(t, authUser.RepoHostAccounts, 1)
+	assert.Len(t, authUser.AccountProviders, 1)
 }
 
 func TestServer_UserProfile_Protected(t *testing.T) {
@@ -139,7 +139,7 @@ func TestServer_UserProfile_Protected(t *testing.T) {
 	})
 }
 
-func TestServer_UserRepoAccounts_Protected(t *testing.T) {
+func TestServer_UserAccountProviders_Protected(t *testing.T) {
 	server, _, token := setupTestServer(t)
 
 	t.Run("without auth returns unauthorized", func(t *testing.T) {
@@ -163,7 +163,7 @@ func TestServer_UserRepoAccounts_Protected(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		var accounts []models.RepoHostAccount
+		var accounts []models.AccountProvider
 		err := json.Unmarshal(w.Body.Bytes(), &accounts)
 		require.NoError(t, err)
 

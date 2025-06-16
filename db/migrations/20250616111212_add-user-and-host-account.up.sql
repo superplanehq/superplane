@@ -9,7 +9,7 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE repo_host_accounts (
+CREATE TABLE account_providers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id),
     provider VARCHAR(50) NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE repo_host_accounts (
 );
 
 CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_repo_host_accounts_user_id ON repo_host_accounts(user_id);
-CREATE INDEX idx_repo_host_accounts_provider ON repo_host_accounts(provider);
+CREATE INDEX idx_account_providers_user_id ON account_providers(user_id);
+CREATE INDEX idx_account_providers_provider ON account_providers(provider);
 
 COMMIT;

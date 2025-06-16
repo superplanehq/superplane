@@ -148,7 +148,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Add protected API routes here
 	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
-	protectedRoute.HandleFunc("/api/v1/user/repo-accounts", s.handleUserRepoAccounts).Methods("GET")
+	protectedRoute.HandleFunc("/api/v1/user/repo-accounts", s.handleUserAccountProviders).Methods("GET")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -172,14 +172,14 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 }
 
 // Handler for user repository accounts
-func (s *Server) handleUserRepoAccounts(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
 		http.Error(w, "User not found in context", http.StatusInternalServerError)
 		return
 	}
 
-	repoAccounts, err := user.GetRepoHostAccounts()
+	accountProviders, err := user.GetAccountProviders()
 	if err != nil {
 		log.Errorf("Error getting repo host accounts: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -187,7 +187,7 @@ func (s *Server) handleUserRepoAccounts(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(repoAccounts)
+	json.NewEncoder(w).Encode(accountProviders)
 }
 
 // RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
