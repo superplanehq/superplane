@@ -142,7 +142,7 @@ func TestAuthenticationHandler_DisconnectProvider_NotFound(t *testing.T) {
 	token, err := handler.jwtSigner.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)
 
-	req := httptest.NewRequest("POST", "/auth/gitlab/disconnect", nil)
+	req := httptest.NewRequest("POST", "/auth/github/disconnect", nil)
 	req.AddCookie(&http.Cookie{
 		Name:  "auth_token",
 		Value: token,
@@ -191,7 +191,6 @@ func TestAuthenticationHandler_AuthMiddleware(t *testing.T) {
 	token, err := handler.jwtSigner.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)
 
-	// Create a test handler that requires auth
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, ok := GetUserFromContext(r.Context())
 		if !ok {

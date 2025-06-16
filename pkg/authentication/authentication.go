@@ -80,15 +80,13 @@ func (a *AuthenticationHandler) InitializeProviders(providers map[string]Provide
 
 // RegisterRoutes adds authentication routes to the router
 func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
-	// Authentication routes
+	router.HandleFunc(a.basePath+"/auth/me", a.handleMe).Methods("GET")
+	router.HandleFunc(a.basePath+"/logout", a.handleLogout).Methods("GET")
+	router.HandleFunc(a.basePath+"/login", a.handleLoginPage).Methods("GET")
+
 	router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
 	router.HandleFunc(a.basePath+"/auth/{provider}", a.handleAuth).Methods("GET")
 	router.HandleFunc(a.basePath+"/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
-	router.HandleFunc(a.basePath+"/logout", a.handleLogout).Methods("GET")
-	router.HandleFunc(a.basePath+"/auth/me", a.handleMe).Methods("GET")
-
-	// Login page
-	router.HandleFunc(a.basePath+"/login", a.handleLoginPage).Methods("GET")
 }
 
 func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
