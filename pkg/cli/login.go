@@ -1,12 +1,10 @@
-// login.go - Proper OAuth implementation
 package cli
 
 import (
-	"context"
-	"crypto/rand"
-	"encoding/base64"
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,30 +16,44 @@ import (
 	"github.com/spf13/viper"
 )
 
-const authSuccessTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-	<title>Authentication Successful</title>
-	<style>
-		body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; text-align: center; padding: 50px; }
-		.success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
-		.message { color: #666; font-size: 16px; }
-	</style>
-</head>
-<body>
-	<div class="success">Authentication Successful!</div>
-	<div class="message">You can now close this window and return to your terminal.</div>
-	<script>
-		setTimeout(function() {
-			window.close();
-		}, 10000);
-	</script>
-</body>
-</html>
-`
+// GitHubClientID set during build time
+var GitHubClientID string
 
-type AuthResponse struct {
+const (
+	GitHubDeviceCodeURL = "https://github.com/login/device/code"
+	GitHubTokenURL      = "https://github.com/login/oauth/access_token"
+	GitHubUserURL       = "https://api.github.com/user"
+)
+
+type DeviceCodeResponse struct {
+	DeviceCode      string `json:"device_code"`
+	UserCode        string `json:"user_code"`
+	VerificationURI string `json:"verification_uri"`
+	ExpiresIn       int    `json:"expires_in"`
+	Interval        int    `json:"interval"`
+}
+
+type TokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	Scope       string `json:"scope"`
+	Error       string `json:"error"`
+	ErrorDesc   string `json:"error_description"`
+}
+
+type GitHubUser struct {
+	ID        int    `json:"id"`
+	Login     string `json:"login"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+type TokenExchangeRequest struct {
+	GitHubToken string `json:"github_token"`
+}
+
+type DevAuthResponse struct {
 	ID          string    `json:"id"`
 	Email       string    `json:"email"`
 	Name        string    `json:"name"`
@@ -50,28 +62,45 @@ type AuthResponse struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+const mockedToken = "dev_token"
+
+type TokenExchangeResponse struct {
+	AccessToken string `json:"access_token"`
+	User        struct {
+		ID        string `json:"id"`
+		Email     string `json:"email"`
+		Name      string `json:"name"`
+		AvatarURL string `json:"avatar_url"`
+	} `json:"user"`
+}
+
+type ServerUserResponse struct {
+	ID        string `json:"id"`
+	Email     string `json:"email"`
+	Name      string `json:"name"`
+	AvatarURL string `json:"avatar_url"`
+}
+
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Authenticate with Superplane",
-	Long:  `Login to Superplane using OAuth or development mode.`,
+	Short: "Authenticate with GitHub",
+	Long:  `Login to GitHub using device flow authentication.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		provider, _ := cmd.Flags().GetString("provider")
 		devMode, _ := cmd.Flags().GetBool("dev")
-		port, _ := cmd.Flags().GetInt("port")
-
-		baseURL := GetAPIURL()
+		provider, _ := cmd.Flags().GetString("provider")
 
 		if devMode || os.Getenv("APP_ENV") == "development" {
-			fmt.Println("🔧 Development mode - using mock authentication")
-			handleDevLogin(baseURL, provider)
+			fmt.Printf("🔧 Development mode - using mock authentication with %s\n", provider)
+			handleDevLogin(GetAPIURL(), provider)
 			return
 		}
 
-		if provider == "" {
-			provider = "github"
+		switch provider {
+		case "github":
+			handleGitHubDeviceFlow()
+		default:
+			Fail(fmt.Sprintf("Unsupported provider: %s. Currently supported: github", provider))
 		}
-
-		handleOAuthLogin(baseURL, provider, port)
 	},
 }
 
@@ -93,7 +122,7 @@ func handleDevLogin(baseURL, provider string) {
 		Fail(fmt.Sprintf("Authentication failed with status: %d", resp.StatusCode))
 	}
 
-	var authResp AuthResponse
+	var authResp DevAuthResponse
 	err = json.NewDecoder(resp.Body).Decode(&authResp)
 	CheckWithMessage(err, "Failed to parse auth response")
 
@@ -105,93 +134,240 @@ func handleDevLogin(baseURL, provider string) {
 	fmt.Printf("✅ Successfully logged in as %s (%s)\n", authResp.Name, authResp.Email)
 }
 
-func handleOAuthLogin(baseURL, provider string, callbackPort int) {
-	state := generateRandomState()
+func handleGitHubDeviceFlow() {
+	fmt.Println("🔐 Starting GitHub authentication...")
 
-	callbackURL := fmt.Sprintf("http://localhost:%d/callback", callbackPort)
-	tokenChan := make(chan string, 1)
-	errorChan := make(chan error, 1)
-
-	server := startCallbackServer(callbackPort, state, tokenChan, errorChan)
-	defer server.Shutdown(context.Background())
-
-	authURL := fmt.Sprintf("%s/auth/%s?callback_url=%s&state=%s",
-		baseURL, provider, url.QueryEscape(callbackURL), state)
-
-	fmt.Printf("🌐 Opening browser for %s authentication...\n", provider)
-	fmt.Printf("If browser doesn't open, visit: %s\n", authURL)
-	fmt.Println("Waiting for authentication...")
-
-	openBrowser(authURL)
-
-	select {
-	case token := <-tokenChan:
-		// Store the token
-		viper.Set(ConfigKeyAuthToken, token)
-		err := viper.WriteConfig()
-		CheckWithMessage(err, "Failed to save authentication token")
-
-		fmt.Println("✅ Successfully authenticated!")
-		fmt.Println("Token saved to config file.")
-
-	case err := <-errorChan:
-		Fail(fmt.Sprintf("Authentication failed: %v", err))
-
-	case <-time.After(5 * time.Minute):
-		Fail("Authentication timeout - please try again")
+	deviceResp, err := requestDeviceCode()
+	if err != nil {
+		Fail(fmt.Sprintf("Failed to get device code: %v", err))
 	}
+
+	fmt.Printf("\n📱 Please visit: %s\n", deviceResp.VerificationURI)
+	fmt.Printf("🔑 Enter this code: %s\n\n", deviceResp.UserCode)
+	fmt.Println("Opening browser automatically...")
+
+	openBrowser(deviceResp.VerificationURI)
+
+	fmt.Println("⏳ Waiting for you to authorize the application...")
+
+	githubToken, err := pollForToken(deviceResp.DeviceCode, deviceResp.Interval, deviceResp.ExpiresIn)
+	if err != nil {
+		Fail(fmt.Sprintf("GitHub authentication failed: %v", err))
+	}
+
+	fmt.Println("\n✅ GitHub authentication successful!")
+	fmt.Println("🔄 Exchanging token with server...")
+
+	appToken, user, err := exchangeGitHubToken(githubToken)
+	if err != nil {
+		Fail(fmt.Sprintf("Token exchange failed: %v", err))
+	}
+
+	viper.Set(ConfigKeyAuthToken, appToken)
+	err = viper.WriteConfig()
+	CheckWithMessage(err, "Failed to save authentication token")
+
+	fmt.Printf("✅ Successfully authenticated as %s (%s)\n", user.User.Name, user.User.Email)
 }
 
-func startCallbackServer(port int, expectedState string, tokenChan chan string, errorChan chan error) *http.Server {
-	mux := http.NewServeMux()
+func getClientID() string {
+	if clientID := os.Getenv("GITHUB_CLIENT_ID"); clientID != "" {
+		return clientID
+	}
 
-	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
-		state := r.URL.Query().Get("state")
-		if state != expectedState {
-			errorChan <- fmt.Errorf("invalid state parameter")
-			http.Error(w, "Invalid state parameter", http.StatusBadRequest)
-			return
-		}
+	if GitHubClientID != "" {
+		return GitHubClientID
+	}
 
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			error := r.URL.Query().Get("error")
-			if error != "" {
-				errorChan <- fmt.Errorf("authentication error: %s", error)
-				http.Error(w, "Authentication failed", http.StatusBadRequest)
-				return
+	return "invalid-client-id"
+}
+
+func getTokenExchangeURL() string {
+	baseURL := GetAPIURL()
+	return baseURL + "/auth/token/exchange"
+}
+
+func requestDeviceCode() (*DeviceCodeResponse, error) {
+	clientID := getClientID()
+
+	data := url.Values{}
+	data.Set("client_id", clientID)
+	data.Set("scope", "read:user user:email")
+
+	req, err := http.NewRequest("POST", GitHubDeviceCodeURL, bytes.NewBufferString(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "superplane-cli/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	buffer := bytes.Buffer{}
+	buffer.ReadFrom(resp.Body)
+	body := buffer.String()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d, body: %s", resp.StatusCode, body)
+	}
+
+	var deviceResp DeviceCodeResponse
+	err = json.Unmarshal([]byte(body), &deviceResp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v, body: %s", err, body)
+	}
+
+	return &deviceResp, nil
+}
+
+func pollForToken(deviceCode string, interval, expiresIn int) (string, error) {
+	timeout := time.After(time.Duration(expiresIn) * time.Second)
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return "", fmt.Errorf("authentication timeout")
+		case <-ticker.C:
+			token, err := checkForToken(deviceCode)
+			if err != nil {
+				if err.Error() == "authorization_pending" {
+					fmt.Print(".")
+					continue
+				}
+				if err.Error() == "slow_down" {
+					fmt.Print(".")
+					ticker.Stop()
+					ticker = time.NewTicker(time.Duration(interval+5) * time.Second)
+					continue
+				}
+				return "", err
 			}
-
-			errorChan <- fmt.Errorf("no token received")
-			http.Error(w, "No token received", http.StatusBadRequest)
-			return
+			return token, nil
 		}
-
-		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(authSuccessTemplate))
-
-		tokenChan <- token
-	})
-
-	server := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: mux,
 	}
-
-	go func() {
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			errorChan <- fmt.Errorf("callback server error: %v", err)
-		}
-	}()
-
-	time.Sleep(100 * time.Millisecond)
-	return server
 }
 
-func generateRandomState() string {
-	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
+func checkForToken(deviceCode string) (string, error) {
+	clientID := getClientID()
+
+	data := url.Values{}
+	data.Set("client_id", clientID)
+	data.Set("device_code", deviceCode)
+	data.Set("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+
+	req, err := http.NewRequest("POST", GitHubTokenURL, bytes.NewBufferString(data.Encode()))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", "superplane-cli/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var tokenResp TokenResponse
+	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
+	if err != nil {
+		return "", err
+	}
+
+	if tokenResp.Error != "" {
+		return "", fmt.Errorf(tokenResp.Error)
+	}
+
+	return tokenResp.AccessToken, nil
+}
+
+func exchangeGitHubToken(githubToken string) (string, *TokenExchangeResponse, error) {
+	reqBody := TokenExchangeRequest{
+		GitHubToken: githubToken,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", nil, err
+	}
+
+	req, err := http.NewRequest("POST", getTokenExchangeURL(), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", nil, err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "superplane-cli/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", nil, fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tokenResp TokenExchangeResponse
+	err = json.NewDecoder(resp.Body).Decode(&tokenResp)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return tokenResp.AccessToken, &tokenResp, nil
+}
+
+// Updated to use your server's /auth/me endpoint instead of GitHub's API
+func getUserInfo(token string) (*GitHubUser, error) {
+	baseURL := GetAPIURL()
+	req, err := http.NewRequest("GET", baseURL+"/auth/me", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "superplane-cli/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Server returned status %d", resp.StatusCode)
+	}
+
+	var user ServerUserResponse
+	err = json.NewDecoder(resp.Body).Decode(&user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GitHubUser{
+		Login:     user.Email,
+		Name:      user.Name,
+		Email:     user.Email,
+		AvatarURL: user.AvatarURL,
+	}, nil
 }
 
 func openBrowser(url string) {
@@ -216,7 +392,7 @@ func openBrowser(url string) {
 
 var logoutCmd = &cobra.Command{
 	Use:   "logout",
-	Short: "Logout from Superplane",
+	Short: "Logout from GitHub",
 	Long:  `Remove stored authentication token.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		viper.Set(ConfigKeyAuthToken, "")
@@ -238,34 +414,24 @@ var whoamiCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		baseURL := GetAPIURL()
-		client := &http.Client{Timeout: 30 * time.Second}
+		if token == mockedToken {
+			fmt.Println("Logged in as: Dev User (dev@superplane.local)")
+			fmt.Println("User ID: dev-user-123")
+			fmt.Println("Email: dev@superplane.local")
+			fmt.Println("Mode: Development")
+			return
+		}
 
-		req, err := http.NewRequest("GET", baseURL+"/auth/me", nil)
-		CheckWithMessage(err, "Failed to create request")
-
-		req.Header.Set("Authorization", "Bearer "+token)
-		req.Header.Set("Accept", "application/json")
-
-		resp, err := client.Do(req)
-		CheckWithMessage(err, "Failed to get user info")
-		defer resp.Body.Close()
-
-		if resp.StatusCode == http.StatusUnauthorized {
+		user, err := getUserInfo(token)
+		if err != nil {
 			fmt.Println("Authentication token expired or invalid. Run 'superplane login' again.")
 			os.Exit(1)
 		}
 
-		if resp.StatusCode != http.StatusOK {
-			Fail(fmt.Sprintf("Failed to get user info: HTTP %d", resp.StatusCode))
+		fmt.Printf("Logged in as: %s (%s)\n", user.Name, user.Login)
+		if user.Email != "" {
+			fmt.Printf("Email: %s\n", user.Email)
 		}
-
-		var authResp AuthResponse
-		err = json.NewDecoder(resp.Body).Decode(&authResp)
-		CheckWithMessage(err, "Failed to parse user info")
-
-		fmt.Printf("Logged in as: %s (%s)\n", authResp.Name, authResp.Email)
-		fmt.Printf("User ID: %s\n", authResp.ID)
 	},
 }
 
@@ -274,7 +440,6 @@ func init() {
 	RootCmd.AddCommand(logoutCmd)
 	RootCmd.AddCommand(whoamiCmd)
 
-	loginCmd.Flags().String("provider", "github", "OAuth provider (github, gitlab, bitbucket)")
 	loginCmd.Flags().Bool("dev", false, "Use development mode authentication")
-	loginCmd.Flags().Int("port", 8080, "Port for OAuth callback server")
+	loginCmd.Flags().String("provider", "github", "OAuth provider to use (github)")
 }

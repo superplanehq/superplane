@@ -38,6 +38,23 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
+type TokenExchangeRequest struct {
+	GitHubToken string `json:"github_token"`
+}
+
+type TokenExchangeResponse struct {
+	AccessToken string             `json:"access_token"`
+	User        AuthenticationUser `json:"user"`
+}
+
+type GitHubUserInfo struct {
+	ID        int    `json:"id"`
+	Login     string `json:"login"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+
 func NewAuthHandler(jwtSigner *jwt.Signer) *AuthenticationHandler {
 	return &AuthenticationHandler{
 		jwtSigner: jwtSigner,
@@ -76,6 +93,9 @@ func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
 
+	// Token exchange route for CLI
+	router.HandleFunc("/auth/token/exchange", a.handleTokenExchange).Methods("POST")
+
 	if os.Getenv("APP_ENV") == "development" {
 		log.Info("Registering development authentication routes")
 		// In dev: both auth and callback just auto-authenticate
@@ -88,6 +108,96 @@ func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
 	}
 
 	router.HandleFunc("/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
+}
+
+func (a *AuthenticationHandler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
+	var req TokenExchangeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.GitHubToken == "" {
+		http.Error(w, "GitHub token is required", http.StatusBadRequest)
+		return
+	}
+
+	githubUser, err := a.getGitHubUserInfo(req.GitHubToken)
+	if err != nil {
+		log.Errorf("Failed to get GitHub user info: %v", err)
+		http.Error(w, "Invalid GitHub token", http.StatusUnauthorized)
+		return
+	}
+
+	accountProvider, err := models.FindAccountProviderByProviderID("github", fmt.Sprintf("%d", githubUser.ID))
+	if err != nil {
+		// If not found by provider ID, try to find by email
+		user, err := models.FindUserByEmail(githubUser.Email)
+		if err != nil {
+			log.Errorf("No existing account found for GitHub user %s (%s)", githubUser.Login, githubUser.Email)
+			http.Error(w, "No existing account found. Please sign up through the web interface first.", http.StatusNotFound)
+			return
+		}
+
+		accountProvider, err = user.GetAccountProvider("github")
+		if err != nil {
+			log.Errorf("User %s exists but has no GitHub account provider", githubUser.Email)
+			http.Error(w, "Account exists but GitHub provider not connected. Please connect GitHub through the web interface.", http.StatusNotFound)
+			return
+		}
+	}
+
+	accountProvider.Username = githubUser.Login
+	accountProvider.Email = githubUser.Email
+	accountProvider.Name = githubUser.Name
+	accountProvider.AvatarURL = githubUser.AvatarURL
+	accountProvider.AccessToken = req.GitHubToken
+
+	if err := accountProvider.Update(); err != nil {
+		log.Errorf("Failed to update account provider: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	dbUser, err := models.FindUserByID(accountProvider.UserID.String())
+	if err != nil {
+		log.Errorf("Failed to find user by ID %s: %v", accountProvider.UserID.String(), err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	dbUser.Email = githubUser.Email
+	dbUser.Name = githubUser.Name
+	dbUser.AvatarURL = githubUser.AvatarURL
+	if err := dbUser.Update(); err != nil {
+		log.Warnf("Failed to update user info: %v", err)
+	}
+
+	token, err := a.jwtSigner.Generate(dbUser.ID.String(), 24*time.Hour)
+	if err != nil {
+		log.Errorf("Error generating JWT: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	accountProviders, _ := dbUser.GetAccountProviders()
+	authUser := AuthenticationUser{
+		ID:               dbUser.ID.String(),
+		Email:            dbUser.Email,
+		Name:             dbUser.Name,
+		AvatarURL:        dbUser.AvatarURL,
+		CreatedAt:        dbUser.CreatedAt,
+		AccountProviders: accountProviders,
+	}
+
+	response := TokenExchangeResponse{
+		AccessToken: token,
+		User:        authUser,
+	}
+
+	log.Infof("Token exchange successful for user %s (%s)", dbUser.Name, dbUser.Email)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
@@ -428,6 +538,32 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 		ctx = SetUserInContext(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (a *AuthenticationHandler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
+	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "superplane-server/1.0")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	var user GitHubUserInfo
+	err = json.NewDecoder(resp.Body).Decode(&user)
+	return &user, err
 }
 
 const loginTemplate = `
