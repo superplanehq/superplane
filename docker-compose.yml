@@ -32,6 +32,9 @@ services:
       PUBLIC_API_BASE_PATH: /api/v1
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
     ports:
       - 8000:8000

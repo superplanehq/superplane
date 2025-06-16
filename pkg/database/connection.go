@@ -92,6 +92,6 @@ func TruncateTables() error {
 		truncate table canvases, events, event_sources, stages,
 		stage_events, stage_event_approvals,
 		stage_connections, stage_executions,
-		secrets;
+		secrets, repo_host_accounts, users;
 	`).Error
 }

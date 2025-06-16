@@ -35,6 +35,9 @@ services:
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv
       NO_ENCRYPTION: "yes"
+      SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
+      GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
 
     ports:
       - 5173:5173
@@ -55,7 +58,7 @@ services:
     volumes:
       - go-pkg-cache:/go
       - .:/app
-      - /tmp:/tmp
+      - ./tmp:/tmp
 
   db:
     image: postgres:17.5

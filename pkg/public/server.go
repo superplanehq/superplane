@@ -95,8 +95,8 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	providers := make(map[string]authentication.ProviderConfig)
 
 	// GitHub
-	if githubKey := os.Getenv("GITHUB_KEY"); githubKey != "" {
-		if githubSecret := os.Getenv("GITHUB_SECRET"); githubSecret != "" {
+	if githubKey := os.Getenv("GITHUB_CLIENT_ID"); githubKey != "" {
+		if githubSecret := os.Getenv("GITHUB_CLIENT_SECRET"); githubSecret != "" {
 			providers["github"] = authentication.ProviderConfig{
 				Key:         githubKey,
 				Secret:      githubSecret,

@@ -79,6 +79,27 @@ CREATE TABLE public.events (
 
 
 --
+-- Name: repo_host_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repo_host_accounts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    provider character varying(50) NOT NULL,
+    provider_id character varying(255) NOT NULL,
+    username character varying(255),
+    email character varying(255),
+    name character varying(255),
+    avatar_url text,
+    access_token text,
+    refresh_token text,
+    token_expires_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -190,6 +211,20 @@ CREATE TABLE public.stages (
 
 
 --
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255) NOT NULL,
+    name character varying(255),
+    avatar_url text,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: canvases canvases_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -227,6 +262,30 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repo_host_accounts repo_host_accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repo_host_accounts
+    ADD CONSTRAINT repo_host_accounts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repo_host_accounts repo_host_accounts_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repo_host_accounts
+    ADD CONSTRAINT repo_host_accounts_provider_provider_id_key UNIQUE (provider, provider_id);
+
+
+--
+-- Name: repo_host_accounts repo_host_accounts_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repo_host_accounts
+    ADD CONSTRAINT repo_host_accounts_user_id_provider_key UNIQUE (user_id, provider);
 
 
 --
@@ -318,6 +377,43 @@ ALTER TABLE ONLY public.stages
 
 
 --
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_repo_host_accounts_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repo_host_accounts_provider ON public.repo_host_accounts USING btree (provider);
+
+
+--
+-- Name: idx_repo_host_accounts_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repo_host_accounts_user_id ON public.repo_host_accounts USING btree (user_id);
+
+
+--
+-- Name: idx_users_email; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_email ON public.users USING btree (email);
+
+
+--
 -- Name: uix_event_sources_canvas; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -386,6 +482,14 @@ CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 ALTER TABLE ONLY public.event_sources
     ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
+
+
+--
+-- Name: repo_host_accounts repo_host_accounts_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repo_host_accounts
+    ADD CONSTRAINT repo_host_accounts_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
