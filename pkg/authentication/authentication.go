@@ -370,6 +370,7 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := a.getUserFromRequest(r)
 		if err != nil {
+			log.Errorf("User not found: %v", err)
 			if r.Header.Get("Accept") == "application/json" {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			} else {
@@ -377,6 +378,7 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 			}
 			return
 		}
+		log.Infof("User %s authenticated", user.Email)
 
 		// Add user to request context
 		ctx := r.Context()

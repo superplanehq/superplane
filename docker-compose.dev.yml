@@ -38,6 +38,7 @@ services:
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      BASE_URL: "http://localhost:8000"
 
     ports:
       - 5173:5173

@@ -19,7 +19,7 @@ import (
 func setupTestAuth(t *testing.T) (*AuthenticationHandler, *mux.Router) {
 	require.NoError(t, database.TruncateTables())
 
-	signer := jwt.NewSigner("test-secret")
+	signer := jwt.NewSigner("test-client-secret")
 	handler := NewAuthHandler(signer, "")
 
 	// Setup test providers
@@ -27,7 +27,7 @@ func setupTestAuth(t *testing.T) (*AuthenticationHandler, *mux.Router) {
 		"github": {
 			Key:         "test-github-key",
 			Secret:      "test-github-secret",
-			CallbackURL: "http://localhost:3000/auth/github/callback",
+			CallbackURL: "http://localhost:8000/auth/github/callback",
 		},
 	}
 	handler.InitializeProviders(providers)
