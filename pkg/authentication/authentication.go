@@ -93,7 +93,6 @@ func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
 }
 
 func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
-	// Try to get the user without re-authenticating
 	if gothUser, err := gothic.CompleteUserAuth(w, r); err == nil {
 		log.Infof("User already authenticated: %s", gothUser.Email)
 		a.handleSuccessfulAuth(w, r, gothUser)
@@ -112,14 +111,13 @@ func (a *AuthenticationHandler) handleDevAuth(w http.ResponseWriter, r *http.Req
 	vars := mux.Vars(r)
 	provider := vars["provider"]
 
-	// Create a mock goth.User with realistic dev data
 	mockUser := goth.User{
 		UserID:      "dev-user-123",
 		Email:       "dev@superplane.local",
 		Name:        "Dev User",
 		NickName:    "devuser",
 		Provider:    provider,
-		AvatarURL:   "https://github.com/github.png", // Default GitHub avatar
+		AvatarURL:   "https://github.com/github.png",
 		AccessToken: "dev-token-" + provider,
 	}
 
@@ -221,14 +219,12 @@ func (a *AuthenticationHandler) handleDisconnectProvider(w http.ResponseWriter, 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
 
-	// Find the repo host account for this provider
 	repoAccount, err := user.GetRepoHostAccount(provider)
 	if err != nil {
 		http.Error(w, "Provider account not found", http.StatusNotFound)
 		return
 	}
 
-	// Delete the repo host account
 	if err := repoAccount.Delete(); err != nil {
 		log.Errorf("Error deleting repo host account: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -298,7 +294,6 @@ func (a *AuthenticationHandler) handleLoginPage(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Get available providers
 	providers := goth.GetProviders()
 	providerNames := make([]string, 0, len(providers))
 	for name := range providers {
@@ -433,7 +428,6 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 		}
 		log.Infof("User %s authenticated", user.Email)
 
-		// Add user to request context
 		ctx := r.Context()
 		ctx = SetUserInContext(ctx, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
