@@ -5,14 +5,13 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
-	"github.com/markbates/goth/providers/bitbucket"
 	"github.com/markbates/goth/providers/github"
-	"github.com/markbates/goth/providers/gitlab"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -60,12 +59,6 @@ func (a *AuthenticationHandler) InitializeProviders(providers map[string]Provide
 		case "github":
 			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL))
 			log.Infof("GitHub OAuth provider initialized")
-		case "gitlab":
-			gothProviders = append(gothProviders, gitlab.New(config.Key, config.Secret, config.CallbackURL))
-			log.Infof("GitLab OAuth provider initialized")
-		case "bitbucket":
-			gothProviders = append(gothProviders, bitbucket.New(config.Key, config.Secret, config.CallbackURL))
-			log.Infof("Bitbucket OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
 		}
@@ -84,8 +77,17 @@ func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc(a.basePath+"/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc(a.basePath+"/login", a.handleLoginPage).Methods("GET")
 
-	router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
-	router.HandleFunc(a.basePath+"/auth/{provider}", a.handleAuth).Methods("GET")
+	if os.Getenv("APP_ENV") == "development" {
+		log.Info("Registering development authentication routes")
+		// In dev: both auth and callback just auto-authenticate
+		router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
+		router.HandleFunc(a.basePath+"/auth/{provider}", a.handleDevAuth).Methods("GET")
+	} else {
+		// Production OAuth routes
+		router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
+		router.HandleFunc(a.basePath+"/auth/{provider}", a.handleAuth).Methods("GET")
+	}
+
 	router.HandleFunc(a.basePath+"/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
 }
 
@@ -98,6 +100,30 @@ func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Reques
 		log.Info("Starting OAuth flow")
 		gothic.BeginAuthHandler(w, r)
 	}
+}
+
+func (a *AuthenticationHandler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
+	if os.Getenv("APP_ENV") != "development" {
+		http.Error(w, "Not available in production", http.StatusForbidden)
+		return
+	}
+
+	vars := mux.Vars(r)
+	provider := vars["provider"]
+
+	// Create a mock goth.User with realistic dev data
+	mockUser := goth.User{
+		UserID:      "dev-user-123",
+		Email:       "dev@superplane.local",
+		Name:        "Dev User",
+		NickName:    "devuser",
+		Provider:    provider,
+		AvatarURL:   "https://github.com/github.png", // Default GitHub avatar
+		AccessToken: "dev-token-" + provider,
+	}
+
+	log.Infof("Development mode: auto-authenticating as %s via %s", mockUser.Email, provider)
+	a.handleSuccessfulAuth(w, r, mockUser)
 }
 
 func (a *AuthenticationHandler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
@@ -446,20 +472,6 @@ var loginTemplate = `
         }
         .login-btn.github:hover {
             background: #1a1e22;
-        }
-        .login-btn.gitlab {
-            background: #fc6d26;
-            color: white;
-        }
-        .login-btn.gitlab:hover {
-            background: #e55100;
-        }
-        .login-btn.bitbucket {
-            background: #0052cc;
-            color: white;
-        }
-        .login-btn.bitbucket:hover {
-            background: #003d99;
         }
         .provider-icon {
             width: 20px;
