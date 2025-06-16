@@ -231,13 +231,10 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = grpcGatewayMux.HandlePath("GET", "/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	// Public health check
+	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
-
-	if err != nil {
-		return err
-	}
+	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with authentication
 	protectedGRPCHandler := s.authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
