@@ -148,7 +148,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Add protected API routes here
 	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
-	protectedRoute.HandleFunc("/api/v1/user/repo-accounts", s.handleUserAccountProviders).Methods("GET")
+	protectedRoute.HandleFunc("/api/v1/user/account-providers", s.handleUserAccountProviders).Methods("GET")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {

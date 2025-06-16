@@ -145,14 +145,14 @@ func TestServer_UserAccountProviders_Protected(t *testing.T) {
 	t.Run("without auth returns unauthorized", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method: "GET",
-			path:   "/api/v1/user/repo-accounts",
+			path:   "/api/v1/user/account-providers",
 		})
 
 		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
 	})
 
 	t.Run("with valid auth returns accounts", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/user/repo-accounts", nil)
+		req := httptest.NewRequest("GET", "/api/v1/user/account-providers", nil)
 		req.AddCookie(&http.Cookie{
 			Name:  "auth_token",
 			Value: token,
