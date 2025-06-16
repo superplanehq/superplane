@@ -207,7 +207,7 @@ func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *h
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(authUser)
 	} else {
-		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
 	}
 }
 

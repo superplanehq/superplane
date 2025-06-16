@@ -582,7 +582,6 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
 
-	// Get authenticated user from context
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
 		log.Error("WebSocket connection without authenticated user")
@@ -590,7 +589,6 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract the canvasId from the URL path variables
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
 	log.Infof("WebSocket connection for canvas ID: %s by user: %s", canvasID, user.Email)
@@ -650,7 +648,7 @@ func getBaseURL() string {
 	if baseURL == "" {
 		port := os.Getenv("PORT")
 		if port == "" {
-			port = "3000"
+			port = "8000"
 		}
 		baseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
