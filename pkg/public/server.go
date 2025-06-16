@@ -59,7 +59,7 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
-	authHandler := authentication.NewAuthHandler(jwtSigner, basePath)
+	authHandler := authentication.NewAuthHandler(jwtSigner)
 
 	// Initialize OAuth providers from environment variables
 	providers := getOAuthProviders()

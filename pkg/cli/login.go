@@ -79,7 +79,7 @@ func handleDevLogin(baseURL, provider string) {
 	fmt.Printf("🔧 Authenticating with %s in development mode...\n", provider)
 
 	client := &http.Client{Timeout: 30 * time.Second}
-	authURL := fmt.Sprintf("%s/api/v1/auth/%s", baseURL, provider)
+	authURL := fmt.Sprintf("%s/auth/%s", baseURL, provider)
 
 	req, err := http.NewRequest("GET", authURL, nil)
 	CheckWithMessage(err, "Failed to create auth request")
@@ -115,7 +115,7 @@ func handleOAuthLogin(baseURL, provider string, callbackPort int) {
 	server := startCallbackServer(callbackPort, state, tokenChan, errorChan)
 	defer server.Shutdown(context.Background())
 
-	authURL := fmt.Sprintf("%s/api/v1/auth/%s?callback_url=%s&state=%s",
+	authURL := fmt.Sprintf("%s/auth/%s?callback_url=%s&state=%s",
 		baseURL, provider, url.QueryEscape(callbackURL), state)
 
 	fmt.Printf("🌐 Opening browser for %s authentication...\n", provider)
@@ -241,7 +241,7 @@ var whoamiCmd = &cobra.Command{
 		baseURL := GetAPIURL()
 		client := &http.Client{Timeout: 30 * time.Second}
 
-		req, err := http.NewRequest("GET", baseURL+"/api/v1/auth/me", nil)
+		req, err := http.NewRequest("GET", baseURL+"/auth/me", nil)
 		CheckWithMessage(err, "Failed to create request")
 
 		req.Header.Set("Authorization", "Bearer "+token)

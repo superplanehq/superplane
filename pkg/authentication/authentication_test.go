@@ -20,7 +20,7 @@ func setupTestAuth(t *testing.T) (*AuthenticationHandler, *mux.Router) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test-client-secret")
-	handler := NewAuthHandler(signer, "")
+	handler := NewAuthHandler(signer)
 
 	// Setup test providers
 	providers := map[string]ProviderConfig{

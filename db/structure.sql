@@ -36,6 +36,27 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_providers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_providers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    provider character varying(50) NOT NULL,
+    provider_id character varying(255) NOT NULL,
+    username character varying(255),
+    email character varying(255),
+    name character varying(255),
+    avatar_url text,
+    access_token text,
+    refresh_token text,
+    token_expires_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: canvases; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -75,27 +96,6 @@ CREATE TABLE public.events (
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
     headers jsonb DEFAULT '{}'::jsonb NOT NULL
-);
-
-
---
--- Name: account_providers; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.account_providers (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    user_id uuid NOT NULL,
-    provider character varying(50) NOT NULL,
-    provider_id character varying(255) NOT NULL,
-    username character varying(255),
-    email character varying(255),
-    name character varying(255),
-    avatar_url text,
-    access_token text,
-    refresh_token text,
-    token_expires_at timestamp without time zone,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -225,6 +225,30 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
+
+
+--
+-- Name: account_providers account_providers_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
+
+
+--
 -- Name: canvases canvases_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -262,30 +286,6 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
-
-
---
--- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
-
-
---
--- Name: account_providers account_providers_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
 
 
 --
@@ -477,19 +477,19 @@ CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 
 --
--- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.event_sources
-    ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
 -- Name: account_providers account_providers_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_sources
+    ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
 
 
 --

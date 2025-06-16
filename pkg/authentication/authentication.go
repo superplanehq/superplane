@@ -20,7 +20,6 @@ import (
 
 type AuthenticationHandler struct {
 	jwtSigner *jwt.Signer
-	basePath  string
 }
 
 type AuthenticationUser struct {
@@ -39,10 +38,9 @@ type ProviderConfig struct {
 	CallbackURL string
 }
 
-func NewAuthHandler(jwtSigner *jwt.Signer, basePath string) *AuthenticationHandler {
+func NewAuthHandler(jwtSigner *jwt.Signer) *AuthenticationHandler {
 	return &AuthenticationHandler{
 		jwtSigner: jwtSigner,
-		basePath:  basePath,
 	}
 }
 
@@ -74,22 +72,22 @@ func (a *AuthenticationHandler) InitializeProviders(providers map[string]Provide
 
 // RegisterRoutes adds authentication routes to the router
 func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
-	router.HandleFunc(a.basePath+"/auth/me", a.handleMe).Methods("GET")
-	router.HandleFunc(a.basePath+"/logout", a.handleLogout).Methods("GET")
-	router.HandleFunc(a.basePath+"/login", a.handleLoginPage).Methods("GET")
+	router.HandleFunc("/auth/me", a.handleMe).Methods("GET")
+	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
+	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
 
 	if os.Getenv("APP_ENV") == "development" {
 		log.Info("Registering development authentication routes")
 		// In dev: both auth and callback just auto-authenticate
-		router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
-		router.HandleFunc(a.basePath+"/auth/{provider}", a.handleDevAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}", a.handleDevAuth).Methods("GET")
 	} else {
 		// Production OAuth routes
-		router.HandleFunc(a.basePath+"/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
-		router.HandleFunc(a.basePath+"/auth/{provider}", a.handleAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
+		router.HandleFunc("/auth/{provider}", a.handleAuth).Methods("GET")
 	}
 
-	router.HandleFunc(a.basePath+"/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
+	router.HandleFunc("/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
 }
 
 func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
@@ -226,7 +224,7 @@ func (a *AuthenticationHandler) handleDisconnectProvider(w http.ResponseWriter, 
 	}
 
 	if err := accountProvider.Delete(); err != nil {
-		log.Errorf("Error deleting repo host account: %v", err)
+		log.Errorf("Error deleting account provider: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -257,7 +255,7 @@ func (a *AuthenticationHandler) handleLogout(w http.ResponseWriter, r *http.Requ
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
 	} else {
-		http.Redirect(w, r, a.basePath+"/login", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 	}
 }
 
@@ -270,7 +268,7 @@ func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request)
 
 	accountProviders, err := user.GetAccountProviders()
 	if err != nil {
-		log.Errorf("Error getting repo host accounts: %v", err)
+		log.Errorf("Error getting account providers: %v", err)
 		accountProviders = []models.AccountProvider{}
 	}
 
@@ -301,10 +299,8 @@ func (a *AuthenticationHandler) handleLoginPage(w http.ResponseWriter, r *http.R
 	}
 
 	data := struct {
-		BasePath  string
 		Providers []string
 	}{
-		BasePath:  a.basePath,
 		Providers: providerNames,
 	}
 
@@ -422,7 +418,7 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 			if r.Header.Get("Accept") == "application/json" {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			} else {
-				http.Redirect(w, r, a.basePath+"/login", http.StatusTemporaryRedirect)
+				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 			}
 			return
 		}
@@ -507,7 +503,7 @@ const loginTemplate = `
         <div class="subtitle">Welcome back! Please sign in to continue.</div>
         
         {{range .Providers}}
-        <a href="{{$.BasePath}}/auth/{{.}}" class="login-btn {{.}}">
+        <a href="/auth/{{.}}" class="login-btn {{.}}">
             {{if eq . "github"}}
                 <svg class="provider-icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
