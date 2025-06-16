@@ -26,22 +26,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 
 service Authorization {
   //
-  // Endpoint for checking user permissions on any resource
-  // Operation is synchronous and idempotent.
-  //
-  rpc CheckPermission(CheckPermissionRequest) returns (CheckPermissionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/authorization/check"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Check permission";
-      description: "Checks if a user has permission to perform an action on a resource within a domain";
-      tags: "Authorization";
-    };
-  }
-
-  //
   // Endpoint for listing all user permissions within a domain
   // Operation is synchronous and idempotent.
   //
@@ -114,36 +98,6 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe role";
       description: "Returns detailed information about a specific role including permissions and inheritance";
-      tags: "Authorization";
-    };
-  }
-
-  //
-  // Endpoint for listing accessible organizations for a user
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListAccessibleOrganizations(ListAccessibleOrganizationsRequest) returns (ListAccessibleOrganizationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/authorization/organizations/accessible/{user_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List accessible organizations";
-      description: "Returns a list of organizations the user has access to";
-      tags: "Authorization";
-    };
-  }
-
-  //
-  // Endpoint for listing accessible canvases for a user
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListAccessibleCanvases(ListAccessibleCanvasesRequest) returns (ListAccessibleCanvasesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/authorization/canvases/accessible/{user_id}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List accessible canvases";
-      description: "Returns a list of canvases the user has access to";
       tags: "Authorization";
     };
   }
@@ -239,49 +193,6 @@ service Authorization {
       tags: "Authorization";
     };
   }
-
-  //
-  // Endpoint for listing users with a specific role in an organization
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListOrganizationUsersForRole(ListOrganizationUsersForRoleRequest) returns (ListOrganizationUsersForRoleResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/authorization/organizations/{org_id}/roles/{role}/users"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List organization users for role";
-      description: "Returns users that have a specific role within an organization";
-      tags: "Authorization";
-    };
-  }
-
-  //
-  // Endpoint for listing users with a specific role in a canvas
-  // Operation is synchronous and idempotent.
-  //
-  rpc ListCanvasUsersForRole(ListCanvasUsersForRoleRequest) returns (ListCanvasUsersForRoleResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/authorization/canvases/{canvas_id}/roles/{role}/users"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List canvas users for role";
-      description: "Returns users that have a specific role within a canvas";
-      tags: "Authorization";
-    };
-  }
-}
-
-// Core permission check messages
-message CheckPermissionRequest {
-  string user_id = 1;
-  DomainType domain_type = 2;
-  string domain_id = 3;
-  string resource = 4;
-  string action = 5;
-}
-
-message CheckPermissionResponse {
-  bool allowed = 1;
 }
 
 // User permissions listing messages
@@ -339,23 +250,6 @@ message DescribeRoleResponse {
   Role role = 1;
 }
 
-// Access listing messages
-message ListAccessibleOrganizationsRequest {
-  string user_id = 1;
-}
-
-message ListAccessibleOrganizationsResponse {
-  repeated string org_ids = 1;
-}
-
-message ListAccessibleCanvasesRequest {
-  string user_id = 1;
-}
-
-message ListAccessibleCanvasesResponse {
-  repeated string canvas_ids = 1;
-}
-
 // User roles messages
 message GetUserRolesRequest {
   string user_id = 1;
@@ -409,25 +303,6 @@ message GetGroupUsersRequest {
 }
 
 message GetGroupUsersResponse {
-  repeated string user_ids = 1;
-}
-
-// Users for role messages
-message ListOrganizationUsersForRoleRequest {
-  string org_id = 1;
-  string role = 2;
-}
-
-message ListOrganizationUsersForRoleResponse {
-  repeated string user_ids = 1;
-}
-
-message ListCanvasUsersForRoleRequest {
-  string canvas_id = 1;
-  string role = 2;
-}
-
-message ListCanvasUsersForRoleResponse {
   repeated string user_ids = 1;
 }
 

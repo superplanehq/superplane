@@ -19,10 +19,6 @@ func NewAuthorizationServer(authService authorization.Authorization) *Authorizat
 	}
 }
 
-func (s *AuthorizationServer) CheckPermission(ctx context.Context, req *pb.CheckPermissionRequest) (*pb.CheckPermissionResponse, error) {
-	return auth.CheckPermission(ctx, req, s.authService)
-}
-
 func (s *AuthorizationServer) ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest) (*pb.ListUserPermissionsResponse, error) {
 	return auth.ListUserPermissions(ctx, req, s.authService)
 }
@@ -41,14 +37,6 @@ func (s *AuthorizationServer) ListRoles(ctx context.Context, req *pb.ListRolesRe
 
 func (s *AuthorizationServer) DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest) (*pb.DescribeRoleResponse, error) {
 	return auth.DescribeRole(ctx, req, s.authService)
-}
-
-func (s *AuthorizationServer) ListAccessibleOrganizations(ctx context.Context, req *pb.ListAccessibleOrganizationsRequest) (*pb.ListAccessibleOrganizationsResponse, error) {
-	return auth.ListAccessibleOrganizations(ctx, req, s.authService)
-}
-
-func (s *AuthorizationServer) ListAccessibleCanvases(ctx context.Context, req *pb.ListAccessibleCanvasesRequest) (*pb.ListAccessibleCanvasesResponse, error) {
-	return auth.ListAccessibleCanvases(ctx, req, s.authService)
 }
 
 func (s *AuthorizationServer) GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest) (*pb.GetUserRolesResponse, error) {
@@ -73,12 +61,4 @@ func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *p
 
 func (s *AuthorizationServer) GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest) (*pb.GetGroupUsersResponse, error) {
 	return auth.GetGroupUsers(ctx, req, s.authService)
-}
-
-func (s *AuthorizationServer) ListOrganizationUsersForRole(ctx context.Context, req *pb.ListOrganizationUsersForRoleRequest) (*pb.ListOrganizationUsersForRoleResponse, error) {
-	return auth.ListOrganizationUsersForRole(ctx, req, s.authService)
-}
-
-func (s *AuthorizationServer) ListCanvasUsersForRole(ctx context.Context, req *pb.ListCanvasUsersForRoleRequest) (*pb.ListCanvasUsersForRoleResponse, error) {
-	return auth.ListCanvasUsersForRole(ctx, req, s.authService)
 }
