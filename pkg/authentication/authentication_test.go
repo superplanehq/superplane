@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,7 +21,7 @@ func setupTestAuth(t *testing.T) (*Handler, *mux.Router) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test-client-secret")
-	handler := NewHandler(signer, "")
+	handler := NewHandler(signer, crypto.NewNoOpEncryptor(), "")
 
 	// Setup test providers
 	providers := map[string]ProviderConfig{

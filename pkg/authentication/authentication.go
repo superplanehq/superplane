@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -12,12 +13,14 @@ import (
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type Handler struct {
 	jwtSigner *jwt.Signer
+	encryptor crypto.Encryptor
 	isDev     bool
 }
 
@@ -54,9 +57,10 @@ type GitHubUserInfo struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func NewHandler(jwtSigner *jwt.Signer, appEnv string) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, appEnv string) *Handler {
 	return &Handler{
 		jwtSigner: jwtSigner,
+		encryptor: encryptor,
 		isDev:     appEnv == "development",
 	}
 }
@@ -147,11 +151,18 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte("github"))
+	if err != nil {
+		log.Errorf("Failed to encrypt access token: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	accountProvider.AccessToken = string(encryptedAccessToken)
+
 	accountProvider.Username = githubUser.Login
 	accountProvider.Email = githubUser.Email
 	accountProvider.Name = githubUser.Name
 	accountProvider.AvatarURL = githubUser.AvatarURL
-	accountProvider.AccessToken = req.GitHubToken
 
 	if err := accountProvider.Update(); err != nil {
 		log.Errorf("Failed to update account provider: %v", err)
@@ -385,11 +396,16 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.AccountProvider, error) {
 	accountProvider, err := models.FindAccountProviderByProviderID(gothUser.Provider, gothUser.UserID)
 	if err == nil {
+
+		encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Provider))
+		if err != nil {
+			return nil, nil, err
+		}
+		accountProvider.AccessToken = string(encryptedAccessToken)
 		accountProvider.Username = gothUser.NickName
 		accountProvider.Email = gothUser.Email
 		accountProvider.Name = gothUser.Name
 		accountProvider.AvatarURL = gothUser.AvatarURL
-		accountProvider.AccessToken = gothUser.AccessToken
 		accountProvider.RefreshToken = gothUser.RefreshToken
 		if !gothUser.ExpiresAt.IsZero() {
 			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt

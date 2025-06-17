@@ -61,7 +61,7 @@ func (s *Server) WebsocketHub() *ws.Hub {
 func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
-	authHandler := authentication.NewHandler(jwtSigner, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
 
 	// Initialize OAuth providers from environment variables
 	providers := getOAuthProviders()
