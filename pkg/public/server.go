@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
@@ -123,20 +124,20 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbAuth.RegisterAuthorizationHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r2 := new(http.Request)
-		*r2 = *r
-		r2.URL = new(url.URL)
-		*r2.URL = *r.URL
-		grpcGatewayMux.ServeHTTP(w, r2)
-	}))
+	protectedGRPCHandler := s.authHandler.Middleware(s.grpcGatewayHandler(grpcGatewayMux))
 
+	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 
 	return nil
