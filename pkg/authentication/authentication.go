@@ -166,9 +166,8 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dbUser.Email = githubUser.Email
 	dbUser.Name = githubUser.Name
-	dbUser.AvatarURL = githubUser.AvatarURL
+
 	if err := dbUser.Update(); err != nil {
 		log.Warnf("Failed to update user info: %v", err)
 	}
@@ -183,9 +182,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 	accountProviders, _ := dbUser.GetAccountProviders()
 	authUser := User{
 		ID:               dbUser.ID.String(),
-		Email:            dbUser.Email,
 		Name:             dbUser.Name,
-		AvatarURL:        dbUser.AvatarURL,
 		CreatedAt:        dbUser.CreatedAt,
 		AccountProviders: accountProviders,
 	}
@@ -195,7 +192,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		User:        authUser,
 	}
 
-	log.Infof("Token exchange successful for user %s (%s)", dbUser.Name, dbUser.Email)
+	log.Infof("Token exchange successful for user %s (%s)", dbUser.Name, dbUser.ID)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
@@ -302,9 +299,7 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		accountProviders, _ := dbUser.GetAccountProviders()
 		authUser := User{
 			ID:               dbUser.ID.String(),
-			Email:            dbUser.Email,
 			Name:             dbUser.Name,
-			AvatarURL:        dbUser.AvatarURL,
 			AccessToken:      token,
 			CreatedAt:        dbUser.CreatedAt,
 			AccountProviders: accountProviders,
@@ -339,7 +334,7 @@ func (a *Handler) handleDisconnectProvider(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	log.Infof("User %s disconnected %s account", user.Email, provider)
+	log.Infof("User %s disconnected %s account", user.ID, provider)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
@@ -384,9 +379,7 @@ func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 
 	authUser := User{
 		ID:               user.ID.String(),
-		Email:            user.Email,
 		Name:             user.Name,
-		AvatarURL:        user.AvatarURL,
 		CreatedAt:        user.CreatedAt,
 		AccountProviders: accountProviders,
 	}
@@ -439,9 +432,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 			return nil, nil, err
 		}
 
-		user.Email = gothUser.Email
 		user.Name = gothUser.Name
-		user.AvatarURL = gothUser.AvatarURL
 		user.Update()
 
 		return user, accountProvider, nil
@@ -450,9 +441,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 	user, err := models.FindUserByEmail(gothUser.Email)
 	if err != nil {
 		user = &models.User{
-			Email:     gothUser.Email,
-			Name:      gothUser.Name,
-			AvatarURL: gothUser.AvatarURL,
+			Name: gothUser.Name,
 		}
 
 		if err := user.Create(); err != nil {
@@ -460,7 +449,6 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		}
 	} else {
 		user.Name = gothUser.Name
-		user.AvatarURL = gothUser.AvatarURL
 		user.Update()
 	}
 
@@ -532,7 +520,6 @@ func (a *Handler) AuthMiddleware(next http.Handler) http.Handler {
 			}
 			return
 		}
-		log.Infof("User %s authenticated", user.Email)
 
 		ctx := r.Context()
 		ctx = SetUserInContext(ctx, user)

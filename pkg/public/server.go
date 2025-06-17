@@ -582,7 +582,7 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
 
-	user, ok := authentication.GetUserFromContext(r.Context())
+	_, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
 		log.Error("WebSocket connection without authenticated user")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -591,10 +591,8 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
-	log.Infof("WebSocket connection for canvas ID: %s by user: %s", canvasID, user.Email)
 
 	// TODO: implement access check once authorization is implemented
-	log.Infof("Skipping access check for user %s has access to canvas %s", user.Email, canvasID)
 
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -606,8 +604,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := s.wsHub.NewClient(ws, canvasID)
-	log.Infof("WebSocket client registered with hub for user: %s", user.Email)
-	// Wait for the client to disconnect
+
 	<-client.Done
 }
 

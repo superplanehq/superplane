@@ -10,9 +10,7 @@ import (
 
 type User struct {
 	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Email     string    `json:"email" gorm:"uniqueIndex;not null"`
 	Name      string    `json:"name"`
-	AvatarURL string    `json:"avatar_url"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

@@ -216,9 +216,7 @@ CREATE TABLE public.stages (
 
 CREATE TABLE public.users (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    email character varying(255) NOT NULL,
     name character varying(255),
-    avatar_url text,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -377,14 +375,6 @@ ALTER TABLE ONLY public.stages
 
 
 --
--- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_email_key UNIQUE (email);
-
-
---
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -404,13 +394,6 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
-
-
---
--- Name: idx_users_email; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_users_email ON public.users USING btree (email);
 
 
 --

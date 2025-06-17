@@ -2,9 +2,7 @@ BEGIN;
 
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    email VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255),
-    avatar_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -28,7 +26,6 @@ CREATE TABLE account_providers (
     UNIQUE(provider, provider_id)
 );
 
-CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_account_providers_user_id ON account_providers(user_id);
 CREATE INDEX idx_account_providers_provider ON account_providers(provider);
 

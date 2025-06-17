@@ -32,9 +32,7 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 
 	// Create test user
 	user := &models.User{
-		Email:     "test@example.com",
-		Name:      "Test User",
-		AvatarURL: "https://github.com/avatar.png",
+		Name: "Test User",
 	}
 	require.NoError(t, user.Create())
 
@@ -101,7 +99,6 @@ func TestServer_AuthMe_WithToken(t *testing.T) {
 	err := json.Unmarshal(w.Body.Bytes(), &authUser)
 	require.NoError(t, err)
 
-	assert.Equal(t, user.Email, authUser.Email)
 	assert.Equal(t, user.Name, authUser.Name)
 	assert.Len(t, authUser.AccountProviders, 1)
 }
@@ -134,7 +131,6 @@ func TestServer_UserProfile_Protected(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &profile)
 		require.NoError(t, err)
 
-		assert.Equal(t, user.Email, profile.Email)
 		assert.Equal(t, user.Name, profile.Name)
 	})
 }

@@ -40,9 +40,7 @@ func setupTestAuth(t *testing.T) (*Handler, *mux.Router) {
 
 func createTestUser(t *testing.T) *models.User {
 	user := &models.User{
-		Email:     "test@example.com",
-		Name:      "Test User",
-		AvatarURL: "https://github.com/avatar.png",
+		Name: "Test User",
 	}
 	require.NoError(t, user.Create())
 	return user
@@ -106,7 +104,6 @@ func TestHandler_Me_WithValidToken(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &authUser)
 	require.NoError(t, err)
 
-	assert.Equal(t, user.Email, authUser.Email)
 	assert.Equal(t, user.Name, authUser.Name)
 	assert.Len(t, authUser.AccountProviders, 1)
 	assert.Equal(t, "github", authUser.AccountProviders[0].Provider)
@@ -192,13 +189,12 @@ func TestHandler_AuthMiddleware(t *testing.T) {
 	require.NoError(t, err)
 
 	testHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, ok := GetUserFromContext(r.Context())
+		_, ok := GetUserFromContext(r.Context())
 		if !ok {
 			t.Error("User not found in context")
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(user.Email))
 	})
 
 	protectedHandler := handler.AuthMiddleware(testHandler)
@@ -213,7 +209,6 @@ func TestHandler_AuthMiddleware(t *testing.T) {
 		protectedHandler.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, user.Email, w.Body.String())
 	})
 
 	t.Run("without token", func(t *testing.T) {
@@ -243,6 +238,5 @@ func TestHandler_AuthMiddleware(t *testing.T) {
 		protectedHandler.ServeHTTP(w, req)
 
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Equal(t, user.Email, w.Body.String())
 	})
 }
