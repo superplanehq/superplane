@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -254,34 +253,6 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 	if err != nil {
 		log.Errorf("Error generating JWT: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	callbackURL := r.URL.Query().Get("callback_url")
-	state := r.URL.Query().Get("state")
-
-	if callbackURL != "" {
-		parsedURL, err := url.Parse(callbackURL)
-		if err != nil {
-			http.Error(w, "Invalid callback URL", http.StatusBadRequest)
-			return
-		}
-
-		// Security check - only allow localhost callbacks
-		if parsedURL.Hostname() != "localhost" && parsedURL.Hostname() != "127.0.0.1" {
-			http.Error(w, "Invalid callback URL - only localhost allowed", http.StatusBadRequest)
-			return
-		}
-
-		query := parsedURL.Query()
-		query.Set("token", token)
-		if state != "" {
-			query.Set("state", state)
-		}
-		parsedURL.RawQuery = query.Encode()
-
-		log.Infof("Redirecting CLI callback to: %s", parsedURL.String())
-		http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)
 		return
 	}
 
