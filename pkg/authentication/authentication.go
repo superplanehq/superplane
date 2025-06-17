@@ -151,7 +151,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte("github"))
+	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte(githubUser.Email))
 	if err != nil {
 		log.Errorf("Failed to encrypt access token: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -397,10 +397,11 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 	accountProvider, err := models.FindAccountProviderByProviderID(gothUser.Provider, gothUser.UserID)
 	if err == nil {
 
-		encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Provider))
+		encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
 		if err != nil {
 			return nil, nil, err
 		}
+
 		accountProvider.AccessToken = string(encryptedAccessToken)
 		accountProvider.Username = gothUser.NickName
 		accountProvider.Email = gothUser.Email
