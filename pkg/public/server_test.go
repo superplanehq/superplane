@@ -27,7 +27,7 @@ import (
 
 func Test__HealthCheckEndpoint(t *testing.T) {
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -42,7 +42,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	userID := uuid.New()
@@ -171,7 +171,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	userID := uuid.New()
@@ -330,7 +330,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
@@ -490,7 +490,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	checkSwaggerFiles(t)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -555,7 +555,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 func Test__GRPCGatewayRegistration(t *testing.T) {
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

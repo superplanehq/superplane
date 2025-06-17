@@ -48,6 +48,7 @@ type Server struct {
 	BasePath              string
 	wsHub                 *ws.Hub
 	authHandler           *authentication.Handler
+	isDev                 bool
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -55,11 +56,11 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
-	authHandler := authentication.NewHandler(jwtSigner)
+	authHandler := authentication.NewHandler(jwtSigner, appEnv)
 
 	// Initialize OAuth providers from environment variables
 	providers := getOAuthProviders()
@@ -81,6 +82,7 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 		BasePath:    basePath,
 		wsHub:       wsHub,
 		authHandler: authHandler,
+		isDev:       appEnv == "development",
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -257,7 +259,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
 
 	// Check if we're in development mode
-	if os.Getenv("APP_ENV") == "development" {
+	if s.isDev {
 		log.Info("Running in development mode - proxying to Vite dev server for web app")
 		s.setupDevProxy(webBasePath)
 	} else {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -19,6 +18,7 @@ import (
 
 type Handler struct {
 	jwtSigner *jwt.Signer
+	isDev     bool
 }
 
 type User struct {
@@ -54,9 +54,10 @@ type GitHubUserInfo struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func NewHandler(jwtSigner *jwt.Signer) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, appEnv string) *Handler {
 	return &Handler{
 		jwtSigner: jwtSigner,
+		isDev:     appEnv == "development",
 	}
 }
 
@@ -95,7 +96,7 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	// Token exchange route for CLI
 	router.HandleFunc("/auth/token/exchange", a.handleTokenExchange).Methods("POST")
 
-	if os.Getenv("APP_ENV") == "development" {
+	if a.isDev {
 		log.Info("Registering development authentication routes")
 		// In dev: both auth and callback just auto-authenticate
 		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
@@ -207,7 +208,7 @@ func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
-	if os.Getenv("APP_ENV") != "development" {
+	if !a.isDev {
 		http.Error(w, "Not available in production", http.StatusForbidden)
 		return
 	}
