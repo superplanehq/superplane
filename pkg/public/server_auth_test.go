@@ -97,7 +97,7 @@ func TestServer_AuthMe_WithToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var authUser authentication.AuthenticationUser
+	var authUser authentication.User
 	err := json.Unmarshal(w.Body.Bytes(), &authUser)
 	require.NoError(t, err)
 

@@ -18,11 +18,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-type AuthenticationHandler struct {
+type Handler struct {
 	jwtSigner *jwt.Signer
 }
 
-type AuthenticationUser struct {
+type User struct {
 	ID               string                   `json:"id"`
 	Email            string                   `json:"email"`
 	Name             string                   `json:"name"`
@@ -43,8 +43,8 @@ type TokenExchangeRequest struct {
 }
 
 type TokenExchangeResponse struct {
-	AccessToken string             `json:"access_token"`
-	User        AuthenticationUser `json:"user"`
+	AccessToken string `json:"access_token"`
+	User        User   `json:"user"`
 }
 
 type GitHubUserInfo struct {
@@ -55,14 +55,14 @@ type GitHubUserInfo struct {
 	AvatarURL string `json:"avatar_url"`
 }
 
-func NewAuthHandler(jwtSigner *jwt.Signer) *AuthenticationHandler {
-	return &AuthenticationHandler{
+func NewHandler(jwtSigner *jwt.Signer) *Handler {
+	return &Handler{
 		jwtSigner: jwtSigner,
 	}
 }
 
 // InitializeProviders sets up the OAuth providers
-func (a *AuthenticationHandler) InitializeProviders(providers map[string]ProviderConfig) {
+func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 	var gothProviders []goth.Provider
 
 	for providerName, config := range providers {
@@ -88,7 +88,7 @@ func (a *AuthenticationHandler) InitializeProviders(providers map[string]Provide
 }
 
 // RegisterRoutes adds authentication routes to the router
-func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
+func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/auth/me", a.handleMe).Methods("GET")
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
@@ -110,7 +110,7 @@ func (a *AuthenticationHandler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
 }
 
-func (a *AuthenticationHandler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 	var req TokenExchangeRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
@@ -181,7 +181,7 @@ func (a *AuthenticationHandler) handleTokenExchange(w http.ResponseWriter, r *ht
 	}
 
 	accountProviders, _ := dbUser.GetAccountProviders()
-	authUser := AuthenticationUser{
+	authUser := User{
 		ID:               dbUser.ID.String(),
 		Email:            dbUser.Email,
 		Name:             dbUser.Name,
@@ -200,7 +200,7 @@ func (a *AuthenticationHandler) handleTokenExchange(w http.ResponseWriter, r *ht
 	json.NewEncoder(w).Encode(response)
 }
 
-func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
 	if gothUser, err := gothic.CompleteUserAuth(w, r); err == nil {
 		log.Infof("User already authenticated: %s", gothUser.Email)
 		a.handleSuccessfulAuth(w, r, gothUser)
@@ -210,7 +210,7 @@ func (a *AuthenticationHandler) handleAuth(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (a *AuthenticationHandler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("APP_ENV") != "development" {
 		http.Error(w, "Not available in production", http.StatusForbidden)
 		return
@@ -233,7 +233,7 @@ func (a *AuthenticationHandler) handleDevAuth(w http.ResponseWriter, r *http.Req
 	a.handleSuccessfulAuth(w, r, mockUser)
 }
 
-func (a *AuthenticationHandler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
 		log.Errorf("Authentication error: %v", err)
@@ -245,7 +245,7 @@ func (a *AuthenticationHandler) handleAuthCallback(w http.ResponseWriter, r *htt
 	a.handleSuccessfulAuth(w, r, gothUser)
 }
 
-func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
 	dbUser, _, err := a.findOrCreateUserAndAccount(gothUser)
 	if err != nil {
 		log.Errorf("Error creating/finding user and account: %v", err)
@@ -300,7 +300,7 @@ func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *h
 
 	if r.Header.Get("Accept") == "application/json" {
 		accountProviders, _ := dbUser.GetAccountProviders()
-		authUser := AuthenticationUser{
+		authUser := User{
 			ID:               dbUser.ID.String(),
 			Email:            dbUser.Email,
 			Name:             dbUser.Name,
@@ -317,7 +317,7 @@ func (a *AuthenticationHandler) handleSuccessfulAuth(w http.ResponseWriter, r *h
 	}
 }
 
-func (a *AuthenticationHandler) handleDisconnectProvider(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleDisconnectProvider(w http.ResponseWriter, r *http.Request) {
 	user, err := a.getUserFromRequest(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -347,7 +347,7 @@ func (a *AuthenticationHandler) handleDisconnectProvider(w http.ResponseWriter, 
 	})
 }
 
-func (a *AuthenticationHandler) handleLogout(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 	gothic.Logout(w, r)
 
 	// Clear the auth cookie
@@ -369,7 +369,7 @@ func (a *AuthenticationHandler) handleLogout(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	user, err := a.getUserFromRequest(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -382,7 +382,7 @@ func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request)
 		accountProviders = []models.AccountProvider{}
 	}
 
-	authUser := AuthenticationUser{
+	authUser := User{
 		ID:               user.ID.String(),
 		Email:            user.Email,
 		Name:             user.Name,
@@ -395,7 +395,7 @@ func (a *AuthenticationHandler) handleMe(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(authUser)
 }
 
-func (a *AuthenticationHandler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
+func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	t, err := template.New("login").Parse(loginTemplate)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -417,7 +417,7 @@ func (a *AuthenticationHandler) handleLoginPage(w http.ResponseWriter, r *http.R
 	t.Execute(w, data)
 }
 
-func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.AccountProvider, error) {
+func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.AccountProvider, error) {
 	accountProvider, err := models.FindAccountProviderByProviderID(gothUser.Provider, gothUser.UserID)
 	if err == nil {
 		accountProvider.Username = gothUser.NickName
@@ -487,7 +487,7 @@ func (a *AuthenticationHandler) findOrCreateUserAndAccount(gothUser goth.User) (
 	return user, accountProvider, nil
 }
 
-func (a *AuthenticationHandler) getUserFromRequest(r *http.Request) (*models.User, error) {
+func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	cookie, err := r.Cookie("auth_token")
 	var token string
 
@@ -520,7 +520,7 @@ func (a *AuthenticationHandler) getUserFromRequest(r *http.Request) (*models.Use
 	return user, nil
 }
 
-func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
+func (a *Handler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := a.getUserFromRequest(r)
 		if err != nil {
@@ -540,7 +540,7 @@ func (a *AuthenticationHandler) AuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *AuthenticationHandler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
+func (a *Handler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
 	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
 	if err != nil {
 		return nil, err

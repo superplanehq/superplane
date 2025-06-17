@@ -16,11 +16,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func setupTestAuth(t *testing.T) (*AuthenticationHandler, *mux.Router) {
+func setupTestAuth(t *testing.T) (*Handler, *mux.Router) {
 	require.NoError(t, database.TruncateTables())
 
 	signer := jwt.NewSigner("test-client-secret")
-	handler := NewAuthHandler(signer)
+	handler := NewHandler(signer)
 
 	// Setup test providers
 	providers := map[string]ProviderConfig{
@@ -62,7 +62,7 @@ func createTestAccountProvider(t *testing.T, userID uuid.UUID) *models.AccountPr
 	return account
 }
 
-func TestAuthenticationHandler_Login(t *testing.T) {
+func TestHandler_Login(t *testing.T) {
 	_, router := setupTestAuth(t)
 
 	req := httptest.NewRequest("GET", "/login", nil)
@@ -74,7 +74,7 @@ func TestAuthenticationHandler_Login(t *testing.T) {
 	assert.Contains(t, w.Body.String(), "Continue with GitHub")
 }
 
-func TestAuthenticationHandler_Me_Unauthorized(t *testing.T) {
+func TestHandler_Me_Unauthorized(t *testing.T) {
 	_, router := setupTestAuth(t)
 
 	req := httptest.NewRequest("GET", "/auth/me", nil)
@@ -84,7 +84,7 @@ func TestAuthenticationHandler_Me_Unauthorized(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
 
-func TestAuthenticationHandler_Me_WithValidToken(t *testing.T) {
+func TestHandler_Me_WithValidToken(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
 	createTestAccountProvider(t, user.ID)
@@ -102,7 +102,7 @@ func TestAuthenticationHandler_Me_WithValidToken(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var authUser AuthenticationUser
+	var authUser User
 	err = json.Unmarshal(w.Body.Bytes(), &authUser)
 	require.NoError(t, err)
 
@@ -112,7 +112,7 @@ func TestAuthenticationHandler_Me_WithValidToken(t *testing.T) {
 	assert.Equal(t, "github", authUser.AccountProviders[0].Provider)
 }
 
-func TestAuthenticationHandler_DisconnectProvider(t *testing.T) {
+func TestHandler_DisconnectProvider(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
 	account := createTestAccountProvider(t, user.ID)
@@ -135,7 +135,7 @@ func TestAuthenticationHandler_DisconnectProvider(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestAuthenticationHandler_DisconnectProvider_NotFound(t *testing.T) {
+func TestHandler_DisconnectProvider_NotFound(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
 
@@ -153,7 +153,7 @@ func TestAuthenticationHandler_DisconnectProvider_NotFound(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-func TestAuthenticationHandler_Logout(t *testing.T) {
+func TestHandler_Logout(t *testing.T) {
 	handler, router := setupTestAuth(t)
 	user := createTestUser(t)
 
@@ -184,7 +184,7 @@ func TestAuthenticationHandler_Logout(t *testing.T) {
 	assert.Equal(t, -1, authCookie.MaxAge)
 }
 
-func TestAuthenticationHandler_AuthMiddleware(t *testing.T) {
+func TestHandler_AuthMiddleware(t *testing.T) {
 	handler, _ := setupTestAuth(t)
 	user := createTestUser(t)
 

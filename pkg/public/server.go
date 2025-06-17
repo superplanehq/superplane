@@ -47,7 +47,7 @@ type Server struct {
 	Router                *mux.Router
 	BasePath              string
 	wsHub                 *ws.Hub
-	authHandler           *authentication.AuthenticationHandler
+	authHandler           *authentication.Handler
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -59,7 +59,7 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 	// Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
-	authHandler := authentication.NewAuthHandler(jwtSigner)
+	authHandler := authentication.NewHandler(jwtSigner)
 
 	// Initialize OAuth providers from environment variables
 	providers := getOAuthProviders()
