@@ -508,7 +508,7 @@ func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	return user, nil
 }
 
-func (a *Handler) AuthMiddleware(next http.Handler) http.Handler {
+func (a *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := a.getUserFromRequest(r)
 		if err != nil {

@@ -144,7 +144,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Protected routes (authentication required)
 	//
 	protectedRoute := r.NewRoute().Subrouter()
-	protectedRoute.Use(s.authHandler.AuthMiddleware)
+	protectedRoute.Use(s.authHandler.Middleware)
 
 	// Add protected API routes here
 	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
@@ -236,7 +236,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	protectedGRPCHandler := s.authHandler.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := new(http.Request)
 		*r2 = *r
 		r2.URL = new(url.URL)
@@ -253,7 +253,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	log.Infof("Registering web routes with base path: %s", webBasePath)
 
 	// WebSocket endpoint - protected by authentication
-	protectedWSHandler := s.authHandler.AuthMiddleware(http.HandlerFunc(s.handleWebSocket))
+	protectedWSHandler := s.authHandler.Middleware(http.HandlerFunc(s.handleWebSocket))
 	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
 
 	// Check if we're in development mode
@@ -266,7 +266,7 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
 
 		// Protect the main web application with authentication
-		protectedWebHandler := s.authHandler.AuthMiddleware(handler)
+		protectedWebHandler := s.authHandler.Middleware(handler)
 		s.Router.PathPrefix(webBasePath).Handler(protectedWebHandler)
 
 		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
@@ -636,7 +636,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	protectedProxy := s.authHandler.AuthMiddleware(proxyHandler)
+	protectedProxy := s.authHandler.Middleware(proxyHandler)
 	s.Router.PathPrefix(webBasePath).Handler(protectedProxy)
 }
 

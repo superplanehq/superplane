@@ -181,7 +181,7 @@ func TestHandler_Logout(t *testing.T) {
 	assert.Equal(t, -1, authCookie.MaxAge)
 }
 
-func TestHandler_AuthMiddleware(t *testing.T) {
+func TestHandler_Middleware(t *testing.T) {
 	handler, _ := setupTestAuth(t)
 	user := createTestUser(t)
 
@@ -197,7 +197,7 @@ func TestHandler_AuthMiddleware(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	protectedHandler := handler.AuthMiddleware(testHandler)
+	protectedHandler := handler.Middleware(testHandler)
 
 	t.Run("with valid token", func(t *testing.T) {
 		req := httptest.NewRequest("GET", "/protected", nil)
