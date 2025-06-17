@@ -28,142 +28,6 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/authorization/canvases/accessible/{userId}": {
-      "get": {
-        "summary": "List accessible canvases",
-        "description": "Returns a list of canvases the user has access to",
-        "operationId": "Authorization_ListAccessibleCanvases",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListAccessibleCanvasesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/canvases/{canvasId}/roles/{role}/users": {
-      "get": {
-        "summary": "List canvas users for role",
-        "description": "Returns users that have a specific role within a canvas",
-        "operationId": "Authorization_ListCanvasUsersForRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListCanvasUsersForRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "role",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/check": {
-      "post": {
-        "summary": "Check permission",
-        "description": "Checks if a user has permission to perform an action on a resource within a domain",
-        "operationId": "Authorization_CheckPermission",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCheckPermissionResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCheckPermissionRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/organizations/accessible/{userId}": {
-      "get": {
-        "summary": "List accessible organizations",
-        "description": "Returns a list of organizations the user has access to",
-        "operationId": "Authorization_ListAccessibleOrganizations",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListAccessibleOrganizationsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/authorization/organizations/{orgId}/groups": {
       "get": {
         "summary": "List organization groups",
@@ -350,44 +214,6 @@
           },
           {
             "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/organizations/{orgId}/roles/{role}/users": {
-      "get": {
-        "summary": "List organization users for role",
-        "description": "Returns users that have a specific role within an organization",
-        "operationId": "Authorization_ListOrganizationUsersForRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListOrganizationUsersForRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "orgId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "role",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1375,35 +1201,6 @@
     "AuthorizationAssignRoleResponse": {
       "type": "object"
     },
-    "AuthorizationCheckPermissionRequest": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "resource": {
-          "type": "string"
-        },
-        "action": {
-          "type": "string"
-        }
-      },
-      "title": "Core permission check messages"
-    },
-    "AuthorizationCheckPermissionResponse": {
-      "type": "object",
-      "properties": {
-        "allowed": {
-          "type": "boolean"
-        }
-      }
-    },
     "AuthorizationCreateGroupBody": {
       "type": "object",
       "properties": {
@@ -1469,54 +1266,10 @@
         }
       }
     },
-    "AuthorizationListAccessibleCanvasesResponse": {
-      "type": "object",
-      "properties": {
-        "canvasIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "AuthorizationListAccessibleOrganizationsResponse": {
-      "type": "object",
-      "properties": {
-        "orgIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "AuthorizationListCanvasUsersForRoleResponse": {
-      "type": "object",
-      "properties": {
-        "userIds": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "AuthorizationListOrganizationGroupsResponse": {
       "type": "object",
       "properties": {
         "groups": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "AuthorizationListOrganizationUsersForRoleResponse": {
-      "type": "object",
-      "properties": {
-        "userIds": {
           "type": "array",
           "items": {
             "type": "string"

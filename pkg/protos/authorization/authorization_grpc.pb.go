@@ -19,31 +19,23 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Authorization_CheckPermission_FullMethodName              = "/Superplane.Authorization.Authorization/CheckPermission"
-	Authorization_ListUserPermissions_FullMethodName          = "/Superplane.Authorization.Authorization/ListUserPermissions"
-	Authorization_AssignRole_FullMethodName                   = "/Superplane.Authorization.Authorization/AssignRole"
-	Authorization_RemoveRole_FullMethodName                   = "/Superplane.Authorization.Authorization/RemoveRole"
-	Authorization_ListRoles_FullMethodName                    = "/Superplane.Authorization.Authorization/ListRoles"
-	Authorization_DescribeRole_FullMethodName                 = "/Superplane.Authorization.Authorization/DescribeRole"
-	Authorization_ListAccessibleOrganizations_FullMethodName  = "/Superplane.Authorization.Authorization/ListAccessibleOrganizations"
-	Authorization_ListAccessibleCanvases_FullMethodName       = "/Superplane.Authorization.Authorization/ListAccessibleCanvases"
-	Authorization_GetUserRoles_FullMethodName                 = "/Superplane.Authorization.Authorization/GetUserRoles"
-	Authorization_CreateGroup_FullMethodName                  = "/Superplane.Authorization.Authorization/CreateGroup"
-	Authorization_AddUserToGroup_FullMethodName               = "/Superplane.Authorization.Authorization/AddUserToGroup"
-	Authorization_RemoveUserFromGroup_FullMethodName          = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
-	Authorization_ListOrganizationGroups_FullMethodName       = "/Superplane.Authorization.Authorization/ListOrganizationGroups"
-	Authorization_GetGroupUsers_FullMethodName                = "/Superplane.Authorization.Authorization/GetGroupUsers"
-	Authorization_ListOrganizationUsersForRole_FullMethodName = "/Superplane.Authorization.Authorization/ListOrganizationUsersForRole"
-	Authorization_ListCanvasUsersForRole_FullMethodName       = "/Superplane.Authorization.Authorization/ListCanvasUsersForRole"
+	Authorization_ListUserPermissions_FullMethodName    = "/Superplane.Authorization.Authorization/ListUserPermissions"
+	Authorization_AssignRole_FullMethodName             = "/Superplane.Authorization.Authorization/AssignRole"
+	Authorization_RemoveRole_FullMethodName             = "/Superplane.Authorization.Authorization/RemoveRole"
+	Authorization_ListRoles_FullMethodName              = "/Superplane.Authorization.Authorization/ListRoles"
+	Authorization_DescribeRole_FullMethodName           = "/Superplane.Authorization.Authorization/DescribeRole"
+	Authorization_GetUserRoles_FullMethodName           = "/Superplane.Authorization.Authorization/GetUserRoles"
+	Authorization_CreateGroup_FullMethodName            = "/Superplane.Authorization.Authorization/CreateGroup"
+	Authorization_AddUserToGroup_FullMethodName         = "/Superplane.Authorization.Authorization/AddUserToGroup"
+	Authorization_RemoveUserFromGroup_FullMethodName    = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
+	Authorization_ListOrganizationGroups_FullMethodName = "/Superplane.Authorization.Authorization/ListOrganizationGroups"
+	Authorization_GetGroupUsers_FullMethodName          = "/Superplane.Authorization.Authorization/GetGroupUsers"
 )
 
 // AuthorizationClient is the client API for Authorization service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthorizationClient interface {
-	// Endpoint for checking user permissions on any resource
-	// Operation is synchronous and idempotent.
-	CheckPermission(ctx context.Context, in *CheckPermissionRequest, opts ...grpc.CallOption) (*CheckPermissionResponse, error)
 	// Endpoint for listing all user permissions within a domain
 	// Operation is synchronous and idempotent.
 	ListUserPermissions(ctx context.Context, in *ListUserPermissionsRequest, opts ...grpc.CallOption) (*ListUserPermissionsResponse, error)
@@ -59,12 +51,6 @@ type AuthorizationClient interface {
 	// Endpoint for describing a specific role
 	// Operation is synchronous and idempotent.
 	DescribeRole(ctx context.Context, in *DescribeRoleRequest, opts ...grpc.CallOption) (*DescribeRoleResponse, error)
-	// Endpoint for listing accessible organizations for a user
-	// Operation is synchronous and idempotent.
-	ListAccessibleOrganizations(ctx context.Context, in *ListAccessibleOrganizationsRequest, opts ...grpc.CallOption) (*ListAccessibleOrganizationsResponse, error)
-	// Endpoint for listing accessible canvases for a user
-	// Operation is synchronous and idempotent.
-	ListAccessibleCanvases(ctx context.Context, in *ListAccessibleCanvasesRequest, opts ...grpc.CallOption) (*ListAccessibleCanvasesResponse, error)
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(ctx context.Context, in *GetUserRolesRequest, opts ...grpc.CallOption) (*GetUserRolesResponse, error)
@@ -83,12 +69,6 @@ type AuthorizationClient interface {
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error)
-	// Endpoint for listing users with a specific role in an organization
-	// Operation is synchronous and idempotent.
-	ListOrganizationUsersForRole(ctx context.Context, in *ListOrganizationUsersForRoleRequest, opts ...grpc.CallOption) (*ListOrganizationUsersForRoleResponse, error)
-	// Endpoint for listing users with a specific role in a canvas
-	// Operation is synchronous and idempotent.
-	ListCanvasUsersForRole(ctx context.Context, in *ListCanvasUsersForRoleRequest, opts ...grpc.CallOption) (*ListCanvasUsersForRoleResponse, error)
 }
 
 type authorizationClient struct {
@@ -97,16 +77,6 @@ type authorizationClient struct {
 
 func NewAuthorizationClient(cc grpc.ClientConnInterface) AuthorizationClient {
 	return &authorizationClient{cc}
-}
-
-func (c *authorizationClient) CheckPermission(ctx context.Context, in *CheckPermissionRequest, opts ...grpc.CallOption) (*CheckPermissionResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CheckPermissionResponse)
-	err := c.cc.Invoke(ctx, Authorization_CheckPermission_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *authorizationClient) ListUserPermissions(ctx context.Context, in *ListUserPermissionsRequest, opts ...grpc.CallOption) (*ListUserPermissionsResponse, error) {
@@ -153,26 +123,6 @@ func (c *authorizationClient) DescribeRole(ctx context.Context, in *DescribeRole
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DescribeRoleResponse)
 	err := c.cc.Invoke(ctx, Authorization_DescribeRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *authorizationClient) ListAccessibleOrganizations(ctx context.Context, in *ListAccessibleOrganizationsRequest, opts ...grpc.CallOption) (*ListAccessibleOrganizationsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListAccessibleOrganizationsResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListAccessibleOrganizations_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *authorizationClient) ListAccessibleCanvases(ctx context.Context, in *ListAccessibleCanvasesRequest, opts ...grpc.CallOption) (*ListAccessibleCanvasesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListAccessibleCanvasesResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListAccessibleCanvases_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -239,33 +189,10 @@ func (c *authorizationClient) GetGroupUsers(ctx context.Context, in *GetGroupUse
 	return out, nil
 }
 
-func (c *authorizationClient) ListOrganizationUsersForRole(ctx context.Context, in *ListOrganizationUsersForRoleRequest, opts ...grpc.CallOption) (*ListOrganizationUsersForRoleResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListOrganizationUsersForRoleResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListOrganizationUsersForRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *authorizationClient) ListCanvasUsersForRole(ctx context.Context, in *ListCanvasUsersForRoleRequest, opts ...grpc.CallOption) (*ListCanvasUsersForRoleResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListCanvasUsersForRoleResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListCanvasUsersForRole_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // AuthorizationServer is the server API for Authorization service.
 // All implementations should embed UnimplementedAuthorizationServer
 // for forward compatibility.
 type AuthorizationServer interface {
-	// Endpoint for checking user permissions on any resource
-	// Operation is synchronous and idempotent.
-	CheckPermission(context.Context, *CheckPermissionRequest) (*CheckPermissionResponse, error)
 	// Endpoint for listing all user permissions within a domain
 	// Operation is synchronous and idempotent.
 	ListUserPermissions(context.Context, *ListUserPermissionsRequest) (*ListUserPermissionsResponse, error)
@@ -281,12 +208,6 @@ type AuthorizationServer interface {
 	// Endpoint for describing a specific role
 	// Operation is synchronous and idempotent.
 	DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error)
-	// Endpoint for listing accessible organizations for a user
-	// Operation is synchronous and idempotent.
-	ListAccessibleOrganizations(context.Context, *ListAccessibleOrganizationsRequest) (*ListAccessibleOrganizationsResponse, error)
-	// Endpoint for listing accessible canvases for a user
-	// Operation is synchronous and idempotent.
-	ListAccessibleCanvases(context.Context, *ListAccessibleCanvasesRequest) (*ListAccessibleCanvasesResponse, error)
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error)
@@ -305,12 +226,6 @@ type AuthorizationServer interface {
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error)
-	// Endpoint for listing users with a specific role in an organization
-	// Operation is synchronous and idempotent.
-	ListOrganizationUsersForRole(context.Context, *ListOrganizationUsersForRoleRequest) (*ListOrganizationUsersForRoleResponse, error)
-	// Endpoint for listing users with a specific role in a canvas
-	// Operation is synchronous and idempotent.
-	ListCanvasUsersForRole(context.Context, *ListCanvasUsersForRoleRequest) (*ListCanvasUsersForRoleResponse, error)
 }
 
 // UnimplementedAuthorizationServer should be embedded to have
@@ -320,9 +235,6 @@ type AuthorizationServer interface {
 // pointer dereference when methods are called.
 type UnimplementedAuthorizationServer struct{}
 
-func (UnimplementedAuthorizationServer) CheckPermission(context.Context, *CheckPermissionRequest) (*CheckPermissionResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CheckPermission not implemented")
-}
 func (UnimplementedAuthorizationServer) ListUserPermissions(context.Context, *ListUserPermissionsRequest) (*ListUserPermissionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUserPermissions not implemented")
 }
@@ -337,12 +249,6 @@ func (UnimplementedAuthorizationServer) ListRoles(context.Context, *ListRolesReq
 }
 func (UnimplementedAuthorizationServer) DescribeRole(context.Context, *DescribeRoleRequest) (*DescribeRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeRole not implemented")
-}
-func (UnimplementedAuthorizationServer) ListAccessibleOrganizations(context.Context, *ListAccessibleOrganizationsRequest) (*ListAccessibleOrganizationsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAccessibleOrganizations not implemented")
-}
-func (UnimplementedAuthorizationServer) ListAccessibleCanvases(context.Context, *ListAccessibleCanvasesRequest) (*ListAccessibleCanvasesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAccessibleCanvases not implemented")
 }
 func (UnimplementedAuthorizationServer) GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserRoles not implemented")
@@ -362,12 +268,6 @@ func (UnimplementedAuthorizationServer) ListOrganizationGroups(context.Context, 
 func (UnimplementedAuthorizationServer) GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGroupUsers not implemented")
 }
-func (UnimplementedAuthorizationServer) ListOrganizationUsersForRole(context.Context, *ListOrganizationUsersForRoleRequest) (*ListOrganizationUsersForRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListOrganizationUsersForRole not implemented")
-}
-func (UnimplementedAuthorizationServer) ListCanvasUsersForRole(context.Context, *ListCanvasUsersForRoleRequest) (*ListCanvasUsersForRoleResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListCanvasUsersForRole not implemented")
-}
 func (UnimplementedAuthorizationServer) testEmbeddedByValue() {}
 
 // UnsafeAuthorizationServer may be embedded to opt out of forward compatibility for this service.
@@ -386,24 +286,6 @@ func RegisterAuthorizationServer(s grpc.ServiceRegistrar, srv AuthorizationServe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Authorization_ServiceDesc, srv)
-}
-
-func _Authorization_CheckPermission_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CheckPermissionRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthorizationServer).CheckPermission(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Authorization_CheckPermission_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).CheckPermission(ctx, req.(*CheckPermissionRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Authorization_ListUserPermissions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -492,42 +374,6 @@ func _Authorization_DescribeRole_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(AuthorizationServer).DescribeRole(ctx, req.(*DescribeRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Authorization_ListAccessibleOrganizations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAccessibleOrganizationsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthorizationServer).ListAccessibleOrganizations(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Authorization_ListAccessibleOrganizations_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListAccessibleOrganizations(ctx, req.(*ListAccessibleOrganizationsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Authorization_ListAccessibleCanvases_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListAccessibleCanvasesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthorizationServer).ListAccessibleCanvases(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Authorization_ListAccessibleCanvases_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListAccessibleCanvases(ctx, req.(*ListAccessibleCanvasesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -640,42 +486,6 @@ func _Authorization_GetGroupUsers_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_ListOrganizationUsersForRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListOrganizationUsersForRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthorizationServer).ListOrganizationUsersForRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Authorization_ListOrganizationUsersForRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListOrganizationUsersForRole(ctx, req.(*ListOrganizationUsersForRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Authorization_ListCanvasUsersForRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListCanvasUsersForRoleRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthorizationServer).ListCanvasUsersForRole(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Authorization_ListCanvasUsersForRole_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListCanvasUsersForRole(ctx, req.(*ListCanvasUsersForRoleRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // Authorization_ServiceDesc is the grpc.ServiceDesc for Authorization service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -683,10 +493,6 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Superplane.Authorization.Authorization",
 	HandlerType: (*AuthorizationServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "CheckPermission",
-			Handler:    _Authorization_CheckPermission_Handler,
-		},
 		{
 			MethodName: "ListUserPermissions",
 			Handler:    _Authorization_ListUserPermissions_Handler,
@@ -706,14 +512,6 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribeRole",
 			Handler:    _Authorization_DescribeRole_Handler,
-		},
-		{
-			MethodName: "ListAccessibleOrganizations",
-			Handler:    _Authorization_ListAccessibleOrganizations_Handler,
-		},
-		{
-			MethodName: "ListAccessibleCanvases",
-			Handler:    _Authorization_ListAccessibleCanvases_Handler,
 		},
 		{
 			MethodName: "GetUserRoles",
@@ -738,14 +536,6 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGroupUsers",
 			Handler:    _Authorization_GetGroupUsers_Handler,
-		},
-		{
-			MethodName: "ListOrganizationUsersForRole",
-			Handler:    _Authorization_ListOrganizationUsersForRole_Handler,
-		},
-		{
-			MethodName: "ListCanvasUsersForRole",
-			Handler:    _Authorization_ListCanvasUsersForRole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
