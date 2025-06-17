@@ -14,7 +14,7 @@ fi
 INTERNAL_OUT=pkg/protos
 GATEWAY_OUT=pkg/protos
 MODULE_NAME=github.com/superplanehq/superplane
-MODULES=$1
+MODULES=(${1//,/ })
 PROTO_DIR="protos"
 
 generate_gateway_files() {

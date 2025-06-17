@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/proto"
@@ -23,7 +23,7 @@ func HandleEventSourceCreated(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	// Fetch complete event source information using gRPC
-	describeEventSourceResp, err := actions.DescribeEventSource(context.Background(), &pb.DescribeEventSourceRequest{
+	describeEventSourceResp, err := eventsources.DescribeEventSource(context.Background(), &pb.DescribeEventSourceRequest{
 		CanvasIdOrName: pbMsg.CanvasId,
 		Id:             pbMsg.SourceId,
 	})

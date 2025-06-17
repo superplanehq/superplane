@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/proto"
@@ -22,7 +22,7 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to unmarshal StageUpdated message: %w", err)
 	}
 
-	describeStageResp, err := actions.DescribeStage(context.Background(), &pb.DescribeStageRequest{
+	describeStageResp, err := stages.DescribeStage(context.Background(), &pb.DescribeStageRequest{
 		CanvasIdOrName: pbMsg.CanvasId,
 		Id:             pbMsg.StageId,
 	})
@@ -32,7 +32,7 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Convert protobuf to a more websocket-friendly format
 	wsEvent := map[string]interface{}{
-		"event": "stage_updated",
+		"event":   "stage_updated",
 		"payload": describeStageResp.Stage,
 	}
 

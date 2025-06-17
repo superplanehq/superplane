@@ -1,0 +1,328 @@
+syntax = "proto3";
+
+package Superplane.Authorization;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/authorization";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Authorization API";
+    version: "1.0";
+    description: "API for the Superplane Authorization service";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Authorization {
+  //
+  // Endpoint for listing all user permissions within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/users/{user_id}/permissions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List user permissions";
+      description: "Returns all permissions a user has within a specific domain";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for assigning a role to a user in an organization or canvas
+  // Operation is synchronous and idempotent.
+  //
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/authorization/roles/assign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Assign role";
+      description: "Assigns a role to a user within an organization or canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for removing a role from a user in an organization or canvas
+  // Operation is synchronous and idempotent.
+  //
+  rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/authorization/roles/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove role";
+      description: "Removes a role from a user within an organization or canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for listing available roles within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List roles";
+      description: "Returns available roles for a specific domain type with their permissions and inheritance";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for describing a specific role
+  // Operation is synchronous and idempotent.
+  //
+  rpc DescribeRole(DescribeRoleRequest) returns (DescribeRoleResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/roles/describe"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe role";
+      description: "Returns detailed information about a specific role including permissions and inheritance";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting user roles within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/users/{user_id}/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get user roles";
+      description: "Returns the roles a user has within a specific domain";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for creating an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/authorization/organizations/{org_id}/groups"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create group";
+      description: "Creates a new group within an organization with a specific role";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for adding a user to an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc AddUserToGroup(AddUserToGroupRequest) returns (AddUserToGroupResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add user to group";
+      description: "Adds a user to an organization group";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for removing a user from an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc RemoveUserFromGroup(RemoveUserFromGroupRequest) returns (RemoveUserFromGroupResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users/{user_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove user from group";
+      description: "Removes a user from an organization group";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for listing organization groups
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListOrganizationGroups(ListOrganizationGroupsRequest) returns (ListOrganizationGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/organizations/{org_id}/groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization groups";
+      description: "Returns a list of groups within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting users in a specific group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetGroupUsers(GetGroupUsersRequest) returns (GetGroupUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get group users";
+      description: "Returns users that belong to a specific group";
+      tags: "Authorization";
+    };
+  }
+}
+
+// User permissions listing messages
+message ListUserPermissionsRequest {
+  string user_id = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+}
+
+message ListUserPermissionsResponse {
+  string user_id = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Permission permissions = 4;
+}
+
+// Role assignment messages
+message AssignRoleRequest {
+  string user_id = 1;
+  RoleAssignment role_assignment = 2;
+}
+
+message AssignRoleResponse {}
+
+message RemoveRoleRequest {
+  string user_id = 1;
+  RoleAssignment role_assignment = 2;
+}
+
+message RemoveRoleResponse {}
+
+message RoleAssignment {
+  DomainType domain_type = 1;
+  string domain_id = 2;
+  string role = 3;
+}
+
+// Role discovery messages
+message ListRolesRequest {
+  DomainType domain_type = 1;
+  string domain_id = 2;
+}
+
+message ListRolesResponse {
+  repeated Role roles = 1;
+}
+
+message DescribeRoleRequest {
+  DomainType domain_type = 1;
+  string domain_id = 2;
+  string role = 3;
+}
+
+message DescribeRoleResponse {
+  Role role = 1;
+}
+
+// User roles messages
+message GetUserRolesRequest {
+  string user_id = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+}
+
+message GetUserRolesResponse {
+  string user_id = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Role roles = 4;
+}
+
+// Group management messages
+message CreateGroupRequest {
+  string org_id = 1;
+  string group_name = 2;
+  string role = 3;
+}
+
+message CreateGroupResponse {}
+
+message AddUserToGroupRequest {
+  string org_id = 1;
+  string group_name = 2;
+  string user_id = 3;
+}
+
+message AddUserToGroupResponse {}
+
+message RemoveUserFromGroupRequest {
+  string org_id = 1;
+  string group_name = 2;
+  string user_id = 3;
+}
+
+message RemoveUserFromGroupResponse {}
+
+message ListOrganizationGroupsRequest {
+  string org_id = 1;
+}
+
+message ListOrganizationGroupsResponse {
+  repeated string groups = 1;
+}
+
+message GetGroupUsersRequest {
+  string org_id = 1;
+  string group_name = 2;
+}
+
+message GetGroupUsersResponse {
+  repeated string user_ids = 1;
+}
+
+// Core data structures
+message Role {
+  string name = 1;
+  DomainType domain_type = 2;
+  repeated Permission permissions = 3;
+  Role inherited_role = 4;
+}
+
+message Permission {
+  string resource = 1;
+  string action = 2;
+  DomainType domain_type = 3;
+}
+
+// Enums
+enum DomainType {
+  DOMAIN_TYPE_UNSPECIFIED = 0;
+  DOMAIN_TYPE_ORGANIZATION = 1;
+  DOMAIN_TYPE_CANVAS = 2;
+}

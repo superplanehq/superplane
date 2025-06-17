@@ -70,6 +70,42 @@ CREATE TABLE public.canvases (
 
 
 --
+-- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.casbin_rule (
+    id integer NOT NULL,
+    ptype character varying(100) NOT NULL,
+    v0 character varying(100),
+    v1 character varying(100),
+    v2 character varying(100),
+    v3 character varying(100),
+    v4 character varying(100),
+    v5 character varying(100)
+);
+
+
+--
+-- Name: casbin_rule_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.casbin_rule_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: casbin_rule_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
+
+
+--
 -- Name: event_sources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -244,6 +280,10 @@ ALTER TABLE ONLY public.account_providers
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
+-- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
 
 
 --
@@ -260,6 +300,14 @@ ALTER TABLE ONLY public.canvases
 
 ALTER TABLE ONLY public.canvases
     ADD CONSTRAINT canvases_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.casbin_rule
+    ADD CONSTRAINT casbin_rule_pkey PRIMARY KEY (id);
 
 
 --
@@ -394,6 +442,31 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+-- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
+
+
+--
+-- Name: idx_casbin_rule_v0; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_casbin_rule_v0 ON public.casbin_rule USING btree (v0);
+
+
+--
+-- Name: idx_casbin_rule_v1; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_casbin_rule_v1 ON public.casbin_rule USING btree (v1);
+
+
+--
+-- Name: idx_casbin_rule_v2; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --

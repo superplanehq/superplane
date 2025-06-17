@@ -18,10 +18,11 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pbSup "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -56,8 +57,7 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
-	// Create and initialize a new WebSocket hub
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
 	authHandler := authentication.NewHandler(jwtSigner, appEnv)
@@ -90,7 +90,6 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 	return server, nil
 }
 
-// getOAuthProviders reads OAuth configuration from environment variables
 func getOAuthProviders() map[string]authentication.ProviderConfig {
 	baseURL := getBaseURL()
 	providers := make(map[string]authentication.ProviderConfig)
@@ -107,8 +106,106 @@ func getOAuthProviders() map[string]authentication.ProviderConfig {
 	}
 
 	// ...Other providers must be added here
-
 	return providers
+}
+
+func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
+	ctx := context.Background()
+
+	grpcGatewayMux := runtime.NewServeMux(
+		runtime.WithIncomingHeaderMatcher(runtime.DefaultHeaderMatcher),
+	)
+
+	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
+
+	err := pbSup.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	// Public health check
+	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}).Methods("GET")
+
+	// Protect the gRPC gateway routes with authentication
+	protectedGRPCHandler := s.authHandler.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		grpcGatewayMux.ServeHTTP(w, r2)
+	}))
+
+	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
+
+	return nil
+}
+
+func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := new(http.Request)
+		*r2 = *r
+		r2.URL = new(url.URL)
+		*r2.URL = *r.URL
+		grpcGatewayMux.ServeHTTP(w, r2)
+	})
+}
+
+// RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
+func (s *Server) RegisterOpenAPIHandler() {
+	swaggerFilesPath := os.Getenv("SWAGGER_BASE_PATH")
+	if swaggerFilesPath == "" {
+		log.Errorf("SWAGGER_BASE_PATH is not set")
+		return
+	}
+
+	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) {
+		log.Errorf("API documentation directory %s does not exist", swaggerFilesPath)
+		return
+	}
+
+	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
+	})
+
+	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
+	})
+
+	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
+	log.Infof("Swagger UI available at %s", swaggerFilesPath)
+	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
+}
+
+func (s *Server) RegisterWebRoutes(webBasePath string) {
+	log.Infof("Registering web routes with base path: %s", webBasePath)
+
+	// WebSocket endpoint - protected by authentication
+	protectedWSHandler := s.authHandler.Middleware(http.HandlerFunc(s.handleWebSocket))
+	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
+
+	// Check if we're in development mode
+	if s.isDev {
+		log.Info("Running in development mode - proxying to Vite dev server for web app")
+		s.setupDevProxy(webBasePath)
+	} else {
+		log.Info("Running in production mode - serving static web assets")
+
+		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
+
+		// Protect the main web application with authentication
+		protectedWebHandler := s.authHandler.Middleware(handler)
+		s.Router.PathPrefix(webBasePath).Handler(protectedWebHandler)
+
+		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == webBasePath {
+				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
+				return
+			}
+			protectedWebHandler.ServeHTTP(w, r)
+		})
+	}
 }
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
@@ -161,7 +258,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	s.Router = r
 }
 
-// Handler for user profile
 func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
@@ -173,7 +269,6 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(user)
 }
 
-// Handler for user repository accounts
 func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
@@ -190,95 +285,6 @@ func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Reque
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(accountProviders)
-}
-
-// RegisterOpenAPIHandler adds handlers to serve the OpenAPI specification and Swagger UI
-func (s *Server) RegisterOpenAPIHandler() {
-	swaggerFilesPath := os.Getenv("SWAGGER_BASE_PATH")
-	if swaggerFilesPath == "" {
-		log.Errorf("SWAGGER_BASE_PATH is not set")
-		return
-	}
-
-	if _, err := os.Stat(swaggerFilesPath); os.IsNotExist(err) {
-		log.Errorf("API documentation directory %s does not exist", swaggerFilesPath)
-		return
-	}
-
-	s.Router.HandleFunc(s.BasePath+"/docs", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/swagger-ui.html")
-	})
-
-	s.Router.HandleFunc(s.BasePath+"/docs/superplane.swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, swaggerFilesPath+"/superplane.swagger.json")
-	})
-
-	log.Infof("OpenAPI specification available at %s", swaggerFilesPath)
-	log.Infof("Swagger UI available at %s", swaggerFilesPath)
-	log.Infof("Raw API JSON available at %s", swaggerFilesPath+"/superplane.swagger.json")
-}
-
-func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
-	ctx := context.Background()
-
-	grpcGatewayMux := runtime.NewServeMux(
-		runtime.WithIncomingHeaderMatcher(runtime.DefaultHeaderMatcher),
-	)
-
-	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
-
-	err := pb.RegisterSuperplaneHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
-	if err != nil {
-		return err
-	}
-
-	// Public health check
-	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}).Methods("GET")
-
-	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r2 := new(http.Request)
-		*r2 = *r
-		r2.URL = new(url.URL)
-		*r2.URL = *r.URL
-		grpcGatewayMux.ServeHTTP(w, r2)
-	}))
-
-	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
-
-	return nil
-}
-
-func (s *Server) RegisterWebRoutes(webBasePath string) {
-	log.Infof("Registering web routes with base path: %s", webBasePath)
-
-	// WebSocket endpoint - protected by authentication
-	protectedWSHandler := s.authHandler.Middleware(http.HandlerFunc(s.handleWebSocket))
-	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
-
-	// Check if we're in development mode
-	if s.isDev {
-		log.Info("Running in development mode - proxying to Vite dev server for web app")
-		s.setupDevProxy(webBasePath)
-	} else {
-		log.Info("Running in production mode - serving static web assets")
-
-		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
-
-		// Protect the main web application with authentication
-		protectedWebHandler := s.authHandler.Middleware(handler)
-		s.Router.PathPrefix(webBasePath).Handler(protectedWebHandler)
-
-		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == webBasePath {
-				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
-				return
-			}
-			protectedWebHandler.ServeHTTP(w, r)
-		})
-	}
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
