@@ -2,6 +2,7 @@ package authentication
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -157,7 +158,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
-	accountProvider.AccessToken = string(encryptedAccessToken)
+	accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
 
 	accountProvider.Username = githubUser.Login
 	accountProvider.Email = githubUser.Email
@@ -402,7 +403,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 			return nil, nil, err
 		}
 
-		accountProvider.AccessToken = string(encryptedAccessToken)
+		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
 		accountProvider.Username = gothUser.NickName
 		accountProvider.Email = gothUser.Email
 		accountProvider.Name = gothUser.Name
@@ -441,6 +442,11 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		user.Update()
 	}
 
+	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
+	if err != nil {
+		return nil, nil, err
+	}
+
 	accountProvider = &models.AccountProvider{
 		UserID:       user.ID,
 		Provider:     gothUser.Provider,
@@ -449,7 +455,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		Email:        gothUser.Email,
 		Name:         gothUser.Name,
 		AvatarURL:    gothUser.AvatarURL,
-		AccessToken:  gothUser.AccessToken,
+		AccessToken:  base64.StdEncoding.EncodeToString(encryptedAccessToken),
 		RefreshToken: gothUser.RefreshToken,
 	}
 
