@@ -3,12 +3,13 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
+import { SuperplaneExecution } from '@/api-client';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showOverlay, setShowOverlay] = useState(false);
-  const { selectStage } = useCanvasStore()
+  const { selectStageId } = useCanvasStore()
 
   // Filter events by their state
   const pendingEvents = useMemo(() => 
@@ -25,9 +26,43 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     props.data.queues?.filter(event => event.state === 'STATE_PROCESSED') || [], 
     [props.data.queues]
   );
+
+  const allExecutions = useMemo(() => 
+    props.data.queues?.flatMap(event => event.execution as SuperplaneExecution)
+      .filter(execution => execution)
+      .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [], 
+    [props.data.queues]
+  );
+
+  const allFinishedExecutions = useMemo(() =>
+    allExecutions
+        .filter(execution => execution?.finishedAt)
+    , [allExecutions]
+  );
+
+  const executionRunning = useMemo(() => 
+    allExecutions.some(execution => execution.state === 'STATE_STARTED'), 
+    [allExecutions]
+  );
+
+  const outputs = useMemo(() => {
+    const lastFinishedExecution = allFinishedExecutions.at(0);
+
+    return props.data.outputs.map(output => {
+      const executionOutput = lastFinishedExecution?.outputs?.find(
+        executionOutput => executionOutput.name === output.name
+      )
+      return {
+        key: output.name,
+        value: executionOutput?.value || '—',
+        required: !!output.required
+      }
+    })
+  }, [props.data.outputs, allFinishedExecutions])
+
   
   return (
-    <div className={`bg-white roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
+    <div className={`bg-white min-w-90 roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
       {/* Modal overlay for View Code */}
       <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>
@@ -42,7 +77,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         </span>
         <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
         {/* Example action button (menu) */}
-        <button onClick={() => selectStage(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
+        <button onClick={() => selectStageId(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
           <span className="material-symbols-outlined text-gray-500">more_vert</span>
         </button>
       </div>
@@ -52,18 +87,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           <span className="text-xs text-gray-500">{props.data.timestamp}</span>
         </div>
         <div className="flex flex-wrap gap-1 mb-3">
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            code: {props.data.labels && props.data.labels[0] ? props.data.labels[0] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            image: {props.data.labels && props.data.labels[1] ? props.data.labels[1] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            terraform: {props.data.labels && props.data.labels[2] ? props.data.labels[2] : '—'}
-          </span>
-          <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2">
-            type: {props.data.labels && props.data.labels[3] ? props.data.labels[3] : '—'}
-          </span>
+        {
+          outputs.map(output => (
+            <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2 max-w-50 truncate">
+              {output.key}: {output.value}
+            </span>
+          ))
+        }
         </div>
       </div>
       <div className="border-t border-gray-200 p-4">
@@ -101,8 +131,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 <div className="text-xs text-gray-600">ID: {waitingEvents[0].id!.substring(0, 8)}...</div>
               </div>
               <button 
-                onClick={() => props.data.approveStageEvent(waitingEvents[0])}
-                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                onClick={() => !executionRunning && props.data.approveStageEvent(waitingEvents[0])}
+                disabled={executionRunning}
+                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
               >
                 Approve
               </button>

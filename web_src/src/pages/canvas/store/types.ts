@@ -1,32 +1,65 @@
 import { CanvasData } from "../types";
-import { SuperplaneCanvas, SuperplaneStage, SuperplaneEventSource, SuperplaneStageEvent } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneStage, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { ReadyState } from "react-use-websocket";
+import { AllNodeType, EdgeType } from "../types/flow";
+import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
 
 // Define the store state type
 export interface CanvasState {
   canvas: SuperplaneCanvas;
   stages: StageWithEventQueue[];
-  event_sources: SuperplaneEventSource[];
+  event_sources: EventSourceWithEvents[];
   nodePositions: Record<string, { x: number, y: number }>;
-  selectedStage: StageWithEventQueue | null;
+  selectedStageId: string | null;
   webSocketConnectionStatus: ReadyState;
   
   // Actions
   initialize: (data: CanvasData) => void;
   addStage: (stage: SuperplaneStage) => void;
   updateStage: (stage: SuperplaneStage) => void;
-  addEventSource: (eventSource: SuperplaneEventSource) => void;
-  updateEventSource: (eventSource: SuperplaneEventSource) => void;
+  addEventSource: (eventSource: EventSourceWithEvents) => void;
+  updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
-  selectStage: (stageId: string) => void;
-  cleanSelectedStage: () => void;
+  selectStageId: (stageId: string) => void;
+  cleanSelectedStageId: () => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
-  
-  // State and action for event handlers setup
-  eventHandlersSetup: boolean;
-  markEventHandlersAsSetup: () => void;
+  syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
+
+  // flow fields
+  nodes: AllNodeType[];
+  edges: EdgeType[];
+  handleDragging:
+  | {
+      source: string | undefined;
+      sourceHandle: string | undefined;
+      target: string | undefined;
+      targetHandle: string | undefined;
+      type: string;
+      color: string;
+    }
+  | undefined;
+  // flow actions
+  syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
+  fitViewNode: (nodeId: string) => void;
+  onNodesChange: OnNodesChange<AllNodeType>;
+  onEdgesChange: OnEdgesChange<EdgeType>;
+  onConnect: (connection: Connection) => void;
+  setNodes: (nodes: AllNodeType[]) => void;
+  setHandleDragging: (
+    data:
+      | {
+          source: string | undefined;
+          sourceHandle: string | undefined;
+          target: string | undefined;
+          targetHandle: string | undefined;
+          type: string;
+          color: string;
+        }
+      | undefined,
+  ) => void;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>}
+export type EventSourceWithEvents = SuperplaneStage & {events: Array<SuperplaneStageEvent>}

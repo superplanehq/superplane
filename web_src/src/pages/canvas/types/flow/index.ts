@@ -7,7 +7,9 @@ import {
   SuperplaneConnection,
   ConnectionFilterOperator,
   SuperplaneCondition,
-  SuperplaneConditionType
+  SuperplaneConditionType,
+  SuperplaneInputDefinition,
+  SuperplaneOutputDefinition
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType;
@@ -16,10 +18,7 @@ export type EdgeType = Edge;
 // Event source node
 export type EventSourceNodeData = {
   id: string;
-  repoName: string;
-  repoUrl: string;
-  eventType: string;
-  release: string;
+  name: string;
   timestamp: string;
 }
 
@@ -35,6 +34,8 @@ export type StageData = {
   queues: SuperplaneStageEvent[];
   connections: SuperplaneConnection[];
   conditions: SuperplaneCondition[];
+  inputs: SuperplaneInputDefinition[];
+  outputs: SuperplaneOutputDefinition[];
   executorSpec: SuperplaneExecutorSpec;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
 }

@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/proto"
 )
 
 // HandleStageEventApproved processes a stage event approved message and forwards it to websocket clients
@@ -13,23 +15,23 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received stage_event_approved event")
 
 	// Parse the message as JSON
-	var rawMsg map[string]interface{}
-	if err := json.Unmarshal(messageBody, &rawMsg); err != nil {
+	var rawMsg pb.StageEventApproved
+	if err := proto.Unmarshal(messageBody, &rawMsg); err != nil {
 		log.Warnf("Failed to unmarshal StageEventApproved message as JSON: %v, trying to continue", err)
 		// If we can't parse it, create a minimal event
-		rawMsg = map[string]interface{}{
-			"event": "stage_event_approved",
+		rawMsg = pb.StageEventApproved{
+			EventId:  "",
+			StageId:  "",
+			CanvasId: "",
+			SourceId: "",
 		}
 	}
 
 	// Extract important fields
-	eventID, _ := rawMsg["event_id"].(string)
-	if eventID == "" {
-		eventID, _ = rawMsg["id"].(string)
-	}
-
-	stageID, _ := rawMsg["stage_id"].(string)
-	canvasID, _ := rawMsg["canvas_id"].(string)
+	eventID := rawMsg.EventId
+	stageID := rawMsg.StageId
+	canvasID := rawMsg.CanvasId
+	sourceID := rawMsg.SourceId
 
 	// Since we don't have access to the actual gRPC service anymore,
 	// we'll just use the raw message data we received
@@ -37,15 +39,8 @@ func HandleStageEventApproved(messageBody []byte, wsHub *ws.Hub) error {
 		"id":        eventID,
 		"stage_id":  stageID,
 		"canvas_id": canvasID,
+		"source_id": sourceID,
 		"approved":  true,
-	}
-
-	// Copy any additional fields from the raw message
-	for k, v := range rawMsg {
-		// Don't overwrite our existing fields
-		if _, exists := payload[k]; !exists {
-			payload[k] = v
-		}
 	}
 
 	// Create the websocket event

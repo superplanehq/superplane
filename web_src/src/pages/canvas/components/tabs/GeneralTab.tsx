@@ -12,6 +12,7 @@ interface GeneralTabProps {
   processedEvents: SuperplaneStageEvent[];
   allExecutions: SuperplaneExecution[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  executionRunning: boolean;
 }
 
 export const GeneralTab = ({
@@ -20,7 +21,8 @@ export const GeneralTab = ({
   waitingEvents,
   processedEvents,
   allExecutions,
-  approveStageEvent
+  approveStageEvent,
+  executionRunning
 }: GeneralTabProps) => {
   return (
     <div className="p-6 space-y-6">
@@ -57,6 +59,7 @@ export const GeneralTab = ({
           emptyIcon="hourglass_empty"
           onApprove={approveStageEvent}
           stageId={selectedStage.metadata!.id}
+          executionRunning={executionRunning}
         />
       )}
 

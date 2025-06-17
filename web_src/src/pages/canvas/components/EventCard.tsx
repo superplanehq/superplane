@@ -9,6 +9,7 @@ interface EventCardProps {
   approvals?: SuperplaneStageEventApproval[];
   onApprove?: () => void;
   variant?: 'pending' | 'waiting' | 'processed';
+  executionRunning?: boolean;
 }
 
 export const EventCard = ({ 
@@ -18,7 +19,8 @@ export const EventCard = ({
   stateReason, 
   approvals,
   onApprove,
-  variant = 'pending'
+  variant = 'pending',
+  executionRunning = false
 }: EventCardProps) => {
   const getVariantStyles = () => {
     switch (variant) {
@@ -75,8 +77,9 @@ export const EventCard = ({
         <div className="flex items-center space-x-2">
           {onApprove && variant === 'waiting' && (
             <button 
-              onClick={onApprove}
-              className="px-3 py-1.5 text-xs font-medium text-white rounded-md transition-colors"
+              onClick={executionRunning ? undefined : onApprove}
+              disabled={executionRunning}
+              className="px-3 py-1.5 text-xs font-medium text-white rounded-md transition-colors disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
               style={{ backgroundColor: '#2563eb' }} 
               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'} 
               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}

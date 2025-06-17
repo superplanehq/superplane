@@ -7,6 +7,7 @@ interface QueueTabProps {
   waitingEvents: SuperplaneStageEvent[];
   processedEvents: SuperplaneStageEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
+  executionRunning: boolean;
 }
 
 export const QueueTab = ({
@@ -14,7 +15,8 @@ export const QueueTab = ({
   pendingEvents,
   waitingEvents,
   processedEvents,
-  approveStageEvent
+  approveStageEvent,
+  executionRunning
 }: QueueTabProps) => {
   const renderEventInputs = (event: SuperplaneStageEvent) => {
     if (!event.inputs || event.inputs.length === 0) {
@@ -209,9 +211,10 @@ export const QueueTab = ({
                       )}
                     </div>
                     <button 
-                      onClick={() => approveStageEvent(event.id!, selectedStage.metadata!.id!)} 
-                      style={{ backgroundColor: '#2563eb' }}
-                      className="text-xs text-white px-3 py-1 rounded transition-colors bg-blue-600 hover:bg-blue-700"
+                      onClick={executionRunning ? () => {} : () => approveStageEvent(event.id!, selectedStage.metadata!.id!)} 
+                      style={{ backgroundColor: executionRunning ? '#2563eb' : '#2563eb' }}
+                      disabled={executionRunning}
+                      className="text-xs text-white px-3 py-1 rounded transition-colors bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
                     >
                       Approve
                     </button>

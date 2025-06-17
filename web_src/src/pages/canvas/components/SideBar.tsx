@@ -38,6 +38,11 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     [selectedStage.queue]
   );
 
+  const executionRunning = useMemo(() =>
+    allExecutions.some(execution => execution.state === 'STATE_STARTED'),
+    [allExecutions]
+  );
+
   // Filter events by their state
   const pendingEvents = useMemo(() =>
     selectedStage.queue?.filter(event => event.state === 'STATE_PENDING') || [],
@@ -66,6 +71,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             processedEvents={processedEvents}
             allExecutions={allExecutions}
             approveStageEvent={approveStageEvent}
+            executionRunning={executionRunning}
           />
         );
 
@@ -80,6 +86,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
             waitingEvents={waitingEvents}
             processedEvents={processedEvents}
             approveStageEvent={approveStageEvent}
+            executionRunning={executionRunning}
           />
         );
 

@@ -12,6 +12,7 @@ interface EventSectionProps {
   emptyIcon: string;
   onApprove?: (eventId: string, stageId: string) => void;
   stageId?: string;
+  executionRunning?: boolean;
 }
 
 export const EventSection = ({
@@ -24,7 +25,8 @@ export const EventSection = ({
   emptyMessage,
   emptyIcon,
   onApprove,
-  stageId
+  stageId,
+  executionRunning
 }: EventSectionProps) => {
   if (events.length === 0) {
     return (
@@ -65,6 +67,7 @@ export const EventSection = ({
               approvals={event.approvals}
               variant={variant}
               onApprove={onApprove && stageId ? () => onApprove(event.id!, stageId) : undefined}
+              executionRunning={executionRunning}
             />
           ))}
           {events.length > maxVisible && (
