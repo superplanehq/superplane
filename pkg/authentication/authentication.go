@@ -419,7 +419,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		accountProvider.AvatarURL = gothUser.AvatarURL
 		accountProvider.AccessToken = gothUser.AccessToken
 		accountProvider.RefreshToken = gothUser.RefreshToken
-		if gothUser.ExpiresAt != (time.Time{}) {
+		if !gothUser.ExpiresAt.IsZero() {
 			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
 		}
 
@@ -464,7 +464,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		RefreshToken: gothUser.RefreshToken,
 	}
 
-	if gothUser.ExpiresAt != (time.Time{}) {
+	if !gothUser.ExpiresAt.IsZero() {
 		accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
 	}
 
