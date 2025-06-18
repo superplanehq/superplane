@@ -40,7 +40,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.account_providers (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid NOT NULL,
     provider character varying(50) NOT NULL,
     provider_id character varying(255) NOT NULL,
@@ -251,7 +251,7 @@ CREATE TABLE public.stages (
 --
 
 CREATE TABLE public.users (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
