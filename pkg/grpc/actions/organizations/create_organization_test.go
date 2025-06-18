@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -15,7 +16,14 @@ import (
 
 func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
-	user := uuid.New()
+	user := models.User{
+		Name: "test-user",
+	}
+
+	err := user.Create()
+	require.NoError(t, err)
+	authService := auth.SetupTestAuthService(t)
+	ctx := context.Background()
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
 		organization := &protos.Organization{
@@ -25,10 +33,10 @@ func Test__CreateOrganization(t *testing.T) {
 			},
 		}
 
-		response, err := CreateOrganization(context.Background(), &protos.CreateOrganizationRequest{
-			RequesterId:  user.String(),
+		response, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
+			RequesterId:  user.ID.String(),
 			Organization: organization,
-		})
+		}, authService)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -38,7 +46,7 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.NotEmpty(t, response.Organization.Metadata.UpdatedAt)
 		assert.Equal(t, "test-org", response.Organization.Metadata.Name)
 		assert.Equal(t, "Test Organization", response.Organization.Metadata.DisplayName)
-		assert.Equal(t, user.String(), response.Organization.Metadata.CreatedBy)
+		assert.Equal(t, user.ID.String(), response.Organization.Metadata.CreatedBy)
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
@@ -49,10 +57,10 @@ func Test__CreateOrganization(t *testing.T) {
 			},
 		}
 
-		_, err := CreateOrganization(context.Background(), &protos.CreateOrganizationRequest{
-			RequesterId:  user.String(),
+		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
+			RequesterId:  user.ID.String(),
 			Organization: organization,
-		})
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -67,10 +75,10 @@ func Test__CreateOrganization(t *testing.T) {
 			},
 		}
 
-		_, err := CreateOrganization(context.Background(), &protos.CreateOrganizationRequest{
-			RequesterId:  user.String(),
+		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
+			RequesterId:  user.ID.String(),
 			Organization: organization,
-		})
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -86,9 +94,9 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		_, err := CreateOrganization(context.Background(), &protos.CreateOrganizationRequest{
-			RequesterId:  user.String(),
+			RequesterId:  user.ID.String(),
 			Organization: organization,
-		})
+		}, nil)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)

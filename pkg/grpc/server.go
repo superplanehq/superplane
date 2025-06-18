@@ -25,7 +25,7 @@ var (
 	customFunc recovery.RecoveryHandlerFunc
 )
 
-func RunServer(encryptor crypto.Encryptor, port int) {
+func RunServer(encryptor crypto.Encryptor, authService authorization.Authorization, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -61,13 +61,8 @@ func RunServer(encryptor crypto.Encryptor, port int) {
 	service := NewDeliveryService(encryptor)
 	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
 
-	organizationService := NewOrganizationService()
+	organizationService := NewOrganizationService(authService)
 	organizationProtos.RegisterOrganizationsServer(grpcServer, organizationService)
-
-	authService, err := authorization.NewAuthService()
-	if err != nil {
-		log.Fatalf("failed to create auth service: %v", err)
-	}
 
 	server := NewAuthorizationServer(authService)
 	authorizationProtos.RegisterAuthorizationServer(grpcServer, server)

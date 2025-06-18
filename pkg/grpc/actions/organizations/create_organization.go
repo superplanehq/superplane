@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
@@ -13,11 +14,11 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
-	requesterID, err := uuid.Parse(req.RequesterId)
-	if err != nil {
-		log.Errorf("Error reading requester id on %v for CreateOrganization: %v", req, err)
-		return nil, err
+func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, authorizationService authorization.Authorization) (*pb.CreateOrganizationResponse, error) {
+	user, userIsSet := authentication.GetUserFromContext(ctx)
+
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
 	if req.Organization == nil || req.Organization.Metadata == nil || req.Organization.Metadata.Name == "" {
@@ -28,7 +29,7 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) 
 		return nil, status.Error(codes.InvalidArgument, "organization display name is required")
 	}
 
-	organization, err := models.CreateOrganization(requesterID, req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName)
+	organization, err := models.CreateOrganization(user.ID, req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -37,6 +38,9 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) 
 		log.Errorf("Error creating organization on %v for CreateOrganization: %v", req, err)
 		return nil, err
 	}
+
+	authorizationService.SetupOrganizationRoles(organization.ID.String())
+	authorizationService.CreateOrganizationOwner(organization.ID.String(), user.ID.String())
 
 	response := &pb.CreateOrganizationResponse{
 		Organization: &pb.Organization{
