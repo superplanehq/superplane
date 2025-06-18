@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -24,6 +25,7 @@ func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, err)
 	authService := auth.SetupTestAuthService(t)
 	ctx := context.Background()
+	authentication.SetUserInContext(ctx, &user)
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
 		organization := &protos.Organization{
