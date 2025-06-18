@@ -65,7 +65,8 @@ CREATE TABLE public.canvases (
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp without time zone NOT NULL,
+    organization_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
 );
 
 
@@ -132,6 +133,20 @@ CREATE TABLE public.events (
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
     headers jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organizations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(255) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    created_by uuid NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -338,6 +353,22 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_name_key UNIQUE (name);
+
+
+--
+-- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -445,13 +476,6 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -645,7 +669,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250616111212	f
+20250618171050	f
 \.
 
 

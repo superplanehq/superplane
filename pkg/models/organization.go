@@ -16,7 +16,6 @@ type Organization struct {
 	CreatedAt   *time.Time
 	CreatedBy   uuid.UUID
 	UpdatedAt   *time.Time
-	Canvases    []Canvas `gorm:"foreignKey:OrganizationID"`
 }
 
 func (Organization) TableName() string {

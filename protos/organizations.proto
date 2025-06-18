@@ -94,8 +94,6 @@ message Organization {
   }
 
   Metadata metadata = 1;
-  // Canvases are not included in the Organization message to avoid circular references
-  // Use separate endpoints to list canvases for an organization
 }
 
 message ListOrganizationsRequest {}

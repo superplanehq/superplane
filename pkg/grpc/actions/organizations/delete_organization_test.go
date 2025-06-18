@@ -1,0 +1,90 @@
+package organizations
+
+import (
+	"context"
+	"testing"
+
+	uuid "github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
+	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func Test__DeleteOrganization(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+	userID := uuid.New()
+
+	t.Run("organization does not exist -> error", func(t *testing.T) {
+		_, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+			IdOrName:    uuid.New().String(),
+			RequesterId: userID.String(),
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, "organization not found", s.Message())
+	})
+
+	t.Run("delete organization by ID -> success", func(t *testing.T) {
+		organization, err := models.CreateOrganization(userID, "test-org-delete", "Test Organization Delete")
+		require.NoError(t, err)
+
+		response, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+			IdOrName:    organization.ID.String(),
+			RequesterId: userID.String(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+
+		// Verify organization is deleted
+		_, err = models.FindOrganizationByID(organization.ID.String())
+		assert.Error(t, err) // Should return an error because organization is deleted
+	})
+
+	t.Run("delete organization by name -> success", func(t *testing.T) {
+		organization, err := models.CreateOrganization(userID, "test-org-delete-2", "Test Organization Delete 2")
+		require.NoError(t, err)
+
+		response, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+			IdOrName:    organization.Name,
+			RequesterId: userID.String(),
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+
+		// Verify organization is deleted
+		_, err = models.FindOrganizationByName(organization.Name)
+		assert.Error(t, err) // Should return an error because organization is deleted
+	})
+
+	t.Run("empty id_or_name -> error", func(t *testing.T) {
+		_, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+			IdOrName:    "",
+			RequesterId: userID.String(),
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "id_or_name is required", s.Message())
+	})
+
+	t.Run("invalid requester ID -> error", func(t *testing.T) {
+		organization, err := models.CreateOrganization(userID, "test-org-delete-3", "Test Organization Delete 3")
+		require.NoError(t, err)
+
+		_, err = DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+			IdOrName:    organization.ID.String(),
+			RequesterId: "invalid-uuid",
+		})
+
+		assert.Error(t, err) // Should return an error for invalid UUID
+	})
+}
