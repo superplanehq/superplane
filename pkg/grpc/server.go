@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	authorizationProtos "github.com/superplanehq/superplane/pkg/protos/authorization"
+	organizationProtos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	superplaneProtos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -59,6 +60,9 @@ func RunServer(encryptor crypto.Encryptor, port int) {
 	//
 	service := NewDeliveryService(encryptor)
 	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
+
+	organizationService := NewOrganizationService()
+	organizationProtos.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	authService, err := authorization.NewAuthService()
 	if err != nil {
