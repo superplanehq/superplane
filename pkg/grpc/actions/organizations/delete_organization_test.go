@@ -42,9 +42,8 @@ func Test__DeleteOrganization(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 
-		// Verify organization is deleted
 		_, err = models.FindOrganizationByID(organization.ID.String())
-		assert.Error(t, err) // Should return an error because organization is deleted
+		assert.Error(t, err)
 	})
 
 	t.Run("delete organization by name -> success", func(t *testing.T) {
@@ -59,9 +58,8 @@ func Test__DeleteOrganization(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response)
 
-		// Verify organization is deleted
 		_, err = models.FindOrganizationByName(organization.Name)
-		assert.Error(t, err) // Should return an error because organization is deleted
+		assert.Error(t, err)
 	})
 
 	t.Run("empty id_or_name -> error", func(t *testing.T) {
@@ -85,6 +83,6 @@ func Test__DeleteOrganization(t *testing.T) {
 			RequesterId: "invalid-uuid",
 		})
 
-		assert.Error(t, err) // Should return an error for invalid UUID
+		assert.Error(t, err)
 	})
 }

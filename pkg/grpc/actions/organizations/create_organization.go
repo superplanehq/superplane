@@ -20,7 +20,6 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) 
 		return nil, err
 	}
 
-	// Extract name and display name from the Organization metadata
 	if req.Organization == nil || req.Organization.Metadata == nil || req.Organization.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "organization name is required")
 	}
@@ -39,7 +38,6 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) 
 		return nil, err
 	}
 
-	// Create response using nested structure
 	response := &pb.CreateOrganizationResponse{
 		Organization: &pb.Organization{
 			Metadata: &pb.Organization_Metadata{

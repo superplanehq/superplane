@@ -18,7 +18,6 @@ func Test__CreateOrganization(t *testing.T) {
 	user := uuid.New()
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
-		// Create an Organization with nested metadata structure
 		organization := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
 				Name:        "test-org",
@@ -43,7 +42,6 @@ func Test__CreateOrganization(t *testing.T) {
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
-		// Create an Organization with nested metadata structure
 		organization := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
 				Name:        "test-org",
