@@ -87,7 +87,9 @@ func startPublicAPI(encryptor crypto.Encryptor, jwtSigner *jwt.Signer) {
 		panic("PUBLIC_API_BASE_PATH must be set")
 	}
 
-	server, err := public.NewServer(encryptor, jwtSigner, basePath)
+	appEnv := os.Getenv("APP_ENV")
+
+	server, err := public.NewServer(encryptor, jwtSigner, basePath, appEnv)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}

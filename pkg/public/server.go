@@ -17,6 +17,8 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
+
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -47,6 +49,8 @@ type Server struct {
 	Router                *mux.Router
 	BasePath              string
 	wsHub                 *ws.Hub
+	authHandler           *authentication.Handler
+	isDev                 bool
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -54,9 +58,14 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
-	// Create and initialize a new WebSocket hub
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
+
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
+
+	// Initialize OAuth providers from environment variables
+	providers := getOAuthProviders()
+	authHandler.InitializeProviders(providers)
 
 	server := &Server{
 		timeoutHandlerTimeout: 15 * time.Second,
@@ -71,13 +80,34 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		BasePath: basePath,
-		wsHub:    wsHub,
+		BasePath:    basePath,
+		wsHub:       wsHub,
+		authHandler: authHandler,
+		isDev:       appEnv == "development",
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
 	server.InitRouter(middlewares...)
 	return server, nil
+}
+
+func getOAuthProviders() map[string]authentication.ProviderConfig {
+	baseURL := getBaseURL()
+	providers := make(map[string]authentication.ProviderConfig)
+
+	// GitHub
+	if githubKey := os.Getenv("GITHUB_CLIENT_ID"); githubKey != "" {
+		if githubSecret := os.Getenv("GITHUB_CLIENT_SECRET"); githubSecret != "" {
+			providers["github"] = authentication.ProviderConfig{
+				Key:         githubKey,
+				Secret:      githubSecret,
+				CallbackURL: fmt.Sprintf("%s/auth/github/callback", baseURL),
+			}
+		}
+	}
+
+	// ...Other providers must be added here
+	return providers
 }
 
 func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
@@ -99,19 +129,16 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = grpcGatewayMux.HandlePath("GET", "/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request, pathParams map[string]string) {
+	// Public health check
+	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-	})
+	}).Methods("GET")
 
-	if err != nil {
-		return err
-	}
+	// Protect the gRPC gateway routes with authentication
+	protectedGRPCHandler := s.authHandler.Middleware(s.grpcGatewayHandler(grpcGatewayMux))
 
-	// This is necessary because it is not possible to use the current router with
-	// runtime Mux. Runtime mux has no specification for the added paths and it the only
-	// supported tool for grpc-gateway.
-	s.Router.PathPrefix("/api/v1/canvases").Handler(s.grpcGatewayHandler(grpcGatewayMux))
-	s.Router.PathPrefix("/api/v1/authorization").Handler(s.grpcGatewayHandler(grpcGatewayMux))
+	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 
 	return nil
 }
@@ -153,27 +180,31 @@ func (s *Server) RegisterOpenAPIHandler() {
 }
 
 func (s *Server) RegisterWebRoutes(webBasePath string) {
-	// The web app routes are registered on the main router
 	log.Infof("Registering web routes with base path: %s", webBasePath)
 
-	s.Router.HandleFunc("/ws/{canvasId}", s.handleWebSocket)
+	// WebSocket endpoint - protected by authentication
+	protectedWSHandler := s.authHandler.Middleware(http.HandlerFunc(s.handleWebSocket))
+	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
 
 	// Check if we're in development mode
-	if os.Getenv("APP_ENV") == "development" {
+	if s.isDev {
 		log.Info("Running in development mode - proxying to Vite dev server for web app")
 		s.setupDevProxy(webBasePath)
 	} else {
 		log.Info("Running in production mode - serving static web assets")
 
 		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
-		s.Router.PathPrefix(webBasePath).Handler(handler)
+
+		// Protect the main web application with authentication
+		protectedWebHandler := s.authHandler.Middleware(handler)
+		s.Router.PathPrefix(webBasePath).Handler(protectedWebHandler)
 
 		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path == webBasePath {
 				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
 				return
 			}
-			handler.ServeHTTP(w, r)
+			protectedWebHandler.ServeHTTP(w, r)
 		})
 	}
 }
@@ -182,35 +213,79 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	r := mux.NewRouter().StrictSlash(true)
 	r.Use(middleware.LoggingMiddleware(log.StandardLogger()))
 
-	//
-	// Authenticated and validated routes.
-	//
-	authenticatedRoute := r.Methods(http.MethodPost).Subrouter()
+	// Register authentication routes (no auth required)
+	s.authHandler.RegisterRoutes(r)
 
-	authenticatedRoute.
+	//
+	// Public routes (no authentication required)
+	//
+	publicRoute := r.Methods(http.MethodGet, http.MethodPost).Subrouter()
+
+	// Health check
+	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
+
+	// Webhook endpoints (they have their own authentication)
+	publicRoute.
 		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	authenticatedRoute.
+	publicRoute.
 		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	authenticatedRoute.
+	publicRoute.
 		HandleFunc(s.BasePath+"/outputs", s.HandleExecutionOutputs).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	authenticatedRoute.Use(additionalMiddlewares...)
+	//
+	// Protected routes (authentication required)
+	//
+	protectedRoute := r.NewRoute().Subrouter()
+	protectedRoute.Use(s.authHandler.Middleware)
 
-	//
-	// No authentication of any kind, just a health endpoint
-	//
-	unauthenticatedRoute := r.Methods(http.MethodGet).Subrouter()
-	unauthenticatedRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
+	// Add protected API routes here
+	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
+	protectedRoute.HandleFunc("/api/v1/user/account-providers", s.handleUserAccountProviders).Methods("GET")
+
+	// Apply additional middlewares
+	for _, middleware := range additionalMiddlewares {
+		publicRoute.Use(middleware)
+		protectedRoute.Use(middleware)
+	}
 
 	s.Router = r
+}
+
+func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
+	user, ok := authentication.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(user)
+}
+
+func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
+	user, ok := authentication.GetUserFromContext(r.Context())
+	if !ok {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	accountProviders, err := user.GetAccountProviders()
+	if err != nil {
+		log.Errorf("Error getting repo host accounts: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(accountProviders)
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -516,10 +591,17 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
 
-	// Extract the canvasId from the URL path variables
+	_, ok := authentication.GetUserFromContext(r.Context())
+	if !ok {
+		log.Error("WebSocket connection without authenticated user")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
-	log.Infof("WebSocket connection for canvas ID: %s", canvasID)
+
+	// TODO: implement access check once authorization is implemented
 
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -531,48 +613,50 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := s.wsHub.NewClient(ws, canvasID)
-	log.Infof("WebSocket client registered with hub")
-	// Wait for the client to disconnect
+
 	<-client.Done
 }
 
 // setupDevProxy configures a simple reverse proxy to the Vite development server
 func (s *Server) setupDevProxy(webBasePath string) {
-	// Configure the target Vite dev server URL
 	target, err := url.Parse("http://localhost:5173")
 	if err != nil {
 		log.Fatalf("Error parsing Vite dev server URL: %v", err)
 	}
 
-	// Create a simple proxy
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
-	// Simple director modification
 	origDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
-		// Store original path for logging
 		originalPath := req.URL.Path
 
-		// Execute original director function
 		origDirector(req)
 
-		// Set host header to target
 		req.Host = target.Host
 
 		log.Infof("Proxying: %s → %s", originalPath, req.URL.Path)
 	}
 
-	// Create a handler for web app routes
 	proxyHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip API requests
 		if len(r.URL.Path) >= 4 && r.URL.Path[:4] == "/api" {
 			return
 		}
 
-		// Forward to Vite
 		proxy.ServeHTTP(w, r)
 	})
 
-	// Mount the handler to the web app path
-	s.Router.PathPrefix(webBasePath).Handler(proxyHandler)
+	protectedProxy := s.authHandler.Middleware(proxyHandler)
+	s.Router.PathPrefix(webBasePath).Handler(protectedProxy)
+}
+
+func getBaseURL() string {
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = "8000"
+		}
+		baseURL = fmt.Sprintf("http://localhost:%s", port)
+	}
+	return baseURL
 }

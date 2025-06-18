@@ -36,6 +36,27 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: account_providers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.account_providers (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid NOT NULL,
+    provider character varying(50) NOT NULL,
+    provider_id character varying(255) NOT NULL,
+    username character varying(255),
+    email character varying(255),
+    name character varying(255),
+    avatar_url text,
+    access_token text,
+    refresh_token text,
+    token_expires_at timestamp without time zone,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: canvases; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -226,10 +247,46 @@ CREATE TABLE public.stages (
 
 
 --
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(255),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_provider_provider_id_key UNIQUE (provider, provider_id);
+
+
+--
+-- Name: account_providers account_providers_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
 
 
 --
@@ -369,6 +426,35 @@ ALTER TABLE ONLY public.stages
 
 
 --
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_account_providers_provider; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_account_providers_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -457,6 +543,14 @@ CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (
 --
 
 CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
+
+
+--
+-- Name: account_providers account_providers_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -551,7 +645,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250605035651	f
+20250616111212	f
 \.
 
 

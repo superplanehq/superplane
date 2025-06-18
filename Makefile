@@ -118,7 +118,7 @@ openapi.web.client.gen:
 #
 
 cli.build:
-	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app go build -o build/cli cmd/cli/main.go
+	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X cli.GitHubClientID=$${GITHUB_CLIENT_ID:-client_id}" -o build/cli cmd/cli/main.go'
 
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
