@@ -14,7 +14,7 @@ import (
 
 func Test_ListUserPermissions(t *testing.T) {
 	r := support.Setup(t)
-	authService := setupTestAuthService(t)
+	authService := SetupTestAuthService(t)
 	ctx := context.Background()
 
 	orgID := uuid.New().String()
