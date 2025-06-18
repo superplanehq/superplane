@@ -259,6 +259,13 @@ CREATE TABLE public.users (
 
 
 --
+-- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
 -- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -280,10 +287,6 @@ ALTER TABLE ONLY public.account_providers
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
--- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
 
 
 --
@@ -442,6 +445,16 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
