@@ -95,10 +95,10 @@ func Test__CreateOrganization(t *testing.T) {
 			},
 		}
 
-		_, err := CreateOrganization(context.Background(), &protos.CreateOrganizationRequest{
+		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
 			RequesterId:  user.ID.String(),
 			Organization: organization,
-		}, nil)
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
