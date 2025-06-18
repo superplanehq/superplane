@@ -25,7 +25,7 @@ func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, err)
 	authService := auth.SetupTestAuthService(t)
 	ctx := context.Background()
-	authentication.SetUserInContext(ctx, &user)
+	ctx = authentication.SetUserInContext(ctx, &user)
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
 		organization := &protos.Organization{
