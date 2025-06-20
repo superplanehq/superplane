@@ -58,7 +58,7 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	//
 	// Initialize services exposed by this server.
 	//
-	service := NewDeliveryService(encryptor)
+	service := NewDeliveryService(encryptor, authService)
 	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
 
 	organizationService := NewOrganizationService(authService)

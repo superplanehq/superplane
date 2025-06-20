@@ -241,6 +241,22 @@ func ListCanvases() ([]Canvas, error) {
 	return canvases, nil
 }
 
+func ListCanvasesByIDs(ids []string) ([]Canvas, error) {
+	var canvases []Canvas
+
+	err := database.Conn().
+		Where("id IN (?)", ids).
+		Order("name ASC").
+		Find(&canvases).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvases, nil
+}
+
 func FindCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
