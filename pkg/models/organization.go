@@ -37,7 +37,7 @@ func ListOrganizations() ([]Organization, error) {
 	return organizations, nil
 }
 
-func ListOrganizationsByIds(ids []string) ([]Organization, error) {
+func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
 	var organizations []Organization
 
 	err := database.Conn().

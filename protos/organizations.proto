@@ -104,7 +104,6 @@ message ListOrganizationsResponse {
 
 message CreateOrganizationRequest {
   Organization organization = 1;
-  string requester_id = 2;
 }
 
 message CreateOrganizationResponse {
@@ -122,7 +121,6 @@ message DescribeOrganizationResponse {
 message UpdateOrganizationRequest {
   Organization organization = 1;
   string id_or_name = 2;
-  string requester_id = 3;
 }
 
 message UpdateOrganizationResponse {
@@ -131,7 +129,6 @@ message UpdateOrganizationResponse {
 
 message DeleteOrganizationRequest {
   string id_or_name = 1;
-  string requester_id = 2;
 }
 
 message DeleteOrganizationResponse {}

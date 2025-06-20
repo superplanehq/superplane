@@ -24,6 +24,8 @@ func Test__CreateCanvas(t *testing.T) {
 	ctx := authentication.SetUserInContext(context.Background(), &models.User{
 		ID: user,
 	})
+	org, err := models.CreateOrganization(user, "test", "test")
+	require.NoError(t, err)
 
 	t.Run("name still not used -> canvas is created", func(t *testing.T) {
 		// Create a Canvas with nested metadata structure
@@ -34,8 +36,8 @@ func Test__CreateCanvas(t *testing.T) {
 		}
 
 		response, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
-			RequesterId: user.String(),
-			Canvas:      canvas,
+			Canvas:         canvas,
+			OrganizationId: org.ID.String(),
 		}, authService)
 
 		require.NoError(t, err)
@@ -55,8 +57,8 @@ func Test__CreateCanvas(t *testing.T) {
 		}
 
 		_, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
-			RequesterId: user.String(),
-			Canvas:      canvas,
+			Canvas:         canvas,
+			OrganizationId: org.ID.String(),
 		}, authService)
 
 		s, ok := status.FromError(err)

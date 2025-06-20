@@ -654,11 +654,11 @@ func (x *Canvas) GetMetadata() *Canvas_Metadata {
 }
 
 type CreateCanvasRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Canvas        *Canvas                `protobuf:"bytes,1,opt,name=canvas,proto3" json:"canvas,omitempty"`
-	RequesterId   string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Canvas         *Canvas                `protobuf:"bytes,1,opt,name=canvas,proto3" json:"canvas,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateCanvasRequest) Reset() {
@@ -698,9 +698,9 @@ func (x *CreateCanvasRequest) GetCanvas() *Canvas {
 	return nil
 }
 
-func (x *CreateCanvasRequest) GetRequesterId() string {
+func (x *CreateCanvasRequest) GetOrganizationId() string {
 	if x != nil {
-		return x.RequesterId
+		return x.OrganizationId
 	}
 	return ""
 }
@@ -5035,10 +5035,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"created_by\x18\x03 \x01(\tR\tcreatedBy\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"d\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"j\n" +
 	"\x13CreateCanvasRequest\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\"B\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\"B\n" +
 	"\x14CreateCanvasResponse\x12*\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\";\n" +
 	"\x15DescribeCanvasRequest\x12\x0e\n" +

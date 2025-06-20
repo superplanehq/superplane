@@ -50,7 +50,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	}
 
 	var err error
-	r.Canvas, err = models.CreateCanvas(r.User, "test")
+	org, err := models.CreateOrganization(r.User, uuid.New().String(), "test")
+	require.NoError(t, err)
+
+	r.Canvas, err = models.CreateCanvas(r.User, org.ID, "test")
 	require.NoError(t, err)
 
 	if options.Source {

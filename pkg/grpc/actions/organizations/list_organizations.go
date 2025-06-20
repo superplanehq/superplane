@@ -24,7 +24,7 @@ func ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest, au
 		return nil, err
 	}
 
-	organizations, err := models.ListOrganizationsByIds(accessibleOrgIDs)
+	organizations, err := models.ListOrganizationsByIDs(accessibleOrgIDs)
 	if err != nil {
 		return nil, err
 	}

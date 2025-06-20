@@ -6,6 +6,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -17,16 +18,16 @@ import (
 )
 
 func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, authorizationService authorization.Authorization) (*pb.DeleteOrganizationResponse, error) {
-	requesterID, err := uuid.Parse(req.RequesterId)
-	if err != nil {
-		log.Errorf("Error reading requester id on %v for DeleteOrganization: %v", req, err)
-		return nil, err
+	user, userIsSet := authentication.GetUserFromContext(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
 	if req.IdOrName == "" {
 		return nil, status.Error(codes.InvalidArgument, "id_or_name is required")
 	}
 
+	var err error
 	var organization *models.Organization
 	if _, parseErr := uuid.Parse(req.IdOrName); parseErr == nil {
 		err = actions.ValidateUUIDs(req.IdOrName)
@@ -53,7 +54,7 @@ func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, 
 		return nil, err
 	}
 
-	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), requesterID.String())
+	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), user.ID.String())
 
 	err = authorizationService.DestroyOrganizationRoles(organization.ID.String())
 	if err != nil {

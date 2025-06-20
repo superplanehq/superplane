@@ -30,7 +30,7 @@ func Test__DescribeCanvas(t *testing.T) {
 	})
 
 	t.Run("empty canvas", func(t *testing.T) {
-		canvas, err := models.CreateCanvas(userID, "test")
+		canvas, err := models.CreateCanvas(userID, uuid.New(), "test")
 		require.NoError(t, err)
 
 		response, err := DescribeCanvas(context.Background(), &protos.DescribeCanvasRequest{

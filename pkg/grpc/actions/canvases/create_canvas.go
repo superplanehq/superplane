@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -22,18 +22,21 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	requesterID, err := uuid.Parse(req.RequesterId)
-	if err != nil {
-		log.Errorf("Error reading requester id on %v for CreateCanvas: %v", req, err)
-		return nil, err
-	}
-
-	// Extract name from the Canvas metadata
 	if req.Canvas == nil || req.Canvas.Metadata == nil || req.Canvas.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "canvas name is required")
 	}
 
-	canvas, err := models.CreateCanvas(requesterID, req.Canvas.Metadata.Name)
+	orgID, err := uuid.Parse(req.OrganizationId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+	}
+
+	_, err = models.FindOrganizationByID(orgID.String())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "organization not found")
+	}
+
+	canvas, err := models.CreateCanvas(user.ID, orgID, req.Canvas.Metadata.Name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -43,7 +46,6 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, err
 	}
 
-	// Create response using nested structure
 	response := &pb.CreateCanvasResponse{
 		Canvas: &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{

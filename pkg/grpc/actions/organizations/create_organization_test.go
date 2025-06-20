@@ -36,7 +36,6 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		response, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
-			RequesterId:  user.ID.String(),
 			Organization: organization,
 		}, authService)
 
@@ -60,7 +59,6 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
-			RequesterId:  user.ID.String(),
 			Organization: organization,
 		}, authService)
 
@@ -78,7 +76,6 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
-			RequesterId:  user.ID.String(),
 			Organization: organization,
 		}, authService)
 
@@ -96,7 +93,6 @@ func Test__CreateOrganization(t *testing.T) {
 		}
 
 		_, err := CreateOrganization(ctx, &protos.CreateOrganizationRequest{
-			RequesterId:  user.ID.String(),
 			Organization: organization,
 		}, authService)
 

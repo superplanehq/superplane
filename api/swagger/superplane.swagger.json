@@ -1287,12 +1287,6 @@
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "requesterId",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -1684,9 +1678,6 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -1725,8 +1716,7 @@
       "type": "object",
       "properties": {
         "metadata": {
-          "$ref": "#/definitions/OrganizationsOrganizationMetadata",
-          "title": "Canvases are not included in the Organization message to avoid circular references\n Use separate endpoints to list canvases for an organization"
+          "$ref": "#/definitions/OrganizationsOrganizationMetadata"
         }
       }
     },
@@ -1760,9 +1750,6 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -1935,7 +1922,7 @@
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
         },
-        "requesterId": {
+        "organizationId": {
           "type": "string"
         }
       }

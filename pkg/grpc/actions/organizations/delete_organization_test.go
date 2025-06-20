@@ -28,8 +28,7 @@ func Test__DeleteOrganization(t *testing.T) {
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
 		_, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
-			IdOrName:    uuid.New().String(),
-			RequesterId: userID.String(),
+			IdOrName: uuid.New().String(),
 		}, authService)
 
 		s, ok := status.FromError(err)
@@ -44,8 +43,7 @@ func Test__DeleteOrganization(t *testing.T) {
 		authService.SetupOrganizationRoles(organization.ID.String())
 
 		response, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
-			IdOrName:    organization.ID.String(),
-			RequesterId: userID.String(),
+			IdOrName: organization.ID.String(),
 		}, authService)
 
 		require.NoError(t, err)
@@ -61,8 +59,7 @@ func Test__DeleteOrganization(t *testing.T) {
 		authService.SetupOrganizationRoles(organization.ID.String())
 
 		response, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
-			IdOrName:    organization.Name,
-			RequesterId: userID.String(),
+			IdOrName: organization.Name,
 		}, authService)
 
 		require.NoError(t, err)
@@ -74,8 +71,7 @@ func Test__DeleteOrganization(t *testing.T) {
 
 	t.Run("empty id_or_name -> error", func(t *testing.T) {
 		_, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
-			IdOrName:    "",
-			RequesterId: userID.String(),
+			IdOrName: "",
 		}, authService)
 
 		s, ok := status.FromError(err)
@@ -89,8 +85,7 @@ func Test__DeleteOrganization(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
-			IdOrName:    organization.ID.String(),
-			RequesterId: "invalid-uuid",
+			IdOrName: organization.ID.String(),
 		}, authService)
 
 		assert.Error(t, err)

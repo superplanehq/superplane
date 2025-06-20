@@ -151,7 +151,6 @@ func (x *ListOrganizationsResponse) GetOrganizations() []*Organization {
 type CreateOrganizationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Organization  *Organization          `protobuf:"bytes,1,opt,name=organization,proto3" json:"organization,omitempty"`
-	RequesterId   string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -191,13 +190,6 @@ func (x *CreateOrganizationRequest) GetOrganization() *Organization {
 		return x.Organization
 	}
 	return nil
-}
-
-func (x *CreateOrganizationRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
-	}
-	return ""
 }
 
 type CreateOrganizationResponse struct {
@@ -336,7 +328,6 @@ type UpdateOrganizationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Organization  *Organization          `protobuf:"bytes,1,opt,name=organization,proto3" json:"organization,omitempty"`
 	IdOrName      string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
-	RequesterId   string                 `protobuf:"bytes,3,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -381,13 +372,6 @@ func (x *UpdateOrganizationRequest) GetOrganization() *Organization {
 func (x *UpdateOrganizationRequest) GetIdOrName() string {
 	if x != nil {
 		return x.IdOrName
-	}
-	return ""
-}
-
-func (x *UpdateOrganizationRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -439,7 +423,6 @@ func (x *UpdateOrganizationResponse) GetOrganization() *Organization {
 type DeleteOrganizationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	IdOrName      string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
-	RequesterId   string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -477,13 +460,6 @@ func (*DeleteOrganizationRequest) Descriptor() ([]byte, []int) {
 func (x *DeleteOrganizationRequest) GetIdOrName() string {
 	if x != nil {
 		return x.IdOrName
-	}
-	return ""
-}
-
-func (x *DeleteOrganizationRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -784,28 +760,25 @@ const file_organizations_proto_rawDesc = "" +
 	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x1a\n" +
 	"\x18ListOrganizationsRequest\"i\n" +
 	"\x19ListOrganizationsResponse\x12L\n" +
-	"\rorganizations\x18\x01 \x03(\v2&.Superplane.Organizations.OrganizationR\rorganizations\"\x8a\x01\n" +
+	"\rorganizations\x18\x01 \x03(\v2&.Superplane.Organizations.OrganizationR\rorganizations\"g\n" +
 	"\x19CreateOrganizationRequest\x12J\n" +
-	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\"h\n" +
+	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"h\n" +
 	"\x1aCreateOrganizationResponse\x12J\n" +
 	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\";\n" +
 	"\x1bDescribeOrganizationRequest\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x01 \x01(\tR\bidOrName\"j\n" +
 	"\x1cDescribeOrganizationResponse\x12J\n" +
-	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"\xa8\x01\n" +
+	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"\x85\x01\n" +
 	"\x19UpdateOrganizationRequest\x12J\n" +
 	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x02 \x01(\tR\bidOrName\x12!\n" +
-	"\frequester_id\x18\x03 \x01(\tR\vrequesterId\"h\n" +
+	"id_or_name\x18\x02 \x01(\tR\bidOrName\"h\n" +
 	"\x1aUpdateOrganizationResponse\x12J\n" +
-	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"\\\n" +
+	"\forganization\x18\x01 \x01(\v2&.Superplane.Organizations.OrganizationR\forganization\"9\n" +
 	"\x19DeleteOrganizationRequest\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\"\x1c\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\"\x1c\n" +
 	"\x1aDeleteOrganizationResponse\"x\n" +
 	"\x13OrganizationCreated\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x128\n" +

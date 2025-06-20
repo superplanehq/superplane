@@ -45,8 +45,11 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
+	org, err := models.CreateOrganization(uuid.New(), "test", "test")
+	require.NoError(t, err)
+
 	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, "test")
+	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
 	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"))
@@ -174,8 +177,11 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
+	org, err := models.CreateOrganization(uuid.New(), "test", "test")
+	require.NoError(t, err)
+
 	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, "test")
+	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
 	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"))

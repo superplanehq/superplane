@@ -18,12 +18,6 @@ import (
 )
 
 func UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
-	_, err := uuid.Parse(req.RequesterId)
-	if err != nil {
-		log.Errorf("Error reading requester id on %v for UpdateOrganization: %v", req, err)
-		return nil, err
-	}
-
 	if req.IdOrName == "" {
 		return nil, status.Error(codes.InvalidArgument, "id_or_name is required")
 	}
@@ -37,6 +31,7 @@ func UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) 
 	}
 
 	var organization *models.Organization
+	var err error
 	if _, parseErr := uuid.Parse(req.IdOrName); parseErr == nil {
 
 		err = actions.ValidateUUIDs(req.IdOrName)

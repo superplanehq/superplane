@@ -29,7 +29,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
 			IdOrName:     uuid.New().String(),
 			Organization: organization,
-			RequesterId:  userID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -52,7 +51,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		response, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
 			IdOrName:     organization.ID.String(),
 			Organization: updatedOrg,
-			RequesterId:  userID.String(),
 		})
 
 		require.NoError(t, err)
@@ -80,7 +78,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		response, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
 			IdOrName:     organization.Name,
 			Organization: updatedOrg,
-			RequesterId:  userID.String(),
 		})
 
 		require.NoError(t, err)
@@ -103,7 +100,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
 			IdOrName:     "",
 			Organization: organization,
-			RequesterId:  userID.String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -114,8 +110,7 @@ func Test__UpdateOrganization(t *testing.T) {
 
 	t.Run("nil organization -> error", func(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
-			IdOrName:    uuid.New().String(),
-			RequesterId: userID.String(),
+			IdOrName: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -128,7 +123,6 @@ func Test__UpdateOrganization(t *testing.T) {
 		_, err := UpdateOrganization(context.Background(), &protos.UpdateOrganizationRequest{
 			IdOrName:     uuid.New().String(),
 			Organization: &protos.Organization{}, // Organization exists but Metadata is nil
-			RequesterId:  userID.String(),
 		})
 
 		s, ok := status.FromError(err)

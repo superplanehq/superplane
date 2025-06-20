@@ -240,7 +240,7 @@ message Canvas {
 
 message CreateCanvasRequest {
   Canvas canvas = 1;
-  string requester_id = 2;
+  string organization_id = 2;
 }
 
 message CreateCanvasResponse {
