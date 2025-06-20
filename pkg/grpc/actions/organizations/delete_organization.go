@@ -6,6 +6,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
+func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, authorizationService authorization.Authorization) (*pb.DeleteOrganizationResponse, error) {
 	requesterID, err := uuid.Parse(req.RequesterId)
 	if err != nil {
 		log.Errorf("Error reading requester id on %v for DeleteOrganization: %v", req, err)
@@ -53,6 +54,12 @@ func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) 
 	}
 
 	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), requesterID.String())
+
+	err = authorizationService.DestroyOrganizationRoles(organization.ID.String())
+	if err != nil {
+		log.Errorf("Error deleting organization roles on %v for DeleteOrganization: %v", req, err)
+		return nil, err
+	}
 
 	return &pb.DeleteOrganizationResponse{}, nil
 }

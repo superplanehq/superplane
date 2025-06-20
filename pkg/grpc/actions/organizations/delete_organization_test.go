@@ -7,6 +7,8 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -17,12 +19,18 @@ import (
 func Test__DeleteOrganization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	userID := uuid.New()
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	ctx := context.Background()
+	ctx = authentication.SetUserInContext(ctx, &models.User{
+		ID: userID,
+	})
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
-		_, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+		_, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
 			IdOrName:    uuid.New().String(),
 			RequesterId: userID.String(),
-		})
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -33,11 +41,12 @@ func Test__DeleteOrganization(t *testing.T) {
 	t.Run("delete organization by ID -> success", func(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org-delete", "Test Organization Delete")
 		require.NoError(t, err)
+		authService.SetupOrganizationRoles(organization.ID.String())
 
-		response, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+		response, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
 			IdOrName:    organization.ID.String(),
 			RequesterId: userID.String(),
-		})
+		}, authService)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -49,11 +58,12 @@ func Test__DeleteOrganization(t *testing.T) {
 	t.Run("delete organization by name -> success", func(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org-delete-2", "Test Organization Delete 2")
 		require.NoError(t, err)
+		authService.SetupOrganizationRoles(organization.ID.String())
 
-		response, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+		response, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
 			IdOrName:    organization.Name,
 			RequesterId: userID.String(),
-		})
+		}, authService)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -63,10 +73,10 @@ func Test__DeleteOrganization(t *testing.T) {
 	})
 
 	t.Run("empty id_or_name -> error", func(t *testing.T) {
-		_, err := DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+		_, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
 			IdOrName:    "",
 			RequesterId: userID.String(),
-		})
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -78,10 +88,10 @@ func Test__DeleteOrganization(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org-delete-3", "Test Organization Delete 3")
 		require.NoError(t, err)
 
-		_, err = DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
+		_, err = DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
 			IdOrName:    organization.ID.String(),
 			RequesterId: "invalid-uuid",
-		})
+		}, authService)
 
 		assert.Error(t, err)
 	})

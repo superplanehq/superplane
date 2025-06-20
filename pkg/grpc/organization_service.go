@@ -27,7 +27,7 @@ func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.
 }
 
 func (s *OrganizationService) ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
-	return organizations.ListOrganizations(ctx, req)
+	return organizations.ListOrganizations(ctx, req, s.authorizationService)
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
@@ -35,5 +35,5 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
-	return organizations.DeleteOrganization(ctx, req)
+	return organizations.DeleteOrganization(ctx, req, s.authorizationService)
 }

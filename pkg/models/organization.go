@@ -37,6 +37,22 @@ func ListOrganizations() ([]Organization, error) {
 	return organizations, nil
 }
 
+func ListOrganizationsByIds(ids []string) ([]Organization, error) {
+	var organizations []Organization
+
+	err := database.Conn().
+		Where("id IN (?)", ids).
+		Order("display_name ASC").
+		Find(&organizations).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return organizations, nil
+}
+
 func FindOrganizationByID(id string) (*Organization, error) {
 	organization := Organization{}
 

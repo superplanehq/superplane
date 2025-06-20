@@ -3,13 +3,28 @@ package organizations
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
-	organizations, err := models.ListOrganizations()
+func ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest, authorizationService authorization.Authorization) (*pb.ListOrganizationsResponse, error) {
+	user, userIsSet := authentication.GetUserFromContext(ctx)
+
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
+	accessibleOrgIDs, err := authorizationService.GetAccessibleOrgsForUser(user.ID.String())
+	if err != nil {
+		return nil, err
+	}
+
+	organizations, err := models.ListOrganizationsByIds(accessibleOrgIDs)
 	if err != nil {
 		return nil, err
 	}
