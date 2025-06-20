@@ -244,8 +244,23 @@ func ListCanvases() ([]Canvas, error) {
 	return canvases, nil
 }
 
-func ListCanvasesByIDs(ids []string) ([]Canvas, error) {
+func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 	var canvases []Canvas
+
+	if organizationID != "" {
+		err := database.Conn().
+			Where("organization_id = ?", organizationID).
+			Where("id IN (?)", ids).
+			Order("name ASC").
+			Find(&canvases).
+			Error
+
+		if err != nil {
+			return nil, err
+		}
+
+		return canvases, nil
+	}
 
 	err := database.Conn().
 		Where("id IN (?)", ids).

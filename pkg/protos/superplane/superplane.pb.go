@@ -530,9 +530,10 @@ func (Execution_Result) EnumDescriptor() ([]byte, []int) {
 }
 
 type ListCanvasesRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListCanvasesRequest) Reset() {
@@ -563,6 +564,13 @@ func (x *ListCanvasesRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListCanvasesRequest.ProtoReflect.Descriptor instead.
 func (*ListCanvasesRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *ListCanvasesRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 type ListCanvasesResponse struct {
@@ -5023,8 +5031,9 @@ var File_superplane_proto protoreflect.FileDescriptor
 const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"\x10superplane.proto\x12\n" +
-	"Superplane\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x15\n" +
-	"\x13ListCanvasesRequest\"F\n" +
+	"Superplane\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\">\n" +
+	"\x13ListCanvasesRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"F\n" +
 	"\x14ListCanvasesResponse\x12.\n" +
 	"\bcanvases\x18\x01 \x03(\v2\x12.Superplane.CanvasR\bcanvases\"\xcc\x01\n" +
 	"\x06Canvas\x127\n" +

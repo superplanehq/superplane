@@ -508,6 +508,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "tags": [
           "Canvas"
         ]

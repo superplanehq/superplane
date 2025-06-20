@@ -24,7 +24,7 @@ func ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest, authorizatio
 		return nil, err
 	}
 
-	canvases, err := models.ListCanvasesByIDs(accessibleCanvasIDs)
+	canvases, err := models.ListCanvasesByIDs(accessibleCanvasIDs, req.OrganizationId)
 	if err != nil {
 		return nil, err
 	}
