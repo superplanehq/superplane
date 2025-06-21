@@ -1177,6 +1177,12 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [

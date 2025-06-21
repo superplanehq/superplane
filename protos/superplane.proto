@@ -252,6 +252,7 @@ message CreateCanvasResponse {
 message DescribeCanvasRequest {
   string id = 1;
   string name = 2;
+  string organization_id = 3;
 }
 
 message DescribeCanvasResponse {
