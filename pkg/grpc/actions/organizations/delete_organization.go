@@ -18,7 +18,7 @@ import (
 )
 
 func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, authorizationService authorization.Authorization) (*pb.DeleteOrganizationResponse, error) {
-	user, userIsSet := authentication.GetUserFromContext(ctx)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
@@ -54,7 +54,7 @@ func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, 
 		return nil, err
 	}
 
-	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), user.ID.String())
+	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), userID)
 
 	err = authorizationService.DestroyOrganizationRoles(organization.ID.String())
 	if err != nil {

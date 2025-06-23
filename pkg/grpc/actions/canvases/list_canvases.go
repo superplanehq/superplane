@@ -13,13 +13,13 @@ import (
 )
 
 func ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest, authorizationService authorization.Authorization) (*pb.ListCanvasesResponse, error) {
-	user, userIsSet := authentication.GetUserFromContext(ctx)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	accessibleCanvasIDs, err := authorizationService.GetAccessibleCanvasesForUser(user.ID.String())
+	accessibleCanvasIDs, err := authorizationService.GetAccessibleCanvasesForUser(userID)
 	if err != nil {
 		return nil, err
 	}

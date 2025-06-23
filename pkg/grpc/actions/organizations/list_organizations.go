@@ -13,13 +13,13 @@ import (
 )
 
 func ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest, authorizationService authorization.Authorization) (*pb.ListOrganizationsResponse, error) {
-	user, userIsSet := authentication.GetUserFromContext(ctx)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	accessibleOrgIDs, err := authorizationService.GetAccessibleOrgsForUser(user.ID.String())
+	accessibleOrgIDs, err := authorizationService.GetAccessibleOrgsForUser(userID)
 	if err != nil {
 		return nil, err
 	}

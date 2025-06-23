@@ -16,7 +16,7 @@ import (
 )
 
 func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizationService authorization.Authorization) (*pb.CreateCanvasResponse, error) {
-	user, userIsSet := authentication.GetUserFromContext(ctx)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -36,7 +36,12 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, status.Error(codes.InvalidArgument, "organization not found")
 	}
 
-	canvas, err := models.CreateCanvas(user.ID, orgID, req.Canvas.Metadata.Name)
+	userIDUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID")
+	}
+
+	canvas, err := models.CreateCanvas(userIDUUID, orgID, req.Canvas.Metadata.Name)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -63,7 +68,7 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, err
 	}
 
-	err = authorizationService.AssignRole(user.ID.String(), authorization.RoleCanvasOwner, canvas.ID.String(), authorization.DomainCanvas)
+	err = authorizationService.AssignRole(userID, authorization.RoleCanvasOwner, canvas.ID.String(), authorization.DomainCanvas)
 	if err != nil {
 		log.Errorf("Error assigning canvas owner role on %v for CreateCanvas: %v", req, err)
 		return nil, err
