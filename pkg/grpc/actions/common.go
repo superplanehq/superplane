@@ -175,15 +175,10 @@ func filterOperatorToProto(in string) pb.Connection_FilterOperator {
 	}
 }
 
-func SerializeConnections(stages []models.Stage, sources []models.EventSource, in []models.Connection) ([]*pb.Connection, error) {
+func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 	connections := []*pb.Connection{}
 
 	for _, c := range in {
-		name, err := findConnectionName(stages, sources, c)
-		if err != nil {
-			return nil, fmt.Errorf("invalid connection: %v", err)
-		}
-
 		filters, err := serializeFilters(c.Filters)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filters: %v", err)
@@ -191,7 +186,7 @@ func SerializeConnections(stages []models.Stage, sources []models.EventSource, i
 
 		connections = append(connections, &pb.Connection{
 			Type:           connectionTypeToProto(c.SourceType),
-			Name:           name,
+			Name:           c.SourceName,
 			FilterOperator: filterOperatorToProto(c.FilterOperator),
 			Filters:        filters,
 		})
@@ -205,31 +200,6 @@ func SerializeConnections(stages []models.Stage, sources []models.EventSource, i
 	})
 
 	return connections, nil
-}
-
-func findConnectionName(stages []models.Stage, sources []models.EventSource, connection models.Connection) (string, error) {
-	switch connection.SourceType {
-	case models.SourceTypeStage:
-		for _, stage := range stages {
-			if stage.ID == connection.SourceID {
-				return stage.Name, nil
-			}
-		}
-
-		return "", fmt.Errorf("stage %s not found", connection.SourceID)
-
-	case models.SourceTypeEventSource:
-		for _, s := range sources {
-			if s.ID == connection.SourceID {
-				return s.Name, nil
-			}
-		}
-
-		return "", fmt.Errorf("event source %s not found", connection.ID)
-
-	default:
-		return "", errors.New("invalid type " + connection.SourceType)
-	}
 }
 
 func serializeFilters(in []models.ConnectionFilter) ([]*pb.Connection_Filter, error) {

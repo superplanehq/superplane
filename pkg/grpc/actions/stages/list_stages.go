@@ -29,12 +29,7 @@ func ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesR
 		return nil, fmt.Errorf("failed to list stages for canvas: %w", err)
 	}
 
-	sources, err := canvas.ListEventSources()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list event sources for canvas: %w", err)
-	}
-
-	serialized, err := serializeStages(stages, sources)
+	serialized, err := serializeStages(stages)
 	if err != nil {
 		return nil, err
 	}

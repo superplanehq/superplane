@@ -142,7 +142,7 @@ func (w *PendingEventsWorker) handleConnectionEvent(tx *gorm.DB, event *models.E
 }
 
 func (w *PendingEventsWorker) handleStageEvent(tx *gorm.DB, event *models.Event, connection models.Connection) error {
-	stage, err := models.FindStageByID(connection.TargetID.String())
+	stage, err := models.FindStageByIDInTransaction(tx, connection.TargetID.String())
 	if err != nil {
 		return err
 	}

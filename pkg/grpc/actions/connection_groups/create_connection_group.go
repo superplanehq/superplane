@@ -31,7 +31,9 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 
 	logger := logging.ForCanvas(canvas)
 
-	// Extract name from ConnectionGroup metadata
+	//
+	// Validate request
+	//
 	if req.ConnectionGroup == nil || req.ConnectionGroup.Metadata == nil || req.ConnectionGroup.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "connection group name is required")
 	}
@@ -51,6 +53,9 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	//
+	// Create connection group
+	//
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		req.ConnectionGroup.Metadata.Name,
 		req.ConnectionGroup.Metadata.CreatedBy,
@@ -123,9 +128,7 @@ func validatePolicy(policy *pb.ConnectionGroup_Spec_Policy) (*models.ConnectionG
 
 func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connections []models.Connection) (*pb.ConnectionGroup, error) {
 	spec := connectionGroup.Spec.Data()
-
-	// TODO: pass all stages and event sources here.
-	conns, err := actions.SerializeConnections([]models.Stage{}, []models.EventSource{}, connections)
+	conns, err := actions.SerializeConnections(connections)
 	if err != nil {
 		return nil, err
 	}

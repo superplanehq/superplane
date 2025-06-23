@@ -40,27 +40,12 @@ func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.Descr
 		return nil, err
 	}
 
-	//
-	// TODO: we have to list all stages/sources because the API expects
-	// the stage connection to use names, and the stage_connections table does not record that.
-	//
-
-	stages, err := canvas.ListStages()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list stages for canvas: %w", err)
-	}
-
-	sources, err := canvas.ListEventSources()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list event sources for canvas: %w", err)
-	}
-
 	connections, err := models.ListConnections(stage.ID, models.ConnectionTargetTypeStage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list connections for stage: %w", err)
 	}
 
-	conn, err := actions.SerializeConnections(stages, sources, connections)
+	conn, err := actions.SerializeConnections(connections)
 	if err != nil {
 		return nil, err
 	}

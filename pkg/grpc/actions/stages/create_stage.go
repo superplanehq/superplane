@@ -447,7 +447,7 @@ func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, erro
 	}
 }
 
-func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb.Stage, error) {
+func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
 	s := []*pb.Stage{}
 	for _, stage := range stages {
 		connections, err := models.ListConnections(stage.ID, models.ConnectionTargetTypeStage)
@@ -455,7 +455,7 @@ func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb
 			return nil, err
 		}
 
-		serialized, err := actions.SerializeConnections(stages, sources, connections)
+		serialized, err := actions.SerializeConnections(connections)
 		if err != nil {
 			return nil, err
 		}
