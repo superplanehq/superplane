@@ -147,10 +147,16 @@ type ApiSuperplaneDescribeCanvasRequest struct {
 	ApiService *CanvasAPIService
 	id string
 	name *string
+	organizationId *string
 }
 
 func (r ApiSuperplaneDescribeCanvasRequest) Name(name string) ApiSuperplaneDescribeCanvasRequest {
 	r.name = &name
+	return r
+}
+
+func (r ApiSuperplaneDescribeCanvasRequest) OrganizationId(organizationId string) ApiSuperplaneDescribeCanvasRequest {
+	r.organizationId = &organizationId
 	return r
 }
 
@@ -199,6 +205,9 @@ func (a *CanvasAPIService) SuperplaneDescribeCanvasExecute(r ApiSuperplaneDescri
 
 	if r.name != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "", "")
+	}
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
@@ -265,6 +274,12 @@ func (a *CanvasAPIService) SuperplaneDescribeCanvasExecute(r ApiSuperplaneDescri
 type ApiSuperplaneListCanvasesRequest struct {
 	ctx context.Context
 	ApiService *CanvasAPIService
+	organizationId *string
+}
+
+func (r ApiSuperplaneListCanvasesRequest) OrganizationId(organizationId string) ApiSuperplaneListCanvasesRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiSuperplaneListCanvasesRequest) Execute() (*SuperplaneListCanvasesResponse, *http.Response, error) {
@@ -307,6 +322,9 @@ func (a *CanvasAPIService) SuperplaneListCanvasesExecute(r ApiSuperplaneListCanv
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneCreateCanvasRequest{}
 // SuperplaneCreateCanvasRequest struct for SuperplaneCreateCanvasRequest
 type SuperplaneCreateCanvasRequest struct {
 	Canvas *SuperplaneCanvas `json:"canvas,omitempty"`
-	RequesterId *string `json:"requesterId,omitempty"`
+	OrganizationId *string `json:"organizationId,omitempty"`
 }
 
 // NewSuperplaneCreateCanvasRequest instantiates a new SuperplaneCreateCanvasRequest object
@@ -73,36 +73,36 @@ func (o *SuperplaneCreateCanvasRequest) SetCanvas(v SuperplaneCanvas) {
 	o.Canvas = &v
 }
 
-// GetRequesterId returns the RequesterId field value if set, zero value otherwise.
-func (o *SuperplaneCreateCanvasRequest) GetRequesterId() string {
-	if o == nil || IsNil(o.RequesterId) {
+// GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
+func (o *SuperplaneCreateCanvasRequest) GetOrganizationId() string {
+	if o == nil || IsNil(o.OrganizationId) {
 		var ret string
 		return ret
 	}
-	return *o.RequesterId
+	return *o.OrganizationId
 }
 
-// GetRequesterIdOk returns a tuple with the RequesterId field value if set, nil otherwise
+// GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneCreateCanvasRequest) GetRequesterIdOk() (*string, bool) {
-	if o == nil || IsNil(o.RequesterId) {
+func (o *SuperplaneCreateCanvasRequest) GetOrganizationIdOk() (*string, bool) {
+	if o == nil || IsNil(o.OrganizationId) {
 		return nil, false
 	}
-	return o.RequesterId, true
+	return o.OrganizationId, true
 }
 
-// HasRequesterId returns a boolean if a field has been set.
-func (o *SuperplaneCreateCanvasRequest) HasRequesterId() bool {
-	if o != nil && !IsNil(o.RequesterId) {
+// HasOrganizationId returns a boolean if a field has been set.
+func (o *SuperplaneCreateCanvasRequest) HasOrganizationId() bool {
+	if o != nil && !IsNil(o.OrganizationId) {
 		return true
 	}
 
 	return false
 }
 
-// SetRequesterId gets a reference to the given string and assigns it to the RequesterId field.
-func (o *SuperplaneCreateCanvasRequest) SetRequesterId(v string) {
-	o.RequesterId = &v
+// SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
+func (o *SuperplaneCreateCanvasRequest) SetOrganizationId(v string) {
+	o.OrganizationId = &v
 }
 
 func (o SuperplaneCreateCanvasRequest) MarshalJSON() ([]byte, error) {
@@ -118,8 +118,8 @@ func (o SuperplaneCreateCanvasRequest) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Canvas) {
 		toSerialize["canvas"] = o.Canvas
 	}
-	if !IsNil(o.RequesterId) {
-		toSerialize["requesterId"] = o.RequesterId
+	if !IsNil(o.OrganizationId) {
+		toSerialize["organizationId"] = o.OrganizationId
 	}
 	return toSerialize, nil
 }
