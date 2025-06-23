@@ -47,6 +47,9 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 		grpc.ChainStreamInterceptor(
 			recovery.StreamServerInterceptor(opts...),
 		),
+		grpc.ChainUnaryInterceptor(
+			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
+		),
 	)
 
 	//
