@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -118,24 +120,51 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 func (a *AuthorizationInterceptor) extractDomainID(req interface{}, domainType string) (string, error) {
 	if domainType == "org" {
-		switch r := req.(type) {
-		case interface{ GetOrganizationId() string }:
-			return r.GetOrganizationId(), nil
-		default:
-			return "", status.Error(codes.Internal, "unable to extract organization ID")
-		}
+		return extractOrganizationID(req)
 	}
 
 	if domainType == "canvas" {
-		switch r := req.(type) {
-		case interface{ GetCanvasId() string }:
-			return r.GetCanvasId(), nil
-		case interface{ GetCanvasIdOrName() string }:
-			return r.GetCanvasIdOrName(), nil
-		default:
-			return "", status.Error(codes.Internal, "unable to extract canvas ID")
-		}
+		return extractCanvasID(req)
 	}
 
 	return "", status.Error(codes.Internal, "unsupported domain type")
+}
+
+func extractOrganizationID(req interface{}) (string, error) {
+	var domainID string
+	switch r := req.(type) {
+	case interface{ GetOrganizationId() string }:
+		domainID = r.GetOrganizationId()
+	default:
+		return "", nil
+	}
+
+	if _, err := uuid.Parse(domainID); err != nil {
+		org, err := models.FindOrganizationByName(domainID)
+		if err != nil {
+			return "", nil
+		}
+		domainID = org.ID.String()
+	}
+
+	return domainID, nil
+}
+
+func extractCanvasID(req interface{}) (string, error) {
+	switch r := req.(type) {
+	case interface{ GetCanvasId() string }:
+		return r.GetCanvasId(), nil
+	case interface{ GetCanvasIdOrName() string }:
+		canvasIDOrName := r.GetCanvasIdOrName()
+		if _, err := uuid.Parse(canvasIDOrName); err != nil {
+			canvas, err := models.FindCanvasByName(canvasIDOrName)
+			if err != nil {
+				return "", nil
+			}
+			return canvas.ID.String(), nil
+		}
+		return canvasIDOrName, nil
+	default:
+		return "", nil
+	}
 }
