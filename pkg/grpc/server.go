@@ -43,12 +43,10 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(opts...),
+			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			recovery.StreamServerInterceptor(opts...),
-		),
-		grpc.ChainUnaryInterceptor(
-			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
 		),
 	)
 

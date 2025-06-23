@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/superplanehq/superplane/pkg/authentication"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -74,10 +75,19 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return handler(ctx, req)
 		}
 
-		user, userIsSet := authentication.GetUserFromContext(ctx)
-		if !userIsSet {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			log.Errorf("User not found in context, metadata %v", md)
 			return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 		}
+
+		userMeta, ok := md["x-user-id"]
+		if !ok || len(userMeta) == 0 {
+			log.Errorf("User not found in metadata, metadata %v", md)
+			return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+		}
+
+		userID := userMeta[0]
 
 		domainID, err := a.extractDomainID(req, rule.DomainType)
 		if err != nil {
@@ -86,13 +96,13 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		var allowed bool
 		if rule.DomainType == "org" {
-			allowed, err = a.authService.CheckOrganizationPermission(user.ID.String(), domainID, rule.Resource, rule.Action)
+			allowed, err = a.authService.CheckOrganizationPermission(userID, domainID, rule.Resource, rule.Action)
 			if err != nil {
 				return nil, err
 			}
 		}
 		if rule.DomainType == "canvas" {
-			allowed, err = a.authService.CheckCanvasPermission(user.ID.String(), domainID, rule.Resource, rule.Action)
+			allowed, err = a.authService.CheckCanvasPermission(userID, domainID, rule.Resource, rule.Action)
 			if err != nil {
 				return nil, err
 			}

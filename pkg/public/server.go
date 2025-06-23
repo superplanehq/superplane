@@ -115,7 +115,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	ctx := context.Background()
 
 	grpcGatewayMux := runtime.NewServeMux(
-		runtime.WithIncomingHeaderMatcher(runtime.DefaultHeaderMatcher),
+		runtime.WithIncomingHeaderMatcher(headersMatcher),
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
@@ -150,13 +150,29 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	return nil
 }
 
+func headersMatcher(key string) (string, bool) {
+	switch key {
+	case "X-User-Id":
+		return key, true
+	default:
+		return runtime.DefaultHeaderMatcher(key)
+	}
+}
+
 func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := authentication.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not found in context", http.StatusUnauthorized)
+			return
+		}
+
 		r2 := new(http.Request)
 		*r2 = *r
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
-		grpcGatewayMux.ServeHTTP(w, r2)
+		r2.Header.Set("x-user-id", user.ID.String())
+		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
 
