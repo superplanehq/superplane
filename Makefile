@@ -47,9 +47,9 @@ test.watch:
 #
 
 dev.setup:
+	docker compose $(DOCKER_COMPOSE_OPTS) build
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
-	docker compose $(DOCKER_COMPOSE_OPTS) build
 
 dev.start:
 	docker compose $(DOCKER_COMPOSE_OPTS) up

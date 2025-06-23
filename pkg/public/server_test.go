@@ -315,7 +315,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		Source: true,
 	})
 
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,

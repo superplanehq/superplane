@@ -59,7 +59,19 @@ service Superplane {
       tags: "Secret";
     };
   }
-  
+
+  rpc CreateConnectionGroup(CreateConnectionGroupRequest) returns (CreateConnectionGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas connection group";
+      description: "Creates a new canvas connection group";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc CreateEventSource(CreateEventSourceRequest) returns (CreateEventSourceResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/event-sources"
@@ -378,11 +390,63 @@ message DescribeEventSourceResponse {
   EventSource event_source = 1;
 }
 
+message CreateConnectionGroupRequest {
+  ConnectionGroup connection_group = 1;
+  string requester_id = 2;
+  string canvas_id_or_name = 3;
+}
+
+message CreateConnectionGroupResponse {
+  ConnectionGroup connection_group = 1;
+}
+
+message ConnectionGroup {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string canvas_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+    string created_by = 5;
+  }
+
+  message Spec {
+    enum PolicyType {
+      POLICY_TYPE_ALL = 0;
+      POLICY_TYPE_MAJORITY = 1;
+    }
+
+    enum TimeoutBehavior {
+      TIMEOUT_BEHAVIOR_DROP = 0;
+      TIMEOUT_BEHAVIOR_FAIL = 1;
+      TIMEOUT_BEHAVIOR_EMIT_PARTIAL = 2;
+    }
+
+    message Policy {
+      PolicyType type = 1;
+      string timeout = 2;
+      TimeoutBehavior timeout_behavior = 3;
+    }
+
+    message Key {
+      string name = 1;
+      string expression = 2;
+    }
+
+    repeated Connection connections = 1;
+    repeated Key keys = 2;
+    Policy policy = 3;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}
+
 message Connection {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_EVENT_SOURCE = 1;
     TYPE_STAGE = 2;
+    TYPE_CONNECTION_GROUP = 3;
   }
 
   enum FilterType {

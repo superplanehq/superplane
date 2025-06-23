@@ -1,10 +1,11 @@
 package workers
 
 import (
+	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -71,28 +72,21 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		return nil
 	}
 
-	//
-	// Otherwise, we find all the stages, apply their filters on this event.
-	//
-	stageIDs := w.stageIDsFromConnections(connections)
-	stages, err := models.ListStagesByIDs(stageIDs)
-	if err != nil {
-		return fmt.Errorf("error listing stages: %v", err)
+	for _, connection := range connections {
+		accept, err := connection.Accept(event)
+		if err != nil {
+			logger.Errorf("Error applying filter: %v", err)
+			continue
+		}
+
+		if !accept {
+			continue
+		}
+
 	}
 
-	logger.Infof("Connected stages: %v", stageIDs)
-
-	stages, err = w.filterStages(logger, event, stages, connections)
-	if err != nil {
-		return fmt.Errorf("error applying filters: %v", err)
-	}
-
-	//
-	// If after applying the filters,
-	// we realize this event shouldn't go to any stage,
-	// we mark it as processed, and return.
-	//
-	if len(stages) == 0 {
+	connections = w.filterConnections(logger, event, connections)
+	if len(connections) == 0 {
 		logger.Info("No connections after filtering")
 		err := event.MarkAsProcessed()
 		if err != nil {
@@ -102,80 +96,170 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 		return nil
 	}
 
-	err = w.enqueueEvent(event, stages)
-	if err != nil {
-		return err
-	}
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		for _, connection := range connections {
+			err = w.handleConnectionEvent(tx, event, connection)
+			if err != nil {
+				return err
+			}
+		}
 
-	log.Infof("Stages after filtering: %v", w.idsFromStages(stages))
-	return nil
+		return event.MarkAsProcessedInTransaction(tx)
+	})
 }
 
-func findConnectionForStage(stageID string, connections []models.StageConnection) (models.StageConnection, error) {
+func (w *PendingEventsWorker) filterConnections(logger *log.Entry, event *models.Event, connections []models.Connection) []models.Connection {
+	filtered := []models.Connection{}
+
 	for _, connection := range connections {
-		if connection.StageID.String() == stageID {
-			return connection, nil
-		}
-	}
-
-	return models.StageConnection{}, fmt.Errorf("connection not found for stage ID: %s", stageID)
-}
-
-func (w *PendingEventsWorker) filterStages(logger *log.Entry, event *models.Event, stages []models.Stage, connections []models.StageConnection) ([]models.Stage, error) {
-	filtered := []models.Stage{}
-
-	for _, stage := range stages {
-		connection, err := findConnectionForStage(stage.ID.String(), connections)
-		if err != nil {
-			return nil, fmt.Errorf("error finding connection for stage: %v", err)
-		}
-
-		//
-		// If the filter evaluation fails, we only log the error and skip this stage.
-		//
 		accept, err := connection.Accept(event)
 		if err != nil {
-			logger.Errorf("Error applying filter on stage %s: %v", stage.ID, err)
+			logger.Errorf("Error applying filter: %v", err)
 			continue
 		}
 
 		if !accept {
-			logger.Infof("Not sending to stage %s - filters did not pass", stage.ID)
 			continue
 		}
 
-		logger.Infof("Sending to stage %s", stage.ID)
-		filtered = append(filtered, stage)
+		filtered = append(filtered, connection)
 	}
 
-	return filtered, nil
+	return filtered
 }
 
-func (w *PendingEventsWorker) enqueueEvent(event *models.Event, stages []models.Stage) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		for _, stage := range stages {
-			inputs, err := w.buildInputs(tx, event, stage)
-			if err != nil {
-				return err
-			}
+func (w *PendingEventsWorker) handleConnectionEvent(tx *gorm.DB, event *models.Event, connection models.Connection) error {
+	switch connection.TargetType {
+	case models.ConnectionTargetTypeStage:
+		return w.handleStageEvent(tx, event, connection)
 
-			stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs)
-			if err != nil {
-				return err
-			}
+	case models.ConnectionTargetTypeConnectionGroup:
+		return w.handleConnectionGroupEvent(tx, event, connection)
 
-			err = messages.NewStageEventCreatedMessage(stage.CanvasID.String(), stageEvent).Publish()
-			if err != nil {
-				logging.ForStage(&stage).Errorf("failed to publish stage event created message: %v", err)
-			}
+	default:
+		return fmt.Errorf("invalid target type: %s", connection.TargetType)
+	}
+}
+
+func (w *PendingEventsWorker) handleStageEvent(tx *gorm.DB, event *models.Event, connection models.Connection) error {
+	stage, err := models.FindStageByID(connection.TargetID.String())
+	if err != nil {
+		return err
+	}
+
+	inputs, err := w.buildInputs(tx, event, *stage)
+	if err != nil {
+		return err
+	}
+
+	stageEvent, err := models.CreateStageEventInTransaction(tx, stage.ID, event, models.StageEventStatePending, "", inputs)
+	if err != nil {
+		return err
+	}
+
+	err = messages.NewStageEventCreatedMessage(stage.CanvasID.String(), stageEvent).Publish()
+	if err != nil {
+		logging.ForStage(stage).Errorf("failed to publish stage event created message: %v", err)
+	}
+
+	return nil
+}
+
+func (w *PendingEventsWorker) handleConnectionGroupEvent(tx *gorm.DB, event *models.Event, connection models.Connection) error {
+	connectionGroup, err := models.FindConnectionGroupByID(tx, connection.TargetID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// Create new records for connection group event and keys.
+	//
+	_, err = models.CreateConnectionGroupEvent(tx, connectionGroup.ID, event)
+	if err != nil {
+		return fmt.Errorf("error creating connection group event: %v", err)
+	}
+
+	keys := []models.ConnectionGroupKey{}
+	for _, keyDef := range connectionGroup.Spec.Data().Keys {
+		value, err := event.EvaluateStringExpression(keyDef.Expression)
+		if err != nil {
+			return fmt.Errorf("error evaluating expression '%s' for connection group key %s: %v", keyDef.Expression, keyDef.Name, err)
 		}
 
-		if err := event.MarkAsProcessedInTransaction(tx); err != nil {
-			return fmt.Errorf("error enqueueing event %s: %v", event.ID, err)
+		keys = append(keys, models.ConnectionGroupKey{
+			ConnectionGroupID: connectionGroup.ID,
+			SourceID:          event.SourceID,
+			Name:              keyDef.Name,
+			Value:             value,
+		})
+	}
+
+	err = tx.Create(keys).Error
+	if err != nil {
+		return err
+	}
+
+	//
+	// Check if new event should be emitted, and if so, emit it.
+	//
+	return w.emitConnectionGroupEvent(tx, connectionGroup, keys)
+}
+
+func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGroup *models.ConnectionGroup, keys []models.ConnectionGroupKey) error {
+	connections, err := models.ListConnectionsInTransaction(tx, connectionGroup.ID, models.ConnectionTargetTypeConnectionGroup)
+	if err != nil {
+		return fmt.Errorf("error listing connections: %v", err)
+	}
+
+	for _, key := range keys {
+		connectionsWithKey, err := models.FindConnectionsWithGroupKey(tx, connectionGroup.ID, key.Name, key.Value)
+		if err != nil {
+			return fmt.Errorf("error finding connections for group key: %v", err)
 		}
 
-		return nil
-	})
+		//
+		// If one of the connections still hasn't emitted an event with this key,
+		// we do not emit any event for the connection group.
+		//
+		for _, conn := range connections {
+			if !slices.Contains(connectionsWithKey, conn.SourceID.String()) {
+				log.Infof("Event from %s with %s=%s not received for connection group %s", conn.SourceName, key.Name, key.Value, connectionGroup.Name)
+				return nil
+			}
+		}
+	}
+
+	//
+	// If we get here, we know that we have received events
+	// with all the required keys from all the connections in the group,
+	// so we emit an event for it.
+	//
+	eventData, err := w.buildConnectionGroupEvent(keys)
+	if err != nil {
+		return fmt.Errorf("error building connection group event: %v", err)
+	}
+
+	_, err = models.CreateEventInTransaction(
+		tx,
+		connectionGroup.ID,
+		connectionGroup.Name,
+		models.SourceTypeConnectionGroup,
+		eventData,
+		[]byte{},
+	)
+
+	return err
+}
+
+func (w *PendingEventsWorker) buildConnectionGroupEvent(keys []models.ConnectionGroupKey) ([]byte, error) {
+	event := map[string]any{}
+	for _, key := range keys {
+		event[key.Name] = key.Value
+	}
+
+	// TODO: include all events that were grouped into this one
+
+	return json.Marshal(event)
 }
 
 func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) (map[string]any, error) {
@@ -186,22 +270,4 @@ func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stag
 	}
 
 	return inputs, nil
-}
-
-func (w *PendingEventsWorker) stageIDsFromConnections(connections []models.StageConnection) []uuid.UUID {
-	IDs := []uuid.UUID{}
-	for _, c := range connections {
-		IDs = append(IDs, c.StageID)
-	}
-
-	return IDs
-}
-
-func (w *PendingEventsWorker) idsFromStages(stages []models.Stage) []uuid.UUID {
-	IDs := []uuid.UUID{}
-	for _, s := range stages {
-		IDs = append(IDs, s.ID)
-	}
-
-	return IDs
 }

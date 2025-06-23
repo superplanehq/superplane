@@ -9,9 +9,9 @@ import (
 
 func Test__StageConnectionFilter(t *testing.T) {
 	t.Run("single expression filters -> true", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a == 1 && b == 2`},
@@ -30,9 +30,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("expression filter with case insensitive headers -> true", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a == 1 && b == 2`},
@@ -51,9 +51,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("single expression filter -> false", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a == 1 && b == 2`},
@@ -68,9 +68,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("expression filter with case insensitive headers -> false", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type:   FilterTypeHeader,
 					Header: &HeaderFilter{Expression: `headers["Content-Type"] == "text/plain" && headers["X-ExAmPlE-HeAdEr"] == "some-value"`},
@@ -85,9 +85,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("expression filter with dot syntax -> true", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a.b == 2`},
@@ -102,9 +102,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("expression filter with array syntax for array -> true", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `1 in a`},
@@ -119,9 +119,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("expression filter with improper dot syntax -> error", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a.b == 2`},
@@ -135,9 +135,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("multiple expression filters with AND", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorAnd,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a == 1`},
@@ -156,9 +156,9 @@ func Test__StageConnectionFilter(t *testing.T) {
 	})
 
 	t.Run("multiple expression filters with OR", func(t *testing.T) {
-		conn := StageConnection{
+		conn := Connection{
 			FilterOperator: FilterOperatorOr,
-			Filters: datatypes.NewJSONSlice([]StageConnectionFilter{
+			Filters: datatypes.NewJSONSlice([]ConnectionFilter{
 				{
 					Type: FilterTypeData,
 					Data: &DataFilter{Expression: `a == 1`},

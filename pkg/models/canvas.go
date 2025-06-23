@@ -137,7 +137,7 @@ func (c *Canvas) CreateStage(
 	name, createdBy string,
 	conditions []StageCondition,
 	executorSpec ExecutorSpec,
-	connections []StageConnection,
+	connections []Connection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
 	outputs []OutputDefinition,
@@ -172,7 +172,8 @@ func (c *Canvas) CreateStage(
 
 		for _, i := range connections {
 			c := i
-			c.StageID = ID
+			c.TargetID = ID
+			c.TargetType = ConnectionTargetTypeStage
 			err := tx.Create(&c).Error
 			if err != nil {
 				return err
@@ -187,19 +188,20 @@ func (c *Canvas) UpdateStage(
 	id, requesterID string,
 	conditions []StageCondition,
 	executorSpec ExecutorSpec,
-	connections []StageConnection,
+	connections []Connection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
 	outputs []OutputDefinition,
 	secrets []ValueDefinition,
 ) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("stage_id = ?", id).Delete(&StageConnection{}).Error; err != nil {
+		if err := tx.Where("target_id = ?", id).Delete(&Connection{}).Error; err != nil {
 			return fmt.Errorf("failed to delete existing connections: %v", err)
 		}
 
 		for _, connection := range connections {
-			connection.StageID = uuid.Must(uuid.Parse(id))
+			connection.TargetID = uuid.Must(uuid.Parse(id))
+			connection.TargetType = ConnectionTargetTypeStage
 			if err := tx.Create(&connection).Error; err != nil {
 				return fmt.Errorf("failed to create connection: %v", err)
 			}

@@ -19,23 +19,24 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Superplane_ListCanvases_FullMethodName        = "/Superplane.Superplane/ListCanvases"
-	Superplane_CreateCanvas_FullMethodName        = "/Superplane.Superplane/CreateCanvas"
-	Superplane_CreateSecret_FullMethodName        = "/Superplane.Superplane/CreateSecret"
-	Superplane_CreateEventSource_FullMethodName   = "/Superplane.Superplane/CreateEventSource"
-	Superplane_CreateStage_FullMethodName         = "/Superplane.Superplane/CreateStage"
-	Superplane_DescribeCanvas_FullMethodName      = "/Superplane.Superplane/DescribeCanvas"
-	Superplane_DescribeStage_FullMethodName       = "/Superplane.Superplane/DescribeStage"
-	Superplane_DescribeEventSource_FullMethodName = "/Superplane.Superplane/DescribeEventSource"
-	Superplane_DescribeSecret_FullMethodName      = "/Superplane.Superplane/DescribeSecret"
-	Superplane_ListStages_FullMethodName          = "/Superplane.Superplane/ListStages"
-	Superplane_ListEventSources_FullMethodName    = "/Superplane.Superplane/ListEventSources"
-	Superplane_ListSecrets_FullMethodName         = "/Superplane.Superplane/ListSecrets"
-	Superplane_ListStageEvents_FullMethodName     = "/Superplane.Superplane/ListStageEvents"
-	Superplane_UpdateStage_FullMethodName         = "/Superplane.Superplane/UpdateStage"
-	Superplane_UpdateSecret_FullMethodName        = "/Superplane.Superplane/UpdateSecret"
-	Superplane_ApproveStageEvent_FullMethodName   = "/Superplane.Superplane/ApproveStageEvent"
-	Superplane_DeleteSecret_FullMethodName        = "/Superplane.Superplane/DeleteSecret"
+	Superplane_ListCanvases_FullMethodName          = "/Superplane.Superplane/ListCanvases"
+	Superplane_CreateCanvas_FullMethodName          = "/Superplane.Superplane/CreateCanvas"
+	Superplane_CreateSecret_FullMethodName          = "/Superplane.Superplane/CreateSecret"
+	Superplane_CreateConnectionGroup_FullMethodName = "/Superplane.Superplane/CreateConnectionGroup"
+	Superplane_CreateEventSource_FullMethodName     = "/Superplane.Superplane/CreateEventSource"
+	Superplane_CreateStage_FullMethodName           = "/Superplane.Superplane/CreateStage"
+	Superplane_DescribeCanvas_FullMethodName        = "/Superplane.Superplane/DescribeCanvas"
+	Superplane_DescribeStage_FullMethodName         = "/Superplane.Superplane/DescribeStage"
+	Superplane_DescribeEventSource_FullMethodName   = "/Superplane.Superplane/DescribeEventSource"
+	Superplane_DescribeSecret_FullMethodName        = "/Superplane.Superplane/DescribeSecret"
+	Superplane_ListStages_FullMethodName            = "/Superplane.Superplane/ListStages"
+	Superplane_ListEventSources_FullMethodName      = "/Superplane.Superplane/ListEventSources"
+	Superplane_ListSecrets_FullMethodName           = "/Superplane.Superplane/ListSecrets"
+	Superplane_ListStageEvents_FullMethodName       = "/Superplane.Superplane/ListStageEvents"
+	Superplane_UpdateStage_FullMethodName           = "/Superplane.Superplane/UpdateStage"
+	Superplane_UpdateSecret_FullMethodName          = "/Superplane.Superplane/UpdateSecret"
+	Superplane_ApproveStageEvent_FullMethodName     = "/Superplane.Superplane/ApproveStageEvent"
+	Superplane_DeleteSecret_FullMethodName          = "/Superplane.Superplane/DeleteSecret"
 )
 
 // SuperplaneClient is the client API for Superplane service.
@@ -45,6 +46,7 @@ type SuperplaneClient interface {
 	ListCanvases(ctx context.Context, in *ListCanvasesRequest, opts ...grpc.CallOption) (*ListCanvasesResponse, error)
 	CreateCanvas(ctx context.Context, in *CreateCanvasRequest, opts ...grpc.CallOption) (*CreateCanvasResponse, error)
 	CreateSecret(ctx context.Context, in *CreateSecretRequest, opts ...grpc.CallOption) (*CreateSecretResponse, error)
+	CreateConnectionGroup(ctx context.Context, in *CreateConnectionGroupRequest, opts ...grpc.CallOption) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(ctx context.Context, in *CreateEventSourceRequest, opts ...grpc.CallOption) (*CreateEventSourceResponse, error)
 	CreateStage(ctx context.Context, in *CreateStageRequest, opts ...grpc.CallOption) (*CreateStageResponse, error)
 	DescribeCanvas(ctx context.Context, in *DescribeCanvasRequest, opts ...grpc.CallOption) (*DescribeCanvasResponse, error)
@@ -93,6 +95,16 @@ func (c *superplaneClient) CreateSecret(ctx context.Context, in *CreateSecretReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateSecretResponse)
 	err := c.cc.Invoke(ctx, Superplane_CreateSecret_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) CreateConnectionGroup(ctx context.Context, in *CreateConnectionGroupRequest, opts ...grpc.CallOption) (*CreateConnectionGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateConnectionGroupResponse)
+	err := c.cc.Invoke(ctx, Superplane_CreateConnectionGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -246,6 +258,7 @@ type SuperplaneServer interface {
 	ListCanvases(context.Context, *ListCanvasesRequest) (*ListCanvasesResponse, error)
 	CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error)
 	CreateSecret(context.Context, *CreateSecretRequest) (*CreateSecretResponse, error)
+	CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error)
 	CreateStage(context.Context, *CreateStageRequest) (*CreateStageResponse, error)
 	DescribeCanvas(context.Context, *DescribeCanvasRequest) (*DescribeCanvasResponse, error)
@@ -277,6 +290,9 @@ func (UnimplementedSuperplaneServer) CreateCanvas(context.Context, *CreateCanvas
 }
 func (UnimplementedSuperplaneServer) CreateSecret(context.Context, *CreateSecretRequest) (*CreateSecretResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSecret not implemented")
+}
+func (UnimplementedSuperplaneServer) CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateConnectionGroup not implemented")
 }
 func (UnimplementedSuperplaneServer) CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateEventSource not implemented")
@@ -390,6 +406,24 @@ func _Superplane_CreateSecret_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).CreateSecret(ctx, req.(*CreateSecretRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_CreateConnectionGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateConnectionGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).CreateConnectionGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_CreateConnectionGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).CreateConnectionGroup(ctx, req.(*CreateConnectionGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -664,6 +698,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateSecret",
 			Handler:    _Superplane_CreateSecret_Handler,
+		},
+		{
+			MethodName: "CreateConnectionGroup",
+			Handler:    _Superplane_CreateConnectionGroup_Handler,
 		},
 		{
 			MethodName: "CreateEventSource",

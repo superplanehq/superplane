@@ -106,6 +106,66 @@ ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
 
 
 --
+-- Name: connection_group_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connection_group_events (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    connection_group_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    source_id uuid NOT NULL,
+    source_name character varying(128) NOT NULL,
+    source_type character varying(64) NOT NULL,
+    state character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: connection_group_keys; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connection_group_keys (
+    connection_group_id uuid NOT NULL,
+    source_id uuid NOT NULL,
+    name character varying(128) NOT NULL,
+    value character varying(128) NOT NULL
+);
+
+
+--
+-- Name: connection_groups; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connection_groups (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(128) NOT NULL,
+    canvas_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    created_by uuid NOT NULL,
+    updated_at timestamp without time zone,
+    updated_by uuid,
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connections (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    target_id uuid NOT NULL,
+    source_id uuid NOT NULL,
+    source_name character varying(128) NOT NULL,
+    source_type character varying(64) NOT NULL,
+    filter_operator character varying(16) NOT NULL,
+    filters jsonb NOT NULL,
+    target_type character varying(64) DEFAULT 'stage'::character varying NOT NULL
+);
+
+
+--
 -- Name: event_sources; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -158,21 +218,6 @@ CREATE TABLE public.secrets (
     created_by uuid NOT NULL,
     provider character varying(64) NOT NULL,
     data bytea NOT NULL
-);
-
-
---
--- Name: stage_connections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_connections (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    stage_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    source_name character varying(128) NOT NULL,
-    source_type character varying(64) NOT NULL,
-    filter_operator character varying(16) NOT NULL,
-    filters jsonb NOT NULL
 );
 
 
@@ -314,6 +359,54 @@ ALTER TABLE ONLY public.casbin_rule
 
 
 --
+-- Name: connection_group_events connection_group_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_group_events
+    ADD CONSTRAINT connection_group_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connection_group_keys connection_group_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_group_keys
+    ADD CONSTRAINT connection_group_keys_pkey PRIMARY KEY (connection_group_id, source_id, name, value);
+
+
+--
+-- Name: connection_groups connection_groups_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_groups
+    ADD CONSTRAINT connection_groups_canvas_id_name_key UNIQUE (canvas_id, name);
+
+
+--
+-- Name: connection_groups connection_groups_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_groups
+    ADD CONSTRAINT connection_groups_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connections connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connections connections_target_id_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT connections_target_id_source_id_key UNIQUE (target_id, source_id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -359,22 +452,6 @@ ALTER TABLE ONLY public.secrets
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_connections stage_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_connections
-    ADD CONSTRAINT stage_connections_pkey PRIMARY KEY (id);
-
-
---
--- Name: stage_connections stage_connections_stage_id_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_connections
-    ADD CONSTRAINT stage_connections_stage_id_source_id_key UNIQUE (stage_id, source_id);
 
 
 --
@@ -448,13 +525,6 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -494,13 +564,6 @@ CREATE INDEX uix_event_sources_canvas ON public.event_sources USING btree (canva
 --
 
 CREATE INDEX uix_events_source ON public.events USING btree (source_id);
-
-
---
--- Name: uix_stage_connections_stage; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX uix_stage_connections_stage ON public.stage_connections USING btree (stage_id);
 
 
 --
@@ -554,6 +617,30 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
+-- Name: connection_group_events connection_group_events_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_group_events
+    ADD CONSTRAINT connection_group_events_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
+
+
+--
+-- Name: connection_group_keys connection_group_keys_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_group_keys
+    ADD CONSTRAINT connection_group_keys_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
+
+
+--
+-- Name: connection_groups connection_groups_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connection_groups
+    ADD CONSTRAINT connection_groups_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -567,14 +654,6 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.secrets
     ADD CONSTRAINT secrets_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
--- Name: stage_connections stage_connections_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_connections
-    ADD CONSTRAINT stage_connections_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
 
 
 --
@@ -645,7 +724,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250616111212	f
+20250620211655	f
 \.
 
 

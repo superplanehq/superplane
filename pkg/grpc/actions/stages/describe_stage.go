@@ -55,12 +55,12 @@ func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.Descr
 		return nil, fmt.Errorf("failed to list event sources for canvas: %w", err)
 	}
 
-	connections, err := models.ListConnectionsForStage(stage.ID)
+	connections, err := models.ListConnections(stage.ID, models.ConnectionTargetTypeStage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list connections for stage: %w", err)
 	}
 
-	conn, err := serializeConnections(stages, sources, connections)
+	conn, err := actions.SerializeConnections(stages, sources, connections)
 	if err != nil {
 		return nil, err
 	}

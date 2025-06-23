@@ -7,7 +7,6 @@
 package authorization
 
 import (
-	_ "github.com/golang/protobuf/ptypes/timestamp"
 	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2/options"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -1376,7 +1375,7 @@ var File_authorization_proto protoreflect.FileDescriptor
 
 const file_authorization_proto_rawDesc = "" +
 	"\n" +
-	"\x13authorization.proto\x12\x18Superplane.Authorization\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x99\x01\n" +
+	"\x13authorization.proto\x12\x18Superplane.Authorization\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x99\x01\n" +
 	"\x1aListUserPermissionsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
