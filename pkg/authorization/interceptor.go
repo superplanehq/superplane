@@ -84,7 +84,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid %s ID", rule.DomainType))
 		}
 
-		var allowed bool = false
+		var allowed bool
 		if rule.DomainType == "org" {
 			allowed, err = a.authService.CheckOrganizationPermission(user.ID.String(), domainID, rule.Resource, rule.Action)
 			if err != nil {
