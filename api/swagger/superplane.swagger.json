@@ -543,6 +543,36 @@
       }
     },
     "/api/v1/canvases/{canvasIdOrName}/connection-groups": {
+      "get": {
+        "summary": "List connection groups",
+        "description": "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)",
+        "operationId": "Superplane_ListConnectionGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListConnectionGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      },
       "post": {
         "summary": "Create a new canvas connection group",
         "description": "Creates a new canvas connection group",
@@ -575,6 +605,44 @@
             "schema": {
               "$ref": "#/definitions/SuperplaneCreateConnectionGroupBody"
             }
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}": {
+      "get": {
+        "summary": "Get connection group details",
+        "description": "Returns the details of a specific connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DescribeConnectionGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeConnectionGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
@@ -1900,6 +1968,14 @@
         }
       }
     },
+    "SuperplaneDescribeConnectionGroupResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
     "SuperplaneDescribeEventSourceResponse": {
       "type": "object",
       "properties": {
@@ -2071,6 +2147,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneCanvas"
+          }
+        }
+      }
+    },
+    "SuperplaneListConnectionGroupsResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroup"
           }
         }
       }

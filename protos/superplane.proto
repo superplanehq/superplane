@@ -129,6 +129,17 @@ service Superplane {
     };
   }
 
+  rpc DescribeConnectionGroup(DescribeConnectionGroupRequest) returns (DescribeConnectionGroupResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get connection group details";
+      description: "Returns the details of a specific connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc DescribeSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -162,6 +173,17 @@ service Superplane {
     };
   }
   
+  rpc ListConnectionGroups(ListConnectionGroupsRequest) returns (ListConnectionGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connection groups";
+      description: "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/secrets"
@@ -398,6 +420,23 @@ message CreateConnectionGroupRequest {
 
 message CreateConnectionGroupResponse {
   ConnectionGroup connection_group = 1;
+}
+
+message DescribeConnectionGroupRequest {
+  string id_or_name = 1;
+  string canvas_id_or_name = 2;
+}
+
+message DescribeConnectionGroupResponse {
+  ConnectionGroup connection_group = 1;
+}
+
+message ListConnectionGroupsRequest {
+  string canvas_id_or_name = 1;
+}
+
+message ListConnectionGroupsResponse {
+  repeated ConnectionGroup connection_groups = 1;
 }
 
 message ConnectionGroup {

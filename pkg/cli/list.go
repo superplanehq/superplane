@@ -99,6 +99,38 @@ var listStagesCmd = &cobra.Command{
 	},
 }
 
+var listConnectionGroupsCmd = &cobra.Command{
+	Use:     "connection-groups",
+	Short:   "List all connection groups for a canvas",
+	Long:    `Retrieve a list of all connection groups for the specified canvas`,
+	Aliases: []string{"connectiongroups"},
+	Args:    cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+
+		c := DefaultClient()
+		response, _, err := c.ConnectionGroupAPI.SuperplaneListConnectionGroups(context.Background(), canvasIDOrName).Execute()
+		Check(err)
+
+		if len(response.ConnectionGroups) == 0 {
+			fmt.Println("No connection groups found for this canvas.")
+			return
+		}
+
+		fmt.Printf("Found %d connection groups:\n\n", len(response.ConnectionGroups))
+		for i, es := range response.ConnectionGroups {
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *es.GetMetadata().Name, *es.GetMetadata().Id)
+			fmt.Printf("   Canvas: %s\n", *es.GetMetadata().CanvasId)
+			fmt.Printf("   Created at: %s\n", *es.GetMetadata().CreatedAt)
+
+			if i < len(response.ConnectionGroups)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 var listSecretsCmd = &cobra.Command{
 	Use:     "secrets",
 	Short:   "List all secrets for a canvas",
@@ -238,6 +270,11 @@ func init() {
 	listCmd.AddCommand(listStagesCmd)
 	listStagesCmd.Flags().String("canvas-id", "", "Canvas ID")
 	listStagesCmd.Flags().String("canvas-name", "", "Canvas name")
+
+	// Connection groups command
+	listCmd.AddCommand(listConnectionGroupsCmd)
+	listConnectionGroupsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listConnectionGroupsCmd.Flags().String("canvas-name", "", "Canvas name")
 
 	// Secrets command
 	listCmd.AddCommand(listSecretsCmd)

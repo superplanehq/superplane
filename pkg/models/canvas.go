@@ -101,6 +101,22 @@ func (c *Canvas) FindConnectionGroupByName(name string) (*ConnectionGroup, error
 	return &connectionGroup, nil
 }
 
+func (c *Canvas) FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
+	var connectionGroup ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", c.ID).
+		Where("id = ?", id).
+		First(&connectionGroup).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &connectionGroup, nil
+}
+
 // NOTE: the caller must decrypt the key before using it
 func (c *Canvas) FindEventSourceByID(id uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource
@@ -147,6 +163,22 @@ func (c *Canvas) ListStages() ([]Stage, error) {
 	}
 
 	return stages, nil
+}
+
+func (c *Canvas) ListConnectionGroups() ([]ConnectionGroup, error) {
+	var connectionGroups []ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", c.ID).
+		Order("name ASC").
+		Find(&connectionGroups).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return connectionGroups, nil
 }
 
 func (c *Canvas) CreateStage(

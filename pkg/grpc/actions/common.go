@@ -55,7 +55,7 @@ func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*
 	case pb.Connection_TYPE_CONNECTION_GROUP:
 		connectionGroup, err := canvas.FindConnectionGroupByName(connection.Name)
 		if err != nil {
-			return nil, fmt.Errorf("event source %s not found", connection.Name)
+			return nil, fmt.Errorf("connection group %s not found", connection.Name)
 		}
 
 		return &connectionGroup.ID, nil

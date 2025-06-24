@@ -76,6 +76,7 @@ docs/SuperplaneCreateSecretResponse.md
 docs/SuperplaneCreateStageBody.md
 docs/SuperplaneCreateStageResponse.md
 docs/SuperplaneDescribeCanvasResponse.md
+docs/SuperplaneDescribeConnectionGroupResponse.md
 docs/SuperplaneDescribeEventSourceResponse.md
 docs/SuperplaneDescribeSecretResponse.md
 docs/SuperplaneDescribeStageResponse.md
@@ -89,6 +90,7 @@ docs/SuperplaneInputDefinition.md
 docs/SuperplaneInputMapping.md
 docs/SuperplaneInputValue.md
 docs/SuperplaneListCanvasesResponse.md
+docs/SuperplaneListConnectionGroupsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
 docs/SuperplaneListSecretsResponse.md
 docs/SuperplaneListStageEventsResponse.md
@@ -171,6 +173,7 @@ model_superplane_create_secret_response.go
 model_superplane_create_stage_body.go
 model_superplane_create_stage_response.go
 model_superplane_describe_canvas_response.go
+model_superplane_describe_connection_group_response.go
 model_superplane_describe_event_source_response.go
 model_superplane_describe_secret_response.go
 model_superplane_describe_stage_response.go
@@ -184,6 +187,7 @@ model_superplane_input_definition.go
 model_superplane_input_mapping.go
 model_superplane_input_value.go
 model_superplane_list_canvases_response.go
+model_superplane_list_connection_groups_response.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_secrets_response.go
 model_superplane_list_stage_events_response.go

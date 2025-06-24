@@ -97,3 +97,11 @@ func (s *SuperplaneService) DeleteSecret(ctx context.Context, req *pb.DeleteSecr
 func (s *SuperplaneService) CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
 	return groups.CreateConnectionGroup(ctx, req)
 }
+
+func (s *SuperplaneService) DescribeConnectionGroup(ctx context.Context, req *pb.DescribeConnectionGroupRequest) (*pb.DescribeConnectionGroupResponse, error) {
+	return groups.DescribeConnectionGroup(ctx, req)
+}
+
+func (s *SuperplaneService) ListConnectionGroups(ctx context.Context, req *pb.ListConnectionGroupsRequest) (*pb.ListConnectionGroupsResponse, error) {
+	return groups.ListConnectionGroups(ctx, req)
+}

@@ -19,24 +19,26 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Superplane_ListCanvases_FullMethodName          = "/Superplane.Superplane/ListCanvases"
-	Superplane_CreateCanvas_FullMethodName          = "/Superplane.Superplane/CreateCanvas"
-	Superplane_CreateSecret_FullMethodName          = "/Superplane.Superplane/CreateSecret"
-	Superplane_CreateConnectionGroup_FullMethodName = "/Superplane.Superplane/CreateConnectionGroup"
-	Superplane_CreateEventSource_FullMethodName     = "/Superplane.Superplane/CreateEventSource"
-	Superplane_CreateStage_FullMethodName           = "/Superplane.Superplane/CreateStage"
-	Superplane_DescribeCanvas_FullMethodName        = "/Superplane.Superplane/DescribeCanvas"
-	Superplane_DescribeStage_FullMethodName         = "/Superplane.Superplane/DescribeStage"
-	Superplane_DescribeEventSource_FullMethodName   = "/Superplane.Superplane/DescribeEventSource"
-	Superplane_DescribeSecret_FullMethodName        = "/Superplane.Superplane/DescribeSecret"
-	Superplane_ListStages_FullMethodName            = "/Superplane.Superplane/ListStages"
-	Superplane_ListEventSources_FullMethodName      = "/Superplane.Superplane/ListEventSources"
-	Superplane_ListSecrets_FullMethodName           = "/Superplane.Superplane/ListSecrets"
-	Superplane_ListStageEvents_FullMethodName       = "/Superplane.Superplane/ListStageEvents"
-	Superplane_UpdateStage_FullMethodName           = "/Superplane.Superplane/UpdateStage"
-	Superplane_UpdateSecret_FullMethodName          = "/Superplane.Superplane/UpdateSecret"
-	Superplane_ApproveStageEvent_FullMethodName     = "/Superplane.Superplane/ApproveStageEvent"
-	Superplane_DeleteSecret_FullMethodName          = "/Superplane.Superplane/DeleteSecret"
+	Superplane_ListCanvases_FullMethodName            = "/Superplane.Superplane/ListCanvases"
+	Superplane_CreateCanvas_FullMethodName            = "/Superplane.Superplane/CreateCanvas"
+	Superplane_CreateSecret_FullMethodName            = "/Superplane.Superplane/CreateSecret"
+	Superplane_CreateConnectionGroup_FullMethodName   = "/Superplane.Superplane/CreateConnectionGroup"
+	Superplane_CreateEventSource_FullMethodName       = "/Superplane.Superplane/CreateEventSource"
+	Superplane_CreateStage_FullMethodName             = "/Superplane.Superplane/CreateStage"
+	Superplane_DescribeCanvas_FullMethodName          = "/Superplane.Superplane/DescribeCanvas"
+	Superplane_DescribeStage_FullMethodName           = "/Superplane.Superplane/DescribeStage"
+	Superplane_DescribeEventSource_FullMethodName     = "/Superplane.Superplane/DescribeEventSource"
+	Superplane_DescribeConnectionGroup_FullMethodName = "/Superplane.Superplane/DescribeConnectionGroup"
+	Superplane_DescribeSecret_FullMethodName          = "/Superplane.Superplane/DescribeSecret"
+	Superplane_ListStages_FullMethodName              = "/Superplane.Superplane/ListStages"
+	Superplane_ListEventSources_FullMethodName        = "/Superplane.Superplane/ListEventSources"
+	Superplane_ListConnectionGroups_FullMethodName    = "/Superplane.Superplane/ListConnectionGroups"
+	Superplane_ListSecrets_FullMethodName             = "/Superplane.Superplane/ListSecrets"
+	Superplane_ListStageEvents_FullMethodName         = "/Superplane.Superplane/ListStageEvents"
+	Superplane_UpdateStage_FullMethodName             = "/Superplane.Superplane/UpdateStage"
+	Superplane_UpdateSecret_FullMethodName            = "/Superplane.Superplane/UpdateSecret"
+	Superplane_ApproveStageEvent_FullMethodName       = "/Superplane.Superplane/ApproveStageEvent"
+	Superplane_DeleteSecret_FullMethodName            = "/Superplane.Superplane/DeleteSecret"
 )
 
 // SuperplaneClient is the client API for Superplane service.
@@ -52,9 +54,11 @@ type SuperplaneClient interface {
 	DescribeCanvas(ctx context.Context, in *DescribeCanvasRequest, opts ...grpc.CallOption) (*DescribeCanvasResponse, error)
 	DescribeStage(ctx context.Context, in *DescribeStageRequest, opts ...grpc.CallOption) (*DescribeStageResponse, error)
 	DescribeEventSource(ctx context.Context, in *DescribeEventSourceRequest, opts ...grpc.CallOption) (*DescribeEventSourceResponse, error)
+	DescribeConnectionGroup(ctx context.Context, in *DescribeConnectionGroupRequest, opts ...grpc.CallOption) (*DescribeConnectionGroupResponse, error)
 	DescribeSecret(ctx context.Context, in *DescribeSecretRequest, opts ...grpc.CallOption) (*DescribeSecretResponse, error)
 	ListStages(ctx context.Context, in *ListStagesRequest, opts ...grpc.CallOption) (*ListStagesResponse, error)
 	ListEventSources(ctx context.Context, in *ListEventSourcesRequest, opts ...grpc.CallOption) (*ListEventSourcesResponse, error)
+	ListConnectionGroups(ctx context.Context, in *ListConnectionGroupsRequest, opts ...grpc.CallOption) (*ListConnectionGroupsResponse, error)
 	ListSecrets(ctx context.Context, in *ListSecretsRequest, opts ...grpc.CallOption) (*ListSecretsResponse, error)
 	ListStageEvents(ctx context.Context, in *ListStageEventsRequest, opts ...grpc.CallOption) (*ListStageEventsResponse, error)
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
@@ -161,6 +165,16 @@ func (c *superplaneClient) DescribeEventSource(ctx context.Context, in *Describe
 	return out, nil
 }
 
+func (c *superplaneClient) DescribeConnectionGroup(ctx context.Context, in *DescribeConnectionGroupRequest, opts ...grpc.CallOption) (*DescribeConnectionGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DescribeConnectionGroupResponse)
+	err := c.cc.Invoke(ctx, Superplane_DescribeConnectionGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) DescribeSecret(ctx context.Context, in *DescribeSecretRequest, opts ...grpc.CallOption) (*DescribeSecretResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DescribeSecretResponse)
@@ -185,6 +199,16 @@ func (c *superplaneClient) ListEventSources(ctx context.Context, in *ListEventSo
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListEventSourcesResponse)
 	err := c.cc.Invoke(ctx, Superplane_ListEventSources_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) ListConnectionGroups(ctx context.Context, in *ListConnectionGroupsRequest, opts ...grpc.CallOption) (*ListConnectionGroupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListConnectionGroupsResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListConnectionGroups_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -264,9 +288,11 @@ type SuperplaneServer interface {
 	DescribeCanvas(context.Context, *DescribeCanvasRequest) (*DescribeCanvasResponse, error)
 	DescribeStage(context.Context, *DescribeStageRequest) (*DescribeStageResponse, error)
 	DescribeEventSource(context.Context, *DescribeEventSourceRequest) (*DescribeEventSourceResponse, error)
+	DescribeConnectionGroup(context.Context, *DescribeConnectionGroupRequest) (*DescribeConnectionGroupResponse, error)
 	DescribeSecret(context.Context, *DescribeSecretRequest) (*DescribeSecretResponse, error)
 	ListStages(context.Context, *ListStagesRequest) (*ListStagesResponse, error)
 	ListEventSources(context.Context, *ListEventSourcesRequest) (*ListEventSourcesResponse, error)
+	ListConnectionGroups(context.Context, *ListConnectionGroupsRequest) (*ListConnectionGroupsResponse, error)
 	ListSecrets(context.Context, *ListSecretsRequest) (*ListSecretsResponse, error)
 	ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error)
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
@@ -309,6 +335,9 @@ func (UnimplementedSuperplaneServer) DescribeStage(context.Context, *DescribeSta
 func (UnimplementedSuperplaneServer) DescribeEventSource(context.Context, *DescribeEventSourceRequest) (*DescribeEventSourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeEventSource not implemented")
 }
+func (UnimplementedSuperplaneServer) DescribeConnectionGroup(context.Context, *DescribeConnectionGroupRequest) (*DescribeConnectionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribeConnectionGroup not implemented")
+}
 func (UnimplementedSuperplaneServer) DescribeSecret(context.Context, *DescribeSecretRequest) (*DescribeSecretResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeSecret not implemented")
 }
@@ -317,6 +346,9 @@ func (UnimplementedSuperplaneServer) ListStages(context.Context, *ListStagesRequ
 }
 func (UnimplementedSuperplaneServer) ListEventSources(context.Context, *ListEventSourcesRequest) (*ListEventSourcesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListEventSources not implemented")
+}
+func (UnimplementedSuperplaneServer) ListConnectionGroups(context.Context, *ListConnectionGroupsRequest) (*ListConnectionGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListConnectionGroups not implemented")
 }
 func (UnimplementedSuperplaneServer) ListSecrets(context.Context, *ListSecretsRequest) (*ListSecretsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListSecrets not implemented")
@@ -518,6 +550,24 @@ func _Superplane_DescribeEventSource_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_DescribeConnectionGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeConnectionGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).DescribeConnectionGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_DescribeConnectionGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).DescribeConnectionGroup(ctx, req.(*DescribeConnectionGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_DescribeSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DescribeSecretRequest)
 	if err := dec(in); err != nil {
@@ -568,6 +618,24 @@ func _Superplane_ListEventSources_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).ListEventSources(ctx, req.(*ListEventSourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_ListConnectionGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListConnectionGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListConnectionGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListConnectionGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListConnectionGroups(ctx, req.(*ListConnectionGroupsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -724,6 +792,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Superplane_DescribeEventSource_Handler,
 		},
 		{
+			MethodName: "DescribeConnectionGroup",
+			Handler:    _Superplane_DescribeConnectionGroup_Handler,
+		},
+		{
 			MethodName: "DescribeSecret",
 			Handler:    _Superplane_DescribeSecret_Handler,
 		},
@@ -734,6 +806,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListEventSources",
 			Handler:    _Superplane_ListEventSources_Handler,
+		},
+		{
+			MethodName: "ListConnectionGroups",
+			Handler:    _Superplane_ListConnectionGroups_Handler,
 		},
 		{
 			MethodName: "ListSecrets",
