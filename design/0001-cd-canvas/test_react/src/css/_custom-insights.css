@@ -1,0 +1,258 @@
+.c-insights-speed-chart {
+    position: relative;
+}
+
+.c-insights-speed-chart .duration {
+    fill: none;
+    stroke: var(--green);
+    stroke-width: 3;
+}
+
+.c-insights-speed-chart .duration-failure {
+    fill: none;
+    stroke: var(--red);
+    stroke-width: 3;
+}
+
+.c-insights-speed-chart .deviation {
+    fill: var(--purple);
+    opacity: 0.1;
+}
+
+.c-insights-speed-chart .axis {
+    font-size: 12px;
+    color: #999;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-speed-chart .axis path {
+    fill: none;
+}
+
+.c-insights-speed-chart .axis line {
+    fill: none;
+}
+
+.c-insights-speed-chart .focus-line {
+    fill: none;
+    stroke: #8658d6;
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-speed-chart .focus-circle {
+    fill: black;
+}
+
+.c-insights-speed-chart .tick line {
+    stroke: rgba(0, 0, 0, 0.05);
+}
+
+.c-insights-speed-chart .overlay {
+    fill: none;
+    stroke: none;
+    pointer-events: all;
+}
+
+.c-insights-speed-chart .tooltip {
+    display: none;
+    font-size: 10px;
+    color: white;
+    background-color: rgba(0, 0, 0, 1);
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.c-insights-failure-rate-chart .axis {
+    font-size: 12px;
+    color: #999;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-failure-rate-chart .axis path {
+    fill: none;
+}
+
+.c-insights-failure-rate-chart .axis line {
+    fill: none;
+}
+
+.c-insights-failure-rate-chart .focus-line {
+    fill: none;
+    stroke: var(--lightest-gray);
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-failure-rate-chart .focus-circle {
+    fill: black;
+}
+
+.c-insights-failure-rate-chart .tick line {
+    stroke: rgba(0, 0, 0, 0.05);
+}
+
+.c-insights-failure-rate-chart .overlay {
+    fill: none;
+    stroke: none;
+    pointer-events: all;
+}
+
+.c-insights-failure-rate-chart .tooltip {
+    display: none;
+    font-size: 10px;
+    color: white;
+    background-color: black;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.c-insights-failure-rate-chart .failed {
+    /* fill: var(--red); */
+}
+
+.c-insights-failure-rate-chart .passed {
+    fill: var(--green);
+}
+
+.c-insights-frequency-chart .axis {
+    font-size: 12px;
+    color: #999;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-frequency-chart .axis path {
+    fill: none;
+}
+
+.c-insights-frequency-chart .axis line {
+    fill: none;
+}
+
+.c-insights-frequency-chart .focus-line {
+    fill: none;
+    stroke: var(--lightest-gray);
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+}
+
+.c-insights-frequency-chart .focus-circle {
+    fill: black;
+}
+
+.c-insights-frequency-chart .tick line {
+    stroke: rgba(0, 0, 0, 0.05);
+}
+
+.c-insights-frequency-chart .overlay {
+    fill: none;
+    stroke: none;
+    pointer-events: all;
+}
+
+.c-insights-frequency-chart .tooltip {
+    display: none;
+    font-size: 10px;
+    color: white;
+    background-color: black;
+    padding: 8px;
+    border-radius: 4px;
+}
+
+.c-insights-frequency-chart .failed {
+    /* fill: var(--red); */
+}
+
+.c-insights-frequency-chart .passed {
+    fill: var(--green);
+}
+
+.c-insights-tab {
+}
+
+.c-insights-tab:hover {
+    background-color: var(--lightest-gray);
+}
+
+.c-insights-tab.c-insights-tab-active {
+    background-color: var(--green);
+    color: white;
+}
+
+.c-insights-tab.c-insights-tab-active div {
+    color: white !important;
+}
+
+.c-insights-tab.c-insights-tab-active svg path {
+    fill: white;
+}
+.c-org-health-column {
+    width: 150px;
+    flex-shrink: 0.1;
+    flex-grow: 0.1;
+    max-width: 170px;
+    padding: 8px;
+}
+
+.c-org-health-column-start {
+    width: 200px;
+    flex-shrink: 0.2;
+    flex-grow: 1;
+}
+.wf-insights-inactive{
+    z-index: 4;
+}
+
+.wf-insights-hover:hover {
+    box-shadow:0 0 0 3px #00359f !important;
+    position:relative;
+    z-index:4;
+    border-radius: 3px;
+    cursor:pointer;
+}
+.wf-insights-selected {
+    box-shadow:0 0 0 3px #00359f !important;
+    position:relative;
+    z-index:4
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5); /* Black background with 50% opacity */
+    z-index: 3;
+    display: block;
+}
+.sidebar-close {
+    position: absolute;
+    top: 15px;
+    left: -40px; /* Extends to the left of the sidebar */
+    width: 40px;
+    height: 50px;
+    display: flex; /* Use flexbox */
+    align-items: center; /* Center vertically */
+    justify-content: center; /* Center horizontally */
+}
+
+.center-align
+{
+    display: flex; /* Use flexbox */
+    align-items: center; /* Center vertically */
+    justify-content: center; /* Center horizontally */
+}
+.filters-group div:first-child,
+.filters-group input:first-child,
+.filters-group select:first-child {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.filters-group div:last-child,
+.filters-group input:last-child,
+.filters-group select:last-child {
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+}

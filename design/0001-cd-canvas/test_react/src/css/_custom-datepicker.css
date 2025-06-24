@@ -1,0 +1,76 @@
+/* Pickaday datepicker overrides */
+.pika-single {
+    font-family: -apple-system, BlinkMacSystemFont,
+               "Segoe UI",
+               Roboto,
+               Oxygen-Sans, Ubuntu, Cantarell,
+               "Helvetica Neue", sans-serif !important;
+    border: none !important;
+    border-radius: 0.25rem !important;
+    z-index: 99999 !important;
+}
+
+.pika-single.is-bound {
+    box-shadow: rgba(0, 0, 0, 0.25) 0px 8px 40px 3px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px !important;
+}
+
+.pika-table {
+    margin-bottom: 0;
+}
+
+.pika-table abbr {
+    text-decoration: none !important;
+    font-size: 13px !important;
+    color: var(--gray) !important;
+}
+
+.pika-button {
+    background: var(--washed-gray) !important;
+    padding: 8px !important;
+}
+
+.is-startrange .pika-button,
+.is-endrange .pika-button {
+    background: var(--gray) !important;
+    border-radius: 0 !important;
+}
+
+.is-today .pika-button {
+    color: var(--dark-indigo) !important;
+}
+
+.is-endrange.is-today .pika-button,
+.is-startrange.is-today .pika-button {
+    color: white !important;
+}
+
+.is-selected.is-today .pika-button {
+    color: white !important;
+}
+
+.is-today .pika-button:hover {
+    color: white !important;
+}
+
+.is-selected .pika-button,
+.has-event .pika-button {
+    background: var(--dark-indigo) !important;
+    box-shadow: none;
+    border-radius: 0 !important;
+}
+
+.pika-button:hover, .pika-row.pick-whole-week:hover .pika-button {
+    border-radius: 0 !important;
+}
+
+.pika-button:hover, .pika-row.pick-whole-week:hover .pika-button {
+    background: var(--gray) !important;
+}
+
+.is-disabled .pika-button {
+    color: var(--gray) !important;
+}
+
+.is-inrange .pika-button {
+    background: var(--lightest-indigo) !important;
+}

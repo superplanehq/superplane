@@ -1,0 +1,320 @@
+/* App Semaphore Forms
+----------------------------------------------------------------------------- */
+
+.label {
+    display: block;
+    font-weight: bold;
+    font-size: 0.9375rem;
+    margin-bottom: 2px;
+}
+
+.form-control {
+    -moz-appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 4px 10px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--dark-gray);
+    background-color: var(--white);
+    font-family: 'Fakt Pro',-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    transition: background .1s ease, border-color .1s ease;
+    position: relative;
+}
+
+input.form-control,
+textarea.form-control {
+    box-shadow: 0 0 0 1px var(--black-20), inset 0 1px 1px 0 var(--lightest-gray);
+}
+
+select.form-control {
+    padding-right: 1.5rem;
+    background-position: right 8px center;
+    background-repeat: no-repeat;
+    background-image: url('data:image/svg+xml;utf8,<svg width="6px" height="11px" viewBox="0 0 6 11" xmlns="http://www.w3.org/2000/svg"><path d="M3 0l3 4H0l3-4zm0 11L0 7h6l-3 4z" fill="%233B4148" fill-rule="evenodd"/></svg>');
+    box-shadow: 0 0 0 1px var(--black-20), inset 0 -1px 1px 0 var(--lightest-gray);
+}
+
+select:-moz-focusring {
+    color: transparent;
+    text-shadow: 0 0 0 #000;
+}
+
+optgroup {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+    font-style: normal;
+}
+
+/* Error state */
+
+.form-control-error {
+    box-shadow: 0 0 0 2px var(--red) !important;
+}
+
+
+/* Form control size */
+
+.form-control-small {
+    font-size: .9375rem;
+    padding: 3px 8px;
+}
+
+.form-control-tiny {
+    font-size: .875rem;
+    padding: 1px 4px;
+}
+
+.form-control-large {
+    font-size: 1.125rem;
+    padding: 6px 10px;
+}
+
+
+/* Disabled form elements */
+
+input[disabled],
+select[disabled],
+textarea[disabled] {
+    color: var(--mid-gray);
+    background-color: var(--near-white);
+    cursor: not-allowed;
+    box-shadow: 0;
+    box-shadow: 0 0 0 1px var(--black-20);
+}
+
+input[type="checkbox"][disabled],
+input[type="radio"][disabled] {
+    opacity: 1;
+}
+
+.form-control:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--dark-indigo) !important;
+    z-index: 4;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+    select.form-control:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px var(--dark-indigo) !important;
+    }
+}
+
+
+/* Placeholder default colour  */
+
+.form-control::placeholder {
+    opacity: 1;
+    color: var(--mid-gray);
+}
+
+textarea {
+    display: block;
+    min-height: 50px;
+}
+
+/* ------------------------------------- */
+
+
+/* Input group */
+
+.input-group {
+    display: flex;
+}
+
+.input-group .form-control:first-child {
+    border-bottom-right-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.input-group .form-control:last-child {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+}
+
+.input-group .form-control:not(:first-child) {
+    margin-left: 0;
+}
+
+.input-group .form-control:not(:first-child):not(:last-child) {
+    border-radius: 0;
+}
+
+
+/* Input-Button group */
+
+.input-button-group {
+    display: flex;
+}
+
+.input-button-group .form-control {
+    border-bottom-right-radius: 0;
+    border-top-right-radius: 0;
+}
+
+.input-button-group .btn {
+    border-bottom-left-radius: 0;
+    border-top-left-radius: 0;
+    margin-left: 1px;
+}
+
+
+/* Input-Textarea group - used on workflow Visual Editor  */
+
+.input-textarea-group input {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.input-textarea-group textarea {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+}
+
+
+
+/* On-Off Toggle ------------------------------------------- */
+
+
+/* https://adrianroselli.com/2019/03/under-engineered-form-toggle.html */
+
+
+/* Example markup */
+
+
+/* <div class="form-toggle">
+    <input type="checkbox" name="notification-1-toggle" id="notification-1-toggle">
+    <label for="notification-1-toggle"></label>
+</div> */
+
+.form-toggle {
+    position: relative;
+    height: 36px;
+}
+
+.form-toggle [disabled]+label,
+.form-toggle [disabled]:hover+label {
+    color: #999;
+}
+
+.form-toggle [type="checkbox"] {
+    position: absolute;
+    top: auto;
+    overflow: hidden;
+    clip: rect(1px, 1px, 1px, 1px);
+    width: 1px;
+    height: 1px;
+    white-space: nowrap;
+}
+
+.form-toggle [type="checkbox"]+label {
+    display: block;
+    position: relative;
+    padding: 0.5em;
+    padding-left: 4em;
+    max-width: calc(100% - 2em);
+}
+
+.form-toggle [type="checkbox"]:focus+label::before {
+    box-shadow: 0 0 0 3px var(--lightest-indigo);
+}
+
+.form-toggle [type="checkbox"]+label::before,
+.form-toggle [type="checkbox"]+label::after {
+    content: "";
+    position: absolute;
+    height: 1.5em;
+    transition: all 0.25s ease;
+}
+
+.form-toggle [type="checkbox"]+label::before {
+    left: 0;
+    top: 0.2em;
+    width: 3em;
+    border: 0.2em solid var(--gray);
+    background: var(--gray);
+    border-radius: 1.1em;
+}
+
+.form-toggle [type="checkbox"]+label::after {
+    left: 0;
+    top: 0.25em;
+    background-color: #fff;
+    background-position: center center;
+    border-radius: 50%;
+    width: 1.5em;
+    border: 0.15em solid var(--gray);
+}
+
+.form-toggle [type="checkbox"]:checked+label::after {
+    left: 1.6em;
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.form-toggle [type="checkbox"]:indeterminate+label::after {
+    left: 0.8em;
+}
+
+.form-toggle [type="checkbox"]:indeterminate+label::before {
+    background-color: #ddd;
+}
+
+.form-toggle [type="checkbox"]:checked+label::before {
+    background-color: var(--green);
+    border-color: var(--green);
+}
+
+.form-toggle [type="checkbox"][disabled]+label::before {
+    background-color: transparent;
+    border-color: #ddd;
+}
+
+.form-toggle [type="checkbox"][disabled]+label::after {
+    border-color: #ddd;
+}
+
+.form-toggle [disabled]:hover+label {
+    color: var(--mid-gray);
+    /* case for CSS custom property if not supporting IE/Edge */
+}
+
+.form-toggle [type="checkbox"][disabled]:hover+label::before {
+    box-shadow: none;
+}
+
+.form-toggle [type="checkbox"][disabled]:hover+label::after {
+    background-image: none;
+}
+
+
+/* Windows High Contrast Mode Support */
+
+@media screen and (-ms-high-contrast: active) {
+    .form-toggle [type="checkbox"]:focus+label::before,
+    .form-toggle [type="checkbox"]:hover+label::before {
+        outline: 1px dotted windowText;
+        outline-offset: 0.25em;
+    }
+    .form-toggle [type="checkbox"]+label::after {
+        background-color: windowText;
+    }
+    .form-toggle [type="checkbox"][disabled]+label::after {
+        background-color: transparent;
+    }
+}
+
+
+/* Reduced motion */
+
+@media screen and (prefers-reduced-motion: reduce) {
+    .form-toggle [type="checkbox"]+label::before,
+    .form-toggle [type="checkbox"]+label::after {
+        transition: none;
+    }
+}
+
+
+/* END On-Off Toggle ------------------- */

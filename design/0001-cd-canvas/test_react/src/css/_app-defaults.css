@@ -1,0 +1,53 @@
+/* GLobal Defaults
+----------------------------------------------------------------------------- */
+html {
+  height: 100%;
+}
+
+body {
+  font-family: 'Fakt Pro',-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  line-height: 1.5;
+  font-size: 1rem;
+  color: var(--dark-gray);
+  min-height: 100%;
+}
+
+a {
+  color: var(--link-blue);
+}
+
+summary:focus {
+  outline: none;
+}
+
+/* Eliminate top margin to avoid some repetitive work
+https://csswizardry.com/2012/06/single-direction-margin-declarations/
+----------------------------------------------------------------------------- */
+h1,h2,h3,h4,h5,h6,hgroup,
+ul,ol,dd,
+p,figure,
+pre,table,fieldset,hr {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+h1,h2,h3,h4,h5,h6,strong,.b {
+  font-weight: 600;
+}
+
+button, input, select, textarea {
+  font-family: 'Fakt Pro',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+}
+
+kbd {
+  font-family: 'Fakt Pro',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Oxygen-Sans,Ubuntu,Cantarell,"Helvetica Neue",sans-serif;
+  background-color: var(--white);
+  border: 1px solid var(--light-gray);
+  box-shadow: 1px 1px 0 var(--light-gray), inset 1px 1px white;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: .85em;
+  line-height: 1;
+  padding: 2px 6px;
+  white-space: nowrap;
+}

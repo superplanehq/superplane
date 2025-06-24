@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="8px" height="14px" viewBox="0 0 8 14" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 43.2 (39069) - http://www.bohemiancoding.com/sketch -->
+    <title>icn-push</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="icn-push" fill="#292E33">
+            <path d="M5,10.2675644 C5.59780137,10.6133738 6,11.2597176 6,12 C6,13.1045695 5.1045695,14 4,14 C2.8954305,14 2,13.1045695 2,12 C2,11.2597176 2.40219863,10.6133738 3,10.2675644 L3,4 L0,4 L4,0 L8,4 L5,4 L5,10.2675644 L5,10.2675644 Z" id="Combined-Shape"></path>
+        </g>
+    </g>
+</svg>
