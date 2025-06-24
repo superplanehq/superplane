@@ -20,9 +20,7 @@ func Test__ListOrganizations(t *testing.T) {
 	userID := uuid.New()
 	authService := auth.SetupTestAuthService(t)
 	ctx := context.Background()
-	ctx = authentication.SetUserInContext(ctx, &models.User{
-		ID: userID,
-	})
+	ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
 
 	organization, err := models.CreateOrganization(userID, "test-org", "Test Organization")
 	require.NoError(t, err)

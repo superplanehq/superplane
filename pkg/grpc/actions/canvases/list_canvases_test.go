@@ -25,7 +25,7 @@ func Test__ListCanvases(t *testing.T) {
 
 	t.Run("no organization ID -> list all canvases", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = authentication.SetUserInContext(ctx, &user)
+		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 		authService.SetupCanvasRoles(r.Canvas.ID.String())
 		authService.AssignRole(user.ID.String(), authorization.RoleCanvasOwner, r.Canvas.ID.String(), authorization.DomainCanvas)
@@ -43,7 +43,7 @@ func Test__ListCanvases(t *testing.T) {
 
 	t.Run("with organization ID -> list canvases from organization", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = authentication.SetUserInContext(ctx, &user)
+		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 		authService.SetupCanvasRoles(r.Canvas.ID.String())
 		authService.AssignRole(user.ID.String(), authorization.RoleCanvasOwner, r.Canvas.ID.String(), authorization.DomainCanvas)
@@ -63,7 +63,7 @@ func Test__ListCanvases(t *testing.T) {
 
 	t.Run("invalid organization ID -> list canvases from organization", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = authentication.SetUserInContext(ctx, &user)
+		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 		res, err := ListCanvases(ctx, &protos.ListCanvasesRequest{
 			OrganizationId: uuid.New().String(),

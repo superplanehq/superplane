@@ -22,6 +22,10 @@ func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 	return user, ok
 }
 
+func SetUserIdInMetadata(ctx context.Context, userId string) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", userId))
+}
+
 func GetUserIdFromMetadata(ctx context.Context) (string, bool) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

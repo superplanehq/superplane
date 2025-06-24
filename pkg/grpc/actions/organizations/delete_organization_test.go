@@ -22,9 +22,7 @@ func Test__DeleteOrganization(t *testing.T) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 	ctx := context.Background()
-	ctx = authentication.SetUserInContext(ctx, &models.User{
-		ID: userID,
-	})
+	ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
 		_, err := DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{

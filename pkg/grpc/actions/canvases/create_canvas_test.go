@@ -21,9 +21,7 @@ func Test__CreateCanvas(t *testing.T) {
 	user := uuid.New()
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
-	ctx := authentication.SetUserInContext(context.Background(), &models.User{
-		ID: user,
-	})
+	ctx := authentication.SetUserIdInMetadata(context.Background(), user.String())
 	org, err := models.CreateOrganization(user, "test", "test")
 	require.NoError(t, err)
 

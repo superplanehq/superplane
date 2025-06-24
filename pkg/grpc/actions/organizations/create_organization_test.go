@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -18,6 +19,7 @@ import (
 func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	user := models.User{
+		ID:   uuid.New(),
 		Name: "test-user",
 	}
 
@@ -25,7 +27,7 @@ func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, err)
 	authService := auth.SetupTestAuthService(t)
 	ctx := context.Background()
-	ctx = authentication.SetUserInContext(ctx, &user)
+	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
 		organization := &protos.Organization{
