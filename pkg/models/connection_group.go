@@ -12,11 +12,8 @@ import (
 )
 
 const (
-	ConnectionGroupPolicyTypeAll              = "all"
-	ConnectionGroupPolicyTypeMajority         = "majority"
-	ConnectionGroupTimeoutBehaviorFail        = "fail"
-	ConnectionGroupTimeoutBehaviorDrop        = "drop"
-	ConnectionGroupTimeoutBehaviorEmitPartial = "emit-partial"
+	ConnectionGroupEmitOnAll      = "all"
+	ConnectionGroupEmitOnMajority = "majority"
 )
 
 type ConnectionGroup struct {
@@ -31,19 +28,17 @@ type ConnectionGroup struct {
 }
 
 type ConnectionGroupSpec struct {
-	Keys   []ConnectionGroupKeyDefinition `json:"keys"`
-	Policy ConnectionGroupPolicy          `json:"policy"`
+	GroupBy *ConnectionGroupBySpec `json:"group_by"`
 }
 
-type ConnectionGroupKeyDefinition struct {
+type ConnectionGroupBySpec struct {
+	Fields []ConnectionGroupByField `json:"fields"`
+	EmitOn string                   `json:"emit_on"`
+}
+
+type ConnectionGroupByField struct {
 	Name       string `json:"name"`
 	Expression string `json:"expression"`
-}
-
-type ConnectionGroupPolicy struct {
-	Type            string `json:"type"`
-	Timeout         string `json:"timeout"`
-	TimeoutBehavior string `json:"timeoutBehavior"`
 }
 
 type ConnectionGroupEvent struct {
@@ -53,12 +48,10 @@ type ConnectionGroupEvent struct {
 	SourceID          uuid.UUID
 	SourceName        string
 	SourceType        string
-	State             string
 	CreatedAt         *time.Time
 }
 
-type ConnectionGroupKey struct {
-	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+type ConnectionGroupField struct {
 	ConnectionGroupID uuid.UUID
 	SourceID          uuid.UUID
 	Name              string
@@ -146,12 +139,13 @@ func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error
 	return connectionGroup, nil
 }
 
-func FindConnectionsWithGroupKey(tx *gorm.DB, groupID uuid.UUID, name, value string) ([]string, error) {
+func FindConnectionsWithGroupByField(tx *gorm.DB, groupID uuid.UUID, name, value string) ([]string, error) {
 	var connections []string
 	err := tx.
-		Table("connection_group_keys").
+		Table("connection_group_fields").
+		Select("source_id").
 		Where("connection_group_id = ?", groupID).
-		Where("key = ?", name).
+		Where("name = ?", name).
 		Where("value = ?", value).
 		Find(&connections).
 		Error

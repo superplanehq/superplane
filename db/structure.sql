@@ -116,16 +116,15 @@ CREATE TABLE public.connection_group_events (
     source_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
-    state character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL
 );
 
 
 --
--- Name: connection_group_keys; Type: TABLE; Schema: public; Owner: -
+-- Name: connection_group_fields; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.connection_group_keys (
+CREATE TABLE public.connection_group_fields (
     connection_group_id uuid NOT NULL,
     source_id uuid NOT NULL,
     name character varying(128) NOT NULL,
@@ -367,11 +366,11 @@ ALTER TABLE ONLY public.connection_group_events
 
 
 --
--- Name: connection_group_keys connection_group_keys_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_fields connection_group_fields_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_keys
-    ADD CONSTRAINT connection_group_keys_pkey PRIMARY KEY (connection_group_id, source_id, name, value);
+ALTER TABLE ONLY public.connection_group_fields
+    ADD CONSTRAINT connection_group_fields_pkey PRIMARY KEY (connection_group_id, source_id, name, value);
 
 
 --
@@ -625,11 +624,11 @@ ALTER TABLE ONLY public.connection_group_events
 
 
 --
--- Name: connection_group_keys connection_group_keys_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_fields connection_group_fields_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_keys
-    ADD CONSTRAINT connection_group_keys_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
+ALTER TABLE ONLY public.connection_group_fields
+    ADD CONSTRAINT connection_group_fields_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
 
 
 --

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -38,12 +37,7 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, "connection group name is required")
 	}
 
-	policy, err := validatePolicy(req.ConnectionGroup.Spec.Policy)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	groupByKeys, err := validateGroupByKeys(req.ConnectionGroup.Spec.Keys)
+	err = actions.ValidateUUIDs(req.RequesterId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -53,17 +47,19 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	spec, err := validateSpec(req.ConnectionGroup.Spec)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	//
 	// Create connection group
 	//
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		req.ConnectionGroup.Metadata.Name,
-		req.ConnectionGroup.Metadata.CreatedBy,
+		req.RequesterId,
 		connections,
-		models.ConnectionGroupSpec{
-			Policy: *policy,
-			Keys:   groupByKeys,
-		},
+		*spec,
 	)
 
 	if err != nil {
@@ -89,41 +85,50 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 	return response, nil
 }
 
-func validateGroupByKeys(in []*pb.ConnectionGroup_Spec_Key) ([]models.ConnectionGroupKeyDefinition, error) {
-	if len(in) < 1 {
-		return nil, fmt.Errorf("connection group must have at least one key to group by")
+func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, error) {
+	if spec == nil {
+		return nil, fmt.Errorf("spec is required")
 	}
 
-	out := make([]models.ConnectionGroupKeyDefinition, len(in))
-	for i, key := range in {
-		if key.Name == "" || key.Expression == "" {
-			return nil, fmt.Errorf("connection group key must have a name and an expression")
+	if spec.GroupBy == nil {
+		return nil, fmt.Errorf("spec.GroupBy is required")
+	}
+
+	if len(spec.GroupBy.Fields) == 0 {
+		return nil, fmt.Errorf("spec.GroupBy fields cannot be empty")
+	}
+
+	fields, err := validateGroupByFields(spec.GroupBy.Fields)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.ConnectionGroupSpec{
+		GroupBy: &models.ConnectionGroupBySpec{
+			Fields: fields,
+			EmitOn: protoToEmitOn(spec.GroupBy.EmitOn),
+		},
+	}, nil
+}
+
+func validateGroupByFields(in []*pb.ConnectionGroup_Spec_GroupBy_Field) ([]models.ConnectionGroupByField, error) {
+	if len(in) < 1 {
+		return nil, fmt.Errorf("connection group must have at least one field to group by")
+	}
+
+	out := make([]models.ConnectionGroupByField, len(in))
+	for i, field := range in {
+		if field.Name == "" || field.Expression == "" {
+			return nil, fmt.Errorf("connection group field must have a name and an expression")
 		}
 
-		out[i] = models.ConnectionGroupKeyDefinition{
-			Name:       key.Name,
-			Expression: key.Expression,
+		out[i] = models.ConnectionGroupByField{
+			Name:       field.Name,
+			Expression: field.Expression,
 		}
 	}
 
 	return out, nil
-}
-
-func validatePolicy(policy *pb.ConnectionGroup_Spec_Policy) (*models.ConnectionGroupPolicy, error) {
-	if policy == nil {
-		return nil, fmt.Errorf("policy is required")
-	}
-
-	_, err := time.ParseDuration(policy.Timeout)
-	if err != nil {
-		return nil, fmt.Errorf("invalid timeout: %v", err)
-	}
-
-	return &models.ConnectionGroupPolicy{
-		Type:            protoToPolicyType(policy.Type),
-		Timeout:         policy.Timeout,
-		TimeoutBehavior: protoToTimeoutBehavior(policy.TimeoutBehavior),
-	}, nil
 }
 
 func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connections []models.Connection) (*pb.ConnectionGroup, error) {
@@ -133,9 +138,9 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 		return nil, err
 	}
 
-	keys := make([]*pb.ConnectionGroup_Spec_Key, len(spec.Keys))
-	for i, k := range spec.Keys {
-		keys[i] = &pb.ConnectionGroup_Spec_Key{
+	fields := make([]*pb.ConnectionGroup_Spec_GroupBy_Field, len(spec.GroupBy.Fields))
+	for i, k := range spec.GroupBy.Fields {
+		fields[i] = &pb.ConnectionGroup_Spec_GroupBy_Field{
 			Name:       k.Name,
 			Expression: k.Expression,
 		}
@@ -147,55 +152,32 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 			Name:      connectionGroup.Name,
 			CanvasId:  connectionGroup.CanvasID.String(),
 			CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
+			CreatedBy: connectionGroup.CreatedBy.String(),
 		},
 		Spec: &pb.ConnectionGroup_Spec{
-			Keys:        keys,
 			Connections: conns,
-			Policy: &pb.ConnectionGroup_Spec_Policy{
-				Type:            policyTypeToProto(spec.Policy.Type),
-				Timeout:         spec.Policy.Timeout,
-				TimeoutBehavior: timeoutBehaviorToProto(spec.Policy.TimeoutBehavior),
+			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
+				Fields: fields,
+				EmitOn: emitOnToProto(spec.GroupBy.EmitOn),
 			},
 		},
 	}, nil
 }
 
-func protoToPolicyType(policyType pb.ConnectionGroup_Spec_PolicyType) string {
-	switch policyType {
-	case pb.ConnectionGroup_Spec_POLICY_TYPE_MAJORITY:
-		return models.ConnectionGroupPolicyTypeMajority
+func protoToEmitOn(emitOn pb.ConnectionGroup_Spec_GroupBy_EmitOn) string {
+	switch emitOn {
+	case pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_MAJORITY:
+		return models.ConnectionGroupEmitOnMajority
 	default:
-		return models.ConnectionGroupPolicyTypeAll
+		return models.ConnectionGroupEmitOnAll
 	}
 }
 
-func policyTypeToProto(policyType string) pb.ConnectionGroup_Spec_PolicyType {
-	switch policyType {
-	case models.ConnectionGroupPolicyTypeMajority:
-		return pb.ConnectionGroup_Spec_POLICY_TYPE_MAJORITY
+func emitOnToProto(emitOn string) pb.ConnectionGroup_Spec_GroupBy_EmitOn {
+	switch emitOn {
+	case models.ConnectionGroupEmitOnMajority:
+		return pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_MAJORITY
 	default:
-		return pb.ConnectionGroup_Spec_POLICY_TYPE_ALL
-	}
-}
-
-func timeoutBehaviorToProto(timeoutBehavior string) pb.ConnectionGroup_Spec_TimeoutBehavior {
-	switch timeoutBehavior {
-	case models.ConnectionGroupTimeoutBehaviorFail:
-		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_FAIL
-	case models.ConnectionGroupTimeoutBehaviorEmitPartial:
-		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT_PARTIAL
-	default:
-		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP
-	}
-}
-
-func protoToTimeoutBehavior(timeoutBehavior pb.ConnectionGroup_Spec_TimeoutBehavior) string {
-	switch timeoutBehavior {
-	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_FAIL:
-		return models.ConnectionGroupTimeoutBehaviorFail
-	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT_PARTIAL:
-		return models.ConnectionGroupTimeoutBehaviorEmitPartial
-	default:
-		return models.ConnectionGroupTimeoutBehaviorDrop
+		return pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_ALL
 	}
 }

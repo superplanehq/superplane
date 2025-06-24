@@ -51,16 +51,16 @@ var createCmd = &cobra.Command{
 
 			// Create the canvas request
 			request := openapi_client.NewSuperplaneCreateCanvasRequest()
-			
+
 			// Create Canvas with metadata
 			canvas := openapi_client.NewSuperplaneCanvas()
 			canvasMeta := openapi_client.NewSuperplaneCanvasMetadata()
 			canvasMeta.SetName(name)
 			canvas.SetMetadata(*canvasMeta)
-			
+
 			// Set canvas in request
 			request.SetCanvas(*canvas)
-			
+
 			// Set requester ID
 			requesterId := uuid.NewString()
 			request.SetRequesterId(requesterId)
@@ -103,17 +103,17 @@ var createCmd = &cobra.Command{
 
 			// Create the initial request
 			request := openapi_client.NewSuperplaneCreateSecretBody()
-			
+
 			// Create Secret with metadata and spec
 			secret := openapi_client.NewSuperplaneSecret()
 			secretMeta := openapi_client.NewSuperplaneSecretMetadata()
 			secretMeta.SetName(name)
 			secretMeta.SetCanvasId(canvasID)
 			secret.SetMetadata(*secretMeta)
-			
+
 			// Create a proper secret spec from the YAML data
 			secretSpec := openapi_client.NewSuperplaneSecretSpec()
-			
+
 			// Convert provider string to enum if present
 			if providerStr, ok := spec["provider"].(string); ok {
 				var provider openapi_client.SecretProvider
@@ -123,7 +123,7 @@ var createCmd = &cobra.Command{
 				}
 				secretSpec.SetProvider(provider)
 			}
-			
+
 			// Handle local data if present
 			if localData, ok := spec["local"].(map[string]interface{}); ok {
 				local := openapi_client.NewSecretLocal()
@@ -139,10 +139,10 @@ var createCmd = &cobra.Command{
 				}
 				secretSpec.SetLocal(*local)
 			}
-			
+
 			// Set the spec
 			secret.SetSpec(*secretSpec)
-			
+
 			// Add secret to request and set requester ID
 			request.SetSecret(*secret)
 			requesterId := uuid.NewString()
@@ -190,18 +190,18 @@ var createCmd = &cobra.Command{
 
 			// Create the event source request
 			request := openapi_client.NewSuperplaneCreateEventSourceBody()
-			
+
 			// Create EventSource with metadata and spec
 			eventSource := openapi_client.NewSuperplaneEventSource()
 			esMeta := openapi_client.NewSuperplaneEventSourceMetadata()
 			esMeta.SetName(name)
 			esMeta.SetCanvasId(canvasIDOrName)
 			eventSource.SetMetadata(*esMeta)
-			
+
 			// Create an empty spec for the EventSource
 			emptySpec := make(map[string]interface{})
 			eventSource.SetSpec(emptySpec)
-			
+
 			// Set in request
 			request.SetEventSource(*eventSource)
 			requesterId := uuid.NewString()
@@ -215,6 +215,47 @@ var createCmd = &cobra.Command{
 				*es.GetMetadata().Name, *es.GetMetadata().Id)
 			fmt.Printf("Key: %s\n", *response.Key)
 			fmt.Println("! Save this key as it won't be shown again.")
+
+		case "ConnectionGroup":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the metadata from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]interface{})
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: metadata section missing")
+			}
+
+			canvasID, ok := metadata["canvasId"].(string)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
+			}
+
+			var connectionGroup openapi_client.SuperplaneConnectionGroup
+			err = yaml.Unmarshal(data, &connectionGroup)
+			Check(err)
+
+			requesterId := uuid.NewString()
+			body := openapi_client.SuperplaneCreateConnectionGroupBody{
+				ConnectionGroup: &connectionGroup,
+				RequesterId:     &requesterId,
+			}
+
+			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneCreateConnectionGroup(context.Background(), canvasID).
+				Body(body).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.ConnectionGroup)
+			Check(err)
+			fmt.Printf("%s", string(out))
 
 		case "Stage":
 			var yamlData map[string]any
@@ -250,26 +291,26 @@ var createCmd = &cobra.Command{
 			// Keep using the original workflow for stages
 			// Parse the stage spec directly from YAML
 			// instead of trying to extract it from a nested map
-			
+
 			// Create stage with metadata and spec
 			stage := openapi_client.NewSuperplaneStage()
 			stageMeta := openapi_client.NewSuperplaneStageMetadata()
 			stageMeta.SetName(name)
 			stageMeta.SetCanvasId(canvasIDOrName)
 			stage.SetMetadata(*stageMeta)
-			
+
 			// Convert the spec to JSON
 			specData, err := json.Marshal(spec)
 			Check(err)
-			
+
 			// Parse into the proper struct
 			var stageSpec openapi_client.SuperplaneStageSpec
 			err = json.Unmarshal(specData, &stageSpec)
 			Check(err)
-			
+
 			// Set the spec
 			stage.SetSpec(stageSpec)
-			
+
 			// Create request and set stage
 			request := openapi_client.NewSuperplaneCreateStageBody()
 			request.SetStage(*stage)

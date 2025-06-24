@@ -52,6 +52,14 @@ func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*
 
 		return &eventSource.ID, nil
 
+	case pb.Connection_TYPE_CONNECTION_GROUP:
+		connectionGroup, err := canvas.FindConnectionGroupByName(connection.Name)
+		if err != nil {
+			return nil, fmt.Errorf("event source %s not found", connection.Name)
+		}
+
+		return &connectionGroup.ID, nil
+
 	default:
 		return nil, errors.New("invalid type")
 	}
@@ -152,6 +160,8 @@ func protoToConnectionType(t pb.Connection_Type) string {
 		return models.SourceTypeStage
 	case pb.Connection_TYPE_EVENT_SOURCE:
 		return models.SourceTypeEventSource
+	case pb.Connection_TYPE_CONNECTION_GROUP:
+		return models.SourceTypeConnectionGroup
 	default:
 		return ""
 	}
@@ -244,6 +254,8 @@ func connectionTypeToProto(t string) pb.Connection_Type {
 		return pb.Connection_TYPE_STAGE
 	case models.SourceTypeEventSource:
 		return pb.Connection_TYPE_EVENT_SOURCE
+	case models.SourceTypeConnectionGroup:
+		return pb.Connection_TYPE_CONNECTION_GROUP
 	default:
 		return pb.Connection_TYPE_UNKNOWN
 	}

@@ -85,6 +85,22 @@ func (c *Canvas) FindStageByName(name string) (*Stage, error) {
 	return &stage, nil
 }
 
+func (c *Canvas) FindConnectionGroupByName(name string) (*ConnectionGroup, error) {
+	var connectionGroup ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", c.ID).
+		Where("name = ?", name).
+		First(&connectionGroup).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &connectionGroup, nil
+}
+
 // NOTE: the caller must decrypt the key before using it
 func (c *Canvas) FindEventSourceByID(id uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource

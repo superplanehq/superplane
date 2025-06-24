@@ -92,7 +92,7 @@ func TruncateTables() error {
 		truncate table canvases, events, event_sources, stages,
 		stage_events, stage_event_approvals,
 		connections, stage_executions,
-		connection_groups, connection_group_events, connection_group_keys,
+		connection_groups, connection_group_events, connection_group_fields,
 		secrets, account_providers, users;
 	`).Error
 }

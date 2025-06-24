@@ -22,14 +22,13 @@ CREATE TABLE connection_group_events (
   source_id           uuid NOT NULL,
   source_name         CHARACTER VARYING(128) NOT NULL,
   source_type         CHARACTER VARYING(64) NOT NULL,
-  state               CHARACTER VARYING(64) NOT NULL,
   created_at          TIMESTAMP NOT NULL,
 
   PRIMARY KEY (id),
   FOREIGN KEY (connection_group_id) REFERENCES connection_groups(id)
 );
 
-CREATE TABLE connection_group_keys (
+CREATE TABLE connection_group_fields (
   connection_group_id uuid NOT NULL,
   source_id           uuid NOT NULL,
   name                CHARACTER VARYING(128) NOT NULL,

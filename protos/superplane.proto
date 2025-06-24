@@ -410,31 +410,23 @@ message ConnectionGroup {
   }
 
   message Spec {
-    enum PolicyType {
-      POLICY_TYPE_ALL = 0;
-      POLICY_TYPE_MAJORITY = 1;
-    }
+    message GroupBy {
+      enum EmitOn {
+        EMIT_ON_ALL = 0;
+        EMIT_ON_MAJORITY = 1;
+      }
 
-    enum TimeoutBehavior {
-      TIMEOUT_BEHAVIOR_DROP = 0;
-      TIMEOUT_BEHAVIOR_FAIL = 1;
-      TIMEOUT_BEHAVIOR_EMIT_PARTIAL = 2;
-    }
+      message Field {
+        string name = 1;
+        string expression = 2;
+      }
 
-    message Policy {
-      PolicyType type = 1;
-      string timeout = 2;
-      TimeoutBehavior timeout_behavior = 3;
-    }
-
-    message Key {
-      string name = 1;
-      string expression = 2;
+      repeated Field fields = 1;
+      EmitOn emit_on = 2;
     }
 
     repeated Connection connections = 1;
-    repeated Key keys = 2;
-    Policy policy = 3;
+    GroupBy group_by = 2;
   }
 
   Metadata metadata = 1;

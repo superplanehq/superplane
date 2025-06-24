@@ -179,22 +179,22 @@ func (w *PendingEventsWorker) handleConnectionGroupEvent(tx *gorm.DB, event *mod
 		return fmt.Errorf("error creating connection group event: %v", err)
 	}
 
-	keys := []models.ConnectionGroupKey{}
-	for _, keyDef := range connectionGroup.Spec.Data().Keys {
-		value, err := event.EvaluateStringExpression(keyDef.Expression)
+	fields := []models.ConnectionGroupField{}
+	for _, fieldDef := range connectionGroup.Spec.Data().GroupBy.Fields {
+		value, err := event.EvaluateStringExpression(fieldDef.Expression)
 		if err != nil {
-			return fmt.Errorf("error evaluating expression '%s' for connection group key %s: %v", keyDef.Expression, keyDef.Name, err)
+			return fmt.Errorf("error evaluating expression '%s' for connection group field %s: %v", fieldDef.Expression, fieldDef.Name, err)
 		}
 
-		keys = append(keys, models.ConnectionGroupKey{
+		fields = append(fields, models.ConnectionGroupField{
 			ConnectionGroupID: connectionGroup.ID,
 			SourceID:          event.SourceID,
-			Name:              keyDef.Name,
+			Name:              fieldDef.Name,
 			Value:             value,
 		})
 	}
 
-	err = tx.Create(keys).Error
+	err = tx.Create(fields).Error
 	if err != nil {
 		return err
 	}
@@ -202,28 +202,28 @@ func (w *PendingEventsWorker) handleConnectionGroupEvent(tx *gorm.DB, event *mod
 	//
 	// Check if new event should be emitted, and if so, emit it.
 	//
-	return w.emitConnectionGroupEvent(tx, connectionGroup, keys)
+	return w.emitConnectionGroupEvent(tx, connectionGroup, fields)
 }
 
-func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGroup *models.ConnectionGroup, keys []models.ConnectionGroupKey) error {
+func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGroup *models.ConnectionGroup, fields []models.ConnectionGroupField) error {
 	connections, err := models.ListConnectionsInTransaction(tx, connectionGroup.ID, models.ConnectionTargetTypeConnectionGroup)
 	if err != nil {
 		return fmt.Errorf("error listing connections: %v", err)
 	}
 
-	for _, key := range keys {
-		connectionsWithKey, err := models.FindConnectionsWithGroupKey(tx, connectionGroup.ID, key.Name, key.Value)
+	for _, field := range fields {
+		connectionsWithField, err := models.FindConnectionsWithGroupByField(tx, connectionGroup.ID, field.Name, field.Value)
 		if err != nil {
-			return fmt.Errorf("error finding connections for group key: %v", err)
+			return fmt.Errorf("error finding connections for group field: %v", err)
 		}
 
 		//
-		// If one of the connections still hasn't emitted an event with this key,
+		// If one of the connections still hasn't emitted an event with this field,
 		// we do not emit any event for the connection group.
 		//
 		for _, conn := range connections {
-			if !slices.Contains(connectionsWithKey, conn.SourceID.String()) {
-				log.Infof("Event from %s with %s=%s not received for connection group %s", conn.SourceName, key.Name, key.Value, connectionGroup.Name)
+			if !slices.Contains(connectionsWithField, conn.SourceID.String()) {
+				log.Infof("Event from %s with %s=%s not received for connection group %s", conn.SourceName, field.Name, field.Value, connectionGroup.Name)
 				return nil
 			}
 		}
@@ -231,10 +231,10 @@ func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGr
 
 	//
 	// If we get here, we know that we have received events
-	// with all the required keys from all the connections in the group,
+	// with all the required fields from all the connections in the group,
 	// so we emit an event for it.
 	//
-	eventData, err := w.buildConnectionGroupEvent(keys)
+	eventData, err := w.buildConnectionGroupEvent(fields)
 	if err != nil {
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
@@ -245,16 +245,16 @@ func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGr
 		connectionGroup.Name,
 		models.SourceTypeConnectionGroup,
 		eventData,
-		[]byte{},
+		[]byte(`{}`),
 	)
 
 	return err
 }
 
-func (w *PendingEventsWorker) buildConnectionGroupEvent(keys []models.ConnectionGroupKey) ([]byte, error) {
+func (w *PendingEventsWorker) buildConnectionGroupEvent(fields []models.ConnectionGroupField) ([]byte, error) {
 	event := map[string]any{}
-	for _, key := range keys {
-		event[key.Name] = key.Value
+	for _, field := range fields {
+		event[field.Name] = field.Value
 	}
 
 	// TODO: include all events that were grouped into this one
