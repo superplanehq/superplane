@@ -6,6 +6,7 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -16,6 +17,7 @@ type Organization struct {
 	CreatedAt   *time.Time
 	CreatedBy   uuid.UUID
 	UpdatedAt   *time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 }
 
 func (Organization) TableName() string {
@@ -107,4 +109,19 @@ func CreateOrganization(requesterID uuid.UUID, name, displayName string) (*Organ
 	}
 
 	return nil, err
+}
+
+func SoftDeleteOrganization(id string) error {
+	return database.Conn().
+		Where("id = ?", id).
+		Delete(&Organization{}).
+		Error
+}
+
+func HardDeleteOrganization(id string) error {
+	return database.Conn().
+		Unscoped().
+		Where("id = ?", id).
+		Delete(&Organization{}).
+		Error
 }

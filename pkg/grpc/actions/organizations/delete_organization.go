@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
@@ -48,13 +47,13 @@ func DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest, 
 		return nil, err
 	}
 
-	err = database.Conn().Delete(organization).Error
+	err = models.SoftDeleteOrganization(organization.ID.String())
 	if err != nil {
 		log.Errorf("Error deleting organization on %v for DeleteOrganization: %v", req, err)
 		return nil, err
 	}
 
-	log.Infof("Organization %s (%s) deleted by user %s", organization.Name, organization.ID.String(), userID)
+	log.Infof("Organization %s (%s) soft-deleted by user %s", organization.Name, organization.ID.String(), userID)
 
 	err = authorizationService.DestroyOrganizationRoles(organization.ID.String())
 	if err != nil {

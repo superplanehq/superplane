@@ -146,7 +146,8 @@ CREATE TABLE public.organizations (
     display_name character varying(255) NOT NULL,
     created_by uuid NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    deleted_at timestamp without time zone
 );
 
 
@@ -504,6 +505,13 @@ CREATE INDEX idx_casbin_rule_v1 ON public.casbin_rule USING btree (v1);
 --
 
 CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
+
+
+--
+-- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
 
 
 --
