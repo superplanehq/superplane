@@ -79,14 +79,14 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			log.Errorf("User not found in context, metadata %v", md)
-			return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+			log.Errorf("Metadata not found in context")
+			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
 		userMeta, ok := md["x-user-id"]
 		if !ok || len(userMeta) == 0 {
 			log.Errorf("User not found in metadata, metadata %v", md)
-			return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
 		userID := userMeta[0]
@@ -111,7 +111,8 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		if !allowed {
-			return nil, status.Error(codes.PermissionDenied, "insufficient permissions")
+			log.Warnf("User %s tried to %s %s in %s %s", userID, rule.Action, rule.Resource, rule.DomainType, domainID)
+			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
 		return handler(ctx, req)
