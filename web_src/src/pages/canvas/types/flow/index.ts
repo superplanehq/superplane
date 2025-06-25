@@ -19,7 +19,7 @@ export type EdgeType = Edge;
 export type EventSourceNodeData = {
   id: string;
   name: string;
-  timestamp: string;
+  events: SuperplaneStageEvent[];
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
