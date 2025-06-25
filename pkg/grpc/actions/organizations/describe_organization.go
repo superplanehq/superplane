@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -23,14 +22,11 @@ func DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationReque
 	var organization *models.Organization
 	var err error
 
-	if _, parseErr := uuid.Parse(req.IdOrName); parseErr == nil {
-		err = actions.ValidateUUIDs(req.IdOrName)
-		if err != nil {
-			return nil, err
-		}
-		organization, err = models.FindOrganizationByID(req.IdOrName)
-	} else {
+	err = actions.ValidateUUIDs(req.IdOrName)
+	if err != nil {
 		organization, err = models.FindOrganizationByName(req.IdOrName)
+	} else {
+		organization, err = models.FindOrganizationByID(req.IdOrName)
 	}
 
 	if err != nil {
