@@ -66,7 +66,7 @@ CREATE TABLE public.canvases (
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    organization_id uuid DEFAULT '00000000-0000-0000-0000-000000000000'::uuid NOT NULL
+    organization_id uuid NOT NULL
 );
 
 
@@ -575,6 +575,14 @@ CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: canvases canvases_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvases
+    ADD CONSTRAINT canvases_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --
