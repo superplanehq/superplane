@@ -5,11 +5,9 @@ import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { SuperplaneExecution } from '@/api-client';
 
-// Define the data type for the deployment card
-// Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showOverlay, setShowOverlay] = useState(false);
-  const { selectStageId } = useCanvasStore()
+  const { selectStageId } = useCanvasStore();
 
   // Filter events by their state
   const pendingEvents = useMemo(() => 
@@ -35,9 +33,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   );
 
   const allFinishedExecutions = useMemo(() =>
-    allExecutions
-        .filter(execution => execution?.finishedAt)
-    , [allExecutions]
+    allExecutions.filter(execution => execution?.finishedAt), 
+    [allExecutions]
   );
 
   const executionRunning = useMemo(() => 
@@ -51,126 +48,203 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     return props.data.outputs.map(output => {
       const executionOutput = lastFinishedExecution?.outputs?.find(
         executionOutput => executionOutput.name === output.name
-      )
+      );
       return {
         key: output.name,
         value: executionOutput?.value || '—',
         required: !!output.required
-      }
-    })
-  }, [props.data.outputs, allFinishedExecutions])
+      };
+    });
+  }, [props.data.outputs, allFinishedExecutions]);
 
-  
+  // Get status icon and color
+  const getStatusIcon = () => {
+    switch (props.data.status?.toLowerCase()) {
+      case 'passed':
+      case 'success':
+        return <span className="material-symbols-outlined fill text-green-600">check_circle</span>;
+      case 'failed':
+      case 'error':
+        return <span className="material-symbols-outlined fill text-red-600">cancel</span>;
+      case 'queued':
+        return <span className="material-symbols-outlined fill text-orange-600">queue</span>;
+      case 'running':
+        return <span className="rounded-full bg-blue-500 w-[22px] h-[22px] flex items-center justify-center">
+          <span className="text-white text-xs animate-pulse">●</span>
+        </span>;
+      default:
+        return <span className="material-symbols-outlined fill text-gray-400">radio_button_unchecked</span>;
+    }
+  };
+
+  // Get status background color class
+  const getStatusBgClass = () => {
+    switch (props.data.status?.toLowerCase()) {
+      case 'passed':
+      case 'success':
+        return 'bg-green-50 border-green-200';
+      case 'failed':
+      case 'error':
+        return 'bg-red-50 border-red-200';
+      case 'running':
+        return 'bg-blue-50 border-blue-200';
+      case 'queued':
+        return 'bg-yellow-50 border-yellow-200';
+      default:
+        return 'bg-green-50 border-green-200';
+    }
+  };
+
   return (
-    <div className={`bg-white min-w-90 roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
+    <div 
+      className={`bg-white rounded-lg border ${props.selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200'} relative`}
+      style={{ 
+        width: 320,
+        boxShadow: '0 4px 12px rgba(128,128,128,0.20)' 
+      }}
+    >
+      {/* Selected state icon overlay */}
+      {props.selected && (
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 flex gap-2 bg-white shadow-lg rounded-lg px-2 py-1 border z-10">
+          <button 
+            className="hover:bg-gray-100 text-gray-600 px-2 py-1 rounded leading-none" 
+            title="Start Run"
+          >
+            <span className="material-symbols-outlined" style={{fontSize:20}}>play_arrow</span>
+          </button>
+          <button 
+            className="hover:bg-gray-100 text-gray-600 px-2 py-1 rounded leading-none" 
+            title="View Code"
+            onClick={() => setShowOverlay(true)}
+          >
+            <span className="material-symbols-outlined" style={{fontSize:20}}>code</span>
+          </button>
+          <button 
+            className="hover:bg-gray-100 text-gray-600 px-2 py-1 rounded leading-none" 
+            title="Edit Triggers"
+          >
+            <span className="material-symbols-outlined" style={{fontSize:20}}>bolt</span>
+          </button>
+          <button 
+            className="hover:bg-red-100 hover:text-red-600 text-gray-600 px-2 py-1 rounded leading-none" 
+            title="Delete Stage"
+          >
+            <span className="material-symbols-outlined" style={{fontSize:20}}>delete</span>
+          </button>
+        </div>
+      )}
+
       {/* Modal overlay for View Code */}
       <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>
         <div style={{ color: '#444', fontSize: 16, lineHeight: 1.7 }}>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse et urna fringilla, tincidunt nulla nec, dictum erat. Etiam euismod, justo id facilisis dictum, urna massa dictum erat, eget dictum urna massa id justo. Praesent nec facilisis urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
+          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse et urna fringilla, tincidunt nulla nec, dictum erat.
         </div>
       </OverlayModal>
-      {/* Custom Node Header */}
-      <div className="flex items-center px-3 py-2 border-b bg-gray-50 rounded-tg">
-        <span className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mr-2">
-          <span className="material-symbols-outlined text-lg">{props.data.icon}</span>
-        </span>
-        <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
-        {/* Example action button (menu) */}
-        <button onClick={() => selectStageId(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
-          <span className="material-symbols-outlined text-gray-500">more_vert</span>
-        </button>
-      </div>
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-3">
-          <span className={`status-badge ${props.data.status ? props.data.status.toLowerCase() : ''}`}>{props.data.status}</span>
-          <span className="text-xs text-gray-500">{props.data.timestamp}</span>
+
+      {/* Header */}
+      <div className="p-3 flex justify-between items-center">
+        <div className="flex items-center">
+          <span className="material-symbols-outlined mr-2 text-gray-600">rocket_launch</span>
+          <p className="mb-0 font-semibold text-gray-900">{props.data.label}</p>
         </div>
-        <div className="flex flex-wrap gap-1 mb-3">
-        {
-          outputs.map(output => (
-            <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2 max-w-50 truncate">
+        <div className='flex items-center gap-2'>
+          {/* Health status indicator */}
+          <div className="rounded-full bg-green-500 w-3 h-3 border-2 border-green-200" title="Healthy"></div>
+          
+          {/* Menu button */}
+          <button 
+            onClick={() => selectStageId(props.id)} 
+            className="p-1 rounded hover:bg-gray-100 transition" 
+            title="More actions"
+          >
+            <span className="material-symbols-outlined text-gray-500">more_vert</span>
+          </button>
+        </div>
+      </div>
+      
+      {/* Last Run Section */}
+      <div className={`p-3 ${getStatusBgClass()} w-full border-t min-w-0 text-ellipsis overflow-hidden`}>
+        <div className="flex items-center w-full justify-between mb-2">
+          <div className="uppercase text-xs font-medium text-gray-600">Last run</div>
+          <div className="text-xs text-gray-500">{props.data.timestamp}</div>
+        </div>
+
+        <div className="flex items-center mb-2">
+          {getStatusIcon()}
+          <img alt="Favicon" className="w-4 h-4 mx-2" src="/favicon.ico"/>
+          <a href="#" className="min-w-0 font-medium text-sm flex items-center hover:underline truncate">
+            {props.data.status} - Latest execution
+          </a>
+        </div>
+        
+        {/* Output badges */}
+        <div className="flex flex-wrap gap-1 mt-2">
+          {outputs.map((output, index) => (
+            <span 
+              key={index}
+              className={`bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full max-w-32 truncate ${
+                output.required ? 'border border-gray-300 font-medium' : ''
+              }`}
+            >
               {output.key}: {output.value}
             </span>
-          ))
-        }
+          ))}
         </div>
       </div>
-      <div className="border-t border-gray-200 p-4">
-        {/* PENDING Queue Section */}
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Pending Runs</h4>
-        { pendingEvents.length > 0 ? (
-          <>
-            {/* Show the first pending item with details */}
-            <div className="flex items-center p-2 bg-amber-50 rounded mb-1">
-              <div className="material-symbols-outlined text-amber-600 mr-2">pending</div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(pendingEvents[0].createdAt || '').toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {pendingEvents[0].id!.substring(0, 8)}...</div>
+
+      {/* Queue Section */}
+      <div className="p-3 pt-2 w-full">
+        <div className="uppercase text-xs font-medium text-gray-600 mb-2">QUEUE</div>
+        <div className="w-full">
+          {/* Pending Events */}
+          {pendingEvents.length > 0 ? (
+            <div className='flex items-center w-full p-2 bg-gray-100 rounded mb-1'>
+              <div className="rounded-full bg-amber-100 text-amber-600 w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined text-sm">pending</span>
+              </div>
+              <div className="min-w-0 text-sm font-medium flex items-center truncate">
+                <div className='truncate'>Pending: {new Date(pendingEvents[0].createdAt || '').toLocaleString()}</div>
               </div>
             </div>
-            {/* Show count of additional pending items */}
-            {pendingEvents.length > 1 && (
-              <div className="text-xs text-amber-600 hover:text-amber-800 mb-3">
-                <a href="#" className="no-underline hover:underline">{pendingEvents.length - 1} more pending</a>
+          ) : null}
+
+          {/* Waiting Events */}
+          {waitingEvents.length > 0 ? (
+            <div className='flex items-center w-full p-2 bg-blue-50 rounded mb-1'>
+              <div className="rounded-full bg-blue-100 text-blue-600 w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined text-sm">how_to_reg</span>
               </div>
-            )}
-          </>
-        ) : (
-          <div className="text-sm text-gray-500 italic mb-3">No pending items</div>
-        )}
-        
-        {/* WAITING Queue Section */}
-        {waitingEvents.length > 0 && (
-          <>
-            <h4 className="text-sm font-medium text-gray-700 mb-2 border-t pt-2">Waiting for Approval</h4>
-            <div className="flex items-center p-2 bg-blue-50 rounded mb-1">
-              <div className="material-symbols-outlined text-blue-600 mr-2">hourglass_empty</div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(waitingEvents[0].createdAt!).toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {waitingEvents[0].id!.substring(0, 8)}...</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  Waiting for approval
+                </div>
+                <div className="text-xs text-gray-600">
+                  {new Date(waitingEvents[0].createdAt!).toLocaleString()}
+                </div>
               </div>
               <button 
                 onClick={() => !executionRunning && props.data.approveStageEvent(waitingEvents[0])}
                 disabled={executionRunning}
-                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
+                className="ml-2 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Approve
               </button>
             </div>
-            {waitingEvents.length > 1 && (
-              <div className="text-xs text-blue-600 hover:text-blue-800 mb-3">
-                <a href="#" className="no-underline hover:underline">{waitingEvents.length - 1} more waiting</a>
-              </div>
-            )}
-          </>
-        )}
-        
-        {/* PROCESSED Queue Section - Only show the count */}
-        {processedEvents.length > 0 && (
-          <>
-            <h4 className="text-sm font-medium text-gray-700 mb-2 border-t pt-2">Processed Recently</h4>
-            <div className="flex items-center p-2 bg-green-50 rounded mb-1">
-              <div className="material-symbols-outlined text-green-600 mr-2">check_circle</div>
-              <div className="flex-1">
-                <div className="text-sm">{processedEvents.length} processed</div>
-                <div className="text-xs text-gray-600">Latest: {new Date(processedEvents[0].createdAt!).toLocaleString()}</div>
-              </div>
-            </div>
-          </>
-        )}
-        
-        {/* Show message when no queues exist */}
-        {(!pendingEvents.length && !waitingEvents.length && !processedEvents.length) && (
-          <div className="text-sm text-gray-500 italic">No queue activity</div>
-        )}
+          ) : null}
 
+          {/* Show empty state */}
+          {pendingEvents.length === 0 && waitingEvents.length === 0 && processedEvents.length === 0 && (
+            <div className="text-sm text-gray-500 italic">No items in queue</div>
+          )}
+        </div>
       </div>
+
       <CustomBarHandle type="target" connections={props.data.connections} conditions={props.data.conditions}/>
       <CustomBarHandle type="source"/>
     </div>
   );
-};
+}
 
 interface OverlayModalProps {
   open: boolean;
