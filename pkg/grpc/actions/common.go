@@ -195,7 +195,7 @@ func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 		}
 
 		connections = append(connections, &pb.Connection{
-			Type:           connectionTypeToProto(c.SourceType),
+			Type:           ConnectionTypeToProto(c.SourceType),
 			Name:           c.SourceName,
 			FilterOperator: filterOperatorToProto(c.FilterOperator),
 			Filters:        filters,
@@ -248,7 +248,7 @@ func serializeFilter(in models.ConnectionFilter) (*pb.Connection_Filter, error) 
 	}
 }
 
-func connectionTypeToProto(t string) pb.Connection_Type {
+func ConnectionTypeToProto(t string) pb.Connection_Type {
 	switch t {
 	case models.SourceTypeStage:
 		return pb.Connection_TYPE_STAGE

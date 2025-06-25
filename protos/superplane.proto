@@ -202,7 +202,18 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List stage events";
       description: "Returns a list of events for the specified stage (canvas can be referenced by ID or name)";
-      tags: "Event";
+      tags: "Stage";
+    };
+  }
+
+  rpc ListConnectionGroupFieldSets(ListConnectionGroupFieldSetsRequest) returns (ListConnectionGroupFieldSetsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}/field-sets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connection group field sets";
+      description: "Returns a list of field sets for the specified connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
     };
   }
 
@@ -238,7 +249,7 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Approve a stage event";
       description: "Approves the specified stage event (canvas can be referenced by ID or name)";
-      tags: "Event";
+      tags: "Stage";
     };
   }
 
@@ -680,6 +691,37 @@ message ListEventSourcesResponse {
   repeated EventSource event_sources = 1;
 }
 
+message ListConnectionGroupFieldSetsRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message ListConnectionGroupFieldSetsResponse {
+  repeated ConnectionGroupFieldSet field_sets = 1;
+}
+
+message ConnectionGroupFieldSet {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_PROCESSED = 4;
+  }
+
+  string id = 1;
+  repeated KeyValuePair fields = 2;
+  string hash = 3;
+  State state = 4;
+  repeated ConnectionGroupEvent events = 5;
+}
+
+message ConnectionGroupEvent {
+  string id = 1;
+  string source_id = 2;
+  Connection.Type source_type = 3;
+  string source_name = 4;
+  google.protobuf.Timestamp received_at = 5;
+}
+
 message ListStageEventsRequest {
   string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
@@ -717,10 +759,10 @@ message StageEvent {
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
-  repeated InputValue inputs = 9;
+  repeated KeyValuePair inputs = 9;
 }
 
-message InputValue {
+message KeyValuePair {
   string name = 1;
   string value = 2;
 }

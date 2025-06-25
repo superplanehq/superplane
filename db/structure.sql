@@ -106,29 +106,31 @@ ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
 
 
 --
--- Name: connection_group_events; Type: TABLE; Schema: public; Owner: -
+-- Name: connection_group_field_set_events; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.connection_group_events (
+CREATE TABLE public.connection_group_field_set_events (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    connection_group_id uuid NOT NULL,
+    connection_group_set_id uuid NOT NULL,
     event_id uuid NOT NULL,
     source_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
-    created_at timestamp without time zone NOT NULL
+    received_at timestamp without time zone NOT NULL
 );
 
 
 --
--- Name: connection_group_fields; Type: TABLE; Schema: public; Owner: -
+-- Name: connection_group_field_sets; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.connection_group_fields (
+CREATE TABLE public.connection_group_field_sets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     connection_group_id uuid NOT NULL,
-    source_id uuid NOT NULL,
-    name character varying(128) NOT NULL,
-    value character varying(128) NOT NULL
+    field_set jsonb NOT NULL,
+    field_set_hash character(64) NOT NULL,
+    state character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL
 );
 
 
@@ -358,19 +360,19 @@ ALTER TABLE ONLY public.casbin_rule
 
 
 --
--- Name: connection_group_events connection_group_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_field_set_events connection_group_field_set_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_events
-    ADD CONSTRAINT connection_group_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.connection_group_field_set_events
+    ADD CONSTRAINT connection_group_field_set_events_pkey PRIMARY KEY (id);
 
 
 --
--- Name: connection_group_fields connection_group_fields_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_field_sets connection_group_field_sets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_fields
-    ADD CONSTRAINT connection_group_fields_pkey PRIMARY KEY (connection_group_id, source_id, name, value);
+ALTER TABLE ONLY public.connection_group_field_sets
+    ADD CONSTRAINT connection_group_field_sets_pkey PRIMARY KEY (id);
 
 
 --
@@ -616,19 +618,19 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: connection_group_events connection_group_events_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_field_set_events connection_group_field_set_events_connection_group_set_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_events
-    ADD CONSTRAINT connection_group_events_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
+ALTER TABLE ONLY public.connection_group_field_set_events
+    ADD CONSTRAINT connection_group_field_set_events_connection_group_set_id_fkey FOREIGN KEY (connection_group_set_id) REFERENCES public.connection_group_field_sets(id);
 
 
 --
--- Name: connection_group_fields connection_group_fields_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: connection_group_field_sets connection_group_field_sets_connection_group_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.connection_group_fields
-    ADD CONSTRAINT connection_group_fields_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
+ALTER TABLE ONLY public.connection_group_field_sets
+    ADD CONSTRAINT connection_group_field_sets_connection_group_id_fkey FOREIGN KEY (connection_group_id) REFERENCES public.connection_groups(id);
 
 
 --

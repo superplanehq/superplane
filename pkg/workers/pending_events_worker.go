@@ -2,6 +2,7 @@ package workers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -172,29 +173,28 @@ func (w *PendingEventsWorker) handleConnectionGroupEvent(tx *gorm.DB, event *mod
 	}
 
 	//
-	// Create new records for connection group event and keys.
+	// Calculate field set for event, and check if field set record already exists.
+	// If it doesn't, create it.
 	//
-	_, err = models.CreateConnectionGroupEvent(tx, connectionGroup.ID, event)
+	fields, hash, err := connectionGroup.CalculateFieldSet(event)
 	if err != nil {
-		return fmt.Errorf("error creating connection group event: %v", err)
+		return err
 	}
 
-	fields := []models.ConnectionGroupField{}
-	for _, fieldDef := range connectionGroup.Spec.Data().GroupBy.Fields {
-		value, err := event.EvaluateStringExpression(fieldDef.Expression)
-		if err != nil {
-			return fmt.Errorf("error evaluating expression '%s' for connection group field %s: %v", fieldDef.Expression, fieldDef.Name, err)
+	fieldSet, err := models.FindConnectionGroupFieldSetByHash(tx, connectionGroup.ID, hash)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			fieldSet, err = models.CreateConnectionGroupFieldSet(tx, connectionGroup.ID, fields, hash)
+			if err != nil {
+				return err
+			}
 		}
-
-		fields = append(fields, models.ConnectionGroupField{
-			ConnectionGroupID: connectionGroup.ID,
-			SourceID:          event.SourceID,
-			Name:              fieldDef.Name,
-			Value:             value,
-		})
 	}
 
-	err = tx.Create(fields).Error
+	//
+	// Create new connection group field set event.
+	//
+	_, err = models.CreateConnectionGroupFieldSetEvent(tx, fieldSet.ID, event)
 	if err != nil {
 		return err
 	}
@@ -202,39 +202,39 @@ func (w *PendingEventsWorker) handleConnectionGroupEvent(tx *gorm.DB, event *mod
 	//
 	// Check if new event should be emitted, and if so, emit it.
 	//
-	return w.emitConnectionGroupEvent(tx, connectionGroup, fields)
+	return w.emitConnectionGroupEvent(tx, connectionGroup, fieldSet)
 }
 
-func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGroup *models.ConnectionGroup, fields []models.ConnectionGroupField) error {
+func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGroup *models.ConnectionGroup, fieldSet *models.ConnectionGroupFieldSet) error {
 	connections, err := models.ListConnectionsInTransaction(tx, connectionGroup.ID, models.ConnectionTargetTypeConnectionGroup)
 	if err != nil {
 		return fmt.Errorf("error listing connections: %v", err)
 	}
 
-	for _, field := range fields {
-		connectionsWithField, err := models.FindConnectionsWithGroupByField(tx, connectionGroup.ID, field.Name, field.Value)
-		if err != nil {
-			return fmt.Errorf("error finding connections for group field: %v", err)
-		}
+	connectionsWithFieldSet, err := models.FindConnectionsWithFieldSetHash(tx, connectionGroup.ID, fieldSet.FieldSetHash)
+	if err != nil {
+		return fmt.Errorf("error finding connections with field set hash: %v", err)
+	}
 
-		//
-		// If one of the connections still hasn't emitted an event with this field,
-		// we do not emit any event for the connection group.
-		//
-		for _, conn := range connections {
-			if !slices.Contains(connectionsWithField, conn.SourceID.String()) {
-				log.Infof("Event from %s with %s=%s not received for connection group %s", conn.SourceName, field.Name, field.Value, connectionGroup.Name)
-				return nil
-			}
+	//
+	// If one of the connections still hasn't emitted an event with this field,
+	// we do not emit any event for the connection group.
+	//
+	for _, conn := range connections {
+		if !slices.Contains(connectionsWithFieldSet, conn.SourceID.String()) {
+			log.Infof("Event from %s with %v not received for connection group %s", conn.SourceName, fieldSet.FieldSet.Data(), connectionGroup.Name)
+			return nil
 		}
 	}
+
+	log.Infof("All events received for %v - emitting event for connection group %s", fieldSet.FieldSet.Data(), connectionGroup.Name)
 
 	//
 	// If we get here, we know that we have received events
 	// with all the required fields from all the connections in the group,
 	// so we emit an event for it.
 	//
-	eventData, err := w.buildConnectionGroupEvent(fields)
+	eventData, err := w.buildConnectionGroupEvent(tx, fieldSet)
 	if err != nil {
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
@@ -248,16 +248,40 @@ func (w *PendingEventsWorker) emitConnectionGroupEvent(tx *gorm.DB, connectionGr
 		[]byte(`{}`),
 	)
 
-	return err
-}
-
-func (w *PendingEventsWorker) buildConnectionGroupEvent(fields []models.ConnectionGroupField) ([]byte, error) {
-	event := map[string]any{}
-	for _, field := range fields {
-		event[field.Name] = field.Value
+	if err != nil {
+		return err
 	}
 
-	// TODO: include all events that were grouped into this one
+	return fieldSet.UpdateState(tx, models.ConnectionGroupFieldSetStateProcessed)
+}
+
+func (w *PendingEventsWorker) buildConnectionGroupEvent(tx *gorm.DB, fieldSet *models.ConnectionGroupFieldSet) ([]byte, error) {
+	event := map[string]any{}
+
+	//
+	// Include fields from field set.
+	//
+	for k, v := range fieldSet.FieldSet.Data() {
+		event[k] = v
+	}
+
+	//
+	// Include events from connections.
+	//
+	events, err := fieldSet.FindEventsWithData(tx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, e := range events {
+		var obj map[string]any
+		err := json.Unmarshal(e.Raw, &obj)
+		if err != nil {
+			return nil, err
+		}
+
+		event[e.SourceName] = obj
+	}
 
 	return json.Marshal(event)
 }

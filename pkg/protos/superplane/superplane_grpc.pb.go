@@ -19,26 +19,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Superplane_ListCanvases_FullMethodName            = "/Superplane.Superplane/ListCanvases"
-	Superplane_CreateCanvas_FullMethodName            = "/Superplane.Superplane/CreateCanvas"
-	Superplane_CreateSecret_FullMethodName            = "/Superplane.Superplane/CreateSecret"
-	Superplane_CreateConnectionGroup_FullMethodName   = "/Superplane.Superplane/CreateConnectionGroup"
-	Superplane_CreateEventSource_FullMethodName       = "/Superplane.Superplane/CreateEventSource"
-	Superplane_CreateStage_FullMethodName             = "/Superplane.Superplane/CreateStage"
-	Superplane_DescribeCanvas_FullMethodName          = "/Superplane.Superplane/DescribeCanvas"
-	Superplane_DescribeStage_FullMethodName           = "/Superplane.Superplane/DescribeStage"
-	Superplane_DescribeEventSource_FullMethodName     = "/Superplane.Superplane/DescribeEventSource"
-	Superplane_DescribeConnectionGroup_FullMethodName = "/Superplane.Superplane/DescribeConnectionGroup"
-	Superplane_DescribeSecret_FullMethodName          = "/Superplane.Superplane/DescribeSecret"
-	Superplane_ListStages_FullMethodName              = "/Superplane.Superplane/ListStages"
-	Superplane_ListEventSources_FullMethodName        = "/Superplane.Superplane/ListEventSources"
-	Superplane_ListConnectionGroups_FullMethodName    = "/Superplane.Superplane/ListConnectionGroups"
-	Superplane_ListSecrets_FullMethodName             = "/Superplane.Superplane/ListSecrets"
-	Superplane_ListStageEvents_FullMethodName         = "/Superplane.Superplane/ListStageEvents"
-	Superplane_UpdateStage_FullMethodName             = "/Superplane.Superplane/UpdateStage"
-	Superplane_UpdateSecret_FullMethodName            = "/Superplane.Superplane/UpdateSecret"
-	Superplane_ApproveStageEvent_FullMethodName       = "/Superplane.Superplane/ApproveStageEvent"
-	Superplane_DeleteSecret_FullMethodName            = "/Superplane.Superplane/DeleteSecret"
+	Superplane_ListCanvases_FullMethodName                 = "/Superplane.Superplane/ListCanvases"
+	Superplane_CreateCanvas_FullMethodName                 = "/Superplane.Superplane/CreateCanvas"
+	Superplane_CreateSecret_FullMethodName                 = "/Superplane.Superplane/CreateSecret"
+	Superplane_CreateConnectionGroup_FullMethodName        = "/Superplane.Superplane/CreateConnectionGroup"
+	Superplane_CreateEventSource_FullMethodName            = "/Superplane.Superplane/CreateEventSource"
+	Superplane_CreateStage_FullMethodName                  = "/Superplane.Superplane/CreateStage"
+	Superplane_DescribeCanvas_FullMethodName               = "/Superplane.Superplane/DescribeCanvas"
+	Superplane_DescribeStage_FullMethodName                = "/Superplane.Superplane/DescribeStage"
+	Superplane_DescribeEventSource_FullMethodName          = "/Superplane.Superplane/DescribeEventSource"
+	Superplane_DescribeConnectionGroup_FullMethodName      = "/Superplane.Superplane/DescribeConnectionGroup"
+	Superplane_DescribeSecret_FullMethodName               = "/Superplane.Superplane/DescribeSecret"
+	Superplane_ListStages_FullMethodName                   = "/Superplane.Superplane/ListStages"
+	Superplane_ListEventSources_FullMethodName             = "/Superplane.Superplane/ListEventSources"
+	Superplane_ListConnectionGroups_FullMethodName         = "/Superplane.Superplane/ListConnectionGroups"
+	Superplane_ListSecrets_FullMethodName                  = "/Superplane.Superplane/ListSecrets"
+	Superplane_ListStageEvents_FullMethodName              = "/Superplane.Superplane/ListStageEvents"
+	Superplane_ListConnectionGroupFieldSets_FullMethodName = "/Superplane.Superplane/ListConnectionGroupFieldSets"
+	Superplane_UpdateStage_FullMethodName                  = "/Superplane.Superplane/UpdateStage"
+	Superplane_UpdateSecret_FullMethodName                 = "/Superplane.Superplane/UpdateSecret"
+	Superplane_ApproveStageEvent_FullMethodName            = "/Superplane.Superplane/ApproveStageEvent"
+	Superplane_DeleteSecret_FullMethodName                 = "/Superplane.Superplane/DeleteSecret"
 )
 
 // SuperplaneClient is the client API for Superplane service.
@@ -61,6 +62,7 @@ type SuperplaneClient interface {
 	ListConnectionGroups(ctx context.Context, in *ListConnectionGroupsRequest, opts ...grpc.CallOption) (*ListConnectionGroupsResponse, error)
 	ListSecrets(ctx context.Context, in *ListSecretsRequest, opts ...grpc.CallOption) (*ListSecretsResponse, error)
 	ListStageEvents(ctx context.Context, in *ListStageEventsRequest, opts ...grpc.CallOption) (*ListStageEventsResponse, error)
+	ListConnectionGroupFieldSets(ctx context.Context, in *ListConnectionGroupFieldSetsRequest, opts ...grpc.CallOption) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
 	UpdateSecret(ctx context.Context, in *UpdateSecretRequest, opts ...grpc.CallOption) (*UpdateSecretResponse, error)
 	ApproveStageEvent(ctx context.Context, in *ApproveStageEventRequest, opts ...grpc.CallOption) (*ApproveStageEventResponse, error)
@@ -235,6 +237,16 @@ func (c *superplaneClient) ListStageEvents(ctx context.Context, in *ListStageEve
 	return out, nil
 }
 
+func (c *superplaneClient) ListConnectionGroupFieldSets(ctx context.Context, in *ListConnectionGroupFieldSetsRequest, opts ...grpc.CallOption) (*ListConnectionGroupFieldSetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListConnectionGroupFieldSetsResponse)
+	err := c.cc.Invoke(ctx, Superplane_ListConnectionGroupFieldSets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateStageResponse)
@@ -295,6 +307,7 @@ type SuperplaneServer interface {
 	ListConnectionGroups(context.Context, *ListConnectionGroupsRequest) (*ListConnectionGroupsResponse, error)
 	ListSecrets(context.Context, *ListSecretsRequest) (*ListSecretsResponse, error)
 	ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error)
+	ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
 	UpdateSecret(context.Context, *UpdateSecretRequest) (*UpdateSecretResponse, error)
 	ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error)
@@ -355,6 +368,9 @@ func (UnimplementedSuperplaneServer) ListSecrets(context.Context, *ListSecretsRe
 }
 func (UnimplementedSuperplaneServer) ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListStageEvents not implemented")
+}
+func (UnimplementedSuperplaneServer) ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListConnectionGroupFieldSets not implemented")
 }
 func (UnimplementedSuperplaneServer) UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateStage not implemented")
@@ -676,6 +692,24 @@ func _Superplane_ListStageEvents_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_ListConnectionGroupFieldSets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListConnectionGroupFieldSetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ListConnectionGroupFieldSets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ListConnectionGroupFieldSets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ListConnectionGroupFieldSets(ctx, req.(*ListConnectionGroupFieldSetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_UpdateStage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateStageRequest)
 	if err := dec(in); err != nil {
@@ -818,6 +852,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListStageEvents",
 			Handler:    _Superplane_ListStageEvents_Handler,
+		},
+		{
+			MethodName: "ListConnectionGroupFieldSets",
+			Handler:    _Superplane_ListConnectionGroupFieldSets_Handler,
 		},
 		{
 			MethodName: "UpdateStage",

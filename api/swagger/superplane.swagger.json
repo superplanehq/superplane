@@ -650,6 +650,44 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}/field-sets": {
+      "get": {
+        "summary": "List connection group field sets",
+        "description": "Returns a list of field sets for the specified connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_ListConnectionGroupFieldSets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListConnectionGroupFieldSetsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/event-sources": {
       "get": {
         "summary": "List event sources",
@@ -1187,7 +1225,7 @@
           }
         ],
         "tags": [
-          "Event"
+          "Stage"
         ]
       }
     },
@@ -1239,7 +1277,7 @@
           }
         ],
         "tags": [
-          "Event"
+          "Stage"
         ]
       }
     },
@@ -1813,6 +1851,64 @@
         }
       }
     },
+    "SuperplaneConnectionGroupEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneConnectionType"
+        },
+        "sourceName": {
+          "type": "string"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneConnectionGroupFieldSet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneKeyValuePair"
+          }
+        },
+        "hash": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetState"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroupEvent"
+          }
+        }
+      }
+    },
+    "SuperplaneConnectionGroupFieldSetState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_PROCESSED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
     "SuperplaneConnectionGroupMetadata": {
       "type": "object",
       "properties": {
@@ -2128,7 +2224,7 @@
         }
       }
     },
-    "SuperplaneInputValue": {
+    "SuperplaneKeyValuePair": {
       "type": "object",
       "properties": {
         "name": {
@@ -2147,6 +2243,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneCanvas"
+          }
+        }
+      }
+    },
+    "SuperplaneListConnectionGroupFieldSetsResponse": {
+      "type": "object",
+      "properties": {
+        "fieldSets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroupFieldSet"
           }
         }
       }
@@ -2323,7 +2431,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneInputValue"
+            "$ref": "#/definitions/SuperplaneKeyValuePair"
           }
         }
       }

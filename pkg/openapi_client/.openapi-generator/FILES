@@ -6,7 +6,6 @@ api/openapi.yaml
 api_authorization.go
 api_canvas.go
 api_connection_group.go
-api_event.go
 api_event_source.go
 api_secret.go
 api_stage.go
@@ -34,7 +33,6 @@ docs/ConnectionFilterOperator.md
 docs/ConnectionFilterType.md
 docs/ConnectionGroupAPI.md
 docs/ConnectionHeaderFilter.md
-docs/EventAPI.md
 docs/EventSourceAPI.md
 docs/ExecutionResult.md
 docs/ExecutorSpecHTTP.md
@@ -62,6 +60,9 @@ docs/SuperplaneConditionTimeWindow.md
 docs/SuperplaneConditionType.md
 docs/SuperplaneConnection.md
 docs/SuperplaneConnectionGroup.md
+docs/SuperplaneConnectionGroupEvent.md
+docs/SuperplaneConnectionGroupFieldSet.md
+docs/SuperplaneConnectionGroupFieldSetState.md
 docs/SuperplaneConnectionGroupMetadata.md
 docs/SuperplaneConnectionGroupSpec.md
 docs/SuperplaneConnectionType.md
@@ -88,8 +89,9 @@ docs/SuperplaneExecutorSpec.md
 docs/SuperplaneExecutorSpecType.md
 docs/SuperplaneInputDefinition.md
 docs/SuperplaneInputMapping.md
-docs/SuperplaneInputValue.md
+docs/SuperplaneKeyValuePair.md
 docs/SuperplaneListCanvasesResponse.md
+docs/SuperplaneListConnectionGroupFieldSetsResponse.md
 docs/SuperplaneListConnectionGroupsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
 docs/SuperplaneListSecretsResponse.md
@@ -159,6 +161,9 @@ model_superplane_condition_time_window.go
 model_superplane_condition_type.go
 model_superplane_connection.go
 model_superplane_connection_group.go
+model_superplane_connection_group_event.go
+model_superplane_connection_group_field_set.go
+model_superplane_connection_group_field_set_state.go
 model_superplane_connection_group_metadata.go
 model_superplane_connection_group_spec.go
 model_superplane_connection_type.go
@@ -185,8 +190,9 @@ model_superplane_executor_spec.go
 model_superplane_executor_spec_type.go
 model_superplane_input_definition.go
 model_superplane_input_mapping.go
-model_superplane_input_value.go
+model_superplane_key_value_pair.go
 model_superplane_list_canvases_response.go
+model_superplane_list_connection_group_field_sets_response.go
 model_superplane_list_connection_groups_response.go
 model_superplane_list_event_sources_response.go
 model_superplane_list_secrets_response.go
@@ -217,7 +223,6 @@ test/api_authorization_test.go
 test/api_canvas_test.go
 test/api_connection_group_test.go
 test/api_event_source_test.go
-test/api_event_test.go
 test/api_secret_test.go
 test/api_stage_test.go
 utils.go

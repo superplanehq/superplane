@@ -105,3 +105,7 @@ func (s *SuperplaneService) DescribeConnectionGroup(ctx context.Context, req *pb
 func (s *SuperplaneService) ListConnectionGroups(ctx context.Context, req *pb.ListConnectionGroupsRequest) (*pb.ListConnectionGroupsResponse, error) {
 	return groups.ListConnectionGroups(ctx, req)
 }
+
+func (s *SuperplaneService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
+	return groups.ListConnectionGroupFieldSets(ctx, req)
+}
