@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>icn-current-step</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="icn-current-step" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle-Copy" fill="#292E33" x="1" y="1" width="14" height="14" rx="7"></rect>
+        <path d="M5,8 L10.0226805,8.02268051" id="Line-Copy-3" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        <polyline id="Line-Copy-4" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" points="8 5 11 8 8 11"></polyline>
+    </g>
+</svg>

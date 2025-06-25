@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>icn-logout</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="icn-logout" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <polyline id="Rectangle-4-Copy-8" stroke="#292E33" stroke-width="2" transform="translate(11.000000, 8.000689) rotate(90.000000) translate(-11.000000, -8.000689) " points="7.99931146 11.0006885 6.00162796 11.0006885 6.00784165 5.00068854 15.9907813 5.00068854 15.998372 11.0006885 13.9993115 11.0006885"></polyline>
+        <polygon id="Combined-Shape" fill="#292E33" transform="translate(6.008801, 8.017609) rotate(-89.000000) translate(-6.008801, -8.017609) " points="7.02625334 7.00850178 7.11336307 12.9902878 5.11366768 13.0251927 5.00895324 7.02610649 2.00941015 7.07846371 5.9390046 3.01002471 10.0081917 6.93884446"></polygon>
+    </g>
+</svg>

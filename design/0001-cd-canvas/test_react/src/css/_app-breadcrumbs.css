@@ -1,0 +1,31 @@
+/* App Semaphore Breadcrumbs
+----------------------------------------------------------------------------- */
+
+.breadcrumb {
+    font-size: .875rem;
+    margin-top: -1px;
+}
+
+.breadcrumb-item {
+    display: inline-block;
+}
+
+.breadcrumb-item a {
+    text-decoration: none;
+    color: var(--dark-gray);
+}
+
+.breadcrumb-item a:hover {
+    color: var(--gray);
+}
+
+.breadcrumb-item a::after {
+    content: '\203A';
+    margin: 0 4px 0 8px;
+    text-decoration: none;
+    color: var(--gray);
+}
+
+.breadcrumb-item.active {
+    color: var(--gray);
+}

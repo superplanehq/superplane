@@ -1,0 +1,27 @@
+/*
+
+   LINKS
+   Docs: http://tachyons.io/docs/elements/links/
+
+*/
+
+.link {
+  text-decoration: none;
+  /* transition: color .1s; */
+}
+
+.link:link,
+.link:visited {
+  /* transition: color .1s; */
+}
+.link:hover   {
+  /* transition: color .1s; */
+}
+.link:active  {
+  /* transition: color .1s; */
+}
+.link:focus   {
+  /* transition: color .1s; */
+  outline: 1px dotted currentColor;
+}
+
