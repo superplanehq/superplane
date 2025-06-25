@@ -141,13 +141,24 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.Middleware(s.grpcGatewayHandler(grpcGatewayMux))
+	protectedGRPCHandler := s.authHandler.Middleware(
+		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
+	)
 
 	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 
 	return nil
+}
+
+// stripUserIDHeaderHandler removes the X-User-Id header from the request before we set it manually
+func (s *Server) stripUserIDHeaderHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Del("X-User-Id")
+		r.Header.Del("x-user-id")
+		next.ServeHTTP(w, r)
+	})
 }
 
 func headersMatcher(key string) (string, bool) {
