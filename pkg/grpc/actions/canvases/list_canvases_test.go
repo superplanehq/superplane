@@ -61,7 +61,7 @@ func Test__ListCanvases(t *testing.T) {
 		assert.NotNil(t, res.Canvases[0].Metadata.CreatedAt)
 	})
 
-	t.Run("invalid organization ID -> list canvases from organization", func(t *testing.T) {
+	t.Run("Organization with no canvases -> empty list", func(t *testing.T) {
 		ctx := context.Background()
 		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
