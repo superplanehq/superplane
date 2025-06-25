@@ -60,9 +60,32 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     })
   }, [props.data.outputs, allFinishedExecutions])
 
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'running':
+      case 'deploying':
+        return 'bg-blue-100 text-blue-800';
+      case 'success':
+      case 'completed':
+        return 'bg-green-100 text-green-800';
+      case 'failed':
+      case 'error':
+        return 'bg-red-100 text-red-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
   
   return (
-    <div className={`bg-white min-w-90 roundedg shadow-md border ${props.selected ? 'ring-2 ring-blue-500' : 'border-gray-200'} relative`}>
+    <div
+      onClick={() => selectStageId(props.id)}
+      className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
+      style={{ width: '320px', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+    >
       {/* Modal overlay for View Code */}
       <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
         <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>
@@ -70,102 +93,119 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse et urna fringilla, tincidunt nulla nec, dictum erat. Etiam euismod, justo id facilisis dictum, urna massa dictum erat, eget dictum urna massa id justo. Praesent nec facilisis urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
         </div>
       </OverlayModal>
-      {/* Custom Node Header */}
-      <div className="flex items-center px-3 py-2 border-b bg-gray-50 rounded-tg">
-        <span className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full mr-2">
-          <span className="material-symbols-outlined text-lg">{props.data.icon}</span>
-        </span>
-        <span className="font-bold text-gray-900 flex-1 text-left">{props.data.label}</span>
-        {/* Example action button (menu) */}
-        <button onClick={() => selectStageId(props.id)} className="ml-2 p-1 rounded hover:bg-gray-200 transition" title="More actions">
-          <span className="material-symbols-outlined text-gray-500">more_vert</span>
-        </button>
-      </div>
-      <div className="p-4">
-        <div className="flex justify-between items-center mb-3">
-          <span className={`status-badge ${props.data.status ? props.data.status.toLowerCase() : ''}`}>{props.data.status}</span>
-          <span className="text-xs text-gray-500">{props.data.timestamp}</span>
-        </div>
-        <div className="flex flex-wrap gap-1 mb-3">
-        {
-          outputs.map(output => (
-            <span className="pipeline-badge bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full mr2 max-w-50 truncate">
-              {output.key}: {output.value}
-            </span>
-          ))
-        }
-        </div>
-      </div>
-      <div className="border-t border-gray-200 p-4">
-        {/* PENDING Queue Section */}
-        <h4 className="text-sm font-medium text-gray-700 mb-2">Pending Runs</h4>
-        { pendingEvents.length > 0 ? (
-          <>
-            {/* Show the first pending item with details */}
-            <div className="flex items-center p-2 bg-amber-50 rounded mb-1">
-              <div className="material-symbols-outlined text-amber-600 mr-2">pending</div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(pendingEvents[0].createdAt || '').toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {pendingEvents[0].id!.substring(0, 8)}...</div>
-              </div>
-            </div>
-            {/* Show count of additional pending items */}
-            {pendingEvents.length > 1 && (
-              <div className="text-xs text-amber-600 hover:text-amber-800 mb-3">
-                <a href="#" className="no-underline hover:underline">{pendingEvents.length - 1} more pending</a>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-sm text-gray-500 italic mb-3">No pending items</div>
-        )}
-        
-        {/* WAITING Queue Section */}
-        {waitingEvents.length > 0 && (
-          <>
-            <h4 className="text-sm font-medium text-gray-700 mb-2 border-t pt-2">Waiting for Approval</h4>
-            <div className="flex items-center p-2 bg-blue-50 rounded mb-1">
-              <div className="material-symbols-outlined text-blue-600 mr-2">hourglass_empty</div>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{new Date(waitingEvents[0].createdAt!).toLocaleString()}</div>
-                <div className="text-xs text-gray-600">ID: {waitingEvents[0].id!.substring(0, 8)}...</div>
-              </div>
-              <button 
-                onClick={() => !executionRunning && props.data.approveStageEvent(waitingEvents[0])}
-                disabled={executionRunning}
-                className="ml-2 inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600! hover:bg-blue-700! focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:text-gray-500 disabled:cursor-not-allowed"
-              >
-                Approve
-              </button>
-            </div>
-            {waitingEvents.length > 1 && (
-              <div className="text-xs text-blue-600 hover:text-blue-800 mb-3">
-                <a href="#" className="no-underline hover:underline">{waitingEvents.length - 1} more waiting</a>
-              </div>
-            )}
-          </>
-        )}
-        
-        {/* PROCESSED Queue Section - Only show the count */}
-        {processedEvents.length > 0 && (
-          <>
-            <h4 className="text-sm font-medium text-gray-700 mb-2 border-t pt-2">Processed Recently</h4>
-            <div className="flex items-center p-2 bg-green-50 rounded mb-1">
-              <div className="material-symbols-outlined text-green-600 mr-2">check_circle</div>
-              <div className="flex-1">
-                <div className="text-sm">{processedEvents.length} processed</div>
-                <div className="text-xs text-gray-600">Latest: {new Date(processedEvents[0].createdAt!).toLocaleString()}</div>
-              </div>
-            </div>
-          </>
-        )}
-        
-        {/* Show message when no queues exist */}
-        {(!pendingEvents.length && !waitingEvents.length && !processedEvents.length) && (
-          <div className="text-sm text-gray-500 italic">No queue activity</div>
-        )}
 
+      {/* Header Section */}
+      <div className="px-4 py-4 flex justify-between items-center">
+        <div className="flex items-center">
+          <span className="material-symbols-outlined mr-2 text-gray-700">rocket_launch</span>
+          <p className="mb-0 font-bold ml-1 text-gray-900">{props.data.label}</p>
+        </div>
+        <div className="flex items-center">
+          <span className="rounded-full bg-green-500 w-3 h-3 border border-green-300"></span>
+        </div>
       </div>
+
+      {/* Last Run Section */}
+      <div className="px-3 py-3 bg-blue-50 border-t border-blue-200 w-full">
+        <div className="flex items-center w-full justify-between mb-2">
+          <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Last run</div>
+          <div className="text-xs text-gray-600">
+            {isRunning ? 'Deploying now' : props.data.timestamp || 'No recent runs'}
+          </div>
+        </div>
+        
+        {/* Current Execution Display */}
+        <div>
+          <div className="flex items-center mb-1">
+            <span className={`rounded-full w-6 h-6 border border-blue-200 text-center mr-2 flex items-center justify-center ${isRunning ? 'bg-blue-500' : 'bg-gray-400'}`}>
+              {isRunning && (
+                <span className="text-white text-sm animate-spin">⟳</span>
+              )}
+            </span>
+            <a 
+              href="#" 
+              className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900"
+              onClick={() => selectStageId(props.id)}
+            >
+              {props.data.label || 'Stage execution'}
+            </a>
+          </div>
+          
+          {/* Output Tags */}
+          <div className="flex flex-wrap gap-1 mt-2">
+            {outputs.slice(0, 4).map((output, index) => (
+              <span 
+                key={index}
+                className={`text-xs px-2 py-1 rounded-full ${
+                  output.required 
+                    ? 'bg-gray-200 text-gray-800 border border-gray-300 font-medium' 
+                    : 'bg-gray-100 text-gray-700'
+                }`}
+              >
+                {output.key}: {output.value}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Queue Section */}
+      <div className="px-3 pt-2 pb-0 w-full">
+        <div className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Queue</div>
+        
+        <div className="w-full">
+          {/* Pending Events */}
+          {pendingEvents.length > 0 && (
+            <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
+              <div className="rounded-full bg-orange-100 text-orange-600 w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined text-sm">how_to_reg</span>
+              </div>
+              <a 
+                href="#" 
+                className="min-w-0 font-semibold text-sm flex items-center hover:underline"
+              >
+                <div className="truncate">Deploy: Pending ({pendingEvents.length})</div>
+              </a>
+            </div>
+          )}
+
+          {/* Waiting Events */}
+          {waitingEvents.length > 0 && (
+            <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
+              <div className="rounded-full bg-orange-100 text-orange-600 w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined text-sm">how_to_reg</span>
+              </div>
+              <a 
+                href="#" 
+                className="min-w-0 font-semibold text-sm flex items-center hover:underline"
+              >
+                <div className="truncate">Scale: Waiting Approval ({waitingEvents.length})</div>
+              </a>
+            </div>
+          )}
+
+          {/* Show empty state when no queue items */}
+          {!pendingEvents.length && !waitingEvents.length && (
+            <div className="text-sm text-gray-500 italic py-2">No queue activity</div>
+          )}
+        </div>
+      </div>
+
+      {/* Status Badge - positioned at bottom for better visibility */}
+      <div className="px-3 pb-3">
+        <div className="flex justify-between items-center mt-2">
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(props.data.status || '')}`}>
+            {props.data.status || 'Ready'}
+          </span>
+          {processedEvents.length > 0 && (
+            <span className="text-xs text-gray-500">
+              {processedEvents.length} completed
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Custom Handles */}
       <CustomBarHandle type="target" connections={props.data.connections} conditions={props.data.conditions}/>
       <CustomBarHandle type="source"/>
     </div>
