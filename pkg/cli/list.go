@@ -15,7 +15,8 @@ var listCanvasesCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		c := DefaultClient()
-		response, _, err := c.CanvasAPI.SuperplaneListCanvases(context.Background()).Execute()
+		organizationId := getOneOrAnotherFlag(cmd, "organization-id", "organization-name")
+		response, _, err := c.CanvasAPI.SuperplaneListCanvases(context.Background()).OrganizationId(organizationId).Execute()
 		Check(err)
 
 		if len(response.Canvases) == 0 {
@@ -228,6 +229,8 @@ func init() {
 
 	// Canvases command
 	listCmd.AddCommand(listCanvasesCmd)
+	listCanvasesCmd.Flags().String("organization-id", "", "Organization ID")
+	listCanvasesCmd.Flags().String("organization-name", "", "Organization name")
 
 	// Event Sources command
 	listCmd.AddCommand(listEventSourcesCmd)

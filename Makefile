@@ -87,8 +87,8 @@ db.delete:
 # Protobuf compilation
 #
 
-MODULES := superplane,authorization
-REST_API_MODULES := superplane,authorization
+MODULES := superplane,authorization,organizations
+REST_API_MODULES := superplane,authorization,organizations
 pb.gen:
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	docker-compose $(DOCKER_COMPOSE_OPTS) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)

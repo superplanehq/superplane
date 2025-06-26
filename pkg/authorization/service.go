@@ -326,6 +326,28 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	return nil
 }
 
+func (a *AuthService) DestroyOrganizationRoles(orgID string) error {
+	domain := fmt.Sprintf("org:%s", orgID)
+	ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
+
+	if err != nil {
+		return fmt.Errorf("failed to remove organization roles: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("organization roles not found for %s", orgID)
+	}
+
+	ok, err = a.enforcer.RemoveFilteredPolicy(1, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove organization policies: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("organization policies not found for %s", orgID)
+	}
+
+	return nil
+}
+
 func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
 	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
@@ -431,6 +453,28 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 				return fmt.Errorf("failed to add policy: %w", err)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
+	domain := fmt.Sprintf("canvas:%s", canvasID)
+
+	ok, err := a.enforcer.RemoveFilteredGroupingPolicy(2, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove canvas roles: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("canvas roles not found for %s", canvasID)
+	}
+
+	ok, err = a.enforcer.RemoveFilteredPolicy(1, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove canvas policies: %w", err)
+	}
+	if !ok {
+		return fmt.Errorf("canvas policies not found for %s", canvasID)
 	}
 
 	return nil

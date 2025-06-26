@@ -50,11 +50,15 @@ type APIClient struct {
 
 	// API Services
 
+	AuthorizationAPI *AuthorizationAPIService
+
 	CanvasAPI *CanvasAPIService
 
 	EventAPI *EventAPIService
 
 	EventSourceAPI *EventSourceAPIService
+
+	OrganizationAPI *OrganizationAPIService
 
 	SecretAPI *SecretAPIService
 
@@ -77,9 +81,11 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.common.client = c
 
 	// API Services
+	c.AuthorizationAPI = (*AuthorizationAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
 	c.EventAPI = (*EventAPIService)(&c.common)
 	c.EventSourceAPI = (*EventSourceAPIService)(&c.common)
+	c.OrganizationAPI = (*OrganizationAPIService)(&c.common)
 	c.SecretAPI = (*SecretAPIService)(&c.common)
 	c.StageAPI = (*StageAPIService)(&c.common)
 

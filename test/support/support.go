@@ -18,6 +18,7 @@ type ResourceRegistry struct {
 	Canvas           *models.Canvas
 	Source           *models.EventSource
 	Stage            *models.Stage
+	Organization     *models.Organization
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -50,7 +51,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	}
 
 	var err error
-	r.Canvas, err = models.CreateCanvas(r.User, "test")
+	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test")
+	require.NoError(t, err)
+
+	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")
 	require.NoError(t, err)
 
 	if options.Source {

@@ -12,7 +12,7 @@ import (
 )
 
 func Test_ListRoles(t *testing.T) {
-	authService := setupTestAuthService(t)
+	authService := SetupTestAuthService(t)
 	ctx := context.Background()
 
 	orgID := uuid.New().String()

@@ -11,18 +11,18 @@ import { Sidebar } from "./components/SideBar";
 
 export function Canvas() {
   // Get the canvas ID from the URL params
-  const { id } = useParams<{ id: string }>();
+  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const { initialize, selectedStageId, cleanSelectedStageId, stages, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Custom hook for setting up event handlers - must be called at top level
-  useWebsocketEvents(id!);
+  useWebsocketEvents(canvasId!);
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
   useEffect(() => {
     // Return early if no ID is available
-    if (!id) {
+    if (!canvasId) {
       setError("No canvas ID provided");
       setIsLoading(false);
       return;
@@ -34,7 +34,8 @@ export function Canvas() {
 
         // Fetch canvas details
         const canvasResponse = await superplaneDescribeCanvas({
-          path: { id }
+          path: { id: canvasId },
+          query: { organizationId: orgId }
         });
 
         if (!canvasResponse.data?.canvas) {
@@ -43,7 +44,7 @@ export function Canvas() {
 
         // Fetch stages for the canvas
         const stagesResponse = await superplaneListStages({
-          path: { canvasIdOrName: id }
+          path: { canvasIdOrName: canvasId },
         });
 
         // Check if stages data was fetched successfully
@@ -53,7 +54,7 @@ export function Canvas() {
 
         // Fetch event sources for the canvas
         const eventSourcesResponse = await superplaneListEventSources({
-          path: { canvasIdOrName: id }
+          path: { canvasIdOrName: canvasId }
         });
 
         // Check if event sources data was fetched successfully
@@ -71,7 +72,7 @@ export function Canvas() {
         // Fetch events for each stage
         for (const stage of mappedStages) {
           const stageEventsResponse = await superplaneListStageEvents({
-            path: { canvasIdOrName: id!, stageIdOrName: stage.metadata!.id! }
+            path: { canvasIdOrName: canvasId!, stageIdOrName: stage.metadata!.id! }
           });
 
           const stageEvents = stageEventsResponse.data?.events || [];
@@ -126,7 +127,7 @@ export function Canvas() {
     };
 
     fetchCanvasData();
-  }, [id, initialize]);
+  }, [canvasId, initialize, orgId]);
 
   if (isLoading) {
     return <div className="loading-state">Loading canvas...</div>;

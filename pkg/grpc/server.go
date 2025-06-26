@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	authorizationProtos "github.com/superplanehq/superplane/pkg/protos/authorization"
+	organizationProtos "github.com/superplanehq/superplane/pkg/protos/organizations"
 	superplaneProtos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -24,7 +25,7 @@ var (
 	customFunc recovery.RecoveryHandlerFunc
 )
 
-func RunServer(encryptor crypto.Encryptor, port int) {
+func RunServer(encryptor crypto.Encryptor, authService authorization.Authorization, port int) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
 	lis, err := net.Listen("tcp", endpoint)
 
@@ -42,6 +43,7 @@ func RunServer(encryptor crypto.Encryptor, port int) {
 	grpcServer := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			recovery.UnaryServerInterceptor(opts...),
+			authorization.NewAuthorizationInterceptor(authService).UnaryInterceptor(),
 		),
 		grpc.ChainStreamInterceptor(
 			recovery.StreamServerInterceptor(opts...),
@@ -57,13 +59,11 @@ func RunServer(encryptor crypto.Encryptor, port int) {
 	//
 	// Initialize services exposed by this server.
 	//
-	service := NewDeliveryService(encryptor)
+	service := NewDeliveryService(encryptor, authService)
 	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
 
-	authService, err := authorization.NewAuthService()
-	if err != nil {
-		log.Fatalf("failed to create auth service: %v", err)
-	}
+	organizationService := NewOrganizationService(authService)
+	organizationProtos.RegisterOrganizationsServer(grpcServer, organizationService)
 
 	server := NewAuthorizationServer(authService)
 	authorizationProtos.RegisterAuthorizationServer(grpcServer, server)

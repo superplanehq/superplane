@@ -15,6 +15,9 @@
     },
     {
       "name": "Authorization"
+    },
+    {
+      "name": "Organizations"
     }
   ],
   "schemes": [
@@ -505,6 +508,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "tags": [
           "Canvas"
         ]
@@ -1166,10 +1177,172 @@
             "in": "query",
             "required": false,
             "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
           "Canvas"
+        ]
+      }
+    },
+    "/api/v1/organizations": {
+      "get": {
+        "summary": "List organizations",
+        "description": "Returns a list of all organizations ordered by display name",
+        "operationId": "Organizations_ListOrganizations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsListOrganizationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Organization"
+        ]
+      },
+      "post": {
+        "summary": "Create a new organization",
+        "description": "Creates a new organization with the given name and display name",
+        "operationId": "Organizations_CreateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsCreateOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsCreateOrganizationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{idOrName}": {
+      "get": {
+        "summary": "Get organization details",
+        "description": "Returns the details of a specific organization (can be referenced by ID or name)",
+        "operationId": "Organizations_DescribeOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDescribeOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "delete": {
+        "summary": "Delete an organization",
+        "description": "Deletes the specified organization (can be referenced by ID or name)",
+        "operationId": "Organizations_DeleteOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsDeleteOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "patch": {
+        "summary": "Update an organization",
+        "description": "Updates the specified organization (can be referenced by ID or name)",
+        "operationId": "Organizations_UpdateOrganization",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateOrganizationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsUpdateOrganizationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
         ]
       }
     }
@@ -1514,6 +1687,94 @@
         }
       }
     },
+    "OrganizationsCreateOrganizationRequest": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsCreateOrganizationResponse": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsDeleteOrganizationResponse": {
+      "type": "object"
+    },
+    "OrganizationsDescribeOrganizationResponse": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsListOrganizationsResponse": {
+      "type": "object",
+      "properties": {
+        "organizations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/OrganizationsOrganization"
+          }
+        }
+      }
+    },
+    "OrganizationsOrganization": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/OrganizationsOrganizationMetadata"
+        }
+      }
+    },
+    "OrganizationsOrganizationMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsUpdateOrganizationBody": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "OrganizationsUpdateOrganizationResponse": {
+      "type": "object",
+      "properties": {
+        "organization": {
+          "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
     "SecretLocal": {
       "type": "object",
       "properties": {
@@ -1675,7 +1936,7 @@
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
         },
-        "requesterId": {
+        "organizationId": {
           "type": "string"
         }
       }
