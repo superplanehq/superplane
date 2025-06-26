@@ -287,7 +287,7 @@ func checkForToken(deviceCode string) (string, error) {
 	}
 
 	if tokenResp.Error != "" {
-		return "", fmt.Errorf("GitHub API error: %s", tokenResp.Error)
+		return "", fmt.Errorf(tokenResp.Error)
 	}
 
 	return tokenResp.AccessToken, nil
