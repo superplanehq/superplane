@@ -2,3 +2,4 @@ junit-report.xml
 pkg/web/assets/dist
 tmp
 build/
+design/node_modules/
