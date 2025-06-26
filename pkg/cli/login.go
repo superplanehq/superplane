@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -287,7 +288,7 @@ func checkForToken(deviceCode string) (string, error) {
 	}
 
 	if tokenResp.Error != "" {
-		return "", fmt.Errorf("GitHub API error: %s", tokenResp.Error)
+		return "", errors.New(tokenResp.Error)
 	}
 
 	return tokenResp.AccessToken, nil
