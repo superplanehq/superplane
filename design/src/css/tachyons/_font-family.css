@@ -1,0 +1,99 @@
+/*
+
+   FONT FAMILY GROUPS
+   Docs: http://tachyons.io/docs/typography/font-family/
+
+*/
+
+
+.sans-serif {
+  font-family: 'Fakt Pro',
+               -apple-system, BlinkMacSystemFont,
+               "Segoe UI",
+               Roboto,
+               Oxygen-Sans, Ubuntu, Cantarell,
+               "Helvetica Neue", sans-serif;
+}
+
+.serif {
+  font-family: serif;
+}
+
+.system-sans-serif {
+  font-family: -apple-system, BlinkMacSystemFont,
+              "Segoe UI",
+              Roboto,
+              Oxygen-Sans, Ubuntu, Cantarell,
+              "Helvetica Neue", sans-serif;;
+}
+
+.system-serif {
+  font-family: serif;
+}
+
+
+/* Monospaced Typefaces (for code) */
+
+/* From http://cssfontstack.com */
+code, .code, pre {
+  font-family: "Jetbrains Mono","SFMono-Regular",Consolas,"Liberation Mono",Menlo,Courier,monospace;
+}
+
+/* .courier {
+  font-family: 'Courier Next',
+               courier,
+               monospace;
+} */
+
+
+/* Sans-Serif Typefaces */
+
+/* .helvetica {
+  font-family: 'helvetica neue', helvetica,
+               sans-serif;
+}
+
+.avenir {
+  font-family: 'avenir next', avenir,
+               sans-serif;
+} */
+
+
+/* Serif Typefaces */
+
+/* .athelas {
+  font-family: athelas,
+               georgia,
+               serif;
+}
+
+.georgia {
+  font-family: georgia,
+               serif;
+}
+
+.times {
+  font-family: times,
+               serif;
+}
+
+.bodoni {
+  font-family: "Bodoni MT",
+                serif;
+}
+
+.calisto {
+  font-family: "Calisto MT",
+                serif;
+}
+
+.garamond {
+  font-family: garamond,
+               serif;
+}
+
+.baskerville {
+  font-family: baskerville,
+               serif;
+} */
+

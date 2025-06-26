@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>org-new</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="org-new" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <polygon id="Combined-Shape" fill="#292E33" points="17 15 21 15 21 17 17 17 17 21 15 21 15 17 11 17 11 15 15 15 15 11 17 11"></polygon>
+        <path d="M1,16 C1,7.71572875 7.71390727,1 16,1 L16,1 C24.2842712,1 31,7.71390727 31,16 L31,16 C31,24.2842712 24.2860927,31 16,31 L16,31 C7.71572875,31 1,24.2860927 1,16 L1,16 Z" id="Rectangle-12" stroke="#292E33" stroke-width="2" stroke-linecap="square" stroke-linejoin="bevel" stroke-dasharray="3,6"></path>
+    </g>
+</svg>

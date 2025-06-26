@@ -1,0 +1,131 @@
+/* App Semaphore Tables
+----------------------------------------------------------------------------- */
+
+.files-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  width: 640px;
+  table-layout: fixed;
+  margin-bottom: 0;
+  border: 2px solid var(--lightest-gray);
+}
+
+@media (--breakpoint-medium) {
+  .files-table {
+      width: 100%;
+  }
+}
+
+.files-table td {
+  border-bottom: 1px solid var(--lighter-gray);
+  padding: 4px 8px;
+}
+
+.files-table td,
+.files-table td img,
+.files-table td span,
+.files-table td a {
+  vertical-align: middle;
+}
+
+.files-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.files-table thead td,
+.files-table thead tr:last-child td {
+    font-weight: bold;
+    border-bottom: 1px solid var(--lighter-gray);
+    background-color: var(--washed-gray);
+}
+
+.files-table-icon {
+  width: 24px;
+}
+
+.files-table-icon img {
+  margin-bottom: -3px;
+}
+
+.files-table-message a {
+  color: var(--gray);
+  text-decoration: none;
+}
+
+.files-table-message a:hover {
+  color: var(--link-blue);
+  text-decoration: underline;
+}
+
+td.files-table-age {
+  text-align: right;
+  color: var(--gray);
+  padding-right: 16px;
+}
+
+td.files-table-control {
+  text-align: right;
+  padding-right: 1px;
+}
+
+
+/* Pricing table */
+
+.plans-table {
+    border-collapse: collapse;
+    border-spacing: 0;
+    table-layout: fixed;
+    width: 720px;
+    margin-bottom: 0;
+    background-color: #fff;
+}
+
+.plans-table th,
+.plans-table td {
+    padding: 3px 18px;
+}
+
+.plans-table th {
+    text-align: left;
+    border-bottom: 1px solid var(--lighter-gray);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    font-size: 21px;
+}
+
+.plans-table tbody tr:hover {
+    background-color: var(--washed-gray);
+}
+
+.plans-table td {
+    vertical-align: middle;
+}
+
+.plans-table tr td:first-child {
+    text-align: right;
+    color: var(--gray);
+    font-size: 14px;
+}
+
+.plans-table td:first-child,
+.plans-table td:nth-child(2) {
+    border-right: 1px solid var(--lighter-gray);
+}
+
+.plans-table tr th:nth-child(2),
+.plans-table tr th:nth-child(3),
+.plans-table tr td:nth-child(2),
+.plans-table tr td:nth-child(3) {
+    width: 210px;
+}
+
+.plans-table tfoot td {
+    padding-top: 18px;
+    padding-bottom: 18px;
+    border-top: 1px solid var(--lighter-gray);
+    vertical-align: top;
+}
+
+.plans-table tfoot td a {
+    display: inline-block;
+}

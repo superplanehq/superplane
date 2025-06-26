@@ -1,0 +1,67 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Fakt Pro", -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Highlightable badge for pipeline info */
+.pipeline-badge {
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  cursor: pointer;
+}
+.pipeline-badge:hover {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
+  box-shadow: 0 2px 8px 0 rgba(55,48,163,0.08);
+}
+
+.sidebar-hidden .sidebar-body{
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  display: none;
+
+}
+
+.node[draggable="true"] {
+  cursor: grab;
+}
+
+.node[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.sidebar-hidden{
+  height: auto;
+}
+.sidebar-hidden #sidebar-toggle i{
+  transform: scaleX(-1);
+}
+.node:hover .add-node{
+  visibility: visible!important;
+  display: block!important;
+}
+
+.page-wrapper{
+  padding-top: 48px;
+}
+.expanded .categories{
+  grid-template-rows: 1fr;
+}
+.expanded .categories > div{
+  overflow: hidden;
+}

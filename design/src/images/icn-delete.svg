@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="16px" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 53.2 (72643) - https://sketchapp.com -->
+    <title>icn-delete</title>
+    <desc>Created with Sketch.</desc>
+    <g id="icn-delete" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <path d="M4.00162796,13.998372 L4.00834255,4.99376961 C4.00875248,4.44402671 4.46099858,3.99837204 5.00364451,3.99837204 L10.9947028,3.99837204 C11.543983,3.99837204 11.9896776,4.45403644 11.9901693,4.99376961 L11.998372,13.998372" id="Rectangle-4-Copy-8" stroke="#292E33" stroke-width="2" transform="translate(8.000000, 8.998372) rotate(-180.000000) translate(-8.000000, -8.998372) "></path>
+        <rect id="Rectangle" fill="#292E33" x="7" y="4" width="2" height="9"></rect>
+        <path d="M7,1 L9,1 C9.55228475,1 10,1.44771525 10,2 L10,3 L6,3 L6,2 C6,1.44771525 6.44771525,1 7,1 Z" id="Rectangle" fill="#292E33"></path>
+        <rect id="Rectangle-Copy" fill="#292E33" x="2" y="2" width="12" height="2" rx="1"></rect>
+    </g>
+</svg>

@@ -1,0 +1,328 @@
+/* Pipeline loading… */
+.c-pipeline-phase-placeholder {
+    height: 240px;
+    background: radial-gradient(ellipse at top left, var(--lightest-gray) 20%, rgba(255, 255, 255, 0) 70%);
+    margin-right: 200px;
+}
+
+.c-pipeline-phase-placeholder:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    animation: placeholder-flash .75s linear infinite;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 70%) 50% 50%;
+}
+
+@keyframes placeholder-flash {
+      0% { transform: translate3d(-50%, 0, 0); }
+    100% { transform: translate3d(100%, 0, 0); }
+}
+
+/* Workflow helpers */
+.wf-pipeline-has-switch {
+    position: relative;
+}
+.wf-pipeline-has-switch::before {
+    content: '';
+    position: absolute;
+    right: -22px;
+    top: 22px;
+    width: 21px;
+    height: 3px;
+    background: repeating-linear-gradient(to right, #98a9a9 0, #98a9a9 5px,rgba(255, 255, 255, 0) 5px,rgba(255, 255, 255, 0) 8px);
+}
+
+.wf-switch-item-selected {
+    position: relative;
+    z-index: 4;
+}
+.wf-switch-item-selected::after {
+    content: '';
+    position: absolute;
+    right: -37px;
+    top: 13px;
+    width: 37px;
+    height: 3px;
+    background-color: #98a9a9;
+}
+
+.wf-switch-container {
+    background-color: var(--washed-gray);
+    background-image: url("data:image/svg+xml,%3Csvg width='6' height='6' viewBox='0 0 6 6' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2397A4A4' fill-opacity='0.4' fill-rule='evenodd'%3E%3Cpath d='M5 0h1L0 6V5zM6 5v1H5z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Edit Worfklow */
+
+.wf-edit-job-hover,
+.wf-edit-block-hover,
+.wf-edit-pipeline-hover {
+    position: relative;
+    cursor: pointer;
+}
+
+.wf-edit-job-hover:hover {
+    background: linear-gradient(to bottom, var(--lightest-orange), rgba(255,255,255,0) 32px);
+    color: var(--dark-brown);
+}
+
+.wf-edit-block-hover:hover,
+.wf-edit-pipeline-hover:hover {
+    background: linear-gradient(to bottom, var(--lightest-orange), rgba(255,255,255,0) 32px);
+    color: var(--dark-brown);
+    border-radius: 8px 8px 0 0;
+}
+
+.wf-edit-job-selected,
+.wf-edit-block-selected,
+.wf-edit-pipeline-selected {
+    box-shadow: inset 0 0 0 1px var(--dark-indigo) !important;
+    color: var(--dark-indigo);
+    border: 1px solid var(--dark-indigo) !important;
+    position: relative;
+    z-index: 4;
+    background-color: var(--lightest-indigo);
+}
+
+.wf-edit-job-selected::after,
+.wf-edit-job-hover:hover::after,
+.wf-edit-block-selected::after,
+.wf-edit-block-hover:hover::after,
+.wf-edit-pipeline-selected::after,
+.wf-edit-pipeline-hover:hover::after {
+    content: "Editing";
+    width: 42px;
+    height: 16px;
+    color: #fff;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 0 0 0 4px;
+    position: absolute;
+    top: -1px;
+    right: -1px;
+}
+
+.wf-edit-job-hover:hover::after,
+.wf-edit-block-hover:hover::after,
+.wf-edit-pipeline-hover:hover::after {
+    content: "Edit";
+    width: 28px;
+    z-index: 5;
+}
+
+.wf-edit-job-selected::after,
+.wf-edit-block-selected::after,
+.wf-edit-pipeline-selected::after
+    { background: var(--dark-indigo); }
+
+.wf-edit-job-hover:hover::after,
+.wf-edit-block-hover:hover::after,
+.wf-edit-pipeline-hover:hover::after
+    { background: var(--dark-brown); }
+
+
+.wf-edit-has-error {
+    position: relative;
+}
+
+.wf-edit-has-error::before {
+    content: "";
+    width: 16px;
+    height: 16px;
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    background: radial-gradient(circle at top right, #ff9192 12px, #ffbebe 12px, #ffbebe 16px, transparent 16px) !important;
+}
+
+.wf-edit-has-error::after {
+    content: "!";
+    width: 16px;
+    height: 16px;
+    background: var(--red);
+    color: #fff;
+    text-align: center;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 99px;
+    position: absolute;
+    top: -8px;
+    right: -8px;
+}
+
+.wf-edit-has-error.wf-edit-selected::after {
+    box-shadow: none;
+}
+
+/* Safari specific styles */
+.browser-safari .wf-edit-hover,
+.browser-safari .wf-edit-selected,
+.browser-safari .wf-edit-has-error {
+    position: static;
+}
+
+.browser-safari .wf-edit-hover::after,
+.browser-safari .wf-edit-selected::after,
+.browser-safari .wf-edit-has-error::after,
+.browser-safari .wf-edit-has-error::before {
+    content: "";
+    top: -9999px;
+}
+
+.browser-safari .wf-edit-has-error {
+    box-shadow: 0 0 0 3px var(--red) !important;
+}
+
+/* drag sidebar visual hint */
+.wf-edit-sidebar-drag {
+    position: relative;
+}
+
+.wf-edit-sidebar-drag::before {
+    content: "";
+    width: 5px;
+    height: 50px;
+    position: absolute;
+    left: -4px;
+    top: calc(50% - 25px);
+    background: white;
+    border: 1px solid var(--lighter-gray);
+    border-radius: 2px;
+    cursor: col-resize;
+}
+
+.wf-edit-sidebar-drag::after {
+    content: "";
+    width: 1px;
+    height: 44px;
+    background: var(--lighter-gray);
+    position: absolute;
+    left: -1px;
+    top: calc(50% - 21px);
+    cursor: col-resize;
+}
+
+
+/* Commit dialogue ------------------------------------------------------------ */
+
+.wf-edit-commit-file {
+    width: 540px;
+    padding: 8px 0;
+    border-top: 1px solid var(--lighter-gray);
+    position: relative;
+}
+
+.wf-edit-commit-file[open] {
+    padding-bottom: 0;
+}
+
+.wf-edit-commit-table-container {
+    margin-top: 8px;
+    height: 200px;
+    overflow: auto;
+}
+
+.wf-edit-commit-table-container::after {
+    content: "";
+    width: 100%;
+    height: 20px;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
+}
+
+.wf-edit-commit-table {
+    border-collapse: collapse;
+    font-family: "Jetbrains Mono","SFMono-Regular",Consolas,"Liberation Mono",Menlo,Courier,monospace;
+    font-size: 13px;
+    padding-bottom: 16px;
+}
+
+.wf-edit-commit-table td {
+    vertical-align: top;
+    padding: 0 12px;
+}
+
+.wf-edit-commit-table td:first-child {
+    text-align: right;
+    color: var(--black-40);
+    border-right: 1px solid var(--black-15);
+}
+
+.wf-edit-commit-table td:nth-child(2) {
+    width: 100%;
+    white-space: pre;
+}
+
+.wf-edit-commit-table tr.line-removed td {
+    background-color: var(--lightest-red);
+}
+
+.wf-edit-commit-table tr.line-added td {
+    background-color: var(--lightest-green);
+}
+
+/* Edit Job ----------------------------------------- */
+
+.wf-edit-job-options-trigger-container {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-top: 1px solid var(--lighter-gray);
+    background: url('data:image/svg+xml;utf8,<svg height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg"><path d="M4.532 4.117a4.502 4.502 0 0 1 1.515-.875l.234-1.25a.626.626 0 0 1 .592-.492h1.254c.276 0 .543.228.592.492l.234 1.25a4.502 4.502 0 0 1 1.515.875l1.201-.422a.626.626 0 0 1 .722.267l.627 1.085a.633.633 0 0 1-.13.76l-.966.828a4.53 4.53 0 0 1 0 1.75l.966.828c.21.18.268.52.13.759l-.627 1.085a.633.633 0 0 1-.722.267l-1.201-.423a4.502 4.502 0 0 1-1.515.876l-.234 1.25a.633.633 0 0 1-.592.492H6.873a.626.626 0 0 1-.592-.492l-.234-1.25a4.502 4.502 0 0 1-1.515-.876l-1.201.423a.633.633 0 0 1-.722-.267l-.627-1.085a.626.626 0 0 1 .13-.76l.966-.828a4.53 4.53 0 0 1 0-1.75l-.966-.828a.633.633 0 0 1-.13-.759l.627-1.085a.626.626 0 0 1 .722-.267zM7.5 9.461a1.952 1.952 0 1 0 0-3.903 1.952 1.952 0 0 0 0 3.903z" fill="none" stroke="%2397A4A4"/></svg>') no-repeat center center;
+}
+
+.wf-edit-job-options-trigger-container:hover {
+    background-image: url('data:image/svg+xml;utf8,<svg height="15" viewBox="0 0 15 15" width="15" xmlns="http://www.w3.org/2000/svg"><path d="M4.532 4.117a4.502 4.502 0 0 1 1.515-.875l.234-1.25a.626.626 0 0 1 .592-.492h1.254c.276 0 .543.228.592.492l.234 1.25a4.502 4.502 0 0 1 1.515.875l1.201-.422a.626.626 0 0 1 .722.267l.627 1.085a.633.633 0 0 1-.13.76l-.966.828a4.53 4.53 0 0 1 0 1.75l.966.828c.21.18.268.52.13.759l-.627 1.085a.633.633 0 0 1-.722.267l-1.201-.423a4.502 4.502 0 0 1-1.515.876l-.234 1.25a.633.633 0 0 1-.592.492H6.873a.626.626 0 0 1-.592-.492l-.234-1.25a4.502 4.502 0 0 1-1.515-.876l-1.201.423a.633.633 0 0 1-.722-.267l-.627-1.085a.626.626 0 0 1 .13-.76l.966-.828a4.53 4.53 0 0 1 0-1.75l-.966-.828a.633.633 0 0 1-.13-.759l.627-1.085a.626.626 0 0 1 .722-.267zM7.5 9.461a1.952 1.952 0 1 0 0-3.903 1.952 1.952 0 0 0 0 3.903z" fill="none" stroke="%23283233"/></svg>');
+}
+
+/* Edit Steps table */
+
+.wf-edit-steps-table td {
+    padding-bottom: 8px;
+    vertical-align: top;
+}
+
+.wf-edit-steps-table tr:last-child td {
+    padding-bottom: 0;
+}
+
+.wf-edit-steps-table td:nth-child(1) {
+    background: linear-gradient(to right, white 16px, var(--lightest-gray) 16px, var(--lightest-gray) 18px, white 18px);
+}
+
+.wf-edit-steps-table td:nth-child(1) div {
+    width: 32px;
+    height: 32px;
+    background-color: var(--green);
+    color: white;
+    box-shadow: 0 0 0 2px white;
+    margin-right: 8px;
+    border-radius: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wf-edit-steps-table tr:last-child td:first-child div {
+    background: var(--gray);
+}
+
+.wf-edit-steps-table tr:last-child td:nth-child(1) {
+    background: none;
+}
+.pipeline-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.8em; /* Adjust as needed for your design */
+}

@@ -1,0 +1,42 @@
+/*
+
+  BOX-SHADOW
+  Docs: http://tachyons.io/docs/themes/box-shadow/
+
+  Media Query Extensions:
+   -ns = not-small
+   -m  = medium
+   -l  = large
+
+ */
+
+.shadow-1 { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08); }
+.shadow-2 { box-shadow: rgba(0, 0, 0, 0.25) 0px 8px 30px 3px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px; }
+.shadow-3 { box-shadow: 0 1px 1px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.1); }
+/* .shadow-4 { box-shadow: 2px 2px 8px 0px rgba( 0, 0, 0, 0.2 ); }
+.shadow-5 { box-shadow: 4px 4px 8px 0px rgba( 0, 0, 0, 0.2 ); } */
+
+@media (--breakpoint-not-small) {
+  .shadow-1-ns { box-shadow: 0 2px 4px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08); }
+  .shadow-2-ns { box-shadow: rgba(0, 0, 0, 0.25) 0px 8px 30px 3px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px; }
+  .shadow-3-ns { box-shadow: 0 1px 1px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.1); }
+  /* .shadow-3-ns { box-shadow: 2px 2px 4px 2px rgba( 0, 0, 0, 0.2 ); }
+  .shadow-4-ns { box-shadow: 2px 2px 8px 0px rgba( 0, 0, 0, 0.2 ); }
+  .shadow-5-ns { box-shadow: 4px 4px 8px 0px rgba( 0, 0, 0, 0.2 ); } */
+}
+
+@media (--breakpoint-medium) {
+  .shadow-1-m { box-shadow: 0 2px 4px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08); }
+  .shadow-2-m { box-shadow: rgba(0, 0, 0, 0.25) 0px 8px 30px 3px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px; }
+  .shadow-3-m { box-shadow: 0 1px 1px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.1); }
+  /* .shadow-4-m { box-shadow: 2px 2px 8px 0px rgba( 0, 0, 0, 0.2 ); }
+  .shadow-5-m { box-shadow: 4px 4px 8px 0px rgba( 0, 0, 0, 0.2 ); } */
+}
+
+@media (--breakpoint-large) {
+  .shadow-1-l { box-shadow: 0 2px 4px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.08); }
+  .shadow-2-l { box-shadow: rgba(0, 0, 0, 0.25) 0px 8px 30px 3px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px; }
+  .shadow-3-l { box-shadow: 0 1px 1px 0 rgba(0,0,0,0.16), 0 0 0 1px rgba(0,0,0,0.1); }
+  /* .shadow-4-l { box-shadow: 2px 2px 8px 0px rgba( 0, 0, 0, 0.2 ); }
+  .shadow-5-l { box-shadow: 4px 4px 8px 0px rgba( 0, 0, 0, 0.2 ); } */
+}

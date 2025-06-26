@@ -1,0 +1,188 @@
+/* App Semaphore Tabs
+----------------------------------------------------------------------------- */
+
+.tabs {
+    display: flex;
+    overflow: auto;
+    white-space: nowrap;
+    position: relative;
+}
+
+.tabs::after {
+    content: "";
+    width: 100%;
+    height: 1px;
+    background-color: var(--lighter-gray);
+    position: absolute;
+    bottom: 0;
+    z-index: 1;
+}
+
+.tab {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: var(--gray);
+    padding: 8px;
+    margin-right: 8px;
+    border-bottom: 3px solid transparent;
+    z-index: 2;
+}
+
+.tab:hover {
+    color: var(--dark-gray);
+    border-bottom-color: var(--lighter-gray);
+}
+
+.tab--active,
+.tab--active:hover {
+    color: var(--dark-gray);
+    font-weight: bold;
+    border-bottom-color: var(--dark-gray);
+}
+
+.tab svg {
+    fill: var(--gray);
+    margin-right: 8px;
+}
+
+.tab:hover svg,
+.tab--active svg {
+    fill: var(--dark-gray) !important;
+}
+
+/* Material icons support: not specific enough, commented out for now
+.tab .material-symbols-outlined {
+    color: var(--gray);
+    margin-right: 6px;
+}
+
+.tab:hover .material-symbols-outlined,
+.tab--active .material-symbols-outlined {
+    color: var(--dark-gray) !important;
+}*/
+
+
+/* Simple tabs */
+[role="tablist"] {
+    display: flex;
+    list-style: none;
+    padding-left: 0;
+    border-bottom: 1px solid var(--lighter-gray);
+}
+[role="tablist"] li {
+    margin-right: 8px;
+    margin-bottom: -1px;
+}
+[role="tablist"] li a {
+    display: block;
+    text-decoration: none;
+    color: var(--dark-gray);
+    background-color: #fff;
+    outline: none;
+    padding: 4px 12px 10px;
+}
+[role="tablist"] [aria-selected="true"] {
+    outline: none;
+    border-bottom: 3px solid var(--red);
+    font-weight: bold;
+}
+
+/* Tabs */
+/* [role="tablist"] {
+    display: flex;
+    list-style: none;
+    padding-left: 0;
+    border-bottom: 1px solid var(--lighter-gray);
+}
+[role="tablist"] li {
+    margin-right: 8px;
+    margin-bottom: -1px;
+}
+[role="tablist"] li a {
+    display: block;
+    text-decoration: none;
+    color: var(--dark-gray);
+    background-color: #fff;
+    outline: none;
+    padding: 3px 16px 4px;
+    border: 1px solid var(--lighter-gray);
+    border-radius: 8px 8px 0 0;
+}
+[role="tablist"] [aria-selected="true"] {
+    outline: none;
+    border-bottom-color: #fff;
+} */
+
+
+/* Rounded edges */
+/* [role="tablist"] {
+    list-style: none;
+    padding-left: 8px;
+    overflow: hidden;
+    position: relative;
+}
+[role="tablist"] li {
+    display: inline-block;
+}
+[role="tablist"] li a {
+    display: block;
+    border: 1px solid var(--lighter-gray);
+    background: linear-gradient(to top, var(--washed-gray), white 4px);
+    color: var(--gray);
+    text-decoration: none;
+    padding: 4px 12px;
+    position: relative;
+    z-index: 0;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    margin: 0 4px;
+    cursor: pointer;
+    outline: none;
+}
+[role="tablist"] li:hover a {
+    color: var(--dark-gray);
+}
+[role="tablist"] [aria-selected="true"] {
+    background: #FFF;
+    z-index: 2;
+    border-bottom-color: #FFF;
+    color: var(--dark-gray);
+    outline: none;
+}
+[role="tablist"]:before {
+    position: absolute;
+    content: " ";
+    width: 100%;
+    bottom: 0;
+    left: 0;
+    border-bottom: 1px solid var(--lighter-gray);
+    z-index: 1;
+}
+[role="tablist"] a:before,
+[role="tablist"] a:after {
+    border: 1px solid var(--lighter-gray);
+    position: absolute;
+    bottom: -1px;
+    width: 5px;
+    height: 5px;
+    content: " ";
+}
+[role="tablist"] a:before {
+    left: -6px;
+    border-bottom-right-radius: 6px;
+    border-width: 0 1px 1px 0;
+    box-shadow: 2px 2px 0 var(--washed-gray);
+}
+[role="tablist"] a:after {
+    right: -6px;
+    border-bottom-left-radius: 6px;
+    border-width: 0 0 1px 1px;
+    box-shadow: -2px 2px 0 var(--washed-gray);
+}
+[role="tablist"] [aria-selected="true"]:before {
+    box-shadow: 2px 2px 0 #FFF;
+}
+[role="tablist"] [aria-selected="true"]:after {
+    box-shadow: -2px 2px 0 #FFF;
+} */
