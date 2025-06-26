@@ -1,13 +1,13 @@
 package models
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -44,7 +44,7 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 		fieldSet[fieldDef.Name] = value
 	}
 
-	hash, err := hashMap(fieldSet)
+	hash, err := crypto.SHA256ForMap(fieldSet)
 	if err != nil {
 		return nil, "", err
 	}
@@ -52,30 +52,38 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 	return fieldSet, hash, nil
 }
 
-// TODO: move this to another package,
-func hashMap(m map[string]string) (string, error) {
-	//
-	// Maps are not ordered, so we need to sort the key/value
-	// pairs before hashing it. We do that by creating an array of key=value
-	// pairs and sorting it.
-	//
-	var keyValues []string
-	for k, v := range m {
-		keyValues = append(keyValues, fmt.Sprintf("%s=%s", k, v))
-	}
-
-	sort.Strings(keyValues)
-
-	//
-	// Now, we join our list of key/value pairs and hash it.
-	//
-	h := sha256.New()
-	_, err := h.Write([]byte(strings.Join(keyValues, ",")))
+func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) (bool, error) {
+	connections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
 	if err != nil {
-		return "", err
+		return false, fmt.Errorf("error listing connections: %v", err)
 	}
 
-	return fmt.Sprintf("%x", h.Sum(nil)), nil
+	connectionsWithFieldSet, err := g.FindConnectionsWithFieldSetHash(tx, fieldSet.FieldSetHash)
+	if err != nil {
+		return false, fmt.Errorf("error finding connections for field set %v: %v", fieldSet.FieldSet.Data(), err)
+	}
+
+	for _, conn := range connections {
+		if !slices.Contains(connectionsWithFieldSet, conn.SourceID.String()) {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) error {
+	eventData, err := fieldSet.BuildEvent(tx)
+	if err != nil {
+		return fmt.Errorf("error building connection group event: %v", err)
+	}
+
+	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, eventData, []byte(`{}`))
+	if err != nil {
+		return err
+	}
+
+	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed)
 }
 
 func (g *ConnectionGroup) ListFieldSets() ([]ConnectionGroupFieldSet, error) {
@@ -97,6 +105,39 @@ func (g *ConnectionGroup) ListFieldSetsInTransaction(tx *gorm.DB) ([]ConnectionG
 	return fieldSets, nil
 }
 
+func (g *ConnectionGroup) FindFieldSetByHash(tx *gorm.DB, hash string) (*ConnectionGroupFieldSet, error) {
+	var fieldSet *ConnectionGroupFieldSet
+	err := tx.
+		Where("connection_group_id = ?", g.ID).
+		Where("field_set_hash = ?", hash).
+		First(&fieldSet).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldSet, nil
+}
+
+func (g *ConnectionGroup) FindConnectionsWithFieldSetHash(tx *gorm.DB, hash string) ([]string, error) {
+	var connections []string
+	err := tx.
+		Table("connection_group_field_set_events AS e").
+		Joins("JOIN connection_group_field_sets AS f ON f.id = e.connection_group_set_id").
+		Select("e.source_id").
+		Where("f.connection_group_id = ?", g.ID).
+		Where("f.field_set_hash = ?", hash).
+		Find(&connections).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return connections, nil
+}
+
 type ConnectionGroupSpec struct {
 	GroupBy *ConnectionGroupBySpec `json:"group_by"`
 }
@@ -109,121 +150,6 @@ type ConnectionGroupBySpec struct {
 type ConnectionGroupByField struct {
 	Name       string `json:"name"`
 	Expression string `json:"expression"`
-}
-
-type ConnectionGroupFieldSet struct {
-	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	ConnectionGroupID uuid.UUID
-	FieldSet          datatypes.JSONType[map[string]string]
-	FieldSetHash      string
-	State             string
-	CreatedAt         *time.Time
-}
-
-func CreateConnectionGroupFieldSet(tx *gorm.DB, connectionGroupID uuid.UUID, fields map[string]string, hash string) (*ConnectionGroupFieldSet, error) {
-	now := time.Now()
-	fieldSet := &ConnectionGroupFieldSet{
-		ConnectionGroupID: connectionGroupID,
-		FieldSet:          datatypes.NewJSONType(fields),
-		FieldSetHash:      hash,
-		State:             ConnectionGroupFieldSetStatePending,
-		CreatedAt:         &now,
-	}
-
-	err := tx.Create(fieldSet).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return fieldSet, nil
-}
-
-func (s *ConnectionGroupFieldSet) FindEvents() ([]ConnectionGroupFieldSetEvent, error) {
-	var events []ConnectionGroupFieldSetEvent
-	err := database.Conn().
-		Where("connection_group_set_id = ?", s.ID).
-		Find(&events).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state string) error {
-	s.State = state
-	return tx.Save(s).Error
-}
-
-type ConnectionGroupFieldSetEventWithData struct {
-	SourceName string
-	Raw        datatypes.JSON
-}
-
-func (s *ConnectionGroupFieldSet) FindEventsWithData(tx *gorm.DB) ([]ConnectionGroupFieldSetEventWithData, error) {
-	var events []ConnectionGroupFieldSetEventWithData
-	err := tx.
-		Table("connection_group_field_set_events AS e").
-		Joins("JOIN events AS ev ON ev.id = e.event_id").
-		Select("e.source_name, ev.raw").
-		Where("e.connection_group_set_id = ?", s.ID).
-		Find(&events).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return events, nil
-}
-
-func FindConnectionGroupFieldSetByHash(tx *gorm.DB, connectionGroupID uuid.UUID, hash string) (*ConnectionGroupFieldSet, error) {
-	var fieldSet *ConnectionGroupFieldSet
-	err := tx.
-		Where("connection_group_id = ?", connectionGroupID).
-		Where("field_set_hash = ?", hash).
-		First(&fieldSet).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return fieldSet, nil
-}
-
-type ConnectionGroupFieldSetEvent struct {
-	ID                   uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	ConnectionGroupSetID uuid.UUID
-	EventID              uuid.UUID
-	SourceID             uuid.UUID
-	SourceName           string
-	SourceType           string
-	ReceivedAt           *time.Time
-}
-
-func CreateConnectionGroupFieldSetEvent(tx *gorm.DB, setID uuid.UUID, event *Event) (*ConnectionGroupFieldSetEvent, error) {
-	now := time.Now()
-	ID := uuid.New()
-
-	connectionGroupEvent := ConnectionGroupFieldSetEvent{
-		ID:                   ID,
-		ConnectionGroupSetID: setID,
-		EventID:              event.ID,
-		SourceID:             event.SourceID,
-		SourceName:           event.SourceName,
-		SourceType:           event.SourceType,
-		ReceivedAt:           &now,
-	}
-
-	err := tx.Create(&connectionGroupEvent).Error
-	if err != nil {
-		return nil, err
-	}
-
-	return &connectionGroupEvent, nil
 }
 
 func (c *Canvas) CreateConnectionGroup(
@@ -283,22 +209,4 @@ func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error
 	}
 
 	return connectionGroup, nil
-}
-
-func FindConnectionsWithFieldSetHash(tx *gorm.DB, groupID uuid.UUID, hash string) ([]string, error) {
-	var connections []string
-	err := tx.
-		Table("connection_group_field_set_events AS e").
-		Joins("JOIN connection_group_field_sets AS f ON f.id = e.connection_group_set_id").
-		Select("e.source_id").
-		Where("f.connection_group_id = ?", groupID).
-		Where("f.field_set_hash = ?", hash).
-		Find(&connections).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return connections, nil
 }

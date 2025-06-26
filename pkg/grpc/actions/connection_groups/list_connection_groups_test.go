@@ -14,7 +14,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func Test__ListSecrets(t *testing.T) {
+func Test__ListConnectionGroups(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
