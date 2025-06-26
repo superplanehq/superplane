@@ -1,0 +1,206 @@
+/* App Semaphore Buttons
+----------------------------------------------------------------------------- */
+
+.btn {
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  align-items: center;
+  line-height: 1.5;
+  padding: 4px 16px 3px;
+  margin: 0;
+  border-radius: 6px;
+  height: auto;
+  outline: none;
+  vertical-align: middle;
+  -webkit-appearance: none;
+  color: inherit;
+  background-color: transparent;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  transition: all .05s ease-in;
+}
+
+::-moz-focus-inner {
+  border: 0;
+  padding: 0;
+}
+
+/* Button styles */
+
+.btn-primary {
+  color: white;
+  background-color: var(--dark-indigo);
+  box-shadow: 0 0 0 1px var(--dark-indigo);
+}
+
+    .btn-primary:hover {
+      background-color: #1149b9;
+      box-shadow: 0 0 0 1px #1149b9;
+    }
+
+.btn-green {
+    color: white;
+    background-color: var(--green);
+    box-shadow: 0 0 0 1px var(--green);
+  }
+
+.btn-secondary,
+.btn-live {
+  color: var(--dark-gray);
+  background-color: white;
+  box-shadow: 0 0 0 1px var(--black-20), inset 0 -1px 1px 0 var(--lightest-gray);
+}
+
+    .btn-secondary:hover {
+      box-shadow: 0 0 0 1px var(--black-30), inset 0 -1px 1px 0 var(--lightest-gray);
+    }
+
+.btn-danger {
+  color: var(--white);
+  background-color: var(--red);
+  box-shadow: 0 0 0 1px var(--red);
+}
+
+.btn-warning {
+  color: var(--white);
+  background-color: var(--orange);
+  box-shadow: 0 0 0 1px var(--orange);
+}
+
+/* Focus */
+
+.btn:focus {
+  z-index: 4;
+  box-shadow: 0 0 0 2px var(--light-gray);
+}
+
+/* Active */
+
+.btn-secondary:active,
+.btn-secondary.active
+{
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.05), inset 0 500px 0 0 var(--washed-gray), 0 0 0 1px var(--black-20);
+}
+
+.btn-primary:active,
+.btn-primary.active {
+  box-shadow: inset 0 1px 1px 0 rgba(0,0,0,0.3), inset 0 500px 0 0 rgba(0, 0, 0, .1), 0 0 0 1px var(--dark-indigo);
+}
+
+.btn-green:active,
+.btn-green.active {
+  box-shadow: inset 0 1px 1px 0 rgba(0,0,0,0.3), inset 0 500px 0 0 rgba(0, 0, 0, .1), 0 0 0 1px var(--green);
+}
+
+.btn-danger:active,
+.btn-danger.active {
+  box-shadow: inset 0 1px 1px 0 rgba(0,0,0,0.3), inset 0 500px 0 0 rgba(0, 0, 0, .1), 0 0 0 1px var(--red);
+  border-top-color: rgba(0,0,0,.25);
+}
+
+/* Button Disabled */
+
+.btn.disabled,
+.btn[disabled],
+.btn.disabled:hover,
+.btn[disabled]:hover {
+  opacity: 1;
+  cursor: not-allowed;
+  box-shadow: 0 0 0 1px var(--black-20);
+  background-color: var(--washed-gray);
+  color: var(--mid-gray);
+}
+
+.btn-live.disabled::before {
+  background-color: var(--light-gray);
+}
+
+/* Button Working */
+
+.btn-working {
+  padding-left: 32px;
+  cursor: not-allowed;
+  box-shadow: 0 0 0 1px var(--black-20);
+  background-color: var(--near-white);
+  color: var(--mid-gray);
+  position: relative;
+}
+
+.btn-working:before {
+  content: '';
+  width: 22px;
+  height: 22px;
+  position: absolute;
+  left: 6px;
+  top: calc(50% - 11px);
+  background-image: url(../images/spinner-2.svg);
+}
+
+.btn-working.btn-small {
+  padding-left: 32px;
+}
+
+/* Button Sizes */
+
+.btn-large {
+  font-size: 1.125rem;
+  padding: 8px 18px;
+}
+
+.btn-small {
+  font-size: .875rem;
+  padding: 3px 12px 2px;
+}
+
+.btn-tiny {
+  font-size: .8125rem;
+  padding: 1px 8px;
+}
+
+
+/* Button Group */
+
+.button-group {
+  display: flex;
+}
+
+.button-group button:first-child,
+.button-group a:first-child,
+.button-group select:first-child {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.button-group button:last-child,
+.button-group a:last-child,
+.button-group select:last-child {
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+}
+
+/* .button-group button:not(:first-child),
+.button-group a:not(:first-child),
+.button-group select:not(:first-child) {
+  margin-left: 1px;
+} */
+
+.button-group button:not(:first-child):not(:last-child),
+.button-group a:not(:first-child):not(:last-child),
+.button-group select:not(:first-child):not(:last-child) {
+  border-radius: 0;
+}
+
+.button-group button,
+.button-group a,
+.button-group select {
+  position: relative;
+}
+
+.btn img {
+  margin-right: 6px;
+}

@@ -1,0 +1,107 @@
+/*
+
+    Tachyons
+    COLOR VARIABLES
+
+    Grayscale
+    - Solids
+    - Transparencies
+    Colors
+
+*/
+
+:root {
+  /* ––––––––––––––––––––––––––––––––– */
+  /* Semaphore color system */
+
+    --link-blue: var(--dark-indigo);
+
+    --dark-gray:    #202B30;
+    --dim-gray:     #495358;
+    --gray:         #677278;
+    --mid-gray:     #96A0A6;
+    --light-gray:   #B5BCC0;
+    --lighter-gray: #D3DADE;
+    --lightest-gray:#E5E8EA;
+    --washed-gray:  #F5F8F9;
+
+    --near-white: #f7fafb;
+
+    --dark-green: #007343;
+    --green: #00a569;
+    --lightest-green: #cef1c8;
+    --washed-green: #e2f5e0;
+
+    --dark-red: #B71C1C;
+    --red: #e53935;
+    --light-red: #EF9A9A;
+    --lightest-red: #ffdddd;
+    --washed-red: #ffecec;
+
+    --dark-indigo: #00359f;
+    --indigo: #1570ff;
+    --lightest-indigo: #cedcff;
+    --washed-indigo: #f2f5fd;
+
+    --dark-purple: #5122a5;
+    --purple: #8658d6;
+    --lightest-purple: #e3d5ff;
+    --washed-purple: #f3ecff;
+
+    --blue: #2196F3;
+    --lighter-blue: #b0e3fd;
+    --lightest-blue: #c7edff;
+    --washed-blue: #eff8ff;
+
+    --yellow: #FBC335;
+    --lightest-yellow: #fff3bf;
+    --washed-yellow: #fffae4;
+
+    --dark-orange: #b85d00;
+    --orange: #fd7e14;
+    --lightest-orange: #ffe1bd;
+    --washed-orange: #ffeeda;
+
+    --dark-brown: #974510;
+    --lightest-brown: #f6f3ec;
+    --washed-brown: #fffef9;
+
+
+    --magenta: #E91E63;
+    --cyan: #00ACC1;
+
+    /* ––––––––––––––––––––––––––––––––– */
+    /* Utility colors */
+
+    --transparent:transparent;
+    --black:  #000;
+    --white:  #FFF;
+
+    --black-90:   rgba(0,0,0,.9);
+    --black-80:   rgba(0,0,0,.8);
+    --black-70:   rgba(0,0,0,.7);
+    --black-60:   rgba(0,0,0,.6);
+    --black-50:   rgba(0,0,0,.5);
+    --black-40:   rgba(0,0,0,.4);
+    --black-30:   rgba(0,0,0,.3);
+    --black-20:   rgba(0,0,0,.2);
+    --black-15:   rgba(0,0,0,.15);
+    --black-10:   rgba(0,0,0,.1);
+    --black-05:   rgba(0,0,0,.05);
+    --black-075:  rgba(0,0,0,.075);
+    --black-025:  rgba(0,0,0,.025);
+    --black-0125: rgba(0,0,0,.0125);
+
+    --white-90:   rgba(255,255,255,.9);
+    --white-80:   rgba(255,255,255,.8);
+    --white-70:   rgba(255,255,255,.7);
+    --white-60:   rgba(255,255,255,.6);
+    --white-50:   rgba(255,255,255,.5);
+    --white-40:   rgba(255,255,255,.4);
+    --white-30:   rgba(255,255,255,.3);
+    --white-20:   rgba(255,255,255,.2);
+    --white-10:   rgba(255,255,255,.1);
+    --white-05:   rgba(255,255,255,.05);
+    --white-025:  rgba(255,255,255,.025);
+    --white-0125: rgba(255,255,255,.0125);
+}

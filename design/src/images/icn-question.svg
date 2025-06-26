@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="32px" height="32px" viewBox="0 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>icn-question</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="icn-question" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <circle id="Oval-37-Copy-5" stroke="#453E2A" stroke-width="2" cx="16" cy="16" r="12"></circle>
+        <path d="M13,12 L13.1055728,11.7888544 C13.6537369,10.6925262 14.7742679,10 16,10 L16,10 C17.1754137,10 18.1999916,10.7999662 18.4850713,11.940285 L18.5627627,12.2510507 C18.8249699,13.2998795 18.3995362,14.4003092 17.5,15 L17.5,15 C16.562883,15.6247446 16,16.6765012 16,17.8027756 L16,18" id="Path-107" stroke="#453E2A" stroke-width="2" stroke-linecap="round"></path>
+        <circle id="Oval-38" fill="#453E2A" cx="16" cy="21.5" r="1.5"></circle>
+    </g>
+</svg>

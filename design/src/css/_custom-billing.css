@@ -1,0 +1,40 @@
+.c-billing-usage-block {
+    width: 16px;
+    height: 16px;
+    margin: 0 2px 2px 0;
+    background-color: var(--lightest-gray);
+}
+
+.c-billing-invoice-table {
+    border-collapse: collapse;
+    font-feature-settings: 'tnum';
+}
+
+.c-billing-invoice-table-amount {
+    text-align: right;
+    padding-right: 8px;
+    padding-left: 16px;
+}
+
+.c-billing-table-sort svg {
+    fill: var(--light-gray);
+    margin-left: 5px;
+    cursor: pointer;
+}
+.c-billing-table-sort--active svg, 
+.c-billing-table-sort svg:hover {
+    fill: var(--dark-gray);
+    margin-left: 5px;
+    cursor: pointer;
+}
+
+.billing-usage-chart svg .tick text{
+    font-size: 12px;
+    fill: #999;
+}
+.billing-usage-chart svg .tick line{
+    stroke: rgba(0,0,0,.05);
+}
+.billing-usage-chart svg path.domain {
+    display: none;
+}

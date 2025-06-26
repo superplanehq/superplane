@@ -1,0 +1,177 @@
+/* App Semaphore Modals
+----------------------------------------------------------------------------- */
+
+
+/* Main sidebar menu modal */
+
+.js-org-sidebar {
+    display: none;
+}
+
+.js-org-sidebar.is-open {
+    display: block;
+}
+
+.js-org-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(40, 50, 60, 0.3);
+    display: flex;
+    justify-content: flex-end;
+    z-index: 99;
+}
+
+.js-org-sidebar-content {
+    width: 16rem;
+    background-color: var(--lightest-brown);
+    height: 100vh;
+    box-shadow: rgba(0, 0, 0, 0.5) 0 0 50px 3px, rgba(0, 0, 0, 0.08) 0 0 0 1px;
+}
+
+
+/* Animation */
+
+.js-org-sidebar[aria-hidden="false"] .js-org-sidebar-overlay {
+    animation: fade-in .2s cubic-bezier(0, 0, .2, 1);
+}
+
+.js-org-sidebar[aria-hidden="false"] .js-org-sidebar-content {
+    animation: slide-in .2s cubic-bezier(0, 0, .2, 1);
+}
+
+.js-org-sidebar[aria-hidden="true"] .js-org-sidebar-overlay {
+    animation: fade-out .2s cubic-bezier(0, 0, .2, 1);
+}
+
+.js-org-sidebar[aria-hidden="true"] .js-org-sidebar-content {
+    animation: slide-out .2s cubic-bezier(0, 0, .2, 1);
+}
+
+@keyframes fade-in {
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
+}
+
+@keyframes fade-out {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes slide-in {
+    0% {
+        transform: translateX(256px)
+    }
+    100% {
+        transform: translateX(0)
+    }
+}
+
+@keyframes slide-out {
+    0% {
+        transform: translateX(0)
+    }
+    100% {
+        transform: translateX(256px)
+    }
+}
+
+
+/* regular modal ------------------------ */
+
+.modal {
+    display: none;
+}
+
+.modal.is-open {
+    display: block;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(40, 50, 50, 0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999999999;
+}
+
+.modal-content {
+    max-width: 48rem;
+    max-height: 100vh;
+    overflow-y: auto;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: rgba(0, 0, 0, 0.5) 0 0 50px 3px, rgba(0, 0, 0, 0.08) 0 0 0 1px;
+}
+
+.modal[aria-hidden="false"] .modal-overlay {
+    animation: mmfadeIn .3s cubic-bezier(0.0, 0.0, 0.2, 1);
+}
+
+.modal[aria-hidden="false"] .modal-content {
+    animation: mmslideIn .3s cubic-bezier(0, 0, .2, 1);
+}
+
+.modal[aria-hidden="true"] .modal-overlay {
+    animation: mmfadeOut .3s cubic-bezier(0.0, 0.0, 0.2, 1);
+}
+
+.modal[aria-hidden="true"] .modal-content {
+    animation: mmslideOut .3s cubic-bezier(0, 0, .2, 1);
+}
+
+.modal .modal-content,
+.modal .modal-overlay {
+    will-change: transform;
+}
+
+@keyframes mmfadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes mmfadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes mmslideIn {
+    from {
+        transform: translateY(15%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+@keyframes mmslideOut {
+    from {
+        transform: translateY(0);
+    }
+    to {
+        transform: translateY(-10%);
+    }
+}
