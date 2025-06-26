@@ -1,0 +1,86 @@
+{
+  "name": "style-loader",
+  "version": "3.3.4",
+  "description": "style loader module for webpack",
+  "license": "MIT",
+  "repository": "webpack-contrib/style-loader",
+  "author": "Tobias Koppers @sokra",
+  "homepage": "https://github.com/webpack-contrib/style-loader",
+  "bugs": "https://github.com/webpack-contrib/style-loader/issues",
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/webpack"
+  },
+  "main": "dist/cjs.js",
+  "engines": {
+    "node": ">= 12.13.0"
+  },
+  "scripts": {
+    "start": "npm run build -- -w",
+    "clean": "del-cli dist",
+    "validate:runtime": "es-check es3 \"dist/runtime/**/*.js\"",
+    "prebuild": "npm run clean",
+    "build": "cross-env NODE_ENV=production babel src -d dist --copy-files",
+    "postbuild": "npm run validate:runtime",
+    "commitlint": "commitlint --from=master",
+    "security": "npm audit --production",
+    "lint:prettier": "prettier --list-different .",
+    "lint:js": "eslint --cache .",
+    "lint:spelling": "cspell \"**/*.*\"",
+    "lint": "npm-run-all -l -p \"lint:**\"",
+    "fix:js": "npm run lint:js -- --fix",
+    "fix:prettier": "npm run lint:prettier -- --write",
+    "fix": "npm-run-all -l fix:js fix:prettier",
+    "test:only": "cross-env NODE_ENV=test jest",
+    "test:watch": "npm run test:only -- --watch",
+    "test:coverage": "npm run test:only -- --collectCoverageFrom=\"src/**/*.js\" --coverage",
+    "test:manual": "npm run build && webpack serve ./test/manual/src/index.js --open --config test/manual/webpack.config.js",
+    "pretest": "npm run lint",
+    "test": "npm run test:coverage",
+    "prepare": "husky install && npm run build",
+    "release": "standard-version"
+  },
+  "files": [
+    "dist"
+  ],
+  "peerDependencies": {
+    "webpack": "^5.0.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.21.5",
+    "@babel/core": "^7.22.1",
+    "@babel/preset-env": "^7.22.4",
+    "@commitlint/cli": "^16.3.0",
+    "@commitlint/config-conventional": "^16.2.4",
+    "@webpack-contrib/eslint-config-webpack": "^3.0.0",
+    "babel-jest": "^28.1.3",
+    "cross-env": "^7.0.3",
+    "cspell": "^6.31.1",
+    "css-loader": "^6.8.1",
+    "del": "^6.1.1",
+    "del-cli": "^4.0.1",
+    "es-check": "^7.1.1",
+    "eslint": "^8.41.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-import": "^2.27.5",
+    "file-loader": "^6.2.0",
+    "husky": "^7.0.1",
+    "jest": "^28.1.3",
+    "jest-environment-jsdom": "^28.1.3",
+    "jsdom": "^18.1.1",
+    "lint-staged": "^12.5.0",
+    "memfs": "^3.5.1",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^2.8.8",
+    "sass": "^1.62.1",
+    "sass-loader": "^12.4.0",
+    "semver": "^7.5.1",
+    "standard-version": "^9.5.0",
+    "webpack": "^5.85.0",
+    "webpack-cli": "^4.10.0",
+    "webpack-dev-server": "^4.15.0"
+  },
+  "keywords": [
+    "webpack"
+  ]
+}

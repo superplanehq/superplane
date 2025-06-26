@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="26px" height="26px" viewBox="0 0 26 26" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 50.2 (55047) - http://www.bohemiancoding.com/sketch -->
+    <title>icn-schedule</title>
+    <desc>Created with Sketch.</desc>
+    <defs></defs>
+    <g id="icn-schedule" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle-103" fill="#292E33" x="18" y="15" width="2" height="5" rx="1"></rect>
+        <rect id="Rectangle-103-Copy" fill="#292E33" x="18" y="18" width="4" height="2" rx="1"></rect>
+        <path d="M13,19 L5,19 C3.8954305,19 3,18.1045695 3,17 L3,6 C3,4.8954305 3.8954305,4 5,4 L21,4 C22.1045695,4 23,4.8954305 23,6 L23,14.5546516" id="Path-129" stroke="#292E33" stroke-width="2"></path>
+        <rect id="Rectangle-104" fill="#292E33" x="3" y="8" width="20" height="2"></rect>
+        <rect id="Rectangle-104-Copy" fill="#292E33" x="3" y="13" width="10" height="2"></rect>
+        <rect id="Rectangle-104-Copy-2" fill="#292E33" x="12" y="8" width="2" height="10"></rect>
+        <rect id="Rectangle-105" stroke="#292E33" stroke-width="2" x="13" y="13" width="12" height="12" rx="6"></rect>
+    </g>
+</svg>

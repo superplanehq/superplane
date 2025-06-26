@@ -1,0 +1,1 @@
+{"version":3,"file":"initialState.d.ts","sourceRoot":"","sources":["../../../../packages/core/src/store/initialState.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,gBAAgB,EAAE,cAAc,EAAE,MAAM,UAAU,CAAC;AAEjE,eAAO,MAAM,cAAc,EAAE,gBAG5B,CAAC;AAEF,QAAA,MAAM,YAAY,EAAE,cA6DnB,CAAC;AAEF,eAAe,YAAY,CAAC"}

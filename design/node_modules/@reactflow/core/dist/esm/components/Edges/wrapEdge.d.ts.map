@@ -1,0 +1,1 @@
+{"version":3,"file":"wrapEdge.d.ts","sourceRoot":"","sources":["../../../../../packages/core/src/components/Edges/wrapEdge.tsx"],"names":[],"mappings":"AAAA,OAAO,KAA0C,MAAM,OAAO,CAAC;AAC/D,OAAO,KAAK,EAAE,aAAa,EAAiB,MAAM,OAAO,CAAC;AAU1D,OAAO,KAAK,EAAE,SAAS,EAAE,aAAa,EAAc,MAAM,aAAa,CAAC;wCAIzC,cAAc,SAAS,CAAC;kjBA8ClD,aAAa,GAAG,WAAW,GAAG,IAAI;;;AA9CvC,wBA8OE"}

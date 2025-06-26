@@ -1,0 +1,45 @@
+{
+  "name": "jsonpath",
+  "description": "Query JavaScript objects with JSONPath expressions. Robust / safe JSONPath engine for Node.js.",
+  "version": "1.1.1",
+  "author": "david@fmail.co.uk",
+  "scripts": {
+    "prepublishOnly": "node lib/aesprim.js > generated/aesprim-browser.js",
+    "test": "mocha -u tdd test && jscs lib && jshint lib",
+    "generate": "node bin/generate_parser.js > generated/parser.js"
+  },
+  "dependencies": {
+    "esprima": "1.2.2",
+    "static-eval": "2.0.2",
+    "underscore": "1.12.1"
+  },
+  "browser": "./jsonpath.js",
+  "alias": {
+    "./lib/aesprim.js": "./generated/aesprim-browser.js"
+  },
+  "devDependencies": {
+    "grunt": "0.4.5",
+    "grunt-browserify": "3.8.0",
+    "grunt-cli": "0.1.13",
+    "grunt-contrib-uglify": "0.9.1",
+    "jison": "0.4.13",
+    "jscs": "1.10.0",
+    "jshint": "2.6.0",
+    "mocha": "2.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dchester/jsonpath"
+  },
+  "keywords": [
+    "JSONPath",
+    "jsonpath",
+    "json-path",
+    "object",
+    "traversal",
+    "json",
+    "path",
+    "data structures"
+  ],
+  "license": "MIT"
+}

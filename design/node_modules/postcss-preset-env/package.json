@@ -1,0 +1,124 @@
+{
+	"name": "postcss-preset-env",
+	"description": "Convert modern CSS into something browsers understand",
+	"version": "7.8.3",
+	"author": "Jonathan Neal <jonathantneal@hotmail.com>",
+	"license": "CC0-1.0",
+	"funding": {
+		"type": "opencollective",
+		"url": "https://opencollective.com/csstools"
+	},
+	"engines": {
+		"node": "^12 || ^14 || >=16"
+	},
+	"main": "dist/index.cjs",
+	"module": "dist/index.mjs",
+	"exports": {
+		".": {
+			"import": "./dist/index.mjs",
+			"require": "./dist/index.cjs",
+			"default": "./dist/index.mjs"
+		}
+	},
+	"files": [
+		"CHANGELOG.md",
+		"LICENSE.md",
+		"README.md",
+		"dist"
+	],
+	"dependencies": {
+		"@csstools/postcss-cascade-layers": "^1.1.1",
+		"@csstools/postcss-color-function": "^1.1.1",
+		"@csstools/postcss-font-format-keywords": "^1.0.1",
+		"@csstools/postcss-hwb-function": "^1.0.2",
+		"@csstools/postcss-ic-unit": "^1.0.1",
+		"@csstools/postcss-is-pseudo-class": "^2.0.7",
+		"@csstools/postcss-nested-calc": "^1.0.0",
+		"@csstools/postcss-normalize-display-values": "^1.0.1",
+		"@csstools/postcss-oklab-function": "^1.1.1",
+		"@csstools/postcss-progressive-custom-properties": "^1.3.0",
+		"@csstools/postcss-stepped-value-functions": "^1.0.1",
+		"@csstools/postcss-text-decoration-shorthand": "^1.0.0",
+		"@csstools/postcss-trigonometric-functions": "^1.0.2",
+		"@csstools/postcss-unset-value": "^1.0.2",
+		"autoprefixer": "^10.4.13",
+		"browserslist": "^4.21.4",
+		"css-blank-pseudo": "^3.0.3",
+		"css-has-pseudo": "^3.0.4",
+		"css-prefers-color-scheme": "^6.0.3",
+		"cssdb": "^7.1.0",
+		"postcss-attribute-case-insensitive": "^5.0.2",
+		"postcss-clamp": "^4.1.0",
+		"postcss-color-functional-notation": "^4.2.4",
+		"postcss-color-hex-alpha": "^8.0.4",
+		"postcss-color-rebeccapurple": "^7.1.1",
+		"postcss-custom-media": "^8.0.2",
+		"postcss-custom-properties": "^12.1.10",
+		"postcss-custom-selectors": "^6.0.3",
+		"postcss-dir-pseudo-class": "^6.0.5",
+		"postcss-double-position-gradients": "^3.1.2",
+		"postcss-env-function": "^4.0.6",
+		"postcss-focus-visible": "^6.0.4",
+		"postcss-focus-within": "^5.0.4",
+		"postcss-font-variant": "^5.0.0",
+		"postcss-gap-properties": "^3.0.5",
+		"postcss-image-set-function": "^4.0.7",
+		"postcss-initial": "^4.0.1",
+		"postcss-lab-function": "^4.2.1",
+		"postcss-logical": "^5.0.4",
+		"postcss-media-minmax": "^5.0.0",
+		"postcss-nesting": "^10.2.0",
+		"postcss-opacity-percentage": "^1.1.2",
+		"postcss-overflow-shorthand": "^3.0.4",
+		"postcss-page-break": "^3.0.4",
+		"postcss-place": "^7.0.5",
+		"postcss-pseudo-class-any-link": "^7.1.6",
+		"postcss-replace-overflow-wrap": "^4.0.0",
+		"postcss-selector-not": "^6.0.1",
+		"postcss-value-parser": "^4.2.0"
+	},
+	"peerDependencies": {
+		"postcss": "^8.2"
+	},
+	"devDependencies": {
+		"postcss-simple-vars": "^7.0.0"
+	},
+	"scripts": {
+		"prebuild": "node ./scripts/generate-plugins-data.mjs && eslint --fix ./src/plugins/*.mjs",
+		"build": "rollup -c ../../rollup/default.js",
+		"clean": "node -e \"fs.rmSync('./dist', { recursive: true, force: true });\"",
+		"docs": "node ./docs/generate.mjs",
+		"lint": "npm run lint:eslint && npm run lint:package-json",
+		"lint:eslint": "eslint ./src --ext .js --ext .ts --ext .mjs --no-error-on-unmatched-pattern",
+		"lint:package-json": "node ../../.github/bin/format-package-json.mjs",
+		"prepublishOnly": "npm run clean && npm run build && npm run test",
+		"stryker": "stryker run --logLevel error",
+		"test": "node .tape.mjs && node ./src/test/test.mjs && npm run test:exports",
+		"test:exports": "node ./test/_import.mjs && node ./test/_require.cjs",
+		"test:rewrite-expects": "REWRITE_EXPECTS=true node .tape.mjs"
+	},
+	"homepage": "https://github.com/csstools/postcss-plugins/tree/main/plugin-packs/postcss-preset-env#readme",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/csstools/postcss-plugins.git",
+		"directory": "plugin-packs/postcss-preset-env"
+	},
+	"bugs": "https://github.com/csstools/postcss-plugins/issues",
+	"keywords": [
+		"css",
+		"csswg",
+		"features",
+		"future",
+		"lists",
+		"next",
+		"postcss",
+		"postcss-plugin",
+		"specifications",
+		"specs",
+		"stages",
+		"w3c"
+	],
+	"volta": {
+		"extends": "../../package.json"
+	}
+}

@@ -1,0 +1,1 @@
+{"version":3,"file":"useOnSelectionChange.d.ts","sourceRoot":"","sources":["../../../../packages/core/src/hooks/useOnSelectionChange.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,qBAAqB,EAAE,MAAM,UAAU,CAAC;AAEtD,MAAM,MAAM,2BAA2B,GAAG;IACxC,QAAQ,EAAE,qBAAqB,CAAC;CACjC,CAAC;AAEF,iBAAS,oBAAoB,CAAC,EAAE,QAAQ,EAAE,EAAE,2BAA2B,QAYtE;AAED,eAAe,oBAAoB,CAAC"}

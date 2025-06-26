@@ -1,0 +1,1 @@
+{"version":3,"file":"useKeyPress.d.ts","sourceRoot":"","sources":["../../../../packages/core/src/hooks/useKeyPress.ts"],"names":[],"mappings":"AAGA,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,UAAU,CAAC;AAKxC,MAAM,WAAW,kBAAkB;IACjC,MAAM,CAAC,EAAE,MAAM,GAAG,QAAQ,GAAG,WAAW,GAAG,UAAU,GAAG,IAAI,CAAC;IAE7D,0BAA0B,CAAC,EAAE,OAAO,CAAC;CACtC;mCAOU,OAAO,GAAG,IAAI,YACd,kBAAkB,KAC1B,OAAO;AAHV,wBAgGE"}

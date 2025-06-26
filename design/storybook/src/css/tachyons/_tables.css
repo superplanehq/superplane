@@ -1,0 +1,57 @@
+/*
+
+  TABLES
+  Docs: http://tachyons.io/docs/elements/tables/
+
+*/
+
+.collapse {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+.striped--lightest-gray:nth-child(odd) {
+  background-color: var(--lightest-gray);
+}
+
+.striped--near-white:nth-child(odd) {
+  background-color: var(--washed-gray);
+}
+
+.stripe-light:nth-child(odd) {
+  background-color: var(--white-10);
+}
+
+.stripe-dark:nth-child(odd) {
+  background-color: var(--black-10);
+}
+
+/* Simple line table */
+
+.line-table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.line-table td,
+.line-table th {
+  vertical-align: top;
+  border-bottom: 1px solid var(--lightest-gray);
+  padding: 4px 10px;
+}
+
+.line-table tr:first-child td,
+.line-table tr:first-child th {
+  border-top: 1px solid var(--lightest-gray);
+}
+
+.line-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.line-table th {
+  text-align: left;
+  color: var(--gray);
+  font-weight: normal;
+  background: var(--washed-gray);
+}

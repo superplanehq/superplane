@@ -1,0 +1,30 @@
+{
+  "name": "@csstools/normalize.css",
+  "version": "12.1.1",
+  "description": "A cross-browser CSS foundation",
+  "author": "Jonathan Neal <jonathantneal@hotmail.com>",
+  "contributors": [
+    "Jonathan Neal <jonathantneal@hotmail.com> (http://jonathantneal.com/)",
+    "Nicolas Gallagher <nicolas@nicolasgallagher.com> (http://nicolasgallagher.com/)",
+    "Luciano Battagliero <lucianobattagliero+git@gmail.com> (https://lucianobattagliero.com/)"
+  ],
+  "license": "CC0-1.0",
+  "repository": "csstools/normalize.css",
+  "homepage": "https://github.com/csstools/normalize.css#readme",
+  "bugs": "https://github.com/csstools/normalize.css/issues",
+  "main": "normalize.css",
+  "style": "normalize.css",
+  "files": [
+    "normalize.css",
+    "opinionated.css"
+  ],
+  "scripts": {
+    "test": "echo \"no test\""
+  },
+  "keywords": [
+    "css",
+    "normalizes",
+    "browsers",
+    "fixes"
+  ]
+}

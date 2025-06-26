@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="3px" height="13px" viewBox="0 0 3 13" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 53.2 (72643) - https://sketchapp.com -->
+    <title>icn-threedot</title>
+    <desc>Created with Sketch.</desc>
+    <g id="icn-threedot" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <circle id="Oval" fill="#292E33" cx="1.5" cy="1.5" r="1.5"></circle>
+        <circle id="Oval-Copy" fill="#292E33" cx="1.5" cy="6.5" r="1.5"></circle>
+        <circle id="Oval-Copy-2" fill="#292E33" cx="1.5" cy="11.5" r="1.5"></circle>
+    </g>
+</svg>

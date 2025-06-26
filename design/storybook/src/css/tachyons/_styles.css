@@ -1,0 +1,12 @@
+/*
+
+  STYLES
+
+  Add custom styles here.
+
+*/
+
+/* Tabular lining of numbers in tables */
+.tnum {
+  font-feature-settings: 'tnum';
+}
