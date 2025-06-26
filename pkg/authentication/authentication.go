@@ -428,7 +428,7 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		return user, accountProvider, nil
 	}
 
-	user, err := models.FindUserByEmail(gothUser.Email)
+	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
 	if err != nil {
 		user = &models.User{
 			Name: gothUser.Name,
