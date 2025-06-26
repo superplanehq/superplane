@@ -27,7 +27,6 @@ func Test__ListConnectionGroupFieldSets(t *testing.T) {
 		},
 		models.ConnectionGroupSpec{
 			GroupBy: &models.ConnectionGroupBySpec{
-				EmitOn: models.ConnectionGroupEmitOnAll,
 				Fields: []models.ConnectionGroupByField{
 					{Name: "version", Expression: "ref"},
 				},

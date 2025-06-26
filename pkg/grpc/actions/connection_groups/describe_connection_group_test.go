@@ -52,7 +52,6 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 			},
 			models.ConnectionGroupSpec{
 				GroupBy: &models.ConnectionGroupBySpec{
-					EmitOn: models.ConnectionGroupEmitOnAll,
 					Fields: []models.ConnectionGroupByField{
 						{Name: "test", Expression: "test"},
 					},
@@ -75,7 +74,6 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 		assert.NotEmpty(t, response.ConnectionGroup.Metadata.CreatedAt)
 		require.NotNil(t, response.ConnectionGroup.Spec)
 		assert.Len(t, response.ConnectionGroup.Spec.Connections, 1)
-		assert.Equal(t, protos.ConnectionGroup_Spec_GroupBy_EMIT_ON_ALL, response.ConnectionGroup.Spec.GroupBy.EmitOn)
 		assert.Len(t, response.ConnectionGroup.Spec.GroupBy.Fields, 1)
 	})
 }

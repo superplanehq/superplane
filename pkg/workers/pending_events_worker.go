@@ -203,11 +203,9 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	}
 
 	if !shouldEmit {
-		log.Infof("Event with %v not received from all required connections for %s - not emitting", fieldSet.FieldSet.Data(), connectionGroup.Name)
 		return nil
 	}
 
-	log.Infof("All events received for %v - emitting event for connection group %s", fieldSet.FieldSet.Data(), connectionGroup.Name)
 	return connectionGroup.Emit(tx, fieldSet)
 }
 

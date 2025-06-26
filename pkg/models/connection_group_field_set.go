@@ -2,6 +2,8 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -141,4 +143,20 @@ func (s *ConnectionGroupFieldSet) AttachEvent(tx *gorm.DB, event *Event) (*Conne
 	}
 
 	return &connectionGroupEvent, nil
+}
+
+func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup, allConnections []string) ([]string, error) {
+	connectionsForFieldSet, err := g.FindConnectionsForFieldSet(tx, s.FieldSetHash)
+	if err != nil {
+		return nil, fmt.Errorf("error finding connections for field set %v: %v", s.FieldSet.Data(), err)
+	}
+
+	missing := []string{}
+	for _, connID := range allConnections {
+		if !slices.Contains(connectionsForFieldSet, connID) {
+			missing = append(missing, connID)
+		}
+	}
+
+	return missing, nil
 }

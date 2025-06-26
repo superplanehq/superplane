@@ -2,11 +2,11 @@ package models
 
 import (
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
@@ -15,9 +15,6 @@ import (
 )
 
 const (
-	ConnectionGroupEmitOnAll      = "all"
-	ConnectionGroupEmitOnMajority = "majority"
-
 	ConnectionGroupFieldSetStatePending   = "pending"
 	ConnectionGroupFieldSetStateProcessed = "processed"
 )
@@ -53,22 +50,23 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 }
 
 func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) (bool, error) {
-	connections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
+	allConnections, err := ListConnectionIDsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
 	if err != nil {
 		return false, fmt.Errorf("error listing connections: %v", err)
 	}
 
-	connectionsWithFieldSet, err := g.FindConnectionsWithFieldSetHash(tx, fieldSet.FieldSetHash)
+	missing, err := fieldSet.MissingConnections(tx, g, allConnections)
 	if err != nil {
-		return false, fmt.Errorf("error finding connections for field set %v: %v", fieldSet.FieldSet.Data(), err)
+		return false, err
 	}
 
-	for _, conn := range connections {
-		if !slices.Contains(connectionsWithFieldSet, conn.SourceID.String()) {
-			return false, nil
-		}
+	fields := fieldSet.FieldSet.Data()
+	if len(missing) > 0 {
+		log.Infof("Connection group %s has missing connections for %v: %v", g.Name, fields, missing)
+		return false, nil
 	}
 
+	log.Infof("All connections received for group %s and field set %v", g.Name, fields)
 	return true, nil
 }
 
@@ -120,14 +118,14 @@ func (g *ConnectionGroup) FindFieldSetByHash(tx *gorm.DB, hash string) (*Connect
 	return fieldSet, nil
 }
 
-func (g *ConnectionGroup) FindConnectionsWithFieldSetHash(tx *gorm.DB, hash string) ([]string, error) {
+func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSetHash string) ([]string, error) {
 	var connections []string
 	err := tx.
 		Table("connection_group_field_set_events AS e").
 		Joins("JOIN connection_group_field_sets AS f ON f.id = e.connection_group_set_id").
 		Select("e.source_id").
 		Where("f.connection_group_id = ?", g.ID).
-		Where("f.field_set_hash = ?", hash).
+		Where("f.field_set_hash = ?", fieldSetHash).
 		Find(&connections).
 		Error
 
@@ -144,7 +142,6 @@ type ConnectionGroupSpec struct {
 
 type ConnectionGroupBySpec struct {
 	Fields []ConnectionGroupByField `json:"fields"`
-	EmitOn string                   `json:"emit_on"`
 }
 
 type ConnectionGroupByField struct {

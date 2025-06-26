@@ -31,13 +31,6 @@ spec:
     fields:
       - name: version
         expression: outputs.version
-
-    #
-    # Controls when an event is emitted from this group:
-    # - EMIT_ON_ALL: after events for all group members have been received for the same grouping keys
-    # - EMIT_ON_MAJORITY: after events for >50% of group members have been received for the same grouping keys
-    #
-    emitOn: EMIT_ON_ALL | EMIT_ON_MAJORITY
 ```
 
 And this is how you use it as a connection for another stage:

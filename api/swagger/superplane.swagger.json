@@ -1644,14 +1644,6 @@
         }
       }
     },
-    "GroupByEmitOn": {
-      "type": "string",
-      "enum": [
-        "EMIT_ON_ALL",
-        "EMIT_ON_MAJORITY"
-      ],
-      "default": "EMIT_ON_ALL"
-    },
     "GroupByField": {
       "type": "object",
       "properties": {
@@ -1708,9 +1700,6 @@
             "type": "object",
             "$ref": "#/definitions/GroupByField"
           }
-        },
-        "emitOn": {
-          "$ref": "#/definitions/GroupByEmitOn"
         }
       }
     },

@@ -30,7 +30,6 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			},
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
-					EmitOn: ConnectionGroupEmitOnAll,
 					Fields: []ConnectionGroupByField{
 						{Name: "version", Expression: "ref"},
 					},
@@ -59,7 +58,6 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			},
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
-					EmitOn: ConnectionGroupEmitOnAll,
 					Fields: []ConnectionGroupByField{
 						{Name: "version", Expression: "ref"},
 						{Name: "type", Expression: "type"},
@@ -90,7 +88,7 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"))
 	require.NoError(t, err)
 
-	t.Run("single field, emit on all", func(t *testing.T) {
+	t.Run("single field", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"single-field-group",
 			uuid.NewString(),
@@ -100,7 +98,6 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 			},
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
-					EmitOn: ConnectionGroupEmitOnAll,
 					Fields: []ConnectionGroupByField{
 						{Name: "version", Expression: "ref"},
 					},
@@ -164,7 +161,7 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.False(t, shouldEmit)
 	})
 
-	t.Run("multiple fields, emit on all", func(t *testing.T) {
+	t.Run("multiple fields", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"multiple-fields-group",
 			uuid.NewString(),
@@ -174,7 +171,6 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 			},
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
-					EmitOn: ConnectionGroupEmitOnAll,
 					Fields: []ConnectionGroupByField{
 						{Name: "version", Expression: "ref"},
 						{Name: "app", Expression: "app"},
@@ -276,7 +272,6 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 		},
 		ConnectionGroupSpec{
 			GroupBy: &ConnectionGroupBySpec{
-				EmitOn: ConnectionGroupEmitOnAll,
 				Fields: []ConnectionGroupByField{
 					{Name: "version", Expression: "ref"},
 					{Name: "app", Expression: "app"},

@@ -106,7 +106,6 @@ func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, e
 	return &models.ConnectionGroupSpec{
 		GroupBy: &models.ConnectionGroupBySpec{
 			Fields: fields,
-			EmitOn: protoToEmitOn(spec.GroupBy.EmitOn),
 		},
 	}, nil
 }
@@ -158,26 +157,7 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 			Connections: conns,
 			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
 				Fields: fields,
-				EmitOn: emitOnToProto(spec.GroupBy.EmitOn),
 			},
 		},
 	}, nil
-}
-
-func protoToEmitOn(emitOn pb.ConnectionGroup_Spec_GroupBy_EmitOn) string {
-	switch emitOn {
-	case pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_MAJORITY:
-		return models.ConnectionGroupEmitOnMajority
-	default:
-		return models.ConnectionGroupEmitOnAll
-	}
-}
-
-func emitOnToProto(emitOn string) pb.ConnectionGroup_Spec_GroupBy_EmitOn {
-	switch emitOn {
-	case models.ConnectionGroupEmitOnMajority:
-		return pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_MAJORITY
-	default:
-		return pb.ConnectionGroup_Spec_GroupBy_EMIT_ON_ALL
-	}
 }

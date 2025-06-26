@@ -38,7 +38,6 @@ docs/ExecutionResult.md
 docs/ExecutorSpecHTTP.md
 docs/ExecutorSpecHTTPResponsePolicy.md
 docs/ExecutorSpecSemaphore.md
-docs/GroupByEmitOn.md
 docs/GroupByField.md
 docs/InputMappingWhen.md
 docs/InputMappingWhenTriggeredBy.md
@@ -141,7 +140,6 @@ model_execution_result.go
 model_executor_spec_http.go
 model_executor_spec_http_response_policy.go
 model_executor_spec_semaphore.go
-model_group_by_emit_on.go
 model_group_by_field.go
 model_input_mapping_when.go
 model_input_mapping_when_triggered_by.go

@@ -21,7 +21,6 @@ var _ MappedNullable = &SpecGroupBy{}
 // SpecGroupBy struct for SpecGroupBy
 type SpecGroupBy struct {
 	Fields []GroupByField `json:"fields,omitempty"`
-	EmitOn *GroupByEmitOn `json:"emitOn,omitempty"`
 }
 
 // NewSpecGroupBy instantiates a new SpecGroupBy object
@@ -30,8 +29,6 @@ type SpecGroupBy struct {
 // will change when the set of required properties is changed
 func NewSpecGroupBy() *SpecGroupBy {
 	this := SpecGroupBy{}
-	var emitOn GroupByEmitOn = GROUPBYEMITON_EMIT_ON_ALL
-	this.EmitOn = &emitOn
 	return &this
 }
 
@@ -40,8 +37,6 @@ func NewSpecGroupBy() *SpecGroupBy {
 // but it doesn't guarantee that properties required by API are set
 func NewSpecGroupByWithDefaults() *SpecGroupBy {
 	this := SpecGroupBy{}
-	var emitOn GroupByEmitOn = GROUPBYEMITON_EMIT_ON_ALL
-	this.EmitOn = &emitOn
 	return &this
 }
 
@@ -77,38 +72,6 @@ func (o *SpecGroupBy) SetFields(v []GroupByField) {
 	o.Fields = v
 }
 
-// GetEmitOn returns the EmitOn field value if set, zero value otherwise.
-func (o *SpecGroupBy) GetEmitOn() GroupByEmitOn {
-	if o == nil || IsNil(o.EmitOn) {
-		var ret GroupByEmitOn
-		return ret
-	}
-	return *o.EmitOn
-}
-
-// GetEmitOnOk returns a tuple with the EmitOn field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SpecGroupBy) GetEmitOnOk() (*GroupByEmitOn, bool) {
-	if o == nil || IsNil(o.EmitOn) {
-		return nil, false
-	}
-	return o.EmitOn, true
-}
-
-// HasEmitOn returns a boolean if a field has been set.
-func (o *SpecGroupBy) HasEmitOn() bool {
-	if o != nil && !IsNil(o.EmitOn) {
-		return true
-	}
-
-	return false
-}
-
-// SetEmitOn gets a reference to the given GroupByEmitOn and assigns it to the EmitOn field.
-func (o *SpecGroupBy) SetEmitOn(v GroupByEmitOn) {
-	o.EmitOn = &v
-}
-
 func (o SpecGroupBy) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -121,9 +84,6 @@ func (o SpecGroupBy) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Fields) {
 		toSerialize["fields"] = o.Fields
-	}
-	if !IsNil(o.EmitOn) {
-		toSerialize["emitOn"] = o.EmitOn
 	}
 	return toSerialize, nil
 }
