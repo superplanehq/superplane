@@ -1,77 +1,70 @@
-# Semaphore RFCs (Requests for Comments)
+# Getting Started with Create React App
 
-## Introduction
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-This document outlines the RFC (Request for Comments) process for the Semaphore updates. It is a way for the Semaphore team to include the community and users in the discussion and design of future improvements.
+## Available Scripts
 
-RFCs are design documents used to propose, describe, and discuss significant changes to Semaphore. The RFC process provides a structured way to gather input from the community and users before implementing major features or changes.
+In the project directory, you can run:
 
-## When should an RFC be created?
+### `npm start`
 
-An RFC should be created for any substantial change to Semaphore that would benefit from broader discussion and consensus. This includes, but is not limited to:
+Runs the app in the development mode.\
+Open [http://localhost:8000](http://localhost:8000) to view it in your browser.
 
-- New features with significant impact on users or the architecture
-- Major changes to existing features or APIs
-- Introduction of new integrations with the Semaphore
+The page will reload when you make changes.\
+You may also see any lint errors in the console.
 
-Not every change will be covered by an RFC. RFCs serve to efficiently gather improvement ideas from the community and validate existing proposals through community feedback.
+### `npm test`
 
-## How to create an RFC
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-1. Fork the Semaphore repository.
+### `npm run build`
 
-2. Create a new branch named `rfc/short-descriptive-title`. For example: `rfc/new-user-api`.
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-3. Create a new subfolder in the `rfcs` directory with the format `0000-your-feature`. For example: `rfcs/0000-new-user-api/`.
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-4. Copy the RFC template from `rfcs/0000-example/rfc.md` to your new subfolder, naming it `rfc.md`.
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-5. Fill in the RFC template with your proposal. Be as detailed as possible, including motivation, design details, alternatives considered, and potential drawbacks.
+### `npm run eject`
 
-6. Submit a pull request to the Semaphore repository with your RFC.
+**Note: this is a one-way operation. Once you `eject`, you can't go back!**
 
-7. Update the front matter of your RFC:
-   - Assign yourself as the author
-   - Set the status to "Draft"
-   - Leave the RFC number as 0000 (it will be assigned later)
+If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-8. The pull request description should include a brief summary of the RFC and any additional context that might be helpful for reviewers.
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
 
-## How are RFCs reviewed?
+You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
-1. Once submitted, Semaphore team will assign a number to the RFC and update the folder name accordingly.
+## Learn More
 
-2. The community and Semaphore team will review the RFC, asking questions and providing feedback through pull request comments.
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-3. You should be prepared to revise your RFC based on the feedback received. Push your changes to the same branch to update the pull request.
+To learn React, check out the [React documentation](https://reactjs.org/).
 
-4. RFCs must remain in the "Draft" status for a minimum of **two weeks** to allow sufficient time for review and discussion.
+### Code Splitting
 
-5. After the review period, Semaphore team will decide to either:
-   - Accept the RFC and merge the pull request
-   - Request further changes
-   - Decline the RFC and close the pull request
+This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
 
-6. Accepted RFCs will have their status updated to "Accepted" before merging and a number assigned.
+### Analyzing the Bundle Size
 
-## Implementation
+This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-Once an RFC is accepted:
+### Making a Progressive Web App
 
-1. Create a new issue in the Semaphore repository to track the implementation progress, linking back to the RFC.
+This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-2. The issue is to be used only to communicate the progress to community and users. 
+### Advanced Configuration
 
-3. Once the implementation is complete and merged, Semaphore team will update the RFC's status to "Implemented" and move it to the `archive` folder.
+This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-## End of life
+### Deployment
 
-As Semaphore evolves, some RFCs may become obsolete or be superseded by newer proposals. In such cases:
+This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-1. Create a pull request to update the RFC's status to "Deprecated" and move it to the `archive` folder. 
+### `npm run build` fails to minify
 
-2. In the PR, provide a brief explanation of why the RFC is being deprecated and, if applicable, link to any new RFCs or documentation that replace it.
-
-3. Once approved and merged, the RFC will be clearly marked as deprecated but will remain in the repository for historical context.
-
-Remember, the RFC process is meant to be collaborative and iterative. Don't hesitate to ask for help or clarification throughout the process. Your contributions help shape the future of Semaphore!
+This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
