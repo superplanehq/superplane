@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -206,29 +205,6 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 
 	default:
 		return nil, fmt.Errorf("invalid condition type: %s", condition.Type)
-	}
-}
-
-func findConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*uuid.UUID, error) {
-	switch connection.Type {
-	case pb.Connection_TYPE_STAGE:
-		stage, err := canvas.FindStageByName(connection.Name)
-		if err != nil {
-			return nil, fmt.Errorf("stage %s not found", connection.Name)
-		}
-
-		return &stage.ID, nil
-
-	case pb.Connection_TYPE_EVENT_SOURCE:
-		eventSource, err := canvas.FindEventSourceByName(connection.Name)
-		if err != nil {
-			return nil, fmt.Errorf("event source %s not found", connection.Name)
-		}
-
-		return &eventSource.ID, nil
-
-	default:
-		return nil, errors.New("invalid type")
 	}
 }
 

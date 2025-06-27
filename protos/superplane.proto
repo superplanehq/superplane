@@ -815,6 +815,12 @@ message StageCreated {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+message ConnectionGroupCreated {
+  string canvas_id = 1;
+  string connection_group_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
 message StageUpdated {
   string canvas_id = 1;
   string stage_id = 2;

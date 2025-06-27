@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -78,6 +79,11 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 
 	response := &pb.CreateConnectionGroupResponse{
 		ConnectionGroup: group,
+	}
+
+	err = messages.NewConnectionGroupCreatedMessage(connectionGroup).Publish()
+	if err != nil {
+		log.Errorf("failed to publish connection group created message: %v", err)
 	}
 
 	logger.Infof("Created connection group. Request: %v", req)
