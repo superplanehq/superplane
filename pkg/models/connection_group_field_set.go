@@ -96,8 +96,9 @@ func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB) ([]byte, error) {
 	//
 	// Include fields from field set.
 	//
+	fieldMap := map[string]string{}
 	for k, v := range s.FieldSet.Data() {
-		event[k] = v
+		fieldMap[k] = v
 	}
 
 	//
@@ -120,6 +121,8 @@ func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB) ([]byte, error) {
 	}
 
 	event["events"] = eventMap
+	event["fields"] = fieldMap
+
 	return json.Marshal(event)
 }
 

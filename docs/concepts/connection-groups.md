@@ -46,14 +46,36 @@ spec:
       name: preprod
 ```
 
-The events emitted by the connection group will have all the grouping keys and all the events that it grouped in it. For our example above, it would look like this:
+The events emitted by the connection group will have all the grouping fields and all the events that were grouped for that field set in it. For our example above, it would look like this:
 
 ```json
 {
-  "version": "v1",
+  "fields": {
+    "version": "v1",
+  },
   "events": {
     "preprod1": {...},
     "preprod2": {...}
   }
 }
+```
+
+So, when defining a stage input from a connection group event data, I would do it like this:
+
+```yaml
+apiVersion: v1
+kind: Stage
+metadata:
+  name: prod
+spec:
+  inputs:
+    - name: VERSION
+
+  inputMappings:
+    - values:
+        - name: VERSION
+          valueFrom:
+            eventData:
+              connection: preprod
+              expression: fields.version
 ```

@@ -11,10 +11,12 @@ import (
 )
 
 func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
-	user := uuid.New()
-	org := uuid.New()
 	require.NoError(t, database.TruncateTables())
-	canvas, err := CreateCanvas(user, org, "test")
+
+	user := uuid.New()
+	org, err := CreateOrganization(user, uuid.New().String(), "test")
+	require.NoError(t, err)
+	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
 	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"))
 	require.NoError(t, err)
@@ -80,10 +82,12 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 }
 
 func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
-	user := uuid.New()
-	org := uuid.New()
 	require.NoError(t, database.TruncateTables())
-	canvas, err := CreateCanvas(user, org, "test")
+
+	user := uuid.New()
+	org, err := CreateOrganization(user, uuid.New().String(), "test")
+	require.NoError(t, err)
+	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
 	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"))
 	require.NoError(t, err)
@@ -318,10 +322,12 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 }
 
 func Test__ConnectionGroup__Emit(t *testing.T) {
-	user := uuid.New()
-	org := uuid.New()
 	require.NoError(t, database.TruncateTables())
-	canvas, err := CreateCanvas(user, org, "test")
+
+	user := uuid.New()
+	org, err := CreateOrganization(user, uuid.New().String(), "test")
+	require.NoError(t, err)
+	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
 	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"))
 	require.NoError(t, err)
@@ -367,8 +373,10 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
-		"version": "v1",
-		"app":     "auth",
+		"fields": map[string]any{
+			"app":     "auth",
+			"version": "v1",
+		},
 		"events": map[string]any{
 			"source-1": map[string]any{"ref": "v1", "app": "auth"},
 			"source-2": map[string]any{"ref": "v1", "app": "auth"},
