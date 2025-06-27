@@ -1,8 +1,8 @@
 import { StageWithEventQueue } from "../../store/types";
 import { SuperplaneExecution } from "@/api-client";
-import { EventSection } from '../EventSection';
 import { ExecutionTimeline } from '../ExecutionTimeline';
 import { SuperplaneStageEvent } from "@/api-client";
+import MessageItem from '../MessageItem';
 
 interface ActivityTabProps {
   selectedStage: StageWithEventQueue;
@@ -21,40 +21,54 @@ export const ActivityTab = ({
   approveStageEvent,
   executionRunning
 }: ActivityTabProps) => {
+  const queueCount = pendingEvents.length + waitingEvents.length;
+  
   return (
-    <div className="p-6 space-y-6">
-      <p className="text-xs text-left w-full font-medium text-gray-700">RECENT RUNS</p>
-      <ExecutionTimeline 
-        executions={allExecutions.slice(0, 2)} 
-      />
-      <p className="text-xs text-left w-full font-medium text-gray-700">QUEUE ({pendingEvents.length + waitingEvents.length})</p>
-      <EventSection
-        title="Pending Runs"
-        icon="pending"
-        iconColor="text-amber-600"
-        events={pendingEvents}
-        variant="pending"
-        maxVisible={3}
-        emptyMessage="No pending runs"
-        emptyIcon="pending"
-      />
-
-      {/* Waiting for Approval Section */}
-      {waitingEvents.length > 0 && (
-        <EventSection
-          title="Waiting for Approval"
-          icon="hourglass_empty"
-          iconColor="text-blue-600"
-          events={waitingEvents}
-          variant="waiting"
-          maxVisible={2}
-          emptyMessage="No events waiting for approval"
-          emptyIcon="hourglass_empty"
-          onApprove={approveStageEvent}
-          stageId={selectedStage.metadata!.id}
-          executionRunning={executionRunning}
+    <div className="p-4 space-y-6">
+      {/* Recent Runs Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Recent Runs</h3>
+        </div>
+        <ExecutionTimeline 
+          executions={allExecutions.slice(0, 3)} 
         />
-      )}
+      </div>
+
+      {/* Queue Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+            Queue ({queueCount})
+          </h3>
+          {queueCount > 0 && (
+            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
+              Manage queue
+            </button>
+          )}
+        </div>
+        
+        <div className="space-y-3">
+          {/* All queue events using MessageItem */}
+          {[...pendingEvents, ...waitingEvents].length === 0 ? (
+            <div className="bg-gray-50 rounded-lg p-8 text-center">
+              <div className="material-symbols-outlined text-4xl text-gray-400 mb-2">queue</div>
+              <div className="text-sm text-gray-500">No items in queue</div>
+            </div>
+          ) : (
+            [...pendingEvents, ...waitingEvents]
+              .sort((a, b) => new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime())
+              .map((event) => (
+                <MessageItem
+                  key={event.id}
+                  event={event}
+                  onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
+                  executionRunning={executionRunning}
+                />
+              ))
+          )}
+        </div>
+      </div>
     </div>
   );
 };

@@ -65,6 +65,7 @@ export const EventSection = ({
               state={event.state!}
               stateReason={event.stateReason}
               approvals={event.approvals}
+              inputs={event.inputs}
               variant={variant}
               onApprove={onApprove && stageId ? () => onApprove(event.id!, stageId) : undefined}
               executionRunning={executionRunning}

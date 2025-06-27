@@ -1,4 +1,4 @@
-import { SuperplaneStageEventApproval } from '@/api-client';
+import { SuperplaneStageEventApproval, SuperplaneInputValue } from '@/api-client';
 import { formatRelativeTime } from '../utils/stageEventUtils';
 
 interface EventCardProps {
@@ -7,6 +7,7 @@ interface EventCardProps {
   state: string;
   stateReason?: string;
   approvals?: SuperplaneStageEventApproval[];
+  inputs?: SuperplaneInputValue[];
   onApprove?: () => void;
   variant?: 'pending' | 'waiting' | 'processed';
   executionRunning?: boolean;
@@ -18,6 +19,7 @@ export const EventCard = ({
   state, 
   stateReason, 
   approvals,
+  inputs,
   onApprove,
   variant = 'pending',
   executionRunning = false
@@ -70,6 +72,18 @@ export const EventCard = ({
             {approvals && approvals.length > 0 && (
               <div className={`text-xs mt-1 ${styles.iconClass}`}>
                 Approvals: {approvals.length}
+              </div>
+            )}
+            {inputs && inputs.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {inputs.slice(0, 3).map((input, index) => (
+                  <span key={index} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full border">
+                    {input.name}: {input.value}
+                  </span>
+                ))}
+                {inputs.length > 3 && (
+                  <span className="text-xs text-gray-500">+{inputs.length - 3} more</span>
+                )}
               </div>
             )}
           </div>

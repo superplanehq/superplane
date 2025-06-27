@@ -1,11 +1,54 @@
 import { SuperplaneValueDefinition } from "@/api-client";
 import { StageWithEventQueue } from "../../store/types";
+import { useState } from "react";
 
 interface SettingsTabProps {
   selectedStage: StageWithEventQueue;
 }
 
 export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
+  const [viewMode, setViewMode] = useState<'form' | 'yaml'>('form');
+
+  const convertToYaml = (obj: any): string => {
+    const yamlify = (value: any, indent: number = 0): string => {
+      const spaces = '  '.repeat(indent);
+      
+      if (value === null || value === undefined) {
+        return 'null';
+      }
+      
+      if (typeof value === 'string') {
+        return value.includes('\n') || value.includes(':') || value.includes('#') 
+          ? `"${value.replace(/"/g, '\\"')}"` 
+          : value;
+      }
+      
+      if (typeof value === 'number' || typeof value === 'boolean') {
+        return String(value);
+      }
+      
+      if (Array.isArray(value)) {
+        if (value.length === 0) return '[]';
+        return '\n' + value.map(item => `${spaces}- ${yamlify(item, indent + 1)}`).join('\n');
+      }
+      
+      if (typeof value === 'object') {
+        const entries = Object.entries(value).filter(([_, v]) => v !== undefined);
+        if (entries.length === 0) return '{}';
+        
+        return '\n' + entries.map(([key, val]) => {
+          const yamlValue = yamlify(val, indent + 1);
+          return yamlValue.startsWith('\n') 
+            ? `${spaces}${key}:${yamlValue}`
+            : `${spaces}${key}: ${yamlValue}`;
+        }).join('\n');
+      }
+      
+      return String(value);
+    };
+    
+    return yamlify(obj).trim();
+  };
   const getAllInputMappings = (inputName: string) => {
     if (!selectedStage.spec!.inputMappings) return [];
     
@@ -51,250 +94,203 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">Stage Settings</h2>
-        <p className="text-gray-600">Configuration and details for this stage</p>
-      </div>
-
-      {/* Basic Information */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Basic Information</h3>
-        </div>
-        <div className="p-4 space-y-4">
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700 font-medium">Stage Name</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.name}</span>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700 font-medium">Stage ID</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.id?.substring(0, 16)}...</span>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700 font-medium">Canvas ID</span>
-            <span className="text-gray-900 font-mono text-sm">{selectedStage.metadata!.canvasId?.substring(0, 16)}...</span>
-          </div>
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700 font-medium">Created</span>
-            <span className="text-gray-900">{selectedStage.metadata!.createdAt ? new Date(selectedStage.metadata!.createdAt).toLocaleString() : 'N/A'}</span>
-          </div>
+    <div className="h-full flex flex-col">
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-between border-b border-gray-200 pb-2 px-3 pt-3">
+        <div className="flex items-center">
+          <button
+            className={`px-3 py-1 text-sm font-medium rounded-l border ${
+              viewMode === 'form' 
+                ? 'bg-gray-100 text-gray-900 border-gray-300 shadow-inner' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+            onClick={() => setViewMode('form')}
+          >
+            Form
+          </button>
+          <button
+            className={`px-3 py-1 text-sm font-medium rounded-r border-l-0 border ${
+              viewMode === 'yaml' 
+                ? 'bg-gray-100 text-gray-900 border-gray-300 shadow-inner' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+            onClick={() => setViewMode('yaml')}
+          >
+            Yaml
+          </button>
         </div>
       </div>
 
-      {/* Inputs */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Inputs</h3>
-        </div>
-        <div className="p-4">
-          {selectedStage.spec!.inputs && selectedStage.spec!.inputs.length > 0 ? (
-            <div className="space-y-4">
-              {selectedStage.spec!.inputs.map((input, index) => {
-                const inputMappings = getAllInputMappings(input.name || '');
-                
-                return (
-                  <div key={`input_${input.name}_${index + 1}`} className="border border-gray-200 rounded-lg p-4">
-                    <div className="mb-3">
-                      <div className="font-medium text-gray-900 mb-1">
-                        {input.name || `Input ${index + 1}`}
-                      </div>
-                      {input.description && (
-                        <div className="text-sm text-gray-600 mb-2">{input.description}</div>
-                      )}
-                    </div>
-                    
-                    {/* Value Mappings */}
-                    {inputMappings.length > 0 ? (
-                      <div className="space-y-3">
-                        {inputMappings.map((inputMapping, mappingIndex) => {
-                          const valueSource = formatValueSource(inputMapping.mapping);
-                          return (
-                            <div key={`mapping_${index}_${mappingIndex}`} className="bg-gray-50 rounded-lg p-3 border">
-                              <div className="flex items-start gap-2">
-                                <span className="text-lg">{valueSource?.icon || '❓'}</span>
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <div className="text-sm font-medium text-gray-700">
-                                      {valueSource?.type || 'Unknown'}
-                                    </div>
-                                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono">
-                                      from: {inputMapping.triggeredBy}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-gray-900 font-mono bg-white px-2 py-1 rounded border">
-                                    {valueSource?.source || 'No source defined'}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-yellow-600">⚠️</span>
-                          <span className="text-sm text-yellow-800">No value mappings configured</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+      {/* Content */}
+      <div className="bg-white flex-1 overflow-auto">
+        {viewMode === 'form' ? (
+          <div className='text-sm p-3'>
+            {/* Stage Details */}
+            <div className='mt-3 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+              Stage Details
             </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No inputs configured</div>
-          )}
-        </div>
-      </div>
-
-      {/* Outputs */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Outputs</h3>
-        </div>
-        <div className="p-4">
-          {selectedStage.spec!.outputs && selectedStage.spec!.outputs.length > 0 ? (
-            <div className="space-y-4">
-              {selectedStage.spec!.outputs.map((output, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-medium text-gray-900">
-                      {output.name || `Output ${index + 1}`}
-                    </div>
-                    <div className="flex gap-2">
-                      {output.required && (
-                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-medium">
-                          Required
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {output.description && (
-                    <div className="text-sm text-gray-600 mb-3">{output.description}</div>
-                  )}
-                  
-                  {/* Output Usage Info */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-600">💡</span>
-                      <div className="text-sm text-blue-800">
-                        <div className="font-medium mb-1">Available for downstream stages</div>
-                        <div className="text-xs text-blue-600 font-mono">
-                          Reference: outputs.{output.name || `output_${index + 1}`}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No outputs configured</div>
-          )}
-        </div>
-      </div>
-
-      {/* Connections */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Connections</h3>
-        </div>
-        <div className="p-4">
-          {selectedStage.spec!.connections && selectedStage.spec!.connections.length > 0 ? (
-            <div className="space-y-3">
-              {selectedStage.spec!.connections.map((connection, index) => (
-                <div key={index} className="border border-gray-200 rounded p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-medium text-gray-900">
-                      {connection.name || `Connection ${index + 1}`}
-                    </div>
-                    <div className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                      {connection.type?.replace('TYPE_', '')}
-                    </div>
-                  </div>
-                  {connection.filters && connection.filters.length > 0 && (
-                    <div className="text-sm text-gray-600">
-                      Filters: {connection.filters.length} configured
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No connections configured</div>
-          )}
-        </div>
-      </div>
-
-      {/* Conditions */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Conditions</h3>
-        </div>
-        <div className="p-4">
-          {selectedStage.spec!.conditions && selectedStage.spec!.conditions.length > 0 ? (
-            <div className="space-y-3">
-              {selectedStage.spec!.conditions.map((condition, index) => (
-                <div key={index} className="border border-gray-200 rounded p-3">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="font-medium text-gray-900">
-                      {condition.type?.replace('CONDITION_TYPE_', '').replace('_', ' ')}
-                    </div>
-                  </div>
-                  {condition.approval && (
-                    <div className="text-sm text-gray-600">
-                      Required approvals: {condition.approval.count}
-                    </div>
-                  )}
-                  {condition.timeWindow && (
-                    <div className="text-sm text-gray-600">
-                      Time window: {condition.timeWindow.start} - {condition.timeWindow.end}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No conditions configured</div>
-          )}
-        </div>
-      </div>
-
-      {/* Executor */}
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <h3 className="font-medium text-gray-900">Executor</h3>
-        </div>
-        <div className="p-4">
-          {selectedStage.spec!.executor ? (
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-700 font-medium">Type</span>
-                <span className="text-gray-900">{selectedStage.spec!.executor!.type?.replace('TYPE_', '')}</span>
+            <div className="space-y-2">
+              <div className="flex items-start w-full">
+                <div className='text-gray-600 w-1/4 text-left'>Name</div>
+                <div className="block w-full font-mono text-sm text-left">{selectedStage.metadata!.name || '—'}</div>
               </div>
-              {selectedStage.spec!.executor!.semaphore && (
-                <>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-700 font-medium">Project ID</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.projectId}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-700 font-medium">Branch</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.branch}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-700 font-medium">Pipeline File</span>
-                    <span className="text-gray-900 font-mono text-sm">{selectedStage.spec!.executor!.semaphore.pipelineFile}</span>
-                  </div>
-                </>
-              )}
+              <div className="flex items-start w-full">
+                <div className='text-gray-600 w-1/4 text-left'>ID</div>
+                <div className="block w-full font-mono text-sm text-left">{selectedStage.metadata!.id || '—'}</div>
+              </div>
             </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">No executor configured</div>
-          )}
-        </div>
+
+            {/* Executor */}
+            {selectedStage.spec!.executor && (
+              <>
+                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                  Executor
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-start w-full">
+                    <div className='text-gray-600 w-1/4 text-left'>Type</div>
+                    <div className="block w-full text-left">{selectedStage.spec!.executor!.type?.replace('TYPE_', '') || '—'}</div>
+                  </div>
+                  {selectedStage.spec!.executor!.semaphore && (
+                    <>
+                      <div className="flex items-start w-full">
+                        <div className='text-gray-600 w-1/4 text-left'>Project ID</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.projectId || '—'}</div>
+                      </div>
+                      <div className="flex items-start w-full">
+                        <div className='text-gray-600 w-1/4 text-left'>Branch</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.branch || '—'}</div>
+                      </div>
+                      <div className="flex items-start w-full">
+                        <div className='text-gray-600 w-1/4 text-left'>Pipeline file</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.pipelineFile || '—'}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+
+            {/* Gates */}
+            {selectedStage.spec!.conditions && selectedStage.spec!.conditions.length > 0 && (
+              <>
+                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                  Gates
+                </div>
+                <div className="space-y-2">
+                  {selectedStage.spec!.conditions.map((condition, index) => (
+                    <div key={index} className="flex items-start w-full">
+                      <div className='text-gray-600 w-1/4 text-left'>Manual approval</div>
+                      <div className="block w-full text-left">
+                        {condition.approval ? `Required: ${condition.approval.count} approvals` : 'Enabled'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Connections */}
+            {selectedStage.spec!.connections && selectedStage.spec!.connections.length > 0 && (
+              <>
+                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                  Connections
+                </div>
+                <div className="space-y-2">
+                  {selectedStage.spec!.connections.map((connection, index) => (
+                    <div key={index} className="flex items-center justify-between w-full">
+                      <span className="bg-gray-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
+                        <span className="material-symbols-outlined mr-1 text-xs">rocket_launch</span>
+                        {connection.name || `Connection ${index + 1}`}
+                      </span>
+                      <span className='text-xs text-green-600 text-left'>Stage</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {/* Inputs */}
+            {selectedStage.spec!.inputs && selectedStage.spec!.inputs.length > 0 && (
+              <>
+                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                  Inputs
+                </div>
+                <div className="space-y-3">
+                  {selectedStage.spec!.inputs.map((input, index) => {
+                    const inputMappings = getAllInputMappings(input.name || '');
+                    
+                    return (
+                      <div key={`input_${input.name}_${index + 1}`}>
+                        <div className="flex items-start w-full mb-2">
+                          <div className='text-gray-600 w-1/4 text-left'>{input.name || `Input ${index + 1}`}</div>
+                          <div className="block w-full text-left">
+                            {inputMappings.length > 0 ? (
+                              <div className="space-y-1">
+                                {inputMappings.map((inputMapping, mappingIndex) => {
+                                  const valueSource = formatValueSource(inputMapping.mapping);
+                                  return (
+                                    <div key={`mapping_${index}_${mappingIndex}`} className="flex items-center w-full">
+                                      <span className="bg-gray-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">
+                                        <span className="material-symbols-outlined mr-1 text-xs">rocket_launch</span>
+                                        {inputMapping.triggeredBy}
+                                      </span>
+                                      <span className="text-xs">.</span>
+                                      <span className="bg-purple-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">
+                                        outputs
+                                      </span>
+                                      <span className="text-xs">.</span>
+                                      <span className="bg-yellow-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">
+                                        {valueSource?.source || input.name || 'VALUE'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500 text-xs text-left">No mappings configured</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Outputs */}
+            {selectedStage.spec!.outputs && selectedStage.spec!.outputs.length > 0 && (
+              <>
+                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                  Outputs
+                </div>
+                <div className="space-y-2">
+                  {selectedStage.spec!.outputs.map((output, index) => (
+                    <div key={index} className="flex items-center justify-between w-full">
+                      <div className='flex items-center'>
+                        <span className="h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">this</span>
+                        <span className="text-xs">.</span>
+                        <span className="bg-purple-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">outputs</span>
+                        <span className="text-xs">.</span>
+                        <span className="bg-yellow-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">{output.name || `output_${index + 1}`}</span>
+                      </div>
+                      <span className={`text-xs text-left ${output.required ? 'text-red-600' : 'text-gray-500'}`}>
+                        {output.required ? 'required' : 'optional'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="h-full">
+            <pre className="bg-white p-4 font-mono text-xs h-full overflow-auto text-left">
+              {convertToYaml(selectedStage)}
+            </pre>
+          </div>
+        )}
       </div>
     </div>
   );

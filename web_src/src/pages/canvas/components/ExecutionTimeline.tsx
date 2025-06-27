@@ -38,12 +38,19 @@ export const ExecutionTimeline = ({
   };
 
   return (
-    <>
+    <div className="space-y-3">
       {
         executions.map((execution) => (
-          <RunItem key={execution.id!} title={'Execution'} inputs={{}} outputs={generateKeyValueMap(execution.outputs)} status={execution.state || 'Unknown'} timestamp={execution.createdAt || 'Unknown'} />
+          <RunItem 
+            key={execution.id!} 
+            title={execution.id || 'Execution'} 
+            inputs={{}} 
+            outputs={generateKeyValueMap(execution.outputs)} 
+            status={execution.state || 'Unknown'} 
+            timestamp={execution.createdAt || new Date().toISOString()} 
+          />
         ))
       }
-    </>
+    </div>
   );
 };

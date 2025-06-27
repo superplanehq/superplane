@@ -1,4 +1,5 @@
-import React, { JSX } from 'react';
+import React, { JSX, useEffect } from 'react';
+import { formatRelativeTime } from '../../utils/stageEventUtils';
 
 interface RunItemProps {
   status: string;
@@ -16,163 +17,180 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   timestamp, 
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
+  const [spinChar, setSpinChar] = React.useState<string>('|');
+
+  // Animation for running status
+  useEffect(() => {
+    if (status.toLowerCase() === 'state_started' || status.toLowerCase() === 'running') {
+      const chars = ['|', '/', '—', '\\'];
+      let charIndex = 0;
+      
+      const interval = setInterval(() => {
+        charIndex = (charIndex + 1) % chars.length;
+        setSpinChar(chars[charIndex]);
+      }, 300);
+
+      return () => clearInterval(interval);
+    }
+  }, [status]);
 
   const toggleExpand = (): void => {
     setIsExpanded(!isExpanded);
   };
 
   const renderStatusIcon = (): JSX.Element | null => {
-    switch (status.toLowerCase()) {
+    const statusKey = status.toLowerCase();
+    switch (statusKey) {
+      case 'state_succeeded':
       case 'passed':
-        return <span className="material-symbols-outlined fill green f1 mr1">check_circle</span>;
+        return (
+          <div className="w-5 h-5 rounded-full bg-green-600 mr-2 flex items-center justify-center">
+            <span className="material-symbols-outlined text-white text-sm">check_circle</span>
+          </div>
+        );
+      case 'state_failed':
       case 'failed':
-        return <span className="material-symbols-outlined fill red f1 mr1">cancel</span>;
+        return (
+          <div className="w-5 h-5 rounded-full bg-red-600 mr-2 flex items-center justify-center">
+            <span className="material-symbols-outlined text-white text-sm">cancel</span>
+          </div>
+        );
+      case 'state_pending':
       case 'queued':
-        return <span className="material-symbols-outlined fill orange f1 mr1">queue</span>;
+        return (
+          <div className="w-5 h-5 rounded-full bg-orange-600 mr-2 flex items-center justify-center">
+            <span className="material-symbols-outlined text-white text-sm">queue</span>
+          </div>
+        );
+      case 'state_started':
       case 'running':
-        return <span className="br-pill bg-blue w-[22px] h-[22px] b--lightest-blue text-center mr2"><span className="white f4 job-log-working"></span></span>;
+        return (
+          <div className="w-5 h-5 rounded-full bg-blue-600 mr-2 flex items-center justify-center">
+            <span className="text-white text-xs font-mono">{spinChar}</span>
+          </div>
+        );
       default:
-        return null;
+        return (
+          <div className="w-5 h-5 rounded-full bg-gray-600 mr-2 flex items-center justify-center">
+            <span className="material-symbols-outlined text-white text-sm">help</span>
+          </div>
+        );
     }
   };
 
   const getBackgroundClass = (): string => {
-    switch (status.toLowerCase()) {
+    const statusKey = status.toLowerCase();
+    switch (statusKey) {
+      case 'state_succeeded':
       case 'passed':
-        return 'bg-washed-green b--green';
+        return 'bg-green-50 border-l-4 border-green-500';
+      case 'state_failed':
       case 'failed':
-        return 'bg-washed-red b--red';
+        return 'bg-red-50 border-l-4 border-red-500';
+      case 'state_started':
+      case 'running':
+        return 'bg-blue-50 border-l-4 border-blue-500';
+      case 'state_pending':
+      case 'queued':
+        return 'bg-orange-50 border-l-4 border-orange-500';
       default:
-        return 'bg-washed-blue b--indigo';
+        return 'bg-gray-50 border-l-4 border-gray-500';
     }
   };
 
   return (
-    <div className={`run-item flex items-start mv1 bg-white bb bl br br2 b--lightest-gray`}>
-     <div className={`flex w-full items-start pa2 bt ${getBackgroundClass()}`}>
+    <div className={`mb-2 bg-white rounded-lg border border-gray-200 overflow-hidden`}>
+     <div className={`flex w-full items-start p-3 ${getBackgroundClass()}`}>
       <button 
-          className="btn btn-outline btn-small py-0 px-0 leading-none mt1 mr1"
+          className="p-1 hover:bg-gray-100 rounded mr-2 text-gray-600"
           onClick={toggleExpand}
           title={isExpanded ? "Hide details" : "Show details"}
         >
-          <span className="material-symbols-outlined">{isExpanded ? 'arrow_drop_down' : 'arrow_right'}</span>
+          <span className="material-symbols-outlined text-sm">{isExpanded ? 'expand_more' : 'chevron_right'}</span>
       </button>
       <div className='w-full'>
-        <div className={`flex justify-between w-ful`}>
-          <div className="flex items-center">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center min-w-0 flex-1">
             {renderStatusIcon()}
-            <img src={""} width={20} className="mx-1 hidden"/>
-            <a href="#" className={`truncate b ${isExpanded ? "flex" : "flex"}`}>{title}</a>
+            <span className="font-semibold text-gray-900 truncate">{title}</span>
           </div>
-          <div className="flex items-center">
-          <div className={`text-xs gray ml3-m ml0 mr3 tr ${isExpanded ? "hidden" : "inline-block"}`}>{timestamp}</div>
-          <button className="btn gray text-lg px-1 py-0"><i className="material-symbols-outlined text-lg">more_vert</i></button>
-          {status.toLowerCase() === 'queued' && <button className="btn btn-secondary btn-small text-sm"><i className="material-symbols-outlined text-sm">close</i></button>}
+          <div className="flex items-center space-x-2">
+            <div className="text-xs text-gray-500">{formatRelativeTime(timestamp)}</div>
+            <button className="p-1 hover:bg-gray-100 rounded text-gray-400">
+              <span className="material-symbols-outlined text-sm">more_vert</span>
+            </button>
           </div>
         </div>
-        <div className="w-full">
         
-        <div className="flex items-start">
-        <div className={`flex items-center pt1 ${isExpanded ? "hidden" : "flex"}`}>
-          {Object.entries(inputs).slice(0, 3).map(([key, value]) => (
-            <span key={key} className="bg-black-10 black text-xs px-1 py-1 br2 mr2 leading-none ba b--black-20 code">{key}: {value}</span>
-          ))}
-        </div>
+        {/* Collapsed view - show key inputs/outputs */}
+        {!isExpanded && Object.keys(inputs).length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {Object.entries(inputs).slice(0, 3).map(([key, value]) => (
+              <span key={key} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded-full border">
+                {key}: {value}
+              </span>
+            ))}
+            {Object.keys(inputs).length > 3 && (
+              <span className="text-xs text-gray-500">+{Object.keys(inputs).length - 3} more</span>
+            )}
+          </div>
+        )}
          
-          {isExpanded && (
-            <div className="pt2">
-              
-                <div className="flex items-center text-sm">
-                    <img src={""} width={16} className="mr1"/>
-                    <span className="mr1 b hidden">Pipeline</span>
-                    <a href="#" className="link dark-indigo underline">Semaphore project/Pipeline name</a>
-                  </div>
-                <div className="flex">
-                  
-                  <div className="flex items-center mt1">
-                  <i className="hidden material-symbols-outlined mr1 text-sm">timer</i>
-                    <div className="text-sm">
-                      <div className="flex items-center">
-                        <div className="flex items-center">
-                          <i className="material-symbols-outlined text-sm gray mr1">nest_clock_farsight_analog</i> Jan 16, 2022 10:23:45
-                          <div className='flex items-center ml3'><i className="material-symbols-outlined text-sm mid-gray mr1">hourglass_bottom</i> 00h 00m 25s</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              <div className="flex justify-between mt-2">
-                <div className='w-1/2'>
-                  <div className="flex items-start"> 
-                    <i className="material-symbols-outlined leading-1.2 mr1 f4">input</i>
-                    <div className="text-sm">
-                    <div className='mb1 ttu'>Inputs</div>
-                      <div className="flex items-center code text-xs">
-                        <div className='gray'>
-                          {Object.keys(inputs).map((key, index) => (
-                            <div key={key} className={index % 2 === 1 ? 'bg-black-05' : ''}>{key}</div>
-                          ))}
-                        </div>
-                        <div className=''>
-                          {Object.values(inputs).map((value, index) => (
-                            <div key={index} className={`pl2 ${index % 2 === 1 ? 'bg-black-05' : ''}`}>{value}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                
-                </div>
-        
-                <div className={`w-1/2 bl br--black-075 pl3 ${status.toLowerCase() === 'passed' ? 'flex' :  'hidden'}`}>
-                  <div className="flex items-start"> 
-                    <i className="material-symbols-outlined mr1 text-sm">output</i>
-                    <div className="text-sm">
-                    <div className='mb1 ttu'>Outputs</div>
-                      <div className="flex items-center code text-xs">
-                        <div className='gray'>
-                          {Object.keys(outputs).map((key, index) => (
-                            <div key={key} className={index % 2 === 1 ? 'bg-black-05' : ''}>{key}</div>
-                          ))}
-                        </div>
-                        <div className=''>
-                          {Object.values(outputs).map((value, index) => (
-                            <div key={index} className={`pl2 ${index % 2 === 1 ? 'bg-black-05' : ''}`}>{value}</div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-            </div>
-              <div className='flex hidden'>
-                <div className="flex items-start"> 
-                    <i className="material-symbols-outlined mr1 text-sm">timer</i>
-                    <div className="text-sm">
-                    <div className='mb1 ttu'>Execution details</div>
-                      <div className="flex items-center">
-                        <div className='gray'>
-                          <div>Date</div>
-                          <div>Started</div>
-                          <div>Finished</div>
-                          <div>Duration</div>
-                        </div>
-                        <div className='ml2'>
-                          <div>Jan 16, 2022</div>
-                          <div>10:23:45</div>
-                          <div>10:23:45</div>
-                          <div>00h 00m 25s</div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+        {/* Expanded view */}
+        {isExpanded && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center space-x-4 text-sm text-gray-600">
+              <div className="flex items-center">
+                <span className="material-symbols-outlined text-sm mr-1">schedule</span>
+                {new Date(timestamp).toLocaleDateString()}
+              </div>
+              <div className="flex items-center">
+                <span className="material-symbols-outlined text-sm mr-1">timer</span>
+                Duration info
               </div>
             </div>
-          )}
-        </div>
-        </div>
-        </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Inputs Section */}
+              {Object.keys(inputs).length > 0 && (
+                <div>
+                  <div className="flex items-center mb-2">
+                    <span className="material-symbols-outlined text-sm mr-2 text-gray-600">input</span>
+                    <span className="text-sm font-medium text-gray-900 uppercase tracking-wide">Inputs</span>
+                  </div>
+                  <div className="space-y-1">
+                    {Object.entries(inputs).map(([key, value]) => (
+                      <div key={key} className="flex justify-between py-1 px-2 bg-gray-50 rounded text-sm font-mono">
+                        <span className="text-gray-600">{key}</span>
+                        <span className="text-gray-900">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+        
+              {/* Outputs Section */}
+              {Object.keys(outputs).length > 0 && (
+                <div className="border-l border-gray-200 pl-4">
+                  <div className="flex items-center mb-2">
+                    <span className="material-symbols-outlined text-sm mr-2 text-gray-600">output</span>
+                    <span className="text-sm font-medium text-gray-900 uppercase tracking-wide">Outputs</span>
+                  </div>
+                  <div className="space-y-1">
+                    {Object.entries(outputs).map(([key, value]) => (
+                      <div key={key} className="flex justify-between py-1 px-2 bg-gray-50 rounded text-sm font-mono">
+                        <span className="text-gray-600">{key}</span>
+                        <span className="text-gray-900">{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+     </div>
     </div>
   );
 });
