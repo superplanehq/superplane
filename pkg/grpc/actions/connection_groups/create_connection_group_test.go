@@ -43,8 +43,8 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		_, err := CreateConnectionGroup(context.Background(), req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "invalid UUID")
+		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Contains(t, s.Message(), "user not authenticated")
 	})
 
 	t.Run("connection group with no name -> error", func(t *testing.T) {
@@ -107,7 +107,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "spec.GroupBy fields cannot be empty", s.Message())
+		assert.Equal(t, "connection group must have at least one field to group by", s.Message())
 	})
 
 	t.Run("valid connection group is created", func(t *testing.T) {

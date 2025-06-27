@@ -240,10 +240,8 @@ var createCmd = &cobra.Command{
 			err = yaml.Unmarshal(data, &connectionGroup)
 			Check(err)
 
-			requesterId := uuid.NewString()
 			body := openapi_client.SuperplaneCreateConnectionGroupBody{
 				ConnectionGroup: &connectionGroup,
-				RequesterId:     &requesterId,
 			}
 
 			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneCreateConnectionGroup(context.Background(), canvasID).
