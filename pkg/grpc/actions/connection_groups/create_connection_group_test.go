@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -17,19 +18,19 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: uuid.NewString(),
-			RequesterId:    uuid.NewString(),
 		}
 
-		_, err := CreateConnectionGroup(context.Background(), req)
+		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "canvas not found", s.Message())
 	})
 
-	t.Run("missing requester ID", func(t *testing.T) {
+	t.Run("no user ID in context -> error", func(t *testing.T) {
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			ConnectionGroup: &protos.ConnectionGroup{
@@ -47,15 +48,15 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no name -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{},
 			},
 		}
 
-		_, err := CreateConnectionGroup(context.Background(), req)
+		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -63,9 +64,9 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no connections -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
 					Name: "test",
@@ -76,7 +77,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 			},
 		}
 
-		_, err := CreateConnectionGroup(context.Background(), req)
+		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -84,9 +85,9 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no group by fields -> error", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
 					Name: "test",
@@ -102,7 +103,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 			},
 		}
 
-		_, err := CreateConnectionGroup(context.Background(), req)
+		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -110,9 +111,9 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("valid connection group is created", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
 					Name: "test",
@@ -130,7 +131,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 			},
 		}
 
-		response, err := CreateConnectionGroup(context.Background(), req)
+		response, err := CreateConnectionGroup(ctx, req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.ConnectionGroup)
@@ -142,9 +143,9 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("name already used", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
 					Name: "test",
@@ -162,7 +163,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 			},
 		}
 
-		_, err := CreateConnectionGroup(context.Background(), req)
+		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

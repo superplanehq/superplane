@@ -2233,9 +2233,6 @@
       "properties": {
         "connectionGroup": {
           "$ref": "#/definitions/SuperplaneConnectionGroup"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },

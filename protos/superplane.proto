@@ -428,8 +428,7 @@ message DescribeEventSourceResponse {
 
 message CreateConnectionGroupRequest {
   ConnectionGroup connection_group = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message CreateConnectionGroupResponse {

@@ -271,6 +271,7 @@ export type SuperplaneConnectionGroupFieldSet = {
     hash?: string;
     state?: SuperplaneConnectionGroupFieldSetState;
     events?: Array<SuperplaneConnectionGroupEvent>;
+    createdAt?: string;
 };
 
 export type SuperplaneConnectionGroupFieldSetState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_PROCESSED';
@@ -301,7 +302,6 @@ export type SuperplaneCreateCanvasResponse = {
 
 export type SuperplaneCreateConnectionGroupBody = {
     connectionGroup?: SuperplaneConnectionGroup;
-    requesterId?: string;
 };
 
 export type SuperplaneCreateConnectionGroupResponse = {
