@@ -16,7 +16,10 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.4",
     "@types/node": "^24.0.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.19.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
