@@ -11,7 +11,6 @@ export const HistoryTab = ({ allExecutions }: HistoryTabProps) => {
       <div className="mb-8">
         <ExecutionTimeline 
           executions={allExecutions} 
-          title="Execution Timeline"
         />
       </div>
     </div>

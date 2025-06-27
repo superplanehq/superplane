@@ -3,19 +3,17 @@ import React, { JSX } from 'react';
 interface RunItemProps {
   status: string;
   title: string;
-  imageVersion: string;
-  extraTags?: string;
+  inputs: Record<string, string>;
+  outputs: Record<string, string>;
   timestamp: string;
-  isHightlighted?: boolean;
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({ 
   status, 
   title, 
-  imageVersion, 
-  extraTags, 
+  inputs, 
+  outputs,
   timestamp, 
-  isHightlighted = false 
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
 
@@ -39,8 +37,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   };
 
   const getBackgroundClass = (): string => {
-    if (!isHightlighted) return '';
-    
     switch (status.toLowerCase()) {
       case 'passed':
         return 'bg-washed-green b--green';
@@ -78,11 +74,10 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         
         <div className="flex items-start">
         <div className={`flex items-center pt1 ${isExpanded ? "hidden" : "flex"}`}>
-              <span className="bg-black-10 black text-xs px-1 py-1 br2 mr2 leading-none ba b--black-20 code">image: {imageVersion}</span>
-              {extraTags && (
-                <span className="text-xs px-2 py-1 mr2">{extraTags}</span>
-              )}
-            </div>
+          {Object.entries(inputs).slice(0, 3).map(([key, value]) => (
+            <span key={key} className="bg-black-10 black text-xs px-1 py-1 br2 mr2 leading-none ba b--black-20 code">{key}: {value}</span>
+          ))}
+        </div>
          
           {isExpanded && (
             <div className="pt2">
@@ -114,16 +109,14 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                     <div className='mb1 ttu'>Inputs</div>
                       <div className="flex items-center code text-xs">
                         <div className='gray'>
-                          <div>Code</div>
-                          <div className='bg-black-05'>Image</div>
-                          <div>Terraform</div>
-                          <div>Something</div>
+                          {Object.keys(inputs).map((key, index) => (
+                            <div key={key} className={index % 2 === 1 ? 'bg-black-05' : ''}>{key}</div>
+                          ))}
                         </div>
                         <div className=''>
-                          <div className='pl2'>1045a77</div>
-                          <div className='bg-black-05 pl2'>{imageVersion}</div>
-                          <div className='pl2'>32.32</div>
-                          <div className='pl2'>adsfasdf</div>
+                          {Object.values(inputs).map((value, index) => (
+                            <div key={index} className={`pl2 ${index % 2 === 1 ? 'bg-black-05' : ''}`}>{value}</div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -138,16 +131,14 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
                     <div className='mb1 ttu'>Outputs</div>
                       <div className="flex items-center code text-xs">
                         <div className='gray'>
-                          <div>Code</div>
-                          <div className='bg-black-05'>Image</div>
-                          <div>Terraform</div>
-                          <div>Something</div>
+                          {Object.keys(outputs).map((key, index) => (
+                            <div key={key} className={index % 2 === 1 ? 'bg-black-05' : ''}>{key}</div>
+                          ))}
                         </div>
                         <div className=''>
-                          <div className='pl2'>1045a77</div>
-                          <div className='bg-black-05 pl2'>{imageVersion}</div>
-                          <div className='pl2'>32.32</div>
-                          <div className='pl2'>adsfasdf</div>
+                          {Object.values(outputs).map((value, index) => (
+                            <div key={index} className={`pl2 ${index % 2 === 1 ? 'bg-black-05' : ''}`}>{value}</div>
+                          ))}
                         </div>
                       </div>
                     </div>

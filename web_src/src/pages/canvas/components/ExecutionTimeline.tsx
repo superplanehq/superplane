@@ -1,4 +1,4 @@
-import { SuperplaneExecution } from "@/api-client";
+import { SuperplaneExecution, SuperplaneInputValue, SuperplaneOutputValue } from "@/api-client";
 import { RunItem } from "./tabs/RunItem";
 
 interface ExecutionTimelineProps {
@@ -21,9 +21,29 @@ export const ExecutionTimeline = ({
     );
   }
 
+  const generateKeyValueMap = (keyValues: SuperplaneOutputValue[] | SuperplaneInputValue[] | undefined) => {
+    if (!keyValues) {
+      return {};
+    }
+
+    const map: Record<string, string> = {};
+    keyValues.forEach((keyValue) => {
+      if (!keyValue.value) {
+        return;
+      }
+
+      map[keyValue.name!] = keyValue.value;
+    });
+    return map;
+  };
+
   return (
     <>
-      <RunItem title="123fdsdsf" imageVersion="123" status="123" timestamp="123" extraTags="123" isHightlighted />
+      {
+        executions.map((execution) => (
+          <RunItem key={execution.id!} title={'Execution'} inputs={{}} outputs={generateKeyValueMap(execution.outputs)} status={execution.state || 'Unknown'} timestamp={execution.createdAt || 'Unknown'} />
+        ))
+      }
     </>
   );
 };
