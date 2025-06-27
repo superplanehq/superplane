@@ -13,6 +13,7 @@ package openapi_client
 
 import (
 	"encoding/json"
+	"time"
 )
 
 // checks if the SuperplaneConnectionGroupFieldSet type satisfies the MappedNullable interface at compile time
@@ -25,6 +26,7 @@ type SuperplaneConnectionGroupFieldSet struct {
 	Hash *string `json:"hash,omitempty"`
 	State *SuperplaneConnectionGroupFieldSetState `json:"state,omitempty"`
 	Events []SuperplaneConnectionGroupEvent `json:"events,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
 
 // NewSuperplaneConnectionGroupFieldSet instantiates a new SuperplaneConnectionGroupFieldSet object
@@ -208,6 +210,38 @@ func (o *SuperplaneConnectionGroupFieldSet) SetEvents(v []SuperplaneConnectionGr
 	o.Events = v
 }
 
+// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupFieldSet) GetCreatedAt() time.Time {
+	if o == nil || IsNil(o.CreatedAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.CreatedAt
+}
+
+// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupFieldSet) GetCreatedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.CreatedAt) {
+		return nil, false
+	}
+	return o.CreatedAt, true
+}
+
+// HasCreatedAt returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupFieldSet) HasCreatedAt() bool {
+	if o != nil && !IsNil(o.CreatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
+func (o *SuperplaneConnectionGroupFieldSet) SetCreatedAt(v time.Time) {
+	o.CreatedAt = &v
+}
+
 func (o SuperplaneConnectionGroupFieldSet) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -232,6 +266,9 @@ func (o SuperplaneConnectionGroupFieldSet) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.Events) {
 		toSerialize["events"] = o.Events
+	}
+	if !IsNil(o.CreatedAt) {
+		toSerialize["createdAt"] = o.CreatedAt
 	}
 	return toSerialize, nil
 }

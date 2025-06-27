@@ -250,7 +250,7 @@ var listStageEventsCmd = &cobra.Command{
 	},
 }
 
-var listConnectionGroupEventsCmd = &cobra.Command{
+var listConnectionGroupFieldSetsCmd = &cobra.Command{
 	Use:   "connection-group-field-sets",
 	Short: "List connection group field sets",
 	Long:  `List all the field sets for a specific connection group`,
@@ -276,7 +276,7 @@ var listConnectionGroupEventsCmd = &cobra.Command{
 			fmt.Printf("%d. Fields: %s (%s)\n", i+1, fieldsAsString(fieldSet.Fields), *fieldSet.Hash)
 
 			fmt.Printf("   State: %s\n", *fieldSet.State)
-			// fmt.Printf("    Created: %s\n", *fieldSet.CreatedAt)
+			fmt.Printf("    Created: %s\n", *fieldSet.CreatedAt)
 
 			if len(fieldSet.Events) > 0 {
 				fmt.Println("   Events:")
@@ -340,11 +340,11 @@ func init() {
 	listStageEventsCmd.Flags().String("stage-name", "", "Stage name")
 
 	// Connection group events command
-	listCmd.AddCommand(listConnectionGroupEventsCmd)
-	listConnectionGroupEventsCmd.Flags().String("canvas-id", "", "Canvas ID")
-	listConnectionGroupEventsCmd.Flags().String("canvas-name", "", "Canvas name")
-	listConnectionGroupEventsCmd.Flags().String("connection-group-id", "", "Connection group ID")
-	listConnectionGroupEventsCmd.Flags().String("connection-group-name", "", "Connection group name")
+	listCmd.AddCommand(listConnectionGroupFieldSetsCmd)
+	listConnectionGroupFieldSetsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listConnectionGroupFieldSetsCmd.Flags().String("canvas-name", "", "Canvas name")
+	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-id", "", "Connection group ID")
+	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-name", "", "Connection group name")
 }
 
 func fieldsAsString(fields []openapi_client.SuperplaneKeyValuePair) string {

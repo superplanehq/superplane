@@ -78,10 +78,11 @@ func serializeConnectionGroupFieldSets(in []models.ConnectionGroupFieldSet) ([]*
 // TODO: very inefficient way of querying the events for the field set that we should fix later
 func serializeConnectionGroupFieldSet(in models.ConnectionGroupFieldSet) (*pb.ConnectionGroupFieldSet, error) {
 	fieldSet := pb.ConnectionGroupFieldSet{
-		Id:     in.ID.String(),
-		Fields: []*pb.KeyValuePair{},
-		Hash:   in.FieldSetHash,
-		State:  fieldSetStateToProto(in.State),
+		Id:        in.ID.String(),
+		Fields:    []*pb.KeyValuePair{},
+		Hash:      in.FieldSetHash,
+		State:     fieldSetStateToProto(in.State),
+		CreatedAt: timestamppb.New(*in.CreatedAt),
 	}
 
 	for k, v := range in.FieldSet.Data() {

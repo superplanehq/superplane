@@ -2147,6 +2147,10 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneConnectionGroupEvent"
           }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },

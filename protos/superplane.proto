@@ -709,6 +709,7 @@ message ConnectionGroupFieldSet {
   string hash = 3;
   State state = 4;
   repeated ConnectionGroupEvent events = 5;
+  google.protobuf.Timestamp created_at = 6;
 }
 
 message ConnectionGroupEvent {
