@@ -50,7 +50,7 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 }
 
 func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) (bool, error) {
-	allConnections, err := ListConnectionIDsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
+	allConnections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
 	if err != nil {
 		return false, fmt.Errorf("error listing connections: %v", err)
 	}
@@ -62,11 +62,14 @@ func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupField
 
 	fields := fieldSet.FieldSet.Data()
 	if len(missing) > 0 {
-		log.Infof("Connection group %s has missing connections for %v: %v", g.Name, fields, missing)
+		log.Infof("Connection group %s has missing connections for field set %s - %v: %v",
+			g.Name, fieldSet.ID.String(), fields, sourceNamesFromConnections(missing),
+		)
+
 		return false, nil
 	}
 
-	log.Infof("All connections received for group %s and field set %v", g.Name, fields)
+	log.Infof("All connections received for group %s and field set %s - %v", g.Name, fieldSet.ID.String(), fields)
 	return true, nil
 }
 
@@ -103,11 +106,12 @@ func (g *ConnectionGroup) ListFieldSetsInTransaction(tx *gorm.DB) ([]ConnectionG
 	return fieldSets, nil
 }
 
-func (g *ConnectionGroup) FindFieldSetByHash(tx *gorm.DB, hash string) (*ConnectionGroupFieldSet, error) {
+func (g *ConnectionGroup) FindPendingFieldSetByHash(tx *gorm.DB, hash string) (*ConnectionGroupFieldSet, error) {
 	var fieldSet *ConnectionGroupFieldSet
 	err := tx.
 		Where("connection_group_id = ?", g.ID).
 		Where("field_set_hash = ?", hash).
+		Where("state = ?", ConnectionGroupFieldSetStatePending).
 		First(&fieldSet).
 		Error
 
@@ -118,14 +122,15 @@ func (g *ConnectionGroup) FindFieldSetByHash(tx *gorm.DB, hash string) (*Connect
 	return fieldSet, nil
 }
 
-func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSetHash string) ([]string, error) {
+func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) ([]string, error) {
 	var connections []string
 	err := tx.
 		Table("connection_group_field_set_events AS e").
 		Joins("JOIN connection_group_field_sets AS f ON f.id = e.connection_group_set_id").
 		Select("e.source_id").
 		Where("f.connection_group_id = ?", g.ID).
-		Where("f.field_set_hash = ?", fieldSetHash).
+		Where("f.id = ?", fieldSet.ID).
+		Where("f.field_set_hash = ?", fieldSet.FieldSetHash).
 		Find(&connections).
 		Error
 
@@ -206,4 +211,12 @@ func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error
 	}
 
 	return connectionGroup, nil
+}
+
+func sourceNamesFromConnections(connections []Connection) []string {
+	sourceNames := []string{}
+	for _, connection := range connections {
+		sourceNames = append(sourceNames, connection.SourceName)
+	}
+	return sourceNames
 }

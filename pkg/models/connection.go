@@ -160,23 +160,3 @@ func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType st
 
 	return connections, nil
 }
-
-func ListConnectionIDs(targetID uuid.UUID, targetType string) ([]Connection, error) {
-	return ListConnectionsInTransaction(database.Conn(), targetID, targetType)
-}
-
-func ListConnectionIDsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType string) ([]string, error) {
-	var connectionIDs []string
-	err := tx.
-		Select("source_id").
-		Where("target_id = ?", targetID).
-		Where("target_type = ?", targetType).
-		Find(&connectionIDs).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return connectionIDs, nil
-}

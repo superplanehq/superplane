@@ -161,6 +161,68 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.False(t, shouldEmit)
 	})
 
+	t.Run("new field set with same hash", func(t *testing.T) {
+		connectionGroup, err := canvas.CreateConnectionGroup(
+			"group1",
+			uuid.NewString(),
+			[]Connection{
+				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
+				{SourceID: source2.ID, SourceName: source2.Name, SourceType: SourceTypeEventSource},
+			},
+			ConnectionGroupSpec{
+				GroupBy: &ConnectionGroupBySpec{
+					Fields: []ConnectionGroupByField{
+						{Name: "version", Expression: "ref"},
+					},
+				},
+			},
+		)
+
+		require.NoError(t, err)
+
+		//
+		// Create version=v1 event for source1 and source2
+		//
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		require.NoError(t, err)
+		fields := map[string]string{"version": "v1"}
+		hash, _ := crypto.SHA256ForMap(fields)
+		fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
+		require.NoError(t, err)
+		_, err = fieldSet.AttachEvent(database.Conn(), event)
+		require.NoError(t, err)
+		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		require.NoError(t, err)
+		_, err = fieldSet.AttachEvent(database.Conn(), event)
+		require.NoError(t, err)
+
+		//
+		// Verify that we should emit for the version=v1 field set,
+		// and move the field set to processed - simulating what the worker does in that case.
+		//
+		shouldEmit, err := connectionGroup.ShouldEmit(database.Conn(), fieldSet)
+		require.NoError(t, err)
+		require.True(t, shouldEmit)
+		require.NoError(t, fieldSet.UpdateState(database.Conn(), ConnectionGroupFieldSetStateProcessed))
+
+		//
+		// Now, we send a new version=v1 event for source1 only.
+		//
+		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		require.NoError(t, err)
+		newFieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
+		require.NoError(t, err)
+		_, err = newFieldSet.AttachEvent(database.Conn(), event)
+		require.NoError(t, err)
+
+		//
+		// Verify we shouldn't emit anything for it yet.
+		//
+		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), newFieldSet)
+		require.NoError(t, err)
+		require.False(t, shouldEmit)
+	})
+
 	t.Run("multiple fields", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"multiple-fields-group",

@@ -171,7 +171,7 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	}
 
 	//
-	// Calculate field set for event, and check if field set record already exists.
+	// Calculate field set for event, and check if pending record for it exists.
 	// If it doesn't, create it, and attach the event to it.
 	//
 	fields, hash, err := connectionGroup.CalculateFieldSet(event)
@@ -179,7 +179,7 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 		return err
 	}
 
-	fieldSet, err := connectionGroup.FindFieldSetByHash(tx, hash)
+	fieldSet, err := connectionGroup.FindPendingFieldSetByHash(tx, hash)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			fieldSet, err = connectionGroup.CreateFieldSet(tx, fields, hash)

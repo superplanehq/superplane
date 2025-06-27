@@ -145,16 +145,16 @@ func (s *ConnectionGroupFieldSet) AttachEvent(tx *gorm.DB, event *Event) (*Conne
 	return &connectionGroupEvent, nil
 }
 
-func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup, allConnections []string) ([]string, error) {
-	connectionsForFieldSet, err := g.FindConnectionsForFieldSet(tx, s.FieldSetHash)
+func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup, allConnections []Connection) ([]Connection, error) {
+	connectionsForFieldSet, err := g.FindConnectionsForFieldSet(tx, s)
 	if err != nil {
-		return nil, fmt.Errorf("error finding connections for field set %v: %v", s.FieldSet.Data(), err)
+		return nil, fmt.Errorf("error finding connections for field set %s - %v: %v", s.ID.String(), s.FieldSet.Data(), err)
 	}
 
-	missing := []string{}
-	for _, connID := range allConnections {
-		if !slices.Contains(connectionsForFieldSet, connID) {
-			missing = append(missing, connID)
+	missing := []Connection{}
+	for _, connection := range allConnections {
+		if !slices.Contains(connectionsForFieldSet, connection.SourceID.String()) {
+			missing = append(missing, connection)
 		}
 	}
 
