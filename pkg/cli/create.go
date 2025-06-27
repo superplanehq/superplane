@@ -38,7 +38,6 @@ var createCmd = &cobra.Command{
 			err = yaml.Unmarshal(data, &yamlData)
 			Check(err)
 
-			// Extract the name and requesterID from the YAML
 			metadata, ok := yamlData["metadata"].(map[string]any)
 			if !ok {
 				Fail("Invalid Canvas YAML: metadata section missing")
@@ -47,6 +46,11 @@ var createCmd = &cobra.Command{
 			name, ok := metadata["name"].(string)
 			if !ok {
 				Fail("Invalid Canvas YAML: name field missing")
+			}
+
+			organizationId, ok := metadata["organizationId"].(string)
+			if !ok {
+				Fail("Invalid Canvas YAML: organizationId field missing")
 			}
 
 			// Create the canvas request
@@ -61,9 +65,8 @@ var createCmd = &cobra.Command{
 			// Set canvas in request
 			request.SetCanvas(*canvas)
 
-			// Set requester ID
-			requesterId := uuid.NewString()
-			request.SetRequesterId(requesterId)
+			// Set organization ID
+			request.SetOrganizationId(organizationId)
 
 			response, _, err := c.CanvasAPI.SuperplaneCreateCanvas(context.Background()).Body(*request).Execute()
 			Check(err)

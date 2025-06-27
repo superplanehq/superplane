@@ -1,0 +1,47 @@
+.c-loading-placeholder {
+    position: relative;
+    overflow: hidden;
+}
+
+/* Thickness of the rows */
+.c-loading-placeholder-thin {
+    min-height: 400px;
+    background: linear-gradient(to bottom, var(--lightest-gray),var(--lightest-gray) 50%, white 50%,white );
+    background-size: 100% 26px;
+}
+
+.c-loading-placeholder-thick {
+    min-height: 500px;
+    background: linear-gradient(to bottom, var(--lightest-gray),var(--lightest-gray) 90%, white 90%,white );
+    background-size: 100% 150px;
+}
+
+.c-loading-placeholder:after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    animation: loading-placeholder-flash 0.75s linear infinite;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0) 30%, rgba(255, 255, 255, 0.6) 50%, rgba(255, 255, 255, 0) 70%) 50% 50%;
+}
+
+.c-loading-placeholder:before {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1));
+}
+
+@keyframes loading-placeholder-flash {
+      0% { transform: translate3d(-50%, 0, 0); }
+    100% { transform: translate3d(100%, 0, 0); }
+}

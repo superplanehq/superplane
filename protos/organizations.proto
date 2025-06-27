@@ -1,0 +1,150 @@
+syntax = "proto3";
+
+package Superplane.Organizations;
+
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/organizations";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Organizations API";
+    version: "1.0";
+    description: "API for managing organizations in the Superplane service";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Organizations {
+  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organizations";
+      description: "Returns a list of all organizations ordered by display name";
+      tags: "Organization";
+    };
+  }
+
+  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new organization";
+      description: "Creates a new organization with the given name and display name";
+      tags: "Organization";
+    };
+  }
+
+  rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization details";
+      description: "Returns the details of a specific organization (can be referenced by ID or name)";
+      tags: "Organization";
+    };
+  }
+
+  rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/organizations/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update an organization";
+      description: "Updates the specified organization (can be referenced by ID or name)";
+      tags: "Organization";
+    };
+  }
+
+  rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/organizations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete an organization";
+      description: "Deletes the specified organization (can be referenced by ID or name)";
+      tags: "Organization";
+    };
+  }
+}
+
+message Organization {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string display_name = 3;
+    string created_by = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+  }
+
+  Metadata metadata = 1;
+}
+
+message ListOrganizationsRequest {}
+
+message ListOrganizationsResponse {
+  repeated Organization organizations = 1;
+}
+
+message CreateOrganizationRequest {
+  Organization organization = 1;
+}
+
+message CreateOrganizationResponse {
+  Organization organization = 1;
+}
+
+message DescribeOrganizationRequest {
+  string id_or_name = 1;
+}
+
+message DescribeOrganizationResponse {
+  Organization organization = 1;
+}
+
+message UpdateOrganizationRequest {
+  Organization organization = 1;
+  string id_or_name = 2;
+}
+
+message UpdateOrganizationResponse {
+  Organization organization = 1;
+}
+
+message DeleteOrganizationRequest {
+  string id_or_name = 1;
+}
+
+message DeleteOrganizationResponse {}
+
+// Event messages for organization lifecycle events
+message OrganizationCreated {
+  string organization_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message OrganizationUpdated {
+  string organization_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}
+
+message OrganizationDeleted {
+  string organization_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}

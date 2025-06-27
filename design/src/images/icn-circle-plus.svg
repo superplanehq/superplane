@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="15px" height="15px" viewBox="0 0 15 15" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 55.1 (78136) - https://sketchapp.com -->
+    <title>icn-circle-plus</title>
+    <desc>Created with Sketch.</desc>
+    <g id="icn-circle-plus" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <circle id="Oval" stroke="#273132" cx="7.5" cy="7.5" r="7"></circle>
+        <rect id="Rectangle" fill="#273132" x="7" y="4" width="1" height="7"></rect>
+        <rect id="Rectangle-Copy-32" fill="#273132" x="4" y="7" width="7" height="1"></rect>
+    </g>
+</svg>

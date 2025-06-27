@@ -5,6 +5,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
@@ -74,9 +75,9 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 	}
 }
 
-func startInternalAPI(encryptor crypto.Encryptor) {
+func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, 50051)
+	grpc.RunServer(encryptor, authService, 50051)
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, jwtSigner *jwt.Signer) {
@@ -159,6 +160,11 @@ func main() {
 		encryptorInstance = crypto.NewAESGCMEncryptor([]byte(encryptionKey))
 	}
 
+	authService, err := authorization.NewAuthService()
+	if err != nil {
+		log.Fatalf("failed to create auth service: %v", err)
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		panic("JWT_SECRET must be set")
@@ -171,7 +177,7 @@ func main() {
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(encryptorInstance)
+		go startInternalAPI(encryptorInstance, authService)
 	}
 
 	startWorkers(jwtSigner, encryptorInstance)

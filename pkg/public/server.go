@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
@@ -114,7 +115,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	ctx := context.Background()
 
 	grpcGatewayMux := runtime.NewServeMux(
-		runtime.WithIncomingHeaderMatcher(runtime.DefaultHeaderMatcher),
+		runtime.WithIncomingHeaderMatcher(headersMatcher),
 	)
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
@@ -129,27 +130,60 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbOrg.RegisterOrganizationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	// Public health check
 	s.Router.HandleFunc("/api/v1/canvases/is-alive", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
 	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.Middleware(s.grpcGatewayHandler(grpcGatewayMux))
+	protectedGRPCHandler := s.authHandler.Middleware(
+		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
+	)
 
 	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 
 	return nil
 }
 
+// stripUserIDHeaderHandler removes the X-User-Id header from the request before we set it manually
+func (s *Server) stripUserIDHeaderHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Header.Del("X-User-Id")
+		r.Header.Del("x-user-id")
+		next.ServeHTTP(w, r)
+	})
+}
+
+func headersMatcher(key string) (string, bool) {
+	switch key {
+	case "X-User-Id":
+		return key, true
+	default:
+		return runtime.DefaultHeaderMatcher(key)
+	}
+}
+
 func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := authentication.GetUserFromContext(r.Context())
+		if !ok {
+			http.Error(w, "User not found in context", http.StatusUnauthorized)
+			return
+		}
+
 		r2 := new(http.Request)
 		*r2 = *r
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
-		grpcGatewayMux.ServeHTTP(w, r2)
+		r2.Header.Set("x-user-id", user.ID.String())
+		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
 

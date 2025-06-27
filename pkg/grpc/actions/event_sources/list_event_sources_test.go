@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,7 +26,10 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("no event sources -> empty list", func(t *testing.T) {
-		canvas, err := models.CreateCanvas(r.User, "empty-canvas")
+		org, err := models.CreateOrganization(uuid.New(), "test", "test")
+		require.NoError(t, err)
+
+		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas")
 		require.NoError(t, err)
 
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{

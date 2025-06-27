@@ -12,7 +12,7 @@ import (
 )
 
 func Test_DescribeRole(t *testing.T) {
-	authService := setupTestAuthService(t)
+	authService := SetupTestAuthService(t)
 	ctx := context.Background()
 
 	orgID := uuid.New().String()
@@ -32,8 +32,8 @@ func Test_DescribeRole(t *testing.T) {
 		assert.NotNil(t, resp.Role.InheritedRole)
 		assert.Equal(t, authorization.RoleOrgAdmin, resp.Role.Name)
 		assert.Equal(t, authorization.RoleOrgViewer, resp.Role.InheritedRole.Name)
-		assert.Len(t, resp.Role.Permissions, 6)
-		assert.Len(t, resp.Role.InheritedRole.Permissions, 1)
+		assert.Len(t, resp.Role.Permissions, 14)
+		assert.Len(t, resp.Role.InheritedRole.Permissions, 2)
 	})
 
 	t.Run("invalid request - missing domain ID", func(t *testing.T) {

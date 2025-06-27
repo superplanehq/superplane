@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
@@ -15,19 +16,21 @@ import (
 )
 
 type SuperplaneService struct {
-	encryptor     crypto.Encryptor
-	specValidator executors.SpecValidator
+	encryptor            crypto.Encryptor
+	specValidator        executors.SpecValidator
+	authorizationService authorization.Authorization
 }
 
-func NewSuperplaneService(encryptor crypto.Encryptor) *SuperplaneService {
+func NewSuperplaneService(encryptor crypto.Encryptor, authService authorization.Authorization) *SuperplaneService {
 	return &SuperplaneService{
-		encryptor:     encryptor,
-		specValidator: executors.SpecValidator{},
+		encryptor:            encryptor,
+		specValidator:        executors.SpecValidator{},
+		authorizationService: authService,
 	}
 }
 
 func (s *SuperplaneService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
-	return canvases.CreateCanvas(ctx, req)
+	return canvases.CreateCanvas(ctx, req, s.authorizationService)
 }
 
 func (s *SuperplaneService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
@@ -67,7 +70,7 @@ func (s *SuperplaneService) ListStages(ctx context.Context, req *pb.ListStagesRe
 }
 
 func (s *SuperplaneService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
-	return canvases.ListCanvases(ctx, req)
+	return canvases.ListCanvases(ctx, req, s.authorizationService)
 }
 
 func (s *SuperplaneService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {

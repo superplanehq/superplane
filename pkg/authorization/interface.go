@@ -28,6 +28,8 @@ type RoleManager interface {
 type AuthorizationSetup interface {
 	SetupOrganizationRoles(orgID string) error
 	SetupCanvasRoles(canvasID string) error
+	DestroyOrganizationRoles(orgID string) error
+	DestroyCanvasRoles(canvasID string) error
 	CreateOrganizationOwner(userID, orgID string) error
 }
 

@@ -1,0 +1,191 @@
+/*
+
+   SKINS
+   Docs: http://tachyons.io/docs/themes/skins/
+
+   Classes for setting foreground and background colors on elements.
+   If you haven't declared a border color, but set border on an element, it will
+   be set to the current text color.
+
+*/
+
+.black {              color: var(--black); }
+.white {              color: var(--white); }
+.transparent {        color: transparent;  }
+
+.bg-black {           background-color: var(--black); }
+.bg-white  {          background-color: var(--white); }
+.bg-transparent {     background-color: var(--transparent); }
+
+/* Grays */
+.dark-gray {          color: var(--dark-gray); }
+.dim-gray {           color: var(--dim-gray); }
+.gray {               color: var(--gray); }
+.mid-gray {           color: var(--mid-gray); }
+.light-gray {         color: var(--light-gray); }
+.lighter-gray {       color: var(--lighter-gray); }
+.lightest-gray {      color: var(--lightest-gray); }
+.washed-gray {        color: var(--washed-gray); }
+.near-white {         color: var(--near-white); }
+
+.bg-dark-gray {       background-color: var(--dark-gray); }
+.bg-dim-gray {        background-color: var(--dim-gray); }
+.bg-gray {            background-color: var(--gray); }
+.bg-mid-gray {        background-color: var(--mid-gray); }
+.bg-light-gray {      background-color: var(--light-gray); }
+.bg-lighter-gray {    background-color: var(--lighter-gray); }
+.bg-lightest-gray {   background-color: var(--lightest-gray); }
+.bg-washed-gray {     background-color: var(--washed-gray); }
+.bg-near-white {      background-color: var(--near-white); }
+
+/* Greens */
+.dark-green {         color: var(--dark-green); }
+.green {              color: var(--green); }
+.lightest-green {     color: var(--lightest-green); }
+
+.bg-dark-green {      background-color: var(--dark-green); }
+.bg-green {           background-color: var(--green); }
+.bg-lightest-green {  background-color: var(--lightest-green); }
+.bg-washed-green {    background-color: var(--washed-green); }
+
+.bg-flash-lightest-green {
+    animation: flash-bg-lightest-green 2s;
+}
+
+@keyframes flash-bg-lightest-green {
+    0%, 80% { background-color: var(--lightest-green); }
+    100%    { background-color: var(--transparent); }
+}
+
+.bg-flash-lightest-yellow {
+    animation: flash-bg-lightest-yellow 2s;
+}
+
+@keyframes flash-bg-lightest-yellow {
+    0%, 80% { background-color: var(--lightest-yellow); }
+    100%    { background-color: var(--transparent); }
+}
+
+/* Reds */
+.dark-red {           color: var(--dark-red); }
+.red {                color: var(--red); }
+.lightest-red {       color: var(--lightest-red); }
+
+.bg-dark-red {        background-color: var(--dark-red); }
+.bg-red {             background-color: var(--red); }
+.bg-lightest-red {    background-color: var(--lightest-red); }
+.bg-washed-red {      background-color: var(--washed-red); }
+
+/* Indigos */
+.dark-indigo {        color: var(--dark-indigo); }
+.indigo {             color: var(--indigo); }
+.lightest-indigo {    color: var(--lightest-indigo); }
+.washed-indigo {      color: var(--washed-indigo); }
+
+.bg-dark-indigo {     background-color: var(--dark-indigo); }
+.bg-indigo {          background-color: var(--indigo); }
+.bg-lightest-indigo { background-color: var(--lightest-indigo); }
+.bg-washed-indigo {   background-color: var(--washed-indigo); }
+
+/* Blues */
+.blue {               color: var(--blue); }
+.link-blue {          color: var(--link-blue); }
+
+.bg-link-blue {       background-color: var(--link-blue); }
+.bg-blue {            background-color: var(--blue); }
+
+.bg-lighter-blue {   background-color: var(--lighter-blue); }
+.bg-lightest-blue {   background-color: var(--lightest-blue); }
+.bg-washed-blue {     background-color: var(--washed-blue); }
+
+/* Purples */
+.dark-purple {        color: var(--dark-purple); }
+.purple {             color: var(--purple); }
+.lightest-purple {    color: var(--lightest-purple); }
+.washed-purple {      color: var(--washed-purple); }
+
+.bg-dark-purple {     background-color: var(--dark-purple); }
+.bg-purple {          background-color: var(--purple); }
+.bg-lightest-purple { background-color: var(--lightest-purple); }
+.bg-washed-purple {   background-color: var(--washed-purple); }
+
+/* Yellows */
+.yellow               { color: var(--yellow); }
+.lightest-yellow      { color: var(--lightest-yellow); }
+.washed-yellow        { color: var(--washed-yellow); }
+
+.bg-yellow            { background-color: var(--yellow); }
+.bg-lightest-yellow   { background-color: var(--lightest-yellow); }
+.bg-washed-yellow     { background-color: var(--washed-yellow); }
+
+/* Oranges */
+.dark-orange          { color: var(--dark-orange); }
+.orange               { color: var(--orange); }
+.lightest-orange      { color: var(--lightest-orange); }
+.washed-orange        { color: var(--washed-orange); }
+
+.bg-dark-orange       { background-color: var(--dark-orange); }
+.bg-orange            { background-color: var(--orange); }
+.bg-lightest-orange   { background-color: var(--lightest-orange); }
+.bg-washed-orange     { background-color: var(--washed-orange); }
+
+/* Browns */
+.dark-brown           { color: var(--dark-brown); }
+.lightest-brown       { color: var(--lightest-brown); }
+.washed-brown         { color: var(--washed-brown); }
+
+.bg-dark-brown        { background-color: var(--dark-brown); }
+.bg-lightest-brown    { background-color: var(--lightest-brown); }
+.bg-washed-brown      { background-color: var(--washed-brown); }
+
+
+/* Job special colors */
+.magenta              { color: var(--magenta); }
+.bg-magenta           { background-color: var(--magenta); }
+.cyan                 { color: var(--cyan); }
+.bg-cyan              { background-color: var(--cyan); }
+
+
+/* BW Shades */
+.black-90 {    color: var(--black-90); }
+.black-80 {    color: var(--black-80); }
+.black-70 {    color: var(--black-70); }
+.black-60 {    color: var(--black-60); }
+.black-50 {    color: var(--black-50); }
+.black-40 {    color: var(--black-40); }
+.black-30 {    color: var(--black-30); }
+.black-20 {    color: var(--black-20); }
+.black-10 {    color: var(--black-10); }
+.black-05 {    color: var(--black-05); }
+
+.white-90 {    color: var(--white-90); }
+.white-80 {    color: var(--white-80); }
+.white-70 {    color: var(--white-70); }
+.white-60 {    color: var(--white-60); }
+.white-50 {    color: var(--white-50); }
+.white-40 {    color: var(--white-40); }
+.white-30 {    color: var(--white-30); }
+.white-20 {    color: var(--white-20); }
+.white-10 {    color: var(--white-10); }
+
+.bg-black-90  { background-color: var(--black-90);  }
+.bg-black-80  { background-color: var(--black-80);  }
+.bg-black-70  { background-color: var(--black-70);  }
+.bg-black-60  { background-color: var(--black-60);  }
+.bg-black-50  { background-color: var(--black-50);  }
+.bg-black-40  { background-color: var(--black-40);  }
+.bg-black-30  { background-color: var(--black-30);  }
+.bg-black-20  { background-color: var(--black-20);  }
+.bg-black-10  { background-color: var(--black-10);  }
+.bg-black-05  { background-color: var(--black-05);  }
+.bg-black-025 { background-color: var(--black-025); }
+
+.bg-white-90  { background-color: var(--white-90);  }
+.bg-white-80  { background-color: var(--white-80);  }
+.bg-white-70  { background-color: var(--white-70);  }
+.bg-white-60  { background-color: var(--white-60);  }
+.bg-white-50  { background-color: var(--white-50);  }
+.bg-white-40  { background-color: var(--white-40);  }
+.bg-white-30  { background-color: var(--white-30);  }
+.bg-white-20  { background-color: var(--white-20);  }
+.bg-white-10  { background-color: var(--white-10);  }

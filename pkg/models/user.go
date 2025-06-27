@@ -43,9 +43,21 @@ func FindUserByID(id string) (*User, error) {
 	return &user, err
 }
 
+func FindUserByProviderId(providerId, provider string) (*User, error) {
+	var user User
+	err := database.Conn().
+		Joins("JOIN account_providers ON users.id = account_providers.user_id").
+		Where("account_providers.provider_id = ? AND account_providers.provider = ?", providerId, provider).
+		First(&user).Error
+	return &user, err
+}
+
 func FindUserByEmail(email string) (*User, error) {
 	var user User
-	err := database.Conn().Where("email = ?", email).First(&user).Error
+	err := database.Conn().
+		Joins("JOIN account_providers ON users.id = account_providers.user_id").
+		Where("account_providers.email = ? AND account_providers.email != '' AND account_providers.email IS NOT NULL", email).
+		First(&user).Error
 	return &user, err
 }
 

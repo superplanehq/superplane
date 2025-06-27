@@ -1,0 +1,7 @@
+/* Styling the help triggers in the header */
+
+@media (--breakpoint-medium) {
+    #quickReferenceMenu {
+        min-width: 360px;
+    }
+}

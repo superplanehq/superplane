@@ -7,7 +7,10 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,6 +19,11 @@ import (
 func Test__CreateCanvas(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	user := uuid.New()
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	ctx := authentication.SetUserIdInMetadata(context.Background(), user.String())
+	org, err := models.CreateOrganization(user, "test", "test")
+	require.NoError(t, err)
 
 	t.Run("name still not used -> canvas is created", func(t *testing.T) {
 		// Create a Canvas with nested metadata structure
@@ -25,10 +33,10 @@ func Test__CreateCanvas(t *testing.T) {
 			},
 		}
 
-		response, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
-			RequesterId: user.String(),
-			Canvas:      canvas,
-		})
+		response, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
+			Canvas:         canvas,
+			OrganizationId: org.ID.String(),
+		}, authService)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -46,10 +54,10 @@ func Test__CreateCanvas(t *testing.T) {
 			},
 		}
 
-		_, err := CreateCanvas(context.Background(), &protos.CreateCanvasRequest{
-			RequesterId: user.String(),
-			Canvas:      canvas,
-		})
+		_, err := CreateCanvas(ctx, &protos.CreateCanvasRequest{
+			Canvas:         canvas,
+			OrganizationId: org.ID.String(),
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)

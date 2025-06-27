@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="15px" height="15px" viewBox="0 0 15 15" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 55.1 (78136) - https://sketchapp.com -->
+    <title>icn-person</title>
+    <desc>Created with Sketch.</desc>
+    <g id="icn-person" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <rect id="Rectangle-Copy-112" stroke="#677278" x="4.5" y="1.5" width="6" height="6" rx="3"></rect>
+        <path d="M5.57499184,9.5 C4.00249184,9.5 2.55557913,10.3589353 1.80258415,11.7394261 C1.70720001,11.914297 1.65721879,12.1103064 1.65721879,12.3094997 C1.65721879,12.9669949 2.19022394,13.5 2.84771911,13.5 L12.1522809,13.5 C12.3514742,13.5 12.5474836,13.4500188 12.7223545,13.3546346 C13.2995666,13.0397917 13.5122588,12.3166382 13.1974158,11.7394261 C12.4444209,10.3589353 10.9975082,9.5 9.42500816,9.5 L5.57499184,9.5 Z" id="Rectangle-Copy-113" stroke="#677278"></path>
+    </g>
+</svg>

@@ -66,7 +66,7 @@ func convertDomainTypeToProto(domainType string) pbAuth.DomainType {
 	}
 }
 
-func setupTestAuthService(t *testing.T) authorization.Authorization {
+func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 	authService.EnableCache(false)
