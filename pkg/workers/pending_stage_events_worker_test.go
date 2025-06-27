@@ -27,7 +27,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -72,7 +72,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-1", r.User.String(), conditions, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -105,7 +105,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		conditions := []models.StageCondition{
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -158,7 +158,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window", r.User.String(), conditions, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -207,7 +207,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window-2", r.User.String(), conditions, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -250,7 +250,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,

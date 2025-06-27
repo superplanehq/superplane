@@ -9,11 +9,22 @@ import {
   SuperplaneCondition,
   SuperplaneConditionType,
   SuperplaneInputDefinition,
-  SuperplaneOutputDefinition
+  SuperplaneOutputDefinition,
+  SpecGroupBy
 } from "@/api-client/types.gen";
 
-export type AllNodeType = EventSourceNodeType | StageNodeType;
+export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
 export type EdgeType = Edge;
+
+// Connection group node
+export type ConnectionGroupNodeData = {
+  id: string;
+  name: string;
+  connections: SuperplaneConnection[];
+  groupBy: SpecGroupBy;
+}
+
+export type ConnectionGroupNodeType = Node<ConnectionGroupNodeData, 'connection_group'>;
 
 // Event source node
 export type EventSourceNodeData = {

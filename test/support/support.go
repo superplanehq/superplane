@@ -74,7 +74,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			r.User.String(),
 			conditions,
 			ExecutorSpec(),
-			[]models.StageConnection{
+			[]models.Connection{
 				{
 					SourceType: models.SourceTypeEventSource,
 					SourceID:   r.Source.ID,

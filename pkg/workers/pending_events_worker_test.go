@@ -37,7 +37,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -64,7 +64,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -137,7 +137,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -171,7 +171,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		firstStage, err := r.Canvas.FindStageByName("stage-3")
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
@@ -233,12 +233,12 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
 				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.StageConnectionFilter{
+				Filters: []models.ConnectionFilter{
 					{
 						Type: models.FilterTypeData,
 						Data: &models.DataFilter{
@@ -251,12 +251,12 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
 				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.StageConnectionFilter{
+				Filters: []models.ConnectionFilter{
 					{
 						Type: models.FilterTypeData,
 						Data: &models.DataFilter{

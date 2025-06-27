@@ -23,8 +23,12 @@ const (
 	EventStateDiscarded = "discarded"
 	EventStateProcessed = "processed"
 
-	SourceTypeEventSource = "event-source"
-	SourceTypeStage       = "stage"
+	SourceTypeEventSource     = "event-source"
+	SourceTypeStage           = "stage"
+	SourceTypeConnectionGroup = "connection-group"
+
+	ConnectionTargetTypeStage           = "stage"
+	ConnectionTargetTypeConnectionGroup = "connection-group"
 )
 
 type Event struct {

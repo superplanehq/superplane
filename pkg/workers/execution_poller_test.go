@@ -26,7 +26,7 @@ func Test__ExecutionPoller(t *testing.T) {
 
 	defer r.Close()
 
-	connections := []models.StageConnection{
+	connections := []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,
@@ -108,7 +108,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
 		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		err = r.Canvas.CreateStage("stage-with-output", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
+		err = r.Canvas.CreateStage("stage-with-output", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,

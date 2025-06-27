@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneInputValue type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneInputValue{}
+// checks if the SuperplaneKeyValuePair type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneKeyValuePair{}
 
-// SuperplaneInputValue struct for SuperplaneInputValue
-type SuperplaneInputValue struct {
+// SuperplaneKeyValuePair struct for SuperplaneKeyValuePair
+type SuperplaneKeyValuePair struct {
 	Name *string `json:"name,omitempty"`
 	Value *string `json:"value,omitempty"`
 }
 
-// NewSuperplaneInputValue instantiates a new SuperplaneInputValue object
+// NewSuperplaneKeyValuePair instantiates a new SuperplaneKeyValuePair object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneInputValue() *SuperplaneInputValue {
-	this := SuperplaneInputValue{}
+func NewSuperplaneKeyValuePair() *SuperplaneKeyValuePair {
+	this := SuperplaneKeyValuePair{}
 	return &this
 }
 
-// NewSuperplaneInputValueWithDefaults instantiates a new SuperplaneInputValue object
+// NewSuperplaneKeyValuePairWithDefaults instantiates a new SuperplaneKeyValuePair object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneInputValueWithDefaults() *SuperplaneInputValue {
-	this := SuperplaneInputValue{}
+func NewSuperplaneKeyValuePairWithDefaults() *SuperplaneKeyValuePair {
+	this := SuperplaneKeyValuePair{}
 	return &this
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneInputValue) GetName() string {
+func (o *SuperplaneKeyValuePair) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *SuperplaneInputValue) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneInputValue) GetNameOk() (*string, bool) {
+func (o *SuperplaneKeyValuePair) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *SuperplaneInputValue) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneInputValue) HasName() bool {
+func (o *SuperplaneKeyValuePair) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *SuperplaneInputValue) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneInputValue) SetName(v string) {
+func (o *SuperplaneKeyValuePair) SetName(v string) {
 	o.Name = &v
 }
 
 // GetValue returns the Value field value if set, zero value otherwise.
-func (o *SuperplaneInputValue) GetValue() string {
+func (o *SuperplaneKeyValuePair) GetValue() string {
 	if o == nil || IsNil(o.Value) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *SuperplaneInputValue) GetValue() string {
 
 // GetValueOk returns a tuple with the Value field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneInputValue) GetValueOk() (*string, bool) {
+func (o *SuperplaneKeyValuePair) GetValueOk() (*string, bool) {
 	if o == nil || IsNil(o.Value) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *SuperplaneInputValue) GetValueOk() (*string, bool) {
 }
 
 // HasValue returns a boolean if a field has been set.
-func (o *SuperplaneInputValue) HasValue() bool {
+func (o *SuperplaneKeyValuePair) HasValue() bool {
 	if o != nil && !IsNil(o.Value) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *SuperplaneInputValue) HasValue() bool {
 }
 
 // SetValue gets a reference to the given string and assigns it to the Value field.
-func (o *SuperplaneInputValue) SetValue(v string) {
+func (o *SuperplaneKeyValuePair) SetValue(v string) {
 	o.Value = &v
 }
 
-func (o SuperplaneInputValue) MarshalJSON() ([]byte, error) {
+func (o SuperplaneKeyValuePair) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o SuperplaneInputValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneInputValue) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneKeyValuePair) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
@@ -124,38 +124,38 @@ func (o SuperplaneInputValue) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneInputValue struct {
-	value *SuperplaneInputValue
+type NullableSuperplaneKeyValuePair struct {
+	value *SuperplaneKeyValuePair
 	isSet bool
 }
 
-func (v NullableSuperplaneInputValue) Get() *SuperplaneInputValue {
+func (v NullableSuperplaneKeyValuePair) Get() *SuperplaneKeyValuePair {
 	return v.value
 }
 
-func (v *NullableSuperplaneInputValue) Set(val *SuperplaneInputValue) {
+func (v *NullableSuperplaneKeyValuePair) Set(val *SuperplaneKeyValuePair) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneInputValue) IsSet() bool {
+func (v NullableSuperplaneKeyValuePair) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneInputValue) Unset() {
+func (v *NullableSuperplaneKeyValuePair) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneInputValue(val *SuperplaneInputValue) *NullableSuperplaneInputValue {
-	return &NullableSuperplaneInputValue{value: val, isSet: true}
+func NewNullableSuperplaneKeyValuePair(val *SuperplaneKeyValuePair) *NullableSuperplaneKeyValuePair {
+	return &NullableSuperplaneKeyValuePair{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneInputValue) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneKeyValuePair) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneInputValue) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneKeyValuePair) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

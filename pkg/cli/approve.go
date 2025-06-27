@@ -28,7 +28,7 @@ var approveEventCmd = &cobra.Command{
 		request := openapi_client.NewSuperplaneApproveStageEventBody()
 		request.SetRequesterId(uuid.NewString())
 
-		response, _, err := c.EventAPI.SuperplaneApproveStageEvent(
+		response, _, err := c.StageAPI.SuperplaneApproveStageEvent(
 			context.Background(),
 			canvasIDOrName,
 			stageIDOrName,

@@ -24,6 +24,7 @@ const (
 	SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN SuperplaneConnectionType = "TYPE_UNKNOWN"
 	SUPERPLANECONNECTIONTYPE_TYPE_EVENT_SOURCE SuperplaneConnectionType = "TYPE_EVENT_SOURCE"
 	SUPERPLANECONNECTIONTYPE_TYPE_STAGE SuperplaneConnectionType = "TYPE_STAGE"
+	SUPERPLANECONNECTIONTYPE_TYPE_CONNECTION_GROUP SuperplaneConnectionType = "TYPE_CONNECTION_GROUP"
 )
 
 // All allowed values of SuperplaneConnectionType enum
@@ -31,6 +32,7 @@ var AllowedSuperplaneConnectionTypeEnumValues = []SuperplaneConnectionType{
 	"TYPE_UNKNOWN",
 	"TYPE_EVENT_SOURCE",
 	"TYPE_STAGE",
+	"TYPE_CONNECTION_GROUP",
 }
 
 func (v *SuperplaneConnectionType) UnmarshalJSON(src []byte) error {

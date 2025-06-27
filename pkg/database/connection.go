@@ -91,7 +91,8 @@ func TruncateTables() error {
 	return Conn().Exec(`
 		truncate table canvases, events, event_sources, stages,
 		stage_events, stage_event_approvals,
-		stage_connections, stage_executions,
+		connections, stage_executions,
+		connection_groups, connection_group_field_sets, connection_group_field_set_events,
 		secrets, account_providers, users, organizations,
 		casbin_rule;
 	`).Error

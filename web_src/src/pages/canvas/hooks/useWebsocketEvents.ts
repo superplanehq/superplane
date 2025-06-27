@@ -13,10 +13,11 @@ const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'w
 export function useWebsocketEvents(canvasId: string): void {
   // Get store access methods directly within the hook
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
-  const eventSources = useCanvasStore((s) => s.event_sources);
+  const eventSources = useCanvasStore((s) => s.eventSources);
   const updateStage = useCanvasStore((s) => s.updateStage);
   const updateEventSource = useCanvasStore((s) => s.updateEventSource);
   const addStage = useCanvasStore((s) => s.addStage);
+  const addConnectionGroup = useCanvasStore((s) => s.addConnectionGroup);
   const syncStageEvents = useCanvasStore((s) => s.syncStageEvents);
   const addEventSource = useCanvasStore((s) => s.addEventSource);
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
@@ -60,6 +61,9 @@ export function useWebsocketEvents(canvasId: string): void {
     switch (event) {
       case 'stage_added':
         addStage(payload as EventMap['stage_added']);
+        break;
+      case 'connection_group_added':
+        addConnectionGroup(payload as EventMap['connection_group_added']);
         break;
       case 'stage_updated':
         updateStage(payload as EventMap['stage_updated']);

@@ -18,11 +18,142 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"reflect"
 )
 
 
 // StageAPIService StageAPI service
 type StageAPIService service
+
+type ApiSuperplaneApproveStageEventRequest struct {
+	ctx context.Context
+	ApiService *StageAPIService
+	canvasIdOrName string
+	stageIdOrName string
+	eventId string
+	body *SuperplaneApproveStageEventBody
+}
+
+func (r ApiSuperplaneApproveStageEventRequest) Body(body SuperplaneApproveStageEventBody) ApiSuperplaneApproveStageEventRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiSuperplaneApproveStageEventRequest) Execute() (*SuperplaneApproveStageEventResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneApproveStageEventExecute(r)
+}
+
+/*
+SuperplaneApproveStageEvent Approve a stage event
+
+Approves the specified stage event (canvas can be referenced by ID or name)
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @param stageIdOrName
+ @param eventId
+ @return ApiSuperplaneApproveStageEventRequest
+*/
+func (a *StageAPIService) SuperplaneApproveStageEvent(ctx context.Context, canvasIdOrName string, stageIdOrName string, eventId string) ApiSuperplaneApproveStageEventRequest {
+	return ApiSuperplaneApproveStageEventRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
+		eventId: eventId,
+	}
+}
+
+// Execute executes the request
+//  @return SuperplaneApproveStageEventResponse
+func (a *StageAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneApproveStageEventRequest) (*SuperplaneApproveStageEventResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneApproveStageEventResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "StageAPIService.SuperplaneApproveStageEvent")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events/{eventId}/approve"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"eventId"+"}", url.PathEscape(parameterValueToString(r.eventId, "eventId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
 
 type ApiSuperplaneCreateStageRequest struct {
 	ctx context.Context
@@ -207,6 +338,155 @@ func (a *StageAPIService) SuperplaneDescribeStageExecute(r ApiSuperplaneDescribe
 
 	if r.name != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiSuperplaneListStageEventsRequest struct {
+	ctx context.Context
+	ApiService *StageAPIService
+	canvasIdOrName string
+	stageIdOrName string
+	states *[]string
+	stateReasons *[]string
+}
+
+func (r ApiSuperplaneListStageEventsRequest) States(states []string) ApiSuperplaneListStageEventsRequest {
+	r.states = &states
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) StateReasons(stateReasons []string) ApiSuperplaneListStageEventsRequest {
+	r.stateReasons = &stateReasons
+	return r
+}
+
+func (r ApiSuperplaneListStageEventsRequest) Execute() (*SuperplaneListStageEventsResponse, *http.Response, error) {
+	return r.ApiService.SuperplaneListStageEventsExecute(r)
+}
+
+/*
+SuperplaneListStageEvents List stage events
+
+Returns a list of events for the specified stage (canvas can be referenced by ID or name)
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @param stageIdOrName
+ @return ApiSuperplaneListStageEventsRequest
+*/
+func (a *StageAPIService) SuperplaneListStageEvents(ctx context.Context, canvasIdOrName string, stageIdOrName string) ApiSuperplaneListStageEventsRequest {
+	return ApiSuperplaneListStageEventsRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+		stageIdOrName: stageIdOrName,
+	}
+}
+
+// Execute executes the request
+//  @return SuperplaneListStageEventsResponse
+func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListStageEventsRequest) (*SuperplaneListStageEventsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *SuperplaneListStageEventsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "StageAPIService.SuperplaneListStageEvents")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{stageIdOrName}/events"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"stageIdOrName"+"}", url.PathEscape(parameterValueToString(r.stageIdOrName, "stageIdOrName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.states != nil {
+		t := *r.states
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "states", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "states", t, "form", "multi")
+		}
+	}
+	if r.stateReasons != nil {
+		t := *r.stateReasons
+		if reflect.TypeOf(t).Kind() == reflect.Slice {
+			s := reflect.ValueOf(t)
+			for i := 0; i < s.Len(); i++ {
+				parameterAddToHeaderOrQuery(localVarQueryParams, "stateReasons", s.Index(i).Interface(), "form", "multi")
+			}
+		} else {
+			parameterAddToHeaderOrQuery(localVarQueryParams, "stateReasons", t, "form", "multi")
+		}
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}

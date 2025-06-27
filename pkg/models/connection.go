@@ -6,6 +6,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 const (
@@ -15,17 +16,18 @@ const (
 	FilterOperatorOr  = "or"
 )
 
-type StageConnection struct {
+type Connection struct {
 	ID             uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()"`
-	StageID        uuid.UUID
+	TargetID       uuid.UUID
+	TargetType     string
 	SourceID       uuid.UUID
 	SourceName     string
 	SourceType     string
-	Filters        datatypes.JSONSlice[StageConnectionFilter]
+	Filters        datatypes.JSONSlice[ConnectionFilter]
 	FilterOperator string
 }
 
-func (c *StageConnection) Accept(event *Event) (bool, error) {
+func (c *Connection) Accept(event *Event) (bool, error) {
 	if len(c.Filters) == 0 {
 		return true, nil
 	}
@@ -42,7 +44,7 @@ func (c *StageConnection) Accept(event *Event) (bool, error) {
 	}
 }
 
-func (c *StageConnection) all(event *Event) (bool, error) {
+func (c *Connection) all(event *Event) (bool, error) {
 	for _, filter := range c.Filters {
 		ok, err := filter.Evaluate(event)
 		if err != nil {
@@ -57,7 +59,7 @@ func (c *StageConnection) all(event *Event) (bool, error) {
 	return true, nil
 }
 
-func (c *StageConnection) any(event *Event) (bool, error) {
+func (c *Connection) any(event *Event) (bool, error) {
 	for _, filter := range c.Filters {
 		ok, err := filter.Evaluate(event)
 		if err != nil {
@@ -72,13 +74,13 @@ func (c *StageConnection) any(event *Event) (bool, error) {
 	return false, nil
 }
 
-type StageConnectionFilter struct {
+type ConnectionFilter struct {
 	Type   string
 	Data   *DataFilter
 	Header *HeaderFilter
 }
 
-func (f *StageConnectionFilter) EvaluateExpression(event *Event) (bool, error) {
+func (f *ConnectionFilter) EvaluateExpression(event *Event) (bool, error) {
 	switch f.Type {
 	case FilterTypeData:
 		return event.EvaluateBoolExpression(f.Data.Expression, FilterTypeData)
@@ -89,7 +91,7 @@ func (f *StageConnectionFilter) EvaluateExpression(event *Event) (bool, error) {
 	}
 }
 
-func (f *StageConnectionFilter) Evaluate(event *Event) (bool, error) {
+func (f *ConnectionFilter) Evaluate(event *Event) (bool, error) {
 	switch f.Type {
 	case FilterTypeData:
 		return f.EvaluateExpression(event)
@@ -109,8 +111,8 @@ type HeaderFilter struct {
 	Expression string
 }
 
-func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]StageConnection, error) {
-	var connections []StageConnection
+func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]Connection, error) {
+	var connections []Connection
 	err := database.Conn().
 		Where("source_id = ?", sourceID).
 		Where("source_type = ?", connectionType).
@@ -124,10 +126,11 @@ func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]Stag
 	return connections, nil
 }
 
-func FindStageConnection(stageID uuid.UUID, sourceName string) (*StageConnection, error) {
-	var connection StageConnection
+func FindConnection(targetID uuid.UUID, targetType string, sourceName string) (*Connection, error) {
+	var connection Connection
 	err := database.Conn().
-		Where("stage_id = ?", stageID).
+		Where("target_id = ?", targetID).
+		Where("target_type = ?", targetType).
 		Where("source_name = ?", sourceName).
 		First(&connection).
 		Error
@@ -139,10 +142,15 @@ func FindStageConnection(stageID uuid.UUID, sourceName string) (*StageConnection
 	return &connection, nil
 }
 
-func ListConnectionsForStage(stageID uuid.UUID) ([]StageConnection, error) {
-	var connections []StageConnection
-	err := database.Conn().
-		Where("stage_id = ?", stageID).
+func ListConnections(targetID uuid.UUID, targetType string) ([]Connection, error) {
+	return ListConnectionsInTransaction(database.Conn(), targetID, targetType)
+}
+
+func ListConnectionsInTransaction(tx *gorm.DB, targetID uuid.UUID, targetType string) ([]Connection, error) {
+	var connections []Connection
+	err := tx.
+		Where("target_id = ?", targetID).
+		Where("target_type = ?", targetType).
 		Find(&connections).
 		Error
 
