@@ -17,8 +17,15 @@ type ConnectionGroupFieldSet struct {
 	ConnectionGroupID uuid.UUID
 	FieldSet          datatypes.JSONType[map[string]string]
 	FieldSetHash      string
+	Timeout           *time.Duration
+	TimeoutBehavior   string
 	State             string
+	Result            string
 	CreatedAt         *time.Time
+}
+
+func (f *ConnectionGroupFieldSet) String() string {
+	return fmt.Sprintf("%s - %v", f.ID.String(), f.FieldSet.Data())
 }
 
 type ConnectionGroupFieldSetEvent struct {
@@ -32,6 +39,7 @@ type ConnectionGroupFieldSetEvent struct {
 }
 
 func (g *ConnectionGroup) CreateFieldSet(tx *gorm.DB, fields map[string]string, hash string) (*ConnectionGroupFieldSet, error) {
+	groupSpec := g.Spec.Data()
 	now := time.Now()
 	fieldSet := &ConnectionGroupFieldSet{
 		ConnectionGroupID: g.ID,
@@ -39,6 +47,11 @@ func (g *ConnectionGroup) CreateFieldSet(tx *gorm.DB, fields map[string]string, 
 		FieldSetHash:      hash,
 		State:             ConnectionGroupFieldSetStatePending,
 		CreatedAt:         &now,
+	}
+
+	if groupSpec.Timeout != nil {
+		fieldSet.Timeout = groupSpec.Timeout.After
+		fieldSet.TimeoutBehavior = groupSpec.Timeout.Behavior
 	}
 
 	err := tx.Create(fieldSet).Error
@@ -63,8 +76,9 @@ func (s *ConnectionGroupFieldSet) FindEvents() ([]ConnectionGroupFieldSetEvent, 
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state string) error {
+func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state, result string) error {
 	s.State = state
+	s.Result = result
 	return tx.Save(s).Error
 }
 
@@ -90,8 +104,8 @@ func (s *ConnectionGroupFieldSet) FindEventsWithData(tx *gorm.DB) ([]ConnectionG
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB) ([]byte, error) {
-	event := map[string]any{}
+func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, result string) ([]byte, error) {
+	event := map[string]any{"result": result}
 
 	//
 	// Include fields from field set.

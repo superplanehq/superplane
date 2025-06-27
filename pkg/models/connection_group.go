@@ -17,6 +17,16 @@ import (
 const (
 	ConnectionGroupFieldSetStatePending   = "pending"
 	ConnectionGroupFieldSetStateProcessed = "processed"
+	ConnectionGroupFieldSetStateDiscarded = "dicarded"
+
+	ConnectionGroupFieldSetResultTimedOut    = "timed-out"
+	ConnectionGroupFieldSetResultReceivedAll = "received-all"
+
+	ConnectionGroupTimeoutBehaviorEmit = "emit"
+	ConnectionGroupTimeoutBehaviorDrop = "drop"
+
+	MinConnectionGroupTimeout = time.Minute
+	MaxConnectionGroupTimeout = 24 * time.Hour
 )
 
 type ConnectionGroup struct {
@@ -73,8 +83,8 @@ func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupField
 	return true, nil
 }
 
-func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) error {
-	eventData, err := fieldSet.BuildEvent(tx)
+func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet, result string) error {
+	eventData, err := fieldSet.BuildEvent(tx, result)
 	if err != nil {
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
@@ -84,7 +94,7 @@ func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) e
 		return err
 	}
 
-	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed)
+	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed, result)
 }
 
 func (g *ConnectionGroup) ListFieldSets() ([]ConnectionGroupFieldSet, error) {
@@ -122,6 +132,21 @@ func (g *ConnectionGroup) FindPendingFieldSetByHash(tx *gorm.DB, hash string) (*
 	return fieldSet, nil
 }
 
+func ListPendingConnectionGroupFieldSets() ([]ConnectionGroupFieldSet, error) {
+	var fieldSets []ConnectionGroupFieldSet
+	err := database.Conn().
+		Where("state = ?", ConnectionGroupFieldSetStatePending).
+		Where("timeout IS NOT NULL").
+		Find(&fieldSets).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldSets, nil
+}
+
 func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) ([]string, error) {
 	var connections []string
 	err := tx.
@@ -142,7 +167,13 @@ func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *Conn
 }
 
 type ConnectionGroupSpec struct {
-	GroupBy *ConnectionGroupBySpec `json:"group_by"`
+	GroupBy *ConnectionGroupBySpec  `json:"group_by"`
+	Timeout *ConnectionGroupTimeout `json:"timeout"`
+}
+
+type ConnectionGroupTimeout struct {
+	After    *time.Duration `json:"after"`
+	Behavior string         `json:"behavior"`
 }
 
 type ConnectionGroupBySpec struct {

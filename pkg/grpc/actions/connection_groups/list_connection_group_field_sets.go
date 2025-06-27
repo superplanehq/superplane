@@ -82,6 +82,7 @@ func serializeConnectionGroupFieldSet(in models.ConnectionGroupFieldSet) (*pb.Co
 		Fields:    []*pb.KeyValuePair{},
 		Hash:      in.FieldSetHash,
 		State:     fieldSetStateToProto(in.State),
+		Result:    fieldSetResultToProto(in.Result),
 		CreatedAt: timestamppb.New(*in.CreatedAt),
 	}
 
@@ -121,5 +122,16 @@ func fieldSetStateToProto(state string) pb.ConnectionGroupFieldSet_State {
 		return pb.ConnectionGroupFieldSet_STATE_PROCESSED
 	default:
 		return pb.ConnectionGroupFieldSet_STATE_UNKNOWN
+	}
+}
+
+func fieldSetResultToProto(result string) pb.ConnectionGroupFieldSet_Result {
+	switch result {
+	case models.ConnectionGroupFieldSetResultTimedOut:
+		return pb.ConnectionGroupFieldSet_RESULT_TIMED_OUT
+	case models.ConnectionGroupFieldSetResultReceivedAll:
+		return pb.ConnectionGroupFieldSet_RESULT_RECEIVED_ALL
+	default:
+		return pb.ConnectionGroupFieldSet_RESULT_NONE
 	}
 }

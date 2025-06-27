@@ -24,6 +24,7 @@ const (
 	SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_UNKNOWN SuperplaneConnectionGroupFieldSetState = "STATE_UNKNOWN"
 	SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_PENDING SuperplaneConnectionGroupFieldSetState = "STATE_PENDING"
 	SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_PROCESSED SuperplaneConnectionGroupFieldSetState = "STATE_PROCESSED"
+	SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_DISCARDED SuperplaneConnectionGroupFieldSetState = "STATE_DISCARDED"
 )
 
 // All allowed values of SuperplaneConnectionGroupFieldSetState enum
@@ -31,6 +32,7 @@ var AllowedSuperplaneConnectionGroupFieldSetStateEnumValues = []SuperplaneConnec
 	"STATE_UNKNOWN",
 	"STATE_PENDING",
 	"STATE_PROCESSED",
+	"STATE_DISCARDED",
 }
 
 func (v *SuperplaneConnectionGroupFieldSetState) UnmarshalJSON(src []byte) error {

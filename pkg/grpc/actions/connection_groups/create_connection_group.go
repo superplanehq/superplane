@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -109,10 +110,36 @@ func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, e
 		return nil, err
 	}
 
+	timeout, err := validateTimeout(spec.Timeout)
+	if err != nil {
+		return nil, err
+	}
+
 	return &models.ConnectionGroupSpec{
+		Timeout: timeout,
 		GroupBy: &models.ConnectionGroupBySpec{
 			Fields: fields,
 		},
+	}, nil
+}
+
+func validateTimeout(timeout *pb.ConnectionGroup_Spec_Timeout) (*models.ConnectionGroupTimeout, error) {
+	if timeout == nil {
+		return nil, nil
+	}
+
+	timeoutAfter, err := time.ParseDuration(timeout.After)
+	if err != nil {
+		return nil, fmt.Errorf("invalid duration for timeout: %v", err)
+	}
+
+	if timeoutAfter < models.MinConnectionGroupTimeout || timeoutAfter > models.MaxConnectionGroupTimeout {
+		return nil, fmt.Errorf("timeout duration must be between %v and %v", models.MinConnectionGroupTimeout, models.MaxConnectionGroupTimeout)
+	}
+
+	return &models.ConnectionGroupTimeout{
+		After:    &timeoutAfter,
+		Behavior: protoToTimeoutBehavior(timeout.Behavior),
 	}, nil
 }
 
@@ -164,6 +191,36 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
 				Fields: fields,
 			},
+			Timeout: serializeTimeout(spec.Timeout),
 		},
 	}, nil
+}
+
+func serializeTimeout(timeout *models.ConnectionGroupTimeout) *pb.ConnectionGroup_Spec_Timeout {
+	if timeout == nil {
+		return nil
+	}
+
+	return &pb.ConnectionGroup_Spec_Timeout{
+		After:    timeout.After.String(),
+		Behavior: timeoutBehaviorToProto(*timeout),
+	}
+}
+
+func protoToTimeoutBehavior(behavior pb.ConnectionGroup_Spec_Timeout_Behavior) string {
+	switch behavior {
+	case pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_EMIT:
+		return models.ConnectionGroupTimeoutBehaviorEmit
+	default:
+		return models.ConnectionGroupTimeoutBehaviorDrop
+	}
+}
+
+func timeoutBehaviorToProto(timeout models.ConnectionGroupTimeout) pb.ConnectionGroup_Spec_Timeout_Behavior {
+	switch timeout.Behavior {
+	case models.ConnectionGroupTimeoutBehaviorEmit:
+		return pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_EMIT
+	default:
+		return pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_DROP
+	}
 }

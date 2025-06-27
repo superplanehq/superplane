@@ -25,6 +25,7 @@ type SuperplaneConnectionGroupFieldSet struct {
 	Fields []SuperplaneKeyValuePair `json:"fields,omitempty"`
 	Hash *string `json:"hash,omitempty"`
 	State *SuperplaneConnectionGroupFieldSetState `json:"state,omitempty"`
+	Result *SuperplaneConnectionGroupFieldSetResult `json:"result,omitempty"`
 	Events []SuperplaneConnectionGroupEvent `json:"events,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
@@ -37,6 +38,8 @@ func NewSuperplaneConnectionGroupFieldSet() *SuperplaneConnectionGroupFieldSet {
 	this := SuperplaneConnectionGroupFieldSet{}
 	var state SuperplaneConnectionGroupFieldSetState = SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_UNKNOWN
 	this.State = &state
+	var result SuperplaneConnectionGroupFieldSetResult = SUPERPLANECONNECTIONGROUPFIELDSETRESULT_RESULT_NONE
+	this.Result = &result
 	return &this
 }
 
@@ -47,6 +50,8 @@ func NewSuperplaneConnectionGroupFieldSetWithDefaults() *SuperplaneConnectionGro
 	this := SuperplaneConnectionGroupFieldSet{}
 	var state SuperplaneConnectionGroupFieldSetState = SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_UNKNOWN
 	this.State = &state
+	var result SuperplaneConnectionGroupFieldSetResult = SUPERPLANECONNECTIONGROUPFIELDSETRESULT_RESULT_NONE
+	this.Result = &result
 	return &this
 }
 
@@ -178,6 +183,38 @@ func (o *SuperplaneConnectionGroupFieldSet) SetState(v SuperplaneConnectionGroup
 	o.State = &v
 }
 
+// GetResult returns the Result field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupFieldSet) GetResult() SuperplaneConnectionGroupFieldSetResult {
+	if o == nil || IsNil(o.Result) {
+		var ret SuperplaneConnectionGroupFieldSetResult
+		return ret
+	}
+	return *o.Result
+}
+
+// GetResultOk returns a tuple with the Result field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupFieldSet) GetResultOk() (*SuperplaneConnectionGroupFieldSetResult, bool) {
+	if o == nil || IsNil(o.Result) {
+		return nil, false
+	}
+	return o.Result, true
+}
+
+// HasResult returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupFieldSet) HasResult() bool {
+	if o != nil && !IsNil(o.Result) {
+		return true
+	}
+
+	return false
+}
+
+// SetResult gets a reference to the given SuperplaneConnectionGroupFieldSetResult and assigns it to the Result field.
+func (o *SuperplaneConnectionGroupFieldSet) SetResult(v SuperplaneConnectionGroupFieldSetResult) {
+	o.Result = &v
+}
+
 // GetEvents returns the Events field value if set, zero value otherwise.
 func (o *SuperplaneConnectionGroupFieldSet) GetEvents() []SuperplaneConnectionGroupEvent {
 	if o == nil || IsNil(o.Events) {
@@ -263,6 +300,9 @@ func (o SuperplaneConnectionGroupFieldSet) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.Result) {
+		toSerialize["result"] = o.Result
 	}
 	if !IsNil(o.Events) {
 		toSerialize["events"] = o.Events

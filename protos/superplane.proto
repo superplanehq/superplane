@@ -472,8 +472,19 @@ message ConnectionGroup {
       repeated Field fields = 1;
     }
 
+    message Timeout {
+      enum Behavior {
+        BEHAVIOR_DROP = 0;
+        BEHAVIOR_EMIT = 1;
+      }
+
+      string after = 1;
+      Behavior behavior = 2;
+    }
+
     repeated Connection connections = 1;
     GroupBy group_by = 2;
+    Timeout timeout = 3;
   }
 
   Metadata metadata = 1;
@@ -701,15 +712,23 @@ message ConnectionGroupFieldSet {
   enum State {
     STATE_UNKNOWN = 0;
     STATE_PENDING = 1;
-    STATE_PROCESSED = 4;
+    STATE_PROCESSED = 2;
+    STATE_DISCARDED = 3;
+  }
+
+  enum Result {
+    RESULT_NONE = 0;
+    RESULT_TIMED_OUT = 1;
+    RESULT_RECEIVED_ALL = 2;
   }
 
   string id = 1;
   repeated KeyValuePair fields = 2;
   string hash = 3;
   State state = 4;
-  repeated ConnectionGroupEvent events = 5;
-  google.protobuf.Timestamp created_at = 6;
+  Result result = 5;
+  repeated ConnectionGroupEvent events = 6;
+  google.protobuf.Timestamp created_at = 7;
 }
 
 message ConnectionGroupEvent {

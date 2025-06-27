@@ -209,7 +209,7 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		shouldEmit, err := connectionGroup.ShouldEmit(database.Conn(), fieldSet)
 		require.NoError(t, err)
 		require.True(t, shouldEmit)
-		require.NoError(t, fieldSet.UpdateState(database.Conn(), ConnectionGroupFieldSetStateProcessed))
+		require.NoError(t, fieldSet.UpdateState(database.Conn(), ConnectionGroupFieldSetStateProcessed, ConnectionGroupFieldSetResultReceivedAll))
 
 		//
 		// Now, we send a new version=v1 event for source1 only.
@@ -369,10 +369,11 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	//
 	// Emit and verify the structure of the outgoing event created.
 	//
-	require.NoError(t, connectionGroup.Emit(database.Conn(), v1AuthfieldSet))
+	require.NoError(t, connectionGroup.Emit(database.Conn(), v1AuthfieldSet, ConnectionGroupFieldSetResultReceivedAll))
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
+		"result": ConnectionGroupFieldSetResultReceivedAll,
 		"fields": map[string]any{
 			"app":     "auth",
 			"version": "v1",

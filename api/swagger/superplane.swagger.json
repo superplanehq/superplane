@@ -1744,15 +1744,6 @@
         }
       }
     },
-    "ExecutionResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_UNKNOWN",
-        "RESULT_PASSED",
-        "RESULT_FAILED"
-      ],
-      "default": "RESULT_UNKNOWN"
-    },
     "ExecutorSpecHTTP": {
       "type": "object",
       "properties": {
@@ -1964,6 +1955,17 @@
         }
       }
     },
+    "SpecTimeout": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "string"
+        },
+        "behavior": {
+          "$ref": "#/definitions/TimeoutBehavior"
+        }
+      }
+    },
     "StageEventStateReason": {
       "type": "string",
       "enum": [
@@ -2141,6 +2143,9 @@
         "state": {
           "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetState"
         },
+        "result": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetResult"
+        },
         "events": {
           "type": "array",
           "items": {
@@ -2154,12 +2159,22 @@
         }
       }
     },
+    "SuperplaneConnectionGroupFieldSetResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_NONE",
+        "RESULT_TIMED_OUT",
+        "RESULT_RECEIVED_ALL"
+      ],
+      "default": "RESULT_NONE"
+    },
     "SuperplaneConnectionGroupFieldSetState": {
       "type": "string",
       "enum": [
         "STATE_UNKNOWN",
         "STATE_PENDING",
-        "STATE_PROCESSED"
+        "STATE_PROCESSED",
+        "STATE_DISCARDED"
       ],
       "default": "STATE_UNKNOWN"
     },
@@ -2196,6 +2211,9 @@
         },
         "groupBy": {
           "$ref": "#/definitions/SpecGroupBy"
+        },
+        "timeout": {
+          "$ref": "#/definitions/SpecTimeout"
         }
       }
     },
@@ -2396,7 +2414,7 @@
           "$ref": "#/definitions/SuperplaneExecutionState"
         },
         "result": {
-          "$ref": "#/definitions/ExecutionResult"
+          "$ref": "#/definitions/SuperplaneExecutionResult"
         },
         "createdAt": {
           "type": "string",
@@ -2418,6 +2436,15 @@
           }
         }
       }
+    },
+    "SuperplaneExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED"
+      ],
+      "default": "RESULT_UNKNOWN"
     },
     "SuperplaneExecutionState": {
       "type": "string",
@@ -2863,7 +2890,7 @@
         "results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/ExecutionResult"
+            "$ref": "#/definitions/SuperplaneExecutionResult"
           }
         }
       }
@@ -2878,6 +2905,14 @@
           "type": "string"
         }
       }
+    },
+    "TimeoutBehavior": {
+      "type": "string",
+      "enum": [
+        "BEHAVIOR_DROP",
+        "BEHAVIOR_EMIT"
+      ],
+      "default": "BEHAVIOR_DROP"
     },
     "protobufAny": {
       "type": "object",

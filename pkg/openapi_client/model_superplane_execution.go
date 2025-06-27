@@ -24,7 +24,7 @@ type SuperplaneExecution struct {
 	Id *string `json:"id,omitempty"`
 	ReferenceId *string `json:"referenceId,omitempty"`
 	State *SuperplaneExecutionState `json:"state,omitempty"`
-	Result *ExecutionResult `json:"result,omitempty"`
+	Result *SuperplaneExecutionResult `json:"result,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
@@ -39,7 +39,7 @@ func NewSuperplaneExecution() *SuperplaneExecution {
 	this := SuperplaneExecution{}
 	var state SuperplaneExecutionState = SUPERPLANEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
+	var result SuperplaneExecutionResult = SUPERPLANEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
 	return &this
 }
@@ -51,7 +51,7 @@ func NewSuperplaneExecutionWithDefaults() *SuperplaneExecution {
 	this := SuperplaneExecution{}
 	var state SuperplaneExecutionState = SUPERPLANEEXECUTIONSTATE_STATE_UNKNOWN
 	this.State = &state
-	var result ExecutionResult = EXECUTIONRESULT_RESULT_UNKNOWN
+	var result SuperplaneExecutionResult = SUPERPLANEEXECUTIONRESULT_RESULT_UNKNOWN
 	this.Result = &result
 	return &this
 }
@@ -153,9 +153,9 @@ func (o *SuperplaneExecution) SetState(v SuperplaneExecutionState) {
 }
 
 // GetResult returns the Result field value if set, zero value otherwise.
-func (o *SuperplaneExecution) GetResult() ExecutionResult {
+func (o *SuperplaneExecution) GetResult() SuperplaneExecutionResult {
 	if o == nil || IsNil(o.Result) {
-		var ret ExecutionResult
+		var ret SuperplaneExecutionResult
 		return ret
 	}
 	return *o.Result
@@ -163,7 +163,7 @@ func (o *SuperplaneExecution) GetResult() ExecutionResult {
 
 // GetResultOk returns a tuple with the Result field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecution) GetResultOk() (*ExecutionResult, bool) {
+func (o *SuperplaneExecution) GetResultOk() (*SuperplaneExecutionResult, bool) {
 	if o == nil || IsNil(o.Result) {
 		return nil, false
 	}
@@ -179,8 +179,8 @@ func (o *SuperplaneExecution) HasResult() bool {
 	return false
 }
 
-// SetResult gets a reference to the given ExecutionResult and assigns it to the Result field.
-func (o *SuperplaneExecution) SetResult(v ExecutionResult) {
+// SetResult gets a reference to the given SuperplaneExecutionResult and assigns it to the Result field.
+func (o *SuperplaneExecution) SetResult(v SuperplaneExecutionResult) {
 	o.Result = &v
 }
 

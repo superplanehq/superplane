@@ -206,7 +206,7 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 		return nil
 	}
 
-	return connectionGroup.Emit(tx, fieldSet)
+	return connectionGroup.Emit(tx, fieldSet, models.ConnectionGroupFieldSetResultReceivedAll)
 }
 
 func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) (map[string]any, error) {

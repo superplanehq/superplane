@@ -31,6 +31,15 @@ spec:
     fields:
       - name: version
         expression: outputs.version
+
+    #
+    # The timeout for the connection group.
+    # drop: drop the events received, and don't do anything
+    # emit: emit the events received, but the resulting event will indicate that events from some connections were missing
+    #
+    timeout:
+      after: 24h
+      behavior: drop | emit
 ```
 
 And this is how you use it as a connection for another stage:
@@ -50,12 +59,27 @@ The events emitted by the connection group will have all the grouping fields and
 
 ```json
 {
+  "result": "received-all",
   "fields": {
     "version": "v1",
   },
   "events": {
     "preprod1": {...},
     "preprod2": {...}
+  }
+}
+```
+
+If the timeout is reached, the connection group will emit an event with the same fields, but with a `result` field set to `timed-out`, and only the events from the connections that have sent events will be included.
+
+```json
+{
+  "result": "timed-out",
+  "fields": {
+    "version": "v1",
+  },
+  "events": {
+    "preprod1": {...}
   }
 }
 ```
