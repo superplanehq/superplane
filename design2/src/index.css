@@ -63,6 +63,9 @@
   --color-error-800: #991b1b;
   --color-error-900: #7f1d1d;
   --color-error-950: #450a0a;
+
+  --text-tiny: 0.625rem;
+  --text-tiny--line-height: 1.5rem; 
 }
 
 @layer base {
