@@ -7,9 +7,8 @@ import { useResizableSidebar } from "../hooks/useResizableSidebar";
 import { SidebarHeader } from "./SidebarHeader";
 import { SidebarTabs } from "./SidebarTabs";
 import { ResizeHandle } from "./ResizeHandle";
-import { GeneralTab } from "./tabs/GeneralTab";
+import { ActivityTab } from "./tabs/ActivityTab";
 import { HistoryTab } from "./tabs/HistoryTab";
-import { QueueTab } from "./tabs/QueueTab";
 import { SettingsTab } from "./tabs/SettingsTab";
 
 interface SidebarProps {
@@ -19,14 +18,13 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarProps) => {
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState('activity');
   const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(600);
 
   // Sidebar tab definitions - memoized to prevent unnecessary re-renders
   const tabs = useMemo(() => [
-    { key: 'general', label: 'General' },
+    { key: 'activity', label: 'Activity' },
     { key: 'history', label: 'History' },
-    { key: 'queue', label: 'Queue' },
     { key: 'settings', label: 'Settings' },
   ], []);
 
@@ -54,21 +52,20 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     [selectedStage.queue]
   );
 
-  const processedEvents = useMemo(() =>
-    selectedStage.queue?.filter(event => event.state === 'STATE_PROCESSED') || [],
-    [selectedStage.queue]
-  );
+  // const processedEvents = useMemo(() =>
+  //   selectedStage.queue?.filter(event => event.state === 'STATE_PROCESSED') || [],
+  //   [selectedStage.queue]
+  // );
 
   // Render the appropriate content based on the active tab
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'general':
+      case 'activity':
         return (
-          <GeneralTab
+          <ActivityTab
             selectedStage={selectedStage}
             pendingEvents={pendingEvents}
             waitingEvents={waitingEvents}
-            processedEvents={processedEvents}
             allExecutions={allExecutions}
             approveStageEvent={approveStageEvent}
             executionRunning={executionRunning}
@@ -77,18 +74,6 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
 
       case 'history':
         return <HistoryTab allExecutions={allExecutions} />;
-
-      case 'queue':
-        return (
-          <QueueTab
-            selectedStage={selectedStage}
-            pendingEvents={pendingEvents}
-            waitingEvents={waitingEvents}
-            processedEvents={processedEvents}
-            approveStageEvent={approveStageEvent}
-            executionRunning={executionRunning}
-          />
-        );
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;

@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { SuperplaneExecution } from '@/api-client';
+import { SuperplaneExecution, SuperplaneExecutionState } from '@/api-client';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
@@ -60,18 +60,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     })
   }, [props.data.outputs, allFinishedExecutions])
 
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'running':
-      case 'deploying':
-        return 'bg-blue-100 text-blue-800';
-      case 'success':
-      case 'completed':
+  const getStatusColor = (status: SuperplaneExecutionState) => {
+    switch (status) {
+      case 'STATE_STARTED':
+      case 'STATE_FINISHED':
         return 'bg-green-100 text-green-800';
-      case 'failed':
-      case 'error':
+      case 'STATE_UNKNOWN':
         return 'bg-red-100 text-red-800';
-      case 'pending':
+      case 'STATE_PENDING':
         return 'bg-yellow-100 text-yellow-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -151,14 +147,14 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
       {/* Queue Section */}
       <div className="px-3 pt-2 pb-0 w-full">
-        <div className="text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Queue</div>
+        <div className="w-full text-left text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Queue</div>
         
-        <div className="w-full">
+        <div className="w-full pt-1 pb-6">
           {/* Pending Events */}
           {pendingEvents.length > 0 && (
             <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
-              <div className="rounded-full bg-orange-100 text-orange-600 w-6 h-6 mr-2 flex items-center justify-center">
-                <span className="material-symbols-outlined text-sm">how_to_reg</span>
+              <div className="rounded-full bg-[var(--lightest-orange)] text-[var(--dark-orange)] w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>how_to_reg</span>
               </div>
               <a 
                 href="#" 
@@ -172,8 +168,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           {/* Waiting Events */}
           {waitingEvents.length > 0 && (
             <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
-              <div className="rounded-full bg-orange-100 text-orange-600 w-6 h-6 mr-2 flex items-center justify-center">
-                <span className="material-symbols-outlined text-sm">how_to_reg</span>
+              <div className="rounded-full bg-[var(--lightest-orange)] text-[var(--dark-orange)] w-6 h-6 mr-2 flex items-center justify-center">
+                <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>how_to_reg</span>
               </div>
               <a 
                 href="#" 
@@ -187,20 +183,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           {/* Show empty state when no queue items */}
           {!pendingEvents.length && !waitingEvents.length && (
             <div className="text-sm text-gray-500 italic py-2">No queue activity</div>
-          )}
-        </div>
-      </div>
-
-      {/* Status Badge - positioned at bottom for better visibility */}
-      <div className="px-3 pb-3">
-        <div className="flex justify-between items-center mt-2">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(props.data.status || '')}`}>
-            {props.data.status || 'Ready'}
-          </span>
-          {processedEvents.length > 0 && (
-            <span className="text-xs text-gray-500">
-              {processedEvents.length} completed
-            </span>
           )}
         </div>
       </div>
