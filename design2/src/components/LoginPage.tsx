@@ -35,14 +35,14 @@ export function LoginPage({ onLogin }: LoginPageProps = {}) {
 
   return (
     <div className="flex flex-col items-stretch min-h-screen px-8 py-8 dark:bg-black">
-      <div className="flex-grow flex flex-col bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950 py-12 sm:px-6 lg:px-8">
+      <div className="flex-grow flex flex-col bg-zinc-100 dark:bg-zinc-950 py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-lg mb-8">
           <Heading level={1} className="text-center">SuperPlane</Heading>
 
         </div>
 
         <div className="sm:mx-auto sm:w-full sm:max-w-lg">
-          <div className="bg-white dark:bg-zinc-900 py-10 px-4 shadow-sm rounded-2xl border border-zinc-200 dark:border-zinc-800 sm:px-10">
+          <div className="bg-white dark:bg-zinc-900 py-10 px-4 shadow-sm rounded-xl border border-zinc-200 dark:border-zinc-800 sm:px-10">
             <form className="space-y-8" onSubmit={handleSubmit}>
               <Text className="text-zinc-600 dark:text-zinc-400 text-center">
               <span className='text-lg sm:text-lg font-bold'>Log in to SuperPlane</span>
