@@ -29,7 +29,7 @@ type SuperplaneStageEvent struct {
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
-	Inputs []SuperplaneInputValue `json:"inputs,omitempty"`
+	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -318,9 +318,9 @@ func (o *SuperplaneStageEvent) SetExecution(v SuperplaneExecution) {
 }
 
 // GetInputs returns the Inputs field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetInputs() []SuperplaneInputValue {
+func (o *SuperplaneStageEvent) GetInputs() []SuperplaneKeyValuePair {
 	if o == nil || IsNil(o.Inputs) {
-		var ret []SuperplaneInputValue
+		var ret []SuperplaneKeyValuePair
 		return ret
 	}
 	return o.Inputs
@@ -328,7 +328,7 @@ func (o *SuperplaneStageEvent) GetInputs() []SuperplaneInputValue {
 
 // GetInputsOk returns a tuple with the Inputs field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetInputsOk() ([]SuperplaneInputValue, bool) {
+func (o *SuperplaneStageEvent) GetInputsOk() ([]SuperplaneKeyValuePair, bool) {
 	if o == nil || IsNil(o.Inputs) {
 		return nil, false
 	}
@@ -344,8 +344,8 @@ func (o *SuperplaneStageEvent) HasInputs() bool {
 	return false
 }
 
-// SetInputs gets a reference to the given []SuperplaneInputValue and assigns it to the Inputs field.
-func (o *SuperplaneStageEvent) SetInputs(v []SuperplaneInputValue) {
+// SetInputs gets a reference to the given []SuperplaneKeyValuePair and assigns it to the Inputs field.
+func (o *SuperplaneStageEvent) SetInputs(v []SuperplaneKeyValuePair) {
 	o.Inputs = v
 }
 

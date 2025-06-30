@@ -32,7 +32,7 @@ func NewEventDistributer(wsHub *ws.Hub) *EventDistributer {
 // Start begins consuming messages from RabbitMQ for all relevant routing keys
 func (e *EventDistributer) Start() error {
 	log.Info("Starting EventDistributer worker")
-	
+
 	amqpURL, err := config.RabbitMQURL()
 	if err != nil {
 		return fmt.Errorf("failed to get RabbitMQ URL: %w", err)
@@ -51,6 +51,7 @@ func (e *EventDistributer) Start() error {
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionStartedRoutingKey, e.createHandler(eventdistributer.HandleExecutionStarted)},
 		{messages.DeliveryHubCanvasExchange, messages.ExecutionFinishedRoutingKey, e.createHandler(eventdistributer.HandleExecutionFinished)},
 		{messages.DeliveryHubCanvasExchange, messages.StageCreatedRoutingKey, e.createHandler(eventdistributer.HandleStageCreated)},
+		{messages.DeliveryHubCanvasExchange, messages.ConnectionGroupCreatedRoutingKey, e.createHandler(eventdistributer.HandleConnectionGroupCreated)},
 		{messages.DeliveryHubCanvasExchange, "stage-updated", e.createHandler(eventdistributer.HandleStageUpdated)},
 	}
 
@@ -81,12 +82,12 @@ func (e *EventDistributer) createHandler(processFn func([]byte, *ws.Hub) error) 
 // consumeMessages sets up a consumer for a specific routing key
 func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string, handler func(delivery tackle.Delivery) error) {
 	queueName := fmt.Sprintf("superplane.%s.%s.consumer", exchange, routingKey)
-	
+
 	for {
 		log.Infof("Connecting to RabbitMQ queue %s for %s events", queueName, routingKey)
-		
+
 		logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
-			"consumer":   "event_distributer",
+			"consumer":      "event_distributer",
 			"route_handler": routingKey,
 		}))
 
@@ -101,7 +102,6 @@ func (e *EventDistributer) consumeMessages(amqpURL, exchange, routingKey string,
 			Service:        queueName,
 			RoutingKey:     routingKey,
 		}, handler)
-
 
 		if err != nil {
 			log.Errorf("Error consuming messages from %s: %v", routingKey, err)

@@ -4,6 +4,7 @@ import '@xyflow/react/dist/style.css';
 
 import StageNode from './nodes/stage';
 import GithubIntegration from './nodes/event_source';
+import ConnectionGroupNode from './nodes/connection_group';
 import { FlowDevTools } from './devtools';
 import { useCanvasStore } from "../store/canvasStore";
 import { useFlowHandlers } from "../hooks/useFlowHandlers";
@@ -12,6 +13,7 @@ import { FlowControls } from "./FlowControls";
 import { ConnectionStatus } from "./ConnectionStatus";
 
 export const nodeTypes = {
+  connectionGroup: ConnectionGroupNode,
   deploymentCard: StageNode,
   githubIntegration: GithubIntegration,
 };

@@ -219,6 +219,45 @@ var createCmd = &cobra.Command{
 			fmt.Printf("Key: %s\n", *response.Key)
 			fmt.Println("! Save this key as it won't be shown again.")
 
+		case "ConnectionGroup":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the metadata from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]interface{})
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: metadata section missing")
+			}
+
+			canvasID, ok := metadata["canvasId"].(string)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
+			}
+
+			var connectionGroup openapi_client.SuperplaneConnectionGroup
+			err = yaml.Unmarshal(data, &connectionGroup)
+			Check(err)
+
+			body := openapi_client.SuperplaneCreateConnectionGroupBody{
+				ConnectionGroup: &connectionGroup,
+			}
+
+			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneCreateConnectionGroup(context.Background(), canvasID).
+				Body(body).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.ConnectionGroup)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
 		case "Stage":
 			var yamlData map[string]any
 			err = yaml.Unmarshal(data, &yamlData)

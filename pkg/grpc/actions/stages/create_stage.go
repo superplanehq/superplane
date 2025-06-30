@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 
-	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -61,7 +59,7 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvas, req.Stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -156,36 +154,6 @@ func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error)
 	return out, nil
 }
 
-func validateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.StageConnection, error) {
-	cs := []models.StageConnection{}
-
-	if len(connections) == 0 {
-		return nil, fmt.Errorf("connections must not be empty")
-	}
-
-	for _, connection := range connections {
-		sourceID, err := findConnectionSourceID(canvas, connection)
-		if err != nil {
-			return nil, fmt.Errorf("invalid connection: %v", err)
-		}
-
-		filters, err := validateFilters(connection.Filters)
-		if err != nil {
-			return nil, err
-		}
-
-		cs = append(cs, models.StageConnection{
-			SourceID:       *sourceID,
-			SourceName:     connection.Name,
-			SourceType:     protoToConnectionType(connection.Type),
-			FilterOperator: protoToFilterOperator(connection.FilterOperator),
-			Filters:        filters,
-		})
-	}
-
-	return cs, nil
-}
-
 func validateConditions(conditions []*pb.Condition) ([]models.StageCondition, error) {
 	cs := []models.StageCondition{}
 
@@ -237,221 +205,6 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 
 	default:
 		return nil, fmt.Errorf("invalid condition type: %s", condition.Type)
-	}
-}
-
-func validateFilters(in []*pb.Connection_Filter) ([]models.StageConnectionFilter, error) {
-	filters := []models.StageConnectionFilter{}
-	for i, f := range in {
-		filter, err := validateFilter(f)
-		if err != nil {
-			return nil, fmt.Errorf("invalid filter [%d]: %v", i, err)
-		}
-
-		filters = append(filters, *filter)
-	}
-
-	return filters, nil
-}
-
-func validateFilter(filter *pb.Connection_Filter) (*models.StageConnectionFilter, error) {
-	switch filter.Type {
-	case pb.Connection_FILTER_TYPE_DATA:
-		return validateDataFilter(filter.Data)
-	case pb.Connection_FILTER_TYPE_HEADER:
-		return validateHeaderFilter(filter.Header)
-	default:
-		return nil, fmt.Errorf("invalid filter type: %s", filter.Type)
-	}
-}
-
-func validateDataFilter(filter *pb.Connection_DataFilter) (*models.StageConnectionFilter, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("no filter provided")
-	}
-
-	if filter.Expression == "" {
-		return nil, fmt.Errorf("expression is empty")
-	}
-
-	return &models.StageConnectionFilter{
-		Type: models.FilterTypeData,
-		Data: &models.DataFilter{
-			Expression: filter.Expression,
-		},
-	}, nil
-}
-
-func validateHeaderFilter(filter *pb.Connection_HeaderFilter) (*models.StageConnectionFilter, error) {
-	if filter == nil {
-		return nil, fmt.Errorf("no filter provided")
-	}
-
-	if filter.Expression == "" {
-		return nil, fmt.Errorf("expression is empty")
-	}
-
-	return &models.StageConnectionFilter{
-		Type: models.FilterTypeHeader,
-		Header: &models.HeaderFilter{
-			Expression: filter.Expression,
-		},
-	}, nil
-}
-
-func protoToFilterOperator(in pb.Connection_FilterOperator) string {
-	switch in {
-	case pb.Connection_FILTER_OPERATOR_OR:
-		return models.FilterOperatorOr
-	default:
-		return models.FilterOperatorAnd
-	}
-}
-
-func filterOperatorToProto(in string) pb.Connection_FilterOperator {
-	switch in {
-	case models.FilterOperatorOr:
-		return pb.Connection_FILTER_OPERATOR_OR
-	default:
-		return pb.Connection_FILTER_OPERATOR_AND
-	}
-}
-
-func serializeFilters(in []models.StageConnectionFilter) ([]*pb.Connection_Filter, error) {
-	filters := []*pb.Connection_Filter{}
-
-	for _, f := range in {
-		filter, err := serializeFilter(f)
-		if err != nil {
-			return nil, fmt.Errorf("invalid filter: %v", err)
-		}
-
-		filters = append(filters, filter)
-	}
-
-	return filters, nil
-}
-
-func serializeFilter(in models.StageConnectionFilter) (*pb.Connection_Filter, error) {
-	switch in.Type {
-	case models.FilterTypeData:
-		return &pb.Connection_Filter{
-			Type: pb.Connection_FILTER_TYPE_DATA,
-			Data: &pb.Connection_DataFilter{
-				Expression: in.Data.Expression,
-			},
-		}, nil
-	case models.FilterTypeHeader:
-		return &pb.Connection_Filter{
-			Type: pb.Connection_FILTER_TYPE_HEADER,
-			Header: &pb.Connection_HeaderFilter{
-				Expression: in.Header.Expression,
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid filter type: %s", in.Type)
-	}
-}
-
-func serializeConnections(stages []models.Stage, sources []models.EventSource, in []models.StageConnection) ([]*pb.Connection, error) {
-	connections := []*pb.Connection{}
-
-	for _, c := range in {
-		name, err := findConnectionName(stages, sources, c)
-		if err != nil {
-			return nil, fmt.Errorf("invalid connection: %v", err)
-		}
-
-		filters, err := serializeFilters(c.Filters)
-		if err != nil {
-			return nil, fmt.Errorf("invalid filters: %v", err)
-		}
-
-		connections = append(connections, &pb.Connection{
-			Type:           connectionTypeToProto(c.SourceType),
-			Name:           name,
-			FilterOperator: filterOperatorToProto(c.FilterOperator),
-			Filters:        filters,
-		})
-	}
-
-	//
-	// Sort them by name so we have some predictability here.
-	//
-	sort.SliceStable(connections, func(i, j int) bool {
-		return connections[i].Name < connections[j].Name
-	})
-
-	return connections, nil
-}
-
-func connectionTypeToProto(t string) pb.Connection_Type {
-	switch t {
-	case models.SourceTypeStage:
-		return pb.Connection_TYPE_STAGE
-	case models.SourceTypeEventSource:
-		return pb.Connection_TYPE_EVENT_SOURCE
-	default:
-		return pb.Connection_TYPE_UNKNOWN
-	}
-}
-
-func findConnectionName(stages []models.Stage, sources []models.EventSource, connection models.StageConnection) (string, error) {
-	switch connection.SourceType {
-	case models.SourceTypeStage:
-		for _, stage := range stages {
-			if stage.ID == connection.SourceID {
-				return stage.Name, nil
-			}
-		}
-
-		return "", fmt.Errorf("stage %s not found", connection.SourceID)
-
-	case models.SourceTypeEventSource:
-		for _, s := range sources {
-			if s.ID == connection.SourceID {
-				return s.Name, nil
-			}
-		}
-
-		return "", fmt.Errorf("event source %s not found", connection.ID)
-
-	default:
-		return "", errors.New("invalid type " + connection.SourceType)
-	}
-}
-
-func findConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*uuid.UUID, error) {
-	switch connection.Type {
-	case pb.Connection_TYPE_STAGE:
-		stage, err := canvas.FindStageByName(connection.Name)
-		if err != nil {
-			return nil, fmt.Errorf("stage %s not found", connection.Name)
-		}
-
-		return &stage.ID, nil
-
-	case pb.Connection_TYPE_EVENT_SOURCE:
-		eventSource, err := canvas.FindEventSourceByName(connection.Name)
-		if err != nil {
-			return nil, fmt.Errorf("event source %s not found", connection.Name)
-		}
-
-		return &eventSource.ID, nil
-
-	default:
-		return nil, errors.New("invalid type")
-	}
-}
-
-func protoToConnectionType(t pb.Connection_Type) string {
-	switch t {
-	case pb.Connection_TYPE_STAGE:
-		return models.SourceTypeStage
-	case pb.Connection_TYPE_EVENT_SOURCE:
-		return models.SourceTypeEventSource
-	default:
-		return ""
 	}
 }
 
@@ -670,15 +423,15 @@ func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, erro
 	}
 }
 
-func serializeStages(stages []models.Stage, sources []models.EventSource) ([]*pb.Stage, error) {
+func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
 	s := []*pb.Stage{}
 	for _, stage := range stages {
-		connections, err := models.ListConnectionsForStage(stage.ID)
+		connections, err := models.ListConnections(stage.ID, models.ConnectionTargetTypeStage)
 		if err != nil {
 			return nil, err
 		}
 
-		serialized, err := serializeConnections(stages, sources, connections)
+		serialized, err := actions.SerializeConnections(connections)
 		if err != nil {
 			return nil, err
 		}

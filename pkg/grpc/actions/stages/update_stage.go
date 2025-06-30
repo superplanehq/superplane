@@ -73,7 +73,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvas, req.Stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

@@ -128,7 +128,7 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 		SourceId:    in.SourceID.String(),
 		SourceType:  pb.Connection_TYPE_EVENT_SOURCE,
 		Approvals:   []*pb.StageEventApproval{},
-		Inputs:      []*pb.InputValue{},
+		Inputs:      []*pb.KeyValuePair{},
 	}
 
 	//
@@ -145,7 +145,7 @@ func serializeStageEvent(in models.StageEvent) (*pb.StageEvent, error) {
 	// Add inputs
 	//
 	for k, v := range in.Inputs.Data() {
-		e.Inputs = append(e.Inputs, &pb.InputValue{Name: k, Value: v.(string)})
+		e.Inputs = append(e.Inputs, &pb.KeyValuePair{Name: k, Value: v.(string)})
 	}
 
 	//
