@@ -62,6 +62,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
       case 'activity':
         return (
           <ActivityTab
+            onChangeTab={setActiveTab}
             selectedStage={selectedStage}
             pendingEvents={pendingEvents}
             waitingEvents={waitingEvents}

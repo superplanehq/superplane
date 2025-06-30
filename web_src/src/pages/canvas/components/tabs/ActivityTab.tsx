@@ -10,6 +10,7 @@ interface ActivityTabProps {
   allExecutions: ExecutionWithEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   executionRunning: boolean;
+  onChangeTab: (tab: string) => void;
 }
 
 export const ActivityTab = ({
@@ -18,7 +19,8 @@ export const ActivityTab = ({
   waitingEvents,
   allExecutions,
   approveStageEvent,
-  executionRunning
+  executionRunning,
+  onChangeTab
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
   
@@ -27,7 +29,12 @@ export const ActivityTab = ({
       {/* Recent Runs Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Recent Runs</h3>
+          <h3 className="text-sm text-gray-700 uppercase tracking-wide">Recent Runs</h3>
+          <button className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+            onClick={() => onChangeTab('history')}
+          >
+            View all
+          </button>
         </div>
         <ExecutionTimeline 
           selectedStage={selectedStage}
@@ -38,7 +45,7 @@ export const ActivityTab = ({
       {/* Queue Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+          <h3 className="text-sm text-gray-700 uppercase tracking-wide">
             Queue ({queueCount})
           </h3>
           {queueCount > 0 && (
@@ -62,6 +69,7 @@ export const ActivityTab = ({
                 <MessageItem
                   key={event.id}
                   event={event}
+                  selectedStage={selectedStage}
                   onApprove={event.state === 'STATE_WAITING' ? (eventId) => approveStageEvent(eventId, selectedStage.metadata!.id!) : undefined}
                   executionRunning={executionRunning}
                 />
