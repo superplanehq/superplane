@@ -117,6 +117,8 @@ docs/SuperplaneStageEventApproval.md
 docs/SuperplaneStageEventState.md
 docs/SuperplaneStageMetadata.md
 docs/SuperplaneStageSpec.md
+docs/SuperplaneUpdateConnectionGroupBody.md
+docs/SuperplaneUpdateConnectionGroupResponse.md
 docs/SuperplaneUpdateSecretBody.md
 docs/SuperplaneUpdateSecretResponse.md
 docs/SuperplaneUpdateStageBody.md
@@ -225,6 +227,8 @@ model_superplane_stage_event_approval.go
 model_superplane_stage_event_state.go
 model_superplane_stage_metadata.go
 model_superplane_stage_spec.go
+model_superplane_update_connection_group_body.go
+model_superplane_update_connection_group_response.go
 model_superplane_update_secret_body.go
 model_superplane_update_secret_response.go
 model_superplane_update_stage_body.go

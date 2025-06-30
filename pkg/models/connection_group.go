@@ -203,6 +203,36 @@ func (c *Canvas) CreateConnectionGroup(
 	return connectionGroup, nil
 }
 
+func (c *Canvas) UpdateConnectionGroup(id, requesterID string, connections []Connection, spec ConnectionGroupSpec) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("target_id = ?", id).Delete(&Connection{}).Error; err != nil {
+			return fmt.Errorf("failed to delete existing connections: %v", err)
+		}
+
+		for _, connection := range connections {
+			connection.TargetID = uuid.Must(uuid.Parse(id))
+			connection.TargetType = ConnectionTargetTypeConnectionGroup
+			if err := tx.Create(&connection).Error; err != nil {
+				return fmt.Errorf("failed to create connection: %v", err)
+			}
+		}
+
+		now := time.Now()
+		err := tx.Model(&ConnectionGroup{}).
+			Where("id = ?", id).
+			Update("updated_at", now).
+			Update("updated_by", requesterID).
+			Update("spec", datatypes.NewJSONType(spec)).
+			Error
+
+		if err != nil {
+			return fmt.Errorf("failed to update connection group: %v", err)
+		}
+
+		return nil
+	})
+}
+
 func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error) {
 	var connectionGroup *ConnectionGroup
 	err := tx.First(&connectionGroup, id).Error

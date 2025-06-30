@@ -101,6 +101,10 @@ func (s *SuperplaneService) CreateConnectionGroup(ctx context.Context, req *pb.C
 	return groups.CreateConnectionGroup(ctx, req)
 }
 
+func (s *SuperplaneService) UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupRequest) (*pb.UpdateConnectionGroupResponse, error) {
+	return groups.UpdateConnectionGroup(ctx, req)
+}
+
 func (s *SuperplaneService) DescribeConnectionGroup(ctx context.Context, req *pb.DescribeConnectionGroupRequest) (*pb.DescribeConnectionGroupResponse, error) {
 	return groups.DescribeConnectionGroup(ctx, req)
 }
