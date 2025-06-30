@@ -24,8 +24,8 @@ type ConnectionGroupFieldSet struct {
 	CreatedAt         *time.Time
 }
 
-func (f *ConnectionGroupFieldSet) String() string {
-	return fmt.Sprintf("%s - %v", f.ID.String(), f.FieldSet.Data())
+func (s *ConnectionGroupFieldSet) String() string {
+	return fmt.Sprintf("%s - %v", s.ID.String(), s.FieldSet.Data())
 }
 
 type ConnectionGroupFieldSetEvent struct {
