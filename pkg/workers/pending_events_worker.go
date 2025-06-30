@@ -165,7 +165,7 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 }
 
 func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *models.Event, connection models.Connection) error {
-	connectionGroup, err := models.FindConnectionGroupByID(tx, connection.TargetID)
+	connectionGroup, err := models.FindConnectionGroupByIDInTransaction(tx, connection.TargetID)
 	if err != nil {
 		return err
 	}

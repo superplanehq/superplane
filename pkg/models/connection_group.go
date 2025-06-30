@@ -226,7 +226,11 @@ func (c *Canvas) CreateConnectionGroup(
 	return connectionGroup, nil
 }
 
-func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error) {
+func FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
+	return FindConnectionGroupByIDInTransaction(database.Conn(), id)
+}
+
+func FindConnectionGroupByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error) {
 	var connectionGroup *ConnectionGroup
 	err := tx.First(&connectionGroup, id).Error
 	if err != nil {
