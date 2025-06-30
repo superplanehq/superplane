@@ -121,10 +121,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         stageIdOrName: stageId,
         eventId: stageEventId
       },
-      body: {
-        requesterId: generateFakeUUID(),
-        // Both fields are optional, but the 'body' property itself is required
-      }
+      body: {}
     });
   },
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -38,11 +39,11 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event once
 	//
-	_, err := stageevents.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
+	ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
+	_, err := stageevents.ApproveStageEvent(ctx, &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),
-		RequesterId:    uuid.New().String(),
 	})
 
 	require.NoError(t, err)
@@ -59,11 +60,11 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	//
 	// Approve event again
 	//
-	_, err = stageevents.ApproveStageEvent(context.Background(), &superplane.ApproveStageEventRequest{
+	ctx = authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
+	_, err = stageevents.ApproveStageEvent(ctx, &superplane.ApproveStageEventRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		StageIdOrName:  r.Stage.ID.String(),
 		EventId:        event.ID.String(),
-		RequesterId:    uuid.New().String(),
 	})
 
 	require.NoError(t, err)
