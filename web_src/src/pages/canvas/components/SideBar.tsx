@@ -86,11 +86,12 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   return (
     <aside
       ref={sidebarRef}
-      className={`fixed top-12 right-0 h-screen z-10 bg-white flex flex-col ${
+      className={`fixed top-12 right-0 z-10 bg-white flex flex-col ${
         isDragging.current ? '' : 'transition-all duration-200'
       }`}
       style={{
         width: width,
+        height: 'calc(100vh - 4rem)',
         minWidth: 300,
         maxWidth: 800,
         boxShadow: 'rgba(0,0,0,0.07) -2px 0 12px',

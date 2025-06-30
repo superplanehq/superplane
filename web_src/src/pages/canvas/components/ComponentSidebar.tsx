@@ -90,12 +90,12 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
 
   return (
     <div
-      className={`fixed top-12 left-0 h-screen bg-white border-r border-gray-200 transition-all duration-300 ease-linear z-20 ${
+      className={`fixed top-12 left-0 bg-white border-r border-gray-200 transition-all duration-300 ease-linear z-20 ${
         isOpen ? 'w-80' : 'w-0'
       } overflow-hidden`}
       style={{
         boxShadow: isOpen ? 'rgba(0,0,0,0.07) 2px 0 12px' : 'none',
-        height: 'calc(100vh - 4rem)'
+        height: 'calc(100vh - 48px)'
       }}
     >
       <div className="flex flex-col h-full">

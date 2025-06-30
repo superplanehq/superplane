@@ -27,7 +27,7 @@ export const FlowRenderer: React.FC = () => {
   const { onNodeDragStop, onInit } = useFlowHandlers();
  
   return (
-    <div style={{ width: "100vw", height: "100vh", minWidth: 0, minHeight: 0 }}>
+    <div style={{ width: "100vw", height: "100%", minWidth: 0, minHeight: 0 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

@@ -144,7 +144,7 @@ export function Canvas() {
     <StrictMode>
       <Navigation />
       
-      <div className="pt-12">
+      <div className="relative" style={{ height: "calc(100vh - 3rem)", marginTop: "3rem", overflow: "hidden" }}>
         <ComponentSidebar 
           isOpen={isComponentSidebarOpen} 
           onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)} 
