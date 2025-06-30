@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
@@ -23,10 +24,10 @@ func Test__ApproveStageEvent(t *testing.T) {
 	userID := uuid.New().String()
 
 	t.Run("no canvas ID -> error", func(t *testing.T) {
-		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
+		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
 			StageIdOrName: uuid.New().String(),
 			EventId:       event.ID.String(),
-			RequesterId:   uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -36,11 +37,11 @@ func Test__ApproveStageEvent(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
+		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			StageIdOrName:  uuid.New().String(),
 			EventId:        event.ID.String(),
-			RequesterId:    uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -50,11 +51,11 @@ func Test__ApproveStageEvent(t *testing.T) {
 	})
 
 	t.Run("stage event does not exist -> error", func(t *testing.T) {
-		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
+		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			StageIdOrName:  r.Stage.ID.String(),
 			EventId:        uuid.New().String(),
-			RequesterId:    uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -69,11 +70,11 @@ func Test__ApproveStageEvent(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		res, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
+		res, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			StageIdOrName:  r.Stage.ID.String(),
 			EventId:        event.ID.String(),
-			RequesterId:    userID,
 		})
 
 		require.NoError(t, err)
@@ -92,11 +93,11 @@ func Test__ApproveStageEvent(t *testing.T) {
 	})
 
 	t.Run("approves with same requester ID -> error", func(t *testing.T) {
-		_, err := ApproveStageEvent(context.Background(), &protos.ApproveStageEventRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
+		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			StageIdOrName:  r.Stage.ID.String(),
 			EventId:        event.ID.String(),
-			RequesterId:    userID,
 		})
 
 		s, ok := status.FromError(err)

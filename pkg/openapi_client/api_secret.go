@@ -151,12 +151,6 @@ type ApiSuperplaneDeleteSecretRequest struct {
 	ApiService *SecretAPIService
 	canvasIdOrName string
 	idOrName string
-	requesterId *string
-}
-
-func (r ApiSuperplaneDeleteSecretRequest) RequesterId(requesterId string) ApiSuperplaneDeleteSecretRequest {
-	r.requesterId = &requesterId
-	return r
 }
 
 func (r ApiSuperplaneDeleteSecretRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -205,9 +199,6 @@ func (a *SecretAPIService) SuperplaneDeleteSecretExecute(r ApiSuperplaneDeleteSe
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.requesterId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "requesterId", r.requesterId, "", "")
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

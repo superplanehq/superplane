@@ -24,11 +24,6 @@ func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Updat
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = actions.ValidateUUIDs(req.RequesterId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid requester ID")
-	}
-
 	err = actions.ValidateUUIDs(req.IdOrName)
 	var secret *models.Secret
 	if err != nil {

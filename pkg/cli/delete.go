@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +25,7 @@ var deleteSecretCmd = &cobra.Command{
 			context.Background(),
 			canvasIDOrName,
 			idOrName,
-		).RequesterId(uuid.NewString()).Execute()
+		).Execute()
 
 		if err != nil {
 			b, _ := io.ReadAll(httpResponse.Body)
