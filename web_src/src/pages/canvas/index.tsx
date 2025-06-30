@@ -150,21 +150,17 @@ export function Canvas() {
           onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)} 
         />
         
-        {/* Toggle Button for ComponentSidebar */}
-        <button
-          onClick={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)}
-          className={`fixed top-16 z-30 p-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2 ${
-            isComponentSidebarOpen ? 'left-80' : 'left-4'
-          }`}
-          title={isComponentSidebarOpen ? "Close Components" : "Open Components"}
-        >
-          <span className="material-symbols-outlined text-gray-600">
-            {isComponentSidebarOpen ? 'close' : 'menu'}
-          </span>
-          {!isComponentSidebarOpen && (
-            <span className="text-sm font-medium text-gray-700">Components</span>
-          )}
-        </button>
+        {/* Toggle Button for ComponentSidebar - Only show when closed */}
+        {!isComponentSidebarOpen && (
+          <button
+            onClick={() => setIsComponentSidebarOpen(true)}
+            className="fixed top-16 left-4 z-30 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2"
+            title="Open Components"
+          >
+            <span className="text-medium font-semibold text-gray-700">Components</span>
+            <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 -scale-x-100">menu_open</span>
+          </button>
+        )}
         
         <FlowRenderer />
         {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
