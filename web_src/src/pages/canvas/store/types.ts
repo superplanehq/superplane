@@ -1,5 +1,5 @@
 import { CanvasData } from "../types";
-import { SuperplaneCanvas, SuperplaneStage, SuperplaneStageEvent } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneExecution, SuperplaneStage, SuperplaneStageEvent } from "@/api-client/types.gen";
 import { ReadyState } from "react-use-websocket";
 import { AllNodeType, EdgeType } from "../types/flow";
 import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
@@ -63,3 +63,4 @@ export interface CanvasState {
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>}
 export type EventSourceWithEvents = SuperplaneStage & {events: Array<SuperplaneStageEvent>}
+export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

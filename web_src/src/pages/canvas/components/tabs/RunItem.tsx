@@ -15,20 +15,11 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   title, 
   timestamp,
   executionDuration,
+  inputs,
+  outputs,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
   const [spinChar, setSpinChar] = React.useState<string>('|');
-  const outputs = {
-    "pastel": "123",
-    "color": "456",
-    "image": "789",
-    "image2": "432",
-  }
-  const inputs = {
-    "test": "123",
-    "test312": "blue",
-    "teas44": "https://example.com/image.jpg",
-  }
 
   // Animation for running status
   useEffect(() => {

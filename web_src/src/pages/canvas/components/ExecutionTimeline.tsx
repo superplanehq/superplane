@@ -1,12 +1,15 @@
-import { SuperplaneExecution, SuperplaneInputValue, SuperplaneOutputValue } from "@/api-client";
+import { ExecutionWithEvent } from "../store/types";
+import { SuperplaneStage } from "@/api-client";
 import { RunItem } from "./tabs/RunItem";
 
 interface ExecutionTimelineProps {
-  executions: SuperplaneExecution[];
+  executions: ExecutionWithEvent[];
+  selectedStage: SuperplaneStage;
 }
 
 export const ExecutionTimeline = ({ 
   executions, 
+  selectedStage
 }: ExecutionTimelineProps) => {
   if (executions.length === 0) {
     return (
@@ -21,22 +24,6 @@ export const ExecutionTimeline = ({
     );
   }
 
-  const generateKeyValueMap = (keyValues: SuperplaneOutputValue[] | SuperplaneInputValue[] | undefined) => {
-    if (!keyValues) {
-      return {};
-    }
-
-    const map: Record<string, string> = {};
-    keyValues.forEach((keyValue) => {
-      if (!keyValue.value) {
-        return;
-      }
-
-      map[keyValue.name!] = keyValue.value;
-    });
-    return map;
-  };
-
   const formatDuration = (startedAt?: string, finishedAt?: string) => {
     if (!startedAt || !finishedAt) {
       return "-";
@@ -47,6 +34,42 @@ export const ExecutionTimeline = ({
     const seconds = Math.floor((duration % (1000 * 60)) / 1000);
     return `${hours}h ${minutes}m ${seconds}s`;
   };
+
+  const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
+    const map: Record<string, string> = {};
+    const executionOutputs = execution.outputs?.map(output => [output.name, output.value]).reduce((acc, [key, value]) => {
+      acc[key!] = value!;
+      return acc;
+    }, {} as Record<string, string>);
+
+    selectedStage.spec?.outputs?.forEach((output) => {
+      if (!output.name) {
+        return;
+      }
+
+      map[output.name!] = executionOutputs?.[output.name!] || "-";
+    });
+    
+    return map;
+  };
+
+  const mapExecutionEventInputs = (execution: ExecutionWithEvent) => {
+    const map: Record<string, string> = {};
+    const executionEventInputs = execution.event.inputs?.map(input => [input.name, input.value]).reduce((acc, [key, value]) => {
+      acc[key!] = value!;
+      return acc;
+    }, {} as Record<string, string>);
+
+    selectedStage.spec?.inputs?.forEach((input) => {
+      if (!input.name) {
+        return;
+      }
+
+      map[input.name!] = executionEventInputs?.[input.name!] || "-";
+    });
+    
+    return map;
+  };
     
 
   return (
@@ -56,8 +79,8 @@ export const ExecutionTimeline = ({
           <RunItem 
             key={execution.id!} 
             title={execution.id || 'Execution'} 
-            inputs={{}} 
-            outputs={generateKeyValueMap(execution.outputs)} 
+            inputs={mapExecutionEventInputs(execution)} 
+            outputs={mapExecutionOutputs(execution)} 
             status={execution.state || 'Unknown'} 
             timestamp={execution.createdAt || new Date().toISOString()} 
             executionDuration={formatDuration(execution.startedAt, execution.finishedAt)}

@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { StageWithEventQueue } from "../store/types";
-import { SuperplaneExecution } from "@/api-client";
+import { ExecutionWithEvent, StageWithEventQueue } from "../store/types";
 
 import { useResizableSidebar } from "../hooks/useResizableSidebar";
 
@@ -30,8 +29,8 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
 
   const allExecutions = useMemo(() =>
     selectedStage.queue
-      ?.flatMap(event => event.execution as SuperplaneExecution)
-      .filter(execution => execution)
+      ?.filter(event => event.execution)
+      .flatMap(event => ({...event.execution, event}) as ExecutionWithEvent)
       .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [selectedStage.queue]
   );
@@ -73,7 +72,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
         );
 
       case 'history':
-        return <HistoryTab allExecutions={allExecutions} />;
+        return <HistoryTab allExecutions={allExecutions} selectedStage={selectedStage} />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;

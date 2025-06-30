@@ -1,5 +1,4 @@
-import { StageWithEventQueue } from "../../store/types";
-import { SuperplaneExecution } from "@/api-client";
+import { ExecutionWithEvent, StageWithEventQueue } from "../../store/types";
 import { ExecutionTimeline } from '../ExecutionTimeline';
 import { SuperplaneStageEvent } from "@/api-client";
 import MessageItem from '../MessageItem';
@@ -8,7 +7,7 @@ interface ActivityTabProps {
   selectedStage: StageWithEventQueue;
   pendingEvents: SuperplaneStageEvent[];
   waitingEvents: SuperplaneStageEvent[];
-  allExecutions: SuperplaneExecution[];
+  allExecutions: ExecutionWithEvent[];
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   executionRunning: boolean;
 }
@@ -31,6 +30,7 @@ export const ActivityTab = ({
           <h3 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Recent Runs</h3>
         </div>
         <ExecutionTimeline 
+          selectedStage={selectedStage}
           executions={allExecutions.slice(0, 3)} 
         />
       </div>
