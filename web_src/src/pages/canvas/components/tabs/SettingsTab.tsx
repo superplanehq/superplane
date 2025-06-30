@@ -9,8 +9,8 @@ interface SettingsTabProps {
 export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   const [viewMode, setViewMode] = useState<'form' | 'yaml'>('form');
 
-  const convertToYaml = (obj: any): string => {
-    const yamlify = (value: any, indent: number = 0): string => {
+  const convertToYaml = (obj: StageWithEventQueue): string => {
+    const yamlify = (value: string | number | boolean | object | null | undefined, indent: number = 0): string => {
       const spaces = '  '.repeat(indent);
       
       if (value === null || value === undefined) {
@@ -33,7 +33,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
       }
       
       if (typeof value === 'object') {
-        const entries = Object.entries(value).filter(([_, v]) => v !== undefined);
+        const entries = Object.entries(value).filter(([, v]) => v !== undefined);
         if (entries.length === 0) return '{}';
         
         return '\n' + entries.map(([key, val]) => {
@@ -49,6 +49,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
     
     return yamlify(obj).trim();
   };
+
   const getAllInputMappings = (inputName: string) => {
     if (!selectedStage.spec!.inputMappings) return [];
     
@@ -122,11 +123,11 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
       </div>
 
       {/* Content */}
-      <div className="bg-white flex-1 overflow-auto">
+      <div className="bg-white flex-1 overflow-auto ml-2">
         {viewMode === 'form' ? (
           <div className='text-sm p-3'>
             {/* Stage Details */}
-            <div className='mt-3 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+            <div className='mt-3 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
               Stage Details
             </div>
             <div className="space-y-2">
@@ -143,7 +144,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Executor */}
             {selectedStage.spec!.executor && (
               <>
-                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
                   Executor
                 </div>
                 <div className="space-y-2">
@@ -174,7 +175,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Gates */}
             {selectedStage.spec!.conditions && selectedStage.spec!.conditions.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
                   Gates
                 </div>
                 <div className="space-y-2">
@@ -193,17 +194,17 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Connections */}
             {selectedStage.spec!.connections && selectedStage.spec!.connections.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
                   Connections
                 </div>
                 <div className="space-y-2">
                   {selectedStage.spec!.connections.map((connection, index) => (
                     <div key={index} className="flex items-center justify-between w-full">
-                      <span className="bg-gray-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
-                        <span className="material-symbols-outlined mr-1 text-xs">rocket_launch</span>
+                      <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
+                        <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
                         {connection.name || `Connection ${index + 1}`}
                       </span>
-                      <span className='text-xs text-green-600 text-left'>Stage</span>
+                      <span className='text-sm text-green-600 text-left'>Stage</span>
                     </div>
                   ))}
                 </div>
@@ -213,7 +214,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Inputs */}
             {selectedStage.spec!.inputs && selectedStage.spec!.inputs.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
                   Inputs
                 </div>
                 <div className="space-y-3">
@@ -231,16 +232,16 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                                   const valueSource = formatValueSource(inputMapping.mapping);
                                   return (
                                     <div key={`mapping_${index}_${mappingIndex}`} className="flex items-center w-full">
-                                      <span className="bg-gray-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">
-                                        <span className="material-symbols-outlined mr-1 text-xs">rocket_launch</span>
+                                      <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">
+                                        <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
                                         {inputMapping.triggeredBy}
                                       </span>
-                                      <span className="text-xs">.</span>
-                                      <span className="bg-purple-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">
+                                      <span className="text-sm">.</span>
+                                      <span className="bg-purple-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">
                                         outputs
                                       </span>
-                                      <span className="text-xs">.</span>
-                                      <span className="bg-yellow-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">
+                                      <span className="text-sm">.</span>
+                                      <span className="bg-yellow-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">
                                         {valueSource?.source || input.name || 'VALUE'}
                                       </span>
                                     </div>
@@ -248,7 +249,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                                 })}
                               </div>
                             ) : (
-                              <span className="text-gray-500 text-xs text-left">No mappings configured</span>
+                              <span className="text-gray-500 text-sm text-left">No mappings configured</span>
                             )}
                           </div>
                         </div>
@@ -262,20 +263,20 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Outputs */}
             {selectedStage.spec!.outputs && selectedStage.spec!.outputs.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-xs font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
                   Outputs
                 </div>
                 <div className="space-y-2">
                   {selectedStage.spec!.outputs.map((output, index) => (
                     <div key={index} className="flex items-center justify-between w-full">
                       <div className='flex items-center'>
-                        <span className="h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">this</span>
-                        <span className="text-xs">.</span>
-                        <span className="bg-purple-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">outputs</span>
-                        <span className="text-xs">.</span>
-                        <span className="bg-yellow-100 h-[26px] text-gray-600 text-xs px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">{output.name || `output_${index + 1}`}</span>
+                        <span className="h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">this</span>
+                        <span className="text-sm">.</span>
+                        <span className="bg-purple-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">outputs</span>
+                        <span className="text-sm">.</span>
+                        <span className="bg-yellow-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">{output.name || `output_${index + 1}`}</span>
                       </div>
-                      <span className={`text-xs text-left ${output.required ? 'text-red-600' : 'text-gray-500'}`}>
+                      <span className={`text-sm text-left ${output.required ? 'text-red-600' : 'text-gray-500'}`}>
                         {output.required ? 'required' : 'optional'}
                       </span>
                     </div>
@@ -286,7 +287,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           </div>
         ) : (
           <div className="h-full">
-            <pre className="bg-white p-4 font-mono text-xs h-full overflow-auto text-left">
+            <pre className="bg-white p-4 font-mono text-sm h-full overflow-auto text-left">
               {convertToYaml(selectedStage)}
             </pre>
           </div>
