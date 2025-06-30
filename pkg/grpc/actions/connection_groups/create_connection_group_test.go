@@ -108,7 +108,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "spec.GroupBy fields cannot be empty", s.Message())
+		assert.Equal(t, "connection group must have at least one field to group by", s.Message())
 	})
 
 	t.Run("connection group with timeout value below min -> error", func(t *testing.T) {
