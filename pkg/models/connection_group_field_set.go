@@ -20,7 +20,7 @@ type ConnectionGroupFieldSet struct {
 	Timeout           uint32
 	TimeoutBehavior   string
 	State             string
-	Result            string
+	StateReason       string
 	CreatedAt         *time.Time
 }
 
@@ -73,9 +73,9 @@ func (s *ConnectionGroupFieldSet) FindEvents() ([]ConnectionGroupFieldSetEvent, 
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state, result string) error {
+func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state, reason string) error {
 	s.State = state
-	s.Result = result
+	s.StateReason = reason
 	return tx.Save(s).Error
 }
 
@@ -110,8 +110,8 @@ func (s *ConnectionGroupFieldSet) FindEventsWithData(tx *gorm.DB) ([]ConnectionG
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, result string) ([]byte, error) {
-	event := map[string]any{"result": result}
+func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, stateReason string, missingConnections []Connection) ([]byte, error) {
+	event := map[string]any{}
 
 	//
 	// Include fields from field set.
@@ -143,6 +143,18 @@ func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, result string) ([]byte
 	event["events"] = eventMap
 	event["fields"] = fieldMap
 
+	//
+	// Include the missing field, if any.
+	//
+	if len(missingConnections) > 0 {
+		missing := []string{}
+		for _, connection := range missingConnections {
+			missing = append(missing, connection.SourceName)
+		}
+
+		event["missing"] = missing
+	}
+
 	return json.Marshal(event)
 }
 
@@ -168,7 +180,12 @@ func (s *ConnectionGroupFieldSet) AttachEvent(tx *gorm.DB, event *Event) (*Conne
 	return &connectionGroupEvent, nil
 }
 
-func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup, allConnections []Connection) ([]Connection, error) {
+func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup) ([]Connection, error) {
+	allConnections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
+	if err != nil {
+		return nil, fmt.Errorf("error listing all connections: %v", err)
+	}
+
 	connectionsForFieldSet, err := g.FindConnectionsForFieldSet(tx, s)
 	if err != nil {
 		return nil, fmt.Errorf("error finding connections for field set %s - %v: %v", s.ID.String(), s.FieldSet.Data(), err)

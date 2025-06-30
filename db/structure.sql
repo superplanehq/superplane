@@ -134,7 +134,7 @@ CREATE TABLE public.connection_group_field_sets (
     created_at timestamp without time zone NOT NULL,
     timeout integer,
     timeout_behavior character varying(64),
-    result character varying(64)
+    state_reason character varying(64)
 );
 
 

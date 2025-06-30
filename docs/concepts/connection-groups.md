@@ -63,7 +63,6 @@ The events emitted by the connection group will have all the grouping fields and
 
 ```json
 {
-  "timeout": "received-all",
   "fields": {
     "version": "v1",
   },
@@ -74,17 +73,17 @@ The events emitted by the connection group will have all the grouping fields and
 }
 ```
 
-If the timeout is reached, the connection group will emit an event with the same fields, but with a `result` field set to `timed-out`, and only the events from the connections that have sent events will be included.
+If the timeout is reached, the connection group will emit an event with the same fields, but with a `missing` field containing the names of the connections that did not send events.
 
 ```json
 {
-  "result": "timed-out",
   "fields": {
     "version": "v1",
   },
   "events": {
     "preprod1": {...}
-  }
+  },
+  "missing": ["preprod2"]
 }
 ```
 

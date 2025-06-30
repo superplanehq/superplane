@@ -419,52 +419,52 @@ func (ConnectionGroupFieldSet_State) EnumDescriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{56, 0}
 }
 
-type ConnectionGroupFieldSet_Result int32
+type ConnectionGroupFieldSet_StateReason int32
 
 const (
-	ConnectionGroupFieldSet_RESULT_NONE         ConnectionGroupFieldSet_Result = 0
-	ConnectionGroupFieldSet_RESULT_TIMED_OUT    ConnectionGroupFieldSet_Result = 1
-	ConnectionGroupFieldSet_RESULT_RECEIVED_ALL ConnectionGroupFieldSet_Result = 2
+	ConnectionGroupFieldSet_STATE_REASON_NONE    ConnectionGroupFieldSet_StateReason = 0
+	ConnectionGroupFieldSet_STATE_REASON_OK      ConnectionGroupFieldSet_StateReason = 1
+	ConnectionGroupFieldSet_STATE_REASON_TIMEOUT ConnectionGroupFieldSet_StateReason = 2
 )
 
-// Enum value maps for ConnectionGroupFieldSet_Result.
+// Enum value maps for ConnectionGroupFieldSet_StateReason.
 var (
-	ConnectionGroupFieldSet_Result_name = map[int32]string{
-		0: "RESULT_NONE",
-		1: "RESULT_TIMED_OUT",
-		2: "RESULT_RECEIVED_ALL",
+	ConnectionGroupFieldSet_StateReason_name = map[int32]string{
+		0: "STATE_REASON_NONE",
+		1: "STATE_REASON_OK",
+		2: "STATE_REASON_TIMEOUT",
 	}
-	ConnectionGroupFieldSet_Result_value = map[string]int32{
-		"RESULT_NONE":         0,
-		"RESULT_TIMED_OUT":    1,
-		"RESULT_RECEIVED_ALL": 2,
+	ConnectionGroupFieldSet_StateReason_value = map[string]int32{
+		"STATE_REASON_NONE":    0,
+		"STATE_REASON_OK":      1,
+		"STATE_REASON_TIMEOUT": 2,
 	}
 )
 
-func (x ConnectionGroupFieldSet_Result) Enum() *ConnectionGroupFieldSet_Result {
-	p := new(ConnectionGroupFieldSet_Result)
+func (x ConnectionGroupFieldSet_StateReason) Enum() *ConnectionGroupFieldSet_StateReason {
+	p := new(ConnectionGroupFieldSet_StateReason)
 	*p = x
 	return p
 }
 
-func (x ConnectionGroupFieldSet_Result) String() string {
+func (x ConnectionGroupFieldSet_StateReason) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (ConnectionGroupFieldSet_Result) Descriptor() protoreflect.EnumDescriptor {
+func (ConnectionGroupFieldSet_StateReason) Descriptor() protoreflect.EnumDescriptor {
 	return file_superplane_proto_enumTypes[8].Descriptor()
 }
 
-func (ConnectionGroupFieldSet_Result) Type() protoreflect.EnumType {
+func (ConnectionGroupFieldSet_StateReason) Type() protoreflect.EnumType {
 	return &file_superplane_proto_enumTypes[8]
 }
 
-func (x ConnectionGroupFieldSet_Result) Number() protoreflect.EnumNumber {
+func (x ConnectionGroupFieldSet_StateReason) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use ConnectionGroupFieldSet_Result.Descriptor instead.
-func (ConnectionGroupFieldSet_Result) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use ConnectionGroupFieldSet_StateReason.Descriptor instead.
+func (ConnectionGroupFieldSet_StateReason) EnumDescriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{56, 1}
 }
 
@@ -3531,14 +3531,14 @@ func (x *ListConnectionGroupFieldSetsResponse) GetFieldSets() []*ConnectionGroup
 }
 
 type ConnectionGroupFieldSet struct {
-	state         protoimpl.MessageState         `protogen:"open.v1"`
-	Id            string                         `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Fields        []*KeyValuePair                `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
-	Hash          string                         `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
-	State         ConnectionGroupFieldSet_State  `protobuf:"varint,4,opt,name=state,proto3,enum=Superplane.ConnectionGroupFieldSet_State" json:"state,omitempty"`
-	Result        ConnectionGroupFieldSet_Result `protobuf:"varint,5,opt,name=result,proto3,enum=Superplane.ConnectionGroupFieldSet_Result" json:"result,omitempty"`
-	Events        []*ConnectionGroupEvent        `protobuf:"bytes,6,rep,name=events,proto3" json:"events,omitempty"`
-	CreatedAt     *timestamp.Timestamp           `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	state         protoimpl.MessageState              `protogen:"open.v1"`
+	Id            string                              `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Fields        []*KeyValuePair                     `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	Hash          string                              `protobuf:"bytes,3,opt,name=hash,proto3" json:"hash,omitempty"`
+	State         ConnectionGroupFieldSet_State       `protobuf:"varint,4,opt,name=state,proto3,enum=Superplane.ConnectionGroupFieldSet_State" json:"state,omitempty"`
+	StateReason   ConnectionGroupFieldSet_StateReason `protobuf:"varint,5,opt,name=state_reason,json=stateReason,proto3,enum=Superplane.ConnectionGroupFieldSet_StateReason" json:"state_reason,omitempty"`
+	Events        []*ConnectionGroupEvent             `protobuf:"bytes,6,rep,name=events,proto3" json:"events,omitempty"`
+	CreatedAt     *timestamp.Timestamp                `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3601,11 +3601,11 @@ func (x *ConnectionGroupFieldSet) GetState() ConnectionGroupFieldSet_State {
 	return ConnectionGroupFieldSet_STATE_UNKNOWN
 }
 
-func (x *ConnectionGroupFieldSet) GetResult() ConnectionGroupFieldSet_Result {
+func (x *ConnectionGroupFieldSet) GetStateReason() ConnectionGroupFieldSet_StateReason {
 	if x != nil {
-		return x.Result
+		return x.StateReason
 	}
-	return ConnectionGroupFieldSet_RESULT_NONE
+	return ConnectionGroupFieldSet_STATE_REASON_NONE
 }
 
 func (x *ConnectionGroupFieldSet) GetEvents() []*ConnectionGroupEvent {
@@ -6402,13 +6402,13 @@ const file_superplane_proto_rawDesc = "" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\"j\n" +
 	"$ListConnectionGroupFieldSetsResponse\x12B\n" +
 	"\n" +
-	"field_sets\x18\x01 \x03(\v2#.Superplane.ConnectionGroupFieldSetR\tfieldSets\"\x8c\x04\n" +
+	"field_sets\x18\x01 \x03(\v2#.Superplane.ConnectionGroupFieldSetR\tfieldSets\"\xa7\x04\n" +
 	"\x17ConnectionGroupFieldSet\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x120\n" +
 	"\x06fields\x18\x02 \x03(\v2\x18.Superplane.KeyValuePairR\x06fields\x12\x12\n" +
 	"\x04hash\x18\x03 \x01(\tR\x04hash\x12?\n" +
-	"\x05state\x18\x04 \x01(\x0e2).Superplane.ConnectionGroupFieldSet.StateR\x05state\x12B\n" +
-	"\x06result\x18\x05 \x01(\x0e2*.Superplane.ConnectionGroupFieldSet.ResultR\x06result\x128\n" +
+	"\x05state\x18\x04 \x01(\x0e2).Superplane.ConnectionGroupFieldSet.StateR\x05state\x12R\n" +
+	"\fstate_reason\x18\x05 \x01(\x0e2/.Superplane.ConnectionGroupFieldSet.StateReasonR\vstateReason\x128\n" +
 	"\x06events\x18\x06 \x03(\v2 .Superplane.ConnectionGroupEventR\x06events\x129\n" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"W\n" +
@@ -6416,11 +6416,11 @@ const file_superplane_proto_rawDesc = "" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x13\n" +
 	"\x0fSTATE_PROCESSED\x10\x02\x12\x13\n" +
-	"\x0fSTATE_DISCARDED\x10\x03\"H\n" +
-	"\x06Result\x12\x0f\n" +
-	"\vRESULT_NONE\x10\x00\x12\x14\n" +
-	"\x10RESULT_TIMED_OUT\x10\x01\x12\x17\n" +
-	"\x13RESULT_RECEIVED_ALL\x10\x02\"\xdf\x01\n" +
+	"\x0fSTATE_DISCARDED\x10\x03\"S\n" +
+	"\vStateReason\x12\x15\n" +
+	"\x11STATE_REASON_NONE\x10\x00\x12\x13\n" +
+	"\x0fSTATE_REASON_OK\x10\x01\x12\x18\n" +
+	"\x14STATE_REASON_TIMEOUT\x10\x02\"\xdf\x01\n" +
 	"\x14ConnectionGroupEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\tsource_id\x18\x02 \x01(\tR\bsourceId\x12<\n" +
@@ -6619,7 +6619,7 @@ var file_superplane_proto_goTypes = []any{
 	(Condition_Type)(0),                          // 5: Superplane.Condition.Type
 	(ExecutorSpec_Type)(0),                       // 6: Superplane.ExecutorSpec.Type
 	(ConnectionGroupFieldSet_State)(0),           // 7: Superplane.ConnectionGroupFieldSet.State
-	(ConnectionGroupFieldSet_Result)(0),          // 8: Superplane.ConnectionGroupFieldSet.Result
+	(ConnectionGroupFieldSet_StateReason)(0),     // 8: Superplane.ConnectionGroupFieldSet.StateReason
 	(StageEvent_State)(0),                        // 9: Superplane.StageEvent.State
 	(StageEvent_StateReason)(0),                  // 10: Superplane.StageEvent.StateReason
 	(Execution_State)(0),                         // 11: Superplane.Execution.State
@@ -6779,7 +6779,7 @@ var file_superplane_proto_depIdxs = []int32{
 	69,  // 49: Superplane.ListConnectionGroupFieldSetsResponse.field_sets:type_name -> Superplane.ConnectionGroupFieldSet
 	74,  // 50: Superplane.ConnectionGroupFieldSet.fields:type_name -> Superplane.KeyValuePair
 	7,   // 51: Superplane.ConnectionGroupFieldSet.state:type_name -> Superplane.ConnectionGroupFieldSet.State
-	8,   // 52: Superplane.ConnectionGroupFieldSet.result:type_name -> Superplane.ConnectionGroupFieldSet.Result
+	8,   // 52: Superplane.ConnectionGroupFieldSet.state_reason:type_name -> Superplane.ConnectionGroupFieldSet.StateReason
 	70,  // 53: Superplane.ConnectionGroupFieldSet.events:type_name -> Superplane.ConnectionGroupEvent
 	113, // 54: Superplane.ConnectionGroupFieldSet.created_at:type_name -> google.protobuf.Timestamp
 	2,   // 55: Superplane.ConnectionGroupEvent.source_type:type_name -> Superplane.Connection.Type

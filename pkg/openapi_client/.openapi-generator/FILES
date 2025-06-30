@@ -35,6 +35,7 @@ docs/ConnectionFilterType.md
 docs/ConnectionGroupAPI.md
 docs/ConnectionHeaderFilter.md
 docs/EventSourceAPI.md
+docs/ExecutionResult.md
 docs/ExecutorSpecHTTP.md
 docs/ExecutorSpecHTTPResponsePolicy.md
 docs/ExecutorSpecSemaphore.md
@@ -58,7 +59,6 @@ docs/SecretProvider.md
 docs/SpecGroupBy.md
 docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
-docs/StageEventStateReason.md
 docs/SuperplaneApproveStageEventBody.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneCanvas.md
@@ -71,8 +71,8 @@ docs/SuperplaneConnection.md
 docs/SuperplaneConnectionGroup.md
 docs/SuperplaneConnectionGroupEvent.md
 docs/SuperplaneConnectionGroupFieldSet.md
-docs/SuperplaneConnectionGroupFieldSetResult.md
 docs/SuperplaneConnectionGroupFieldSetState.md
+docs/SuperplaneConnectionGroupFieldSetStateReason.md
 docs/SuperplaneConnectionGroupMetadata.md
 docs/SuperplaneConnectionGroupSpec.md
 docs/SuperplaneConnectionType.md
@@ -94,7 +94,6 @@ docs/SuperplaneDescribeStageResponse.md
 docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneExecution.md
-docs/SuperplaneExecutionResult.md
 docs/SuperplaneExecutionState.md
 docs/SuperplaneExecutorSpec.md
 docs/SuperplaneExecutorSpecType.md
@@ -117,6 +116,7 @@ docs/SuperplaneStage.md
 docs/SuperplaneStageEvent.md
 docs/SuperplaneStageEventApproval.md
 docs/SuperplaneStageEventState.md
+docs/SuperplaneStageEventStateReason.md
 docs/SuperplaneStageMetadata.md
 docs/SuperplaneStageSpec.md
 docs/SuperplaneUpdateSecretBody.md
@@ -148,6 +148,7 @@ model_connection_filter.go
 model_connection_filter_operator.go
 model_connection_filter_type.go
 model_connection_header_filter.go
+model_execution_result.go
 model_executor_spec_http.go
 model_executor_spec_http_response_policy.go
 model_executor_spec_semaphore.go
@@ -168,7 +169,6 @@ model_secret_local.go
 model_secret_provider.go
 model_spec_group_by.go
 model_spec_timeout_behavior.go
-model_stage_event_state_reason.go
 model_superplane_approve_stage_event_body.go
 model_superplane_approve_stage_event_response.go
 model_superplane_canvas.go
@@ -181,8 +181,8 @@ model_superplane_connection.go
 model_superplane_connection_group.go
 model_superplane_connection_group_event.go
 model_superplane_connection_group_field_set.go
-model_superplane_connection_group_field_set_result.go
 model_superplane_connection_group_field_set_state.go
+model_superplane_connection_group_field_set_state_reason.go
 model_superplane_connection_group_metadata.go
 model_superplane_connection_group_spec.go
 model_superplane_connection_type.go
@@ -204,7 +204,6 @@ model_superplane_describe_stage_response.go
 model_superplane_event_source.go
 model_superplane_event_source_metadata.go
 model_superplane_execution.go
-model_superplane_execution_result.go
 model_superplane_execution_state.go
 model_superplane_executor_spec.go
 model_superplane_executor_spec_type.go
@@ -227,6 +226,7 @@ model_superplane_stage.go
 model_superplane_stage_event.go
 model_superplane_stage_event_approval.go
 model_superplane_stage_event_state.go
+model_superplane_stage_event_state_reason.go
 model_superplane_stage_metadata.go
 model_superplane_stage_spec.go
 model_superplane_update_secret_body.go

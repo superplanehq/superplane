@@ -25,7 +25,7 @@ type SuperplaneStageEvent struct {
 	SourceId *string `json:"sourceId,omitempty"`
 	SourceType *SuperplaneConnectionType `json:"sourceType,omitempty"`
 	State *SuperplaneStageEventState `json:"state,omitempty"`
-	StateReason *StageEventStateReason `json:"stateReason,omitempty"`
+	StateReason *SuperplaneStageEventStateReason `json:"stateReason,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
@@ -42,7 +42,7 @@ func NewSuperplaneStageEvent() *SuperplaneStageEvent {
 	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
-	var stateReason StageEventStateReason = STAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
+	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
 	this.StateReason = &stateReason
 	return &this
 }
@@ -56,7 +56,7 @@ func NewSuperplaneStageEventWithDefaults() *SuperplaneStageEvent {
 	this.SourceType = &sourceType
 	var state SuperplaneStageEventState = SUPERPLANESTAGEEVENTSTATE_STATE_UNKNOWN
 	this.State = &state
-	var stateReason StageEventStateReason = STAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
+	var stateReason SuperplaneStageEventStateReason = SUPERPLANESTAGEEVENTSTATEREASON_STATE_REASON_UNKNOWN
 	this.StateReason = &stateReason
 	return &this
 }
@@ -190,9 +190,9 @@ func (o *SuperplaneStageEvent) SetState(v SuperplaneStageEventState) {
 }
 
 // GetStateReason returns the StateReason field value if set, zero value otherwise.
-func (o *SuperplaneStageEvent) GetStateReason() StageEventStateReason {
+func (o *SuperplaneStageEvent) GetStateReason() SuperplaneStageEventStateReason {
 	if o == nil || IsNil(o.StateReason) {
-		var ret StageEventStateReason
+		var ret SuperplaneStageEventStateReason
 		return ret
 	}
 	return *o.StateReason
@@ -200,7 +200,7 @@ func (o *SuperplaneStageEvent) GetStateReason() StageEventStateReason {
 
 // GetStateReasonOk returns a tuple with the StateReason field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageEvent) GetStateReasonOk() (*StageEventStateReason, bool) {
+func (o *SuperplaneStageEvent) GetStateReasonOk() (*SuperplaneStageEventStateReason, bool) {
 	if o == nil || IsNil(o.StateReason) {
 		return nil, false
 	}
@@ -216,8 +216,8 @@ func (o *SuperplaneStageEvent) HasStateReason() bool {
 	return false
 }
 
-// SetStateReason gets a reference to the given StageEventStateReason and assigns it to the StateReason field.
-func (o *SuperplaneStageEvent) SetStateReason(v StageEventStateReason) {
+// SetStateReason gets a reference to the given SuperplaneStageEventStateReason and assigns it to the StateReason field.
+func (o *SuperplaneStageEvent) SetStateReason(v SuperplaneStageEventStateReason) {
 	o.StateReason = &v
 }
 

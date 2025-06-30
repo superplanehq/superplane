@@ -276,7 +276,7 @@ var listConnectionGroupFieldSetsCmd = &cobra.Command{
 			fmt.Printf("%d. Fields: %s (%s)\n", i+1, fieldsAsString(fieldSet.Fields), *fieldSet.Hash)
 
 			fmt.Printf("   State: %s\n", *fieldSet.State)
-			fmt.Printf("   Result: %s\n", *fieldSet.Result)
+			fmt.Printf("   Reason: %s\n", *fieldSet.StateReason)
 			fmt.Printf("   Created: %s\n", *fieldSet.CreatedAt)
 
 			if len(fieldSet.Events) > 0 {

@@ -7,7 +7,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/gorm"
 )
 
 type PendingFieldSetsWorker struct {
@@ -65,20 +64,23 @@ func (w *PendingFieldSetsWorker) ProcessFieldSet(fieldSet models.ConnectionGroup
 		return nil
 	}
 
+	missingConnections, err := fieldSet.MissingConnections(database.Conn(), connectionGroup)
+	if err != nil {
+		return err
+	}
+
 	switch connectionGroupSpec.TimeoutBehavior {
 	case models.ConnectionGroupTimeoutBehaviorEmit:
 		log.Infof("Field set %s for %s has timed out - processing", fieldSet.String(), connectionGroup.Name)
 
-		return database.Conn().Transaction(func(tx *gorm.DB) error {
-			return connectionGroup.Emit(tx, &fieldSet, models.ConnectionGroupFieldSetResultTimedOut)
-		})
+		return connectionGroup.Emit(&fieldSet, models.ConnectionGroupFieldSetStateReasonTimeout, missingConnections)
 
 	case models.ConnectionGroupTimeoutBehaviorDrop:
 		log.Infof("Field set %s for %s timed out - discarding", fieldSet.String(), connectionGroup.Name)
 		return fieldSet.UpdateState(
 			database.Conn(),
 			models.ConnectionGroupFieldSetStateDiscarded,
-			models.ConnectionGroupFieldSetResultTimedOut,
+			models.ConnectionGroupFieldSetStateReasonTimeout,
 		)
 
 	default:

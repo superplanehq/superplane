@@ -712,17 +712,17 @@ message ConnectionGroupFieldSet {
     STATE_DISCARDED = 3;
   }
 
-  enum Result {
-    RESULT_NONE = 0;
-    RESULT_TIMED_OUT = 1;
-    RESULT_RECEIVED_ALL = 2;
+  enum StateReason {
+    STATE_REASON_NONE = 0;
+    STATE_REASON_OK = 1;
+    STATE_REASON_TIMEOUT = 2;
   }
 
   string id = 1;
   repeated KeyValuePair fields = 2;
   string hash = 3;
   State state = 4;
-  Result result = 5;
+  StateReason state_reason = 5;
   repeated ConnectionGroupEvent events = 6;
   google.protobuf.Timestamp created_at = 7;
 }

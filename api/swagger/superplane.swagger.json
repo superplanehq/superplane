@@ -1744,6 +1744,15 @@
         }
       }
     },
+    "ExecutionResult": {
+      "type": "string",
+      "enum": [
+        "RESULT_UNKNOWN",
+        "RESULT_PASSED",
+        "RESULT_FAILED"
+      ],
+      "default": "RESULT_UNKNOWN"
+    },
     "ExecutorSpecHTTP": {
       "type": "object",
       "properties": {
@@ -1964,19 +1973,6 @@
       ],
       "default": "TIMEOUT_BEHAVIOR_NONE"
     },
-    "StageEventStateReason": {
-      "type": "string",
-      "enum": [
-        "STATE_REASON_UNKNOWN",
-        "STATE_REASON_APPROVAL",
-        "STATE_REASON_TIME_WINDOW",
-        "STATE_REASON_EXECUTION",
-        "STATE_REASON_CONNECTION",
-        "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY"
-      ],
-      "default": "STATE_REASON_UNKNOWN"
-    },
     "SuperplaneApproveStageEventBody": {
       "type": "object",
       "properties": {
@@ -2141,8 +2137,8 @@
         "state": {
           "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetState"
         },
-        "result": {
-          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetResult"
+        "stateReason": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetStateReason"
         },
         "events": {
           "type": "array",
@@ -2157,15 +2153,6 @@
         }
       }
     },
-    "SuperplaneConnectionGroupFieldSetResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_NONE",
-        "RESULT_TIMED_OUT",
-        "RESULT_RECEIVED_ALL"
-      ],
-      "default": "RESULT_NONE"
-    },
     "SuperplaneConnectionGroupFieldSetState": {
       "type": "string",
       "enum": [
@@ -2175,6 +2162,15 @@
         "STATE_DISCARDED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneConnectionGroupFieldSetStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_NONE",
+        "STATE_REASON_OK",
+        "STATE_REASON_TIMEOUT"
+      ],
+      "default": "STATE_REASON_NONE"
     },
     "SuperplaneConnectionGroupMetadata": {
       "type": "object",
@@ -2413,7 +2409,7 @@
           "$ref": "#/definitions/SuperplaneExecutionState"
         },
         "result": {
-          "$ref": "#/definitions/SuperplaneExecutionResult"
+          "$ref": "#/definitions/ExecutionResult"
         },
         "createdAt": {
           "type": "string",
@@ -2435,15 +2431,6 @@
           }
         }
       }
-    },
-    "SuperplaneExecutionResult": {
-      "type": "string",
-      "enum": [
-        "RESULT_UNKNOWN",
-        "RESULT_PASSED",
-        "RESULT_FAILED"
-      ],
-      "default": "RESULT_UNKNOWN"
     },
     "SuperplaneExecutionState": {
       "type": "string",
@@ -2691,7 +2678,7 @@
           "$ref": "#/definitions/SuperplaneStageEventState"
         },
         "stateReason": {
-          "$ref": "#/definitions/StageEventStateReason"
+          "$ref": "#/definitions/SuperplaneStageEventStateReason"
         },
         "createdAt": {
           "type": "string",
@@ -2737,6 +2724,19 @@
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneStageEventStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_UNKNOWN",
+        "STATE_REASON_APPROVAL",
+        "STATE_REASON_TIME_WINDOW",
+        "STATE_REASON_EXECUTION",
+        "STATE_REASON_CONNECTION",
+        "STATE_REASON_CANCELLED",
+        "STATE_REASON_UNHEALTHY"
+      ],
+      "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneStageMetadata": {
       "type": "object",
@@ -2889,7 +2889,7 @@
         "results": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/SuperplaneExecutionResult"
+            "$ref": "#/definitions/ExecutionResult"
           }
         }
       }
