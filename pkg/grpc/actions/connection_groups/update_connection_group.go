@@ -53,9 +53,6 @@ func UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	//
-	// Create connection group
-	//
 	err = canvas.UpdateConnectionGroup(connectionGroup.ID.String(), userID, connections, *spec)
 	if err != nil {
 		log.Errorf("Error updating connection group. Request: %v. Error: %v", req, err)
