@@ -58,22 +58,12 @@ var updateCmd = &cobra.Command{
 				Fail("Invalid Stage YAML: id field missing")
 			}
 
-			spec, ok := yamlData["spec"].(map[string]any)
-			if !ok {
-				Fail("Invalid Stage YAML: spec section missing")
-			}
-
-			// Convert to JSON
-			specData, err := json.Marshal(spec)
+			var stage openapi_client.SuperplaneStage
+			err = yaml.Unmarshal(data, &stage)
 			Check(err)
 
 			// Convert JSON to stage request
-			var request openapi_client.SuperplaneUpdateStageBody
-			err = json.Unmarshal(specData, &request)
-			Check(err)
-
-			// TODO: this should be known through the API token used to call the API
-			// so we just put something here until we have auth in this API.
+			request := openapi_client.SuperplaneUpdateStageBody{Stage: &stage}
 			request.SetRequesterId(uuid.NewString())
 
 			response, httpResponse, err := c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
@@ -135,10 +125,10 @@ var updateStageCmd = &cobra.Command{
 
 		// Create stage with spec
 		stage := openapi_client.NewSuperplaneStage()
-		
+
 		// Create stage spec
 		stageSpec := openapi_client.NewSuperplaneStageSpec()
-		
+
 		// Parse connections if present
 		if len(connections) > 0 {
 			connJSON, err := json.Marshal(connections)
@@ -151,10 +141,10 @@ var updateStageCmd = &cobra.Command{
 			// Set connections in spec
 			stageSpec.SetConnections(apiConnections)
 		}
-		
+
 		// Set spec in stage
 		stage.SetSpec(*stageSpec)
-		
+
 		// Set stage in request
 		request.SetStage(*stage)
 

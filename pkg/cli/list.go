@@ -353,7 +353,7 @@ func fieldsAsString(fields []openapi_client.SuperplaneKeyValuePair) string {
 	for i, field := range fields {
 		sb.WriteString(fmt.Sprintf("%s=%s", *field.Name, *field.Value))
 		if i < len(fields)-1 {
-			sb.WriteString("\n")
+			sb.WriteString(", ")
 		}
 	}
 	return sb.String()

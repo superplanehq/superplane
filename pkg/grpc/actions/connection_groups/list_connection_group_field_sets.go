@@ -120,6 +120,8 @@ func fieldSetStateToProto(state string) pb.ConnectionGroupFieldSet_State {
 		return pb.ConnectionGroupFieldSet_STATE_PENDING
 	case models.ConnectionGroupFieldSetStateProcessed:
 		return pb.ConnectionGroupFieldSet_STATE_PROCESSED
+	case models.ConnectionGroupFieldSetStateDiscarded:
+		return pb.ConnectionGroupFieldSet_STATE_DISCARDED
 	default:
 		return pb.ConnectionGroupFieldSet_STATE_UNKNOWN
 	}
