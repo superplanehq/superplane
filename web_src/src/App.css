@@ -1,7 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 #root {
   width: 100%;
   text-align: center;
 
+  --jetbrains-mono: 'JetBrains Mono', monospace;
   --dark-gray:    #202B30;
   --dim-gray:     #495358;
   --gray:         #677278;

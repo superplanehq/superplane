@@ -37,6 +37,18 @@ export const ExecutionTimeline = ({
     return map;
   };
 
+  const formatDuration = (startedAt?: string, finishedAt?: string) => {
+    if (!startedAt || !finishedAt) {
+      return "-";
+    }
+    const duration = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
+    const hours = Math.floor(duration / (1000 * 60 * 60));
+    const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((duration % (1000 * 60)) / 1000);
+    return `${hours}h ${minutes}m ${seconds}s`;
+  };
+    
+
   return (
     <div className="space-y-3">
       {
@@ -48,6 +60,7 @@ export const ExecutionTimeline = ({
             outputs={generateKeyValueMap(execution.outputs)} 
             status={execution.state || 'Unknown'} 
             timestamp={execution.createdAt || new Date().toISOString()} 
+            executionDuration={formatDuration(execution.startedAt, execution.finishedAt)}
           />
         ))
       }
