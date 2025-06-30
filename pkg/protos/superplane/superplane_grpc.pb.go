@@ -37,6 +37,7 @@ const (
 	Superplane_ListStageEvents_FullMethodName              = "/Superplane.Superplane/ListStageEvents"
 	Superplane_ListConnectionGroupFieldSets_FullMethodName = "/Superplane.Superplane/ListConnectionGroupFieldSets"
 	Superplane_UpdateStage_FullMethodName                  = "/Superplane.Superplane/UpdateStage"
+	Superplane_UpdateConnectionGroup_FullMethodName        = "/Superplane.Superplane/UpdateConnectionGroup"
 	Superplane_UpdateSecret_FullMethodName                 = "/Superplane.Superplane/UpdateSecret"
 	Superplane_ApproveStageEvent_FullMethodName            = "/Superplane.Superplane/ApproveStageEvent"
 	Superplane_DeleteSecret_FullMethodName                 = "/Superplane.Superplane/DeleteSecret"
@@ -64,6 +65,7 @@ type SuperplaneClient interface {
 	ListStageEvents(ctx context.Context, in *ListStageEventsRequest, opts ...grpc.CallOption) (*ListStageEventsResponse, error)
 	ListConnectionGroupFieldSets(ctx context.Context, in *ListConnectionGroupFieldSetsRequest, opts ...grpc.CallOption) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(ctx context.Context, in *UpdateStageRequest, opts ...grpc.CallOption) (*UpdateStageResponse, error)
+	UpdateConnectionGroup(ctx context.Context, in *UpdateConnectionGroupRequest, opts ...grpc.CallOption) (*UpdateConnectionGroupResponse, error)
 	UpdateSecret(ctx context.Context, in *UpdateSecretRequest, opts ...grpc.CallOption) (*UpdateSecretResponse, error)
 	ApproveStageEvent(ctx context.Context, in *ApproveStageEventRequest, opts ...grpc.CallOption) (*ApproveStageEventResponse, error)
 	DeleteSecret(ctx context.Context, in *DeleteSecretRequest, opts ...grpc.CallOption) (*DeleteSecretResponse, error)
@@ -257,6 +259,16 @@ func (c *superplaneClient) UpdateStage(ctx context.Context, in *UpdateStageReque
 	return out, nil
 }
 
+func (c *superplaneClient) UpdateConnectionGroup(ctx context.Context, in *UpdateConnectionGroupRequest, opts ...grpc.CallOption) (*UpdateConnectionGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateConnectionGroupResponse)
+	err := c.cc.Invoke(ctx, Superplane_UpdateConnectionGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *superplaneClient) UpdateSecret(ctx context.Context, in *UpdateSecretRequest, opts ...grpc.CallOption) (*UpdateSecretResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateSecretResponse)
@@ -309,6 +321,7 @@ type SuperplaneServer interface {
 	ListStageEvents(context.Context, *ListStageEventsRequest) (*ListStageEventsResponse, error)
 	ListConnectionGroupFieldSets(context.Context, *ListConnectionGroupFieldSetsRequest) (*ListConnectionGroupFieldSetsResponse, error)
 	UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error)
+	UpdateConnectionGroup(context.Context, *UpdateConnectionGroupRequest) (*UpdateConnectionGroupResponse, error)
 	UpdateSecret(context.Context, *UpdateSecretRequest) (*UpdateSecretResponse, error)
 	ApproveStageEvent(context.Context, *ApproveStageEventRequest) (*ApproveStageEventResponse, error)
 	DeleteSecret(context.Context, *DeleteSecretRequest) (*DeleteSecretResponse, error)
@@ -374,6 +387,9 @@ func (UnimplementedSuperplaneServer) ListConnectionGroupFieldSets(context.Contex
 }
 func (UnimplementedSuperplaneServer) UpdateStage(context.Context, *UpdateStageRequest) (*UpdateStageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateStage not implemented")
+}
+func (UnimplementedSuperplaneServer) UpdateConnectionGroup(context.Context, *UpdateConnectionGroupRequest) (*UpdateConnectionGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateConnectionGroup not implemented")
 }
 func (UnimplementedSuperplaneServer) UpdateSecret(context.Context, *UpdateSecretRequest) (*UpdateSecretResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSecret not implemented")
@@ -728,6 +744,24 @@ func _Superplane_UpdateStage_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Superplane_UpdateConnectionGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateConnectionGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).UpdateConnectionGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_UpdateConnectionGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).UpdateConnectionGroup(ctx, req.(*UpdateConnectionGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Superplane_UpdateSecret_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateSecretRequest)
 	if err := dec(in); err != nil {
@@ -860,6 +894,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateStage",
 			Handler:    _Superplane_UpdateStage_Handler,
+		},
+		{
+			MethodName: "UpdateConnectionGroup",
+			Handler:    _Superplane_UpdateConnectionGroup_Handler,
 		},
 		{
 			MethodName: "UpdateSecret",

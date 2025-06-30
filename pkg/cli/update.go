@@ -87,6 +87,49 @@ var updateCmd = &cobra.Command{
 			Check(err)
 			fmt.Printf("%s", string(out))
 
+		case "ConnectionGroup":
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			metadata, ok := yamlData["metadata"].(map[string]any)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: metadata section missing")
+			}
+
+			canvasIDOrName, ok := metadata["canvasId"].(string)
+			if !ok {
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
+				}
+			}
+
+			ID, ok := metadata["id"].(string)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: id field missing")
+			}
+
+			var connectionGroup openapi_client.SuperplaneConnectionGroup
+			err = yaml.Unmarshal(data, &connectionGroup)
+			Check(err)
+
+			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneUpdateConnectionGroup(context.Background(), canvasIDOrName, ID).
+				Body(openapi_client.SuperplaneUpdateConnectionGroupBody{ConnectionGroup: &connectionGroup}).
+				Execute()
+
+			if err != nil {
+				body, err := io.ReadAll(httpResponse.Body)
+				Check(err)
+				fmt.Printf("Error: %v", err)
+				fmt.Printf("HTTP Response: %s", string(body))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.ConnectionGroup)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
 		default:
 			Fail(fmt.Sprintf("Unsupported resource kind '%s' for update", kind))
 		}
