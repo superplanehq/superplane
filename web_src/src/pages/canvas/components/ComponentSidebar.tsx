@@ -18,23 +18,23 @@ interface SidebarNodeProps {
 const SidebarNode = ({ label, icon, onDragStart, onClick }: SidebarNodeProps) => {
   return (
     <div
-      className="flex items-center p-2 mb-1 bg-gray-50 hover:bg-gray-100 rounded cursor-pointer border border-gray-200"
+      className="flex items-center p-2 mb-1 bg-gray-100 hover:bg-gray-200 rounded cursor-pointer"
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
     >
       {icon && (
-        <span className="material-symbols-outlined text-gray-600 mr-2 text-sm">
+        <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 mr-2 py-2">
           {icon}
         </span>
       )}
       <span className="text-sm text-gray-800 truncate">{label}</span>
       <div className="ml-auto flex gap-1">
         <button className="text-xs text-gray-500 hover:text-gray-700 px-1">
-          <span className="material-symbols-outlined text-xs">add</span>
+          <span style={{ fontSize: '1rem' }} className="material-symbols-outlined text-xs">add</span>
         </button>
         <button className="text-xs text-gray-500 hover:text-gray-700 px-1">
-          <span className="material-symbols-outlined text-xs">drag_indicator</span>
+          <span style={{ fontSize: '1rem' }} className="material-symbols-outlined text-xs">drag_indicator</span>
         </button>
       </div>
     </div>
@@ -43,22 +43,16 @@ const SidebarNode = ({ label, icon, onDragStart, onClick }: SidebarNodeProps) =>
 
 interface NodeGroupProps {
   title: string;
-  icon?: string;
   children: React.ReactNode;
 }
 
-const NodeGroup = ({ title, icon, children }: NodeGroupProps) => {
+const NodeGroup = ({ title, children }: NodeGroupProps) => {
   return (
     <div className="mb-4">
-      <div className="flex items-center w-full p-2 text-left text-sm font-medium text-gray-700">
-        {icon && (
-          <span className="material-symbols-outlined text-gray-600 mr-2 text-sm">
-            {icon}
-          </span>
-        )}
-        <span className="uppercase tracking-wide text-xs font-semibold">{title}</span>
+      <div className="flex items-center w-full py-2 text-left font-medium text-gray-700">
+        <span className="uppercase tracking-wide text-sm font-semibold">{title}</span>
       </div>
-      <div className="ml-6 mt-2">
+      <div className="mt-2">
         {children}
       </div>
     </div>
@@ -90,7 +84,7 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
 
   return (
     <div
-      className={`fixed top-12 left-0 bg-white border-r border-gray-200 transition-all duration-300 ease-linear z-20 ${
+      className={`fixed top-12 left-0 bg-white transition-all duration-300 ease-linear z-20 ${
         isOpen ? 'w-80' : 'w-0'
       } overflow-hidden`}
       style={{
@@ -100,8 +94,8 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
     >
       <div className="flex flex-col h-full">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Components</h2>
+        <div className="flex items-center justify-between p-4">
+          <h2 className="text-medium font-semibold text-gray-900">Components</h2>
           <button
             onClick={onToggle}
             className="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-700"
@@ -111,20 +105,20 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
         </div>
 
         {/* Search */}
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4">
           <input
             type="text"
             placeholder="Search…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
           {/* Stages Section */}
-          <NodeGroup title="Stages" icon="rocket_launch">
+          <NodeGroup title="Stages">
             {filteredStages.map((stage) => (
               <SidebarNode
                 key={stage.metadata?.id}
@@ -143,7 +137,7 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
           </NodeGroup>
 
           {/* Event Sources Section */}
-          <NodeGroup title="Event Sources" icon="sensors">
+          <NodeGroup title="Event Sources">
             {filteredEventSources.map((eventSource: EventSourceWithEvents) => (
               <SidebarNode
                 key={eventSource.metadata?.id}
