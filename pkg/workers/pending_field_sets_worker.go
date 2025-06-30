@@ -60,12 +60,15 @@ func (w *PendingFieldSetsWorker) ProcessFieldSet(fieldSet models.ConnectionGroup
 	//
 	// If we still haven't hit the timeout, we do nothing.
 	//
-	if fieldSet.CreatedAt.Add(*connectionGroupSpec.Timeout.After).Before(w.nowFunc()) {
+	if !fieldSet.IsTimedOut(w.nowFunc()) {
+		log.Infof("Field set %s for %s has not timed out - skipping", fieldSet.String(), connectionGroup.Name)
 		return nil
 	}
 
-	switch connectionGroupSpec.Timeout.Behavior {
+	switch connectionGroupSpec.TimeoutBehavior {
 	case models.ConnectionGroupTimeoutBehaviorEmit:
+		log.Infof("Field set %s for %s has timed out - processing", fieldSet.String(), connectionGroup.Name)
+
 		return database.Conn().Transaction(func(tx *gorm.DB) error {
 			return connectionGroup.Emit(tx, &fieldSet, models.ConnectionGroupFieldSetResultTimedOut)
 		})
@@ -79,6 +82,6 @@ func (w *PendingFieldSetsWorker) ProcessFieldSet(fieldSet models.ConnectionGroup
 		)
 
 	default:
-		return fmt.Errorf("invalid timeout behavior: %s", connectionGroupSpec.Timeout.Behavior)
+		return fmt.Errorf("invalid timeout behavior: %s", connectionGroupSpec.TimeoutBehavior)
 	}
 }

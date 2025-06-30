@@ -1955,16 +1955,14 @@
         }
       }
     },
-    "SpecTimeout": {
-      "type": "object",
-      "properties": {
-        "after": {
-          "type": "string"
-        },
-        "behavior": {
-          "$ref": "#/definitions/TimeoutBehavior"
-        }
-      }
+    "SpecTimeoutBehavior": {
+      "type": "string",
+      "enum": [
+        "TIMEOUT_BEHAVIOR_NONE",
+        "TIMEOUT_BEHAVIOR_DROP",
+        "TIMEOUT_BEHAVIOR_EMIT"
+      ],
+      "default": "TIMEOUT_BEHAVIOR_NONE"
     },
     "StageEventStateReason": {
       "type": "string",
@@ -2213,7 +2211,11 @@
           "$ref": "#/definitions/SpecGroupBy"
         },
         "timeout": {
-          "$ref": "#/definitions/SpecTimeout"
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeoutBehavior": {
+          "$ref": "#/definitions/SpecTimeoutBehavior"
         }
       }
     },
@@ -2905,14 +2907,6 @@
           "type": "string"
         }
       }
-    },
-    "TimeoutBehavior": {
-      "type": "string",
-      "enum": [
-        "BEHAVIOR_DROP",
-        "BEHAVIOR_EMIT"
-      ],
-      "default": "BEHAVIOR_DROP"
     },
     "protobufAny": {
       "type": "object",

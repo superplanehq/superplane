@@ -17,7 +17,7 @@ type ConnectionGroupFieldSet struct {
 	ConnectionGroupID uuid.UUID
 	FieldSet          datatypes.JSONType[map[string]string]
 	FieldSetHash      string
-	Timeout           *time.Duration
+	Timeout           uint32
 	TimeoutBehavior   string
 	State             string
 	Result            string
@@ -46,12 +46,9 @@ func (g *ConnectionGroup) CreateFieldSet(tx *gorm.DB, fields map[string]string, 
 		FieldSet:          datatypes.NewJSONType(fields),
 		FieldSetHash:      hash,
 		State:             ConnectionGroupFieldSetStatePending,
+		Timeout:           groupSpec.Timeout,
+		TimeoutBehavior:   groupSpec.TimeoutBehavior,
 		CreatedAt:         &now,
-	}
-
-	if groupSpec.Timeout != nil {
-		fieldSet.Timeout = groupSpec.Timeout.After
-		fieldSet.TimeoutBehavior = groupSpec.Timeout.Behavior
 	}
 
 	err := tx.Create(fieldSet).Error
@@ -80,6 +77,15 @@ func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state, result string)
 	s.State = state
 	s.Result = result
 	return tx.Save(s).Error
+}
+
+func (s *ConnectionGroupFieldSet) IsTimedOut(now time.Time) bool {
+	if s.Timeout == 0 {
+		return false
+	}
+
+	timeout := time.Duration(s.Timeout) * time.Second
+	return now.Sub(*s.CreatedAt) > timeout
 }
 
 type ConnectionGroupFieldSetEventWithData struct {

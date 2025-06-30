@@ -56,7 +56,7 @@ docs/SecretAPI.md
 docs/SecretLocal.md
 docs/SecretProvider.md
 docs/SpecGroupBy.md
-docs/SpecTimeout.md
+docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
 docs/StageEventStateReason.md
 docs/SuperplaneApproveStageEventBody.md
@@ -128,7 +128,6 @@ docs/SuperplaneValueFrom.md
 docs/SuperplaneValueFromEventData.md
 docs/SuperplaneValueFromLastExecution.md
 docs/SuperplaneValueFromSecret.md
-docs/TimeoutBehavior.md
 git_push.sh
 model_authorization_add_user_to_group_body.go
 model_authorization_assign_role_request.go
@@ -168,7 +167,7 @@ model_rpc_status.go
 model_secret_local.go
 model_secret_provider.go
 model_spec_group_by.go
-model_spec_timeout.go
+model_spec_timeout_behavior.go
 model_stage_event_state_reason.go
 model_superplane_approve_stage_event_body.go
 model_superplane_approve_stage_event_response.go
@@ -239,7 +238,6 @@ model_superplane_value_from.go
 model_superplane_value_from_event_data.go
 model_superplane_value_from_last_execution.go
 model_superplane_value_from_secret.go
-model_timeout_behavior.go
 response.go
 test/api_authorization_test.go
 test/api_canvas_test.go

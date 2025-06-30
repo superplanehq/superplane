@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -110,37 +109,30 @@ func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, e
 		return nil, err
 	}
 
-	timeout, err := validateTimeout(spec.Timeout)
+	err = validateTimeout(spec.Timeout)
 	if err != nil {
 		return nil, err
 	}
 
 	return &models.ConnectionGroupSpec{
-		Timeout: timeout,
+		Timeout:         spec.Timeout,
+		TimeoutBehavior: protoToTimeoutBehavior(spec.TimeoutBehavior),
 		GroupBy: &models.ConnectionGroupBySpec{
 			Fields: fields,
 		},
 	}, nil
 }
 
-func validateTimeout(timeout *pb.ConnectionGroup_Spec_Timeout) (*models.ConnectionGroupTimeout, error) {
-	if timeout == nil {
-		return nil, nil
+func validateTimeout(timeout uint32) error {
+	if timeout == 0 {
+		return nil
 	}
 
-	timeoutAfter, err := time.ParseDuration(timeout.After)
-	if err != nil {
-		return nil, fmt.Errorf("invalid duration for timeout: %v", err)
+	if timeout < models.MinConnectionGroupTimeout || timeout > models.MaxConnectionGroupTimeout {
+		return fmt.Errorf("timeout duration must be between %ds and %ds", models.MinConnectionGroupTimeout, models.MaxConnectionGroupTimeout)
 	}
 
-	if timeoutAfter < models.MinConnectionGroupTimeout || timeoutAfter > models.MaxConnectionGroupTimeout {
-		return nil, fmt.Errorf("timeout duration must be between %v and %v", models.MinConnectionGroupTimeout, models.MaxConnectionGroupTimeout)
-	}
-
-	return &models.ConnectionGroupTimeout{
-		After:    &timeoutAfter,
-		Behavior: protoToTimeoutBehavior(timeout.Behavior),
-	}, nil
+	return nil
 }
 
 func validateGroupByFields(in []*pb.ConnectionGroup_Spec_GroupBy_Field) ([]models.ConnectionGroupByField, error) {
@@ -178,6 +170,15 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 		}
 	}
 
+	protoSpec := &pb.ConnectionGroup_Spec{
+		Connections:     conns,
+		Timeout:         spec.Timeout,
+		TimeoutBehavior: timeoutBehaviorToProto(spec.TimeoutBehavior),
+		GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
+			Fields: fields,
+		},
+	}
+
 	return &pb.ConnectionGroup{
 		Metadata: &pb.ConnectionGroup_Metadata{
 			Id:        connectionGroup.ID.String(),
@@ -186,41 +187,28 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 			CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
 			CreatedBy: connectionGroup.CreatedBy.String(),
 		},
-		Spec: &pb.ConnectionGroup_Spec{
-			Connections: conns,
-			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
-				Fields: fields,
-			},
-			Timeout: serializeTimeout(spec.Timeout),
-		},
+		Spec: protoSpec,
 	}, nil
 }
 
-func serializeTimeout(timeout *models.ConnectionGroupTimeout) *pb.ConnectionGroup_Spec_Timeout {
-	if timeout == nil {
-		return nil
-	}
-
-	return &pb.ConnectionGroup_Spec_Timeout{
-		After:    timeout.After.String(),
-		Behavior: timeoutBehaviorToProto(*timeout),
-	}
-}
-
-func protoToTimeoutBehavior(behavior pb.ConnectionGroup_Spec_Timeout_Behavior) string {
+func protoToTimeoutBehavior(behavior pb.ConnectionGroup_Spec_TimeoutBehavior) string {
 	switch behavior {
-	case pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_EMIT:
+	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT:
 		return models.ConnectionGroupTimeoutBehaviorEmit
-	default:
+	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP:
 		return models.ConnectionGroupTimeoutBehaviorDrop
+	default:
+		return models.ConnectionGroupTimeoutBehaviorNone
 	}
 }
 
-func timeoutBehaviorToProto(timeout models.ConnectionGroupTimeout) pb.ConnectionGroup_Spec_Timeout_Behavior {
-	switch timeout.Behavior {
+func timeoutBehaviorToProto(timeoutBehavior string) pb.ConnectionGroup_Spec_TimeoutBehavior {
+	switch timeoutBehavior {
 	case models.ConnectionGroupTimeoutBehaviorEmit:
-		return pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_EMIT
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT
+	case models.ConnectionGroupTimeoutBehaviorDrop:
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP
 	default:
-		return pb.ConnectionGroup_Spec_Timeout_BEHAVIOR_DROP
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_NONE
 	}
 }

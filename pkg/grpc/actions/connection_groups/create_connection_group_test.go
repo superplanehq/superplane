@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -109,6 +110,64 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		assert.Equal(t, "spec.GroupBy fields cannot be empty", s.Message())
 	})
 
+	t.Run("connection group with timeout value below min -> error", func(t *testing.T) {
+		req := &protos.CreateConnectionGroupRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    uuid.NewString(),
+			ConnectionGroup: &protos.ConnectionGroup{
+				Metadata: &protos.ConnectionGroup_Metadata{
+					Name: "test",
+				},
+				Spec: &protos.ConnectionGroup_Spec{
+					Connections: []*protos.Connection{
+						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+					},
+					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+							{Name: "test", Expression: "test"},
+						},
+					},
+					Timeout: models.MinConnectionGroupTimeout - 1,
+				},
+			},
+		}
+
+		_, err := CreateConnectionGroup(context.Background(), req)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "timeout duration must be between 60s and 86400s", s.Message())
+	})
+
+	t.Run("connection group with timeout value above max -> error", func(t *testing.T) {
+		req := &protos.CreateConnectionGroupRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			RequesterId:    uuid.NewString(),
+			ConnectionGroup: &protos.ConnectionGroup{
+				Metadata: &protos.ConnectionGroup_Metadata{
+					Name: "test",
+				},
+				Spec: &protos.ConnectionGroup_Spec{
+					Connections: []*protos.Connection{
+						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+					},
+					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+							{Name: "test", Expression: "test"},
+						},
+					},
+					Timeout: models.MaxConnectionGroupTimeout + 1,
+				},
+			},
+		}
+
+		_, err := CreateConnectionGroup(context.Background(), req)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "timeout duration must be between 60s and 86400s", s.Message())
+	})
+
 	t.Run("valid connection group is created", func(t *testing.T) {
 		req := &protos.CreateConnectionGroupRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
@@ -126,6 +185,8 @@ func Test__CreateConnectionGroup(t *testing.T) {
 							{Name: "test", Expression: "test"},
 						},
 					},
+					Timeout:         models.MaxConnectionGroupTimeout,
+					TimeoutBehavior: protos.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP,
 				},
 			},
 		}
@@ -139,6 +200,9 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		require.NotNil(t, response.ConnectionGroup.Spec)
 		assert.Len(t, response.ConnectionGroup.Spec.Connections, 1)
 		assert.Len(t, response.ConnectionGroup.Spec.GroupBy.Fields, 1)
+		require.NotNil(t, response.ConnectionGroup.Spec.Timeout)
+		assert.Equal(t, models.MaxConnectionGroupTimeout, int(response.ConnectionGroup.Spec.Timeout))
+		assert.Equal(t, protos.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP, response.ConnectionGroup.Spec.TimeoutBehavior)
 	})
 
 	t.Run("name already used", func(t *testing.T) {

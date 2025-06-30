@@ -22,11 +22,12 @@ const (
 	ConnectionGroupFieldSetResultTimedOut    = "timed-out"
 	ConnectionGroupFieldSetResultReceivedAll = "received-all"
 
+	ConnectionGroupTimeoutBehaviorNone = "none"
 	ConnectionGroupTimeoutBehaviorEmit = "emit"
 	ConnectionGroupTimeoutBehaviorDrop = "drop"
 
-	MinConnectionGroupTimeout = time.Minute
-	MaxConnectionGroupTimeout = 24 * time.Hour
+	MinConnectionGroupTimeout = 60    // 1 minute
+	MaxConnectionGroupTimeout = 86400 // 1 day
 )
 
 type ConnectionGroup struct {
@@ -116,6 +117,20 @@ func (g *ConnectionGroup) ListFieldSetsInTransaction(tx *gorm.DB) ([]ConnectionG
 	return fieldSets, nil
 }
 
+func (g *ConnectionGroup) FindFieldSetByID(ID uuid.UUID) (*ConnectionGroupFieldSet, error) {
+	var fieldSet *ConnectionGroupFieldSet
+	err := database.Conn().
+		Where("id = ?", ID).
+		First(&fieldSet).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldSet, nil
+}
+
 func (g *ConnectionGroup) FindPendingFieldSetByHash(tx *gorm.DB, hash string) (*ConnectionGroupFieldSet, error) {
 	var fieldSet *ConnectionGroupFieldSet
 	err := tx.
@@ -136,7 +151,7 @@ func ListPendingConnectionGroupFieldSets() ([]ConnectionGroupFieldSet, error) {
 	var fieldSets []ConnectionGroupFieldSet
 	err := database.Conn().
 		Where("state = ?", ConnectionGroupFieldSetStatePending).
-		Where("timeout IS NOT NULL").
+		Where("timeout_behavior != ?", ConnectionGroupTimeoutBehaviorNone).
 		Find(&fieldSets).
 		Error
 
@@ -167,13 +182,9 @@ func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *Conn
 }
 
 type ConnectionGroupSpec struct {
-	GroupBy *ConnectionGroupBySpec  `json:"group_by"`
-	Timeout *ConnectionGroupTimeout `json:"timeout"`
-}
-
-type ConnectionGroupTimeout struct {
-	After    *time.Duration `json:"after"`
-	Behavior string         `json:"behavior"`
+	GroupBy         *ConnectionGroupBySpec `json:"group_by"`
+	Timeout         uint32                 `json:"timeout"`
+	TimeoutBehavior string                 `json:"timeout_behavior"`
 }
 
 type ConnectionGroupBySpec struct {

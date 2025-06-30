@@ -472,19 +472,16 @@ message ConnectionGroup {
       repeated Field fields = 1;
     }
 
-    message Timeout {
-      enum Behavior {
-        BEHAVIOR_DROP = 0;
-        BEHAVIOR_EMIT = 1;
-      }
-
-      string after = 1;
-      Behavior behavior = 2;
+    enum TimeoutBehavior {
+      TIMEOUT_BEHAVIOR_NONE = 0;
+      TIMEOUT_BEHAVIOR_DROP = 1;
+      TIMEOUT_BEHAVIOR_EMIT = 2;
     }
 
     repeated Connection connections = 1;
     GroupBy group_by = 2;
-    Timeout timeout = 3;
+    uint32 timeout = 3;
+    TimeoutBehavior timeout_behavior = 4;
   }
 
   Metadata metadata = 1;

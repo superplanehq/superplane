@@ -33,13 +33,18 @@ spec:
         expression: outputs.version
 
     #
-    # The timeout for the connection group.
-    # drop: drop the events received, and don't do anything
-    # emit: emit the events received, but the resulting event will indicate that events from some connections were missing
+    # How long to wait, in seconds, for all the connections
+    # to send events with the same grouping fields.
+    # If nothing is specified, no timeout is applied.
     #
-    timeout:
-      after: 24h
-      behavior: drop | emit
+    timeout: 86400
+
+    #
+    # Determines what to do when the timeout for a connection group field set is reached:
+    # - drop: do not emit anything
+    # - emit: emit an event for the events received, but indicate some connections were missing
+    #
+    timeoutBehavior: drop | emit
 ```
 
 And this is how you use it as a connection for another stage:
@@ -59,7 +64,7 @@ The events emitted by the connection group will have all the grouping fields and
 
 ```json
 {
-  "result": "received-all",
+  "timeout": "received-all",
   "fields": {
     "version": "v1",
   },
