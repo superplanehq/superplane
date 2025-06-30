@@ -90,7 +90,7 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
 
   return (
     <div
-      className={`fixed top-16 left-0 h-screen bg-white border-r border-gray-200 transition-all duration-300 ease-linear z-20 ${
+      className={`fixed top-12 left-0 h-screen bg-white border-r border-gray-200 transition-all duration-300 ease-linear z-20 ${
         isOpen ? 'w-80' : 'w-0'
       } overflow-hidden`}
       style={{

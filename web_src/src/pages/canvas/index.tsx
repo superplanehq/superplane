@@ -144,7 +144,7 @@ export function Canvas() {
     <StrictMode>
       <Navigation />
       
-      <div className="pt-16">
+      <div className="pt-12">
         <ComponentSidebar 
           isOpen={isComponentSidebarOpen} 
           onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)} 
@@ -153,7 +153,7 @@ export function Canvas() {
         {/* Toggle Button for ComponentSidebar */}
         <button
           onClick={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)}
-          className={`fixed top-20 z-30 p-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2 ${
+          className={`fixed top-16 z-30 p-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2 ${
             isComponentSidebarOpen ? 'left-80' : 'left-4'
           }`}
           title={isComponentSidebarOpen ? "Close Components" : "Open Components"}
