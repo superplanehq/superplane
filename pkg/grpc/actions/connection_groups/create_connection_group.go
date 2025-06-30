@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -17,6 +18,11 @@ import (
 )
 
 func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -38,11 +44,6 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, "connection group name is required")
 	}
 
-	err = actions.ValidateUUIDs(req.RequesterId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
 	connections, err := actions.ValidateConnections(canvas, req.ConnectionGroup.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -58,7 +59,7 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 	//
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		req.ConnectionGroup.Metadata.Name,
-		req.RequesterId,
+		userID,
 		connections,
 		*spec,
 	)
@@ -98,10 +99,6 @@ func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, e
 
 	if spec.GroupBy == nil {
 		return nil, fmt.Errorf("spec.GroupBy is required")
-	}
-
-	if len(spec.GroupBy.Fields) == 0 {
-		return nil, fmt.Errorf("spec.GroupBy fields cannot be empty")
 	}
 
 	fields, err := validateGroupByFields(spec.GroupBy.Fields)
@@ -170,15 +167,6 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 		}
 	}
 
-	protoSpec := &pb.ConnectionGroup_Spec{
-		Connections:     conns,
-		Timeout:         spec.Timeout,
-		TimeoutBehavior: timeoutBehaviorToProto(spec.TimeoutBehavior),
-		GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
-			Fields: fields,
-		},
-	}
-
 	return &pb.ConnectionGroup{
 		Metadata: &pb.ConnectionGroup_Metadata{
 			Id:        connectionGroup.ID.String(),
@@ -187,7 +175,14 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 			CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
 			CreatedBy: connectionGroup.CreatedBy.String(),
 		},
-		Spec: protoSpec,
+		Spec: &pb.ConnectionGroup_Spec{
+			Connections:     conns,
+			Timeout:         spec.Timeout,
+			TimeoutBehavior: timeoutBehaviorToProto(spec.TimeoutBehavior),
+			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
+				Fields: fields,
+			},
+		},
 	}, nil
 }
 

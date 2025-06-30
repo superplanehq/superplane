@@ -1937,8 +1937,7 @@ func (x *DescribeEventSourceResponse) GetEventSource() *EventSource {
 type CreateConnectionGroupRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	ConnectionGroup *ConnectionGroup       `protobuf:"bytes,1,opt,name=connection_group,json=connectionGroup,proto3" json:"connection_group,omitempty"`
-	RequesterId     string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
-	CanvasIdOrName  string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName  string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -1978,13 +1977,6 @@ func (x *CreateConnectionGroupRequest) GetConnectionGroup() *ConnectionGroup {
 		return x.ConnectionGroup
 	}
 	return nil
-}
-
-func (x *CreateConnectionGroupRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
-	}
-	return ""
 }
 
 func (x *CreateConnectionGroupRequest) GetCanvasIdOrName() string {
@@ -6199,11 +6191,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
 	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"Y\n" +
 	"\x1bDescribeEventSourceResponse\x12:\n" +
-	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\"\xb4\x01\n" +
+	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\"\x91\x01\n" +
 	"\x1cCreateConnectionGroupRequest\x12F\n" +
-	"\x10connection_group\x18\x01 \x01(\v2\x1b.Superplane.ConnectionGroupR\x0fconnectionGroup\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"g\n" +
+	"\x10connection_group\x18\x01 \x01(\v2\x1b.Superplane.ConnectionGroupR\x0fconnectionGroup\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"g\n" +
 	"\x1dCreateConnectionGroupResponse\x12F\n" +
 	"\x10connection_group\x18\x01 \x01(\v2\x1b.Superplane.ConnectionGroupR\x0fconnectionGroup\"i\n" +
 	"\x1eDescribeConnectionGroupRequest\x12\x1c\n" +
