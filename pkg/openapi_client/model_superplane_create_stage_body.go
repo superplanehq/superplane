@@ -21,7 +21,6 @@ var _ MappedNullable = &SuperplaneCreateStageBody{}
 // SuperplaneCreateStageBody struct for SuperplaneCreateStageBody
 type SuperplaneCreateStageBody struct {
 	Stage *SuperplaneStage `json:"stage,omitempty"`
-	RequesterId *string `json:"requesterId,omitempty"`
 }
 
 // NewSuperplaneCreateStageBody instantiates a new SuperplaneCreateStageBody object
@@ -73,38 +72,6 @@ func (o *SuperplaneCreateStageBody) SetStage(v SuperplaneStage) {
 	o.Stage = &v
 }
 
-// GetRequesterId returns the RequesterId field value if set, zero value otherwise.
-func (o *SuperplaneCreateStageBody) GetRequesterId() string {
-	if o == nil || IsNil(o.RequesterId) {
-		var ret string
-		return ret
-	}
-	return *o.RequesterId
-}
-
-// GetRequesterIdOk returns a tuple with the RequesterId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneCreateStageBody) GetRequesterIdOk() (*string, bool) {
-	if o == nil || IsNil(o.RequesterId) {
-		return nil, false
-	}
-	return o.RequesterId, true
-}
-
-// HasRequesterId returns a boolean if a field has been set.
-func (o *SuperplaneCreateStageBody) HasRequesterId() bool {
-	if o != nil && !IsNil(o.RequesterId) {
-		return true
-	}
-
-	return false
-}
-
-// SetRequesterId gets a reference to the given string and assigns it to the RequesterId field.
-func (o *SuperplaneCreateStageBody) SetRequesterId(v string) {
-	o.RequesterId = &v
-}
-
 func (o SuperplaneCreateStageBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -117,9 +84,6 @@ func (o SuperplaneCreateStageBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Stage) {
 		toSerialize["stage"] = o.Stage
-	}
-	if !IsNil(o.RequesterId) {
-		toSerialize["requesterId"] = o.RequesterId
 	}
 	return toSerialize, nil
 }

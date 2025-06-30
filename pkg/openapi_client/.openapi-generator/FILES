@@ -59,7 +59,6 @@ docs/SecretProvider.md
 docs/SpecGroupBy.md
 docs/StageAPI.md
 docs/StageEventStateReason.md
-docs/SuperplaneApproveStageEventBody.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
@@ -169,7 +168,6 @@ model_secret_local.go
 model_secret_provider.go
 model_spec_group_by.go
 model_stage_event_state_reason.go
-model_superplane_approve_stage_event_body.go
 model_superplane_approve_stage_event_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go

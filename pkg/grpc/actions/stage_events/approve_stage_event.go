@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -16,8 +17,12 @@ import (
 )
 
 func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
 
+	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
@@ -47,11 +52,6 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
-	err = actions.ValidateUUIDs(req.EventId, req.RequesterId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
-	}
-
 	logger := logging.ForStage(stage)
 	event, err := models.FindStageEventByID(req.EventId, stage.ID.String())
 	if err != nil {
@@ -62,7 +62,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 		return nil, err
 	}
 
-	err = event.Approve(uuid.MustParse(req.RequesterId))
+	err = event.Approve(uuid.MustParse(userID))
 	if err != nil {
 		if errors.Is(err, models.ErrEventAlreadyApprovedByRequester) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())

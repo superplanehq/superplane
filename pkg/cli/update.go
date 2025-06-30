@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/google/uuid"
 
 	"github.com/spf13/cobra"
 
@@ -71,10 +70,6 @@ var updateCmd = &cobra.Command{
 			var request openapi_client.SuperplaneUpdateStageBody
 			err = json.Unmarshal(specData, &request)
 			Check(err)
-
-			// TODO: this should be known through the API token used to call the API
-			// so we just put something here until we have auth in this API.
-			request.SetRequesterId(uuid.NewString())
 
 			response, httpResponse, err := c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
 				Body(request).
@@ -150,7 +145,6 @@ var updateStageCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
 		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
-		requesterID, _ := cmd.Flags().GetString("requester-id")
 		yamlFile, _ := cmd.Flags().GetString("file")
 
 		if yamlFile == "" {
@@ -174,7 +168,6 @@ var updateStageCmd = &cobra.Command{
 
 		// Create update request with nested structure
 		request := openapi_client.NewSuperplaneUpdateStageBody()
-		request.SetRequesterId(requesterID)
 
 		// Create stage with spec
 		stage := openapi_client.NewSuperplaneStage()
@@ -226,6 +219,5 @@ func init() {
 	updateStageCmd.Flags().String("canvas-name", "", "Canvas name")
 	updateStageCmd.Flags().String("stage-id", "", "Stage ID")
 	updateStageCmd.Flags().String("stage-name", "", "Stage name")
-	updateStageCmd.Flags().String("requester-id", "", "ID of the user updating the stage")
 	updateStageCmd.Flags().StringP("file", "f", "", "File containing stage configuration updates")
 }

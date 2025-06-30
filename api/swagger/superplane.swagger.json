@@ -994,12 +994,6 @@
             "in": "path",
             "required": true,
             "type": "string"
-          },
-          {
-            "name": "requesterId",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -2022,12 +2016,7 @@
       "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneApproveStageEventBody": {
-      "type": "object",
-      "properties": {
-        "requesterId": {
-          "type": "string"
-        }
-      }
+      "type": "object"
     },
     "SuperplaneApproveStageEventResponse": {
       "type": "object",
@@ -2300,9 +2289,6 @@
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2322,9 +2308,6 @@
       "properties": {
         "secret": {
           "$ref": "#/definitions/SuperplaneSecret"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2341,9 +2324,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2849,9 +2829,6 @@
       "properties": {
         "secret": {
           "$ref": "#/definitions/SuperplaneSecret"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2868,9 +2845,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },

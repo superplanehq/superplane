@@ -344,8 +344,7 @@ message DescribeStageResponse {
 
 message CreateEventSourceRequest {
   EventSource event_source = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message CreateEventSourceResponse {
@@ -384,8 +383,7 @@ message Secret {
 
 message CreateSecretRequest {
   Secret secret = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message CreateSecretResponse {
@@ -396,7 +394,6 @@ message UpdateSecretRequest {
   Secret secret = 1;
   string id_or_name = 2;
   string canvas_id_or_name = 3;
-  string requester_id = 4;
 }
 
 message UpdateSecretResponse {
@@ -423,7 +420,6 @@ message ListSecretsResponse {
 message DeleteSecretRequest {
   string canvas_id_or_name = 1;
   string id_or_name = 2;
-  string requester_id = 3;
 }
 
 message DeleteSecretResponse {}
@@ -643,8 +639,7 @@ message ConditionTimeWindow {
 
 message CreateStageRequest {
   Stage stage = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message ExecutorSpec {
@@ -688,7 +683,6 @@ message UpdateStageRequest {
   Stage stage = 1;
   string id_or_name = 2;
   string canvas_id_or_name = 3;
-  string requester_id = 4;
 }
 
 message UpdateStageResponse {
@@ -826,7 +820,6 @@ message ApproveStageEventRequest {
   string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   string event_id = 3;
-  string requester_id = 4;
 }
 
 message ApproveStageEventResponse {

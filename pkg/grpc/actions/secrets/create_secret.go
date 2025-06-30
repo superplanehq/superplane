@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -16,6 +17,11 @@ import (
 )
 
 func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -45,17 +51,12 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Creat
 		return nil, status.Error(codes.InvalidArgument, "invalid provider")
 	}
 
-	err = actions.ValidateUUIDs(req.RequesterId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid requester ID")
-	}
-
 	data, err := prepareSecretData(ctx, encryptor, req.Secret)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secret, err := models.CreateSecret(req.Secret.Metadata.Name, provider, req.RequesterId, canvas.ID, data)
+	secret, err := models.CreateSecret(req.Secret.Metadata.Name, provider, userID, canvas.ID, data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())

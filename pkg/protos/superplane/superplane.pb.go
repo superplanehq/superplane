@@ -1072,8 +1072,7 @@ func (x *DescribeStageResponse) GetStage() *Stage {
 type CreateEventSourceRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	EventSource    *EventSource           `protobuf:"bytes,1,opt,name=event_source,json=eventSource,proto3" json:"event_source,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1113,13 +1112,6 @@ func (x *CreateEventSourceRequest) GetEventSource() *EventSource {
 		return x.EventSource
 	}
 	return nil
-}
-
-func (x *CreateEventSourceRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
-	}
-	return ""
 }
 
 func (x *CreateEventSourceRequest) GetCanvasIdOrName() string {
@@ -1236,8 +1228,7 @@ func (x *Secret) GetSpec() *Secret_Spec {
 type CreateSecretRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Secret         *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1277,13 +1268,6 @@ func (x *CreateSecretRequest) GetSecret() *Secret {
 		return x.Secret
 	}
 	return nil
-}
-
-func (x *CreateSecretRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
-	}
-	return ""
 }
 
 func (x *CreateSecretRequest) GetCanvasIdOrName() string {
@@ -1342,7 +1326,6 @@ type UpdateSecretRequest struct {
 	Secret         *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
 	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,4,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1394,13 +1377,6 @@ func (x *UpdateSecretRequest) GetIdOrName() string {
 func (x *UpdateSecretRequest) GetCanvasIdOrName() string {
 	if x != nil {
 		return x.CanvasIdOrName
-	}
-	return ""
-}
-
-func (x *UpdateSecretRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -1637,7 +1613,6 @@ type DeleteSecretRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,3,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1682,13 +1657,6 @@ func (x *DeleteSecretRequest) GetCanvasIdOrName() string {
 func (x *DeleteSecretRequest) GetIdOrName() string {
 	if x != nil {
 		return x.IdOrName
-	}
-	return ""
-}
-
-func (x *DeleteSecretRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -2988,8 +2956,7 @@ func (x *ConditionTimeWindow) GetWeekDays() []string {
 type CreateStageRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Stage          *Stage                 `protobuf:"bytes,1,opt,name=stage,proto3" json:"stage,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,2,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -3029,13 +2996,6 @@ func (x *CreateStageRequest) GetStage() *Stage {
 		return x.Stage
 	}
 	return nil
-}
-
-func (x *CreateStageRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
-	}
-	return ""
 }
 
 func (x *CreateStageRequest) GetCanvasIdOrName() string {
@@ -3154,7 +3114,6 @@ type UpdateStageRequest struct {
 	Stage          *Stage                 `protobuf:"bytes,1,opt,name=stage,proto3" json:"stage,omitempty"`
 	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,4,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -3206,13 +3165,6 @@ func (x *UpdateStageRequest) GetIdOrName() string {
 func (x *UpdateStageRequest) GetCanvasIdOrName() string {
 	if x != nil {
 		return x.CanvasIdOrName
-	}
-	return ""
-}
-
-func (x *UpdateStageRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -4174,7 +4126,6 @@ type ApproveStageEventRequest struct {
 	StageIdOrName  string                 `protobuf:"bytes,1,opt,name=stage_id_or_name,json=stageIdOrName,proto3" json:"stage_id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	EventId        string                 `protobuf:"bytes,3,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
-	RequesterId    string                 `protobuf:"bytes,4,opt,name=requester_id,json=requesterId,proto3" json:"requester_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -4226,13 +4177,6 @@ func (x *ApproveStageEventRequest) GetCanvasIdOrName() string {
 func (x *ApproveStageEventRequest) GetEventId() string {
 	if x != nil {
 		return x.EventId
-	}
-	return ""
-}
-
-func (x *ApproveStageEventRequest) GetRequesterId() string {
-	if x != nil {
-		return x.RequesterId
 	}
 	return ""
 }
@@ -6123,11 +6067,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
 	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"@\n" +
 	"\x15DescribeStageResponse\x12'\n" +
-	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\xa4\x01\n" +
+	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\x81\x01\n" +
 	"\x18CreateEventSourceRequest\x12:\n" +
-	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"i\n" +
+	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"i\n" +
 	"\x19CreateEventSourceResponse\x12:\n" +
 	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\x12\x10\n" +
 	"\x03key\x18\x02 \x01(\tR\x03key\"\x98\x04\n" +
@@ -6150,19 +6093,17 @@ const file_superplane_proto_rawDesc = "" +
 	"\x05local\x18\x02 \x01(\v2\x18.Superplane.Secret.LocalR\x05local\"4\n" +
 	"\bProvider\x12\x14\n" +
 	"\x10PROVIDER_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0ePROVIDER_LOCAL\x10\x01\"\x8f\x01\n" +
+	"\x0ePROVIDER_LOCAL\x10\x01\"l\n" +
 	"\x13CreateSecretRequest\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"B\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"B\n" +
 	"\x14CreateSecretResponse\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"\xad\x01\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"\x8a\x01\n" +
 	"\x13UpdateSecretRequest\x12*\n" +
 	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\x12!\n" +
-	"\frequester_id\x18\x04 \x01(\tR\vrequesterId\"B\n" +
+	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"B\n" +
 	"\x14UpdateSecretResponse\x12*\n" +
 	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"`\n" +
 	"\x15DescribeSecretRequest\x12)\n" +
@@ -6174,12 +6115,11 @@ const file_superplane_proto_rawDesc = "" +
 	"\x12ListSecretsRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"C\n" +
 	"\x13ListSecretsResponse\x12,\n" +
-	"\asecrets\x18\x01 \x03(\v2\x12.Superplane.SecretR\asecrets\"\x81\x01\n" +
+	"\asecrets\x18\x01 \x03(\v2\x12.Superplane.SecretR\asecrets\"^\n" +
 	"\x13DeleteSecretRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x02 \x01(\tR\bidOrName\x12!\n" +
-	"\frequester_id\x18\x03 \x01(\tR\vrequesterId\"\x16\n" +
+	"id_or_name\x18\x02 \x01(\tR\bidOrName\"\x16\n" +
 	"\x14DeleteSecretResponse\"k\n" +
 	"\x1aDescribeEventSourceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -6338,11 +6278,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\x13ConditionTimeWindow\x12\x14\n" +
 	"\x05start\x18\x01 \x01(\tR\x05start\x12\x10\n" +
 	"\x03end\x18\x02 \x01(\tR\x03end\x12\x1b\n" +
-	"\tweek_days\x18\x03 \x03(\tR\bweekDays\"\x8b\x01\n" +
+	"\tweek_days\x18\x03 \x03(\tR\bweekDays\"h\n" +
 	"\x12CreateStageRequest\x12'\n" +
-	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\x12!\n" +
-	"\frequester_id\x18\x02 \x01(\tR\vrequesterId\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"\xff\a\n" +
+	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"\xff\a\n" +
 	"\fExecutorSpec\x121\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1d.Superplane.ExecutorSpec.TypeR\x04type\x12@\n" +
 	"\tsemaphore\x18\x02 \x01(\v2\".Superplane.ExecutorSpec.SemaphoreR\tsemaphore\x121\n" +
@@ -6379,13 +6318,12 @@ const file_superplane_proto_rawDesc = "" +
 	"\x0eTYPE_SEMAPHORE\x10\x01\x12\r\n" +
 	"\tTYPE_HTTP\x10\x02\">\n" +
 	"\x13CreateStageResponse\x12'\n" +
-	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\xa9\x01\n" +
+	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\x86\x01\n" +
 	"\x12UpdateStageRequest\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\x12!\n" +
-	"\frequester_id\x18\x04 \x01(\tR\vrequesterId\">\n" +
+	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\">\n" +
 	"\x13UpdateStageResponse\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\">\n" +
 	"\x11ListStagesRequest\x12)\n" +
@@ -6488,12 +6426,11 @@ const file_superplane_proto_rawDesc = "" +
 	"\vapproved_by\x18\x01 \x01(\tR\n" +
 	"approvedBy\x12;\n" +
 	"\vapproved_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"approvedAt\"\xac\x01\n" +
+	"approvedAt\"\x89\x01\n" +
 	"\x18ApproveStageEventRequest\x12'\n" +
 	"\x10stage_id_or_name\x18\x01 \x01(\tR\rstageIdOrName\x12)\n" +
 	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x19\n" +
-	"\bevent_id\x18\x03 \x01(\tR\aeventId\x12!\n" +
-	"\frequester_id\x18\x04 \x01(\tR\vrequesterId\"I\n" +
+	"\bevent_id\x18\x03 \x01(\tR\aeventId\"I\n" +
 	"\x19ApproveStageEventResponse\x12,\n" +
 	"\x05event\x18\x01 \x01(\v2\x16.Superplane.StageEventR\x05event\"\x80\x01\n" +
 	"\fStageCreated\x12\x1b\n" +
