@@ -3,7 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { SuperplaneExecution, SuperplaneExecutionState } from '@/api-client';
+import { SuperplaneExecution } from '@/api-client';
 
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
@@ -19,11 +19,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const waitingEvents = useMemo(() => 
     props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [], 
-    [props.data.queues]
-  );
-  
-  const processedEvents = useMemo(() => 
-    props.data.queues?.filter(event => event.state === 'STATE_PROCESSED') || [], 
     [props.data.queues]
   );
 
@@ -60,21 +55,55 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     })
   }, [props.data.outputs, allFinishedExecutions])
 
-  const getStatusColor = (status: SuperplaneExecutionState) => {
+
+  const getStatusIcon = () => {
+    const latestExecution = allExecutions.at(0);
+    const status = latestExecution?.state;
+    
     switch (status) {
       case 'STATE_STARTED':
+        return (
+          <span className="rounded-full bg-blue-500 w-[22px] h-[22px] border border-blue-200 text-center mr-2 flex items-center justify-center">
+            <span className="text-white text-base job-log-working"></span>
+          </span>
+        );
       case 'STATE_FINISHED':
-        return 'bg-green-100 text-green-800';
+        return <span className="material-symbols-outlined text-green-600 text-2xl mr-2">check_circle</span>;
       case 'STATE_UNKNOWN':
-        return 'bg-red-100 text-red-800';
+        return <span className="material-symbols-outlined text-red-600 text-2xl mr-2">cancel</span>;
       case 'STATE_PENDING':
-        return 'bg-yellow-100 text-yellow-800';
+        return (
+          <span className="rounded-full bg-orange-500 w-[22px] h-[22px] border border-orange-200 text-center mr-2 flex items-center justify-center">
+            <span className="text-white text-xs job-log-pending"></span>
+          </span>
+        );
       default:
-        return 'bg-gray-100 text-gray-800';
+        return (
+          <span className="rounded-full bg-gray-400 w-6 h-6 border border-gray-200 text-center mr-2 flex items-center justify-center">
+          </span>
+        );
     }
   };
 
   const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
+  
+  const getBackgroundColorClass = () => {
+    const latestExecution = allExecutions.at(0);
+    const status = latestExecution?.state;
+    
+    switch (status) {
+      case 'STATE_STARTED':
+        return 'bg-blue-50 border-blue-200';
+      case 'STATE_FINISHED':
+        return 'bg-green-50 border-green-200';
+      case 'STATE_UNKNOWN':
+        return 'bg-red-50 border-red-200';
+      case 'STATE_PENDING':
+        return 'bg-yellow-50 border-yellow-200';
+      default:
+        return 'bg-blue-50 border-blue-200';
+    }
+  };
   
   return (
     <div
@@ -102,22 +131,18 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       </div>
 
       {/* Last Run Section */}
-      <div className="px-3 py-3 bg-blue-50 border-t border-blue-200 w-full">
+      <div className={`px-3 py-3 border-t w-full ${getBackgroundColorClass()}`}>
         <div className="flex items-center w-full justify-between mb-2">
           <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Last run</div>
           <div className="text-xs text-gray-600">
-            {isRunning ? 'Deploying now' : props.data.timestamp || 'No recent runs'}
+            {isRunning ? 'Running...' : props.data.timestamp || 'No recent runs'}
           </div>
         </div>
         
         {/* Current Execution Display */}
         <div>
           <div className="flex items-center mb-1">
-            <span className={`rounded-full w-6 h-6 border border-blue-200 text-center mr-2 flex items-center justify-center ${isRunning ? 'bg-blue-500' : 'bg-gray-400'}`}>
-              {isRunning && (
-                <span className="text-white text-sm animate-spin">⟳</span>
-              )}
-            </span>
+            {getStatusIcon()}
             <a 
               href="#" 
               className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900"
@@ -160,7 +185,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 href="#" 
                 className="min-w-0 font-semibold text-sm flex items-center hover:underline"
               >
-                <div className="truncate">Deploy: Pending ({pendingEvents.length})</div>
+                <div className="truncate">Pending ({pendingEvents.length})</div>
               </a>
             </div>
           )}
@@ -175,7 +200,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 href="#" 
                 className="min-w-0 font-semibold text-sm flex items-center hover:underline"
               >
-                <div className="truncate">Scale: Waiting Approval ({waitingEvents.length})</div>
+                <div className="truncate">Waiting Approval ({waitingEvents.length})</div>
               </a>
             </div>
           )}

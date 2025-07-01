@@ -1,4 +1,4 @@
-import React, { JSX, useEffect } from 'react';
+import React, { JSX } from 'react';
 import { formatRelativeTime } from '../../utils/stageEventUtils';
 
 interface RunItemProps {
@@ -19,22 +19,6 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   outputs,
 }) => {
   const [isExpanded, setIsExpanded] = React.useState<boolean>(false);
-  const [spinChar, setSpinChar] = React.useState<string>('|');
-
-  // Animation for running status
-  useEffect(() => {
-    if (status.toLowerCase() === 'state_started' || status.toLowerCase() === 'running') {
-      const chars = ['|', '/', '—', '\\'];
-      let charIndex = 0;
-      
-      const interval = setInterval(() => {
-        charIndex = (charIndex + 1) % chars.length;
-        setSpinChar(chars[charIndex]);
-      }, 300);
-
-      return () => clearInterval(interval);
-    }
-  }, [status]);
 
   const toggleExpand = (): void => {
     setIsExpanded(!isExpanded);
@@ -60,15 +44,15 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
       case 'state_pending':
       case 'queued':
         return (
-          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <span className="material-icons text-orange-600 text-sm">queue</span>
+          <div className="w-5 h-5 rounded-full bg-orange-500 border border-orange-200 mr-2 flex items-center justify-center">
+            <span className="text-white text-xs job-log-pending"></span>
           </div>
         );
       case 'state_started':
       case 'running':
         return (
-          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <span className="material-icons text-blue-600 text-sm">{spinChar}</span>
+          <div className="w-5 h-5 rounded-full bg-blue-500 border border-blue-200 mr-2 flex items-center justify-center">
+            <span className="text-white text-xs job-log-working"></span>
           </div>
         );
       default:
