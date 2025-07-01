@@ -26,6 +26,22 @@ export type AuthorizationCreateGroupResponse = {
     [key: string]: unknown;
 };
 
+export type AuthorizationCreateRoleRequest = {
+    name?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    permissions?: Array<AuthorizationPermission>;
+    inheritedRole?: string;
+};
+
+export type AuthorizationCreateRoleResponse = {
+    [key: string]: unknown;
+};
+
+export type AuthorizationDeleteRoleResponse = {
+    [key: string]: unknown;
+};
+
 export type AuthorizationDescribeRoleResponse = {
     role?: AuthorizationRole;
 };
@@ -90,6 +106,17 @@ export type AuthorizationRoleAssignment = {
     role?: string;
 };
 
+export type AuthorizationUpdateRoleBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    permissions?: Array<AuthorizationPermission>;
+    inheritedRole?: string;
+};
+
+export type AuthorizationUpdateRoleResponse = {
+    [key: string]: unknown;
+};
+
 export type ConnectionDataFilter = {
     expression?: string;
 };
@@ -107,6 +134,8 @@ export type ConnectionFilterType = 'FILTER_TYPE_UNKNOWN' | 'FILTER_TYPE_DATA' | 
 export type ConnectionHeaderFilter = {
     expression?: string;
 };
+
+export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type ExecutorSpecHttp = {
     url?: string;
@@ -206,8 +235,6 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
-export type StageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
-
 export type SuperplaneApproveStageEventBody = {
     [key: string]: unknown;
 };
@@ -270,14 +297,14 @@ export type SuperplaneConnectionGroupFieldSet = {
     fields?: Array<SuperplaneKeyValuePair>;
     hash?: string;
     state?: SuperplaneConnectionGroupFieldSetState;
-    result?: SuperplaneConnectionGroupFieldSetResult;
+    stateReason?: SuperplaneConnectionGroupFieldSetStateReason;
     events?: Array<SuperplaneConnectionGroupEvent>;
     createdAt?: string;
 };
 
-export type SuperplaneConnectionGroupFieldSetResult = 'RESULT_NONE' | 'RESULT_TIMED_OUT' | 'RESULT_RECEIVED_ALL';
-
 export type SuperplaneConnectionGroupFieldSetState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_PROCESSED' | 'STATE_DISCARDED';
+
+export type SuperplaneConnectionGroupFieldSetStateReason = 'STATE_REASON_NONE' | 'STATE_REASON_OK' | 'STATE_REASON_TIMEOUT';
 
 export type SuperplaneConnectionGroupMetadata = {
     id?: string;
@@ -285,6 +312,8 @@ export type SuperplaneConnectionGroupMetadata = {
     canvasId?: string;
     createdAt?: string;
     createdBy?: string;
+    updatedAt?: string;
+    updatedBy?: string;
 };
 
 export type SuperplaneConnectionGroupSpec = {
@@ -382,14 +411,12 @@ export type SuperplaneExecution = {
     id?: string;
     referenceId?: string;
     state?: SuperplaneExecutionState;
-    result?: SuperplaneExecutionResult;
+    result?: ExecutionResult;
     createdAt?: string;
     startedAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
 };
-
-export type SuperplaneExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
@@ -482,7 +509,7 @@ export type SuperplaneStageEvent = {
     sourceId?: string;
     sourceType?: SuperplaneConnectionType;
     state?: SuperplaneStageEventState;
-    stateReason?: StageEventStateReason;
+    stateReason?: SuperplaneStageEventStateReason;
     createdAt?: string;
     approvals?: Array<SuperplaneStageEventApproval>;
     execution?: SuperplaneExecution;
@@ -495,6 +522,8 @@ export type SuperplaneStageEventApproval = {
 };
 
 export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED';
+
+export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
 
 export type SuperplaneStageMetadata = {
     id?: string;
@@ -511,6 +540,14 @@ export type SuperplaneStageSpec = {
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
     secrets?: Array<SuperplaneValueDefinition>;
+};
+
+export type SuperplaneUpdateConnectionGroupBody = {
+    connectionGroup?: SuperplaneConnectionGroup;
+};
+
+export type SuperplaneUpdateConnectionGroupResponse = {
+    connectionGroup?: SuperplaneConnectionGroup;
 };
 
 export type SuperplaneUpdateSecretBody = {
@@ -547,7 +584,7 @@ export type SuperplaneValueFromEventData = {
 };
 
 export type SuperplaneValueFromLastExecution = {
-    results?: Array<SuperplaneExecutionResult>;
+    results?: Array<ExecutionResult>;
 };
 
 export type SuperplaneValueFromSecret = {
@@ -733,6 +770,31 @@ export type AuthorizationListRolesResponses = {
 
 export type AuthorizationListRolesResponse2 = AuthorizationListRolesResponses[keyof AuthorizationListRolesResponses];
 
+export type AuthorizationCreateRoleData = {
+    body: AuthorizationCreateRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/authorization/roles';
+};
+
+export type AuthorizationCreateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationCreateRoleError = AuthorizationCreateRoleErrors[keyof AuthorizationCreateRoleErrors];
+
+export type AuthorizationCreateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationCreateRoleResponse;
+};
+
+export type AuthorizationCreateRoleResponse2 = AuthorizationCreateRoleResponses[keyof AuthorizationCreateRoleResponses];
+
 export type AuthorizationAssignRoleData = {
     body: AuthorizationAssignRoleRequest;
     path?: never;
@@ -811,6 +873,63 @@ export type AuthorizationRemoveRoleResponses = {
 };
 
 export type AuthorizationRemoveRoleResponse2 = AuthorizationRemoveRoleResponses[keyof AuthorizationRemoveRoleResponses];
+
+export type AuthorizationDeleteRoleData = {
+    body?: never;
+    path: {
+        roleName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/authorization/roles/{roleName}';
+};
+
+export type AuthorizationDeleteRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationDeleteRoleError = AuthorizationDeleteRoleErrors[keyof AuthorizationDeleteRoleErrors];
+
+export type AuthorizationDeleteRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationDeleteRoleResponse;
+};
+
+export type AuthorizationDeleteRoleResponse2 = AuthorizationDeleteRoleResponses[keyof AuthorizationDeleteRoleResponses];
+
+export type AuthorizationUpdateRoleData = {
+    body: AuthorizationUpdateRoleBody;
+    path: {
+        roleName: string;
+    };
+    query?: never;
+    url: '/api/v1/authorization/roles/{roleName}';
+};
+
+export type AuthorizationUpdateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationUpdateRoleError = AuthorizationUpdateRoleErrors[keyof AuthorizationUpdateRoleErrors];
+
+export type AuthorizationUpdateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationUpdateRoleResponse;
+};
+
+export type AuthorizationUpdateRoleResponse2 = AuthorizationUpdateRoleResponses[keyof AuthorizationUpdateRoleResponses];
 
 export type AuthorizationListUserPermissionsData = {
     body?: never;
@@ -1005,6 +1124,34 @@ export type SuperplaneDescribeConnectionGroupResponses = {
 };
 
 export type SuperplaneDescribeConnectionGroupResponse2 = SuperplaneDescribeConnectionGroupResponses[keyof SuperplaneDescribeConnectionGroupResponses];
+
+export type SuperplaneUpdateConnectionGroupData = {
+    body: SuperplaneUpdateConnectionGroupBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}';
+};
+
+export type SuperplaneUpdateConnectionGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneUpdateConnectionGroupError = SuperplaneUpdateConnectionGroupErrors[keyof SuperplaneUpdateConnectionGroupErrors];
+
+export type SuperplaneUpdateConnectionGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateConnectionGroupResponse;
+};
+
+export type SuperplaneUpdateConnectionGroupResponse2 = SuperplaneUpdateConnectionGroupResponses[keyof SuperplaneUpdateConnectionGroupResponses];
 
 export type SuperplaneListConnectionGroupFieldSetsData = {
     body?: never;

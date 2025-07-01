@@ -269,6 +269,38 @@
         "tags": [
           "Authorization"
         ]
+      },
+      "post": {
+        "summary": "Create role",
+        "description": "Creates a new custom role with specified permissions",
+        "operationId": "Authorization_CreateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateRoleRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
       }
     },
     "/api/v1/authorization/roles/assign": {
@@ -381,6 +413,94 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/AuthorizationRemoveRoleRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/roles/{roleName}": {
+      "delete": {
+        "summary": "Delete role",
+        "description": "Deletes an existing custom role",
+        "operationId": "Authorization_DeleteRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationDeleteRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "put": {
+        "summary": "Update role",
+        "description": "Updates an existing custom role with new permissions",
+        "operationId": "Authorization_UpdateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateRoleBody"
             }
           }
         ],
@@ -1573,6 +1693,37 @@
     "AuthorizationCreateGroupResponse": {
       "type": "object"
     },
+    "AuthorizationCreateRoleRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "inheritedRole": {
+          "type": "string"
+        }
+      },
+      "title": "Custom role management messages"
+    },
+    "AuthorizationCreateRoleResponse": {
+      "type": "object"
+    },
+    "AuthorizationDeleteRoleResponse": {
+      "type": "object"
+    },
     "AuthorizationDescribeRoleResponse": {
       "type": "object",
       "properties": {
@@ -1733,6 +1884,30 @@
           "type": "string"
         }
       }
+    },
+    "AuthorizationUpdateRoleBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "inheritedRole": {
+          "type": "string"
+        }
+      }
+    },
+    "AuthorizationUpdateRoleResponse": {
+      "type": "object"
     },
     "ConnectionDataFilter": {
       "type": "object",
