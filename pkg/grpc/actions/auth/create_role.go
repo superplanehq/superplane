@@ -55,7 +55,7 @@ func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService auth
 	err = authService.CreateCustomRole(req.DomainId, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", req.Name, err)
-		return nil, status.Error(codes.Internal, "failed to create role")
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	log.Infof("created custom role %s in domain %s (%s)", req.Name, req.DomainId, domainType)

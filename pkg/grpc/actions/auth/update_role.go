@@ -62,7 +62,7 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 	err = authService.UpdateCustomRole(req.DomainId, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", req.RoleName, err)
-		return nil, status.Error(codes.Internal, "failed to update role")
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	log.Infof("updated custom role %s in domain %s (%s)", req.RoleName, req.DomainId, domainType)
