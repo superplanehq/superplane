@@ -87,10 +87,6 @@ func (v *SpecValidator) validateSemaphoreExecutorSpec(in *pb.ExecutorSpec) (*mod
 		return nil, fmt.Errorf("invalid semaphore executor spec: missing API token")
 	}
 
-	if in.Semaphore.TaskId == "" {
-		return nil, fmt.Errorf("invalid semaphore executor spec: only triggering tasks is supported for now")
-	}
-
 	return &models.ExecutorSpec{
 		Type: models.ExecutorSpecTypeSemaphore,
 		Semaphore: &models.SemaphoreExecutorSpec{
