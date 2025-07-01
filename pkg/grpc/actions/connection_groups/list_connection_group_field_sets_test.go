@@ -7,8 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
@@ -74,8 +72,8 @@ func Test__ListConnectionGroupFieldSets(t *testing.T) {
 	})
 
 	t.Run("field sets exist -> returns list", func(t *testing.T) {
-		createFieldSet(t, map[string]string{"version": "v1"}, connectionGroup, r.Source)
-		createFieldSet(t, map[string]string{"version": "v2"}, connectionGroup, r.Source)
+		support.CreateFieldSet(t, map[string]string{"version": "v1"}, connectionGroup, r.Source)
+		support.CreateFieldSet(t, map[string]string{"version": "v2"}, connectionGroup, r.Source)
 
 		req := &protos.ListConnectionGroupFieldSetsRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
@@ -87,16 +85,4 @@ func Test__ListConnectionGroupFieldSets(t *testing.T) {
 		require.NotNil(t, response)
 		require.Len(t, response.FieldSets, 2)
 	})
-}
-
-func createFieldSet(t *testing.T, fields map[string]string, connectionGroup *models.ConnectionGroup, source *models.EventSource) {
-	hash, err := crypto.SHA256ForMap(fields)
-	require.NoError(t, err)
-
-	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
-	require.NoError(t, err)
-
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`))
-	require.NoError(t, err)
-	fieldSet.AttachEvent(database.Conn(), event)
 }

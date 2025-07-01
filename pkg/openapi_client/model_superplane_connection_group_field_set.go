@@ -25,6 +25,7 @@ type SuperplaneConnectionGroupFieldSet struct {
 	Fields []SuperplaneKeyValuePair `json:"fields,omitempty"`
 	Hash *string `json:"hash,omitempty"`
 	State *SuperplaneConnectionGroupFieldSetState `json:"state,omitempty"`
+	StateReason *SuperplaneConnectionGroupFieldSetStateReason `json:"stateReason,omitempty"`
 	Events []SuperplaneConnectionGroupEvent `json:"events,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 }
@@ -37,6 +38,8 @@ func NewSuperplaneConnectionGroupFieldSet() *SuperplaneConnectionGroupFieldSet {
 	this := SuperplaneConnectionGroupFieldSet{}
 	var state SuperplaneConnectionGroupFieldSetState = SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_UNKNOWN
 	this.State = &state
+	var stateReason SuperplaneConnectionGroupFieldSetStateReason = SUPERPLANECONNECTIONGROUPFIELDSETSTATEREASON_STATE_REASON_NONE
+	this.StateReason = &stateReason
 	return &this
 }
 
@@ -47,6 +50,8 @@ func NewSuperplaneConnectionGroupFieldSetWithDefaults() *SuperplaneConnectionGro
 	this := SuperplaneConnectionGroupFieldSet{}
 	var state SuperplaneConnectionGroupFieldSetState = SUPERPLANECONNECTIONGROUPFIELDSETSTATE_STATE_UNKNOWN
 	this.State = &state
+	var stateReason SuperplaneConnectionGroupFieldSetStateReason = SUPERPLANECONNECTIONGROUPFIELDSETSTATEREASON_STATE_REASON_NONE
+	this.StateReason = &stateReason
 	return &this
 }
 
@@ -178,6 +183,38 @@ func (o *SuperplaneConnectionGroupFieldSet) SetState(v SuperplaneConnectionGroup
 	o.State = &v
 }
 
+// GetStateReason returns the StateReason field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupFieldSet) GetStateReason() SuperplaneConnectionGroupFieldSetStateReason {
+	if o == nil || IsNil(o.StateReason) {
+		var ret SuperplaneConnectionGroupFieldSetStateReason
+		return ret
+	}
+	return *o.StateReason
+}
+
+// GetStateReasonOk returns a tuple with the StateReason field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupFieldSet) GetStateReasonOk() (*SuperplaneConnectionGroupFieldSetStateReason, bool) {
+	if o == nil || IsNil(o.StateReason) {
+		return nil, false
+	}
+	return o.StateReason, true
+}
+
+// HasStateReason returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupFieldSet) HasStateReason() bool {
+	if o != nil && !IsNil(o.StateReason) {
+		return true
+	}
+
+	return false
+}
+
+// SetStateReason gets a reference to the given SuperplaneConnectionGroupFieldSetStateReason and assigns it to the StateReason field.
+func (o *SuperplaneConnectionGroupFieldSet) SetStateReason(v SuperplaneConnectionGroupFieldSetStateReason) {
+	o.StateReason = &v
+}
+
 // GetEvents returns the Events field value if set, zero value otherwise.
 func (o *SuperplaneConnectionGroupFieldSet) GetEvents() []SuperplaneConnectionGroupEvent {
 	if o == nil || IsNil(o.Events) {
@@ -263,6 +300,9 @@ func (o SuperplaneConnectionGroupFieldSet) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.State) {
 		toSerialize["state"] = o.State
+	}
+	if !IsNil(o.StateReason) {
+		toSerialize["stateReason"] = o.StateReason
 	}
 	if !IsNil(o.Events) {
 		toSerialize["events"] = o.Events

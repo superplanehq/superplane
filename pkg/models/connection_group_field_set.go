@@ -17,8 +17,15 @@ type ConnectionGroupFieldSet struct {
 	ConnectionGroupID uuid.UUID
 	FieldSet          datatypes.JSONType[map[string]string]
 	FieldSetHash      string
+	Timeout           uint32
+	TimeoutBehavior   string
 	State             string
+	StateReason       string
 	CreatedAt         *time.Time
+}
+
+func (s *ConnectionGroupFieldSet) String() string {
+	return fmt.Sprintf("%s - %v", s.ID.String(), s.FieldSet.Data())
 }
 
 type ConnectionGroupFieldSetEvent struct {
@@ -32,12 +39,15 @@ type ConnectionGroupFieldSetEvent struct {
 }
 
 func (g *ConnectionGroup) CreateFieldSet(tx *gorm.DB, fields map[string]string, hash string) (*ConnectionGroupFieldSet, error) {
+	groupSpec := g.Spec.Data()
 	now := time.Now()
 	fieldSet := &ConnectionGroupFieldSet{
 		ConnectionGroupID: g.ID,
 		FieldSet:          datatypes.NewJSONType(fields),
 		FieldSetHash:      hash,
 		State:             ConnectionGroupFieldSetStatePending,
+		Timeout:           groupSpec.Timeout,
+		TimeoutBehavior:   groupSpec.TimeoutBehavior,
 		CreatedAt:         &now,
 	}
 
@@ -63,9 +73,19 @@ func (s *ConnectionGroupFieldSet) FindEvents() ([]ConnectionGroupFieldSetEvent, 
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state string) error {
+func (s *ConnectionGroupFieldSet) UpdateState(tx *gorm.DB, state, reason string) error {
 	s.State = state
+	s.StateReason = reason
 	return tx.Save(s).Error
+}
+
+func (s *ConnectionGroupFieldSet) IsTimedOut(now time.Time) bool {
+	if s.Timeout == 0 {
+		return false
+	}
+
+	timeout := time.Duration(s.Timeout) * time.Second
+	return now.Sub(*s.CreatedAt) > timeout
 }
 
 type ConnectionGroupFieldSetEventWithData struct {
@@ -90,7 +110,7 @@ func (s *ConnectionGroupFieldSet) FindEventsWithData(tx *gorm.DB) ([]ConnectionG
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB) ([]byte, error) {
+func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, stateReason string, missingConnections []Connection) ([]byte, error) {
 	event := map[string]any{}
 
 	//
@@ -123,6 +143,18 @@ func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB) ([]byte, error) {
 	event["events"] = eventMap
 	event["fields"] = fieldMap
 
+	//
+	// Include the missing field, if any.
+	//
+	if len(missingConnections) > 0 {
+		missing := []string{}
+		for _, connection := range missingConnections {
+			missing = append(missing, connection.SourceName)
+		}
+
+		event["missing"] = missing
+	}
+
 	return json.Marshal(event)
 }
 
@@ -148,7 +180,12 @@ func (s *ConnectionGroupFieldSet) AttachEvent(tx *gorm.DB, event *Event) (*Conne
 	return &connectionGroupEvent, nil
 }
 
-func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup, allConnections []Connection) ([]Connection, error) {
+func (s *ConnectionGroupFieldSet) MissingConnections(tx *gorm.DB, g *ConnectionGroup) ([]Connection, error) {
+	allConnections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
+	if err != nil {
+		return nil, fmt.Errorf("error listing all connections: %v", err)
+	}
+
 	connectionsForFieldSet, err := g.FindConnectionsForFieldSet(tx, s)
 	if err != nil {
 		return nil, fmt.Errorf("error finding connections for field set %s - %v: %v", s.ID.String(), s.FieldSet.Data(), err)

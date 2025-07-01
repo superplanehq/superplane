@@ -2002,18 +2002,14 @@
         }
       }
     },
-    "StageEventStateReason": {
+    "SpecTimeoutBehavior": {
       "type": "string",
       "enum": [
-        "STATE_REASON_UNKNOWN",
-        "STATE_REASON_APPROVAL",
-        "STATE_REASON_TIME_WINDOW",
-        "STATE_REASON_EXECUTION",
-        "STATE_REASON_CONNECTION",
-        "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY"
+        "TIMEOUT_BEHAVIOR_NONE",
+        "TIMEOUT_BEHAVIOR_DROP",
+        "TIMEOUT_BEHAVIOR_EMIT"
       ],
-      "default": "STATE_REASON_UNKNOWN"
+      "default": "TIMEOUT_BEHAVIOR_NONE"
     },
     "SuperplaneApproveStageEventBody": {
       "type": "object"
@@ -2174,6 +2170,9 @@
         "state": {
           "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetState"
         },
+        "stateReason": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetStateReason"
+        },
         "events": {
           "type": "array",
           "items": {
@@ -2192,9 +2191,19 @@
       "enum": [
         "STATE_UNKNOWN",
         "STATE_PENDING",
-        "STATE_PROCESSED"
+        "STATE_PROCESSED",
+        "STATE_DISCARDED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneConnectionGroupFieldSetStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_NONE",
+        "STATE_REASON_OK",
+        "STATE_REASON_TIMEOUT"
+      ],
+      "default": "STATE_REASON_NONE"
     },
     "SuperplaneConnectionGroupMetadata": {
       "type": "object",
@@ -2236,6 +2245,13 @@
         },
         "groupBy": {
           "$ref": "#/definitions/SpecGroupBy"
+        },
+        "timeout": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeoutBehavior": {
+          "$ref": "#/definitions/SpecTimeoutBehavior"
         }
       }
     },
@@ -2693,7 +2709,7 @@
           "$ref": "#/definitions/SuperplaneStageEventState"
         },
         "stateReason": {
-          "$ref": "#/definitions/StageEventStateReason"
+          "$ref": "#/definitions/SuperplaneStageEventStateReason"
         },
         "createdAt": {
           "type": "string",
@@ -2739,6 +2755,19 @@
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneStageEventStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_UNKNOWN",
+        "STATE_REASON_APPROVAL",
+        "STATE_REASON_TIME_WINDOW",
+        "STATE_REASON_EXECUTION",
+        "STATE_REASON_CONNECTION",
+        "STATE_REASON_CANCELLED",
+        "STATE_REASON_UNHEALTHY"
+      ],
+      "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneStageMetadata": {
       "type": "object",

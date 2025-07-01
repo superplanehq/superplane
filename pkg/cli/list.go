@@ -276,7 +276,8 @@ var listConnectionGroupFieldSetsCmd = &cobra.Command{
 			fmt.Printf("%d. Fields: %s (%s)\n", i+1, fieldsAsString(fieldSet.Fields), *fieldSet.Hash)
 
 			fmt.Printf("   State: %s\n", *fieldSet.State)
-			fmt.Printf("    Created: %s\n", *fieldSet.CreatedAt)
+			fmt.Printf("   Reason: %s\n", *fieldSet.StateReason)
+			fmt.Printf("   Created: %s\n", *fieldSet.CreatedAt)
 
 			if len(fieldSet.Events) > 0 {
 				fmt.Println("   Events:")
@@ -352,7 +353,7 @@ func fieldsAsString(fields []openapi_client.SuperplaneKeyValuePair) string {
 	for i, field := range fields {
 		sb.WriteString(fmt.Sprintf("%s=%s", *field.Name, *field.Value))
 		if i < len(fields)-1 {
-			sb.WriteString("\n")
+			sb.WriteString(", ")
 		}
 	}
 	return sb.String()

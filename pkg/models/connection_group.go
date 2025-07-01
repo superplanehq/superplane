@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
@@ -17,6 +16,17 @@ import (
 const (
 	ConnectionGroupFieldSetStatePending   = "pending"
 	ConnectionGroupFieldSetStateProcessed = "processed"
+	ConnectionGroupFieldSetStateDiscarded = "dicarded"
+
+	ConnectionGroupFieldSetStateReasonTimeout = "timeout"
+	ConnectionGroupFieldSetStateReasonOK      = "ok"
+
+	ConnectionGroupTimeoutBehaviorNone = "none"
+	ConnectionGroupTimeoutBehaviorEmit = "emit"
+	ConnectionGroupTimeoutBehaviorDrop = "drop"
+
+	MinConnectionGroupTimeout = 60    // 1 minute
+	MaxConnectionGroupTimeout = 86400 // 1 day
 )
 
 type ConnectionGroup struct {
@@ -49,32 +59,14 @@ func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, st
 	return fieldSet, hash, nil
 }
 
-func (g *ConnectionGroup) ShouldEmit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) (bool, error) {
-	allConnections, err := ListConnectionsInTransaction(tx, g.ID, ConnectionTargetTypeConnectionGroup)
-	if err != nil {
-		return false, fmt.Errorf("error listing connections: %v", err)
-	}
-
-	missing, err := fieldSet.MissingConnections(tx, g, allConnections)
-	if err != nil {
-		return false, err
-	}
-
-	fields := fieldSet.FieldSet.Data()
-	if len(missing) > 0 {
-		log.Infof("Connection group %s has missing connections for field set %s - %v: %v",
-			g.Name, fieldSet.ID.String(), fields, sourceNamesFromConnections(missing),
-		)
-
-		return false, nil
-	}
-
-	log.Infof("All connections received for group %s and field set %s - %v", g.Name, fieldSet.ID.String(), fields)
-	return true, nil
+func (g *ConnectionGroup) Emit(fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return g.EmitInTransaction(tx, fieldSet, stateReason, missingConnections)
+	})
 }
 
-func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) error {
-	eventData, err := fieldSet.BuildEvent(tx)
+func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) error {
+	eventData, err := fieldSet.BuildEvent(tx, stateReason, missingConnections)
 	if err != nil {
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
@@ -84,7 +76,7 @@ func (g *ConnectionGroup) Emit(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) e
 		return err
 	}
 
-	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed)
+	return fieldSet.UpdateState(tx, ConnectionGroupFieldSetStateProcessed, stateReason)
 }
 
 func (g *ConnectionGroup) ListFieldSets() ([]ConnectionGroupFieldSet, error) {
@@ -106,6 +98,20 @@ func (g *ConnectionGroup) ListFieldSetsInTransaction(tx *gorm.DB) ([]ConnectionG
 	return fieldSets, nil
 }
 
+func (g *ConnectionGroup) FindFieldSetByID(ID uuid.UUID) (*ConnectionGroupFieldSet, error) {
+	var fieldSet *ConnectionGroupFieldSet
+	err := database.Conn().
+		Where("id = ?", ID).
+		First(&fieldSet).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldSet, nil
+}
+
 func (g *ConnectionGroup) FindPendingFieldSetByHash(tx *gorm.DB, hash string) (*ConnectionGroupFieldSet, error) {
 	var fieldSet *ConnectionGroupFieldSet
 	err := tx.
@@ -120,6 +126,21 @@ func (g *ConnectionGroup) FindPendingFieldSetByHash(tx *gorm.DB, hash string) (*
 	}
 
 	return fieldSet, nil
+}
+
+func ListPendingConnectionGroupFieldSets() ([]ConnectionGroupFieldSet, error) {
+	var fieldSets []ConnectionGroupFieldSet
+	err := database.Conn().
+		Where("state = ?", ConnectionGroupFieldSetStatePending).
+		Where("timeout_behavior != ?", ConnectionGroupTimeoutBehaviorNone).
+		Find(&fieldSets).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return fieldSets, nil
 }
 
 func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet) ([]string, error) {
@@ -142,7 +163,9 @@ func (g *ConnectionGroup) FindConnectionsForFieldSet(tx *gorm.DB, fieldSet *Conn
 }
 
 type ConnectionGroupSpec struct {
-	GroupBy *ConnectionGroupBySpec `json:"group_by"`
+	GroupBy         *ConnectionGroupBySpec `json:"group_by"`
+	Timeout         uint32                 `json:"timeout"`
+	TimeoutBehavior string                 `json:"timeout_behavior"`
 }
 
 type ConnectionGroupBySpec struct {
@@ -233,7 +256,11 @@ func (c *Canvas) UpdateConnectionGroup(id, requesterID string, connections []Con
 	})
 }
 
-func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error) {
+func FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
+	return FindConnectionGroupByIDInTransaction(database.Conn(), id)
+}
+
+func FindConnectionGroupByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error) {
 	var connectionGroup *ConnectionGroup
 	err := tx.First(&connectionGroup, id).Error
 	if err != nil {
@@ -241,12 +268,4 @@ func FindConnectionGroupByID(tx *gorm.DB, id uuid.UUID) (*ConnectionGroup, error
 	}
 
 	return connectionGroup, nil
-}
-
-func sourceNamesFromConnections(connections []Connection) []string {
-	sourceNames := []string{}
-	for _, connection := range connections {
-		sourceNames = append(sourceNames, connection.SourceName)
-	}
-	return sourceNames
 }

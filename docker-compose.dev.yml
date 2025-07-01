@@ -34,6 +34,7 @@ services:
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
       START_EVENT_DISTRIBUTER: "yes"
+      START_PENDING_FIELD_SETS_WORKER: "yes"
       WEB_BASE_PATH: "/app"
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
       JWT_SECRET: 1234567890abcdefghijklmnopqrstuv

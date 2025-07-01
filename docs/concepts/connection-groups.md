@@ -20,17 +20,30 @@ spec:
     - type: TYPE_STAGE
       name: preprod2
 
+  #
+  # The fields in the connection events we use to group things by.
+  # Multiple fields can be used.
+  # All the members of this group must have send
+  # these fields in their events.
+  #
   groupBy:
-
-    #
-    # The fields in the connection events we use to group things by.
-    # Multiple fields can be used.
-    # All the members of this group must have send
-    # these fields in their events.
-    #
     fields:
       - name: version
         expression: outputs.version
+
+  #
+  # How long to wait, in seconds, for all the connections
+  # to send events with the same grouping fields.
+  # If nothing is specified, no timeout is applied.
+  #
+  timeout: 86400
+
+  #
+  # Determines what to do when the timeout for a connection group field set is reached:
+  # - DROP: do not emit anything
+  # - EMIT: emit an event for the events received, but indicate some connections were missing
+  #
+  timeoutBehavior: TIMEOUT_BEHAVIOR_DROP | TIMEOUT_BEHAVIOR_EMIT
 ```
 
 And this is how you use it as a connection for another stage:
@@ -57,6 +70,20 @@ The events emitted by the connection group will have all the grouping fields and
     "preprod1": {...},
     "preprod2": {...}
   }
+}
+```
+
+If the timeout is reached, the connection group will emit an event with the same fields, but with a `missing` field containing the names of the connections that did not send events.
+
+```json
+{
+  "fields": {
+    "version": "v1",
+  },
+  "events": {
+    "preprod1": {...}
+  },
+  "missing": ["preprod2"]
 }
 ```
 

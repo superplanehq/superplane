@@ -57,8 +57,8 @@ docs/SecretAPI.md
 docs/SecretLocal.md
 docs/SecretProvider.md
 docs/SpecGroupBy.md
+docs/SpecTimeoutBehavior.md
 docs/StageAPI.md
-docs/StageEventStateReason.md
 docs/SuperplaneApproveStageEventResponse.md
 docs/SuperplaneCanvas.md
 docs/SuperplaneCanvasMetadata.md
@@ -71,6 +71,7 @@ docs/SuperplaneConnectionGroup.md
 docs/SuperplaneConnectionGroupEvent.md
 docs/SuperplaneConnectionGroupFieldSet.md
 docs/SuperplaneConnectionGroupFieldSetState.md
+docs/SuperplaneConnectionGroupFieldSetStateReason.md
 docs/SuperplaneConnectionGroupMetadata.md
 docs/SuperplaneConnectionGroupSpec.md
 docs/SuperplaneConnectionType.md
@@ -114,6 +115,7 @@ docs/SuperplaneStage.md
 docs/SuperplaneStageEvent.md
 docs/SuperplaneStageEventApproval.md
 docs/SuperplaneStageEventState.md
+docs/SuperplaneStageEventStateReason.md
 docs/SuperplaneStageMetadata.md
 docs/SuperplaneStageSpec.md
 docs/SuperplaneUpdateConnectionGroupBody.md
@@ -167,7 +169,7 @@ model_rpc_status.go
 model_secret_local.go
 model_secret_provider.go
 model_spec_group_by.go
-model_stage_event_state_reason.go
+model_spec_timeout_behavior.go
 model_superplane_approve_stage_event_response.go
 model_superplane_canvas.go
 model_superplane_canvas_metadata.go
@@ -180,6 +182,7 @@ model_superplane_connection_group.go
 model_superplane_connection_group_event.go
 model_superplane_connection_group_field_set.go
 model_superplane_connection_group_field_set_state.go
+model_superplane_connection_group_field_set_state_reason.go
 model_superplane_connection_group_metadata.go
 model_superplane_connection_group_spec.go
 model_superplane_connection_type.go
@@ -223,6 +226,7 @@ model_superplane_stage.go
 model_superplane_stage_event.go
 model_superplane_stage_event_approval.go
 model_superplane_stage_event_state.go
+model_superplane_stage_event_state_reason.go
 model_superplane_stage_metadata.go
 model_superplane_stage_spec.go
 model_superplane_update_connection_group_body.go

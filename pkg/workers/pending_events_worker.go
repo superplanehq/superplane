@@ -165,7 +165,7 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 }
 
 func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *models.Event, connection models.Connection) error {
-	connectionGroup, err := models.FindConnectionGroupByID(tx, connection.TargetID)
+	connectionGroup, err := models.FindConnectionGroupByIDInTransaction(tx, connection.TargetID)
 	if err != nil {
 		return err
 	}
@@ -195,18 +195,23 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	}
 
 	//
-	// Check if new event should be emitted, and if so, emit it.
+	// Check if the field set has missing connections.
+	// If it does, do not do anything yet.
+	// If it doesn't, emit an event for this field set.
 	//
-	shouldEmit, err := connectionGroup.ShouldEmit(tx, fieldSet)
+	missing, err := fieldSet.MissingConnections(tx, connectionGroup)
 	if err != nil {
-		return fmt.Errorf("error determining if connection group should emit event: %v", err)
+		return err
 	}
 
-	if !shouldEmit {
-		return nil
+	if len(missing) > 0 {
+		log.Infof("Connection group %s has missing connections for field set %s - %v: %v",
+			connectionGroup.Name, fieldSet.String(), fields, sourceNamesFromConnections(missing),
+		)
 	}
 
-	return connectionGroup.Emit(tx, fieldSet)
+	log.Infof("All connections received for group %s and field set %s - %v", connectionGroup.Name, fieldSet.String(), fields)
+	return connectionGroup.EmitInTransaction(tx, fieldSet, models.ConnectionGroupFieldSetStateReasonOK, missing)
 }
 
 func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) (map[string]any, error) {
@@ -217,4 +222,12 @@ func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stag
 	}
 
 	return inputs, nil
+}
+
+func sourceNamesFromConnections(connections []models.Connection) []string {
+	sourceNames := []string{}
+	for _, connection := range connections {
+		sourceNames = append(sourceNames, connection.SourceName)
+	}
+	return sourceNames
 }

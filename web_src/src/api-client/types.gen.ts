@@ -108,8 +108,6 @@ export type ConnectionHeaderFilter = {
     expression?: string;
 };
 
-export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
-
 export type ExecutorSpecHttp = {
     url?: string;
     headers?: {
@@ -206,6 +204,8 @@ export type SpecGroupBy = {
     fields?: Array<GroupByField>;
 };
 
+export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
+
 export type StageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
 
 export type SuperplaneApproveStageEventBody = {
@@ -270,11 +270,14 @@ export type SuperplaneConnectionGroupFieldSet = {
     fields?: Array<SuperplaneKeyValuePair>;
     hash?: string;
     state?: SuperplaneConnectionGroupFieldSetState;
+    result?: SuperplaneConnectionGroupFieldSetResult;
     events?: Array<SuperplaneConnectionGroupEvent>;
     createdAt?: string;
 };
 
-export type SuperplaneConnectionGroupFieldSetState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_PROCESSED';
+export type SuperplaneConnectionGroupFieldSetResult = 'RESULT_NONE' | 'RESULT_TIMED_OUT' | 'RESULT_RECEIVED_ALL';
+
+export type SuperplaneConnectionGroupFieldSetState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_PROCESSED' | 'STATE_DISCARDED';
 
 export type SuperplaneConnectionGroupMetadata = {
     id?: string;
@@ -287,6 +290,8 @@ export type SuperplaneConnectionGroupMetadata = {
 export type SuperplaneConnectionGroupSpec = {
     connections?: Array<SuperplaneConnection>;
     groupBy?: SpecGroupBy;
+    timeout?: number;
+    timeoutBehavior?: SpecTimeoutBehavior;
 };
 
 export type SuperplaneConnectionType = 'TYPE_UNKNOWN' | 'TYPE_EVENT_SOURCE' | 'TYPE_STAGE' | 'TYPE_CONNECTION_GROUP';
@@ -377,12 +382,14 @@ export type SuperplaneExecution = {
     id?: string;
     referenceId?: string;
     state?: SuperplaneExecutionState;
-    result?: ExecutionResult;
+    result?: SuperplaneExecutionResult;
     createdAt?: string;
     startedAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
 };
+
+export type SuperplaneExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
@@ -540,7 +547,7 @@ export type SuperplaneValueFromEventData = {
 };
 
 export type SuperplaneValueFromLastExecution = {
-    results?: Array<ExecutionResult>;
+    results?: Array<SuperplaneExecutionResult>;
 };
 
 export type SuperplaneValueFromSecret = {

@@ -78,11 +78,12 @@ func serializeConnectionGroupFieldSets(in []models.ConnectionGroupFieldSet) ([]*
 // TODO: very inefficient way of querying the events for the field set that we should fix later
 func serializeConnectionGroupFieldSet(in models.ConnectionGroupFieldSet) (*pb.ConnectionGroupFieldSet, error) {
 	fieldSet := pb.ConnectionGroupFieldSet{
-		Id:        in.ID.String(),
-		Fields:    []*pb.KeyValuePair{},
-		Hash:      in.FieldSetHash,
-		State:     fieldSetStateToProto(in.State),
-		CreatedAt: timestamppb.New(*in.CreatedAt),
+		Id:          in.ID.String(),
+		Fields:      []*pb.KeyValuePair{},
+		Hash:        in.FieldSetHash,
+		State:       fieldSetStateToProto(in.State),
+		StateReason: fieldSetStateReasonToProto(in.StateReason),
+		CreatedAt:   timestamppb.New(*in.CreatedAt),
 	}
 
 	for k, v := range in.FieldSet.Data() {
@@ -119,7 +120,20 @@ func fieldSetStateToProto(state string) pb.ConnectionGroupFieldSet_State {
 		return pb.ConnectionGroupFieldSet_STATE_PENDING
 	case models.ConnectionGroupFieldSetStateProcessed:
 		return pb.ConnectionGroupFieldSet_STATE_PROCESSED
+	case models.ConnectionGroupFieldSetStateDiscarded:
+		return pb.ConnectionGroupFieldSet_STATE_DISCARDED
 	default:
 		return pb.ConnectionGroupFieldSet_STATE_UNKNOWN
+	}
+}
+
+func fieldSetStateReasonToProto(reason string) pb.ConnectionGroupFieldSet_StateReason {
+	switch reason {
+	case models.ConnectionGroupFieldSetStateReasonTimeout:
+		return pb.ConnectionGroupFieldSet_STATE_REASON_TIMEOUT
+	case models.ConnectionGroupFieldSetStateReasonOK:
+		return pb.ConnectionGroupFieldSet_STATE_REASON_OK
+	default:
+		return pb.ConnectionGroupFieldSet_STATE_REASON_NONE
 	}
 }

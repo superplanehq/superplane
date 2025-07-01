@@ -57,22 +57,13 @@ var updateCmd = &cobra.Command{
 				Fail("Invalid Stage YAML: id field missing")
 			}
 
-			spec, ok := yamlData["spec"].(map[string]any)
-			if !ok {
-				Fail("Invalid Stage YAML: spec section missing")
-			}
-
-			// Convert to JSON
-			specData, err := json.Marshal(spec)
+			var stage openapi_client.SuperplaneStage
+			err = yaml.Unmarshal(data, &stage)
 			Check(err)
 
-			// Convert JSON to stage request
-			var request openapi_client.SuperplaneUpdateStageBody
-			err = json.Unmarshal(specData, &request)
-			Check(err)
-
+			// Execute request
 			response, httpResponse, err := c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
-				Body(request).
+				Body(openapi_client.SuperplaneUpdateStageBody{Stage: &stage}).
 				Execute()
 
 			if err != nil {

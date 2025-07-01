@@ -22,6 +22,8 @@ var _ MappedNullable = &SuperplaneConnectionGroupSpec{}
 type SuperplaneConnectionGroupSpec struct {
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	GroupBy *SpecGroupBy `json:"groupBy,omitempty"`
+	Timeout *int64 `json:"timeout,omitempty"`
+	TimeoutBehavior *SpecTimeoutBehavior `json:"timeoutBehavior,omitempty"`
 }
 
 // NewSuperplaneConnectionGroupSpec instantiates a new SuperplaneConnectionGroupSpec object
@@ -30,6 +32,8 @@ type SuperplaneConnectionGroupSpec struct {
 // will change when the set of required properties is changed
 func NewSuperplaneConnectionGroupSpec() *SuperplaneConnectionGroupSpec {
 	this := SuperplaneConnectionGroupSpec{}
+	var timeoutBehavior SpecTimeoutBehavior = SPECTIMEOUTBEHAVIOR_TIMEOUT_BEHAVIOR_NONE
+	this.TimeoutBehavior = &timeoutBehavior
 	return &this
 }
 
@@ -38,6 +42,8 @@ func NewSuperplaneConnectionGroupSpec() *SuperplaneConnectionGroupSpec {
 // but it doesn't guarantee that properties required by API are set
 func NewSuperplaneConnectionGroupSpecWithDefaults() *SuperplaneConnectionGroupSpec {
 	this := SuperplaneConnectionGroupSpec{}
+	var timeoutBehavior SpecTimeoutBehavior = SPECTIMEOUTBEHAVIOR_TIMEOUT_BEHAVIOR_NONE
+	this.TimeoutBehavior = &timeoutBehavior
 	return &this
 }
 
@@ -105,6 +111,70 @@ func (o *SuperplaneConnectionGroupSpec) SetGroupBy(v SpecGroupBy) {
 	o.GroupBy = &v
 }
 
+// GetTimeout returns the Timeout field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupSpec) GetTimeout() int64 {
+	if o == nil || IsNil(o.Timeout) {
+		var ret int64
+		return ret
+	}
+	return *o.Timeout
+}
+
+// GetTimeoutOk returns a tuple with the Timeout field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupSpec) GetTimeoutOk() (*int64, bool) {
+	if o == nil || IsNil(o.Timeout) {
+		return nil, false
+	}
+	return o.Timeout, true
+}
+
+// HasTimeout returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupSpec) HasTimeout() bool {
+	if o != nil && !IsNil(o.Timeout) {
+		return true
+	}
+
+	return false
+}
+
+// SetTimeout gets a reference to the given int64 and assigns it to the Timeout field.
+func (o *SuperplaneConnectionGroupSpec) SetTimeout(v int64) {
+	o.Timeout = &v
+}
+
+// GetTimeoutBehavior returns the TimeoutBehavior field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupSpec) GetTimeoutBehavior() SpecTimeoutBehavior {
+	if o == nil || IsNil(o.TimeoutBehavior) {
+		var ret SpecTimeoutBehavior
+		return ret
+	}
+	return *o.TimeoutBehavior
+}
+
+// GetTimeoutBehaviorOk returns a tuple with the TimeoutBehavior field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupSpec) GetTimeoutBehaviorOk() (*SpecTimeoutBehavior, bool) {
+	if o == nil || IsNil(o.TimeoutBehavior) {
+		return nil, false
+	}
+	return o.TimeoutBehavior, true
+}
+
+// HasTimeoutBehavior returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupSpec) HasTimeoutBehavior() bool {
+	if o != nil && !IsNil(o.TimeoutBehavior) {
+		return true
+	}
+
+	return false
+}
+
+// SetTimeoutBehavior gets a reference to the given SpecTimeoutBehavior and assigns it to the TimeoutBehavior field.
+func (o *SuperplaneConnectionGroupSpec) SetTimeoutBehavior(v SpecTimeoutBehavior) {
+	o.TimeoutBehavior = &v
+}
+
 func (o SuperplaneConnectionGroupSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +190,12 @@ func (o SuperplaneConnectionGroupSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.GroupBy) {
 		toSerialize["groupBy"] = o.GroupBy
+	}
+	if !IsNil(o.Timeout) {
+		toSerialize["timeout"] = o.Timeout
+	}
+	if !IsNil(o.TimeoutBehavior) {
+		toSerialize["timeoutBehavior"] = o.TimeoutBehavior
 	}
 	return toSerialize, nil
 }

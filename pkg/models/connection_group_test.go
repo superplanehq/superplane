@@ -81,7 +81,7 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	})
 }
 
-func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
+func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
@@ -138,14 +138,14 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Connection group should not emit anything yet, for v1 and v2
+		// Connection group should still have missing connections, for v1 and v2
 		//
-		shouldEmit, err := connectionGroup.ShouldEmit(database.Conn(), fieldSet)
+		missingConnections, err := fieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), fieldSetV2)
+		require.NotEmpty(t, missingConnections)
+		missingConnections, err = fieldSetV2.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
+		require.NotEmpty(t, missingConnections)
 
 		//
 		// Create version=v1 event for source2
@@ -156,15 +156,16 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Now that version=v1 events from both connections came in, connection group should emit,
-		// while still not emitting anything for v2.
+		// Now that version=v1 events from both connections came in,
+		// no missing connections for v1 should be there,
+		// while still having some for v2.
 		//
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), fieldSet)
+		missingConnections, err = fieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.True(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), fieldSetV2)
+		require.Empty(t, missingConnections)
+		missingConnections, err = fieldSetV2.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
+		require.NotEmpty(t, missingConnections)
 	})
 
 	t.Run("new field set with same hash", func(t *testing.T) {
@@ -206,10 +207,10 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		// Verify that we should emit for the version=v1 field set,
 		// and move the field set to processed - simulating what the worker does in that case.
 		//
-		shouldEmit, err := connectionGroup.ShouldEmit(database.Conn(), fieldSet)
+		missingConnections, err := fieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.True(t, shouldEmit)
-		require.NoError(t, fieldSet.UpdateState(database.Conn(), ConnectionGroupFieldSetStateProcessed))
+		require.Empty(t, missingConnections)
+		require.NoError(t, fieldSet.UpdateState(database.Conn(), ConnectionGroupFieldSetStateProcessed, ConnectionGroupFieldSetStateReasonOK))
 
 		//
 		// Now, we send a new version=v1 event for source1 only.
@@ -224,9 +225,9 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		//
 		// Verify we shouldn't emit anything for it yet.
 		//
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), newFieldSet)
+		missingConnections, err = newFieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
+		require.NotEmpty(t, missingConnections)
 	})
 
 	t.Run("multiple fields", func(t *testing.T) {
@@ -286,17 +287,17 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Connection group should not emit anything yet, for anything
+		// All the field sets should have missing connections so far.
 		//
-		shouldEmit, err := connectionGroup.ShouldEmit(database.Conn(), v1AuthfieldSet)
+		missingConnections, err := v1AuthfieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), v2AuthfieldSet)
+		require.NotEmpty(t, missingConnections)
+		missingConnections, err = v2AuthfieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), v1CoreFieldSet)
+		require.NotEmpty(t, missingConnections)
+		missingConnections, err = v1CoreFieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
+		require.NotEmpty(t, missingConnections)
 
 		//
 		// Simulate new version=v1,app=auth event coming from source2
@@ -307,17 +308,17 @@ func Test__ConnectionGroup__ShouldEmit(t *testing.T) {
 		require.NoError(t, err)
 
 		//
-		// Event should be emitted for version=v1,app=auth only
+		// Field set for version=v1,app=auth should not have missing connections.
 		//
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), v1AuthfieldSet)
+		missingConnections, err = v1AuthfieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.True(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), v2AuthfieldSet)
+		require.Empty(t, missingConnections)
+		missingConnections, err = v2AuthfieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
-		shouldEmit, err = connectionGroup.ShouldEmit(database.Conn(), v1CoreFieldSet)
+		require.NotEmpty(t, missingConnections)
+		missingConnections, err = v1CoreFieldSet.MissingConnections(database.Conn(), connectionGroup)
 		require.NoError(t, err)
-		require.False(t, shouldEmit)
+		require.NotEmpty(t, missingConnections)
 	})
 }
 
@@ -369,7 +370,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	//
 	// Emit and verify the structure of the outgoing event created.
 	//
-	require.NoError(t, connectionGroup.Emit(database.Conn(), v1AuthfieldSet))
+	require.NoError(t, connectionGroup.Emit(v1AuthfieldSet, ConnectionGroupFieldSetStateReasonOK, []Connection{}))
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{

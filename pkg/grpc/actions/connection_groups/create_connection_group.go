@@ -106,11 +106,30 @@ func validateSpec(spec *pb.ConnectionGroup_Spec) (*models.ConnectionGroupSpec, e
 		return nil, err
 	}
 
+	err = validateTimeout(spec.Timeout)
+	if err != nil {
+		return nil, err
+	}
+
 	return &models.ConnectionGroupSpec{
+		Timeout:         spec.Timeout,
+		TimeoutBehavior: protoToTimeoutBehavior(spec.TimeoutBehavior),
 		GroupBy: &models.ConnectionGroupBySpec{
 			Fields: fields,
 		},
 	}, nil
+}
+
+func validateTimeout(timeout uint32) error {
+	if timeout == 0 {
+		return nil
+	}
+
+	if timeout < models.MinConnectionGroupTimeout || timeout > models.MaxConnectionGroupTimeout {
+		return fmt.Errorf("timeout duration must be between %ds and %ds", models.MinConnectionGroupTimeout, models.MaxConnectionGroupTimeout)
+	}
+
+	return nil
 }
 
 func validateGroupByFields(in []*pb.ConnectionGroup_Spec_GroupBy_Field) ([]models.ConnectionGroupByField, error) {
@@ -164,10 +183,34 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 	return &pb.ConnectionGroup{
 		Metadata: metadata,
 		Spec: &pb.ConnectionGroup_Spec{
-			Connections: conns,
+			Connections:     conns,
+			Timeout:         spec.Timeout,
+			TimeoutBehavior: timeoutBehaviorToProto(spec.TimeoutBehavior),
 			GroupBy: &pb.ConnectionGroup_Spec_GroupBy{
 				Fields: fields,
 			},
 		},
 	}, nil
+}
+
+func protoToTimeoutBehavior(behavior pb.ConnectionGroup_Spec_TimeoutBehavior) string {
+	switch behavior {
+	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT:
+		return models.ConnectionGroupTimeoutBehaviorEmit
+	case pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP:
+		return models.ConnectionGroupTimeoutBehaviorDrop
+	default:
+		return models.ConnectionGroupTimeoutBehaviorNone
+	}
+}
+
+func timeoutBehaviorToProto(timeoutBehavior string) pb.ConnectionGroup_Spec_TimeoutBehavior {
+	switch timeoutBehavior {
+	case models.ConnectionGroupTimeoutBehaviorEmit:
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_EMIT
+	case models.ConnectionGroupTimeoutBehaviorDrop:
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP
+	default:
+		return pb.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_NONE
+	}
 }

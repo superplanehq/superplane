@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -112,6 +113,41 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	}
 
 	return &r
+}
+
+func CreateConnectionGroup(t *testing.T, name string, canvas *models.Canvas, source *models.EventSource, timeout uint32, timeoutBehavior string) *models.ConnectionGroup {
+	connectionGroup, err := canvas.CreateConnectionGroup(
+		name,
+		uuid.NewString(),
+		[]models.Connection{
+			{SourceID: source.ID, SourceName: source.Name, SourceType: models.SourceTypeEventSource},
+		},
+		models.ConnectionGroupSpec{
+			Timeout:         timeout,
+			TimeoutBehavior: timeoutBehavior,
+			GroupBy: &models.ConnectionGroupBySpec{
+				Fields: []models.ConnectionGroupByField{
+					{Name: "test", Expression: "test"},
+				},
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	return connectionGroup
+}
+
+func CreateFieldSet(t *testing.T, fields map[string]string, connectionGroup *models.ConnectionGroup, source *models.EventSource) *models.ConnectionGroupFieldSet {
+	hash, err := crypto.SHA256ForMap(fields)
+	require.NoError(t, err)
+
+	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
+	require.NoError(t, err)
+
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`))
+	require.NoError(t, err)
+	fieldSet.AttachEvent(database.Conn(), event)
+	return fieldSet
 }
 
 func CreateStageEvent(t *testing.T, source *models.EventSource, stage *models.Stage) *models.StageEvent {
