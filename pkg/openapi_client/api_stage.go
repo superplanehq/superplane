@@ -31,10 +31,10 @@ type ApiSuperplaneApproveStageEventRequest struct {
 	canvasIdOrName string
 	stageIdOrName string
 	eventId string
-	body *SuperplaneApproveStageEventBody
+	body *map[string]interface{}
 }
 
-func (r ApiSuperplaneApproveStageEventRequest) Body(body SuperplaneApproveStageEventBody) ApiSuperplaneApproveStageEventRequest {
+func (r ApiSuperplaneApproveStageEventRequest) Body(body map[string]interface{}) ApiSuperplaneApproveStageEventRequest {
 	r.body = &body
 	return r
 }

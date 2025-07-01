@@ -78,14 +78,14 @@ func Test__DeleteOrganization(t *testing.T) {
 		assert.Equal(t, "id_or_name is required", s.Message())
 	})
 
-	t.Run("invalid requester ID -> error", func(t *testing.T) {
+	t.Run("unauthenticated user -> error", func(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org-delete-3", "Test Organization Delete 3")
 		require.NoError(t, err)
 
-		_, err = DeleteOrganization(ctx, &protos.DeleteOrganizationRequest{
+		_, err = DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{
 			IdOrName: organization.ID.String(),
 		}, authService)
 
-		assert.Error(t, err)
+		assert.ErrorContains(t, err, "user not authenticated")
 	})
 }

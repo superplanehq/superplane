@@ -209,7 +209,7 @@ export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DR
 export type StageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
 
 export type SuperplaneApproveStageEventBody = {
-    requesterId?: string;
+    [key: string]: unknown;
 };
 
 export type SuperplaneApproveStageEventResponse = {
@@ -315,7 +315,6 @@ export type SuperplaneCreateConnectionGroupResponse = {
 
 export type SuperplaneCreateEventSourceBody = {
     eventSource?: SuperplaneEventSource;
-    requesterId?: string;
 };
 
 export type SuperplaneCreateEventSourceResponse = {
@@ -325,7 +324,6 @@ export type SuperplaneCreateEventSourceResponse = {
 
 export type SuperplaneCreateSecretBody = {
     secret?: SuperplaneSecret;
-    requesterId?: string;
 };
 
 export type SuperplaneCreateSecretResponse = {
@@ -334,7 +332,6 @@ export type SuperplaneCreateSecretResponse = {
 
 export type SuperplaneCreateStageBody = {
     stage?: SuperplaneStage;
-    requesterId?: string;
 };
 
 export type SuperplaneCreateStageResponse = {
@@ -518,7 +515,6 @@ export type SuperplaneStageSpec = {
 
 export type SuperplaneUpdateSecretBody = {
     secret?: SuperplaneSecret;
-    requesterId?: string;
 };
 
 export type SuperplaneUpdateSecretResponse = {
@@ -527,7 +523,6 @@ export type SuperplaneUpdateSecretResponse = {
 
 export type SuperplaneUpdateStageBody = {
     stage?: SuperplaneStage;
-    requesterId?: string;
 };
 
 export type SuperplaneUpdateStageResponse = {
@@ -1183,9 +1178,7 @@ export type SuperplaneDeleteSecretData = {
         canvasIdOrName: string;
         idOrName: string;
     };
-    query?: {
-        requesterId?: string;
-    };
+    query?: never;
     url: '/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}';
 };
 

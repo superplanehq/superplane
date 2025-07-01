@@ -26,6 +26,8 @@ type SuperplaneConnectionGroupMetadata struct {
 	CanvasId *string `json:"canvasId,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	CreatedBy *string `json:"createdBy,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
+	UpdatedBy *string `json:"updatedBy,omitempty"`
 }
 
 // NewSuperplaneConnectionGroupMetadata instantiates a new SuperplaneConnectionGroupMetadata object
@@ -205,6 +207,70 @@ func (o *SuperplaneConnectionGroupMetadata) SetCreatedBy(v string) {
 	o.CreatedBy = &v
 }
 
+// GetUpdatedAt returns the UpdatedAt field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupMetadata) GetUpdatedAt() time.Time {
+	if o == nil || IsNil(o.UpdatedAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.UpdatedAt
+}
+
+// GetUpdatedAtOk returns a tuple with the UpdatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupMetadata) GetUpdatedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.UpdatedAt) {
+		return nil, false
+	}
+	return o.UpdatedAt, true
+}
+
+// HasUpdatedAt returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupMetadata) HasUpdatedAt() bool {
+	if o != nil && !IsNil(o.UpdatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedAt gets a reference to the given time.Time and assigns it to the UpdatedAt field.
+func (o *SuperplaneConnectionGroupMetadata) SetUpdatedAt(v time.Time) {
+	o.UpdatedAt = &v
+}
+
+// GetUpdatedBy returns the UpdatedBy field value if set, zero value otherwise.
+func (o *SuperplaneConnectionGroupMetadata) GetUpdatedBy() string {
+	if o == nil || IsNil(o.UpdatedBy) {
+		var ret string
+		return ret
+	}
+	return *o.UpdatedBy
+}
+
+// GetUpdatedByOk returns a tuple with the UpdatedBy field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConnectionGroupMetadata) GetUpdatedByOk() (*string, bool) {
+	if o == nil || IsNil(o.UpdatedBy) {
+		return nil, false
+	}
+	return o.UpdatedBy, true
+}
+
+// HasUpdatedBy returns a boolean if a field has been set.
+func (o *SuperplaneConnectionGroupMetadata) HasUpdatedBy() bool {
+	if o != nil && !IsNil(o.UpdatedBy) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedBy gets a reference to the given string and assigns it to the UpdatedBy field.
+func (o *SuperplaneConnectionGroupMetadata) SetUpdatedBy(v string) {
+	o.UpdatedBy = &v
+}
+
 func (o SuperplaneConnectionGroupMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -229,6 +295,12 @@ func (o SuperplaneConnectionGroupMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.CreatedBy) {
 		toSerialize["createdBy"] = o.CreatedBy
+	}
+	if !IsNil(o.UpdatedAt) {
+		toSerialize["updatedAt"] = o.UpdatedAt
+	}
+	if !IsNil(o.UpdatedBy) {
+		toSerialize["updatedBy"] = o.UpdatedBy
 	}
 	return toSerialize, nil
 }

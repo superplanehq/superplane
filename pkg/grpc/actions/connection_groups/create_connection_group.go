@@ -167,14 +167,21 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 		}
 	}
 
+	metadata := &pb.ConnectionGroup_Metadata{
+		Id:        connectionGroup.ID.String(),
+		Name:      connectionGroup.Name,
+		CanvasId:  connectionGroup.CanvasID.String(),
+		CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
+		CreatedBy: connectionGroup.CreatedBy.String(),
+	}
+
+	if connectionGroup.UpdatedAt != nil {
+		metadata.UpdatedAt = timestamppb.New(*connectionGroup.UpdatedAt)
+		metadata.UpdatedBy = connectionGroup.UpdatedBy.String()
+	}
+
 	return &pb.ConnectionGroup{
-		Metadata: &pb.ConnectionGroup_Metadata{
-			Id:        connectionGroup.ID.String(),
-			Name:      connectionGroup.Name,
-			CanvasId:  connectionGroup.CanvasID.String(),
-			CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
-			CreatedBy: connectionGroup.CreatedBy.String(),
-		},
+		Metadata: metadata,
 		Spec: &pb.ConnectionGroup_Spec{
 			Connections:     conns,
 			Timeout:         spec.Timeout,

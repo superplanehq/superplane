@@ -38,23 +38,9 @@ func Test__DeleteSecret(t *testing.T) {
 		assert.Equal(t, "canvas not found", s.Message())
 	})
 
-	t.Run("missing requester ID", func(t *testing.T) {
-		req := &protos.DeleteSecretRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       "test",
-		}
-
-		_, err := DeleteSecret(context.Background(), req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid requester ID", s.Message())
-	})
-
 	t.Run("secret does not exist -> error", func(t *testing.T) {
 		req := &protos.DeleteSecretRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			IdOrName:       "test2",
 		}
 
@@ -69,7 +55,6 @@ func Test__DeleteSecret(t *testing.T) {
 		req := &protos.DeleteSecretRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			IdOrName:       "test",
-			RequesterId:    uuid.NewString(),
 		}
 
 		_, err := DeleteSecret(context.Background(), req)

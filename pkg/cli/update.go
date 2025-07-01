@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/google/uuid"
 
 	"github.com/spf13/cobra"
 
@@ -62,12 +61,9 @@ var updateCmd = &cobra.Command{
 			err = yaml.Unmarshal(data, &stage)
 			Check(err)
 
-			// Convert JSON to stage request
-			request := openapi_client.SuperplaneUpdateStageBody{Stage: &stage}
-			request.SetRequesterId(uuid.NewString())
-
+			// Execute request
 			response, httpResponse, err := c.StageAPI.SuperplaneUpdateStage(context.Background(), canvasIDOrName, stageID).
-				Body(request).
+				Body(openapi_client.SuperplaneUpdateStageBody{Stage: &stage}).
 				Execute()
 
 			if err != nil {
@@ -79,6 +75,49 @@ var updateCmd = &cobra.Command{
 			}
 
 			out, err := yaml.Marshal(response.Stage)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
+		case "ConnectionGroup":
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			metadata, ok := yamlData["metadata"].(map[string]any)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: metadata section missing")
+			}
+
+			canvasIDOrName, ok := metadata["canvasId"].(string)
+			if !ok {
+				canvasIDOrName, ok = metadata["canvasName"].(string)
+				if !ok {
+					Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
+				}
+			}
+
+			ID, ok := metadata["id"].(string)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: id field missing")
+			}
+
+			var connectionGroup openapi_client.SuperplaneConnectionGroup
+			err = yaml.Unmarshal(data, &connectionGroup)
+			Check(err)
+
+			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneUpdateConnectionGroup(context.Background(), canvasIDOrName, ID).
+				Body(openapi_client.SuperplaneUpdateConnectionGroupBody{ConnectionGroup: &connectionGroup}).
+				Execute()
+
+			if err != nil {
+				body, err := io.ReadAll(httpResponse.Body)
+				Check(err)
+				fmt.Printf("Error: %v", err)
+				fmt.Printf("HTTP Response: %s", string(body))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.ConnectionGroup)
 			Check(err)
 			fmt.Printf("%s", string(out))
 
@@ -97,7 +136,6 @@ var updateStageCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
 		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
-		requesterID, _ := cmd.Flags().GetString("requester-id")
 		yamlFile, _ := cmd.Flags().GetString("file")
 
 		if yamlFile == "" {
@@ -121,7 +159,6 @@ var updateStageCmd = &cobra.Command{
 
 		// Create update request with nested structure
 		request := openapi_client.NewSuperplaneUpdateStageBody()
-		request.SetRequesterId(requesterID)
 
 		// Create stage with spec
 		stage := openapi_client.NewSuperplaneStage()
@@ -173,6 +210,5 @@ func init() {
 	updateStageCmd.Flags().String("canvas-name", "", "Canvas name")
 	updateStageCmd.Flags().String("stage-id", "", "Stage ID")
 	updateStageCmd.Flags().String("stage-name", "", "Stage name")
-	updateStageCmd.Flags().String("requester-id", "", "ID of the user updating the stage")
 	updateStageCmd.Flags().StringP("file", "f", "", "File containing stage configuration updates")
 }
