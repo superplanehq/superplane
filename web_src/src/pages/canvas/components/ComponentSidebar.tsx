@@ -65,7 +65,7 @@ interface ComponentSidebarProps {
 }
 
 export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) => {
-  const { stages, event_sources } = useCanvasStore();
+  const { stages, eventSources } = useCanvasStore();
   const [searchTerm, setSearchTerm] = useState('');
 
   const handleDragStart = (event: React.DragEvent, nodeType: string, data: DragData) => {
@@ -78,7 +78,7 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
     stage.metadata?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredEventSources = event_sources.filter((eventSource: EventSourceWithEvents) => 
+  const filteredEventSources = eventSources.filter((eventSource: EventSourceWithEvents) => 
     eventSource.metadata?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 

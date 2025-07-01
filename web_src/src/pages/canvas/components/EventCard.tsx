@@ -1,4 +1,4 @@
-import { SuperplaneStageEventApproval, SuperplaneInputValue } from '@/api-client';
+import { SuperplaneStageEventApproval, SuperplaneKeyValuePair } from '@/api-client';
 import { formatRelativeTime } from '../utils/stageEventUtils';
 
 interface EventCardProps {
@@ -7,7 +7,7 @@ interface EventCardProps {
   state: string;
   stateReason?: string;
   approvals?: SuperplaneStageEventApproval[];
-  inputs?: SuperplaneInputValue[];
+  inputs?: SuperplaneKeyValuePair[];
   onApprove?: () => void;
   variant?: 'pending' | 'waiting' | 'processed';
   executionRunning?: boolean;
