@@ -16,6 +16,13 @@ type EventSource struct {
 	UpdatedAt *time.Time
 }
 
+func (s *EventSource) UpdateKey(key []byte) error {
+	now := time.Now()
+	s.Key = key
+	s.UpdatedAt = &now
+	return database.Conn().Save(s).Error
+}
+
 func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource
 	err := database.Conn().

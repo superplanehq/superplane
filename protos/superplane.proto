@@ -84,6 +84,18 @@ service Superplane {
     };
   }
   
+  rpc ResetEventSourceKey(ResetEventSourceKeyRequest) returns (ResetEventSourceKeyResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/event-sources/{id_or_name}/reset-key"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Reset the key for an event source";
+      description: "Resets the key used to receive events from the specified event source (canvas can be referenced by ID or name)";
+      tags: "EventSource";
+    };
+  }
+
   rpc CreateStage(CreateStageRequest) returns (CreateStageResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/stages"
@@ -322,6 +334,7 @@ message EventSource {
     string name = 2;
     string canvas_id = 3;
     google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
   }
 
   message Spec {
@@ -348,6 +361,16 @@ message CreateEventSourceRequest {
 }
 
 message CreateEventSourceResponse {
+  EventSource event_source = 1;
+  string key = 2;
+}
+
+message ResetEventSourceKeyRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message ResetEventSourceKeyResponse {
   EventSource event_source = 1;
   string key = 2;
 }

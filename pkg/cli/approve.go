@@ -22,12 +22,10 @@ var approveEventCmd = &cobra.Command{
 
 		c := DefaultClient()
 
-		response, _, err := c.StageAPI.SuperplaneApproveStageEvent(
-			context.Background(),
-			canvasIDOrName,
-			stageIDOrName,
-			eventID,
-		).Execute()
+		response, _, err := c.StageAPI.SuperplaneApproveStageEvent(context.Background(), canvasIDOrName, stageIDOrName, eventID).
+			Body(map[string]any{}).
+			Execute()
+
 		Check(err)
 
 		fmt.Printf("Event '%s' approved successfully.\n", *response.Event.Id)
