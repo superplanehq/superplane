@@ -933,6 +933,52 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}/reset-key": {
+      "post": {
+        "summary": "Reset the key for an event source",
+        "description": "Resets the key used to receive events from the specified event source (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_ResetEventSourceKey",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneResetEventSourceKeyResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneResetEventSourceKeyBody"
+            }
+          }
+        ],
+        "tags": [
+          "EventSource"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}": {
       "get": {
         "summary": "Get event source details",
@@ -2595,6 +2641,10 @@
         "createdAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -2813,6 +2863,20 @@
           "type": "string"
         },
         "value": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneResetEventSourceKeyBody": {
+      "type": "object"
+    },
+    "SuperplaneResetEventSourceKeyResponse": {
+      "type": "object",
+      "properties": {
+        "eventSource": {
+          "$ref": "#/definitions/SuperplaneEventSource"
+        },
+        "key": {
           "type": "string"
         }
       }

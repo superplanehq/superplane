@@ -78,6 +78,7 @@ func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 			Name:      eventSource.Name,
 			CanvasId:  eventSource.CanvasID.String(),
 			CreatedAt: timestamppb.New(*eventSource.CreatedAt),
+			UpdatedAt: timestamppb.New(*eventSource.UpdatedAt),
 		},
 		Spec: &pb.EventSource_Spec{},
 	}

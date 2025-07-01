@@ -401,6 +401,7 @@ export type SuperplaneEventSourceMetadata = {
     name?: string;
     canvasId?: string;
     createdAt?: string;
+    updatedAt?: string;
 };
 
 export type SuperplaneEventSourceSpec = {
@@ -480,6 +481,15 @@ export type SuperplaneOutputDefinition = {
 export type SuperplaneOutputValue = {
     name?: string;
     value?: string;
+};
+
+export type SuperplaneResetEventSourceKeyBody = {
+    [key: string]: unknown;
+};
+
+export type SuperplaneResetEventSourceKeyResponse = {
+    eventSource?: SuperplaneEventSource;
+    key?: string;
 };
 
 export type SuperplaneSecret = {
@@ -1234,6 +1244,34 @@ export type SuperplaneCreateEventSourceResponses = {
 };
 
 export type SuperplaneCreateEventSourceResponse2 = SuperplaneCreateEventSourceResponses[keyof SuperplaneCreateEventSourceResponses];
+
+export type SuperplaneResetEventSourceKeyData = {
+    body: SuperplaneResetEventSourceKeyBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}/reset-key';
+};
+
+export type SuperplaneResetEventSourceKeyErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneResetEventSourceKeyError = SuperplaneResetEventSourceKeyErrors[keyof SuperplaneResetEventSourceKeyErrors];
+
+export type SuperplaneResetEventSourceKeyResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneResetEventSourceKeyResponse;
+};
+
+export type SuperplaneResetEventSourceKeyResponse2 = SuperplaneResetEventSourceKeyResponses[keyof SuperplaneResetEventSourceKeyResponses];
 
 export type SuperplaneDescribeEventSourceData = {
     body?: never;
