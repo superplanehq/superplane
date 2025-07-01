@@ -108,6 +108,7 @@ docs/SuperplaneListStageEventsResponse.md
 docs/SuperplaneListStagesResponse.md
 docs/SuperplaneOutputDefinition.md
 docs/SuperplaneOutputValue.md
+docs/SuperplaneResetEventSourceKeyResponse.md
 docs/SuperplaneSecret.md
 docs/SuperplaneSecretMetadata.md
 docs/SuperplaneSecretSpec.md
@@ -219,6 +220,7 @@ model_superplane_list_stage_events_response.go
 model_superplane_list_stages_response.go
 model_superplane_output_definition.go
 model_superplane_output_value.go
+model_superplane_reset_event_source_key_response.go
 model_superplane_secret.go
 model_superplane_secret_metadata.go
 model_superplane_secret_spec.go

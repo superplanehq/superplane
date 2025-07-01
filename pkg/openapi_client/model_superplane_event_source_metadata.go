@@ -25,6 +25,7 @@ type SuperplaneEventSourceMetadata struct {
 	Name *string `json:"name,omitempty"`
 	CanvasId *string `json:"canvasId,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
 
 // NewSuperplaneEventSourceMetadata instantiates a new SuperplaneEventSourceMetadata object
@@ -172,6 +173,38 @@ func (o *SuperplaneEventSourceMetadata) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
+// GetUpdatedAt returns the UpdatedAt field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceMetadata) GetUpdatedAt() time.Time {
+	if o == nil || IsNil(o.UpdatedAt) {
+		var ret time.Time
+		return ret
+	}
+	return *o.UpdatedAt
+}
+
+// GetUpdatedAtOk returns a tuple with the UpdatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSourceMetadata) GetUpdatedAtOk() (*time.Time, bool) {
+	if o == nil || IsNil(o.UpdatedAt) {
+		return nil, false
+	}
+	return o.UpdatedAt, true
+}
+
+// HasUpdatedAt returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceMetadata) HasUpdatedAt() bool {
+	if o != nil && !IsNil(o.UpdatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedAt gets a reference to the given time.Time and assigns it to the UpdatedAt field.
+func (o *SuperplaneEventSourceMetadata) SetUpdatedAt(v time.Time) {
+	o.UpdatedAt = &v
+}
+
 func (o SuperplaneEventSourceMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -193,6 +226,9 @@ func (o SuperplaneEventSourceMetadata) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt
+	}
+	if !IsNil(o.UpdatedAt) {
+		toSerialize["updatedAt"] = o.UpdatedAt
 	}
 	return toSerialize, nil
 }
