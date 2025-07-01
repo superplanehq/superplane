@@ -205,9 +205,11 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	}
 
 	if len(missing) > 0 {
-		log.Infof("Connection group %s has missing connections for field set %s - %v: %v",
-			connectionGroup.Name, fieldSet.String(), fields, sourceNamesFromConnections(missing),
+		log.Infof("Connection group %s has missing connections for field set %s: %v",
+			connectionGroup.Name, fieldSet.String(), sourceNamesFromConnections(missing),
 		)
+
+		return nil
 	}
 
 	log.Infof("All connections received for group %s and field set %s - %v", connectionGroup.Name, fieldSet.String(), fields)
