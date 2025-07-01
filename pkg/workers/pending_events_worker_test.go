@@ -131,6 +131,71 @@ func Test__PendingEventsWorker(t *testing.T) {
 		assert.Equal(t, map[string]any{"VERSION": "v1"}, stage1Events[0].Inputs.Data())
 	})
 
+	t.Run("sources are connected to connection group", func(t *testing.T) {
+		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`))
+		require.NoError(t, err)
+
+		//
+		// Create connection group connected to both sources
+		//
+		connectionGroup, err := r.Canvas.CreateConnectionGroup(
+			"connection-group-1",
+			r.User.String(),
+			[]models.Connection{
+				{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},
+				{SourceID: source2.ID, SourceName: source2.Name, SourceType: models.SourceTypeEventSource},
+			},
+			models.ConnectionGroupSpec{
+				GroupBy: &models.ConnectionGroupBySpec{
+					Fields: []models.ConnectionGroupByField{
+						{Name: "VERSION", Expression: "ref"},
+					},
+				},
+			},
+		)
+
+		require.NoError(t, err)
+
+		//
+		// Create an event for the first source, and trigger the worker.
+		//
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		require.NoError(t, err)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Field set is created, but remains in pending state.
+		//
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateProcessed, event.State)
+		fieldSets, err := connectionGroup.ListFieldSets()
+		require.NoError(t, err)
+		require.Len(t, fieldSets, 1)
+		assert.Equal(t, models.ConnectionGroupFieldSetStatePending, fieldSets[0].State)
+
+		//
+		// Create an event for the second source, and trigger the worker.
+		//
+		event, err = models.CreateEvent(source2.ID, source2.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		require.NoError(t, err)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Field set is moved to processed(ok) state.
+		//
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateProcessed, event.State)
+		fieldSets, err = connectionGroup.ListFieldSets()
+		require.NoError(t, err)
+		require.Len(t, fieldSets, 1)
+		assert.Equal(t, models.ConnectionGroupFieldSetStateProcessed, fieldSets[0].State)
+		assert.Equal(t, models.ConnectionGroupFieldSetStateReasonOK, fieldSets[0].StateReason)
+	})
+
 	t.Run("stage completion event is processed", func(t *testing.T) {
 		//
 		// Create two stages.
