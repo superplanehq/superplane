@@ -59,7 +59,19 @@ service Superplane {
       tags: "Secret";
     };
   }
-  
+
+  rpc CreateConnectionGroup(CreateConnectionGroupRequest) returns (CreateConnectionGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas connection group";
+      description: "Creates a new canvas connection group";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc CreateEventSource(CreateEventSourceRequest) returns (CreateEventSourceResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/event-sources"
@@ -117,6 +129,17 @@ service Superplane {
     };
   }
 
+  rpc DescribeConnectionGroup(DescribeConnectionGroupRequest) returns (DescribeConnectionGroupResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get connection group details";
+      description: "Returns the details of a specific connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc DescribeSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -150,6 +173,17 @@ service Superplane {
     };
   }
   
+  rpc ListConnectionGroups(ListConnectionGroupsRequest) returns (ListConnectionGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connection groups";
+      description: "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/secrets"
@@ -168,7 +202,18 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List stage events";
       description: "Returns a list of events for the specified stage (canvas can be referenced by ID or name)";
-      tags: "Event";
+      tags: "Stage";
+    };
+  }
+
+  rpc ListConnectionGroupFieldSets(ListConnectionGroupFieldSetsRequest) returns (ListConnectionGroupFieldSetsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}/field-sets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List connection group field sets";
+      description: "Returns a list of field sets for the specified connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
     };
   }
 
@@ -184,6 +229,18 @@ service Superplane {
     };
   }
   
+  rpc UpdateConnectionGroup(UpdateConnectionGroupRequest) returns (UpdateConnectionGroupResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a connection group";
+      description: "Updates the specified connection group (canvas can be referenced by ID or name)";
+      tags: "ConnectionGroup";
+    };
+  }
+
   rpc UpdateSecret(UpdateSecretRequest) returns (UpdateSecretResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -204,7 +261,7 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Approve a stage event";
       description: "Approves the specified stage event (canvas can be referenced by ID or name)";
-      tags: "Event";
+      tags: "Stage";
     };
   }
 
@@ -287,8 +344,7 @@ message DescribeStageResponse {
 
 message CreateEventSourceRequest {
   EventSource event_source = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message CreateEventSourceResponse {
@@ -327,8 +383,7 @@ message Secret {
 
 message CreateSecretRequest {
   Secret secret = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message CreateSecretResponse {
@@ -339,7 +394,6 @@ message UpdateSecretRequest {
   Secret secret = 1;
   string id_or_name = 2;
   string canvas_id_or_name = 3;
-  string requester_id = 4;
 }
 
 message UpdateSecretResponse {
@@ -366,7 +420,6 @@ message ListSecretsResponse {
 message DeleteSecretRequest {
   string canvas_id_or_name = 1;
   string id_or_name = 2;
-  string requester_id = 3;
 }
 
 message DeleteSecretResponse {}
@@ -381,11 +434,85 @@ message DescribeEventSourceResponse {
   EventSource event_source = 1;
 }
 
+message CreateConnectionGroupRequest {
+  ConnectionGroup connection_group = 1;
+  string canvas_id_or_name = 2;
+}
+
+message CreateConnectionGroupResponse {
+  ConnectionGroup connection_group = 1;
+}
+
+message UpdateConnectionGroupRequest {
+  ConnectionGroup connection_group = 1;
+  string canvas_id_or_name = 2;
+  string id_or_name = 3;
+}
+
+message UpdateConnectionGroupResponse {
+  ConnectionGroup connection_group = 1;
+}
+
+message DescribeConnectionGroupRequest {
+  string id_or_name = 1;
+  string canvas_id_or_name = 2;
+}
+
+message DescribeConnectionGroupResponse {
+  ConnectionGroup connection_group = 1;
+}
+
+message ListConnectionGroupsRequest {
+  string canvas_id_or_name = 1;
+}
+
+message ListConnectionGroupsResponse {
+  repeated ConnectionGroup connection_groups = 1;
+}
+
+message ConnectionGroup {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string canvas_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+    string created_by = 5;
+    google.protobuf.Timestamp updated_at = 6;
+    string updated_by = 7;
+  }
+
+  message Spec {
+    message GroupBy {
+      message Field {
+        string name = 1;
+        string expression = 2;
+      }
+
+      repeated Field fields = 1;
+    }
+
+    enum TimeoutBehavior {
+      TIMEOUT_BEHAVIOR_NONE = 0;
+      TIMEOUT_BEHAVIOR_DROP = 1;
+      TIMEOUT_BEHAVIOR_EMIT = 2;
+    }
+
+    repeated Connection connections = 1;
+    GroupBy group_by = 2;
+    uint32 timeout = 3;
+    TimeoutBehavior timeout_behavior = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}
+
 message Connection {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_EVENT_SOURCE = 1;
     TYPE_STAGE = 2;
+    TYPE_CONNECTION_GROUP = 3;
   }
 
   enum FilterType {
@@ -520,8 +647,7 @@ message ConditionTimeWindow {
 
 message CreateStageRequest {
   Stage stage = 1;
-  string requester_id = 2;
-  string canvas_id_or_name = 3;
+  string canvas_id_or_name = 2;
 }
 
 message ExecutorSpec {
@@ -565,7 +691,6 @@ message UpdateStageRequest {
   Stage stage = 1;
   string id_or_name = 2;
   string canvas_id_or_name = 3;
-  string requester_id = 4;
 }
 
 message UpdateStageResponse {
@@ -586,6 +711,46 @@ message ListEventSourcesRequest {
 
 message ListEventSourcesResponse {
   repeated EventSource event_sources = 1;
+}
+
+message ListConnectionGroupFieldSetsRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message ListConnectionGroupFieldSetsResponse {
+  repeated ConnectionGroupFieldSet field_sets = 1;
+}
+
+message ConnectionGroupFieldSet {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_PENDING = 1;
+    STATE_PROCESSED = 2;
+    STATE_DISCARDED = 3;
+  }
+
+  enum StateReason {
+    STATE_REASON_NONE = 0;
+    STATE_REASON_OK = 1;
+    STATE_REASON_TIMEOUT = 2;
+  }
+
+  string id = 1;
+  repeated KeyValuePair fields = 2;
+  string hash = 3;
+  State state = 4;
+  StateReason state_reason = 5;
+  repeated ConnectionGroupEvent events = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message ConnectionGroupEvent {
+  string id = 1;
+  string source_id = 2;
+  Connection.Type source_type = 3;
+  string source_name = 4;
+  google.protobuf.Timestamp received_at = 5;
 }
 
 message ListStageEventsRequest {
@@ -625,10 +790,10 @@ message StageEvent {
   google.protobuf.Timestamp created_at = 6;
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
-  repeated InputValue inputs = 9;
+  repeated KeyValuePair inputs = 9;
 }
 
-message InputValue {
+message KeyValuePair {
   string name = 1;
   string value = 2;
 }
@@ -671,7 +836,6 @@ message ApproveStageEventRequest {
   string stage_id_or_name = 1;
   string canvas_id_or_name = 2;
   string event_id = 3;
-  string requester_id = 4;
 }
 
 message ApproveStageEventResponse {
@@ -681,6 +845,12 @@ message ApproveStageEventResponse {
 message StageCreated {
   string canvas_id = 1;
   string stage_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message ConnectionGroupCreated {
+  string canvas_id = 1;
+  string connection_group_id = 2;
   google.protobuf.Timestamp timestamp = 3;
 }
 

@@ -21,7 +21,6 @@ var _ MappedNullable = &SuperplaneCreateEventSourceBody{}
 // SuperplaneCreateEventSourceBody struct for SuperplaneCreateEventSourceBody
 type SuperplaneCreateEventSourceBody struct {
 	EventSource *SuperplaneEventSource `json:"eventSource,omitempty"`
-	RequesterId *string `json:"requesterId,omitempty"`
 }
 
 // NewSuperplaneCreateEventSourceBody instantiates a new SuperplaneCreateEventSourceBody object
@@ -73,38 +72,6 @@ func (o *SuperplaneCreateEventSourceBody) SetEventSource(v SuperplaneEventSource
 	o.EventSource = &v
 }
 
-// GetRequesterId returns the RequesterId field value if set, zero value otherwise.
-func (o *SuperplaneCreateEventSourceBody) GetRequesterId() string {
-	if o == nil || IsNil(o.RequesterId) {
-		var ret string
-		return ret
-	}
-	return *o.RequesterId
-}
-
-// GetRequesterIdOk returns a tuple with the RequesterId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneCreateEventSourceBody) GetRequesterIdOk() (*string, bool) {
-	if o == nil || IsNil(o.RequesterId) {
-		return nil, false
-	}
-	return o.RequesterId, true
-}
-
-// HasRequesterId returns a boolean if a field has been set.
-func (o *SuperplaneCreateEventSourceBody) HasRequesterId() bool {
-	if o != nil && !IsNil(o.RequesterId) {
-		return true
-	}
-
-	return false
-}
-
-// SetRequesterId gets a reference to the given string and assigns it to the RequesterId field.
-func (o *SuperplaneCreateEventSourceBody) SetRequesterId(v string) {
-	o.RequesterId = &v
-}
-
 func (o SuperplaneCreateEventSourceBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -117,9 +84,6 @@ func (o SuperplaneCreateEventSourceBody) ToMap() (map[string]interface{}, error)
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.EventSource) {
 		toSerialize["eventSource"] = o.EventSource
-	}
-	if !IsNil(o.RequesterId) {
-		toSerialize["requesterId"] = o.RequesterId
 	}
 	return toSerialize, nil
 }

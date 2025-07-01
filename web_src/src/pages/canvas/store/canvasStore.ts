@@ -1,27 +1,20 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, EventSourceWithEvents } from './types';
-import { SuperplaneCanvas, SuperplaneStage } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
-import { autoLayoutNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
-
-function generateFakeUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
 // Create the store
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Initial state
   canvas: {},
   stages: [],
-  event_sources: [],
+  eventSources: [],
+  connectionGroups: [],
   nodePositions: {},
   selectedStageId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
@@ -38,7 +31,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({
       canvas: data.canvas || {},
       stages: data.stages || [],
-      event_sources: data.event_sources || [],
+      eventSources: data.eventSources || [],
+      connectionGroups: data.connectionGroups || [],
       nodePositions: {},
     });
     get().syncToReactFlow({ autoLayout: true });
@@ -66,9 +60,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
+  addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
+    console.log("Adding connection group:", connectionGroup);
+    set((state) => ({
+      connectionGroups: [...state.connectionGroups, connectionGroup]
+    }));
+    get().syncToReactFlow();
+  },
+
   addEventSource: (eventSource: EventSourceWithEvents) => {
     set((state) => ({
-      event_sources: [...state.event_sources, eventSource]
+      eventSources: [...state.eventSources, eventSource]
     }));
     get().syncToReactFlow();
   },
@@ -76,7 +78,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   updateEventSource: (eventSource: EventSourceWithEvents) => {
     console.log("Updating event source:", eventSource);
     set((state) => ({
-      event_sources: state.event_sources.map(es =>
+      eventSources: state.eventSources.map(es =>
         es.metadata!.id === eventSource.metadata!.id ? eventSource : es
       )
     }));
@@ -111,10 +113,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         stageIdOrName: stageId,
         eventId: stageEventId
       },
-      body: {
-        requesterId: generateFakeUUID(),
-        // Both fields are optional, but the 'body' property itself is required
-      }
+      body: {}
     });
   },
 
@@ -153,15 +152,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   syncToReactFlow: async (options?: { autoLayout?: boolean }) => {
-    const { stages, event_sources, nodePositions, approveStageEvent } = get();
+    const { stages, connectionGroups, eventSources, nodePositions, approveStageEvent } = get();
 
     // Use the transformer functions from flowTransformers.ts
     const stageNodes = transformStagesToNodes(stages, nodePositions, approveStageEvent);
-    const eventSourceNodes = transformEventSourcesToNodes(event_sources, nodePositions);
+    const connectionGroupNodes = transformConnectionGroupsToNodes(connectionGroups, nodePositions);
+    const eventSourceNodes = transformEventSourcesToNodes(eventSources, nodePositions);
 
     // Get edges based on connections
-    const edges = transformToEdges(stages, event_sources);
-    const unlayoutedNodes = [...stageNodes, ...eventSourceNodes];
+    const edges = transformToEdges(stages, connectionGroups, eventSources);
+    const unlayoutedNodes = [...stageNodes, ...connectionGroupNodes, ...eventSourceNodes];
     const nodes = options?.autoLayout ?
       await autoLayoutNodes(unlayoutedNodes, edges) :
       unlayoutedNodes;

@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -23,9 +24,9 @@ func Test__CreateStage(t *testing.T) {
 	specValidator := executors.SpecValidator{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: uuid.New().String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -42,7 +43,7 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "canvas not found", s.Message())
 	})
 
-	t.Run("missing requester ID -> error", func(t *testing.T) {
+	t.Run("unauthenticated user -> error", func(t *testing.T) {
 		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
@@ -57,14 +58,14 @@ func Test__CreateStage(t *testing.T) {
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
+		assert.Equal(t, codes.Unauthenticated, s.Code())
+		assert.Equal(t, "user not authenticated", s.Message())
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -88,9 +89,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -117,9 +118,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -149,9 +150,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -183,9 +184,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -217,9 +218,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -252,9 +253,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -294,9 +295,9 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		executor := support.ProtoExecutor()
-		res, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		res, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
@@ -375,9 +376,9 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    r.User.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",

@@ -3,8 +3,10 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 var listCanvasesCmd = &cobra.Command{
@@ -100,6 +102,38 @@ var listStagesCmd = &cobra.Command{
 	},
 }
 
+var listConnectionGroupsCmd = &cobra.Command{
+	Use:     "connection-groups",
+	Short:   "List all connection groups for a canvas",
+	Long:    `Retrieve a list of all connection groups for the specified canvas`,
+	Aliases: []string{"connectiongroups"},
+	Args:    cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+
+		c := DefaultClient()
+		response, _, err := c.ConnectionGroupAPI.SuperplaneListConnectionGroups(context.Background(), canvasIDOrName).Execute()
+		Check(err)
+
+		if len(response.ConnectionGroups) == 0 {
+			fmt.Println("No connection groups found for this canvas.")
+			return
+		}
+
+		fmt.Printf("Found %d connection groups:\n\n", len(response.ConnectionGroups))
+		for i, es := range response.ConnectionGroups {
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *es.GetMetadata().Name, *es.GetMetadata().Id)
+			fmt.Printf("   Canvas: %s\n", *es.GetMetadata().CanvasId)
+			fmt.Printf("   Created at: %s\n", *es.GetMetadata().CreatedAt)
+
+			if i < len(response.ConnectionGroups)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 var listSecretsCmd = &cobra.Command{
 	Use:     "secrets",
 	Short:   "List all secrets for a canvas",
@@ -140,8 +174,8 @@ var listSecretsCmd = &cobra.Command{
 	},
 }
 
-var listEventsCmd = &cobra.Command{
-	Use:   "events",
+var listStageEventsCmd = &cobra.Command{
+	Use:   "stage-events",
 	Short: "List stage events",
 	Long:  `List all events for a specific stage`,
 	Args:  cobra.ExactArgs(0),
@@ -154,7 +188,7 @@ var listEventsCmd = &cobra.Command{
 		stateReasons, _ := cmd.Flags().GetStringSlice("state-reasons")
 
 		c := DefaultClient()
-		listRequest := c.EventAPI.SuperplaneListStageEvents(context.Background(), canvasIDOrName, stageIDOrName)
+		listRequest := c.StageAPI.SuperplaneListStageEvents(context.Background(), canvasIDOrName, stageIDOrName)
 
 		if len(states) > 0 {
 			listRequest = listRequest.States(states)
@@ -216,6 +250,51 @@ var listEventsCmd = &cobra.Command{
 	},
 }
 
+var listConnectionGroupFieldSetsCmd = &cobra.Command{
+	Use:   "connection-group-field-sets",
+	Short: "List connection group field sets",
+	Long:  `List all the field sets for a specific connection group`,
+	Args:  cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		connGroupIdOrName := getOneOrAnotherFlag(cmd, "connection-group-id", "connection-group-name")
+
+		c := DefaultClient()
+		listRequest := c.ConnectionGroupAPI.SuperplaneListConnectionGroupFieldSets(context.Background(), canvasIDOrName, connGroupIdOrName)
+
+		response, _, err := listRequest.Execute()
+		Check(err)
+
+		if len(response.FieldSets) == 0 {
+			fmt.Println("No field sets found.")
+			return
+		}
+
+		fmt.Printf("Found %d field sets:\n\n", len(response.FieldSets))
+		for i, fieldSet := range response.FieldSets {
+			fmt.Printf("%d. Fields: %s (%s)\n", i+1, fieldsAsString(fieldSet.Fields), *fieldSet.Hash)
+
+			fmt.Printf("   State: %s\n", *fieldSet.State)
+			fmt.Printf("   Reason: %s\n", *fieldSet.StateReason)
+			fmt.Printf("   Created: %s\n", *fieldSet.CreatedAt)
+
+			if len(fieldSet.Events) > 0 {
+				fmt.Println("   Events:")
+				for _, event := range fieldSet.Events {
+					fmt.Printf("     * ID: %s\n", *event.Id)
+					fmt.Printf("       Source: %s (%s)\n", *event.SourceName, *event.SourceType)
+					fmt.Printf("       Received At: %s\n", *event.ReceivedAt)
+				}
+			}
+
+			if i < len(response.FieldSets)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 // Root list command
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -242,17 +321,40 @@ func init() {
 	listStagesCmd.Flags().String("canvas-id", "", "Canvas ID")
 	listStagesCmd.Flags().String("canvas-name", "", "Canvas name")
 
+	// Connection groups command
+	listCmd.AddCommand(listConnectionGroupsCmd)
+	listConnectionGroupsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listConnectionGroupsCmd.Flags().String("canvas-name", "", "Canvas name")
+
 	// Secrets command
 	listCmd.AddCommand(listSecretsCmd)
 	listSecretsCmd.Flags().String("canvas-id", "", "Canvas ID")
 	listSecretsCmd.Flags().String("canvas-name", "", "Canvas name")
 
-	// Events command
-	listCmd.AddCommand(listEventsCmd)
-	listEventsCmd.Flags().StringSlice("states", []string{}, "Filter by event states (PENDING, WAITING, PROCESSED)")
-	listEventsCmd.Flags().StringSlice("state-reasons", []string{}, "Filter by event state reasons")
-	listEventsCmd.Flags().String("canvas-id", "", "Canvas ID")
-	listEventsCmd.Flags().String("canvas-name", "", "Canvas name")
-	listEventsCmd.Flags().String("stage-id", "", "Stage ID")
-	listEventsCmd.Flags().String("stage-name", "", "Stage name")
+	// Stage events command
+	listCmd.AddCommand(listStageEventsCmd)
+	listStageEventsCmd.Flags().StringSlice("states", []string{}, "Filter by event states (PENDING, WAITING, PROCESSED)")
+	listStageEventsCmd.Flags().StringSlice("state-reasons", []string{}, "Filter by event state reasons")
+	listStageEventsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listStageEventsCmd.Flags().String("canvas-name", "", "Canvas name")
+	listStageEventsCmd.Flags().String("stage-id", "", "Stage ID")
+	listStageEventsCmd.Flags().String("stage-name", "", "Stage name")
+
+	// Connection group events command
+	listCmd.AddCommand(listConnectionGroupFieldSetsCmd)
+	listConnectionGroupFieldSetsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listConnectionGroupFieldSetsCmd.Flags().String("canvas-name", "", "Canvas name")
+	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-id", "", "Connection group ID")
+	listConnectionGroupFieldSetsCmd.Flags().String("connection-group-name", "", "Connection group name")
+}
+
+func fieldsAsString(fields []openapi_client.SuperplaneKeyValuePair) string {
+	var sb strings.Builder
+	for i, field := range fields {
+		sb.WriteString(fmt.Sprintf("%s=%s", *field.Name, *field.Value))
+		if i < len(fields)-1 {
+			sb.WriteString(", ")
+		}
+	}
+	return sb.String()
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -17,8 +18,12 @@ import (
 )
 
 func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	err := actions.ValidateUUIDs(req.IdOrName)
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
 
+	err := actions.ValidateUUIDs(req.IdOrName)
 	var canvas *models.Canvas
 	if err != nil {
 		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
@@ -46,12 +51,6 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, err
 	}
 
-	err = actions.ValidateUUIDs(req.RequesterId)
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "requester ID is invalid")
-	}
-
 	if req.Stage == nil || req.Stage.Spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
@@ -73,7 +72,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := validateConnections(canvas, req.Stage.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvas, req.Stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -90,7 +89,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 
 	err = canvas.UpdateStage(
 		stage.ID.String(),
-		req.RequesterId,
+		userID,
 		conditions,
 		*executor,
 		connections,

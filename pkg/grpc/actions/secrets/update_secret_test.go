@@ -39,23 +39,9 @@ func Test__UpdateSecret(t *testing.T) {
 		assert.Equal(t, "canvas not found", s.Message())
 	})
 
-	t.Run("missing requester ID", func(t *testing.T) {
-		req := &protos.UpdateSecretRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       "test",
-		}
-
-		_, err := UpdateSecret(context.Background(), encryptor, req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid requester ID", s.Message())
-	})
-
 	t.Run("secret does not exist -> error", func(t *testing.T) {
 		req := &protos.UpdateSecretRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
-			RequesterId:    uuid.NewString(),
 			IdOrName:       "test2",
 		}
 
@@ -70,7 +56,6 @@ func Test__UpdateSecret(t *testing.T) {
 		req := &protos.UpdateSecretRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			IdOrName:       "test",
-			RequesterId:    uuid.NewString(),
 			Secret: &protos.Secret{
 				Metadata: &protos.Secret_Metadata{
 					Name: "test",

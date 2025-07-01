@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 var approveEventCmd = &cobra.Command{
@@ -25,15 +22,12 @@ var approveEventCmd = &cobra.Command{
 
 		c := DefaultClient()
 
-		request := openapi_client.NewSuperplaneApproveStageEventBody()
-		request.SetRequesterId(uuid.NewString())
-
-		response, _, err := c.EventAPI.SuperplaneApproveStageEvent(
+		response, _, err := c.StageAPI.SuperplaneApproveStageEvent(
 			context.Background(),
 			canvasIDOrName,
 			stageIDOrName,
 			eventID,
-		).Body(*request).Execute()
+		).Execute()
 		Check(err)
 
 		fmt.Printf("Event '%s' approved successfully.\n", *response.Event.Id)

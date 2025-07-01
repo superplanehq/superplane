@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
-import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent } from "@/api-client";
+import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
@@ -53,6 +53,15 @@ export function Canvas() {
         // Check if stages data was fetched successfully
         if (!stagesResponse.data?.stages) {
           throw new Error('Failed to fetch stages data');
+        }
+
+        // Fetch connection groups for the canvas
+        const connectionGroupsResponse = await superplaneListConnectionGroups({
+          path: { canvasIdOrName: canvasId },
+        });
+
+        if (!connectionGroupsResponse.data?.connectionGroups) {
+          throw new Error('Failed to fetch connection groups data');
         }
 
         // Fetch event sources for the canvas
@@ -113,7 +122,8 @@ export function Canvas() {
         const initialData = {
           canvas: canvasResponse.data?.canvas || {},
           stages: stagesWithQueues,
-          event_sources: eventSourcesWithEvents,
+          eventSources: eventSourcesWithEvents,
+          connectionGroups: connectionGroupsResponse.data?.connectionGroups || [],
           handleEvent: () => { },
           removeHandleEvent: () => { },
           pushEvent: () => { },

@@ -8,7 +8,6 @@ import (
 	"os"
 
 	"github.com/goccy/go-yaml"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -143,13 +142,8 @@ var createCmd = &cobra.Command{
 				secretSpec.SetLocal(*local)
 			}
 
-			// Set the spec
 			secret.SetSpec(*secretSpec)
-
-			// Add secret to request and set requester ID
 			request.SetSecret(*secret)
-			requesterId := uuid.NewString()
-			request.SetRequesterId(requesterId)
 
 			// Send request
 			response, httpResponse, err := c.SecretAPI.SuperplaneCreateSecret(context.Background(), canvasID).
@@ -205,10 +199,7 @@ var createCmd = &cobra.Command{
 			emptySpec := make(map[string]interface{})
 			eventSource.SetSpec(emptySpec)
 
-			// Set in request
 			request.SetEventSource(*eventSource)
-			requesterId := uuid.NewString()
-			request.SetRequesterId(requesterId)
 			response, _, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasIDOrName).Body(*request).Execute()
 			Check(err)
 
@@ -218,6 +209,45 @@ var createCmd = &cobra.Command{
 				*es.GetMetadata().Name, *es.GetMetadata().Id)
 			fmt.Printf("Key: %s\n", *response.Key)
 			fmt.Println("! Save this key as it won't be shown again.")
+
+		case "ConnectionGroup":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the metadata from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]interface{})
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: metadata section missing")
+			}
+
+			canvasID, ok := metadata["canvasId"].(string)
+			if !ok {
+				Fail("Invalid ConnectionGroup YAML: canvasId or canvasName field missing")
+			}
+
+			var connectionGroup openapi_client.SuperplaneConnectionGroup
+			err = yaml.Unmarshal(data, &connectionGroup)
+			Check(err)
+
+			body := openapi_client.SuperplaneCreateConnectionGroupBody{
+				ConnectionGroup: &connectionGroup,
+			}
+
+			response, httpResponse, err := c.ConnectionGroupAPI.SuperplaneCreateConnectionGroup(context.Background(), canvasID).
+				Body(body).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.ConnectionGroup)
+			Check(err)
+			fmt.Printf("%s", string(out))
 
 		case "Stage":
 			var yamlData map[string]any
@@ -276,8 +306,6 @@ var createCmd = &cobra.Command{
 			// Create request and set stage
 			request := openapi_client.NewSuperplaneCreateStageBody()
 			request.SetStage(*stage)
-			requesterId := uuid.NewString()
-			request.SetRequesterId(requesterId)
 			response, httpResponse, err := c.StageAPI.SuperplaneCreateStage(context.Background(), canvasIDOrName).
 				Body(*request).
 				Execute()

@@ -81,7 +81,7 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Create stage, connected to our two sources
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.StageConnection{
+		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
 			{
 				SourceID:   docsSource.ID,
 				SourceName: docsSource.Name,

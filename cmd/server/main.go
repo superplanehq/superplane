@@ -73,6 +73,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 
 		go w.Start()
 	}
+
+	if os.Getenv("START_PENDING_FIELD_SETS_WORKER") == "yes" {
+		log.Println("Starting Pending Field Sets Worker")
+
+		w, err := workers.NewPendingFieldSetsWorker(time.Now)
+		if err != nil {
+			panic(err)
+		}
+
+		go w.Start()
+	}
 }
 
 func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization) {

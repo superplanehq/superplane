@@ -25,7 +25,12 @@ RUN apt-get update -y && apt-get install --no-install-recommends -y curl gnupg &
     npm -v
 
 WORKDIR /tmp
-RUN curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz && \
+RUN ARCH=$(dpkg --print-architecture) && \
+    if [ "$ARCH" = "arm64" ]; then \
+    curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-arm64.tar.gz | tar xvz; \
+    else \
+    curl -L https://github.com/golang-migrate/migrate/releases/download/v4.18.2/migrate.linux-amd64.tar.gz | tar xvz; \
+    fi && \
     mv /tmp/migrate /usr/bin/migrate && \
     chmod +x /usr/bin/migrate
 
@@ -39,7 +44,6 @@ RUN ARCH=$(dpkg --print-architecture) && \
     unzip protoc.zip && \
     mv bin/protoc /usr/local/bin/protoc && \
     rm -rf protoc.zip
-
 
 WORKDIR /app
 COPY pkg pkg

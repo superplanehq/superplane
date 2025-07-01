@@ -38,7 +38,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		// Create stage that trigger Semaphore task.
 		//
 		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -90,7 +90,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 			"REF_TYPE": "${{ inputs.REF_TYPE }}",
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.StageConnection{
+		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,

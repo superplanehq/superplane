@@ -553,6 +553,196 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/connection-groups": {
+      "get": {
+        "summary": "List connection groups",
+        "description": "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)",
+        "operationId": "Superplane_ListConnectionGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListConnectionGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      },
+      "post": {
+        "summary": "Create a new canvas connection group",
+        "description": "Creates a new canvas connection group",
+        "operationId": "Superplane_CreateConnectionGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateConnectionGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateConnectionGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}": {
+      "get": {
+        "summary": "Get connection group details",
+        "description": "Returns the details of a specific connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DescribeConnectionGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeConnectionGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      },
+      "patch": {
+        "summary": "Update a connection group",
+        "description": "Updates the specified connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_UpdateConnectionGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateConnectionGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneUpdateConnectionGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}/field-sets": {
+      "get": {
+        "summary": "List connection group field sets",
+        "description": "Returns a list of field sets for the specified connection group (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_ListConnectionGroupFieldSets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListConnectionGroupFieldSetsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ConnectionGroup"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/event-sources": {
       "get": {
         "summary": "List event sources",
@@ -803,12 +993,6 @@
             "name": "idOrName",
             "in": "path",
             "required": true,
-            "type": "string"
-          },
-          {
-            "name": "requesterId",
-            "in": "query",
-            "required": false,
             "type": "string"
           }
         ],
@@ -1090,7 +1274,7 @@
           }
         ],
         "tags": [
-          "Event"
+          "Stage"
         ]
       }
     },
@@ -1142,7 +1326,7 @@
           }
         ],
         "tags": [
-          "Event"
+          "Stage"
         ]
       }
     },
@@ -1671,6 +1855,17 @@
         }
       }
     },
+    "GroupByField": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
     "InputMappingWhen": {
       "type": "object",
       "properties": {
@@ -1795,26 +1990,29 @@
       ],
       "default": "PROVIDER_UNKNOWN"
     },
-    "StageEventStateReason": {
-      "type": "string",
-      "enum": [
-        "STATE_REASON_UNKNOWN",
-        "STATE_REASON_APPROVAL",
-        "STATE_REASON_TIME_WINDOW",
-        "STATE_REASON_EXECUTION",
-        "STATE_REASON_CONNECTION",
-        "STATE_REASON_CANCELLED",
-        "STATE_REASON_UNHEALTHY"
-      ],
-      "default": "STATE_REASON_UNKNOWN"
-    },
-    "SuperplaneApproveStageEventBody": {
+    "SpecGroupBy": {
       "type": "object",
       "properties": {
-        "requesterId": {
-          "type": "string"
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/GroupByField"
+          }
         }
       }
+    },
+    "SpecTimeoutBehavior": {
+      "type": "string",
+      "enum": [
+        "TIMEOUT_BEHAVIOR_NONE",
+        "TIMEOUT_BEHAVIOR_DROP",
+        "TIMEOUT_BEHAVIOR_EMIT"
+      ],
+      "default": "TIMEOUT_BEHAVIOR_NONE"
+    },
+    "SuperplaneApproveStageEventBody": {
+      "type": "object"
     },
     "SuperplaneApproveStageEventResponse": {
       "type": "object",
@@ -1921,12 +2119,149 @@
         }
       }
     },
+    "SuperplaneConnectionGroup": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupSpec"
+        }
+      }
+    },
+    "SuperplaneConnectionGroupEvent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sourceId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "$ref": "#/definitions/SuperplaneConnectionType"
+        },
+        "sourceName": {
+          "type": "string"
+        },
+        "receivedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneConnectionGroupFieldSet": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneKeyValuePair"
+          }
+        },
+        "hash": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetState"
+        },
+        "stateReason": {
+          "$ref": "#/definitions/SuperplaneConnectionGroupFieldSetStateReason"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroupEvent"
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SuperplaneConnectionGroupFieldSetState": {
+      "type": "string",
+      "enum": [
+        "STATE_UNKNOWN",
+        "STATE_PENDING",
+        "STATE_PROCESSED",
+        "STATE_DISCARDED"
+      ],
+      "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneConnectionGroupFieldSetStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_NONE",
+        "STATE_REASON_OK",
+        "STATE_REASON_TIMEOUT"
+      ],
+      "default": "STATE_REASON_NONE"
+    },
+    "SuperplaneConnectionGroupMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "canvasId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedBy": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneConnectionGroupSpec": {
+      "type": "object",
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnection"
+          }
+        },
+        "groupBy": {
+          "$ref": "#/definitions/SpecGroupBy"
+        },
+        "timeout": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "timeoutBehavior": {
+          "$ref": "#/definitions/SpecTimeoutBehavior"
+        }
+      }
+    },
     "SuperplaneConnectionType": {
       "type": "string",
       "enum": [
         "TYPE_UNKNOWN",
         "TYPE_EVENT_SOURCE",
-        "TYPE_STAGE"
+        "TYPE_STAGE",
+        "TYPE_CONNECTION_GROUP"
       ],
       "default": "TYPE_UNKNOWN"
     },
@@ -1949,14 +2284,27 @@
         }
       }
     },
+    "SuperplaneCreateConnectionGroupBody": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
+    "SuperplaneCreateConnectionGroupResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
     "SuperplaneCreateEventSourceBody": {
       "type": "object",
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -1976,9 +2324,6 @@
       "properties": {
         "secret": {
           "$ref": "#/definitions/SuperplaneSecret"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -1995,9 +2340,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2017,6 +2359,14 @@
       "properties": {
         "canvas": {
           "$ref": "#/definitions/SuperplaneCanvas"
+        }
+      }
+    },
+    "SuperplaneDescribeConnectionGroupResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
         }
       }
     },
@@ -2172,7 +2522,7 @@
         }
       }
     },
-    "SuperplaneInputValue": {
+    "SuperplaneKeyValuePair": {
       "type": "object",
       "properties": {
         "name": {
@@ -2191,6 +2541,30 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneCanvas"
+          }
+        }
+      }
+    },
+    "SuperplaneListConnectionGroupFieldSetsResponse": {
+      "type": "object",
+      "properties": {
+        "fieldSets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroupFieldSet"
+          }
+        }
+      }
+    },
+    "SuperplaneListConnectionGroupsResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneConnectionGroup"
           }
         }
       }
@@ -2335,7 +2709,7 @@
           "$ref": "#/definitions/SuperplaneStageEventState"
         },
         "stateReason": {
-          "$ref": "#/definitions/StageEventStateReason"
+          "$ref": "#/definitions/SuperplaneStageEventStateReason"
         },
         "createdAt": {
           "type": "string",
@@ -2355,7 +2729,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/SuperplaneInputValue"
+            "$ref": "#/definitions/SuperplaneKeyValuePair"
           }
         }
       }
@@ -2381,6 +2755,19 @@
         "STATE_PROCESSED"
       ],
       "default": "STATE_UNKNOWN"
+    },
+    "SuperplaneStageEventStateReason": {
+      "type": "string",
+      "enum": [
+        "STATE_REASON_UNKNOWN",
+        "STATE_REASON_APPROVAL",
+        "STATE_REASON_TIME_WINDOW",
+        "STATE_REASON_EXECUTION",
+        "STATE_REASON_CONNECTION",
+        "STATE_REASON_CANCELLED",
+        "STATE_REASON_UNHEALTHY"
+      ],
+      "default": "STATE_REASON_UNKNOWN"
     },
     "SuperplaneStageMetadata": {
       "type": "object",
@@ -2450,14 +2837,27 @@
         }
       }
     },
+    "SuperplaneUpdateConnectionGroupBody": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
+    "SuperplaneUpdateConnectionGroupResponse": {
+      "type": "object",
+      "properties": {
+        "connectionGroup": {
+          "$ref": "#/definitions/SuperplaneConnectionGroup"
+        }
+      }
+    },
     "SuperplaneUpdateSecretBody": {
       "type": "object",
       "properties": {
         "secret": {
           "$ref": "#/definitions/SuperplaneSecret"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
@@ -2474,9 +2874,6 @@
       "properties": {
         "stage": {
           "$ref": "#/definitions/SuperplaneStage"
-        },
-        "requesterId": {
-          "type": "string"
         }
       }
     },
