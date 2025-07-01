@@ -49,6 +49,15 @@ type RoleDefinitionQuery interface {
 	GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error)
 }
 
+// Custom role management interface
+type CustomRoleManager interface {
+	CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error
+	UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error
+	DeleteCustomRole(domainID string, domainType string, roleName string) error
+	IsDefaultRole(roleName string, domainType string) bool
+	CustomizeDefaultRole(domainID string, domainType string, roleName string, permissions []*Permission) error
+}
+
 // Authorization interface
 type Authorization interface {
 	PermissionChecker
@@ -57,6 +66,7 @@ type Authorization interface {
 	AuthorizationSetup
 	UserAccessQuery
 	RoleDefinitionQuery
+	CustomRoleManager
 }
 
 type RoleDefinition struct {

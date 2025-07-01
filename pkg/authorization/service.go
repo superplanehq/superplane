@@ -563,6 +563,169 @@ func (a *AuthService) EnableCache(enable bool) {
 	a.enforcer.EnableCache(enable)
 }
 
+// CreateCustomRole creates a new custom role for a domain
+func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
+		return fmt.Errorf("cannot create custom role with default role name: %s", roleDefinition.Name)
+	}
+
+	// Add policies for each permission
+	for _, permission := range roleDefinition.Permissions {
+		domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
+		_, err := a.enforcer.AddPolicy(roleDefinition.Name, domain, permission.Resource, permission.Action)
+		if err != nil {
+			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	// Add inheritance if specified
+	if roleDefinition.InheritsFrom != nil {
+		_, err := a.enforcer.AddRoleForUser(roleDefinition.Name, roleDefinition.InheritsFrom.Name)
+		if err != nil {
+			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateCustomRole updates an existing custom role
+func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
+		return fmt.Errorf("cannot update default role: %s", roleDefinition.Name)
+	}
+
+	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
+
+	// Remove existing policies for this role in this domain
+	_, err := a.enforcer.RemoveFilteredPolicy(0, roleDefinition.Name, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
+	}
+
+	// Remove existing role inheritance
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, roleDefinition.Name)
+	if err != nil {
+		return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
+	}
+
+	// Add new policies
+	for _, permission := range roleDefinition.Permissions {
+		_, err := a.enforcer.AddPolicy(roleDefinition.Name, domain, permission.Resource, permission.Action)
+		if err != nil {
+			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	// Add inheritance if specified
+	if roleDefinition.InheritsFrom != nil {
+		_, err := a.enforcer.AddRoleForUser(roleDefinition.Name, roleDefinition.InheritsFrom.Name)
+		if err != nil {
+			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// DeleteCustomRole deletes a custom role
+func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleName string) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleName, domainType) {
+		return fmt.Errorf("cannot delete default role: %s", roleName)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	// Remove all policies for this role in this domain
+	_, err := a.enforcer.RemoveFilteredPolicy(0, roleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove policies for role %s: %w", roleName, err)
+	}
+
+	// Remove role inheritance
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, roleName)
+	if err != nil {
+		return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
+	}
+
+	// Remove users from this role
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(1, roleName)
+	if err != nil {
+		return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
+	}
+
+	return nil
+}
+
+// IsDefaultRole checks if a role is a default system role
+func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
+	defaultRoles := map[string][]string{
+		DomainOrg:    {RoleOrgOwner, RoleOrgAdmin, RoleOrgViewer},
+		DomainCanvas: {RoleCanvasOwner, RoleCanvasAdmin, RoleCanvasViewer},
+	}
+
+	roles, exists := defaultRoles[domainType]
+	if !exists {
+		return false
+	}
+
+	return contains(roles, roleName)
+}
+
+// CustomizeDefaultRole allows customizing permissions of default roles for a specific domain
+func (a *AuthService) CustomizeDefaultRole(domainID string, domainType string, roleName string, permissions []*Permission) error {
+	// Validate that the role is a default role
+	if !a.IsDefaultRole(roleName, domainType) {
+		return fmt.Errorf("role %s is not a default role", roleName)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	// Remove existing custom policies for this role in this domain (keep original template policies)
+	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, roleName, domain)
+	for _, policy := range existingPolicies {
+		if len(policy) >= 4 {
+			// Only remove if it's a custom policy (not from template)
+			if !a.isPolicyFromTemplate(roleName, policy[2], policy[3], domainType) {
+				_, err := a.enforcer.RemovePolicy(policy)
+				if err != nil {
+					return fmt.Errorf("failed to remove existing custom policy: %w", err)
+				}
+			}
+		}
+	}
+
+	// Add new custom permissions
+	for _, permission := range permissions {
+		_, err := a.enforcer.AddPolicy(roleName, domain, permission.Resource, permission.Action)
+		if err != nil {
+			return fmt.Errorf("failed to add custom permission for role %s: %w", roleName, err)
+		}
+	}
+
+	return nil
+}
+
+// isPolicyFromTemplate checks if a policy comes from the original template
+func (a *AuthService) isPolicyFromTemplate(roleName, resource, action, domainType string) bool {
+	var templates [][5]string
+	if domainType == DomainOrg {
+		templates = a.orgPolicyTemplates
+	} else if domainType == DomainCanvas {
+		templates = a.canvasPolicyTemplates
+	}
+
+	for _, template := range templates {
+		if template[0] == roleName && template[2] == resource && template[3] == action {
+			return true
+		}
+	}
+	return false
+}
+
 func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 	var policies [][5]string
 
