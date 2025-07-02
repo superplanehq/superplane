@@ -108,6 +108,8 @@ export type ConnectionHeaderFilter = {
     expression?: string;
 };
 
+export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
+
 export type ExecutorSpecHttp = {
     url?: string;
     headers?: {
@@ -206,8 +208,6 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
-export type StageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
-
 export type SuperplaneApproveStageEventBody = {
     [key: string]: unknown;
 };
@@ -270,14 +270,14 @@ export type SuperplaneConnectionGroupFieldSet = {
     fields?: Array<SuperplaneKeyValuePair>;
     hash?: string;
     state?: SuperplaneConnectionGroupFieldSetState;
-    result?: SuperplaneConnectionGroupFieldSetResult;
+    stateReason?: SuperplaneConnectionGroupFieldSetStateReason;
     events?: Array<SuperplaneConnectionGroupEvent>;
     createdAt?: string;
 };
 
-export type SuperplaneConnectionGroupFieldSetResult = 'RESULT_NONE' | 'RESULT_TIMED_OUT' | 'RESULT_RECEIVED_ALL';
-
 export type SuperplaneConnectionGroupFieldSetState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_PROCESSED' | 'STATE_DISCARDED';
+
+export type SuperplaneConnectionGroupFieldSetStateReason = 'STATE_REASON_NONE' | 'STATE_REASON_OK' | 'STATE_REASON_TIMEOUT';
 
 export type SuperplaneConnectionGroupMetadata = {
     id?: string;
@@ -285,6 +285,8 @@ export type SuperplaneConnectionGroupMetadata = {
     canvasId?: string;
     createdAt?: string;
     createdBy?: string;
+    updatedAt?: string;
+    updatedBy?: string;
 };
 
 export type SuperplaneConnectionGroupSpec = {
@@ -372,6 +374,7 @@ export type SuperplaneEventSourceMetadata = {
     name?: string;
     canvasId?: string;
     createdAt?: string;
+    updatedAt?: string;
 };
 
 export type SuperplaneEventSourceSpec = {
@@ -382,14 +385,12 @@ export type SuperplaneExecution = {
     id?: string;
     referenceId?: string;
     state?: SuperplaneExecutionState;
-    result?: SuperplaneExecutionResult;
+    result?: ExecutionResult;
     createdAt?: string;
     startedAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
 };
-
-export type SuperplaneExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
@@ -455,6 +456,15 @@ export type SuperplaneOutputValue = {
     value?: string;
 };
 
+export type SuperplaneResetEventSourceKeyBody = {
+    [key: string]: unknown;
+};
+
+export type SuperplaneResetEventSourceKeyResponse = {
+    eventSource?: SuperplaneEventSource;
+    key?: string;
+};
+
 export type SuperplaneSecret = {
     metadata?: SuperplaneSecretMetadata;
     spec?: SuperplaneSecretSpec;
@@ -482,7 +492,7 @@ export type SuperplaneStageEvent = {
     sourceId?: string;
     sourceType?: SuperplaneConnectionType;
     state?: SuperplaneStageEventState;
-    stateReason?: StageEventStateReason;
+    stateReason?: SuperplaneStageEventStateReason;
     createdAt?: string;
     approvals?: Array<SuperplaneStageEventApproval>;
     execution?: SuperplaneExecution;
@@ -495,6 +505,8 @@ export type SuperplaneStageEventApproval = {
 };
 
 export type SuperplaneStageEventState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_WAITING' | 'STATE_PROCESSED';
+
+export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_REASON_APPROVAL' | 'STATE_REASON_TIME_WINDOW' | 'STATE_REASON_EXECUTION' | 'STATE_REASON_CONNECTION' | 'STATE_REASON_CANCELLED' | 'STATE_REASON_UNHEALTHY';
 
 export type SuperplaneStageMetadata = {
     id?: string;
@@ -511,6 +523,14 @@ export type SuperplaneStageSpec = {
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
     secrets?: Array<SuperplaneValueDefinition>;
+};
+
+export type SuperplaneUpdateConnectionGroupBody = {
+    connectionGroup?: SuperplaneConnectionGroup;
+};
+
+export type SuperplaneUpdateConnectionGroupResponse = {
+    connectionGroup?: SuperplaneConnectionGroup;
 };
 
 export type SuperplaneUpdateSecretBody = {
@@ -547,7 +567,7 @@ export type SuperplaneValueFromEventData = {
 };
 
 export type SuperplaneValueFromLastExecution = {
-    results?: Array<SuperplaneExecutionResult>;
+    results?: Array<ExecutionResult>;
 };
 
 export type SuperplaneValueFromSecret = {
@@ -1006,6 +1026,34 @@ export type SuperplaneDescribeConnectionGroupResponses = {
 
 export type SuperplaneDescribeConnectionGroupResponse2 = SuperplaneDescribeConnectionGroupResponses[keyof SuperplaneDescribeConnectionGroupResponses];
 
+export type SuperplaneUpdateConnectionGroupData = {
+    body: SuperplaneUpdateConnectionGroupBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/connection-groups/{idOrName}';
+};
+
+export type SuperplaneUpdateConnectionGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneUpdateConnectionGroupError = SuperplaneUpdateConnectionGroupErrors[keyof SuperplaneUpdateConnectionGroupErrors];
+
+export type SuperplaneUpdateConnectionGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneUpdateConnectionGroupResponse;
+};
+
+export type SuperplaneUpdateConnectionGroupResponse2 = SuperplaneUpdateConnectionGroupResponses[keyof SuperplaneUpdateConnectionGroupResponses];
+
 export type SuperplaneListConnectionGroupFieldSetsData = {
     body?: never;
     path: {
@@ -1087,6 +1135,34 @@ export type SuperplaneCreateEventSourceResponses = {
 };
 
 export type SuperplaneCreateEventSourceResponse2 = SuperplaneCreateEventSourceResponses[keyof SuperplaneCreateEventSourceResponses];
+
+export type SuperplaneResetEventSourceKeyData = {
+    body: SuperplaneResetEventSourceKeyBody;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}/reset-key';
+};
+
+export type SuperplaneResetEventSourceKeyErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type SuperplaneResetEventSourceKeyError = SuperplaneResetEventSourceKeyErrors[keyof SuperplaneResetEventSourceKeyErrors];
+
+export type SuperplaneResetEventSourceKeyResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneResetEventSourceKeyResponse;
+};
+
+export type SuperplaneResetEventSourceKeyResponse2 = SuperplaneResetEventSourceKeyResponses[keyof SuperplaneResetEventSourceKeyResponses];
 
 export type SuperplaneDescribeEventSourceData = {
     body?: never;
