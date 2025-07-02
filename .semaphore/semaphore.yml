@@ -6,6 +6,7 @@ agent:
     os_image: ubuntu2204
 blocks:
   - name: "\U0001F9EA QA"
+    dependencies: []
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -27,6 +28,7 @@ blocks:
             - test-results publish junit-report.xml
 
   - name: "🔨 Frontend Build"
+    dependencies: []
     task:
       prologue:
         commands:
