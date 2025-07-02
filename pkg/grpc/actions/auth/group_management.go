@@ -11,7 +11,7 @@ import (
 )
 
 func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.Authorization) (*pb.AddUserToGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.OrgId, req.UserId)
+	err := actions.ValidateUUIDs(req.DomainId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -20,7 +20,17 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	err = authService.AddUserToGroup(req.OrgId, req.UserId, req.GroupName)
+	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
+	}
+
+	// For now, only support organization groups as the interface only has AddUserToGroup(orgID, userID, group)
+	// TODO: Update authorization service interface to support domain types
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
+		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	}
+
+	err = authService.AddUserToGroup(req.DomainId, req.UserId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to add user to group")
 	}
@@ -29,7 +39,7 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 }
 
 func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest, authService authorization.Authorization) (*pb.RemoveUserFromGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.OrgId, req.UserId)
+	err := actions.ValidateUUIDs(req.DomainId, req.UserId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -38,7 +48,17 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	err = authService.RemoveUserFromGroup(req.OrgId, req.UserId, req.GroupName)
+	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
+	}
+
+	// For now, only support organization groups as the interface only has RemoveUserFromGroup(orgID, userID, group)
+	// TODO: Update authorization service interface to support domain types
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
+		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	}
+
+	err = authService.RemoveUserFromGroup(req.DomainId, req.UserId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove user from group")
 	}
@@ -46,38 +66,80 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 	return &pb.RemoveUserFromGroupResponse{}, nil
 }
 
-func ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest, authService authorization.Authorization) (*pb.ListOrganizationGroupsResponse, error) {
-	err := actions.ValidateUUIDs(req.OrgId)
+func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	groups, err := authService.GetGroups(req.OrgId)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get organization groups")
+	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	return &pb.ListOrganizationGroupsResponse{
+	// For now, only support organization groups as the interface only has GetGroups(orgID)
+	// TODO: Update authorization service interface to support domain types
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
+		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	}
+
+	groupNames, err := authService.GetGroups(req.DomainId)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get groups")
+	}
+
+	// Convert group names to Group objects
+	groups := make([]*pb.Group, len(groupNames))
+	for i, groupName := range groupNames {
+		// Get the role for this group - for now we'll leave it empty as the interface doesn't provide it
+		// TODO: Update authorization service to return group details including roles
+		groups[i] = &pb.Group{
+			Name:       groupName,
+			DomainType: req.DomainType,
+			DomainId:   req.DomainId,
+			Role:       "", // TODO: get actual role from service
+		}
+	}
+
+	return &pb.ListGroupsResponse{
 		Groups: groups,
 	}, nil
 }
 
 func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.Authorization) (*pb.GetGroupUsersResponse, error) {
-	err := actions.ValidateUUIDs(req.OrgId)
+	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
 	if req.GroupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	userIDs, err := authService.GetGroupUsers(req.OrgId, req.GroupName)
+	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
+	}
+
+	// For now, only support organization groups as the interface only has GetGroupUsers(orgID, group)
+	// TODO: Update authorization service interface to support domain types
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
+		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	}
+
+	userIDs, err := authService.GetGroupUsers(req.DomainId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
 
+	// Create group object for response
+	group := &pb.Group{
+		Name:       req.GroupName,
+		DomainType: req.DomainType,
+		DomainId:   req.DomainId,
+		Role:       "", // TODO: get actual role from service
+	}
+
 	return &pb.GetGroupUsersResponse{
 		UserIds: userIDs,
+		Group:   group,
 	}, nil
 }

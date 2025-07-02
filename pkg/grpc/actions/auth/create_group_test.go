@@ -21,9 +21,10 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("successful group creation", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			OrgId:     orgID,
-			GroupName: "test-group",
-			Role:      authorization.RoleOrgAdmin,
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			GroupName:  "test-group",
+			Role:       authorization.RoleOrgAdmin,
 		}
 
 		resp, err := CreateGroup(ctx, req, authService)
@@ -39,9 +40,10 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			OrgId:     orgID,
-			GroupName: "",
-			Role:      authorization.RoleOrgAdmin,
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			GroupName:  "",
+			Role:       authorization.RoleOrgAdmin,
 		}
 
 		_, err := CreateGroup(ctx, req, authService)

@@ -55,8 +55,8 @@ func (s *AuthorizationServer) RemoveUserFromGroup(ctx context.Context, req *pb.R
 	return auth.RemoveUserFromGroup(ctx, req, s.authService)
 }
 
-func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest) (*pb.ListOrganizationGroupsResponse, error) {
-	return auth.ListOrganizationGroups(ctx, req, s.authService)
+func (s *AuthorizationServer) ListGroups(ctx context.Context, req *pb.ListGroupsRequest) (*pb.ListGroupsResponse, error) {
+	return auth.ListGroups(ctx, req, s.authService)
 }
 
 func (s *AuthorizationServer) GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest) (*pb.GetGroupUsersResponse, error) {

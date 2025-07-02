@@ -27,9 +27,10 @@ func Test_GroupManagement(t *testing.T) {
 
 	t.Run("successful add user to group", func(t *testing.T) {
 		req := &pb.AddUserToGroupRequest{
-			OrgId:     orgID,
-			UserId:    r.User.String(),
-			GroupName: "test-group",
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
+			GroupName:  "test-group",
 		}
 
 		resp, err := AddUserToGroup(ctx, req, authService)
@@ -39,9 +40,10 @@ func Test_GroupManagement(t *testing.T) {
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &pb.AddUserToGroupRequest{
-			OrgId:     orgID,
-			UserId:    r.User.String(),
-			GroupName: "",
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
+			GroupName:  "",
 		}
 
 		_, err := AddUserToGroup(ctx, req, authService)
