@@ -159,6 +159,26 @@ func Test__InputBuilder(t *testing.T) {
 		require.NoError(t, err)
 
 		//
+		// When no execution exists yet, inputs that come last execution should be empty.
+		//
+		builder := NewBuilder(*stage)
+		inputs, err := builder.Build(database.Conn(), &models.Event{
+			SourceName: docsSource.Name,
+			Raw:        []byte(`{"ref":"docs.v2"}`),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"DOCS_VERSION": "docs.v2", "TF_VERSION": ""}, inputs)
+
+		inputs, err = builder.Build(database.Conn(), &models.Event{
+			SourceName: tfSource.Name,
+			Raw:        []byte(`{"ref":"terraform.v2"}`),
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, map[string]any{"DOCS_VERSION": "", "TF_VERSION": "terraform.v2"}, inputs)
+
+		//
 		// Mock a completed previous execution of the stage
 		//
 		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
@@ -167,8 +187,7 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Build inputs from docs source event
 		//
-		builder := NewBuilder(*stage)
-		inputs, err := builder.Build(database.Conn(), &models.Event{
+		inputs, err = builder.Build(database.Conn(), &models.Event{
 			SourceName: docsSource.Name,
 			Raw:        []byte(`{"ref":"docs.v2"}`),
 		})
