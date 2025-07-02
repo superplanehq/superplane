@@ -1,6 +1,7 @@
 package inputs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -121,6 +122,16 @@ func (b *InputBuilder) getValue(tx *gorm.DB, valueDefinition *models.ValueDefini
 	if valueDefinition.ValueFrom.LastExecution != nil {
 		lastInputs, err := b.stage.FindLastExecutionInputs(tx, valueDefinition.ValueFrom.LastExecution.Results)
 		if err != nil {
+
+			//
+			// If this is the first execution, we don't have a value for the last execution,
+			// so in order to not block anything, we just return an empty string,
+			// and the executor will have to deal with an empty input.
+			//
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return "", nil
+			}
+
 			return nil, fmt.Errorf("error finding last execution inputs: %v", err)
 		}
 

@@ -45,6 +45,10 @@ func (s *SuperplaneService) DescribeEventSource(ctx context.Context, req *pb.Des
 	return eventsources.DescribeEventSource(ctx, req)
 }
 
+func (s *SuperplaneService) ResetEventSourceKey(ctx context.Context, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
+	return eventsources.ResetEventSourceKey(ctx, s.encryptor, req)
+}
+
 func (s *SuperplaneService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	return stages.CreateStage(ctx, s.specValidator, req)
 }

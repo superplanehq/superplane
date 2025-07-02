@@ -24,6 +24,7 @@ const (
 	Superplane_CreateSecret_FullMethodName                 = "/Superplane.Superplane/CreateSecret"
 	Superplane_CreateConnectionGroup_FullMethodName        = "/Superplane.Superplane/CreateConnectionGroup"
 	Superplane_CreateEventSource_FullMethodName            = "/Superplane.Superplane/CreateEventSource"
+	Superplane_ResetEventSourceKey_FullMethodName          = "/Superplane.Superplane/ResetEventSourceKey"
 	Superplane_CreateStage_FullMethodName                  = "/Superplane.Superplane/CreateStage"
 	Superplane_DescribeCanvas_FullMethodName               = "/Superplane.Superplane/DescribeCanvas"
 	Superplane_DescribeStage_FullMethodName                = "/Superplane.Superplane/DescribeStage"
@@ -52,6 +53,7 @@ type SuperplaneClient interface {
 	CreateSecret(ctx context.Context, in *CreateSecretRequest, opts ...grpc.CallOption) (*CreateSecretResponse, error)
 	CreateConnectionGroup(ctx context.Context, in *CreateConnectionGroupRequest, opts ...grpc.CallOption) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(ctx context.Context, in *CreateEventSourceRequest, opts ...grpc.CallOption) (*CreateEventSourceResponse, error)
+	ResetEventSourceKey(ctx context.Context, in *ResetEventSourceKeyRequest, opts ...grpc.CallOption) (*ResetEventSourceKeyResponse, error)
 	CreateStage(ctx context.Context, in *CreateStageRequest, opts ...grpc.CallOption) (*CreateStageResponse, error)
 	DescribeCanvas(ctx context.Context, in *DescribeCanvasRequest, opts ...grpc.CallOption) (*DescribeCanvasResponse, error)
 	DescribeStage(ctx context.Context, in *DescribeStageRequest, opts ...grpc.CallOption) (*DescribeStageResponse, error)
@@ -123,6 +125,16 @@ func (c *superplaneClient) CreateEventSource(ctx context.Context, in *CreateEven
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateEventSourceResponse)
 	err := c.cc.Invoke(ctx, Superplane_CreateEventSource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) ResetEventSourceKey(ctx context.Context, in *ResetEventSourceKeyRequest, opts ...grpc.CallOption) (*ResetEventSourceKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResetEventSourceKeyResponse)
+	err := c.cc.Invoke(ctx, Superplane_ResetEventSourceKey_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -308,6 +320,7 @@ type SuperplaneServer interface {
 	CreateSecret(context.Context, *CreateSecretRequest) (*CreateSecretResponse, error)
 	CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error)
+	ResetEventSourceKey(context.Context, *ResetEventSourceKeyRequest) (*ResetEventSourceKeyResponse, error)
 	CreateStage(context.Context, *CreateStageRequest) (*CreateStageResponse, error)
 	DescribeCanvas(context.Context, *DescribeCanvasRequest) (*DescribeCanvasResponse, error)
 	DescribeStage(context.Context, *DescribeStageRequest) (*DescribeStageResponse, error)
@@ -348,6 +361,9 @@ func (UnimplementedSuperplaneServer) CreateConnectionGroup(context.Context, *Cre
 }
 func (UnimplementedSuperplaneServer) CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateEventSource not implemented")
+}
+func (UnimplementedSuperplaneServer) ResetEventSourceKey(context.Context, *ResetEventSourceKeyRequest) (*ResetEventSourceKeyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResetEventSourceKey not implemented")
 }
 func (UnimplementedSuperplaneServer) CreateStage(context.Context, *CreateStageRequest) (*CreateStageResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateStage not implemented")
@@ -506,6 +522,24 @@ func _Superplane_CreateEventSource_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).CreateEventSource(ctx, req.(*CreateEventSourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_ResetEventSourceKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResetEventSourceKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).ResetEventSourceKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_ResetEventSourceKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).ResetEventSourceKey(ctx, req.(*ResetEventSourceKeyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -842,6 +876,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateEventSource",
 			Handler:    _Superplane_CreateEventSource_Handler,
+		},
+		{
+			MethodName: "ResetEventSourceKey",
+			Handler:    _Superplane_ResetEventSourceKey_Handler,
 		},
 		{
 			MethodName: "CreateStage",
