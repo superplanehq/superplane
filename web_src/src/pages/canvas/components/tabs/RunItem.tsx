@@ -1,8 +1,10 @@
 import React, { JSX } from 'react';
 import { formatRelativeTime } from '../../utils/stageEventUtils';
+import { SuperplaneExecutionResult, SuperplaneExecutionState } from '@/api-client';
 
 interface RunItemProps {
-  status: string;
+  state: SuperplaneExecutionState;
+  result: SuperplaneExecutionResult;
   title: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
@@ -11,7 +13,8 @@ interface RunItemProps {
 }
 
 export const RunItem: React.FC<RunItemProps> = React.memo(({ 
-  status, 
+  state,
+  result,
   title, 
   timestamp,
   executionDuration,
@@ -25,31 +28,34 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   };
 
   const renderStatusIcon = (): JSX.Element | null => {
-    const statusKey = status.toLowerCase();
-    switch (statusKey) {
-      case 'state_succeeded':
-      case 'passed':
+    switch (state) {
+      case 'STATE_FINISHED':
+        if (result === 'RESULT_PASSED') {
+          return (
+            <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+              <span className="material-icons text-green-600 text-sm">check_circle</span>
+            </div>
+          );
+        }
+        if (result === 'RESULT_FAILED') {
+          return (
+            <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
+              <span className="material-icons text-red-600 text-sm">cancel</span>
+            </div>
+          );
+        }
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <span className="material-icons text-green-600 text-sm">check_circle</span>
+            <span className="material-icons text-gray-600 text-sm">help</span>
           </div>
         );
-      case 'state_failed':
-      case 'failed':
-        return (
-          <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <span className="material-icons text-red-600 text-sm">cancel</span>
-          </div>
-        );
-      case 'state_pending':
-      case 'queued':
+      case 'STATE_PENDING':
         return (
           <div className="w-5 h-5 rounded-full bg-orange-500 border border-orange-200 mr-2 flex items-center justify-center">
             <span className="text-white text-xs job-log-pending"></span>
           </div>
         );
-      case 'state_started':
-      case 'running':
+      case 'STATE_STARTED':
         return (
           <div className="w-5 h-5 rounded-full bg-blue-500 border border-blue-200 mr-2 flex items-center justify-center">
             <span className="text-white text-xs job-log-working"></span>
@@ -65,20 +71,19 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
   };
 
   const getBackgroundClass = (): string => {
-    const statusKey = status.toLowerCase();
-    switch (statusKey) {
-      case 'state_succeeded':
-      case 'passed':
-        return 'bg-green-50 border-t-1 border-green-500';
-      case 'state_failed':
-      case 'failed':
-        return 'bg-red-50 border-t-1 border-red-500';
-      case 'state_started':
-      case 'running':
-        return 'bg-blue-50 border-t-1 border-blue-500';
-      case 'state_pending':
-      case 'queued':
+    switch (state) {
+      case 'STATE_FINISHED':
+        if (result === 'RESULT_PASSED') {
+          return 'bg-green-50 border-t-1 border-green-500';
+        }
+        if (result === 'RESULT_FAILED') {
+          return 'bg-red-50 border-t-1 border-red-500';
+        }
+        return 'bg-gray-50 border-t-1 border-gray-500';
+      case 'STATE_PENDING':
         return 'bg-orange-50 border-t-1 border-orange-500';
+      case 'STATE_STARTED':
+        return 'bg-blue-50 border-t-1 border-blue-500';
       default:
         return 'bg-gray-50 border-t-1 border-gray-500';
     }

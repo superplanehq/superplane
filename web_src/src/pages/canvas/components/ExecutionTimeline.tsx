@@ -81,7 +81,8 @@ export const ExecutionTimeline = ({
             title={execution.id || 'Execution'} 
             inputs={mapExecutionEventInputs(execution)} 
             outputs={mapExecutionOutputs(execution)} 
-            status={execution.state || 'Unknown'} 
+            state={execution.state || 'STATE_UNKNOWN'} 
+            result={execution.result || 'RESULT_UNKNOWN'} 
             timestamp={execution.createdAt || new Date().toISOString()} 
             executionDuration={formatDuration(execution.startedAt, execution.finishedAt)}
           />

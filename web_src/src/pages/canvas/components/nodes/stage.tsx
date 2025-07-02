@@ -59,6 +59,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const getStatusIcon = () => {
     const latestExecution = allExecutions.at(0);
     const status = latestExecution?.state;
+    const result = latestExecution?.result;
     
     switch (status) {
       case 'STATE_STARTED':
@@ -68,9 +69,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           </span>
         );
       case 'STATE_FINISHED':
+        if (result === 'RESULT_PASSED') {
+          return <span className="material-symbols-outlined text-green-600 text-2xl mr-2">check_circle</span>;
+        }
+        if (result === 'RESULT_FAILED') {
+          return <span className="material-symbols-outlined text-red-600 text-2xl mr-2">cancel</span>;
+        }
         return <span className="material-symbols-outlined text-green-600 text-2xl mr-2">check_circle</span>;
-      case 'STATE_UNKNOWN':
-        return <span className="material-symbols-outlined text-red-600 text-2xl mr-2">cancel</span>;
       case 'STATE_PENDING':
         return (
           <span className="rounded-full bg-orange-500 w-[22px] h-[22px] border border-orange-200 text-center mr-2 flex items-center justify-center">
@@ -79,8 +84,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         );
       default:
         return (
-          <span className="rounded-full bg-gray-400 w-6 h-6 border border-gray-200 text-center mr-2 flex items-center justify-center">
-          </span>
+          <span className="material-symbols-outlined text-gray-600 text-2xl mr-2">help</span>
         );
     }
   };
@@ -90,18 +94,23 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const getBackgroundColorClass = () => {
     const latestExecution = allExecutions.at(0);
     const status = latestExecution?.state;
+    const result = latestExecution?.result;
     
     switch (status) {
       case 'STATE_STARTED':
         return 'bg-blue-50 border-blue-200';
       case 'STATE_FINISHED':
+        if (result === 'RESULT_PASSED') {
+          return 'bg-green-50 border-green-200';
+        }
+        if (result === 'RESULT_FAILED') {
+          return 'bg-red-50 border-red-200';
+        }
         return 'bg-green-50 border-green-200';
-      case 'STATE_UNKNOWN':
-        return 'bg-red-50 border-red-200';
       case 'STATE_PENDING':
         return 'bg-yellow-50 border-yellow-200';
       default:
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-gray-50 border-gray-200';
     }
   };
   
