@@ -70,12 +70,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         );
       case 'STATE_FINISHED':
         if (result === 'RESULT_PASSED') {
-          return <span className="material-symbols-outlined text-green-600 text-2xl mr-2">check_circle</span>;
+          return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
         }
         if (result === 'RESULT_FAILED') {
-          return <span className="material-symbols-outlined text-red-600 text-2xl mr-2">cancel</span>;
+          return <span className="material-icons text-red-600 text-2xl mr-2">cancel</span>;
         }
-        return <span className="material-symbols-outlined text-green-600 text-2xl mr-2">check_circle</span>;
+        return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
       case 'STATE_PENDING':
         return (
           <span className="rounded-full bg-orange-500 w-[22px] h-[22px] border border-orange-200 text-center mr-2 flex items-center justify-center">
@@ -84,7 +84,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         );
       default:
         return (
-          <span className="material-symbols-outlined text-gray-600 text-2xl mr-2">help</span>
+          <span className="material-icons text-gray-600 text-2xl mr-2">help</span>
         );
     }
   };
