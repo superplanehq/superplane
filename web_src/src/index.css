@@ -11,9 +11,9 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
   text-decoration: inherit;
 }
+
 a:hover {
   color: #535bf2;
 }
@@ -32,20 +32,36 @@ h1 {
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #f9f9f9;
   cursor: pointer;
-  transition: border-color 0.25s;
 }
-button:hover {
-  border-color: #747bff;
+
+/* Job log working animation */
+.job-log-working::before {
+  display: inline-block;
+  text-align: center;
+  font-family: "Jetbrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  content: '\007C';
+  animation: switch-chars 0.3s infinite;
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+
+@keyframes switch-chars {
+  0%, 100% { content: '\007C' } /* vertical line | */
+  25% { content: '\002F' } /* slash / */
+  50% { content: '\2014' } /* mdash — */
+  75% { content: '\005C' } /* backslash \ */
+}
+
+/* Pending dots animation */
+.job-log-pending::before {
+  display: inline-block;
+  text-align: center;
+  font-family: "Jetbrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  content: '\2022';
+  animation: pending-dots 1.5s infinite;
+}
+
+@keyframes pending-dots {
+  0%, 100% { content: '\2022' } /* • */
+  33% { content: '\2022\2022' } /* •• */
+  66% { content: '\2022\2022\2022' } /* ••• */
 }
