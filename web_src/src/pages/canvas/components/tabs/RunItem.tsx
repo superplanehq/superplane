@@ -1,10 +1,10 @@
 import React, { JSX } from 'react';
 import { formatRelativeTime } from '../../utils/stageEventUtils';
-import { SuperplaneExecutionResult, SuperplaneExecutionState } from '@/api-client';
+import { ExecutionResult, SuperplaneExecutionState } from '@/api-client';
 
 interface RunItemProps {
   state: SuperplaneExecutionState;
-  result: SuperplaneExecutionResult;
+  result: ExecutionResult;
   title: string;
   inputs: Record<string, string>;
   outputs: Record<string, string>;
