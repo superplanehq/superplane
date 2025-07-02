@@ -19,17 +19,17 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Authorization_ListUserPermissions_FullMethodName    = "/Superplane.Authorization.Authorization/ListUserPermissions"
-	Authorization_AssignRole_FullMethodName             = "/Superplane.Authorization.Authorization/AssignRole"
-	Authorization_RemoveRole_FullMethodName             = "/Superplane.Authorization.Authorization/RemoveRole"
-	Authorization_ListRoles_FullMethodName              = "/Superplane.Authorization.Authorization/ListRoles"
-	Authorization_DescribeRole_FullMethodName           = "/Superplane.Authorization.Authorization/DescribeRole"
-	Authorization_GetUserRoles_FullMethodName           = "/Superplane.Authorization.Authorization/GetUserRoles"
-	Authorization_CreateGroup_FullMethodName            = "/Superplane.Authorization.Authorization/CreateGroup"
-	Authorization_AddUserToGroup_FullMethodName         = "/Superplane.Authorization.Authorization/AddUserToGroup"
-	Authorization_RemoveUserFromGroup_FullMethodName    = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
-	Authorization_ListOrganizationGroups_FullMethodName = "/Superplane.Authorization.Authorization/ListOrganizationGroups"
-	Authorization_GetGroupUsers_FullMethodName          = "/Superplane.Authorization.Authorization/GetGroupUsers"
+	Authorization_ListUserPermissions_FullMethodName = "/Superplane.Authorization.Authorization/ListUserPermissions"
+	Authorization_AssignRole_FullMethodName          = "/Superplane.Authorization.Authorization/AssignRole"
+	Authorization_RemoveRole_FullMethodName          = "/Superplane.Authorization.Authorization/RemoveRole"
+	Authorization_ListRoles_FullMethodName           = "/Superplane.Authorization.Authorization/ListRoles"
+	Authorization_DescribeRole_FullMethodName        = "/Superplane.Authorization.Authorization/DescribeRole"
+	Authorization_GetUserRoles_FullMethodName        = "/Superplane.Authorization.Authorization/GetUserRoles"
+	Authorization_CreateGroup_FullMethodName         = "/Superplane.Authorization.Authorization/CreateGroup"
+	Authorization_AddUserToGroup_FullMethodName      = "/Superplane.Authorization.Authorization/AddUserToGroup"
+	Authorization_RemoveUserFromGroup_FullMethodName = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
+	Authorization_ListGroups_FullMethodName          = "/Superplane.Authorization.Authorization/ListGroups"
+	Authorization_GetGroupUsers_FullMethodName       = "/Superplane.Authorization.Authorization/GetGroupUsers"
 )
 
 // AuthorizationClient is the client API for Authorization service.
@@ -54,18 +54,18 @@ type AuthorizationClient interface {
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(ctx context.Context, in *GetUserRolesRequest, opts ...grpc.CallOption) (*GetUserRolesResponse, error)
-	// Endpoint for creating an organization group
+	// Endpoint for creating a group within a domain (organization or canvas)
 	// Operation is synchronous and idempotent.
 	CreateGroup(ctx context.Context, in *CreateGroupRequest, opts ...grpc.CallOption) (*CreateGroupResponse, error)
-	// Endpoint for adding a user to an organization group
+	// Endpoint for adding a user to a group
 	// Operation is synchronous and idempotent.
 	AddUserToGroup(ctx context.Context, in *AddUserToGroupRequest, opts ...grpc.CallOption) (*AddUserToGroupResponse, error)
-	// Endpoint for removing a user from an organization group
+	// Endpoint for removing a user from a group
 	// Operation is synchronous and idempotent.
 	RemoveUserFromGroup(ctx context.Context, in *RemoveUserFromGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromGroupResponse, error)
-	// Endpoint for listing organization groups
+	// Endpoint for listing groups within a domain
 	// Operation is synchronous and idempotent.
-	ListOrganizationGroups(ctx context.Context, in *ListOrganizationGroupsRequest, opts ...grpc.CallOption) (*ListOrganizationGroupsResponse, error)
+	ListGroups(ctx context.Context, in *ListGroupsRequest, opts ...grpc.CallOption) (*ListGroupsResponse, error)
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error)
@@ -169,10 +169,10 @@ func (c *authorizationClient) RemoveUserFromGroup(ctx context.Context, in *Remov
 	return out, nil
 }
 
-func (c *authorizationClient) ListOrganizationGroups(ctx context.Context, in *ListOrganizationGroupsRequest, opts ...grpc.CallOption) (*ListOrganizationGroupsResponse, error) {
+func (c *authorizationClient) ListGroups(ctx context.Context, in *ListGroupsRequest, opts ...grpc.CallOption) (*ListGroupsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListOrganizationGroupsResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListOrganizationGroups_FullMethodName, in, out, cOpts...)
+	out := new(ListGroupsResponse)
+	err := c.cc.Invoke(ctx, Authorization_ListGroups_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -211,18 +211,18 @@ type AuthorizationServer interface {
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error)
-	// Endpoint for creating an organization group
+	// Endpoint for creating a group within a domain (organization or canvas)
 	// Operation is synchronous and idempotent.
 	CreateGroup(context.Context, *CreateGroupRequest) (*CreateGroupResponse, error)
-	// Endpoint for adding a user to an organization group
+	// Endpoint for adding a user to a group
 	// Operation is synchronous and idempotent.
 	AddUserToGroup(context.Context, *AddUserToGroupRequest) (*AddUserToGroupResponse, error)
-	// Endpoint for removing a user from an organization group
+	// Endpoint for removing a user from a group
 	// Operation is synchronous and idempotent.
 	RemoveUserFromGroup(context.Context, *RemoveUserFromGroupRequest) (*RemoveUserFromGroupResponse, error)
-	// Endpoint for listing organization groups
+	// Endpoint for listing groups within a domain
 	// Operation is synchronous and idempotent.
-	ListOrganizationGroups(context.Context, *ListOrganizationGroupsRequest) (*ListOrganizationGroupsResponse, error)
+	ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error)
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error)
@@ -262,8 +262,8 @@ func (UnimplementedAuthorizationServer) AddUserToGroup(context.Context, *AddUser
 func (UnimplementedAuthorizationServer) RemoveUserFromGroup(context.Context, *RemoveUserFromGroupRequest) (*RemoveUserFromGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RemoveUserFromGroup not implemented")
 }
-func (UnimplementedAuthorizationServer) ListOrganizationGroups(context.Context, *ListOrganizationGroupsRequest) (*ListOrganizationGroupsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListOrganizationGroups not implemented")
+func (UnimplementedAuthorizationServer) ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListGroups not implemented")
 }
 func (UnimplementedAuthorizationServer) GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGroupUsers not implemented")
@@ -450,20 +450,20 @@ func _Authorization_RemoveUserFromGroup_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_ListOrganizationGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListOrganizationGroupsRequest)
+func _Authorization_ListGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGroupsRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).ListOrganizationGroups(ctx, in)
+		return srv.(AuthorizationServer).ListGroups(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_ListOrganizationGroups_FullMethodName,
+		FullMethod: Authorization_ListGroups_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListOrganizationGroups(ctx, req.(*ListOrganizationGroupsRequest))
+		return srv.(AuthorizationServer).ListGroups(ctx, req.(*ListGroupsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -530,8 +530,8 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Authorization_RemoveUserFromGroup_Handler,
 		},
 		{
-			MethodName: "ListOrganizationGroups",
-			Handler:    _Authorization_ListOrganizationGroups_Handler,
+			MethodName: "ListGroups",
+			Handler:    _Authorization_ListGroups_Handler,
 		},
 		{
 			MethodName: "GetGroupUsers",

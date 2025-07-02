@@ -27,12 +27,10 @@ type AuthorizationAPIService service
 type ApiAuthorizationAddUserToGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
-	groupName string
-	body *AuthorizationAddUserToGroupBody
+	body *AuthorizationAddUserToGroupRequest
 }
 
-func (r ApiAuthorizationAddUserToGroupRequest) Body(body AuthorizationAddUserToGroupBody) ApiAuthorizationAddUserToGroupRequest {
+func (r ApiAuthorizationAddUserToGroupRequest) Body(body AuthorizationAddUserToGroupRequest) ApiAuthorizationAddUserToGroupRequest {
 	r.body = &body
 	return r
 }
@@ -44,19 +42,15 @@ func (r ApiAuthorizationAddUserToGroupRequest) Execute() (map[string]interface{}
 /*
 AuthorizationAddUserToGroup Add user to group
 
-Adds a user to an organization group
+Adds a user to a group within any domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
- @param groupName
  @return ApiAuthorizationAddUserToGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationAddUserToGroup(ctx context.Context, orgId string, groupName string) ApiAuthorizationAddUserToGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationAddUserToGroup(ctx context.Context) ApiAuthorizationAddUserToGroupRequest {
 	return ApiAuthorizationAddUserToGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
-		groupName: groupName,
 	}
 }
 
@@ -75,9 +69,7 @@ func (a *AuthorizationAPIService) AuthorizationAddUserToGroupExecute(r ApiAuthor
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+	localVarPath := localBasePath + "/api/v1/authorization/groups/users/add"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -271,44 +263,41 @@ func (a *AuthorizationAPIService) AuthorizationAssignRoleExecute(r ApiAuthorizat
 type ApiAuthorizationCreateGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
-	body *AuthorizationCreateGroupBody
+	body *AuthorizationCreateGroupRequest
 }
 
-func (r ApiAuthorizationCreateGroupRequest) Body(body AuthorizationCreateGroupBody) ApiAuthorizationCreateGroupRequest {
+func (r ApiAuthorizationCreateGroupRequest) Body(body AuthorizationCreateGroupRequest) ApiAuthorizationCreateGroupRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAuthorizationCreateGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
+func (r ApiAuthorizationCreateGroupRequest) Execute() (*AuthorizationCreateGroupResponse, *http.Response, error) {
 	return r.ApiService.AuthorizationCreateGroupExecute(r)
 }
 
 /*
 AuthorizationCreateGroup Create group
 
-Creates a new group within an organization with a specific role
+Creates a new group within a domain (organization or canvas) with a specific role
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
  @return ApiAuthorizationCreateGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationCreateGroup(ctx context.Context, orgId string) ApiAuthorizationCreateGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationCreateGroup(ctx context.Context) ApiAuthorizationCreateGroupRequest {
 	return ApiAuthorizationCreateGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
-func (a *AuthorizationAPIService) AuthorizationCreateGroupExecute(r ApiAuthorizationCreateGroupRequest) (map[string]interface{}, *http.Response, error) {
+//  @return AuthorizationCreateGroupResponse
+func (a *AuthorizationAPIService) AuthorizationCreateGroupExecute(r ApiAuthorizationCreateGroupRequest) (*AuthorizationCreateGroupResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarReturnValue  *AuthorizationCreateGroupResponse
 	)
 
 	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationCreateGroup")
@@ -316,8 +305,7 @@ func (a *AuthorizationAPIService) AuthorizationCreateGroupExecute(r ApiAuthoriza
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/authorization/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -530,8 +518,24 @@ func (a *AuthorizationAPIService) AuthorizationDescribeRoleExecute(r ApiAuthoriz
 type ApiAuthorizationGetGroupUsersRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
-	groupName string
+	domainType *string
+	domainId *string
+	groupName *string
+}
+
+func (r ApiAuthorizationGetGroupUsersRequest) DomainType(domainType string) ApiAuthorizationGetGroupUsersRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiAuthorizationGetGroupUsersRequest) DomainId(domainId string) ApiAuthorizationGetGroupUsersRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiAuthorizationGetGroupUsersRequest) GroupName(groupName string) ApiAuthorizationGetGroupUsersRequest {
+	r.groupName = &groupName
+	return r
 }
 
 func (r ApiAuthorizationGetGroupUsersRequest) Execute() (*AuthorizationGetGroupUsersResponse, *http.Response, error) {
@@ -541,19 +545,15 @@ func (r ApiAuthorizationGetGroupUsersRequest) Execute() (*AuthorizationGetGroupU
 /*
 AuthorizationGetGroupUsers Get group users
 
-Returns users that belong to a specific group
+Returns users that belong to a specific group within any domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
- @param groupName
  @return ApiAuthorizationGetGroupUsersRequest
 */
-func (a *AuthorizationAPIService) AuthorizationGetGroupUsers(ctx context.Context, orgId string, groupName string) ApiAuthorizationGetGroupUsersRequest {
+func (a *AuthorizationAPIService) AuthorizationGetGroupUsers(ctx context.Context) ApiAuthorizationGetGroupUsersRequest {
 	return ApiAuthorizationGetGroupUsersRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
-		groupName: groupName,
 	}
 }
 
@@ -572,14 +572,24 @@ func (a *AuthorizationAPIService) AuthorizationGetGroupUsersExecute(r ApiAuthori
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+	localVarPath := localBasePath + "/api/v1/authorization/groups/users"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
+	if r.groupName != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "groupName", r.groupName, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -774,55 +784,72 @@ func (a *AuthorizationAPIService) AuthorizationGetUserRolesExecute(r ApiAuthoriz
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAuthorizationListOrganizationGroupsRequest struct {
+type ApiAuthorizationListGroupsRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiAuthorizationListOrganizationGroupsRequest) Execute() (*AuthorizationListOrganizationGroupsResponse, *http.Response, error) {
-	return r.ApiService.AuthorizationListOrganizationGroupsExecute(r)
+func (r ApiAuthorizationListGroupsRequest) DomainType(domainType string) ApiAuthorizationListGroupsRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiAuthorizationListGroupsRequest) DomainId(domainId string) ApiAuthorizationListGroupsRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiAuthorizationListGroupsRequest) Execute() (*AuthorizationListGroupsResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationListGroupsExecute(r)
 }
 
 /*
-AuthorizationListOrganizationGroups List organization groups
+AuthorizationListGroups List groups
 
-Returns a list of groups within an organization
+Returns a list of groups within a domain (organization or canvas)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
- @return ApiAuthorizationListOrganizationGroupsRequest
+ @return ApiAuthorizationListGroupsRequest
 */
-func (a *AuthorizationAPIService) AuthorizationListOrganizationGroups(ctx context.Context, orgId string) ApiAuthorizationListOrganizationGroupsRequest {
-	return ApiAuthorizationListOrganizationGroupsRequest{
+func (a *AuthorizationAPIService) AuthorizationListGroups(ctx context.Context) ApiAuthorizationListGroupsRequest {
+	return ApiAuthorizationListGroupsRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
 	}
 }
 
 // Execute executes the request
-//  @return AuthorizationListOrganizationGroupsResponse
-func (a *AuthorizationAPIService) AuthorizationListOrganizationGroupsExecute(r ApiAuthorizationListOrganizationGroupsRequest) (*AuthorizationListOrganizationGroupsResponse, *http.Response, error) {
+//  @return AuthorizationListGroupsResponse
+func (a *AuthorizationAPIService) AuthorizationListGroupsExecute(r ApiAuthorizationListGroupsRequest) (*AuthorizationListGroupsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *AuthorizationListOrganizationGroupsResponse
+		localVarReturnValue  *AuthorizationListGroupsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationListOrganizationGroups")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationListGroups")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/authorization/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -1266,9 +1293,12 @@ func (a *AuthorizationAPIService) AuthorizationRemoveRoleExecute(r ApiAuthorizat
 type ApiAuthorizationRemoveUserFromGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
-	groupName string
-	userId string
+	body *AuthorizationRemoveUserFromGroupRequest
+}
+
+func (r ApiAuthorizationRemoveUserFromGroupRequest) Body(body AuthorizationRemoveUserFromGroupRequest) ApiAuthorizationRemoveUserFromGroupRequest {
+	r.body = &body
+	return r
 }
 
 func (r ApiAuthorizationRemoveUserFromGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -1278,21 +1308,15 @@ func (r ApiAuthorizationRemoveUserFromGroupRequest) Execute() (map[string]interf
 /*
 AuthorizationRemoveUserFromGroup Remove user from group
 
-Removes a user from an organization group
+Removes a user from a group within any domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
- @param groupName
- @param userId
  @return ApiAuthorizationRemoveUserFromGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroup(ctx context.Context, orgId string, groupName string, userId string) ApiAuthorizationRemoveUserFromGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroup(ctx context.Context) ApiAuthorizationRemoveUserFromGroupRequest {
 	return ApiAuthorizationRemoveUserFromGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
-		groupName: groupName,
-		userId: userId,
 	}
 }
 
@@ -1311,17 +1335,17 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroupExecute(r ApiA
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users/{userId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
+	localVarPath := localBasePath + "/api/v1/authorization/groups/users/remove"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
 
 	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
+	localVarHTTPContentTypes := []string{"application/json"}
 
 	// set Content-Type header
 	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
@@ -1337,6 +1361,8 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroupExecute(r ApiA
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	// body params
+	localVarPostBody = r.body
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

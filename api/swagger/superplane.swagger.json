@@ -31,16 +31,16 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/authorization/organizations/{orgId}/groups": {
+    "/api/v1/authorization/groups": {
       "get": {
-        "summary": "List organization groups",
-        "description": "Returns a list of groups within an organization",
-        "operationId": "Authorization_ListOrganizationGroups",
+        "summary": "List groups",
+        "description": "Returns a list of groups within a domain (organization or canvas)",
+        "operationId": "Authorization_ListGroups",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
+              "$ref": "#/definitions/AuthorizationListGroupsResponse"
             }
           },
           "default": {
@@ -52,9 +52,21 @@
         },
         "parameters": [
           {
-            "name": "orgId",
-            "in": "path",
-            "required": true,
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
             "type": "string"
           }
         ],
@@ -64,7 +76,7 @@
       },
       "post": {
         "summary": "Create group",
-        "description": "Creates a new group within an organization with a specific role",
+        "description": "Creates a new group within a domain (organization or canvas) with a specific role",
         "operationId": "Authorization_CreateGroup",
         "responses": {
           "200": {
@@ -82,17 +94,11 @@
         },
         "parameters": [
           {
-            "name": "orgId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
             "name": "body",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AuthorizationCreateGroupBody"
+              "$ref": "#/definitions/AuthorizationCreateGroupRequest"
             }
           }
         ],
@@ -101,10 +107,10 @@
         ]
       }
     },
-    "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users": {
+    "/api/v1/authorization/groups/users": {
       "get": {
         "summary": "Get group users",
-        "description": "Returns users that belong to a specific group",
+        "description": "Returns users that belong to a specific group within any domain",
         "operationId": "Authorization_GetGroupUsers",
         "responses": {
           "200": {
@@ -122,25 +128,39 @@
         },
         "parameters": [
           {
-            "name": "orgId",
-            "in": "path",
-            "required": true,
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
             "type": "string"
           },
           {
             "name": "groupName",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "type": "string"
           }
         ],
         "tags": [
           "Authorization"
         ]
-      },
+      }
+    },
+    "/api/v1/authorization/groups/users/add": {
       "patch": {
         "summary": "Add user to group",
-        "description": "Adds a user to an organization group",
+        "description": "Adds a user to a group within any domain",
         "operationId": "Authorization_AddUserToGroup",
         "responses": {
           "200": {
@@ -158,23 +178,11 @@
         },
         "parameters": [
           {
-            "name": "orgId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
             "name": "body",
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToGroupBody"
+              "$ref": "#/definitions/AuthorizationAddUserToGroupRequest"
             }
           }
         ],
@@ -183,10 +191,10 @@
         ]
       }
     },
-    "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users/{userId}": {
+    "/api/v1/authorization/groups/users/remove": {
       "patch": {
         "summary": "Remove user from group",
-        "description": "Removes a user from an organization group",
+        "description": "Removes a user from a group within any domain",
         "operationId": "Authorization_RemoveUserFromGroup",
         "responses": {
           "200": {
@@ -204,22 +212,12 @@
         },
         "parameters": [
           {
-            "name": "orgId",
-            "in": "path",
+            "name": "body",
+            "in": "body",
             "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromGroupRequest"
+            }
           }
         ],
         "tags": [
@@ -1578,9 +1576,18 @@
     }
   },
   "definitions": {
-    "AuthorizationAddUserToGroupBody": {
+    "AuthorizationAddUserToGroupRequest": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
         "userId": {
           "type": "string"
         }
@@ -1604,9 +1611,15 @@
     "AuthorizationAssignRoleResponse": {
       "type": "object"
     },
-    "AuthorizationCreateGroupBody": {
+    "AuthorizationCreateGroupRequest": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
         "groupName": {
           "type": "string"
         },
@@ -1617,7 +1630,12 @@
       "title": "Group management messages"
     },
     "AuthorizationCreateGroupResponse": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/AuthorizationGroup"
+        }
+      }
     },
     "AuthorizationDescribeRoleResponse": {
       "type": "object",
@@ -1645,6 +1663,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "group": {
+          "$ref": "#/definitions/AuthorizationGroup"
         }
       }
     },
@@ -1669,13 +1690,32 @@
         }
       }
     },
-    "AuthorizationListOrganizationGroupsResponse": {
+    "AuthorizationGroup": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      },
+      "title": "Core data structures"
+    },
+    "AuthorizationListGroupsResponse": {
       "type": "object",
       "properties": {
         "groups": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationGroup"
           }
         }
       }
@@ -1741,6 +1781,23 @@
     "AuthorizationRemoveRoleResponse": {
       "type": "object"
     },
+    "AuthorizationRemoveUserFromGroupRequest": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        }
+      }
+    },
     "AuthorizationRemoveUserFromGroupResponse": {
       "type": "object"
     },
@@ -1763,8 +1820,7 @@
         "inheritedRole": {
           "$ref": "#/definitions/AuthorizationRole"
         }
-      },
-      "title": "Core data structures"
+      }
     },
     "AuthorizationRoleAssignment": {
       "type": "object",
