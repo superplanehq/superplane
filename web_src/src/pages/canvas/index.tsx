@@ -6,6 +6,8 @@ import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
 import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
+import { ComponentSidebar } from "./components/ComponentSidebar";
+import Navigation from "../../components/Navigation";
 
 // No props needed as we'll get the ID from the URL params
 
@@ -15,6 +17,7 @@ export function Canvas() {
   const { initialize, selectedStageId, cleanSelectedStageId, stages, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(canvasId!);
 
@@ -149,8 +152,29 @@ export function Canvas() {
 
   return (
     <StrictMode>
-      <FlowRenderer />
-      {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+      <Navigation />
+      
+      <div className="relative" style={{ height: "calc(100vh - 3rem)", marginTop: "3rem", overflow: "hidden" }}>
+        <ComponentSidebar 
+          isOpen={isComponentSidebarOpen} 
+          onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)} 
+        />
+        
+        {/* Toggle Button for ComponentSidebar - Only show when closed */}
+        {!isComponentSidebarOpen && (
+          <button
+            onClick={() => setIsComponentSidebarOpen(true)}
+            className="fixed top-16 left-4 z-30 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2"
+            title="Open Components"
+          >
+            <span className="text-medium font-semibold text-gray-700">Components</span>
+            <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 -scale-x-100">menu_open</span>
+          </button>
+        )}
+        
+        <FlowRenderer />
+        {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+      </div>
     </StrictMode>
   );
 }

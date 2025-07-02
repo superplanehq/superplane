@@ -1,5 +1,5 @@
 import React from "react";
-import { ReactFlow, Background } from "@xyflow/react";
+import { ReactFlow, Background, BackgroundVariant } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 
 import StageNode from './nodes/stage';
@@ -29,7 +29,7 @@ export const FlowRenderer: React.FC = () => {
   const { onNodeDragStop, onInit } = useFlowHandlers();
  
   return (
-    <div style={{ width: "100vw", height: "100vh", minWidth: 0, minHeight: 0 }}>
+    <div style={{ width: "100vw", height: "100%", minWidth: 0, minHeight: 0 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -49,7 +49,7 @@ export const FlowRenderer: React.FC = () => {
           nodes={nodes}
           edges={edges}
         />
-        <Background />
+        <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="#96A0A6" bgColor="#f3f4f6" />
         <FlowDevTools />
         <ConnectionStatus />
       </ReactFlow>

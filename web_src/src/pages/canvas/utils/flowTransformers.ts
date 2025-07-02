@@ -16,15 +16,14 @@ export const transformEventSourcesToNodes = (
   nodePositions: NodePositions
 ): AllNodeType[] => {
   return eventSources.map((es, idx) => {
-    const lastEvent = es.events && es.events.length > 0 
+    const lastEvents = es.events
       ? es.events.sort((a, b) => {
           const timeA = new Date(a.createdAt || 0).getTime();
           const timeB = new Date(b.createdAt || 0).getTime();
           return timeB - timeA;
-        })[0]
-      : null;
+        }).slice(0, 3)
+      : [];
     
-    const lastEventTimestamp = lastEvent?.createdAt ? new Date(lastEvent.createdAt).toLocaleString() : 'n/a';
     
     return ({
       id: es.metadata?.id || '',
@@ -32,7 +31,7 @@ export const transformEventSourcesToNodes = (
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
-        timestamp: lastEventTimestamp
+        events: lastEvents
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
       draggable: true

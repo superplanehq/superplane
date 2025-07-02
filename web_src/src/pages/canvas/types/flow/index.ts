@@ -30,7 +30,7 @@ export type ConnectionGroupNodeType = Node<ConnectionGroupNodeData, 'connection_
 export type EventSourceNodeData = {
   id: string;
   name: string;
-  timestamp: string;
+  events: SuperplaneStageEvent[];
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;

@@ -14,7 +14,7 @@ export const FlowControls: React.FC<FlowControlsProps> = ({
   edges
 }) => {
   return (
-    <Controls>
+    <Controls position="bottom-right">
       <ControlButton
         onClick={() => onAutoLayout(nodes, edges)}
         title="ELK Auto Layout"

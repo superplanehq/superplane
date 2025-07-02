@@ -19,7 +19,7 @@ import {
    
     return (
       <div className="react-flow__devtools">
-        <Panel position="top-right">
+        <Panel position="top-right" className="flex items-center gap-2">
           <DevToolButton
             setActive={setNodeInspectorActive}
             active={nodeInspectorActive}
@@ -62,7 +62,7 @@ import {
     return (
       <button
         onClick={() => setActive((a) => !a)}
-        className={active ? 'active' : ''}
+        className={'border border-gray-200 px-2 py-1 text-sm font-medium transition-colors text-color-[var(--dark-indigo)] bg-white ' + (active ? 'active' : '')}
         {...rest}
       >
         {children}
