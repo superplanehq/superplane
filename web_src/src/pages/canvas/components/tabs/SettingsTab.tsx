@@ -59,7 +59,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
       for (const valueMapping of valueMappings) {
         mappings.push({
           mapping: valueMapping,
-          triggeredBy: mapping.when?.triggeredBy?.connection || 'Unknown'
+          triggeredBy: mapping.when?.triggeredBy?.connection || valueMapping.valueFrom?.eventData?.connection || 'Unknown'
         });
       }
     }
@@ -198,15 +198,30 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                   Connections
                 </div>
                 <div className="space-y-2">
-                  {selectedStage.spec!.connections.map((connection, index) => (
-                    <div key={index} className="flex items-center justify-between w-full">
-                      <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
-                        <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
-                        {connection.name || `Connection ${index + 1}`}
-                      </span>
-                      <span className='text-sm text-green-600 text-left'>Stage</span>
-                    </div>
-                  ))}
+                  {selectedStage.spec!.connections.map((connection, index) => {
+                    const getConnectionTypeLabel = (type?: string) => {
+                      switch (type) {
+                        case 'TYPE_CONNECTION_GROUP':
+                          return 'Connection Group';
+                        case 'TYPE_STAGE':
+                          return 'Stage';
+                        case 'TYPE_EVENT_SOURCE':
+                          return 'Event Source';
+                        default:
+                          return 'Stage';
+                      }
+                    };
+
+                    return (
+                      <div key={connection.name || `connection-${index + 1}`} className="flex items-center justify-between w-full">
+                        <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
+                          <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
+                          {connection.name || `Connection ${index + 1}`}
+                        </span>
+                        <span className='text-sm text-green-600 text-left'>{getConnectionTypeLabel(connection.type)}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}
