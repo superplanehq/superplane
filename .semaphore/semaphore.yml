@@ -26,6 +26,21 @@ blocks:
           commands:
             - test-results publish junit-report.xml
 
+  - name: "🔨 Frontend Build"
+    task:
+      prologue:
+        commands:
+          - checkout
+          - sem-version node 20
+      jobs:
+        - name: "Build Frontend"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - cd web_src
+            - npm ci
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+            - npm run build
+
 after_pipeline:
   task:
     jobs:
