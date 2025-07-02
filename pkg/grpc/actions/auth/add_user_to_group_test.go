@@ -12,7 +12,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test_GroupManagement(t *testing.T) {
+func Test_AddUserToGroup(t *testing.T) {
 	r := support.Setup(t)
 	authService := SetupTestAuthService(t)
 	ctx := context.Background()
@@ -49,5 +49,31 @@ func Test_GroupManagement(t *testing.T) {
 		_, err := AddUserToGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
+	})
+
+	t.Run("invalid request - missing domain type", func(t *testing.T) {
+		req := &pb.AddUserToGroupRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
+			GroupName:  "test-group",
+		}
+
+		_, err := AddUserToGroup(ctx, req, authService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "domain type must be specified")
+	})
+
+	t.Run("invalid request - canvas groups not supported", func(t *testing.T) {
+		req := &pb.AddUserToGroupRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   uuid.New().String(),
+			UserId:     r.User.String(),
+			GroupName:  "test-group",
+		}
+
+		_, err := AddUserToGroup(ctx, req, authService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "only organization groups are currently supported")
 	})
 }
