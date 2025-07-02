@@ -51,11 +51,6 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
     [selectedStage.queue]
   );
 
-  // const processedEvents = useMemo(() =>
-  //   selectedStage.queue?.filter(event => event.state === 'STATE_PROCESSED') || [],
-  //   [selectedStage.queue]
-  // );
-
   // Render the appropriate content based on the active tab
   const renderTabContent = () => {
     switch (activeTab) {
