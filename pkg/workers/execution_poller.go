@@ -76,7 +76,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
-	executor, err := executors.NewExecutor(spec.Type, *execution, nil)
+	executor, err := executors.NewExecutor(*spec, *execution, nil, w.Encryptor)
 	if err != nil {
 		return err
 	}

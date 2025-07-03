@@ -1,0 +1,74 @@
+package integrations
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
+)
+
+const (
+	ResourceTypeTask        = "task"
+	ResourceTypeTaskTrigger = "task-trigger"
+	ResourceTypeProject     = "project"
+	ResourceTypeWorkflow    = "workflow"
+	ResourceTypePipeline    = "pipeline"
+	ResourceTypeRepository  = "repository"
+)
+
+type Integration interface {
+	GetResource(resourceType, id string) (IntegrationResource, error)
+	CreateResource(resourceType string, params CreateParams) (IntegrationResource, error)
+	ListResources(resourceType string) ([]IntegrationResource, error)
+}
+
+type IntegrationResource interface {
+	ID() string
+	Name() string
+	Type() string
+}
+
+// TODO: don't like this, think of a better way to do it
+type CreateParams interface {
+	For() string
+}
+
+func NewIntegration(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (Integration, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		//
+		// TODO: if integration can be on organization level, and integration can use secret,
+		// then secret should also be on organization level as well.
+		//
+		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
+		secret, err := models.FindSecretByName(integration.DomainID.String(), secretInfo.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		//
+		// TODO: this handling should account for possibly other types of secrets
+		//
+		decrypted, err := encryptor.Decrypt(ctx, secret.Data, []byte(secretInfo.Name))
+		if err != nil {
+			return nil, err
+		}
+
+		var keys map[string]string
+		err = json.Unmarshal(decrypted, &keys)
+		if err != nil {
+			return nil, err
+		}
+
+		token, ok := keys[secretInfo.Key]
+		if !ok {
+			return nil, fmt.Errorf("secret %s does not contain key %s", secretInfo.Name, secretInfo.Key)
+		}
+
+		return NewSemaphoreIntegration(integration.URL, token)
+	default:
+		return nil, fmt.Errorf("unsupported integration type %s", integration.Type)
+	}
+}

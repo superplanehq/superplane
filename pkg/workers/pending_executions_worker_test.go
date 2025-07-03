@@ -6,10 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -165,7 +165,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, trigger *integrations.TaskTrigger, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
 		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
 		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
@@ -177,12 +177,12 @@ func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *m
 
 	assert.Len(t, trigger.Spec.Parameters, len(all)+1)
 	for name, value := range all {
-		assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
+		assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p integrations.TaskTriggerParameter) bool {
 			return p.Name == name && p.Value == value
 		}))
 	}
 
-	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
+	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p integrations.TaskTriggerParameter) bool {
 		return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
 	}))
 }

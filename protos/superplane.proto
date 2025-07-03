@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane;
 
+import "authorization.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -69,6 +70,51 @@ service Superplane {
       summary: "Create a new canvas connection group";
       description: "Creates a new canvas connection group";
       tags: "ConnectionGroup";
+    };
+  }
+
+  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/integrations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integrations for a canvas";
+      description: "List integrations for a canvas";
+      tags: "Integration";
+    };
+  }
+
+  rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an integration for a canvas";
+      description: "Describe an integration for a canvas";
+      tags: "Integration";
+    };
+  }
+
+  rpc ListIntegrationResources(ListIntegrationResourcesRequest) returns (ListIntegrationResourcesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}/resources/{resource_type}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integration resources for a canvas integration";
+      description: "List integration resources for a canvas integration";
+      tags: "Integration";
+    };
+  }
+
+  rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/integrations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas integration";
+      description: "Creates a new canvas integration";
+      tags: "Integration";
     };
   }
 
@@ -287,6 +333,101 @@ service Superplane {
       tags: "Secret";
     };
   }
+}
+
+message CreateIntegrationRequest {
+  string canvas_id_or_name = 1;
+  Integration integration = 2;
+}
+
+message CreateIntegrationResponse {
+  Integration integration = 1;
+}
+
+message ListIntegrationsRequest {
+  string canvas_id_or_name = 1;
+}
+
+message ListIntegrationsResponse {
+  repeated Integration integrations = 1;
+}
+
+message ListIntegrationResourcesRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+  IntegrationResource.Type resource_type = 3;
+}
+
+message ListIntegrationResourcesResponse {
+  repeated IntegrationResource resources = 1;
+}
+
+message IntegrationResource {
+  enum Type {
+    TYPE_NONE = 0;
+    TYPE_PROJECT = 1;
+    TYPE_TASK = 2;
+    TYPE_REPOSITORY = 3;
+  }
+
+  Type type = 1;
+  string id = 2;
+  string name = 3;
+}
+
+message DescribeIntegrationRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DescribeIntegrationResponse {
+  Integration integration = 1;
+}
+
+message Integration {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string created_by = 3;
+    google.protobuf.Timestamp created_at = 4;
+    Authorization.DomainType domain_type = 5;
+    string domain_id = 6;
+  }
+
+  enum Type {
+    TYPE_NONE = 0;
+    TYPE_SEMAPHORE = 1;
+    TYPE_GITHUB = 2;
+  }
+
+  message Auth {
+    message Token {
+      ValueFrom value_from = 1;
+    }
+
+    AuthType use = 1;
+    Token token = 2;
+  }
+
+  enum AuthType {
+    AUTH_TYPE_NONE = 0;
+    AUTH_TYPE_TOKEN = 1;
+    AUTH_TYPE_OIDC = 2;
+  }
+
+  message OIDC {
+    bool enabled = 1;
+  }
+
+  message Spec {
+    Type type = 1;
+    string url = 2;
+    Auth auth = 3;
+    OIDC oidc = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
 }
 
 message ListCanvasesRequest {
@@ -701,9 +842,17 @@ message ExecutorSpec {
     repeated uint32 status_codes = 1;
   }
 
+  message IntegrationRef {
+    Authorization.DomainType domain_type = 1;
+    string domain_id = 2;
+    string id = 3;
+    string name = 4;
+  }
+
   Type type = 1;
-  Semaphore semaphore = 2;
-  HTTP http = 3;
+  IntegrationRef integration = 2;
+  Semaphore semaphore = 3;
+  HTTP http = 4;
 }
 
 message CreateStageResponse {

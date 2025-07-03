@@ -9,15 +9,15 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 type SemaphoreAPIMock struct {
 	Server    *httptest.Server
 	Workflows map[string]Pipeline
 
-	LastTaskTrigger *semaphore.TaskTrigger
-	LastRunWorkflow *semaphore.RunWorkflowParams
+	LastTaskTrigger *integrations.TaskTrigger
+	LastRunWorkflow *integrations.CreateWorkflowParams
 }
 
 type Pipeline struct {
@@ -78,7 +78,7 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, _ := json.Marshal(semaphore.Workflow{InitialPplID: pipeline.ID})
+	data, _ := json.Marshal(integrations.SemaphoreWorkflow{InitialPplID: pipeline.ID})
 	w.Write(data)
 }
 
@@ -90,11 +90,11 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 
 	for wfID, p := range s.Workflows {
 		if p.ID == pipelineID {
-			data, _ := json.Marshal(semaphore.PipelineResponse{
-				Pipeline: &semaphore.Pipeline{
-					ID:         p.ID,
+			data, _ := json.Marshal(integrations.SemaphorePipelineResponse{
+				Pipeline: &integrations.SemaphorePipeline{
+					PipelineID: p.ID,
 					WorkflowID: wfID,
-					State:      semaphore.PipelineStateDone,
+					State:      integrations.SemaphorePipelineStateDone,
 					Result:     p.Result,
 				},
 			})
@@ -114,7 +114,7 @@ func (s *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var trigger semaphore.TaskTrigger
+	var trigger integrations.TaskTrigger
 	err = json.Unmarshal(body, &trigger)
 	if err != nil {
 		w.WriteHeader(500)
@@ -140,14 +140,14 @@ func (s *SemaphoreAPIMock) RunWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var params semaphore.RunWorkflowParams
+	var params integrations.CreateWorkflowParams
 	err = json.Unmarshal(body, &params)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	data, err := json.Marshal(semaphore.RunWorkflowResponse{
+	data, err := json.Marshal(integrations.CreateWorkflowResponse{
 		WorkflowID: uuid.New().String(),
 	})
 

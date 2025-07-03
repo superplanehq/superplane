@@ -70,7 +70,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return err
 	}
 
-	executor, err := executors.NewExecutor(spec.Type, execution, w.JwtSigner)
+	executor, err := executors.NewExecutor(*spec, execution, w.JwtSigner, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}

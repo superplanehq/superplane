@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/integrations"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/secrets"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
@@ -119,4 +120,20 @@ func (s *SuperplaneService) ListConnectionGroups(ctx context.Context, req *pb.Li
 
 func (s *SuperplaneService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
 	return groups.ListConnectionGroupFieldSets(ctx, req)
+}
+
+func (s *SuperplaneService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+	return integrations.CreateIntegration(ctx, req)
+}
+
+func (s *SuperplaneService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
+	return integrations.DescribeIntegration(ctx, req)
+}
+
+func (s *SuperplaneService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
+	return integrations.ListIntegrations(ctx, req)
+}
+
+func (s *SuperplaneService) ListIntegrationResources(ctx context.Context, req *pb.ListIntegrationResourcesRequest) (*pb.ListIntegrationResourcesResponse, error) {
+	return integrations.ListIntegrationResources(ctx, s.encryptor, req)
 }

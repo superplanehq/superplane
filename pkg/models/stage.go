@@ -191,9 +191,17 @@ type ApprovalCondition struct {
 }
 
 type ExecutorSpec struct {
-	Type      string                 `json:"type"`
-	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
-	HTTP      *HTTPExecutorSpec      `json:"http,omitempty"`
+	Type        string                 `json:"type"`
+	Integration *IntegrationRef        `json:"integration,omitempty"`
+	Semaphore   *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
+	HTTP        *HTTPExecutorSpec      `json:"http,omitempty"`
+}
+
+type IntegrationRef struct {
+	DomainType string  `json:"domain_type"`
+	DomainID   string  `json:"domain_id"`
+	ID         *string `json:"id,omitempty"`
+	Name       *string `json:"name,omitempty"`
 }
 
 type SemaphoreExecutorSpec struct {

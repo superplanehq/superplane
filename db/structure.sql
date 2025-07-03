@@ -201,6 +201,26 @@ CREATE TABLE public.events (
 
 
 --
+-- Name: integrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integrations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(128) NOT NULL,
+    domain_type character varying(64) NOT NULL,
+    domain_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    created_by uuid NOT NULL,
+    updated_at timestamp without time zone,
+    type character varying(64) NOT NULL,
+    url character varying(256) NOT NULL,
+    auth_type character varying(64) NOT NULL,
+    auth jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oidc jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -448,6 +468,22 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: integrations integrations_domain_type_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integrations
+    ADD CONSTRAINT integrations_domain_type_domain_id_name_key UNIQUE (domain_type, domain_id, name);
+
+
+--
+-- Name: integrations integrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integrations
+    ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
 
 
 --
@@ -775,7 +811,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250627174249	f
+20250703133505	f
 \.
 
 
