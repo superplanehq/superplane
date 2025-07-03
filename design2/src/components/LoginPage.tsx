@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Button } from '../lib/components/Button/button'
-import { Input, InputGroup } from '../lib/components/Input/input'
-import { Checkbox } from '../lib/components/Checkbox/checkbox'
-import { Text, TextLink } from '../lib/components/Text/text'
-import { Heading } from '../lib/components/Heading/heading'
-import { Divider } from '../lib/components/Divider/divider'
+import { Button } from './lib/Button/button'
+import { Input, InputGroup } from './lib/Input/input'
+import { Checkbox } from './lib/Checkbox/checkbox'
+import { Text, TextLink } from './lib/Text/text'
+import { Heading } from './lib/Heading/heading'
+import { Divider } from './lib/Divider/divider'
 import { Label, Field } from '@headlessui/react'
   
 interface LoginPageProps {

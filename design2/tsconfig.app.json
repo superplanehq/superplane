@@ -22,7 +22,7 @@
       "@/components/*": ["src/components/*"],
       "@/utils/*": ["src/utils/*"],
       "@/types/*": ["src/types/*"],
-      "@/lib/*": ["src/lib/*"],
+      "@/lib/*": ["src/components/lib/*"],
       "@/styles/*": ["src/styles/*"],
       "@/pages/*": ["src/pages/*"]
     },

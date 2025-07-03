@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Button } from '../lib/components/Button/button'
-import { Badge } from '../lib/components/Badge/badge'
-import { Avatar } from '../lib/components/Avatar/avatar'
-import { Text, TextLink } from '../lib/components/Text/text'
-import { Heading, Subheading } from '../lib/components/Heading/heading'
-import { Navigation, type User, type Organization } from '../lib/components/Navigation/navigation'
+import { Button } from './lib/Button/button'
+import { Badge } from './lib/Badge/badge'
+import { Avatar } from './lib/Avatar/avatar'
+import { Text, TextLink } from './lib/Text/text'
+import { Heading, Subheading } from './lib/Heading/heading'
+import { Navigation, type User, type Organization } from './lib/Navigation/navigation'
 import clsx from 'clsx'
 
 interface OrganizationPageSidebarProps {

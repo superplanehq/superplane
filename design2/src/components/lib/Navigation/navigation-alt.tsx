@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Button } from '../Button/button'
 import { Avatar } from '../Avatar/avatar'
 import { Badge } from '../Badge/badge'

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Button } from '../lib/components/Button/button'
-import { Badge } from '../lib/components/Badge/badge'
-import { Avatar } from '../lib/components/Avatar/avatar'
-import { Text, TextLink } from '../lib/components/Text/text'
-import { Heading, Subheading } from '../lib/components/Heading/heading'
-import { Tabs, type Tab } from '../lib/components/Tabs/tabs'
-import { NavigationAlt, type User, type Organization } from '../lib/components/Navigation/navigation-alt'
+import { Button } from './lib/Button/button'
+import { Badge } from './lib/Badge/badge'
+import { Avatar } from './lib/Avatar/avatar'
+import { Text, TextLink } from './lib/Text/text'
+import { Heading, Subheading } from './lib/Heading/heading'
+import { Tabs, type Tab } from './lib/Tabs/tabs'
+import { NavigationAlt, type User, type Organization } from './lib/Navigation/navigation-alt'
+import { Navigation } from './lib/Navigation/navigation'
 
 interface OrganizationPageProps {
   onSignOut?: () => void
@@ -514,7 +515,7 @@ export function OrganizationPage({ onSignOut }: OrganizationPageProps) {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900">
       {/* Navigation */}
-      <NavigationAlt
+      <Navigation
         user={currentUser}
         organization={currentOrganization}
         onHelpClick={handleHelpClick}
