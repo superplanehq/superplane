@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { LoginPage } from './components/LoginPage'
+import { MainLandingPage } from './components/MainLandingPage'
+import { CanvasesPage } from './components/CanvasesPage'
 import { WorkspacesPage } from './components/WorkspacesPage'
 import { DashboardPage } from './components/DashboardPage'
 import { OrganizationPage } from './components/OrganizationPage'
@@ -62,6 +64,14 @@ function App() {
     )
   }
 
+  if (currentPath === '/canvases') {
+    return (
+      <CanvasesPage 
+        onSignOut={() => setIsLoggedIn(false)} 
+      />
+    )
+  }
+
   // Special route for dashboard
   if (currentPath === '/dashboard') {
     return (
@@ -72,11 +82,10 @@ function App() {
     )
   }
 
-  // Default to workspaces page after login
+  // Default to main landing page after login
   return (
-    <WorkspacesPage 
+    <MainLandingPage 
       onSignOut={() => setIsLoggedIn(false)} 
-      onWorkspaceSelect={handleWorkspaceSelect}
     />
   )
 }
