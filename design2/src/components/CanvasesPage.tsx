@@ -9,6 +9,8 @@ import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol'
 
 interface CanvasesPageProps {
   onSignOut?: () => void
+  navigationLinks?: NavigationLink[]
+  onLinkClick?: (linkId: string) => void
 }
 
 interface Canvas {
@@ -23,12 +25,14 @@ interface Canvas {
     initials: string
   }
   status: 'draft' | 'published' | 'archived'
-  type: 'canvas' | 'dashboard' | 'form' | 'report'
+  type: 'canvas'
 }
 
-export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
+export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick }: CanvasesPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const showIcons = false
 
   // Mock user and organization data
   const currentUser: User = {
@@ -86,7 +90,7 @@ export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
         initials: 'MC',
       },
       status: 'draft',
-      type: 'form'
+      type: 'canvas'
     },
     {
       id: '4',
@@ -99,7 +103,7 @@ export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
         initials: 'ER',
       },
       status: 'published',
-      type: 'report'
+      type: 'canvas'
     },
     {
       id: '5',
@@ -153,44 +157,27 @@ export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
     console.log(`Organization action: ${action}`)
   }
 
-  // Navigation links configuration
-  const navigationLinks: NavigationLink[] = [
-    {
-      id: 'canvases',
-      label: 'Canvases',
-      icon: <MaterialSymbol size='lg' opticalSize={20} weight={400} name="automation" />,
-      isActive: true,
-      tooltip: 'Canvases'
-    }
-  ]
-
+  // Navigation link click handler
   const handleLinkClick = (linkId: string) => {
-    console.log(`Navigation link clicked: ${linkId}`)
+    if (onLinkClick) {
+      onLinkClick(linkId)
+    } else {
+      console.log(`Navigation link clicked: ${linkId}`)
+    }
   }
 
-  const getCanvasIcon = (type: Canvas['type']) => {
-    switch (type) {
-      case 'canvas':
-        return <MaterialSymbol name="workflow" className="text-blue-600" />
-      case 'dashboard':
-        return <MaterialSymbol name="dashboard" className="text-green-600" />
-      case 'form':
-        return <MaterialSymbol name="description" className="text-purple-600" />
-      case 'report':
-        return <MaterialSymbol name="analytics" className="text-orange-600" />
-      default:
-        return <MaterialSymbol name="canvas" className="text-blue-600" />
-    }
+  const getCanvasIcon = () => {
+    return <MaterialSymbol name="automation" size='md' weight={400} className="text-blue-600" />
   }
 
   const getStatusBadge = (status: Canvas['status']) => {
     switch (status) {
       case 'published':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">Published</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400">Published</span>
       case 'draft':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">Draft</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400">Draft</span>
       case 'archived':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">Archived</span>
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-400">Archived</span>
     }
   }
 
@@ -258,6 +245,34 @@ export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
               </select>
             </div>
 
+            {/* View Mode Toggle */}
+            <div className="flex items-center border border-zinc-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                }`}
+                title="Grid view"
+              >
+                <MaterialSymbol name="grid_view" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
+                }`}
+                title="List view"
+              >
+                <MaterialSymbol name="view_list" />
+              </button>
+            </div>
+
+            
+
             {/* Create Canvas Button */}
             <Button color="blue">
               <MaterialSymbol name="add" className="mr-2" />
@@ -265,61 +280,134 @@ export function CanvasesPage({ onSignOut }: CanvasesPageProps) {
             </Button>
           </div>
 
-          {/* Canvases Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredCanvases.map((canvas) => (
-              <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow group">
-                <div className="p-6 flex flex-col justify-between h-full">
-                  <div>
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <Link href={`/canvas/${canvas.id}`} className="block">
-                          <Heading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors !leading-7">
-                            {canvas.name} 
-                          </Heading>
-                        </Link>
+          {/* Canvases Display */}
+          {viewMode === 'grid' ? (
+            /* Grid View */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredCanvases.map((canvas) => (
+                <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow group">
+                  <div className="p-6 flex flex-col justify-between h-full">
+                    <div>
+                      {/* Header */}
+                      <div className="flex items-start mb-4">
+                        <div className="flex items-start justify-between space-x-3 flex-1">
+                          {showIcons && (
+                            <div className="p-1 bg-zinc-100 dark:bg-zinc-700 rounded-md h-8 w-8 text-center">
+                              {getCanvasIcon()}
+                            </div>
+                          )}
+                          <div className='flex flex-col'>
+                            <Link href={`/canvas/${canvas.id}`} className="block">
+                              <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6">
+                                {canvas.name}
+                              </Heading>
+                            </Link>
+                            <div>
+                              {getStatusBadge(canvas.status)}
+                            </div>
+                          </div>
+                          <Button plain className="text-zinc-400 hover:text-zinc-600 opacity-100 group-hover:opacity-100 transition-opacity">
+                            <MaterialSymbol name="more_vert" />
+                          </Button>
+                        </div>
+                        
                       </div>
-                      <div className='flex items-center gap-2'>
-                        {getStatusBadge(canvas.status)}
-                        <Button plain className="text-zinc-400 hover:text-zinc-600 opacity-100 group-hover:opacity-100 transition-opacity">
+
+                      {/* Content */}
+                      <div className="mb-4">
+                        
+                        {canvas.description && (
+                          <Text className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+                            {canvas.description}
+                          </Text>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Footer */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-zinc-500">
+                        <span>Created {canvas.createdAt}</span>
+                        <span>Updated {canvas.updatedAt}</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Avatar
+                          src={canvas.createdBy.avatar}
+                          initials={canvas.createdBy.initials}
+                          alt={canvas.createdBy.name}
+                          className="w-5 h-5"
+                        />
+                        <Text className="text-xs text-zinc-600 dark:text-zinc-400">
+                          by {canvas.createdBy.name}
+                        </Text>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* List View */
+            <div className="space-y-3">
+              {filteredCanvases.map((canvas) => (
+                <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-sm transition-shadow group">
+                  <div className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4 flex-1">
+                        {/* Icon */}
+                        {showIcons && (
+                          <div className="p-2 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex-shrink-0">
+                            {getCanvasIcon()}
+                          </div>
+                        )}
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-3 mb-1">
+                            <Link href={`/canvas/${canvas.id}`} className="block">
+                              <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">
+                                {canvas.name}
+                              </Heading>
+                            </Link>
+                            {getStatusBadge(canvas.status)}
+                          </div>
+                          
+                          {canvas.description && (
+                            <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1">
+                              {canvas.description}
+                            </Text>
+                          )}
+                          
+                          <div className="flex items-center space-x-4 text-xs text-zinc-500">
+                            <span>Created {canvas.createdAt}</span>
+                            <span>•</span>
+                            <span>Updated {canvas.updatedAt}</span>
+                            <span>•</span>
+                            <div className="flex items-center space-x-2">
+                              <Avatar
+                                src={canvas.createdBy.avatar}
+                                initials={canvas.createdBy.initials}
+                                alt={canvas.createdBy.name}
+                                className="w-4 h-4"
+                              />
+                              <span>by {canvas.createdBy.name}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Actions */}
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        <Button plain className="text-zinc-400 hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
                           <MaterialSymbol name="more_vert" />
                         </Button>
                       </div>
                     </div>
-
-                  {/* Content */}
-                  <div className="mb-4">
-                    
-                    {canvas.description && (
-                      <Text className="text-sm text-zinc-600 dark:text-zinc-400 mt-1 line-clamp-2">
-                        {canvas.description}
-                      </Text>
-                    )}
-                  </div>
-                  </div>
-                  {/* Footer */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-zinc-500">
-                      <span>Created {canvas.createdAt}</span>
-                      <span>Updated {canvas.updatedAt}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Avatar
-                        src={canvas.createdBy.avatar}
-                        initials={canvas.createdBy.initials}
-                        alt={canvas.createdBy.name}
-                        className="w-5 h-5"
-                      />
-                      <Text className="text-xs text-zinc-600 dark:text-zinc-400">
-                        by {canvas.createdBy.name}
-                      </Text>
-                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* Empty State */}
           {filteredCanvases.length === 0 && (

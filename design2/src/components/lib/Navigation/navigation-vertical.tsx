@@ -39,6 +39,7 @@ export interface NavigationVerticalProps {
   showOrganization?: boolean
   links?: NavigationLink[]
   onHelpClick?: () => void
+  onConfigurationClick?: () => void
   onUserMenuAction?: (action: 'profile' | 'settings' | 'signout') => void
   onOrganizationMenuAction?: (action: 'settings' | 'billing' | 'members') => void
   onLinkClick?: (linkId: string) => void
@@ -51,6 +52,7 @@ export function NavigationVertical({
   showOrganization = true,
   links = [],
   onHelpClick,
+  onConfigurationClick,
   onUserMenuAction,
   onOrganizationMenuAction,
   onLinkClick,
@@ -86,6 +88,17 @@ export function NavigationVertical({
 
       {/* Middle Section - Spacer */}
       <div className="flex-1" />
+      {/* Configuration Icon */}
+      <div className="flex-shrink-0 flex items-center justify-center pb-4">
+        <Button
+          plain
+          onClick={onConfigurationClick}
+          className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
+          aria-label="Configuration"
+        >
+          <MaterialSymbol name="settings" size='lg'/>
+        </Button>
+      </div>
 
       {/* Help Icon */}
       <div className="flex-shrink-0 flex items-center justify-center pb-4">
@@ -95,9 +108,7 @@ export function NavigationVertical({
           className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
           aria-label="Help"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <MaterialSymbol name="help" size='lg'/>
         </Button>
       </div>
 

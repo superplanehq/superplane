@@ -11,6 +11,8 @@ import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol'
 
 interface MainLandingPageProps {
   onSignOut?: () => void
+  navigationLinks?: NavigationLink[]
+  onLinkClick?: (linkId: string) => void
 }
 
 interface WorkItem {
@@ -37,7 +39,7 @@ interface Credential {
   status: 'active' | 'expired' | 'revoked'
 }
 
-export function MainLandingPage({ onSignOut }: MainLandingPageProps) {
+export function MainLandingPage({ onSignOut, navigationLinks = [], onLinkClick }: MainLandingPageProps) {
   const [activeTab, setActiveTab] = useState<'my-work' | 'credentials'>('my-work')
 
   // Mock user and organization data
@@ -191,20 +193,13 @@ export function MainLandingPage({ onSignOut }: MainLandingPageProps) {
     console.log(`Organization action: ${action}`)
   }
 
-  // Navigation links configuration
-  const navigationLinks: NavigationLink[] = [
-    {
-      id: 'canvases',
-      label: 'Canvases',
-      icon: <MaterialSymbol name="automation" />,
-      href: '/canvases',
-      isActive: true,
-      tooltip: 'Canvases'
-    }
-  ]
-
+  // Navigation link click handler
   const handleLinkClick = (linkId: string) => {
-    console.log(`Navigation link clicked: ${linkId}`)
+    if (onLinkClick) {
+      onLinkClick(linkId)
+    } else {
+      console.log(`Navigation link clicked: ${linkId}`)
+    }
   }
 
   const getWorkItemIcon = () => {

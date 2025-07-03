@@ -8,11 +8,31 @@ import { OrganizationPage } from './components/OrganizationPage'
 import { OrganizationPageSidebar } from './components/OrganizationPageSidebar'
 import { StudioPage } from './components/StudioPage'
 import { AdministrationPage } from './components/AdministrationPage'
+import { MaterialSymbol } from './components/lib/MaterialSymbol/material-symbol'
+import type { NavigationLink } from './components/lib/Navigation/navigation-vertical'
 import './App.css'
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
+
+  // Central navigation links configuration
+  const navigationLinks: NavigationLink[] = [
+    {
+      id: 'home',
+      label: 'Home',
+      icon: <MaterialSymbol size='lg' opticalSize={20} weight={400} name="home" />,
+      isActive: currentPath === '/',
+      tooltip: 'Home'
+    },
+    {
+      id: 'canvases',
+      label: 'Canvases',
+      icon: <MaterialSymbol size='lg' opticalSize={20} weight={400} name="automation" />,
+      isActive: currentPath === '/canvases',
+      tooltip: 'Canvases'
+    }
+  ]
 
   useEffect(() => {
     const handlePopState = () => {
@@ -27,6 +47,20 @@ function App() {
     // Navigate to organization page when workspace is selected
     window.history.pushState(null, '', `/workspace/${workspaceId}`)
     setCurrentPath(`/workspace/${workspaceId}`)
+  }
+
+  const handleLinkClick = (linkId: string) => {
+    console.log(`Navigation link clicked: ${linkId}`)
+    switch (linkId) {
+      case 'home':
+        window.history.pushState(null, '', '/')
+        setCurrentPath('/')
+        break
+      case 'canvases':
+        window.history.pushState(null, '', '/canvases')
+        setCurrentPath('/canvases')
+        break
+    }
   }
 
 
@@ -67,7 +101,9 @@ function App() {
   if (currentPath === '/canvases') {
     return (
       <CanvasesPage 
-        onSignOut={() => setIsLoggedIn(false)} 
+        onSignOut={() => setIsLoggedIn(false)}
+        navigationLinks={navigationLinks}
+        onLinkClick={handleLinkClick}
       />
     )
   }
@@ -85,7 +121,9 @@ function App() {
   // Default to main landing page after login
   return (
     <MainLandingPage 
-      onSignOut={() => setIsLoggedIn(false)} 
+      onSignOut={() => setIsLoggedIn(false)}
+      navigationLinks={navigationLinks}
+      onLinkClick={handleLinkClick}
     />
   )
 }
