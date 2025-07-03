@@ -24,10 +24,9 @@ func RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// For now, only support organization groups as the interface only has RemoveUserFromGroup(orgID, userID, group)
-	// TODO: Update authorization service interface to support domain types
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
-		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	// Support both organization and canvas groups
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION && req.DomainType != pb.DomainType_DOMAIN_TYPE_CANVAS {
+		return nil, status.Error(codes.Unimplemented, "only organization and canvas groups are currently supported")
 	}
 
 	err = authService.RemoveUserFromGroup(req.DomainId, req.UserId, req.GroupName)

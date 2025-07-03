@@ -20,10 +20,9 @@ func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// For now, only support organization groups as the interface only has GetGroups(orgID)
-	// TODO: Update authorization service interface to support domain types
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
-		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	// Support both organization and canvas groups
+	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION && req.DomainType != pb.DomainType_DOMAIN_TYPE_CANVAS {
+		return nil, status.Error(codes.Unimplemented, "only organization and canvas groups are currently supported")
 	}
 
 	groupNames, err := authService.GetGroups(req.DomainId)

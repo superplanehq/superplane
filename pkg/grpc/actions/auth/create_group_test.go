@@ -38,6 +38,23 @@ func Test_CreateGroup(t *testing.T) {
 		assert.Len(t, groups, 1)
 	})
 
+	t.Run("successful canvas group creation", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		req := &pb.CreateGroupRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
+			GroupName:  "canvas-group",
+			Role:       authorization.RoleOrgAdmin,
+		}
+
+		resp, err := CreateGroup(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, "canvas-group", resp.Group.Name)
+		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.DomainType)
+		assert.Equal(t, canvasID, resp.Group.DomainId)
+	})
+
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,

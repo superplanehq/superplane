@@ -68,16 +68,24 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 
-	t.Run("invalid request - canvas groups not supported", func(t *testing.T) {
+	t.Run("successful canvas group remove user", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		
+		// Create canvas group and add user
+		err := authService.CreateGroup(canvasID, "canvas-group", authorization.RoleOrgAdmin)
+		require.NoError(t, err)
+		err = authService.AddUserToGroup(canvasID, r.User.String(), "canvas-group")
+		require.NoError(t, err)
+		
 		req := &pb.RemoveUserFromGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   uuid.New().String(),
+			DomainId:   canvasID,
 			UserId:     r.User.String(),
-			GroupName:  "test-group",
+			GroupName:  "canvas-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "only organization groups are currently supported")
+		resp, err := RemoveUserFromGroup(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
 	})
 }

@@ -75,16 +75,32 @@ func Test_GetGroupUsers(t *testing.T) {
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 
-	t.Run("invalid request - canvas groups not supported", func(t *testing.T) {
+	t.Run("successful canvas group get users", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		
+		// Create canvas group and add user
+		err := authService.CreateGroup(canvasID, "canvas-group", authorization.RoleOrgAdmin)
+		require.NoError(t, err)
+		err = authService.AddUserToGroup(canvasID, r.User.String(), "canvas-group")
+		require.NoError(t, err)
+		
 		req := &pb.GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   uuid.New().String(),
-			GroupName:  "test-group",
+			DomainId:   canvasID,
+			GroupName:  "canvas-group",
 		}
 
-		_, err := GetGroupUsers(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "only organization groups are currently supported")
+		resp, err := GetGroupUsers(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.UserIds, 1)
+		assert.Contains(t, resp.UserIds, r.User.String())
+		
+		// Check the group object in response
+		assert.NotNil(t, resp.Group)
+		assert.Equal(t, "canvas-group", resp.Group.Name)
+		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.DomainType)
+		assert.Equal(t, canvasID, resp.Group.DomainId)
 	})
 
 	t.Run("empty group - no users", func(t *testing.T) {

@@ -65,14 +65,38 @@ func Test_ListGroups(t *testing.T) {
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 
-	t.Run("invalid request - canvas groups not supported", func(t *testing.T) {
+	t.Run("successful canvas groups list", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		
+		// Create canvas groups
+		err := authService.CreateGroup(canvasID, "canvas-group-1", authorization.RoleOrgAdmin)
+		require.NoError(t, err)
+		err = authService.CreateGroup(canvasID, "canvas-group-2", authorization.RoleOrgViewer)
+		require.NoError(t, err)
+		
 		req := &pb.ListGroupsRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   uuid.New().String(),
+			DomainId:   canvasID,
 		}
 
-		_, err := ListGroups(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "only organization groups are currently supported")
+		resp, err := ListGroups(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Len(t, resp.Groups, 2)
+		
+		// Check that groups have the correct structure
+		for _, group := range resp.Groups {
+			assert.NotEmpty(t, group.Name)
+			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, group.DomainType)
+			assert.Equal(t, canvasID, group.DomainId)
+		}
+		
+		// Check specific group names
+		groupNames := make([]string, len(resp.Groups))
+		for i, group := range resp.Groups {
+			groupNames[i] = group.Name
+		}
+		assert.Contains(t, groupNames, "canvas-group-1")
+		assert.Contains(t, groupNames, "canvas-group-2")
 	})
 }
