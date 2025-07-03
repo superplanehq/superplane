@@ -297,11 +297,17 @@ export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick }: C
                             </div>
                           )}
                           <div className='flex flex-col'>
-                            <Link href={`/canvas/${canvas.id}`} className="block">
+                            <button
+                              onClick={() => {
+                                window.history.pushState(null, '', `/canvas/${canvas.id}`)
+                                window.dispatchEvent(new PopStateEvent('popstate'))
+                              }}
+                              className="block text-left w-full"
+                            >
                               <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6">
                                 {canvas.name}
                               </Heading>
-                            </Link>
+                            </button>
                             <div>
                               {getStatusBadge(canvas.status)}
                             </div>
@@ -364,11 +370,17 @@ export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick }: C
                         {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center space-x-3 mb-1">
-                            <Link href={`/canvas/${canvas.id}`} className="block">
+                            <button
+                              onClick={() => {
+                                window.history.pushState(null, '', `/canvas/${canvas.id}`)
+                                window.dispatchEvent(new PopStateEvent('popstate'))
+                              }}
+                              className="block text-left"
+                            >
                               <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">
                                 {canvas.name}
                               </Heading>
-                            </Link>
+                            </button>
                             {getStatusBadge(canvas.status)}
                           </div>
                           

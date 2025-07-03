@@ -75,7 +75,7 @@ export function NavigationVertical({
 
       {/* Navigation Links */}
       {links.length > 0 && (
-        <div className="flex-shrink-0 flex flex-col items-center space-y-2 px-2">
+        <div className="flex-shrink-0 flex flex-col items-center space-y-4 px-2">
           {links.map((link) => (
             <NavigationLinkItem
               key={link.id}
@@ -315,18 +315,21 @@ function NavigationLinkItem({
   }
 
   const buttonClasses = clsx(
-    'relative w-11 h-11 flex items-center justify-center rounded-md transition-all duration-200 ease-in-out group',
-    link.isActive 
-      ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
-      : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800'
+    'relative p-1 flex flex-col rounded-md transition-all duration-200 ease-in-out gap-1 group leading-1',
+    'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300'
   )
 
   const buttonContent = (
-    <div className="flex items-center justify-center">
-      {link.icon}
-      {link.isActive && (
-        <div className="hidden absolute -right-1 top-1/2 transform -translate-y-1/2 w-0.5 h-6 bg-blue-600 dark:bg-blue-400 rounded-full" />
-      )}
+    <div className='flex flex-col items-center'>
+      <div className={(
+        link.isActive
+        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' 
+        : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800'
+        ) + " w-7 h-7 block rounded-md"}>
+        {link.icon}
+      </div>
+      <span className="text-tiny block mt-2 leading-0">{link.label}</span>
+      
       {link.tooltip && (
         <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
           {link.tooltip}
@@ -358,6 +361,7 @@ function NavigationLinkItem({
       title={link.tooltip || link.label}
     >
       {buttonContent}
+      
     </button>
   )
 }

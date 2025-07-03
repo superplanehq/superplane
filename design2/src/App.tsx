@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LoginPage } from './components/LoginPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
+import { CanvasEditorPage } from './components/CanvasEditorPage'
 import { WorkspacesPage } from './components/WorkspacesPage'
 import { DashboardPage } from './components/DashboardPage'
 import { OrganizationPage } from './components/OrganizationPage'
@@ -104,6 +105,23 @@ function App() {
         onSignOut={() => setIsLoggedIn(false)}
         navigationLinks={navigationLinks}
         onLinkClick={handleLinkClick}
+      />
+    )
+  }
+
+  // Canvas editor route
+  if (currentPath.startsWith('/canvas/')) {
+    const canvasId = currentPath.split('/canvas/')[1]
+    return (
+      <CanvasEditorPage 
+        canvasId={canvasId}
+        onSignOut={() => setIsLoggedIn(false)}
+        navigationLinks={navigationLinks}
+        onLinkClick={handleLinkClick}
+        onBack={() => {
+          window.history.pushState(null, '', '/canvases')
+          setCurrentPath('/canvases')
+        }}
       />
     )
   }
