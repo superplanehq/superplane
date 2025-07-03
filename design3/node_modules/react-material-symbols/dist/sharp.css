@@ -1,0 +1,12 @@
+@import url('./common.css');
+
+@font-face {
+	font-family: 'Material Symbols Sharp';
+	font-style: normal;
+	font-display: block;
+	src: url('./material-symbols-sharp.woff2') format('woff2');
+}
+
+.material-symbols {
+	font-family: 'Material Symbols Sharp';
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@yarnpkg/libzip",
+  "version": "2.3.0",
+  "license": "BSD-2-Clause",
+  "main": "./lib/sync.js",
+  "browser": "./lib/async.js",
+  "scripts": {
+    "build:libzip:wasm": "cd ./artifacts && ./build.sh",
+    "postpack": "rm -rf lib",
+    "prepack": "run build:compile \"$(pwd)\"",
+    "release": "yarn npm publish"
+  },
+  "publishConfig": {
+    "main": "./lib/sync.js",
+    "browser": "./lib/async.js"
+  },
+  "files": [
+    "/lib/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com/yarnpkg/berry.git",
+    "directory": "packages/yarnpkg-libzip"
+  },
+  "devDependencies": {
+    "@types/prettier": "1.19.0",
+    "prettier": "^1.19.1"
+  },
+  "dependencies": {
+    "@types/emscripten": "^1.39.6",
+    "tslib": "^1.13.0"
+  },
+  "engines": {
+    "node": ">=12 <14 || 14.2 - 14.9 || >14.10.0"
+  }
+}

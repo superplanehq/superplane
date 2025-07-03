@@ -1,0 +1,62 @@
+{
+  "name": "@asamuzakjp/dom-selector",
+  "description": "A CSS selector engine.",
+  "author": "asamuzaK",
+  "license": "MIT",
+  "homepage": "https://github.com/asamuzaK/domSelector#readme",
+  "bugs": {
+    "url": "https://github.com/asamuzaK/domSelector/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/asamuzaK/domSelector.git"
+  },
+  "files": [
+    "dist",
+    "src",
+    "types"
+  ],
+  "type": "module",
+  "exports": {
+    "import": "./src/index.js",
+    "require": "./dist/cjs/index.js"
+  },
+  "types": "types/index.d.ts",
+  "dependencies": {
+    "bidi-js": "^1.0.3",
+    "css-tree": "^2.3.1",
+    "is-potential-custom-element-name": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/css-tree": "^2.3.4",
+    "benchmark": "^2.1.4",
+    "c8": "^9.0.0",
+    "chai": "^5.0.0",
+    "commander": "^11.1.0",
+    "esbuild": "^0.19.11",
+    "eslint": "^8.56.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.1",
+    "eslint-plugin-jsdoc": "^48.0.2",
+    "eslint-plugin-regexp": "^2.1.2",
+    "eslint-plugin-unicorn": "^50.0.1",
+    "happy-dom": "^12.10.3",
+    "jsdom": "^23.1.0",
+    "linkedom": "^0.16.6",
+    "mocha": "^10.2.0",
+    "sinon": "^17.0.1",
+    "typescript": "^5.3.3",
+    "wpt-runner": "^5.0.0"
+  },
+  "scripts": {
+    "bench": "node benchmark/bench.js",
+    "build": "npm run tsc && npm run lint && npm test && npm run compat",
+    "compat": "esbuild --format=cjs --platform=node --outdir=dist/cjs/ --minify --sourcemap src/**/*.js",
+    "lint": "eslint --fix .",
+    "test": "c8 --reporter=text mocha --exit test/**/*.test.js",
+    "test-wpt": "npm run update-wpt && node test/wpt/wpt-runner.js",
+    "tsc": "npx tsc",
+    "update-wpt": "git submodule update --init --recursive --remote"
+  },
+  "version": "2.0.2"
+}

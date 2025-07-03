@@ -1,0 +1,60 @@
+{
+  "name": "get-npm-tarball-url",
+  "version": "2.1.0",
+  "description": "Create the tarball URL of a npm package",
+  "packageManager": "pnpm@8.10.2",
+  "type": "commonjs",
+  "main": "lib/index.js",
+  "module": "lib/index.mjs",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./lib/index.d.ts",
+        "default": "./lib/index.js"
+      },
+      "import": {
+        "types": "./lib/index.d.mts",
+        "default": "./lib/index.mjs"
+      }
+    }
+  },
+  "files": [
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pnpm/get-npm-tarball-url.git"
+  },
+  "engines": {
+    "node": ">=12.17"
+  },
+  "keywords": [
+    "npm",
+    "url",
+    "tarball"
+  ],
+  "author": {
+    "name": "Zoltan Kochan",
+    "email": "z@kochan.io",
+    "url": "https://www.kochan.io/"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/pnpm/get-npm-tarball-url/issues"
+  },
+  "homepage": "https://github.com/pnpm/get-npm-tarball-url#readme",
+  "devDependencies": {
+    "@types/jest": "^27.0.3",
+    "jest": "^27.3.1",
+    "ts-jest": "^27.0.7",
+    "ts-node": "^10.4.0",
+    "tsup": "^7.2.0",
+    "typescript": "^4.5.2"
+  },
+  "scripts": {
+    "test": "jest",
+    "tsc": "tsc",
+    "build": "tsup"
+  }
+}

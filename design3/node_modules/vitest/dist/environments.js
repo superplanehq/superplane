@@ -1,0 +1,15 @@
+export { e as builtinEnvironments, p as populateGlobal } from './vendor-environments.7aba93d9.js';
+import 'pathe';
+import './vendor-index.0b5b3600.js';
+import 'acorn';
+import 'node:module';
+import 'node:fs';
+import 'node:url';
+import 'node:assert';
+import 'node:process';
+import 'node:path';
+import 'node:v8';
+import 'node:util';
+import 'vite-node/client';
+import 'node:console';
+import 'local-pkg';

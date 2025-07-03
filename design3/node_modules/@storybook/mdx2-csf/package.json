@@ -1,0 +1,92 @@
+{
+  "name": "@storybook/mdx2-csf",
+  "version": "1.1.0",
+  "description": "MDXv2 to CSF webpack compiler and loader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/csf-mdx2"
+  },
+  "author": "Michael Shilman <michael@lab80.co>",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "test": "jest",
+    "build": "tsup",
+    "start": "yarn build && yarn storybook -- --no-manager-cache --quiet\"",
+    "release": "yarn build && auto shipit",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "prettier": "prettier",
+    "prepare": "husky install"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/cli": "^7.12.1",
+    "@babel/core": "^7.12.3",
+    "@babel/generator": "^7.12.11",
+    "@babel/parser": "^7.12.11",
+    "@babel/preset-env": "^7.12.1",
+    "@babel/preset-react": "^7.12.5",
+    "@babel/preset-typescript": "^7.13.0",
+    "@babel/template": "^7.14.5",
+    "@babel/traverse": "^7.12.11",
+    "@babel/types": "^7.14.8",
+    "@jest/types": "^27.0.6",
+    "@mdx-js/mdx": "^2.0.0",
+    "@storybook/addon-actions": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/addon-essentials": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/addon-interactions": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/addon-links": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/react": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/react-webpack5": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "@storybook/testing-library": "next",
+    "@testing-library/dom": "^8.1.0",
+    "@testing-library/react": "^12.0.0",
+    "@testing-library/user-event": "^13.2.1",
+    "@types/jest": "^27.0.3",
+    "@types/js-string-escape": "^1.0.1",
+    "@types/lodash": "^4.14.167",
+    "@types/node": "^16.4.1",
+    "auto": "^10.3.0",
+    "babel-jest": "^27.0.6",
+    "babel-loader": "^8.1.0",
+    "concurrently": "^7.0.0",
+    "estree-to-babel": "^4.9.0",
+    "hast-util-to-estree": "^2.0.2",
+    "husky": ">=6",
+    "jest": "^27.0.6",
+    "jest-environment-jsdom": "^27.0.6",
+    "js-string-escape": "^1.0.1",
+    "lint-staged": ">=10",
+    "lodash": "^4.17.21",
+    "prettier": "^2.3.1",
+    "prompts": "^2.4.2",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "remark-gfm": "^3.0.1",
+    "rimraf": "^3.0.2",
+    "storybook": "^7.0.0-beta.0 || ^7.0.0-rc.0 || ^7.0.0",
+    "ts-dedent": "^2.2.0",
+    "ts-jest": "^27.0.4",
+    "tsup": "^6.2.2",
+    "typescript": "^4.2.4"
+  },
+  "resolutions": {
+    "@types/estree": "1.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,js,css,md}": "prettier --write"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "packageManager": "yarn@1.22.9"
+}

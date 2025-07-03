@@ -1,0 +1,36 @@
+{
+  "name": "@aw-web-design/x-default-browser",
+  "version": "1.4.126",
+  "description": "Detect default web browser of the current user, cross-platform (Win/Lin/Mac)",
+  "license": "MIT",
+  "homepage": "https://github.com/The-Code-Monkey/TechStack/blob/dev/packages/x-default-browser/README.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/The-Code-Monkey/TechStack.git"
+  },
+  "bugs": {
+    "url": "https://github.com/The-Code-Monkey/TechStack/issues"
+  },
+  "bin": "bin/x-default-browser.js",
+  "main": "index.js",
+  "scripts": {
+    "lint": "tcm lint src bin",
+    "mocha": "mocha"
+  },
+  "keywords": [
+    "windows",
+    "ubuntu",
+    "linux",
+    "default",
+    "browser"
+  ],
+  "dependencies": {
+    "default-browser-id": "3.0.0"
+  },
+  "devDependencies": {
+    "@aw-web-design/tcm-cli": "4.1.128",
+    "mocha": "10.0.0",
+    "rewire": "6.0.0"
+  },
+  "gitHead": "2498ddfa1ff52b42bbd70eee90d7317449deecf5"
+}

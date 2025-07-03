@@ -1,0 +1,5 @@
+import { StorybookError } from '../chunk-3FIG6PJN.mjs';
+
+var Category=(Category2=>(Category2.MANAGER_UNCAUGHT="MANAGER_UNCAUGHT",Category2.MANAGER_UI="MANAGER_UI",Category2.MANAGER_API="MANAGER_API",Category2.MANAGER_CLIENT_LOGGER="MANAGER_CLIENT-LOGGER",Category2.MANAGER_CHANNELS="MANAGER_CHANNELS",Category2.MANAGER_CORE_EVENTS="MANAGER_CORE-EVENTS",Category2.MANAGER_ROUTER="MANAGER_ROUTER",Category2.MANAGER_THEMING="MANAGER_THEMING",Category2))(Category||{}),ProviderDoesNotExtendBaseProviderError=class extends StorybookError{constructor(){super(...arguments);this.category="MANAGER_UI";this.code=1;}template(){return "The Provider passed into Storybook's UI is not extended from the base Provider. Please check your Provider implementation."}},UncaughtManagerError=class extends StorybookError{constructor(data){super(data.error.message);this.data=data;this.category="MANAGER_UNCAUGHT";this.code=1;this.stack=data.error.stack;}template(){return this.message}};
+
+export { Category, ProviderDoesNotExtendBaseProviderError, UncaughtManagerError };

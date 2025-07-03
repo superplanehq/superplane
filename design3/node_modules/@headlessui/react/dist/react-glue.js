@@ -1,0 +1,1 @@
+import{useSyncExternalStoreWithSelector as a}from"use-sync-external-store/with-selector";import{useEvent as t}from'./hooks/use-event.js';import{shallowEqual as o}from'./machine.js';function S(e,n,r=o){return a(t(i=>e.subscribe(s,i)),t(()=>e.state),t(()=>e.state),t(n),r)}function s(e){return e}export{S as useSlice};

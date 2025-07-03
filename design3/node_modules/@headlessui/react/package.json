@@ -1,0 +1,65 @@
+{
+  "name": "@headlessui/react",
+  "version": "2.2.4",
+  "description": "A set of completely unstyled, fully accessible UI components for React, designed to integrate beautifully with Tailwind CSS.",
+  "main": "dist/index.cjs",
+  "typings": "dist/index.d.ts",
+  "module": "dist/headlessui.esm.js",
+  "license": "MIT",
+  "files": [
+    "README.md",
+    "dist"
+  ],
+  "exports": {
+    "types": {
+      "import": "./dist/index.d.ts",
+      "require": "./dist/index.d.cts"
+    },
+    "import": "./dist/headlessui.esm.js",
+    "require": "./dist/index.cjs"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=10"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tailwindlabs/headlessui.git",
+    "directory": "packages/@headlessui-react"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepublishOnly": "npm run build",
+    "build": "../../scripts/build.sh --external:react --external:react-dom --external:use-sync-external-store",
+    "watch": "../../scripts/watch.sh --external:react --external:react-dom --external:use-sync-external-store",
+    "test": "../../scripts/test.sh",
+    "lint": "../../scripts/lint.sh",
+    "lint-types": "npm run attw -P --workspaces --if-present",
+    "playground": "npm run dev --workspace=playground-react",
+    "clean": "rimraf ./dist"
+  },
+  "peerDependencies": {
+    "react": "^18 || ^19 || ^19.0.0-rc",
+    "react-dom": "^18 || ^19 || ^19.0.0-rc"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^15.0.7",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/use-sync-external-store": "^1.5.0",
+    "jsdom-testing-mocks": "^1.13.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "snapshot-diff": "^0.10.0"
+  },
+  "dependencies": {
+    "@floating-ui/react": "^0.26.16",
+    "@react-aria/focus": "^3.20.2",
+    "@react-aria/interactions": "^3.25.0",
+    "@tanstack/react-virtual": "^3.13.9",
+    "use-sync-external-store": "^1.5.0"
+  }
+}

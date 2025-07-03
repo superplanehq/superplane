@@ -1,0 +1,25 @@
+{
+    "name": "@types/pretty-hrtime",
+    "version": "1.0.3",
+    "description": "TypeScript definitions for pretty-hrtime",
+    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/pretty-hrtime",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "BendingBender",
+            "githubUsername": "BendingBender",
+            "url": "https://github.com/BendingBender"
+        }
+    ],
+    "main": "",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/pretty-hrtime"
+    },
+    "scripts": {},
+    "dependencies": {},
+    "typesPublisherContentHash": "0b45446d42e401276a16b7dad4fb769c4b0097a9c62099b25eb79821e9a99513",
+    "typeScriptVersion": "4.5"
+}

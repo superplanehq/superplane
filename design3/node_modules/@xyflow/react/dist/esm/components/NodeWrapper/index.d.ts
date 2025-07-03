@@ -1,0 +1,3 @@
+import type { Node, NodeWrapperProps } from '../../types';
+export declare function NodeWrapper<NodeType extends Node>({ id, onClick, onMouseEnter, onMouseMove, onMouseLeave, onContextMenu, onDoubleClick, nodesDraggable, elementsSelectable, nodesConnectable, nodesFocusable, resizeObserver, noDragClassName, noPanClassName, disableKeyboardA11y, rfId, nodeTypes, nodeClickDistance, onError, }: NodeWrapperProps<NodeType>): import("react/jsx-runtime").JSX.Element | null;
+//# sourceMappingURL=index.d.ts.map

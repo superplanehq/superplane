@@ -1,0 +1,94 @@
+{
+  "name": "react-element-to-jsx-string",
+  "version": "15.0.0",
+  "description": "Turn a ReactElement into the corresponding JSX string.",
+  "main": "dist/cjs/index.js",
+  "module": "dist/esm/index.js",
+  "browser": "dist/cjs/index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "rollup -c",
+    "build:flow": "flow-copy-source -v --ignore=*.spec.js src/ dist/cjs",
+    "prebuild": "rm -rf dist/",
+    "postbuild": "npm run build:flow",
+    "prepare": "npm run build",
+    "lint": "eslint .",
+    "lint:fix": "npm run lint -- --fix",
+    "flow": "flow",
+    "precommit": "lint-staged",
+    "prepublishOnly": "npm run build",
+    "prettier:fix": "prettier --write \"**/*.{js,json}\"",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "release": "./release.sh",
+    "smoke": "node tests/smoke/run"
+  },
+  "lint-staged": {
+    "*.js": [
+      "prettier --write \"**/*.{js,json}\"",
+      "git add"
+    ]
+  },
+  "author": {
+    "name": "Algolia, Inc.",
+    "url": "https://github.com/algolia"
+  },
+  "license": "MIT",
+  "repository": "algolia/react-element-to-jsx-string",
+  "devDependencies": {
+    "@babel/cli": "7.17.6",
+    "@babel/core": "7.17.9",
+    "@babel/preset-env": "7.16.11",
+    "@babel/preset-flow": "7.16.7",
+    "@babel/preset-react": "7.16.7",
+    "@commitlint/cli": "8.3.6",
+    "@commitlint/config-angular": "8.3.6",
+    "@testing-library/jest-dom": "^5.16.4",
+    "@testing-library/react": "^13.2.0",
+    "babel-eslint": "10.1.0",
+    "babel-jest": "24.9.0",
+    "babel-register": "6.26.0",
+    "conventional-changelog-cli": "2.2.2",
+    "doctoc": "1.4.0",
+    "eslint": "6.8.0",
+    "eslint-config-algolia": "14.0.1",
+    "eslint-config-prettier": "6.15.0",
+    "eslint-plugin-import": "2.26.0",
+    "eslint-plugin-jest": "22.21.0",
+    "eslint-plugin-prettier": "3.4.1",
+    "eslint-plugin-react": "7.29.4",
+    "esm": "3.2.25",
+    "expect": "27.5.1",
+    "flow-bin": "0.119.1",
+    "flow-copy-source": "2.0.9",
+    "husky": "3.1.0",
+    "jest": "27.5.1",
+    "json": "10.0.0",
+    "lint-staged": "10.5.4",
+    "mversion": "2.0.1",
+    "prettier": "1.19.1",
+    "react": "^18.1.0",
+    "react-dom": "^18.1.0",
+    "react-test-renderer": "^18.1.0",
+    "rollup": "2.70.1",
+    "rollup-plugin-babel": "4.4.0",
+    "rollup-plugin-node-builtins": "2.1.2",
+    "rollup-plugin-node-globals": "1.4.0",
+    "rollup-plugin-node-resolve": "5.2.0",
+    "rollup-plugin-sourcemaps": "0.6.3"
+  },
+  "peerDependencies": {
+    "react": "^0.14.8 || ^15.0.1 || ^16.0.0 || ^17.0.1 || ^18.0.0",
+    "react-dom": "^0.14.8 || ^15.0.1 || ^16.0.0 || ^17.0.1 || ^18.0.0"
+  },
+  "dependencies": {
+    "@base2/pretty-print-object": "1.0.1",
+    "is-plain-object": "5.0.0",
+    "react-is": "18.1.0"
+  },
+  "jest": {
+    "setupFilesAfterEnv": [
+      "<rootDir>tests/setupTests.js"
+    ]
+  }
+}

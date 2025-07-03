@@ -1,0 +1,69 @@
+{
+  "name": "@storybook/docs-mdx",
+  "version": "0.1.0",
+  "description": "Storybook Docs MDX analyzer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/docs-mdx"
+  },
+  "license": "MIT",
+  "author": "Michael Shilman <michael@lab80.co>",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "build-storybook": "build-storybook",
+    "prepare": "husky install",
+    "prettier": "prettier",
+    "prebuild": "rm -rf dist",
+    "release": "yarn build && auto shipit",
+    "start": "concurrently \"yarn build:watch\" \"yarn storybook -- --no-manager-cache --quiet\"",
+    "storybook": "start-storybook -p 6006",
+    "test": "jest"
+  },
+  "lint-staged": {
+    "*.{ts,js,css,md}": "prettier --write"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.12.1",
+    "@babel/core": "^7.12.3",
+    "@babel/parser": "^7.12.11",
+    "@babel/preset-env": "^7.12.1",
+    "@babel/preset-typescript": "^7.13.0",
+    "@babel/traverse": "^7.12.11",
+    "@babel/types": "^7.14.8",
+    "@jest/types": "^27.0.6",
+    "@mdx-js/mdx": "^2.0.0",
+    "@types/jest": "^27.0.3",
+    "@types/lodash": "^4.14.182",
+    "@types/node": "^16.4.1",
+    "auto": "^10.3.0",
+    "babel-jest": "^27.0.6",
+    "babel-loader": "^8.1.0",
+    "babel-plugin-add-import-extension": "^1.6.0",
+    "concurrently": "^7.0.0",
+    "estree-to-babel": "^4.9.0",
+    "hast-util-to-estree": "^2.0.2",
+    "husky": ">=6",
+    "jest": "^27.0.6",
+    "jest-environment-jsdom": "^27.0.6",
+    "lint-staged": ">=10",
+    "lodash": "^4.17.21",
+    "prettier": "^2.3.1",
+    "rimraf": "^3.0.2",
+    "ts-dedent": "^2.2.0",
+    "ts-jest": "^27.0.4",
+    "tsup": "^6.2.2",
+    "typescript": "^4.2.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

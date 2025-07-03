@@ -1,0 +1,30 @@
+{
+    "name": "@types/find-cache-dir",
+    "version": "3.2.1",
+    "description": "TypeScript definitions for find-cache-dir",
+    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/find-cache-dir",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "BendingBender",
+            "url": "https://github.com/BendingBender",
+            "githubUsername": "BendingBender"
+        },
+        {
+            "name": "Piotr Błażejewicz",
+            "url": "https://github.com/peterblazejewicz",
+            "githubUsername": "peterblazejewicz"
+        }
+    ],
+    "main": "",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/find-cache-dir"
+    },
+    "scripts": {},
+    "dependencies": {},
+    "typesPublisherContentHash": "334de16107158efff7e9ae59f7f60bfce908bd9097d9796e9dd9a62c13c018fe",
+    "typeScriptVersion": "3.6"
+}

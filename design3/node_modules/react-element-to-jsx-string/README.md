@@ -1,0 +1,168 @@
+# react-element-to-jsx-string
+
+[![Version][version-svg]][package-url] [![Build Status][travis-svg]][travis-url] [![License][license-image]][license-url] [![Downloads][downloads-image]][downloads-url]
+
+[travis-svg]: https://img.shields.io/travis/algolia/react-element-to-jsx-string/master.svg?style=flat-square
+[travis-url]: https://travis-ci.org/algolia/react-element-to-jsx-string
+[license-image]: http://img.shields.io/badge/license-MIT-green.svg?style=flat-square
+[license-url]: LICENSE
+[downloads-image]: https://img.shields.io/npm/dm/react-element-to-jsx-string.svg?style=flat-square
+[downloads-url]: http://npm-stat.com/charts.html?package=react-element-to-jsx-string
+[version-svg]: https://img.shields.io/npm/v/react-element-to-jsx-string.svg?style=flat-square
+[package-url]: https://npmjs.org/package/react-element-to-jsx-string
+
+Turn a ReactElement into the corresponding JSX string.
+
+Useful for unit testing and any other need you may think of.
+
+Features:
+- supports nesting and deep nesting like `<div a={{b: {c: {d: <div />}}}} />`
+- props: supports string, number, function (inlined as `prop={function noRefCheck() {}}`), object, ReactElement (inlined), regex, booleans (with or without [shorthand syntax](https://facebook.github.io/react/docs/jsx-in-depth.html#boolean-attributes)), ...
+- order props alphabetically
+- sort object keys in a deterministic order (`o={{a: 1, b:2}} === o={{b:2, a:1}}`)
+- handle `ref` and `key` attributes, they are always on top of props
+- React's documentation indent style for JSX
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Setup](#setup)
+- [Usage](#usage)
+- [API](#api)
+  - [reactElementToJSXString(ReactElement[, options])](#reactelementtojsxstringreactelement-options)
+- [Environment requirements](#environment-requirements)
+- [Test](#test)
+- [Build](#build)
+- [Release](#release)
+- [Thanks](#thanks)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+## Setup
+
+```sh
+yarn add react-element-to-jsx-string [--dev]
+```
+
+## Usage
+
+```js
+import React from 'react';
+import reactElementToJSXString from 'react-element-to-jsx-string';
+
+console.log(reactElementToJSXString(<div a="1" b="2">Hello, world!</div>));
+// <div
+//   a="1"
+//   b="2"
+// >
+//   Hello, world!
+// </div>
+```
+
+## API
+
+### reactElementToJSXString(ReactElement[, options])
+
+**options.displayName: function(ReactElement)**
+
+  Provide a different algorithm in charge of finding the right display name (name of the underlying Class) for your element.
+
+  Just return the name you want for the provided ReactElement, as a string.
+
+**options.filterProps: string[] | (val: any, key: string) => boolean, default []**
+
+  If an array of strings is passed, filter out any prop who's name is in
+  the array. For example ['key'] will suppress the key="" prop from being added.
+
+  If a function is passed, it will be called for each prop with two arguments,
+  the prop value and key, and will filter out any that return false.
+
+**options.showDefaultProps: boolean, default true**
+
+  If true, default props shown.
+
+  If false, default props are omitted unless they differ from from the default value.
+
+**options.showFunctions: boolean, default false**
+
+  If true, functions bodies are shown.
+
+  If false, functions bodies are replaced with `function noRefCheck() {}`.
+
+**options.functionValue: function, default `(fn) => fn`**
+
+  Allows you to override the default formatting of function values.
+
+  `functionValue` receives the original function reference as input
+  and should send any value as output.
+
+**options.tabStop: number, default 2**
+
+  Provide a different number of columns for indentation.
+
+**options.useBooleanShorthandSyntax: boolean, default true**
+
+  If true, Boolean prop values will be omitted for [shorthand syntax](https://facebook.github.io/react/docs/jsx-in-depth.html#boolean-attributes).
+
+  If false, Boolean prop values will be explicitly output like `prop={true}` and `prop={false}`
+
+**options.maxInlineAttributesLineLength: number, default undefined**
+
+  Allows to render multiple attributes on the same line and control the behaviour.
+
+  You can provide the max number of characters to render inline with the tag name. If the number of characters on the line (including spacing and the tag name)
+  exceeds this number, then all attributes will be rendered on a separate line. The default value of this option is `undefined`. If this option is `undefined`
+  then if there is more than one attribute on an element, they will render on their own line. Note: Objects passed as attribute values are always rendered
+  on multiple lines
+
+**options.sortProps: boolean, default true**
+
+  Either to sort or not props. If you use this lib to make some isomorphic rendering you should set it to false, otherwise this would lead to react invalid checksums as the prop order is part of react isomorphic checksum algorithm.
+
+**options.useFragmentShortSyntax: boolean, default true**
+
+  If true, fragment will be represented with the JSX short syntax `<>...</>` (when possible).
+
+  If false, fragment will always be represented with the JSX explicit syntax `<React.Fragment>...</React.Fragment>`.
+
+  According to [the specs](https://reactjs.org/docs/fragments.html):
+  - A keyed fragment will always use the explicit syntax: `<React.Fragment key={...}>...</React.Fragment>`
+  - An empty fragment will always use the explicit syntax: `<React.Fragment />`
+
+  Note: to use fragment you must use React >= 16.2
+
+## Environment requirements
+
+The environment you use to use `react-element-to-jsx-string` should have [ES2015](https://babeljs.io/learn-es2015/) support.
+
+Use the [Babel polyfill](https://babeljs.io/docs/usage/polyfill/) or any other method that will make you
+environment behave like an ES2015 environment.
+
+## Test
+
+```sh
+yarn test
+yarn test:watch
+```
+
+## Build
+
+```sh
+yarn build
+yarn build:watch
+```
+
+## Release
+
+Decide if this is a `patch`, `minor` or `major` release, look at http://semver.org/
+
+```sh
+npm run release [major|minor|patch|x.x.x]
+```
+
+## Thanks
+
+[alexlande/react-to-jsx](https://github.com/alexlande/react-to-jsx/) was a good source of inspiration.
+
+We built our own module because we had some needs like ordering props in alphabetical order.

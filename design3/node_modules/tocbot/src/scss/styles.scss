@@ -1,0 +1,58 @@
+/* Styles */
+
+// Page
+@use 'page-styles';
+@use 'code-styles';
+@use 'tocbot-responsive';
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-size: 1.2rem;
+  font-family: -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans",
+    "Droid Sans", "Helvetica Neue", sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  padding-top: 1.8em;
+}
+
+h1:focus,
+h2:focus,
+h3:focus,
+h4:focus,
+h5:focus,
+h6:focus {
+  outline: 0;
+}
+
+p {
+  margin-top: 0.25rem;
+}
+
+pre {
+  display: block;
+  background: #f7f7f7;
+  border-radius: 2px;
+  border: 1px solid #e0e0e0;
+  padding: 2px;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+code {
+  display: inline;
+  font-size: .8em;
+  max-width: 100%;
+}

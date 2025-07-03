@@ -1,0 +1,157 @@
+{
+  "name": "tocbot",
+  "version": "4.36.4",
+  "description": "Generate a table of contents based on the heading structure of a html document.",
+  "main": "./dist/tocbot.cjs",
+  "module": "./index.js",
+  "type": "module",
+  "exports": {
+    ".": {
+      "require": "./dist/tocbot.cjs",
+      "import": "./index.js",
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./tocbot.css": "./dist/tocbot.css",
+    "./dist/tocbot.js": "./dist/tocbot.js",
+    "./dist/tocbot.min.js": "./dist/tocbot.min.js",
+    "./dist/styles.css": "./dist/styles.css",
+    "./dist/tocbot.css": "./dist/tocbot.css",
+    "./src/js/*.js": "./src/js/*.js",
+    "./src/utils/*.js": "./src/js/*.js",
+    "./src/scss/styles.scss": "./src/scss/styles.scss",
+    "./src/scss/tocbot.scss": "./src/scss/tocbot.scss"
+  },
+  "files": [
+    "./*.js",
+    "./index.d.ts",
+    "./index.js",
+    "./index.mjs",
+    "./dist/*",
+    "./src/js/*",
+    "./src/scss/*",
+    "./src/utils/*"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist/",
+    "mkdir-dist": "mkdir dist",
+    "cleanInstall": "rm -rf node_modules package-lock.json && npm i",
+    "build": "npm run build-all",
+    "build-all": "npm run clean && npm run mkdir-dist && npm run build-js && npm run build-js-uglify && npm run build-css && npm run build-dist && npm run build-docs && npm run build-cjs",
+    "build-cjs": "cp ./dist/tocbot.js ./dist/tocbot.cjs",
+    "build-docs": "npm run build-content && npm run next-build && npm run next-export && npm run fix-jekyll",
+    "build-css": "sass --load-path=./node_modules --style=compressed src/scss/:static/css/",
+    "build-css-watch": "sass --watch --load-path=./node_modules --style=compressed src/scss/:static/css/",
+    "build-dist": "cp static/js/tocbot.js ./dist/ && cp static/js/tocbot.min.js ./dist/ && cp static/css/tocbot.css ./dist/ && cp static/css/styles.css ./dist/",
+    "build-js": "webpack-cli ./src/js/index-dist.js -o static/js/ --mode=development --devtool=source-map && mv static/js/main.js static/js/tocbot.js",
+    "build-js-watch": "webpack-cli --watch --mode=development ./src/js/index-dist.js -o static/js/",
+    "build-js-uglify": "webpack-cli ./src/js/index-dist.js -o static/js/ --mode=production && mv static/js/main.js static/js/tocbot.min.js",
+    "build-content": "processmd \"*.md\" --outputDir data --markdownOptions.html=true --headingIds",
+    "estimate-js-size": "gzip -9 -c dist/tocbot.min.js | wc -c",
+    "estimate-css-size": "gzip -9 -c dist/tocbot.css | wc -c",
+    "fix-jekyll": "cd out && touch .nojekyll",
+    "lint": "biome format --write ./src",
+    "dev": "npm run build-css && npm-run-all --parallel \"next\" \"build-js-watch\" \"build-css-watch\" \"build-content\"",
+    "start": "npm run dev",
+    "deploy": "npm run build-all && gh-pages -d out",
+    "deploy:local": "mv out tocbot && mkdir out && mv tocbot out/tocbot",
+    "test": "npm run lint && npm run test:esm && npm run test:dist && npm run test:ssr",
+    "test:esm": "wtr test/index-esm.mjs --node-resolve",
+    "test:esm:watch": "npm run esm:dist -- --watch",
+    "test:dist": "mocha test/index-dist.mjs",
+    "test:dist:watch": "npm run test:dist -- --watch",
+    "test:integration": "codeceptjs run --steps",
+    "test:ssr": "mocha test/server-test.mjs",
+    "test:update-screenshots": "cp -R -v ./test/__screenshots-new__/* ./test/__screenshots__",
+    "test:image-diff": "node ./test/imageDiff.js './test/__screenshots__/*.png' './test/__screenshots-new__/*.png'",
+    "test:diff-preview": "node ./test/diffPreview.js './test/__screenshots__' './test/__screenshots-new__'",
+    "next": "node ./server.js",
+    "next-build": "./node_modules/.bin/next build",
+    "next-export": "./node_modules/.bin/next export",
+    "next-start": "./node_modules/.bin/next start",
+    "update-readme-version": "node ./scripts/update-readme-version.js",
+    "v-prerelease": "npm version prerelease && git push --tags && npm publish && git push",
+    "v-patch": "npm version patch && git push --tags && npm publish && git push",
+    "v-minor": "npm version minor && git push --tags && npm publish && git push",
+    "v-major": "npm version major && git push --tags && npm publish && git push"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tscanlin/tocbot.git"
+  },
+  "keywords": [
+    "tocbot",
+    "javascript",
+    "table",
+    "of",
+    "contents",
+    "generate",
+    "html",
+    "structure",
+    "vanilla"
+  ],
+  "author": "Tim Scanlin",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tscanlin/tocbot/issues"
+  },
+  "homepage": "https://github.com/tscanlin/tocbot",
+  "devDependencies": {
+    "@babel/cli": "^7.19.3",
+    "@babel/core": "^7.20.2",
+    "@babel/plugin-syntax-dynamic-import": "^7.8.3",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.18.6",
+    "@biomejs/biome": "1.9.4",
+    "@esm-bundle/chai": "^4.3.4-fix.0",
+    "@web/test-runner": "^0.18.1",
+    "babel-loader": "^9.1.0",
+    "chai": "^4.3.7",
+    "eslint": "^8.27.0",
+    "express": "^4.18.2",
+    "fs-extra": "^10.1.0",
+    "gh-pages": "^5.0.0",
+    "globby": "^13.1.2",
+    "js-yaml": "^4.1.0",
+    "jsdom": "^20.0.2",
+    "marked": "^4.2.2",
+    "mkdirp": "^1.0.4",
+    "mocha": "^10.1.0",
+    "next": "^13.0.3",
+    "node-resemble-js": "^0.2.0",
+    "npm-run-all": "^4.1.5",
+    "processmd": "^4.6.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sass": "^1.84.0",
+    "standard": "^17.0.0",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^4.10.0"
+  },
+  "npmName": "tocbot",
+  "npmFileMap": [
+    {
+      "basePath": "dist",
+      "files": [
+        "**/*"
+      ]
+    }
+  ],
+  "standard": {
+    "ignore": [
+      "dist/",
+      "scripts/",
+      "test/"
+    ],
+    "globals": [
+      "it",
+      "describe",
+      "before",
+      "after",
+      "beforeEach",
+      "afterEach"
+    ]
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

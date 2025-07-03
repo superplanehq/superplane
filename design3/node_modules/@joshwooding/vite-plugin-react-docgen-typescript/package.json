@@ -1,0 +1,64 @@
+{
+  "name": "@joshwooding/vite-plugin-react-docgen-typescript",
+  "version": "0.3.0",
+  "description": "A vite plugin to inject react typescript docgen information",
+  "keywords": [
+    "vite",
+    "vite-plugin",
+    "react-docgen-typescript"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joshwooding/vite-plugin-react-docgen-typescript.git"
+  },
+  "license": "MIT",
+  "author": "Josh Wooding",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "rome": "rome format . --write",
+    "rome:check": "rome ci .",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "glob": "^7.2.0",
+    "glob-promise": "^4.2.0",
+    "magic-string": "^0.27.0",
+    "react-docgen-typescript": "^2.2.2"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.25.2",
+    "@types/react": "^17.0.38",
+    "react": "^17.0.2",
+    "rome": "^12.0.0",
+    "typescript": "^4.3.0",
+    "unbuild": "^1.0.2",
+    "vite": "^5.0.0-beta.1",
+    "vitest": "^0.25.8"
+  },
+  "peerDependencies": {
+    "typescript": ">= 4.3.x",
+    "vite": "^3.0.0 || ^4.0.0 || ^5.0.0"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "packageManager": "yarn@3.2.4"
+}

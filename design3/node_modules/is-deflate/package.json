@@ -1,0 +1,34 @@
+{
+  "name": "is-deflate",
+  "version": "1.0.0",
+  "description": "Detect if a Buffer/Uint8Array is compressed using deflate",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "standard": "^5.4.1"
+  },
+  "scripts": {
+    "test": "standard"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/watson/is-deflate.git"
+  },
+  "keywords": [
+    "deflate",
+    "inflate",
+    "compression",
+    "zlib",
+    "test"
+  ],
+  "author": "Thomas Watson Steen <w@tson.dk> (https://twitter.com/wa7son)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/watson/is-deflate/issues"
+  },
+  "homepage": "https://github.com/watson/is-deflate#readme",
+  "coordinates": [
+    55.6666671,
+    12.5798778
+  ]
+}

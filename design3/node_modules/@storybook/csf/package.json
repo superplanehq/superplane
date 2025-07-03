@@ -1,0 +1,136 @@
+{
+  "name": "@storybook/csf",
+  "version": "0.1.13",
+  "description": "Component Story Format (CSF) utilities",
+  "keywords": [
+    "storybook",
+    "component story format",
+    "csf",
+    "stories"
+  ],
+  "homepage": "https://github.com/ComponentDriven/csf",
+  "bugs": {
+    "url": "https://github.com/ComponentDriven/csf/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ComponentDriven/csf.git"
+  },
+  "author": "Storybook Bot <storybookbot@gmail.com>",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "browser": "./dist/index.mjs",
+      "node": "./dist/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts"
+  ],
+  "scripts": {
+    "build": "tsup ./src/index.ts --format esm,cjs --dts --treeshake --minify",
+    "check": "tsc",
+    "lint": "eslint src --ext .ts",
+    "release": "yarn build && auto shipit",
+    "test": "NODE_NO_WARNINGS=1 NODE_OPTIONS=--experimental-vm-modules jest"
+  },
+  "prettier": "@storybook/linter-config/prettier.config",
+  "eslintConfig": {
+    "parserOptions": {
+      "project": [
+        "./tsconfig.json"
+      ]
+    },
+    "settings": {
+      "import/resolver": {
+        "typescript": {
+          "project": [
+            "./tsconfig.json"
+          ]
+        }
+      }
+    },
+    "extends": [
+      "@storybook/eslint-config-storybook"
+    ],
+    "rules": {
+      "@typescript-eslint/no-empty-interface": "off",
+      "import/no-unresolved": "error",
+      "jest/expect-expect": [
+        "warn",
+        {
+          "assertFunctionNames": [
+            "expect",
+            "expectTypeOf"
+          ]
+        }
+      ]
+    }
+  },
+  "jest": {
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
+    "moduleNameMapper": {
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "preset": "ts-jest/presets/default-esm",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "type-fest": "^2.19.0"
+  },
+  "devDependencies": {
+    "@auto-it/released": "^11.1.1",
+    "@ngard/tiny-isequal": "^1.1.0",
+    "@storybook/eslint-config-storybook": "^3.1.2",
+    "@types/jest": "^29.2.0",
+    "@types/node": "^18.11.0",
+    "@typescript-eslint/eslint-plugin": "^5.42.1",
+    "@typescript-eslint/parser": "^5.42.1",
+    "auto": "^11.1.1",
+    "common-tags": "^1.8.0",
+    "eslint": "^8.27.0",
+    "eslint-import-resolver-typescript": "^3.5.2",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jest": "^27.1.4",
+    "expect-type": "^0.14.2",
+    "jest": "^29.3.1",
+    "lodash": "^4.17.21",
+    "@types/lodash": "^4.14.191",
+    "prettier": "^2.7.1",
+    "ts-jest": "^29.0.3",
+    "tsup": "^6.4.0",
+    "typescript": "^4.8.4"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "auto": {
+    "plugins": [
+      "npm",
+      "released"
+    ]
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

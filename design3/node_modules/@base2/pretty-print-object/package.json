@@ -1,0 +1,45 @@
+{
+  "name": "@base2/pretty-print-object",
+  "version": "1.0.1",
+  "description": "Convert an object or array into a formatted string",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Chris-Baker/pretty-print-object"
+  },
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --verbose"
+  },
+  "keywords": [
+    "object",
+    "stringify",
+    "pretty",
+    "print",
+    "dump",
+    "format",
+    "type",
+    "json"
+  ],
+  "files": [
+    "dist/"
+  ],
+  "author": "Chris Baker",
+  "license": "BSD-2-Clause",
+  "dependencies": {},
+  "devDependencies": {
+    "@babel/core": "^7.4.3",
+    "@babel/plugin-transform-runtime": "^7.4.3",
+    "@babel/preset-env": "^7.4.3",
+    "@babel/preset-typescript": "^7.3.3",
+    "@babel/runtime": "^7.5.5",
+    "@types/jest": "^24.0.13",
+    "eslint": "^6.2.2",
+    "eslint-config-prettier": "^6.1.0",
+    "eslint-plugin-prettier": "^3.1.0",
+    "jest": "^24.8.0",
+    "prettier": "^1.15.3",
+    "pretty-quick": "^1.8.0",
+    "typescript": "^3.6.2"
+  }
+}

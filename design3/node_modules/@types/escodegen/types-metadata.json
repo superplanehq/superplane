@@ -1,0 +1,23 @@
+{
+    "authors": "Simon de Lang <https://github.com/simondel>",
+    "definitionFilename": "index.d.ts",
+    "libraryDependencies": [],
+    "moduleDependencies": [],
+    "libraryMajorVersion": "0",
+    "libraryMinorVersion": "0",
+    "libraryName": "escodegen",
+    "typingsPackageName": "escodegen",
+    "projectName": "https://github.com/estools/escodegen",
+    "sourceRepoURL": "https://www.github.com/DefinitelyTyped/DefinitelyTyped",
+    "sourceBranch": "types-2.0",
+    "kind": "ProperModule",
+    "globals": [],
+    "declaredModules": [
+        "escodegen"
+    ],
+    "files": [
+        "index.d.ts"
+    ],
+    "hasPackageJson": false,
+    "contentHash": "cf570b54f275e79234277bc498aee95b974e39190fdfa6bd9d43a48a667bd089"
+}

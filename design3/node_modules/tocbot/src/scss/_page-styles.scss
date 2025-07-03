@@ -1,0 +1,79 @@
+/* Page Styles */
+
+body {
+  background-color: #FFF;
+}
+
+.transition--300 {
+  transition: all 300ms ease-in-out;
+}
+
+.toc {
+  height: 100%;
+  width: 280px;
+  transform: translateX(0);
+}
+
+.content {
+  position: relative;
+  // margin-right: 280px;
+  h1:first-child, h2:first-child {
+    padding-top: 0;
+    margin-top: 0;
+  }
+}
+
+.title {
+  font-size: 3em;
+}
+
+.content {
+  // margin-bottom: 95vh;
+
+  ul,
+  ol {
+    list-style: inherit;
+  }
+
+  a {
+    color: #0977c3;
+    text-decoration: none;
+    border-bottom: 1px solid #EEE;
+    transition: all 300ms ease;
+
+    &.no-decoration {
+      border-bottom: 0;
+    }
+  }
+
+  a:hover {
+    border-bottom: 1px solid #0977c3;
+
+    &.no-decoration {
+      border-bottom: 0;
+    }
+  }
+}
+
+a.toc-link {
+  text-decoration: none;
+}
+
+.try-it-container {
+  transform: translateY(84%);
+
+  &.is-open {
+    transform: translateY(0%);
+  }
+}
+
+.page-content {
+  display: block !important;
+}
+
+// Tocbot styles for extra nesting.
+.toc-link.node-name--H1 ~ .toc-list .toc-list-item .toc-link.node-name--H3,
+.toc-link.node-name--H2 ~ .toc-list .toc-list-item .toc-link.node-name--H4,
+.toc-link.node-name--H3 ~ .toc-list .toc-list-item .toc-link.node-name--H5 {
+  margin-left: 10px;
+}

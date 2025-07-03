@@ -1,0 +1,48 @@
+{
+  "name": "esbuild-plugin-alias",
+  "version": "0.2.1",
+  "description": "esbuild plugin for path aliases",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "dev": "nodemon --exec 'npm run test' --watch index.js --watch tests",
+    "test": "mocha",
+    "lint": "eslint ."
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/igoradamenko/esbuild-plugin-alias.git"
+  },
+  "keywords": [
+    "esbuild",
+    "alias",
+    "plugin"
+  ],
+  "author": "Igor Adamenko <mail@igoradamenko.com> (https://igoradamenko.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/igoradamenko/esbuild-plugin-alias/issues"
+  },
+  "homepage": "https://github.com/igoradamenko/esbuild-plugin-alias#readme",
+  "devDependencies": {
+    "@funboxteam/eslint-config": "5.3.0",
+    "esbuild": "0.8.44",
+    "eslint": "7.19.0",
+    "husky": "4.3.8",
+    "lint-staged": "10.5.4",
+    "mocha": "8.2.1",
+    "nodemon": "2.0.13"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged -q"
+    }
+  },
+  "lint-staged": {
+    "*.js": "eslint --fix"
+  }
+}

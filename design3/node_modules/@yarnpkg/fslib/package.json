@@ -1,0 +1,34 @@
+{
+  "name": "@yarnpkg/fslib",
+  "version": "2.10.3",
+  "license": "BSD-2-Clause",
+  "main": "./lib/index.js",
+  "sideEffects": false,
+  "dependencies": {
+    "@yarnpkg/libzip": "^2.3.0",
+    "tslib": "^1.13.0"
+  },
+  "scripts": {
+    "postpack": "rm -rf lib",
+    "prepack": "run build:compile \"$(pwd)\"",
+    "release": "yarn npm publish",
+    "test:fslib": "run test:unit packages/yarnpkg-fslib",
+    "test:watch:fslib": "run test:unit --watch packages/yarnpkg-fslib"
+  },
+  "publishConfig": {
+    "main": "./lib/index.js",
+    "typings": "./lib/index.d.ts"
+  },
+  "files": [
+    "/lib/**/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@github.com/yarnpkg/berry.git",
+    "directory": "packages/yarnpkg-fslib"
+  },
+  "engines": {
+    "node": ">=12 <14 || 14.2 - 14.9 || >14.10.0"
+  },
+  "typings": "./lib/index.d.ts"
+}

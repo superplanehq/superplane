@@ -1,0 +1,25 @@
+{
+    "name": "@types/detect-port",
+    "version": "1.3.5",
+    "description": "TypeScript definitions for detect-port",
+    "homepage": "https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/detect-port",
+    "license": "MIT",
+    "contributors": [
+        {
+            "name": "Ivan Medina",
+            "githubUsername": "ivandevp",
+            "url": "https://github.com/ivandevp"
+        }
+    ],
+    "main": "",
+    "types": "index.d.ts",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped.git",
+        "directory": "types/detect-port"
+    },
+    "scripts": {},
+    "dependencies": {},
+    "typesPublisherContentHash": "e3bc2bfeb5adee7b9bdd4af39e48b1ac855a2ffed891aadb6d76ca5f94b1e8d4",
+    "typeScriptVersion": "4.5"
+}

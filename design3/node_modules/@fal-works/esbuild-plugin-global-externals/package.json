@@ -1,0 +1,50 @@
+{
+  "name": "@fal-works/esbuild-plugin-global-externals",
+  "description": "esbuild plugin for replacing imports with global variables.",
+  "version": "2.1.2",
+  "license": "MIT",
+  "author": "FAL",
+  "keywords": [
+    "esbuild"
+  ],
+  "homepage": "https://github.com/fal-works/esbuild-plugin-global-externals#readme",
+  "bugs": {
+    "url": "https://github.com/fal-works/esbuild-plugin-global-externals/issues"
+  },
+  "type": "module",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "main": "lib/index.cjs",
+  "module": "lib/index.js",
+  "exports": {
+    "import": "./lib/index.js",
+    "require": "./lib/index.cjs"
+  },
+  "types": "lib/index.d.ts",
+  "directories": {
+    "lib": "lib"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "4.28.3",
+    "@typescript-eslint/parser": "^4.28.3",
+    "esbuild": "^0.12.15",
+    "eslint": "7.31.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-total-functions": "^4.9.0",
+    "prettier": "^2.3.2",
+    "rimraf": "^3.0.2",
+    "typescript": "^4.3.5"
+  },
+  "scripts": {
+    "prebuild": "rimraf lib",
+    "build": "npm run build:esm & npm run build:cjs",
+    "build:esm": "tsc && npm run format:lib:esm",
+    "preformat:lib:esm": "eslint --fix --no-ignore lib/**/*.{js,ts}",
+    "format:lib:esm": "prettier --write lib/**/*.{js,ts}",
+    "build:cjs": "esbuild src/index.ts --outfile=lib/index.cjs --format=cjs --platform=node --bundle --minify",
+    "lint": "eslint src/",
+    "test": "node test/test.js"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "name": "remark-slug",
+  "version": "6.1.0",
+  "description": "remark plugin to add anchors to headings",
+  "license": "MIT",
+  "keywords": [
+    "unified",
+    "remark",
+    "remark-plugin",
+    "plugin",
+    "mdast",
+    "markdown",
+    "text",
+    "slug",
+    "id",
+    "github",
+    "npm"
+  ],
+  "repository": "remarkjs/remark-slug",
+  "bugs": "https://github.com/remarkjs/remark-slug/issues",
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/unified"
+  },
+  "author": "Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)",
+  "contributors": [
+    "Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)",
+    "Jayson Harshbarger <hypercubed@gmail.com>"
+  ],
+  "files": [
+    "index.js",
+    "types/index.d.ts"
+  ],
+  "types": "types/index.d.ts",
+  "dependencies": {
+    "github-slugger": "^1.0.0",
+    "mdast-util-to-string": "^1.0.0",
+    "unist-util-visit": "^2.0.0"
+  },
+  "devDependencies": {
+    "browserify": "^17.0.0",
+    "dtslint": "^4.0.0",
+    "nyc": "^15.0.0",
+    "prettier": "^2.0.0",
+    "remark": "^13.0.0",
+    "remark-cli": "^9.0.0",
+    "remark-preset-wooorm": "^8.0.0",
+    "tape": "^5.0.0",
+    "tinyify": "^3.0.0",
+    "unist-builder": "^2.0.0",
+    "unist-util-remove-position": "^3.0.0",
+    "xo": "^0.37.0"
+  },
+  "scripts": {
+    "format": "remark . -qfo && prettier . -w --loglevel warn && xo --fix",
+    "build-bundle": "browserify . -s remarkSlug > remark-slug.js",
+    "build-mangle": "browserify . -s remarkSlug -p tinyify > remark-slug.min.js",
+    "build": "npm run build-bundle && npm run build-mangle",
+    "test-api": "node test",
+    "test-coverage": "nyc --reporter lcov tape test.js",
+    "test-types": "dtslint types",
+    "test": "npm run format && npm run build && npm run test-coverage && npm run test-types"
+  },
+  "prettier": {
+    "tabWidth": 2,
+    "useTabs": false,
+    "singleQuote": true,
+    "bracketSpacing": false,
+    "semi": false,
+    "trailingComma": "none"
+  },
+  "xo": {
+    "prettier": true,
+    "esnext": false,
+    "ignores": [
+      "remark-slug.js",
+      "types/index.d.ts"
+    ]
+  },
+  "remarkConfig": {
+    "plugins": [
+      "preset-wooorm"
+    ]
+  }
+}

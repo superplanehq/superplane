@@ -1,0 +1,106 @@
+{
+  "name": "@storybook/react",
+  "version": "7.6.20",
+  "description": "Storybook React renderer",
+  "keywords": [
+    "storybook"
+  ],
+  "homepage": "https://github.com/storybookjs/storybook/tree/next/code/renderers/react",
+  "bugs": {
+    "url": "https://github.com/storybookjs/storybook/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/storybook.git",
+    "directory": "code/renderers/react"
+  },
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/storybook"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": "./dist/index.js",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./preset": "./preset.js",
+    "./dist/entry-preview.mjs": "./dist/entry-preview.mjs",
+    "./dist/entry-preview-docs.mjs": "./dist/entry-preview-docs.mjs",
+    "./package.json": "./package.json"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "template/cli/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts",
+    "!src/**/*"
+  ],
+  "scripts": {
+    "check": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/check.ts",
+    "prep": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/bundle.ts"
+  },
+  "dependencies": {
+    "@storybook/client-logger": "7.6.20",
+    "@storybook/core-client": "7.6.20",
+    "@storybook/docs-tools": "7.6.20",
+    "@storybook/global": "^5.0.0",
+    "@storybook/preview-api": "7.6.20",
+    "@storybook/react-dom-shim": "7.6.20",
+    "@storybook/types": "7.6.20",
+    "@types/escodegen": "^0.0.6",
+    "@types/estree": "^0.0.51",
+    "@types/node": "^18.0.0",
+    "acorn": "^7.4.1",
+    "acorn-jsx": "^5.3.1",
+    "acorn-walk": "^7.2.0",
+    "escodegen": "^2.1.0",
+    "html-tags": "^3.1.0",
+    "lodash": "^4.17.21",
+    "prop-types": "^15.7.2",
+    "react-element-to-jsx-string": "^15.0.0",
+    "ts-dedent": "^2.0.0",
+    "type-fest": "~2.19",
+    "util-deprecate": "^1.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.2",
+    "@storybook/test": "7.6.20",
+    "@types/util-deprecate": "^1.0.0",
+    "expect-type": "^0.15.0",
+    "jest-specific-snapshot": "^8.0.0",
+    "require-from-string": "^2.0.2"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0",
+    "typescript": "*"
+  },
+  "peerDependenciesMeta": {
+    "typescript": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bundler": {
+    "entries": [
+      "./src/index.ts",
+      "./src/preset.ts",
+      "./src/entry-preview.ts",
+      "./src/entry-preview-docs.ts"
+    ],
+    "platform": "browser"
+  },
+  "gitHead": "e6a7fd8a655c69780bc20b9749c2699e44beae17"
+}

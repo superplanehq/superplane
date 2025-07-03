@@ -1,0 +1,5 @@
+import { __commonJS } from './chunk-JRLSWQMA.mjs';
+
+var require_properties=__commonJS({"../../node_modules/highlight.js/lib/languages/properties.js"(exports,module){function properties(hljs){var WS0="[ \\t\\f]*",WS1="[ \\t\\f]+",EQUAL_DELIM=WS0+"[:=]"+WS0,WS_DELIM=WS1,DELIM="("+EQUAL_DELIM+"|"+WS_DELIM+")",KEY_ALPHANUM="([^\\\\\\W:= \\t\\f\\n]|\\\\.)+",KEY_OTHER="([^\\\\:= \\t\\f\\n]|\\\\.)+",DELIM_AND_VALUE={end:DELIM,relevance:0,starts:{className:"string",end:/$/,relevance:0,contains:[{begin:"\\\\\\\\"},{begin:"\\\\\\n"}]}};return {name:".properties",case_insensitive:!0,illegal:/\S/,contains:[hljs.COMMENT("^\\s*[!#]","$"),{returnBegin:!0,variants:[{begin:KEY_ALPHANUM+EQUAL_DELIM,relevance:1},{begin:KEY_ALPHANUM+WS_DELIM,relevance:0}],contains:[{className:"attr",begin:KEY_ALPHANUM,endsParent:!0,relevance:0}],starts:DELIM_AND_VALUE},{begin:KEY_OTHER+DELIM,returnBegin:!0,relevance:0,contains:[{className:"meta",begin:KEY_OTHER,endsParent:!0,relevance:0}],starts:DELIM_AND_VALUE},{className:"attr",relevance:0,begin:KEY_OTHER+WS0+"$"}]}}module.exports=properties;}});var propertiesN2YJG7KT = require_properties();
+
+export { propertiesN2YJG7KT as default };

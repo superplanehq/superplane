@@ -1,0 +1,12 @@
+export declare function isNode(element: unknown): element is Node;
+export declare function isElement(element: unknown): element is Element;
+export declare function isHTMLElement(element: unknown): element is HTMLElement;
+export declare function isHTMLorSVGElement(element: unknown): element is HTMLOrSVGElement & Element;
+export declare function hasInlineStyle(element: unknown): element is ElementCSSInlineStyle;
+export declare function isHTMLIframeElement(element: unknown): element is HTMLIFrameElement;
+export declare function isHTMLInputElement(element: unknown): element is HTMLInputElement;
+export declare function isHTMLTextAreaElement(element: unknown): element is HTMLTextAreaElement;
+export declare function isHTMLLabelElement(element: unknown): element is HTMLLabelElement;
+export declare function isHTMLFieldSetElement(element: unknown): element is HTMLFieldSetElement;
+export declare function isHTMLLegendElement(element: unknown): element is HTMLLegendElement;
+export declare function isInteractiveElement(element: unknown): element is Element;

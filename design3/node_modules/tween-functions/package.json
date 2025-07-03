@@ -1,0 +1,29 @@
+{
+  "name": "tween-functions",
+  "version": "1.2.0",
+  "description": "Robert Penner's easing functions, slightly modified",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chenglou/tween-functions"
+  },
+  "keywords": [
+    "tween",
+    "ease",
+    "react",
+    "animation",
+    "easing",
+    "penner",
+    "bezier",
+    "interpolation"
+  ],
+  "author": "chenglou",
+  "license": "BSD",
+  "bugs": {
+    "url": "https://github.com/chenglou/tween-functions/issues"
+  },
+  "homepage": "https://github.com/chenglou/tween-functions"
+}

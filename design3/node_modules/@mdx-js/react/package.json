@@ -1,0 +1,72 @@
+{
+  "name": "@mdx-js/react",
+  "version": "2.3.0",
+  "description": "React context for MDX",
+  "license": "MIT",
+  "keywords": [
+    "mdx",
+    "markdown",
+    "react",
+    "jsx",
+    "remark",
+    "mdxast"
+  ],
+  "homepage": "https://mdxjs.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mdx-js/mdx",
+    "directory": "packages/react"
+  },
+  "bugs": "https://github.com/mdx-js/mdx/issues",
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/unified"
+  },
+  "author": "John Otander <johnotander@gmail.com> (https://johno.com)",
+  "contributors": [
+    "John Otander <johnotander@gmail.com> (https://johno.com)",
+    "Tim Neutkens <tim@vercel.com>",
+    "Matija Marohnić <matija.marohnic@gmail.com>",
+    "Titus Wormer <tituswormer@gmail.com> (https://wooorm.com)",
+    "JounQin <admin@1stg.me> (https://www.1stg.me)",
+    "Christian Murphy <christian.murphy.42@gmail.com>"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "lib/",
+    "index.d.ts",
+    "index.js"
+  ],
+  "dependencies": {
+    "@types/mdx": "^2.0.0",
+    "@types/react": ">=16"
+  },
+  "peerDependencies": {
+    "react": ">=16"
+  },
+  "devDependencies": {
+    "@mdx-js/mdx": "^2.0.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "scripts": {
+    "prepack": "npm run build",
+    "build": "tsc --build --clean && tsc --build && type-coverage",
+    "test-api": "node --no-warnings --experimental-loader=../../script/jsx-loader.js ../../node_modules/uvu/bin.js test \"\\.jsx?$\"",
+    "test-coverage": "c8 --check-coverage --100 --reporter lcov npm run test-api",
+    "test": "npm run build && npm run test-coverage"
+  },
+  "xo": false,
+  "typeCoverage": {
+    "atLeast": 100,
+    "detail": true,
+    "strict": true,
+    "ignoreCatch": true
+  },
+  "gitHead": "bf7deab69996449cb99c2217dff75e65855eb2c1"
+}

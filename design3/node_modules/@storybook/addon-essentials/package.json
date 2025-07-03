@@ -1,0 +1,114 @@
+{
+  "name": "@storybook/addon-essentials",
+  "version": "7.6.20",
+  "description": "Curated addons to bring out the best of Storybook",
+  "keywords": [
+    "addon",
+    "essentials",
+    "storybook"
+  ],
+  "homepage": "https://github.com/storybookjs/storybook/tree/next/code/addons/essentials",
+  "bugs": {
+    "url": "https://github.com/storybookjs/storybook/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/storybook.git",
+    "directory": "code/addons/essentials"
+  },
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/storybook"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "node": "./dist/index.js",
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./actions/preview": "./dist/actions/preview.js",
+    "./actions/manager": "./dist/actions/manager.js",
+    "./backgrounds/preview": "./dist/backgrounds/preview.js",
+    "./backgrounds/manager": "./dist/backgrounds/manager.js",
+    "./controls/manager": "./dist/controls/manager.js",
+    "./docs/preview": "./dist/docs/preview.js",
+    "./docs/preset": "./dist/docs/preset.js",
+    "./docs/mdx-react-shim": "./dist/docs/mdx-react-shim.js",
+    "./highlight/preview": "./dist/highlight/preview.js",
+    "./measure/preview": "./dist/measure/preview.js",
+    "./measure/manager": "./dist/measure/manager.js",
+    "./outline/preview": "./dist/outline/preview.js",
+    "./outline/manager": "./dist/outline/manager.js",
+    "./toolbars/manager": "./dist/toolbars/manager.js",
+    "./viewport/manager": "./dist/viewport/manager.js",
+    "./package.json": "./package.json"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts",
+    "!src/**/*"
+  ],
+  "scripts": {
+    "check": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/check.ts",
+    "prep": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/addon-bundle.ts"
+  },
+  "dependencies": {
+    "@storybook/addon-actions": "7.6.20",
+    "@storybook/addon-backgrounds": "7.6.20",
+    "@storybook/addon-controls": "7.6.20",
+    "@storybook/addon-docs": "7.6.20",
+    "@storybook/addon-highlight": "7.6.20",
+    "@storybook/addon-measure": "7.6.20",
+    "@storybook/addon-outline": "7.6.20",
+    "@storybook/addon-toolbars": "7.6.20",
+    "@storybook/addon-viewport": "7.6.20",
+    "@storybook/core-common": "7.6.20",
+    "@storybook/manager-api": "7.6.20",
+    "@storybook/node-logger": "7.6.20",
+    "@storybook/preview-api": "7.6.20",
+    "ts-dedent": "^2.0.0"
+  },
+  "devDependencies": {
+    "@storybook/vue": "7.6.20",
+    "typescript": "^4.9.3"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bundler": {
+    "nodeEntries": [
+      "./src/index.ts",
+      "./src/docs/preset.ts",
+      "./src/docs/mdx-react-shim.ts"
+    ],
+    "managerEntries": [
+      "./src/actions/manager.ts",
+      "./src/backgrounds/manager.ts",
+      "./src/controls/manager.ts",
+      "./src/measure/manager.ts",
+      "./src/outline/manager.ts",
+      "./src/toolbars/manager.ts",
+      "./src/viewport/manager.ts"
+    ],
+    "previewEntries": [
+      "./src/actions/preview.ts",
+      "./src/backgrounds/preview.ts",
+      "./src/docs/preview.ts",
+      "./src/highlight/preview.ts",
+      "./src/measure/preview.ts",
+      "./src/outline/preview.ts"
+    ]
+  },
+  "gitHead": "e6a7fd8a655c69780bc20b9749c2699e44beae17"
+}

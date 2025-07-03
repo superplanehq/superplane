@@ -1,0 +1,1 @@
+import{useCallback as r,useState as a}from"react";import*as i from'../utils/dom.js';function d(t){let e=typeof t=="string"?t:void 0,[s,o]=a(e);return[e!=null?e:s,r(n=>{e||i.isHTMLElement(n)&&o(n.tagName.toLowerCase())},[e])]}export{d as useResolvedTag};

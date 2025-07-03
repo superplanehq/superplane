@@ -1,0 +1,23 @@
+{
+  "parser": "flow",
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "overrides": [
+    {
+      "files": ".prettierrc",
+      "options": { "parser": "json" }
+    },
+    {
+      "files": ".babelrc",
+      "options": { "parser": "json" }
+    },
+    {
+      "files": "*.json",
+      "options": { "parser": "json" }
+    },
+    {
+      "files": "package.json",
+      "options": { "printWidth": 999 }
+    }
+  ]
+}

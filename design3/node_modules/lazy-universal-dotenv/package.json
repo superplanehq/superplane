@@ -1,0 +1,49 @@
+{
+  "name": "lazy-universal-dotenv",
+  "version": "4.0.0",
+  "description": "Robust Environment Configuration for Universal Applications.",
+  "keywords": [
+    "dotenv",
+    "env",
+    "universal"
+  ],
+  "homepage": "https://github.com/storybooks/lazy-universal-dotenv#readme",
+  "bugs": {
+    "url": "https://github.com/storybooks/lazy-universal-dotenv/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/storybooks/lazy-universal-dotenv.git"
+  },
+  "license": "Apache-2.0",
+  "author": "Storybook Team",
+  "files": [
+    "lib/"
+  ],
+  "type": "module",
+  "main": "lib/index.cjs",
+  "module": "lib/index.mjs",
+  "exports": {
+    ".": {
+      "import": "./lib/index.mjs",
+      "require": "./lib/index.cjs"
+    }
+  },
+  "scripts": {
+    "prepare": "rimraf lib && unbuild",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+  },
+  "dependencies": {
+    "app-root-dir": "^1.0.2",
+    "dotenv": "^16.0.0",
+    "dotenv-expand": "^10.0.0"
+  },
+  "devDependencies": {
+    "jest": "^29.4.1",
+    "rimraf": "^2.6.2",
+    "unbuild": "^1.1.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

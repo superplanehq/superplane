@@ -1,0 +1,112 @@
+{
+  "name": "@storybook/addon-links",
+  "version": "7.6.20",
+  "description": "Link stories together to build demos and prototypes with your UI components",
+  "keywords": [
+    "addon",
+    "storybook",
+    "organize"
+  ],
+  "homepage": "https://github.com/storybookjs/storybook/tree/next/code/addons/links",
+  "bugs": {
+    "url": "https://github.com/storybookjs/storybook/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/storybook.git",
+    "directory": "code/addons/links"
+  },
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/storybook"
+  },
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": "./dist/index.js",
+      "require": "./dist/index.js",
+      "import": "./dist/index.mjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "require": "./dist/react/index.js",
+      "import": "./dist/react/index.mjs"
+    },
+    "./manager": "./dist/manager.js",
+    "./preview": "./dist/preview.js",
+    "./register": "./dist/manager.js",
+    "./package.json": "./package.json"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "*": [
+        "dist/index.d.ts"
+      ],
+      "react": [
+        "dist/react/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts",
+    "!src/**/*"
+  ],
+  "scripts": {
+    "check": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/check.ts",
+    "prep": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/addon-bundle.ts"
+  },
+  "dependencies": {
+    "@storybook/csf": "^0.1.2",
+    "@storybook/global": "^5.0.0",
+    "ts-dedent": "^2.0.0"
+  },
+  "devDependencies": {
+    "@storybook/client-logger": "7.6.20",
+    "@storybook/core-events": "7.6.20",
+    "@storybook/manager-api": "7.6.20",
+    "@storybook/preview-api": "7.6.20",
+    "@storybook/router": "7.6.20",
+    "@storybook/types": "7.6.20",
+    "fs-extra": "^11.1.0",
+    "typescript": "~4.9.3"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bundler": {
+    "exportEntries": [
+      "./src/react/index.ts",
+      "./src/index.ts"
+    ],
+    "managerEntries": [
+      "./src/manager.ts"
+    ],
+    "previewEntries": [
+      "./src/preview.ts"
+    ],
+    "post": "./scripts/fix-preview-api-reference.ts"
+  },
+  "gitHead": "e6a7fd8a655c69780bc20b9749c2699e44beae17",
+  "storybook": {
+    "displayName": "Links",
+    "icon": "https://user-images.githubusercontent.com/263385/101991673-48355c80-3c7c-11eb-9b6e-b627c96a75f6.png",
+    "unsupportedFrameworks": [
+      "react-native"
+    ]
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "name": "@storybook/react-dom-shim",
+  "version": "7.6.20",
+  "description": "",
+  "keywords": [
+    "storybook"
+  ],
+  "homepage": "https://github.com/storybookjs/storybook/tree/next/code/lib/react-dom-shim",
+  "bugs": {
+    "url": "https://github.com/storybookjs/storybook/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/storybookjs/storybook.git",
+    "directory": "code/lib/react-dom-shim"
+  },
+  "funding": {
+    "type": "opencollective",
+    "url": "https://opencollective.com/storybook"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/react-16.d.ts",
+      "node": "./dist/react-16.js",
+      "require": "./dist/react-16.js",
+      "import": "./dist/react-16.mjs"
+    },
+    "./dist/react-18": {
+      "types": "./dist/react-18.d.ts",
+      "node": "./dist/react-18.js",
+      "require": "./dist/react-18.js",
+      "import": "./dist/react-18.mjs"
+    },
+    "./dist/preset": {
+      "types": "./dist/preset.d.ts",
+      "require": "./dist/preset.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "dist/react-16.js",
+  "module": "dist/react-16.mjs",
+  "types": "dist/react-16.d.ts",
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "*.js",
+    "*.d.ts",
+    "!src/**/*"
+  ],
+  "scripts": {
+    "check": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/check.ts",
+    "prep": "node --loader ../../../scripts/node_modules/esbuild-register/loader.js -r ../../../scripts/node_modules/esbuild-register/register.js ../../../scripts/prepare/bundle.ts"
+  },
+  "devDependencies": {
+    "@storybook/types": "7.6.20",
+    "typescript": "~4.9.3"
+  },
+  "peerDependencies": {
+    "react": "^16.8.0 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "bundler": {
+    "entries": [
+      "./src/preset.ts",
+      "./src/react-16.tsx",
+      "./src/react-18.tsx"
+    ]
+  },
+  "gitHead": "e6a7fd8a655c69780bc20b9749c2699e44beae17"
+}
