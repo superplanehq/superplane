@@ -29,14 +29,19 @@ func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService au
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// Support both organization and canvas groups
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION && req.DomainType != pb.DomainType_DOMAIN_TYPE_CANVAS {
-		return nil, status.Error(codes.Unimplemented, "only organization and canvas groups are currently supported")
+	var domainType string
+	switch req.DomainType {
+	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		domainType = "org"
+	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+		domainType = "canvas"
+	default:
+		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
 	// TODO: once orgs/canvases are implemented, check if the domain exists
 
-	err = authService.CreateGroup(req.DomainId, req.GroupName, req.Role)
+	err = authService.CreateGroup(req.DomainId, domainType, req.GroupName, req.Role)
 	if err != nil {
 		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainId, err)
 		return nil, status.Error(codes.Internal, "failed to create group")

@@ -32,7 +32,7 @@ func Test_CreateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if group was created
-		groups, err := authService.GetGroups(orgID)
+		groups, err := authService.GetGroups(orgID, "org")
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)
@@ -40,11 +40,14 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("successful canvas group creation", func(t *testing.T) {
 		canvasID := uuid.New().String()
+		err := authService.SetupCanvasRoles(canvasID)
+		require.NoError(t, err)
+		
 		req := &pb.CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			GroupName:  "canvas-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       authorization.RoleCanvasAdmin,
 		}
 
 		resp, err := CreateGroup(ctx, req, authService)

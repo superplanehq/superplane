@@ -24,13 +24,17 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// For now, only support organization groups as the interface only has AddUserToGroup(orgID, userID, group)
-	// TODO: Update authorization service interface to support domain types
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION {
-		return nil, status.Error(codes.Unimplemented, "only organization groups are currently supported")
+	var domainType string
+	switch req.DomainType {
+	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		domainType = "org"
+	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+		domainType = "canvas"
+	default:
+		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
-	err = authService.AddUserToGroup(req.DomainId, req.UserId, req.GroupName)
+	err = authService.AddUserToGroup(req.DomainId, domainType, req.UserId, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to add user to group")
 	}

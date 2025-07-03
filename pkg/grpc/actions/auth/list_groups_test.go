@@ -20,9 +20,9 @@ func Test_ListGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create some groups first
-	err = authService.CreateGroup(orgID, "test-group-1", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, "org", "test-group-1", authorization.RoleOrgAdmin)
 	require.NoError(t, err)
-	err = authService.CreateGroup(orgID, "test-group-2", authorization.RoleOrgViewer)
+	err = authService.CreateGroup(orgID, "org", "test-group-2", authorization.RoleOrgViewer)
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
@@ -68,10 +68,12 @@ func Test_ListGroups(t *testing.T) {
 	t.Run("successful canvas groups list", func(t *testing.T) {
 		canvasID := uuid.New().String()
 		
-		// Create canvas groups
-		err := authService.CreateGroup(canvasID, "canvas-group-1", authorization.RoleOrgAdmin)
+		// Setup canvas roles and create canvas groups
+		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas-group-2", authorization.RoleOrgViewer)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-1", authorization.RoleCanvasAdmin)
+		require.NoError(t, err)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", authorization.RoleCanvasViewer)
 		require.NoError(t, err)
 		
 		req := &pb.ListGroupsRequest{

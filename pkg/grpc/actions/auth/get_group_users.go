@@ -24,12 +24,17 @@ func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authServic
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// Support both organization and canvas groups
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION && req.DomainType != pb.DomainType_DOMAIN_TYPE_CANVAS {
-		return nil, status.Error(codes.Unimplemented, "only organization and canvas groups are currently supported")
+	var domainType string
+	switch req.DomainType {
+	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		domainType = "org"
+	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+		domainType = "canvas"
+	default:
+		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
-	userIDs, err := authService.GetGroupUsers(req.DomainId, req.GroupName)
+	userIDs, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}

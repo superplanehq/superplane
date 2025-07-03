@@ -20,12 +20,17 @@ func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	// Support both organization and canvas groups
-	if req.DomainType != pb.DomainType_DOMAIN_TYPE_ORGANIZATION && req.DomainType != pb.DomainType_DOMAIN_TYPE_CANVAS {
-		return nil, status.Error(codes.Unimplemented, "only organization and canvas groups are currently supported")
+	var domainType string
+	switch req.DomainType {
+	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		domainType = "org"
+	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+		domainType = "canvas"
+	default:
+		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
-	groupNames, err := authService.GetGroups(req.DomainId)
+	groupNames, err := authService.GetGroups(req.DomainId, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get groups")
 	}

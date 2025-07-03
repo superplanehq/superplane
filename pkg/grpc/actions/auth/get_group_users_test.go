@@ -22,11 +22,11 @@ func Test_GetGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, "test-group", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, "org", "test-group", authorization.RoleOrgAdmin)
 	require.NoError(t, err)
 
 	// Add user to group
-	err = authService.AddUserToGroup(orgID, r.User.String(), "test-group")
+	err = authService.AddUserToGroup(orgID, "org", r.User.String(), "test-group")
 	require.NoError(t, err)
 
 	t.Run("successful get group users", func(t *testing.T) {
@@ -78,10 +78,12 @@ func Test_GetGroupUsers(t *testing.T) {
 	t.Run("successful canvas group get users", func(t *testing.T) {
 		canvasID := uuid.New().String()
 		
-		// Create canvas group and add user
-		err := authService.CreateGroup(canvasID, "canvas-group", authorization.RoleOrgAdmin)
+		// Setup canvas roles and create canvas group
+		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(canvasID, r.User.String(), "canvas-group")
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin)
+		require.NoError(t, err)
+		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
 		
 		req := &pb.GetGroupUsersRequest{
@@ -105,7 +107,7 @@ func Test_GetGroupUsers(t *testing.T) {
 
 	t.Run("empty group - no users", func(t *testing.T) {
 		// Create another group without users
-		err = authService.CreateGroup(orgID, "empty-group", authorization.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, "org", "empty-group", authorization.RoleOrgViewer)
 		require.NoError(t, err)
 
 		req := &pb.GetGroupUsersRequest{
