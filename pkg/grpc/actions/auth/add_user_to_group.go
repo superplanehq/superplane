@@ -36,7 +36,7 @@ func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authServ
 
 	err = authService.AddUserToGroup(req.DomainId, domainType, req.UserId, req.GroupName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to add user to group")
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	return &pb.AddUserToGroupResponse{}, nil

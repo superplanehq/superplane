@@ -55,17 +55,17 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		"/Superplane.Organizations.Organizations/DeleteOrganization":   {Resource: "org", Action: "delete", DomainType: "org"},
 
 		// Authorization rules
-		"/Superplane.Authorization.Authorization/ListUserPermissions":    {Resource: "user", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/AssignRole":             {Resource: "role", Action: "assign", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/RemoveRole":             {Resource: "role", Action: "remove", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/ListRoles":              {Resource: "role", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/DescribeRole":           {Resource: "role", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/GetUserRoles":           {Resource: "user", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/CreateGroup":            {Resource: "group", Action: "create", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/AddUserToGroup":         {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/RemoveUserFromGroup":    {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/ListOrganizationGroups": {Resource: "group", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/GetGroupUsers":          {Resource: "group", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/ListUserPermissions": {Resource: "user", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/AssignRole":          {Resource: "role", Action: "assign", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/RemoveRole":          {Resource: "role", Action: "remove", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/ListRoles":           {Resource: "role", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/DescribeRole":        {Resource: "role", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/GetUserRoles":        {Resource: "user", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/CreateGroup":         {Resource: "group", Action: "create", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/AddUserToGroup":      {Resource: "group", Action: "update", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/RemoveUserFromGroup": {Resource: "group", Action: "update", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/ListGroups":          {Resource: "group", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/GetGroupUsers":       {Resource: "group", Action: "read", DomainType: "org"},
 	}
 
 	return &AuthorizationInterceptor{
