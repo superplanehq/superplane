@@ -4,7 +4,8 @@ import { Subheading } from './lib/Heading/heading'
 import { Text } from './lib/Text/text'
 import { Button } from './lib/Button/button'
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol'
-import { Tabs, type Tab } from './lib/Tabs/tabs'
+import { type Tab } from './lib/Tabs/tabs'
+import clsx from 'clsx'
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel, DropdownDescription } from './lib/Dropdown/dropdown'
 import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from './lib/Dialog/dialog'
 import { Input, InputGroup } from './lib/Input/input'
@@ -255,19 +256,32 @@ export function SettingsPage({
         </header>
 
         {/* Settings Content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto">
-            {/* Tabs */}
-            <div className="mb-6">
-              <Tabs
-                tabs={tabs}
-                defaultTab="users"
-                onTabChange={(tabId) => setActiveTab(tabId as 'users' | 'groups' | 'roles')}
-                variant="underline"
-              />
-            </div>
+        <main className="flex-1 flex">
+          {/* Sidebar Navigation */}
+          <div className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-700 p-6">
+            <nav className="space-y-2">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as 'users' | 'groups' | 'roles')}
+                  className={clsx(
+                    'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors',
+                    activeTab === tab.id
+                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+                  )}
+                >
+                  {tab.icon}
+                  <span className="text-sm font-medium">{tab.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
 
-            {/* Tab Content */}
+          {/* Main Content Area */}
+          <div className="flex-1 p-6">
+            <div className="max-w-5xl mx-auto">
+              {/* Tab Content */}
             {activeTab === 'users' && (
               <div className="space-y-6">
                 {/* Invite new members section */}
@@ -506,6 +520,7 @@ export function SettingsPage({
                 </div>
               </div>
             )}
+            </div>
           </div>
         </main>
       </div>
