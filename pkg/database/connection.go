@@ -94,6 +94,6 @@ func TruncateTables() error {
 		connections, stage_executions,
 		connection_groups, connection_group_field_sets, connection_group_field_set_events,
 		secrets, account_providers, users, organizations,
-		casbin_rule;
+		casbin_rule, role_permission_overrides, role_hierarchy_overrides;
 	`).Error
 }

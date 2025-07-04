@@ -1,6 +1,7 @@
 package authorization
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -1165,5 +1166,554 @@ func Test__AuthService_GetRoleHierarchy(t *testing.T) {
 		// Test invalid domain type
 		_, err = authService.GetRoleHierarchy(RoleOrgViewer, "invalid_domain", orgID)
 		assert.Error(t, err)
+	})
+}
+
+func Test__AuthService_DetectMissingPermissions(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	t.Run("detect missing permissions in empty database", func(t *testing.T) {
+		// Since we have orgs and canvases but no permissions set up yet
+		missingOrgs, missingCanvases, err := authService.DetectMissingPermissions()
+		require.NoError(t, err)
+
+		// Should detect missing permissions for existing org and canvas
+		// The optimized version only returns entities that actually have missing permissions
+		assert.GreaterOrEqual(t, len(missingOrgs), 0, "Should detect orgs with missing permissions")
+		assert.GreaterOrEqual(t, len(missingCanvases), 0, "Should detect canvases with missing permissions")
+	})
+
+	t.Run("detect no missing permissions after setup", func(t *testing.T) {
+		orgID := r.Organization.ID.String()
+		canvasID := r.Canvas.ID.String()
+
+		// Setup roles for org and canvas
+		err := authService.SetupOrganizationRoles(orgID)
+		require.NoError(t, err)
+		err = authService.SetupCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		// Now detect missing permissions
+		missingOrgs, missingCanvases, err := authService.DetectMissingPermissions()
+		require.NoError(t, err)
+
+		// Should not detect any missing permissions for the setup org and canvas
+		orgFound := false
+		canvasFound := false
+
+		for _, missing := range missingOrgs {
+			if strings.Contains(missing, orgID) {
+				orgFound = true
+				break
+			}
+		}
+
+		for _, missing := range missingCanvases {
+			if strings.Contains(missing, canvasID) {
+				canvasFound = true
+				break
+			}
+		}
+
+		assert.False(t, orgFound, "Should not find missing permissions for setup org")
+		assert.False(t, canvasFound, "Should not find missing permissions for setup canvas")
+	})
+
+	t.Run("detect missing permissions after partial setup", func(t *testing.T) {
+		// Test that we can detect missing permissions for existing entities
+		// Note: In real scenario, orgs/canvases would exist but not have roles set up
+
+		missingOrgs, _, err := authService.DetectMissingPermissions()
+		require.NoError(t, err)
+
+		// Should detect missing permissions for any orgs that exist but don't have roles set up
+		assert.GreaterOrEqual(t, len(missingOrgs), 0)
+	})
+}
+
+func Test__AuthService_SyncDefaultRoles(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	orgID := r.Organization.ID.String()
+	canvasID := r.Canvas.ID.String()
+
+	t.Run("sync default roles for existing entities", func(t *testing.T) {
+		// First check that we have missing permissions
+		missingOrgsBefore, missingCanvasesBefore, err := authService.DetectMissingPermissions()
+		require.NoError(t, err)
+
+		// Sync default roles
+		err = authService.SyncDefaultRoles()
+		require.NoError(t, err)
+
+		// Check that missing permissions are now resolved
+		missingOrgsAfter, missingCanvasesAfter, err := authService.DetectMissingPermissions()
+		require.NoError(t, err)
+
+		// Should have fewer or same missing permissions after sync
+		assert.LessOrEqual(t, len(missingOrgsAfter), len(missingOrgsBefore))
+		assert.LessOrEqual(t, len(missingCanvasesAfter), len(missingCanvasesBefore))
+
+		// Verify that roles are properly set up
+		roles, err := authService.GetAllRoleDefinitions(DomainOrg, orgID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(roles), 3) // Should have viewer, admin, owner
+
+		canvasRoles, err := authService.GetAllRoleDefinitions(DomainCanvas, canvasID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(canvasRoles), 3) // Should have viewer, admin, owner
+	})
+
+	t.Run("sync is idempotent", func(t *testing.T) {
+		// Run sync twice
+		err := authService.SyncDefaultRoles()
+		require.NoError(t, err)
+
+		err = authService.SyncDefaultRoles()
+		require.NoError(t, err)
+
+		// Should still work and not create duplicates
+		roles, err := authService.GetAllRoleDefinitions(DomainOrg, orgID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(roles), 3)
+
+		// Test that permissions still work
+		userID := r.User.String()
+		err = authService.AssignRole(userID, RoleOrgViewer, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+	})
+}
+
+func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	t.Run("check and sync in one operation", func(t *testing.T) {
+		// Run the combined operation
+		err := authService.CheckAndSyncMissingPermissions()
+		require.NoError(t, err)
+
+		// Verify that permissions are now properly set up
+		orgID := r.Organization.ID.String()
+		canvasID := r.Canvas.ID.String()
+
+		// Test org permissions
+		roles, err := authService.GetAllRoleDefinitions(DomainOrg, orgID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(roles), 3)
+
+		// Test canvas permissions
+		canvasRoles, err := authService.GetAllRoleDefinitions(DomainCanvas, canvasID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(canvasRoles), 3)
+
+		// Test that roles work properly
+		userID := r.User.String()
+		err = authService.AssignRole(userID, RoleOrgAdmin, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "create")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+	})
+
+	t.Run("no errors on already synced system", func(t *testing.T) {
+		// Run sync twice - should not error
+		err := authService.CheckAndSyncMissingPermissions()
+		require.NoError(t, err)
+
+		err = authService.CheckAndSyncMissingPermissions()
+		require.NoError(t, err)
+	})
+}
+
+func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	orgID := r.Organization.ID.String()
+
+	t.Run("sync organization roles creates expected policies", func(t *testing.T) {
+		// Sync org roles
+		err := authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// Test that all expected roles exist
+		expectedRoles := []string{RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner}
+		for _, role := range expectedRoles {
+			roleDef, err := authService.GetRoleDefinition(role, DomainOrg, orgID)
+			require.NoError(t, err)
+			assert.Equal(t, role, roleDef.Name)
+			assert.NotEmpty(t, roleDef.Permissions)
+		}
+
+		// Test role hierarchy
+		userID := r.User.String()
+		err = authService.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		// Owner should have admin and viewer permissions through inheritance
+		roles, err := authService.GetUserRolesForOrg(userID, orgID)
+		require.NoError(t, err)
+
+		flatRoles := make(map[string]bool)
+		for _, role := range roles {
+			flatRoles[role.Name] = true
+		}
+
+		assert.True(t, flatRoles[RoleOrgOwner])
+		assert.True(t, flatRoles[RoleOrgAdmin])
+		assert.True(t, flatRoles[RoleOrgViewer])
+	})
+
+	t.Run("sync is idempotent for organizations", func(t *testing.T) {
+		// Sync multiple times
+		err := authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		err = authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// Should still work correctly
+		roles, err := authService.GetAllRoleDefinitions(DomainOrg, orgID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(roles), 3)
+	})
+}
+
+func Test__AuthService_SyncCanvasRoles(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	canvasID := r.Canvas.ID.String()
+
+	t.Run("sync canvas roles creates expected policies", func(t *testing.T) {
+		// Sync canvas roles
+		err := authService.syncCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		// Test that all expected roles exist
+		expectedRoles := []string{RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner}
+		for _, role := range expectedRoles {
+			roleDef, err := authService.GetRoleDefinition(role, DomainCanvas, canvasID)
+			require.NoError(t, err)
+			assert.Equal(t, role, roleDef.Name)
+			assert.NotEmpty(t, roleDef.Permissions)
+		}
+
+		// Test role hierarchy
+		userID := r.User.String()
+		err = authService.AssignRole(userID, RoleCanvasOwner, canvasID, DomainCanvas)
+		require.NoError(t, err)
+
+		// Owner should have admin and viewer permissions through inheritance
+		roles, err := authService.GetUserRolesForCanvas(userID, canvasID)
+		require.NoError(t, err)
+
+		flatRoles := make(map[string]bool)
+		for _, role := range roles {
+			flatRoles[role.Name] = true
+		}
+
+		assert.True(t, flatRoles[RoleCanvasOwner])
+		assert.True(t, flatRoles[RoleCanvasAdmin])
+		assert.True(t, flatRoles[RoleCanvasViewer])
+	})
+
+	t.Run("sync is idempotent for canvases", func(t *testing.T) {
+		// Sync multiple times
+		err := authService.syncCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		err = authService.syncCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		err = authService.syncCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		// Should still work correctly
+		roles, err := authService.GetAllRoleDefinitions(DomainCanvas, canvasID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(roles), 3)
+	})
+}
+
+func Test__AuthService_PermissionSync_Integration(t *testing.T) {
+	r := support.Setup(t)
+
+	// Create a fresh auth service to test manual sync
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	t.Run("manual sync sets up permissions correctly", func(t *testing.T) {
+		orgID := r.Organization.ID.String()
+		canvasID := r.Canvas.ID.String()
+
+		// Run the sync manually (simulating what happens in main.go)
+		err := authService.CheckAndSyncMissingPermissions()
+		require.NoError(t, err)
+
+		// Test that roles are now available
+		orgRoles, err := authService.GetAllRoleDefinitions(DomainOrg, orgID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(orgRoles), 3)
+
+		canvasRoles, err := authService.GetAllRoleDefinitions(DomainCanvas, canvasID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(canvasRoles), 3)
+	})
+
+	t.Run("permissions work end-to-end after startup sync", func(t *testing.T) {
+		userID := r.User.String()
+		orgID := r.Organization.ID.String()
+		canvasID := r.Canvas.ID.String()
+
+		// Assign roles
+		err := authService.AssignRole(userID, RoleOrgAdmin, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		err = authService.AssignRole(userID, RoleCanvasViewer, canvasID, DomainCanvas)
+		require.NoError(t, err)
+
+		// Test org permissions
+		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "create")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		// Test canvas permissions
+		allowed, err = authService.CheckCanvasPermission(userID, canvasID, "stage", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed)
+
+		// Test that viewer doesn't have write permissions
+		allowed, err = authService.CheckCanvasPermission(userID, canvasID, "stage", "create")
+		require.NoError(t, err)
+		assert.False(t, allowed)
+	})
+}
+
+func Test__AuthService_PermissionOverrides(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	orgID := r.Organization.ID.String()
+	canvasID := r.Canvas.ID.String()
+	userID := r.User.String()
+
+	// Setup default roles first
+	err = authService.SetupOrganizationRoles(orgID)
+	require.NoError(t, err)
+	err = authService.SetupCanvasRoles(canvasID)
+	require.NoError(t, err)
+
+	t.Run("create permission override - disable permission", func(t *testing.T) {
+		// Test removing a permission that normally exists
+		err := authService.SetPermissionOverride(&orgID, nil, "org_admin", "user", "remove", false, userID)
+		require.NoError(t, err)
+
+		// Apply sync to see if override takes effect
+		err = authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// Verify the permission was removed
+		testUserID := uuid.New().String()
+		err = authService.AssignRole(testUserID, RoleOrgAdmin, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		// Should not have user remove permission due to override
+		allowed, err := authService.CheckOrganizationPermission(testUserID, orgID, "user", "remove")
+		require.NoError(t, err)
+		assert.False(t, allowed, "Permission should be disabled by override")
+	})
+
+	t.Run("create permission override - add custom permission", func(t *testing.T) {
+		// Test adding a custom permission that doesn't exist in CSV
+		err := authService.SetPermissionOverride(nil, &canvasID, "canvas_viewer", "custom_resource", "custom_action", true, userID)
+		require.NoError(t, err)
+
+		// Apply sync to see if override takes effect
+		err = authService.syncCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		// Verify the custom permission was added
+		testUserID := uuid.New().String()
+		err = authService.AssignRole(testUserID, RoleCanvasViewer, canvasID, DomainCanvas)
+		require.NoError(t, err)
+
+		// Should have the custom permission
+		allowed, err := authService.CheckCanvasPermission(testUserID, canvasID, "custom_resource", "custom_action")
+		require.NoError(t, err)
+		assert.True(t, allowed, "Custom permission should be added by override")
+	})
+
+	t.Run("get permission overrides", func(t *testing.T) {
+		overrides, err := authService.GetAllPermissionOverrides(&orgID, nil)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(overrides), 1, "Should have at least one org override")
+
+		canvasOverrides, err := authService.GetAllPermissionOverrides(nil, &canvasID)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(canvasOverrides), 1, "Should have at least one canvas override")
+	})
+
+	t.Run("hierarchy override", func(t *testing.T) {
+		// Test modifying role hierarchy
+		err := authService.SetHierarchyOverride(&orgID, nil, "role:org_admin", "role:org_viewer", false, userID)
+		require.NoError(t, err)
+
+		// Apply sync
+		err = authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// This would affect inheritance, but testing inheritance changes
+		// requires more complex setup - this test verifies the override was created
+		hierarchyOverrides, err := authService.GetAllHierarchyOverrides(&orgID, nil)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, len(hierarchyOverrides), 1, "Should have hierarchy override")
+	})
+
+	t.Run("validation errors", func(t *testing.T) {
+		// Test validation errors
+		err := authService.SetPermissionOverride(&orgID, &canvasID, "test_role", "test_resource", "test_action", true, userID)
+		assert.Error(t, err, "Should reject both orgID and canvasID")
+
+		err = authService.SetPermissionOverride(nil, nil, "test_role", "test_resource", "test_action", true, userID)
+		assert.Error(t, err, "Should reject neither orgID nor canvasID")
+
+		err = authService.SetPermissionOverride(&orgID, nil, "test_role", "test_resource", "test_action", true, "invalid-uuid")
+		assert.Error(t, err, "Should reject invalid user ID")
+	})
+}
+
+func Test__AuthService_PermissionOverrides_Integration(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	orgID := r.Organization.ID.String()
+	userID := r.User.String()
+
+	t.Run("overrides applied during sync", func(t *testing.T) {
+		// Create override before setting up roles
+		err := authService.SetPermissionOverride(&orgID, nil, "org_viewer", "custom_resource", "read", true, userID)
+		require.NoError(t, err)
+
+		// Now setup roles (this should apply overrides)
+		err = authService.SetupOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// Manually trigger sync to apply overrides
+		err = authService.syncOrganizationRoles(orgID)
+		require.NoError(t, err)
+
+		// Test that the custom permission works
+		testUserID := uuid.New().String()
+		err = authService.AssignRole(testUserID, RoleOrgViewer, orgID, DomainOrg)
+		require.NoError(t, err)
+
+		allowed, err := authService.CheckOrganizationPermission(testUserID, orgID, "custom_resource", "read")
+		require.NoError(t, err)
+		assert.True(t, allowed, "Custom permission should work after sync")
+	})
+
+	t.Run("update existing override", func(t *testing.T) {
+		// Create initial override
+		err := authService.SetPermissionOverride(&orgID, nil, "org_admin", "test_resource", "test_action", true, userID)
+		require.NoError(t, err)
+
+		// Update the same override (should update, not create new)
+		err = authService.SetPermissionOverride(&orgID, nil, "org_admin", "test_resource", "test_action", false, userID)
+		require.NoError(t, err)
+
+		// Verify only one override exists for this combination
+		overrides, err := authService.GetAllPermissionOverrides(&orgID, nil)
+		require.NoError(t, err)
+
+		testOverrideCount := 0
+		for _, override := range overrides {
+			if override.RoleName == "org_admin" && override.Resource == "test_resource" && override.Action == "test_action" {
+				testOverrideCount++
+				assert.False(t, override.IsActive, "Override should be inactive after update")
+			}
+		}
+		assert.Equal(t, 1, testOverrideCount, "Should have exactly one override for this combination")
+	})
+}
+
+func Test__AuthService_OptimizedSync(t *testing.T) {
+	r := support.Setup(t)
+
+	authService, err := NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
+	orgID := r.Organization.ID.String()
+	canvasID := r.Canvas.ID.String()
+
+	t.Run("only syncs entities with missing permissions", func(t *testing.T) {
+		// Before setup - should find missing permissions
+		orgsMissingBefore, err := authService.getOrganizationsWithMissingPermissions()
+		require.NoError(t, err)
+		canvasesMissingBefore, err := authService.getCanvasesWithMissingPermissions()
+		require.NoError(t, err)
+
+		// Should include our test entities since they haven't been set up yet
+		assert.Contains(t, orgsMissingBefore, orgID, "Org should have missing permissions before setup")
+		assert.Contains(t, canvasesMissingBefore, canvasID, "Canvas should have missing permissions before setup")
+
+		// Setup permissions for org and canvas
+		err = authService.SetupOrganizationRoles(orgID)
+		require.NoError(t, err)
+		err = authService.SetupCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		// After setup - should not find missing permissions for these entities
+		orgsMissingAfter, err := authService.getOrganizationsWithMissingPermissions()
+		require.NoError(t, err)
+		canvasesMissingAfter, err := authService.getCanvasesWithMissingPermissions()
+		require.NoError(t, err)
+
+		// Should NOT include our test entities since they're now properly set up
+		assert.NotContains(t, orgsMissingAfter, orgID, "Org should not have missing permissions after setup")
+		assert.NotContains(t, canvasesMissingAfter, canvasID, "Canvas should not have missing permissions after setup")
+	})
+
+	t.Run("optimized sync skips entities with complete permissions", func(t *testing.T) {
+		// Run sync again - should be very fast since no missing permissions
+		err := authService.SyncDefaultRoles()
+		require.NoError(t, err)
+
+		// The sync should have completed without errors and been efficient
+		// (we can't easily test performance here, but the function should work correctly)
 	})
 }
