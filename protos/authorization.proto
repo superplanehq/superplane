@@ -185,7 +185,7 @@ service Authorization {
   //
   rpc GetGroupUsers(GetGroupUsersRequest) returns (GetGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/authorization/groups/users"
+      get: "/api/v1/authorization/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get group users";
