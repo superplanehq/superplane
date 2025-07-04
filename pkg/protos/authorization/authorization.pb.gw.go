@@ -356,14 +356,23 @@ func local_request_Authorization_ListGroups_0(ctx context.Context, marshaler run
 	return msg, metadata, err
 }
 
-var filter_Authorization_GetGroupUsers_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+var filter_Authorization_GetGroupUsers_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
 func request_Authorization_GetGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetGroupUsersRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
 	io.Copy(io.Discard, req.Body)
+	val, ok := pathParams["group_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "group_name")
+	}
+	protoReq.GroupName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
@@ -378,7 +387,16 @@ func local_request_Authorization_GetGroupUsers_0(ctx context.Context, marshaler 
 	var (
 		protoReq GetGroupUsersRequest
 		metadata runtime.ServerMetadata
+		err      error
 	)
+	val, ok := pathParams["group_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "group_name")
+	}
+	protoReq.GroupName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
@@ -718,7 +736,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1006,7 +1024,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1084,7 +1102,10 @@ var (
 	pattern_Authorization_AddUserToGroup_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "users", "add"}, ""))
 	pattern_Authorization_RemoveUserFromGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "users", "remove"}, ""))
 	pattern_Authorization_ListGroups_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "groups"}, ""))
-	pattern_Authorization_GetGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "authorization", "groups", "users"}, ""))
+	pattern_Authorization_GetGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "group_name", "users"}, ""))
+	pattern_Authorization_CreateRole_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "roles"}, ""))
+	pattern_Authorization_UpdateRole_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "authorization", "roles", "role_name"}, ""))
+	pattern_Authorization_DeleteRole_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "authorization", "roles", "role_name"}, ""))
 )
 
 var (
@@ -1099,4 +1120,7 @@ var (
 	forward_Authorization_RemoveUserFromGroup_0 = runtime.ForwardResponseMessage
 	forward_Authorization_ListGroups_0          = runtime.ForwardResponseMessage
 	forward_Authorization_GetGroupUsers_0       = runtime.ForwardResponseMessage
+	forward_Authorization_CreateRole_0          = runtime.ForwardResponseMessage
+	forward_Authorization_UpdateRole_0          = runtime.ForwardResponseMessage
+	forward_Authorization_DeleteRole_0          = runtime.ForwardResponseMessage
 )

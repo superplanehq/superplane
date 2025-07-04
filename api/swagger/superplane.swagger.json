@@ -107,56 +107,6 @@
         ]
       }
     },
-    "/api/v1/authorization/groups/users": {
-      "get": {
-        "summary": "Get group users",
-        "description": "Returns users that belong to a specific group within any domain",
-        "operationId": "Authorization_GetGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/authorization/groups/users/add": {
       "patch": {
         "summary": "Add user to group",
@@ -218,6 +168,56 @@
             "schema": {
               "$ref": "#/definitions/AuthorizationRemoveUserFromGroupRequest"
             }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/groups/{groupName}/users": {
+      "get": {
+        "summary": "Get group users",
+        "description": "Returns users that belong to a specific group within any domain",
+        "operationId": "Authorization_GetGroupUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetGroupUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [

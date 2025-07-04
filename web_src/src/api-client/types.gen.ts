@@ -686,35 +686,6 @@ export type AuthorizationCreateGroupResponses = {
 
 export type AuthorizationCreateGroupResponse2 = AuthorizationCreateGroupResponses[keyof AuthorizationCreateGroupResponses];
 
-export type AuthorizationGetGroupUsersData = {
-    body?: never;
-    path?: never;
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-        groupName?: string;
-    };
-    url: '/api/v1/authorization/groups/users';
-};
-
-export type AuthorizationGetGroupUsersErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationGetGroupUsersError = AuthorizationGetGroupUsersErrors[keyof AuthorizationGetGroupUsersErrors];
-
-export type AuthorizationGetGroupUsersResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationGetGroupUsersResponse;
-};
-
-export type AuthorizationGetGroupUsersResponse2 = AuthorizationGetGroupUsersResponses[keyof AuthorizationGetGroupUsersResponses];
-
 export type AuthorizationAddUserToGroupData = {
     body: AuthorizationAddUserToGroupRequest;
     path?: never;
@@ -764,6 +735,36 @@ export type AuthorizationRemoveUserFromGroupResponses = {
 };
 
 export type AuthorizationRemoveUserFromGroupResponse2 = AuthorizationRemoveUserFromGroupResponses[keyof AuthorizationRemoveUserFromGroupResponses];
+
+export type AuthorizationGetGroupUsersData = {
+    body?: never;
+    path: {
+        groupName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/authorization/groups/{groupName}/users';
+};
+
+export type AuthorizationGetGroupUsersErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationGetGroupUsersError = AuthorizationGetGroupUsersErrors[keyof AuthorizationGetGroupUsersErrors];
+
+export type AuthorizationGetGroupUsersResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationGetGroupUsersResponse;
+};
+
+export type AuthorizationGetGroupUsersResponse2 = AuthorizationGetGroupUsersResponses[keyof AuthorizationGetGroupUsersResponses];
 
 export type AuthorizationListRolesData = {
     body?: never;

@@ -30,6 +30,9 @@ const (
 	Authorization_RemoveUserFromGroup_FullMethodName = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
 	Authorization_ListGroups_FullMethodName          = "/Superplane.Authorization.Authorization/ListGroups"
 	Authorization_GetGroupUsers_FullMethodName       = "/Superplane.Authorization.Authorization/GetGroupUsers"
+	Authorization_CreateRole_FullMethodName          = "/Superplane.Authorization.Authorization/CreateRole"
+	Authorization_UpdateRole_FullMethodName          = "/Superplane.Authorization.Authorization/UpdateRole"
+	Authorization_DeleteRole_FullMethodName          = "/Superplane.Authorization.Authorization/DeleteRole"
 )
 
 // AuthorizationClient is the client API for Authorization service.

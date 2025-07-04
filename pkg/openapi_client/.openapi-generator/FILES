@@ -17,6 +17,7 @@ docs/AuthorizationAddUserToGroupRequest.md
 docs/AuthorizationAssignRoleRequest.md
 docs/AuthorizationCreateGroupRequest.md
 docs/AuthorizationCreateGroupResponse.md
+docs/AuthorizationCreateRoleRequest.md
 docs/AuthorizationDescribeRoleResponse.md
 docs/AuthorizationDomainType.md
 docs/AuthorizationGetGroupUsersResponse.md
@@ -139,6 +140,7 @@ model_authorization_add_user_to_group_request.go
 model_authorization_assign_role_request.go
 model_authorization_create_group_request.go
 model_authorization_create_group_response.go
+model_authorization_create_role_request.go
 model_authorization_describe_role_response.go
 model_authorization_domain_type.go
 model_authorization_get_group_users_response.go

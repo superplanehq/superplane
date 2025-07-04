@@ -768,9 +768,9 @@ func (a *AuthorizationAPIService) AuthorizationDescribeRoleExecute(r ApiAuthoriz
 type ApiAuthorizationGetGroupUsersRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
+	groupName string
 	domainType *string
 	domainId *string
-	groupName *string
 }
 
 func (r ApiAuthorizationGetGroupUsersRequest) DomainType(domainType string) ApiAuthorizationGetGroupUsersRequest {
@@ -780,11 +780,6 @@ func (r ApiAuthorizationGetGroupUsersRequest) DomainType(domainType string) ApiA
 
 func (r ApiAuthorizationGetGroupUsersRequest) DomainId(domainId string) ApiAuthorizationGetGroupUsersRequest {
 	r.domainId = &domainId
-	return r
-}
-
-func (r ApiAuthorizationGetGroupUsersRequest) GroupName(groupName string) ApiAuthorizationGetGroupUsersRequest {
-	r.groupName = &groupName
 	return r
 }
 
@@ -798,12 +793,14 @@ AuthorizationGetGroupUsers Get group users
 Returns users that belong to a specific group within any domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
  @return ApiAuthorizationGetGroupUsersRequest
 */
-func (a *AuthorizationAPIService) AuthorizationGetGroupUsers(ctx context.Context) ApiAuthorizationGetGroupUsersRequest {
+func (a *AuthorizationAPIService) AuthorizationGetGroupUsers(ctx context.Context, groupName string) ApiAuthorizationGetGroupUsersRequest {
 	return ApiAuthorizationGetGroupUsersRequest{
 		ApiService: a,
 		ctx: ctx,
+		groupName: groupName,
 	}
 }
 
@@ -822,7 +819,8 @@ func (a *AuthorizationAPIService) AuthorizationGetGroupUsersExecute(r ApiAuthori
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/groups/users"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -836,9 +834,6 @@ func (a *AuthorizationAPIService) AuthorizationGetGroupUsersExecute(r ApiAuthori
 	}
 	if r.domainId != nil {
 		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
-	}
-	if r.groupName != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "groupName", r.groupName, "", "")
 	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
