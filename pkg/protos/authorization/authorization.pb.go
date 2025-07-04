@@ -1242,6 +1242,327 @@ func (x *GetGroupUsersResponse) GetUserIds() []string {
 	return nil
 }
 
+// Custom role management messages
+type CreateRoleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	DomainType    DomainType             `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	Permissions   []*Permission          `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	InheritedRole string                 `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoleRequest) Reset() {
+	*x = CreateRoleRequest{}
+	mi := &file_authorization_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoleRequest) ProtoMessage() {}
+
+func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoleRequest.ProtoReflect.Descriptor instead.
+func (*CreateRoleRequest) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *CreateRoleRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetDomainType() DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return DomainType_DOMAIN_TYPE_UNSPECIFIED
+}
+
+func (x *CreateRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetPermissions() []*Permission {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *CreateRoleRequest) GetInheritedRole() string {
+	if x != nil {
+		return x.InheritedRole
+	}
+	return ""
+}
+
+type CreateRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateRoleResponse) Reset() {
+	*x = CreateRoleResponse{}
+	mi := &file_authorization_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateRoleResponse) ProtoMessage() {}
+
+func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateRoleResponse.ProtoReflect.Descriptor instead.
+func (*CreateRoleResponse) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{24}
+}
+
+type UpdateRoleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoleName      string                 `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	DomainType    DomainType             `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	Permissions   []*Permission          `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
+	InheritedRole string                 `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateRoleRequest) Reset() {
+	*x = UpdateRoleRequest{}
+	mi := &file_authorization_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateRoleRequest) ProtoMessage() {}
+
+func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateRoleRequest.ProtoReflect.Descriptor instead.
+func (*UpdateRoleRequest) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *UpdateRoleRequest) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
+func (x *UpdateRoleRequest) GetDomainType() DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return DomainType_DOMAIN_TYPE_UNSPECIFIED
+}
+
+func (x *UpdateRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *UpdateRoleRequest) GetPermissions() []*Permission {
+	if x != nil {
+		return x.Permissions
+	}
+	return nil
+}
+
+func (x *UpdateRoleRequest) GetInheritedRole() string {
+	if x != nil {
+		return x.InheritedRole
+	}
+	return ""
+}
+
+type UpdateRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateRoleResponse) Reset() {
+	*x = UpdateRoleResponse{}
+	mi := &file_authorization_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateRoleResponse) ProtoMessage() {}
+
+func (x *UpdateRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateRoleResponse.ProtoReflect.Descriptor instead.
+func (*UpdateRoleResponse) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{26}
+}
+
+type DeleteRoleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoleName      string                 `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	DomainType    DomainType             `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteRoleRequest) Reset() {
+	*x = DeleteRoleRequest{}
+	mi := &file_authorization_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteRoleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteRoleRequest) ProtoMessage() {}
+
+func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteRoleRequest.ProtoReflect.Descriptor instead.
+func (*DeleteRoleRequest) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *DeleteRoleRequest) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
+func (x *DeleteRoleRequest) GetDomainType() DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return DomainType_DOMAIN_TYPE_UNSPECIFIED
+}
+
+func (x *DeleteRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+type DeleteRoleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteRoleResponse) Reset() {
+	*x = DeleteRoleResponse{}
+	mi := &file_authorization_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteRoleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteRoleResponse) ProtoMessage() {}
+
+func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteRoleResponse.ProtoReflect.Descriptor instead.
+func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{28}
+}
+
 // Core data structures
 type Role struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1255,7 +1576,7 @@ type Role struct {
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_authorization_proto_msgTypes[23]
+	mi := &file_authorization_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1267,7 +1588,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[23]
+	mi := &file_authorization_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1280,7 +1601,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{23}
+	return file_authorization_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *Role) GetName() string {
@@ -1322,7 +1643,7 @@ type Permission struct {
 
 func (x *Permission) Reset() {
 	*x = Permission{}
-	mi := &file_authorization_proto_msgTypes[24]
+	mi := &file_authorization_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1334,7 +1655,7 @@ func (x *Permission) String() string {
 func (*Permission) ProtoMessage() {}
 
 func (x *Permission) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[24]
+	mi := &file_authorization_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1347,7 +1668,7 @@ func (x *Permission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Permission.ProtoReflect.Descriptor instead.
 func (*Permission) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{24}
+	return file_authorization_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *Permission) GetResource() string {
@@ -1451,7 +1772,29 @@ const file_authorization_proto_rawDesc = "" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"2\n" +
 	"\x15GetGroupUsersResponse\x12\x19\n" +
-	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\xf0\x01\n" +
+	"\buser_ids\x18\x01 \x03(\tR\auserIds\"\xfa\x01\n" +
+	"\x11CreateRoleRequest\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
+	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
+	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
+	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\"\x14\n" +
+	"\x12CreateRoleResponse\"\x83\x02\n" +
+	"\x11UpdateRoleRequest\x12\x1b\n" +
+	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
+	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
+	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
+	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\"\x14\n" +
+	"\x12UpdateRoleResponse\"\x94\x01\n" +
+	"\x11DeleteRoleRequest\x12\x1b\n" +
+	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
+	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\x14\n" +
+	"\x12DeleteRoleResponse\"\xf0\x01\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
@@ -1468,7 +1811,7 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x022\xd7\x17\n" +
+	"\x12DOMAIN_TYPE_CANVAS\x10\x022\x8d\x1d\n" +
 	"\rAuthorization\x12\xa4\x02\n" +
 	"\x13ListUserPermissions\x124.Superplane.Authorization.ListUserPermissionsRequest\x1a5.Superplane.Authorization.ListUserPermissionsResponse\"\x9f\x01\x92Ac\n" +
 	"\rAuthorization\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x023\x121/api/v1/authorization/users/{user_id}/permissions\x12\xf1\x01\n" +
@@ -1494,7 +1837,16 @@ const file_authorization_proto_rawDesc = "" +
 	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x98\x01\x92AZ\n" +
 	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x025\x123/api/v1/authorization/organizations/{org_id}/groups\x12\x93\x02\n" +
 	"\rGetGroupUsers\x12..Superplane.Authorization.GetGroupUsersRequest\x1a/.Superplane.Authorization.GetGroupUsersResponse\"\xa0\x01\x92AO\n" +
-	"\rAuthorization\x12\x0fGet group users\x1a-Returns users that belong to a specific group\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/usersB\xe3\x01\x92A\xa2\x01\x12x\n" +
+	"\rAuthorization\x12\x0fGet group users\x1a-Returns users that belong to a specific group\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/organizations/{org_id}/groups/{group_name}/users\x12\xe4\x01\n" +
+	"\n" +
+	"CreateRole\x12+.Superplane.Authorization.CreateRoleRequest\x1a,.Superplane.Authorization.CreateRoleResponse\"{\x92AR\n" +
+	"\rAuthorization\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/authorization/roles\x12\xf1\x01\n" +
+	"\n" +
+	"UpdateRole\x12+.Superplane.Authorization.UpdateRoleRequest\x1a,.Superplane.Authorization.UpdateRoleResponse\"\x87\x01\x92AR\n" +
+	"\rAuthorization\x12\vUpdate role\x1a4Updates an existing custom role with new permissions\x82\xd3\xe4\x93\x02,:\x01*\x1a'/api/v1/authorization/roles/{role_name}\x12\xd8\x01\n" +
+	"\n" +
+	"DeleteRole\x12+.Superplane.Authorization.DeleteRoleRequest\x1a,.Superplane.Authorization.DeleteRoleResponse\"o\x92A=\n" +
+	"\rAuthorization\x12\vDelete role\x1a\x1fDeletes an existing custom role\x82\xd3\xe4\x93\x02)*'/api/v1/authorization/roles/{role_name}B\xe3\x01\x92A\xa2\x01\x12x\n" +
 	"\x1cSuperplane Authorization API\x12,API for the Superplane Authorization service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/authorizationb\x06proto3"
 
@@ -1511,7 +1863,7 @@ func file_authorization_proto_rawDescGZIP() []byte {
 }
 
 var file_authorization_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_authorization_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_authorization_proto_msgTypes = make([]protoimpl.MessageInfo, 31)
 var file_authorization_proto_goTypes = []any{
 	(DomainType)(0),                        // 0: Superplane.Authorization.DomainType
 	(*ListUserPermissionsRequest)(nil),     // 1: Superplane.Authorization.ListUserPermissionsRequest
@@ -1537,54 +1889,71 @@ var file_authorization_proto_goTypes = []any{
 	(*ListOrganizationGroupsResponse)(nil), // 21: Superplane.Authorization.ListOrganizationGroupsResponse
 	(*GetGroupUsersRequest)(nil),           // 22: Superplane.Authorization.GetGroupUsersRequest
 	(*GetGroupUsersResponse)(nil),          // 23: Superplane.Authorization.GetGroupUsersResponse
-	(*Role)(nil),                           // 24: Superplane.Authorization.Role
-	(*Permission)(nil),                     // 25: Superplane.Authorization.Permission
+	(*CreateRoleRequest)(nil),              // 24: Superplane.Authorization.CreateRoleRequest
+	(*CreateRoleResponse)(nil),             // 25: Superplane.Authorization.CreateRoleResponse
+	(*UpdateRoleRequest)(nil),              // 26: Superplane.Authorization.UpdateRoleRequest
+	(*UpdateRoleResponse)(nil),             // 27: Superplane.Authorization.UpdateRoleResponse
+	(*DeleteRoleRequest)(nil),              // 28: Superplane.Authorization.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),             // 29: Superplane.Authorization.DeleteRoleResponse
+	(*Role)(nil),                           // 30: Superplane.Authorization.Role
+	(*Permission)(nil),                     // 31: Superplane.Authorization.Permission
 }
 var file_authorization_proto_depIdxs = []int32{
 	0,  // 0: Superplane.Authorization.ListUserPermissionsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 1: Superplane.Authorization.ListUserPermissionsResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	25, // 2: Superplane.Authorization.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
+	31, // 2: Superplane.Authorization.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
 	7,  // 3: Superplane.Authorization.AssignRoleRequest.role_assignment:type_name -> Superplane.Authorization.RoleAssignment
 	7,  // 4: Superplane.Authorization.RemoveRoleRequest.role_assignment:type_name -> Superplane.Authorization.RoleAssignment
 	0,  // 5: Superplane.Authorization.RoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 6: Superplane.Authorization.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	24, // 7: Superplane.Authorization.ListRolesResponse.roles:type_name -> Superplane.Authorization.Role
+	30, // 7: Superplane.Authorization.ListRolesResponse.roles:type_name -> Superplane.Authorization.Role
 	0,  // 8: Superplane.Authorization.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	24, // 9: Superplane.Authorization.DescribeRoleResponse.role:type_name -> Superplane.Authorization.Role
+	30, // 9: Superplane.Authorization.DescribeRoleResponse.role:type_name -> Superplane.Authorization.Role
 	0,  // 10: Superplane.Authorization.GetUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 11: Superplane.Authorization.GetUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	24, // 12: Superplane.Authorization.GetUserRolesResponse.roles:type_name -> Superplane.Authorization.Role
-	0,  // 13: Superplane.Authorization.Role.domain_type:type_name -> Superplane.Authorization.DomainType
-	25, // 14: Superplane.Authorization.Role.permissions:type_name -> Superplane.Authorization.Permission
-	24, // 15: Superplane.Authorization.Role.inherited_role:type_name -> Superplane.Authorization.Role
-	0,  // 16: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
-	1,  // 17: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
-	3,  // 18: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
-	5,  // 19: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
-	8,  // 20: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
-	10, // 21: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
-	12, // 22: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
-	14, // 23: Superplane.Authorization.Authorization.CreateGroup:input_type -> Superplane.Authorization.CreateGroupRequest
-	16, // 24: Superplane.Authorization.Authorization.AddUserToGroup:input_type -> Superplane.Authorization.AddUserToGroupRequest
-	18, // 25: Superplane.Authorization.Authorization.RemoveUserFromGroup:input_type -> Superplane.Authorization.RemoveUserFromGroupRequest
-	20, // 26: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
-	22, // 27: Superplane.Authorization.Authorization.GetGroupUsers:input_type -> Superplane.Authorization.GetGroupUsersRequest
-	2,  // 28: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
-	4,  // 29: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
-	6,  // 30: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
-	9,  // 31: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
-	11, // 32: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
-	13, // 33: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
-	15, // 34: Superplane.Authorization.Authorization.CreateGroup:output_type -> Superplane.Authorization.CreateGroupResponse
-	17, // 35: Superplane.Authorization.Authorization.AddUserToGroup:output_type -> Superplane.Authorization.AddUserToGroupResponse
-	19, // 36: Superplane.Authorization.Authorization.RemoveUserFromGroup:output_type -> Superplane.Authorization.RemoveUserFromGroupResponse
-	21, // 37: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
-	23, // 38: Superplane.Authorization.Authorization.GetGroupUsers:output_type -> Superplane.Authorization.GetGroupUsersResponse
-	28, // [28:39] is the sub-list for method output_type
-	17, // [17:28] is the sub-list for method input_type
-	17, // [17:17] is the sub-list for extension type_name
-	17, // [17:17] is the sub-list for extension extendee
-	0,  // [0:17] is the sub-list for field type_name
+	30, // 12: Superplane.Authorization.GetUserRolesResponse.roles:type_name -> Superplane.Authorization.Role
+	0,  // 13: Superplane.Authorization.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	31, // 14: Superplane.Authorization.CreateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
+	0,  // 15: Superplane.Authorization.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	31, // 16: Superplane.Authorization.UpdateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
+	0,  // 17: Superplane.Authorization.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	0,  // 18: Superplane.Authorization.Role.domain_type:type_name -> Superplane.Authorization.DomainType
+	31, // 19: Superplane.Authorization.Role.permissions:type_name -> Superplane.Authorization.Permission
+	30, // 20: Superplane.Authorization.Role.inherited_role:type_name -> Superplane.Authorization.Role
+	0,  // 21: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
+	1,  // 22: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
+	3,  // 23: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
+	5,  // 24: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
+	8,  // 25: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
+	10, // 26: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
+	12, // 27: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
+	14, // 28: Superplane.Authorization.Authorization.CreateGroup:input_type -> Superplane.Authorization.CreateGroupRequest
+	16, // 29: Superplane.Authorization.Authorization.AddUserToGroup:input_type -> Superplane.Authorization.AddUserToGroupRequest
+	18, // 30: Superplane.Authorization.Authorization.RemoveUserFromGroup:input_type -> Superplane.Authorization.RemoveUserFromGroupRequest
+	20, // 31: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
+	22, // 32: Superplane.Authorization.Authorization.GetGroupUsers:input_type -> Superplane.Authorization.GetGroupUsersRequest
+	24, // 33: Superplane.Authorization.Authorization.CreateRole:input_type -> Superplane.Authorization.CreateRoleRequest
+	26, // 34: Superplane.Authorization.Authorization.UpdateRole:input_type -> Superplane.Authorization.UpdateRoleRequest
+	28, // 35: Superplane.Authorization.Authorization.DeleteRole:input_type -> Superplane.Authorization.DeleteRoleRequest
+	2,  // 36: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
+	4,  // 37: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
+	6,  // 38: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
+	9,  // 39: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
+	11, // 40: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
+	13, // 41: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
+	15, // 42: Superplane.Authorization.Authorization.CreateGroup:output_type -> Superplane.Authorization.CreateGroupResponse
+	17, // 43: Superplane.Authorization.Authorization.AddUserToGroup:output_type -> Superplane.Authorization.AddUserToGroupResponse
+	19, // 44: Superplane.Authorization.Authorization.RemoveUserFromGroup:output_type -> Superplane.Authorization.RemoveUserFromGroupResponse
+	21, // 45: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
+	23, // 46: Superplane.Authorization.Authorization.GetGroupUsers:output_type -> Superplane.Authorization.GetGroupUsersResponse
+	25, // 47: Superplane.Authorization.Authorization.CreateRole:output_type -> Superplane.Authorization.CreateRoleResponse
+	27, // 48: Superplane.Authorization.Authorization.UpdateRole:output_type -> Superplane.Authorization.UpdateRoleResponse
+	29, // 49: Superplane.Authorization.Authorization.DeleteRole:output_type -> Superplane.Authorization.DeleteRoleResponse
+	36, // [36:50] is the sub-list for method output_type
+	22, // [22:36] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_authorization_proto_init() }
@@ -1598,7 +1967,7 @@ func file_authorization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_authorization_proto_rawDesc), len(file_authorization_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   25,
+			NumMessages:   31,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

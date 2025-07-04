@@ -30,6 +30,9 @@ const (
 	Authorization_RemoveUserFromGroup_FullMethodName    = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
 	Authorization_ListOrganizationGroups_FullMethodName = "/Superplane.Authorization.Authorization/ListOrganizationGroups"
 	Authorization_GetGroupUsers_FullMethodName          = "/Superplane.Authorization.Authorization/GetGroupUsers"
+	Authorization_CreateRole_FullMethodName             = "/Superplane.Authorization.Authorization/CreateRole"
+	Authorization_UpdateRole_FullMethodName             = "/Superplane.Authorization.Authorization/UpdateRole"
+	Authorization_DeleteRole_FullMethodName             = "/Superplane.Authorization.Authorization/DeleteRole"
 )
 
 // AuthorizationClient is the client API for Authorization service.
@@ -69,6 +72,15 @@ type AuthorizationClient interface {
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error)
+	// Endpoint for creating a custom role
+	// Operation is synchronous and idempotent.
+	CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error)
+	// Endpoint for updating a custom role
+	// Operation is synchronous and idempotent.
+	UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*UpdateRoleResponse, error)
+	// Endpoint for deleting a custom role
+	// Operation is synchronous and idempotent.
+	DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error)
 }
 
 type authorizationClient struct {
@@ -189,6 +201,36 @@ func (c *authorizationClient) GetGroupUsers(ctx context.Context, in *GetGroupUse
 	return out, nil
 }
 
+func (c *authorizationClient) CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateRoleResponse)
+	err := c.cc.Invoke(ctx, Authorization_CreateRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) UpdateRole(ctx context.Context, in *UpdateRoleRequest, opts ...grpc.CallOption) (*UpdateRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateRoleResponse)
+	err := c.cc.Invoke(ctx, Authorization_UpdateRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteRoleResponse)
+	err := c.cc.Invoke(ctx, Authorization_DeleteRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthorizationServer is the server API for Authorization service.
 // All implementations should embed UnimplementedAuthorizationServer
 // for forward compatibility.
@@ -226,6 +268,15 @@ type AuthorizationServer interface {
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
 	GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error)
+	// Endpoint for creating a custom role
+	// Operation is synchronous and idempotent.
+	CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error)
+	// Endpoint for updating a custom role
+	// Operation is synchronous and idempotent.
+	UpdateRole(context.Context, *UpdateRoleRequest) (*UpdateRoleResponse, error)
+	// Endpoint for deleting a custom role
+	// Operation is synchronous and idempotent.
+	DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error)
 }
 
 // UnimplementedAuthorizationServer should be embedded to have
@@ -267,6 +318,15 @@ func (UnimplementedAuthorizationServer) ListOrganizationGroups(context.Context, 
 }
 func (UnimplementedAuthorizationServer) GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGroupUsers not implemented")
+}
+func (UnimplementedAuthorizationServer) CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateRole not implemented")
+}
+func (UnimplementedAuthorizationServer) UpdateRole(context.Context, *UpdateRoleRequest) (*UpdateRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateRole not implemented")
+}
+func (UnimplementedAuthorizationServer) DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteRole not implemented")
 }
 func (UnimplementedAuthorizationServer) testEmbeddedByValue() {}
 
@@ -486,6 +546,60 @@ func _Authorization_GetGroupUsers_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Authorization_CreateRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).CreateRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_CreateRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).CreateRole(ctx, req.(*CreateRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_UpdateRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).UpdateRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_UpdateRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).UpdateRole(ctx, req.(*UpdateRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_DeleteRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).DeleteRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_DeleteRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).DeleteRole(ctx, req.(*DeleteRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Authorization_ServiceDesc is the grpc.ServiceDesc for Authorization service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -536,6 +650,18 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGroupUsers",
 			Handler:    _Authorization_GetGroupUsers_Handler,
+		},
+		{
+			MethodName: "CreateRole",
+			Handler:    _Authorization_CreateRole_Handler,
+		},
+		{
+			MethodName: "UpdateRole",
+			Handler:    _Authorization_UpdateRole_Handler,
+		},
+		{
+			MethodName: "DeleteRole",
+			Handler:    _Authorization_DeleteRole_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
