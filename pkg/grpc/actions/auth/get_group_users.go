@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
@@ -11,18 +10,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.Authorization) (*pb.GetGroupUsersResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
+		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
 	if req.GroupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
-	}
-
-	if req.Role == "" {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
 	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
@@ -39,25 +34,21 @@ func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService au
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
 
-	// TODO: once orgs/canvases are implemented, check if the domain exists
-
-	err = authService.CreateGroup(req.DomainId, domainType, req.GroupName, req.Role)
+	userIDs, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainId, err)
-		return nil, status.Error(codes.Internal, "failed to create group")
+		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
 
-	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainId, req.DomainType.String())
-
-	// Create the group object for response
+	// Create group object for response
 	group := &pb.Group{
 		Name:       req.GroupName,
 		DomainType: req.DomainType,
 		DomainId:   req.DomainId,
-		Role:       req.Role,
+		Role:       "", // TODO: get actual role from service
 	}
 
-	return &pb.CreateGroupResponse{
-		Group: group,
+	return &pb.GetGroupUsersResponse{
+		UserIds: userIDs,
+		Group:   group,
 	}, nil
 }

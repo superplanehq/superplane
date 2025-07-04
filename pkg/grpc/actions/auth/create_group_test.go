@@ -21,9 +21,10 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("successful group creation", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			OrgId:     orgID,
-			GroupName: "test-group",
-			Role:      authorization.RoleOrgAdmin,
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			GroupName:  "test-group",
+			Role:       authorization.RoleOrgAdmin,
 		}
 
 		resp, err := CreateGroup(ctx, req, authService)
@@ -31,17 +32,38 @@ func Test_CreateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if group was created
-		groups, err := authService.GetGroups(orgID)
+		groups, err := authService.GetGroups(orgID, "org")
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)
 	})
 
+	t.Run("successful canvas group creation", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		err := authService.SetupCanvasRoles(canvasID)
+		require.NoError(t, err)
+		
+		req := &pb.CreateGroupRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
+			GroupName:  "canvas-group",
+			Role:       authorization.RoleCanvasAdmin,
+		}
+
+		resp, err := CreateGroup(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.Equal(t, "canvas-group", resp.Group.Name)
+		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.DomainType)
+		assert.Equal(t, canvasID, resp.Group.DomainId)
+	})
+
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			OrgId:     orgID,
-			GroupName: "",
-			Role:      authorization.RoleOrgAdmin,
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			GroupName:  "",
+			Role:       authorization.RoleOrgAdmin,
 		}
 
 		_, err := CreateGroup(ctx, req, authService)
