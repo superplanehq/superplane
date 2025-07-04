@@ -62,3 +62,15 @@ func (s *AuthorizationServer) ListGroups(ctx context.Context, req *pb.ListGroups
 func (s *AuthorizationServer) GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest) (*pb.GetGroupUsersResponse, error) {
 	return auth.GetGroupUsers(ctx, req, s.authService)
 }
+
+func (s *AuthorizationServer) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {
+	return auth.CreateRole(ctx, req, s.authService)
+}
+
+func (s *AuthorizationServer) UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest) (*pb.UpdateRoleResponse, error) {
+	return auth.UpdateRole(ctx, req, s.authService)
+}
+
+func (s *AuthorizationServer) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
+	return auth.DeleteRole(ctx, req, s.authService)
+}

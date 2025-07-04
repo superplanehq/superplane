@@ -31,6 +31,22 @@ export type AuthorizationCreateGroupResponse = {
     group?: AuthorizationGroup;
 };
 
+export type AuthorizationCreateRoleRequest = {
+    name?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    permissions?: Array<AuthorizationPermission>;
+    inheritedRole?: string;
+};
+
+export type AuthorizationCreateRoleResponse = {
+    [key: string]: unknown;
+};
+
+export type AuthorizationDeleteRoleResponse = {
+    [key: string]: unknown;
+};
+
 export type AuthorizationDescribeRoleResponse = {
     role?: AuthorizationRole;
 };
@@ -108,6 +124,17 @@ export type AuthorizationRoleAssignment = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
     role?: string;
+};
+
+export type AuthorizationUpdateRoleBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    permissions?: Array<AuthorizationPermission>;
+    inheritedRole?: string;
+};
+
+export type AuthorizationUpdateRoleResponse = {
+    [key: string]: unknown;
 };
 
 export type ConnectionDataFilter = {
@@ -766,6 +793,31 @@ export type AuthorizationListRolesResponses = {
 
 export type AuthorizationListRolesResponse2 = AuthorizationListRolesResponses[keyof AuthorizationListRolesResponses];
 
+export type AuthorizationCreateRoleData = {
+    body: AuthorizationCreateRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/authorization/roles';
+};
+
+export type AuthorizationCreateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationCreateRoleError = AuthorizationCreateRoleErrors[keyof AuthorizationCreateRoleErrors];
+
+export type AuthorizationCreateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationCreateRoleResponse;
+};
+
+export type AuthorizationCreateRoleResponse2 = AuthorizationCreateRoleResponses[keyof AuthorizationCreateRoleResponses];
+
 export type AuthorizationAssignRoleData = {
     body: AuthorizationAssignRoleRequest;
     path?: never;
@@ -844,6 +896,63 @@ export type AuthorizationRemoveRoleResponses = {
 };
 
 export type AuthorizationRemoveRoleResponse2 = AuthorizationRemoveRoleResponses[keyof AuthorizationRemoveRoleResponses];
+
+export type AuthorizationDeleteRoleData = {
+    body?: never;
+    path: {
+        roleName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/authorization/roles/{roleName}';
+};
+
+export type AuthorizationDeleteRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationDeleteRoleError = AuthorizationDeleteRoleErrors[keyof AuthorizationDeleteRoleErrors];
+
+export type AuthorizationDeleteRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationDeleteRoleResponse;
+};
+
+export type AuthorizationDeleteRoleResponse2 = AuthorizationDeleteRoleResponses[keyof AuthorizationDeleteRoleResponses];
+
+export type AuthorizationUpdateRoleData = {
+    body: AuthorizationUpdateRoleBody;
+    path: {
+        roleName: string;
+    };
+    query?: never;
+    url: '/api/v1/authorization/roles/{roleName}';
+};
+
+export type AuthorizationUpdateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationUpdateRoleError = AuthorizationUpdateRoleErrors[keyof AuthorizationUpdateRoleErrors];
+
+export type AuthorizationUpdateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationUpdateRoleResponse;
+};
+
+export type AuthorizationUpdateRoleResponse2 = AuthorizationUpdateRoleResponses[keyof AuthorizationUpdateRoleResponses];
 
 export type AuthorizationListUserPermissionsData = {
     body?: never;

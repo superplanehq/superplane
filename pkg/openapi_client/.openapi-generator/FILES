@@ -30,6 +30,7 @@ docs/AuthorizationRemoveRoleRequest.md
 docs/AuthorizationRemoveUserFromGroupRequest.md
 docs/AuthorizationRole.md
 docs/AuthorizationRoleAssignment.md
+docs/AuthorizationUpdateRoleBody.md
 docs/CanvasAPI.md
 docs/ConnectionDataFilter.md
 docs/ConnectionFilter.md
@@ -151,6 +152,7 @@ model_authorization_remove_role_request.go
 model_authorization_remove_user_from_group_request.go
 model_authorization_role.go
 model_authorization_role_assignment.go
+model_authorization_update_role_body.go
 model_connection_data_filter.go
 model_connection_filter.go
 model_connection_filter_operator.go

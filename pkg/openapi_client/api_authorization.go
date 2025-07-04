@@ -378,6 +378,256 @@ func (a *AuthorizationAPIService) AuthorizationCreateGroupExecute(r ApiAuthoriza
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiAuthorizationCreateRoleRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	body *AuthorizationCreateRoleRequest
+}
+
+func (r ApiAuthorizationCreateRoleRequest) Body(body AuthorizationCreateRoleRequest) ApiAuthorizationCreateRoleRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiAuthorizationCreateRoleRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationCreateRoleExecute(r)
+}
+
+/*
+AuthorizationCreateRole Create role
+
+Creates a new custom role with specified permissions
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiAuthorizationCreateRoleRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationCreateRole(ctx context.Context) ApiAuthorizationCreateRoleRequest {
+	return ApiAuthorizationCreateRoleRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *AuthorizationAPIService) AuthorizationCreateRoleExecute(r ApiAuthorizationCreateRoleRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationCreateRole")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/authorization/roles"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationDeleteRoleRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	roleName string
+	domainType *string
+	domainId *string
+}
+
+func (r ApiAuthorizationDeleteRoleRequest) DomainType(domainType string) ApiAuthorizationDeleteRoleRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiAuthorizationDeleteRoleRequest) DomainId(domainId string) ApiAuthorizationDeleteRoleRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiAuthorizationDeleteRoleRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationDeleteRoleExecute(r)
+}
+
+/*
+AuthorizationDeleteRole Delete role
+
+Deletes an existing custom role
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiAuthorizationDeleteRoleRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationDeleteRole(ctx context.Context, roleName string) ApiAuthorizationDeleteRoleRequest {
+	return ApiAuthorizationDeleteRoleRequest{
+		ApiService: a,
+		ctx: ctx,
+		roleName: roleName,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *AuthorizationAPIService) AuthorizationDeleteRoleExecute(r ApiAuthorizationDeleteRoleRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationDeleteRole")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/authorization/roles/{roleName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiAuthorizationDescribeRoleRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
@@ -1336,6 +1586,128 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroupExecute(r ApiA
 	}
 
 	localVarPath := localBasePath + "/api/v1/authorization/groups/users/remove"
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationUpdateRoleRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	roleName string
+	body *AuthorizationUpdateRoleBody
+}
+
+func (r ApiAuthorizationUpdateRoleRequest) Body(body AuthorizationUpdateRoleBody) ApiAuthorizationUpdateRoleRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiAuthorizationUpdateRoleRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationUpdateRoleExecute(r)
+}
+
+/*
+AuthorizationUpdateRole Update role
+
+Updates an existing custom role with new permissions
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param roleName
+ @return ApiAuthorizationUpdateRoleRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationUpdateRole(ctx context.Context, roleName string) ApiAuthorizationUpdateRoleRequest {
+	return ApiAuthorizationUpdateRoleRequest{
+		ApiService: a,
+		ctx: ctx,
+		roleName: roleName,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *AuthorizationAPIService) AuthorizationUpdateRoleExecute(r ApiAuthorizationUpdateRoleRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPut
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationUpdateRole")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/authorization/roles/{roleName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"roleName"+"}", url.PathEscape(parameterValueToString(r.roleName, "roleName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

@@ -97,6 +97,21 @@ export const authorizationListRoles = <ThrowOnError extends boolean = false>(opt
 };
 
 /**
+ * Create role
+ * Creates a new custom role with specified permissions
+ */
+export const authorizationCreateRole = <ThrowOnError extends boolean = false>(options: Options<AuthorizationCreateRoleData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).post<AuthorizationCreateRoleResponse2, AuthorizationCreateRoleError, ThrowOnError>({
+        url: '/api/v1/authorization/roles',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers
+        }
+    });
+};
+
+/**
  * Assign role
  * Assigns a role to a user within an organization or canvas
  */
@@ -129,6 +144,32 @@ export const authorizationDescribeRole = <ThrowOnError extends boolean = false>(
 export const authorizationRemoveRole = <ThrowOnError extends boolean = false>(options: Options<AuthorizationRemoveRoleData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).patch<AuthorizationRemoveRoleResponse2, AuthorizationRemoveRoleError, ThrowOnError>({
         url: '/api/v1/authorization/roles/remove',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers
+        }
+    });
+};
+
+/**
+ * Delete role
+ * Deletes an existing custom role
+ */
+export const authorizationDeleteRole = <ThrowOnError extends boolean = false>(options: Options<AuthorizationDeleteRoleData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).delete<AuthorizationDeleteRoleResponse2, AuthorizationDeleteRoleError, ThrowOnError>({
+        url: '/api/v1/authorization/roles/{roleName}',
+        ...options
+    });
+};
+
+/**
+ * Update role
+ * Updates an existing custom role with new permissions
+ */
+export const authorizationUpdateRole = <ThrowOnError extends boolean = false>(options: Options<AuthorizationUpdateRoleData, ThrowOnError>) => {
+    return (options.client ?? _heyApiClient).put<AuthorizationUpdateRoleResponse2, AuthorizationUpdateRoleError, ThrowOnError>({
+        url: '/api/v1/authorization/roles/{roleName}',
         ...options,
         headers: {
             'Content-Type': 'application/json',
