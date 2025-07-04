@@ -55,7 +55,6 @@ type CustomRoleManager interface {
 	UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error
 	DeleteCustomRole(domainID string, domainType string, roleName string) error
 	IsDefaultRole(roleName string, domainType string) bool
-	CustomizeDefaultRole(domainID string, domainType string, roleName string, permissions []*Permission) error
 }
 
 // Authorization interface

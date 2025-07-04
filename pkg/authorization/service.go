@@ -786,57 +786,6 @@ func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
 	return contains(roles, roleName)
 }
 
-// CustomizeDefaultRole allows customizing permissions of default roles for a specific domain
-func (a *AuthService) CustomizeDefaultRole(domainID string, domainType string, roleName string, permissions []*Permission) error {
-	// Validate that the role is a default role
-	if !a.IsDefaultRole(roleName, domainType) {
-		return fmt.Errorf("role %s is not a default role", roleName)
-	}
-
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-
-	// Remove existing custom policies for this role in this domain (keep original template policies)
-	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, roleName, domain)
-	for _, policy := range existingPolicies {
-		if len(policy) >= 4 {
-			// Only remove if it's a custom policy (not from template)
-			if !a.isPolicyFromTemplate(roleName, policy[2], policy[3], domainType) {
-				_, err := a.enforcer.RemovePolicy(policy)
-				if err != nil {
-					return fmt.Errorf("failed to remove existing custom policy: %w", err)
-				}
-			}
-		}
-	}
-
-	// Add new custom permissions
-	for _, permission := range permissions {
-		_, err := a.enforcer.AddPolicy(roleName, domain, permission.Resource, permission.Action)
-		if err != nil {
-			return fmt.Errorf("failed to add custom permission for role %s: %w", roleName, err)
-		}
-	}
-
-	return nil
-}
-
-// isPolicyFromTemplate checks if a policy comes from the original template
-func (a *AuthService) isPolicyFromTemplate(roleName, resource, action, domainType string) bool {
-	var templates [][5]string
-	if domainType == DomainOrg {
-		templates = a.orgPolicyTemplates
-	} else if domainType == DomainCanvas {
-		templates = a.canvasPolicyTemplates
-	}
-
-	for _, template := range templates {
-		if template[0] == roleName && template[2] == resource && template[3] == action {
-			return true
-		}
-	}
-	return false
-}
-
 func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 	var policies [][5]string
 
