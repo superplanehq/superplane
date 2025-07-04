@@ -6,6 +6,7 @@ agent:
     os_image: ubuntu2204
 blocks:
   - name: "\U0001F9EA QA"
+    dependencies: []
     task:
       env_vars:
         - name: DOCKER_BUILDKIT
@@ -25,6 +26,22 @@ blocks:
         always:
           commands:
             - test-results publish junit-report.xml
+
+  - name: "🔨 Frontend Build"
+    dependencies: []
+    task:
+      prologue:
+        commands:
+          - checkout
+          - sem-version node 20
+      jobs:
+        - name: "Build Frontend"
+          commands:
+            - cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules
+            - cd web_src
+            - npm ci
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+            - npm run build
 
 after_pipeline:
   task:
