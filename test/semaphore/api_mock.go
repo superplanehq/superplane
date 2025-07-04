@@ -17,6 +17,7 @@ type SemaphoreAPIMock struct {
 	Workflows map[string]Pipeline
 
 	LastTaskTrigger *semaphore.TaskTrigger
+	LastRunWorkflow *semaphore.RunWorkflowParams
 }
 
 type Pipeline struct {
@@ -45,6 +46,11 @@ func (s *SemaphoreAPIMock) Init() {
 
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1alpha/pipelines") {
 			s.DescribePipeline(w, r)
+			return
+		}
+
+		if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/api/v1alpha/plumber-workflows") {
+			s.RunWorkflow(w, r)
 			return
 		}
 
@@ -124,5 +130,32 @@ func (s *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.LastTaskTrigger = &trigger
+	w.Write(data)
+}
+
+func (s *SemaphoreAPIMock) RunWorkflow(w http.ResponseWriter, r *http.Request) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	var params semaphore.RunWorkflowParams
+	err = json.Unmarshal(body, &params)
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	data, err := json.Marshal(semaphore.RunWorkflowResponse{
+		WorkflowID: uuid.New().String(),
+	})
+
+	if err != nil {
+		w.WriteHeader(500)
+		return
+	}
+
+	s.LastRunWorkflow = &params
 	w.Write(data)
 }

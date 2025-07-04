@@ -49,3 +49,5 @@ executor:
       VERSION_A: ${{ inputs.VERSION_A }}
       VERSION_B: ${{ inputs.VERSION_B }}
 ```
+
+If the `taskId` is not specified, the executor will use the [workflows API](https://docs.semaphoreci.com/reference/api#run-workflow) to run a workflow. If the `taskId` is specified, the executor will use the [tasks API](https://docs.semaphoreci.com/reference/api#run-task) to run the task.

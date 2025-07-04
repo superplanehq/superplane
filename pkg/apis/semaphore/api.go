@@ -97,6 +97,55 @@ func (s *Semaphore) DescribeWorkflow(workflowID string) (*Workflow, error) {
 	return &workflow, nil
 }
 
+type RunWorkflowParams struct {
+	ProjectID    string            `json:"project_id"`
+	Reference    string            `json:"reference"`
+	PipelineFile string            `json:"pipeline_file"`
+	Parameters   map[string]string `json:"parameters"`
+}
+
+type RunWorkflowResponse struct {
+	WorkflowID string `json:"workflow_id"`
+}
+
+func (s *Semaphore) RunWorkflow(params RunWorkflowParams) (string, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", s.URL)
+
+	body, err := json.Marshal(&params)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling run workflow params: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var response RunWorkflowResponse
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return response.WorkflowID, nil
+}
+
 // NOTE: pipelines v2 API is not working :)
 func (s *Semaphore) DescribePipeline(pipelineID string) (*Pipeline, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", s.URL, pipelineID)
