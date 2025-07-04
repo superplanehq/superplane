@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { LoginPage } from './components/LoginPage'
+import { HomePage } from './components/HomePage'
+import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
@@ -63,6 +65,12 @@ function App() {
     }
   }
 
+  const handleConfigurationClick = () => {
+    console.log('Configuration button clicked')
+    window.history.pushState(null, '', '/settings')
+    setCurrentPath('/settings')
+  }
+
 
   if (!isLoggedIn) {
     return <LoginPage onLogin={() => setIsLoggedIn(true)} />
@@ -98,12 +106,24 @@ function App() {
     )
   }
 
+  if (currentPath === '/settings') {
+    return (
+      <SettingsPage 
+        onSignOut={() => setIsLoggedIn(false)}
+        navigationLinks={navigationLinks}
+        onLinkClick={handleLinkClick}
+        onConfigurationClick={handleConfigurationClick}
+      />
+    )
+  }
+
   if (currentPath === '/canvases') {
     return (
       <CanvasesPage 
         onSignOut={() => setIsLoggedIn(false)}
         navigationLinks={navigationLinks}
         onLinkClick={handleLinkClick}
+        onConfigurationClick={handleConfigurationClick}
       />
     )
   }
@@ -117,6 +137,7 @@ function App() {
         onSignOut={() => setIsLoggedIn(false)}
         navigationLinks={navigationLinks}
         onLinkClick={handleLinkClick}
+        onConfigurationClick={handleConfigurationClick}
         onBack={() => {
           window.history.pushState(null, '', '/canvases')
           setCurrentPath('/canvases')
@@ -135,12 +156,13 @@ function App() {
     )
   }
 
-  // Default to main landing page after login
+  // Default to home page after login
   return (
-    <MainLandingPage 
+    <HomePage 
       onSignOut={() => setIsLoggedIn(false)}
       navigationLinks={navigationLinks}
       onLinkClick={handleLinkClick}
+      onConfigurationClick={handleConfigurationClick}
     />
   )
 }

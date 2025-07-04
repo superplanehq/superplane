@@ -10,6 +10,7 @@ interface CanvasesPageProps {
   onSignOut?: () => void
   navigationLinks?: NavigationLink[]
   onLinkClick?: (linkId: string) => void
+  onConfigurationClick?: () => void
 }
 
 interface Canvas {
@@ -27,7 +28,7 @@ interface Canvas {
   type: 'canvas'
 }
 
-export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick }: CanvasesPageProps) {
+export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick, onConfigurationClick }: CanvasesPageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -200,6 +201,7 @@ export function CanvasesPage({ onSignOut, navigationLinks = [], onLinkClick }: C
         onUserMenuAction={handleUserMenuAction}
         onOrganizationMenuAction={handleOrganizationMenuAction}
         onLinkClick={handleLinkClick}
+        onConfigurationClick={onConfigurationClick}
       />
 
       {/* Main Content */}

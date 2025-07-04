@@ -20,7 +20,7 @@ import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
 import { Button } from './lib/Button/button';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
-import { Heading } from './lib/Heading/heading';
+import { Heading, Subheading } from './lib/Heading/heading';
 import { Text } from './lib/Text/text';
 
 
@@ -34,6 +34,7 @@ interface CanvasEditorPageProps {
   onSignOut?: () => void
   navigationLinks?: NavigationLink[]
   onLinkClick?: (linkId: string) => void
+  onConfigurationClick?: () => void
   onBack?: () => void
 }
 
@@ -119,6 +120,7 @@ export function CanvasEditorPage({
   onSignOut, 
   navigationLinks = [], 
   onLinkClick,
+  onConfigurationClick,
   onBack
 }: CanvasEditorPageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -286,6 +288,7 @@ export function CanvasEditorPage({
              onUserMenuAction={handleUserMenuAction}
              onOrganizationMenuAction={handleOrganizationMenuAction}
              onLinkClick={handleLinkClick}
+             onConfigurationClick={onConfigurationClick}
            />
      
            {/* Main Content */}
@@ -296,7 +299,7 @@ export function CanvasEditorPage({
                  <div className="flex items-center space-x-4">
                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
                    <div>
-                     <Heading level={1} className="!text-md mb-1">{getCanvasName(canvasId)}</Heading>
+                     <Subheading level={1} className="font-normal mb-1">{getCanvasName(canvasId)}</Subheading>
                    </div>
                  </div>
                  

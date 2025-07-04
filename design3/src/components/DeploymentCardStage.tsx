@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import Tippy from '@tippyjs/react';
-import { DeploymentCardStageProps } from '../types';
+import { DeploymentCardStageProps } from '../types/index';
 
 /**
  * OverlayModal component for displaying code or other content
