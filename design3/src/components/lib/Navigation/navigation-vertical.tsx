@@ -66,8 +66,8 @@ export function NavigationVertical({
       className
     )}>
       {/* Top Section - Logo */}
-      <div className="flex-shrink-0 flex items-center justify-center py-4">
-        <div className="w-8 h-8 flex flex-col items-center justify-center">
+      <div className="flex-shrink-0 flex items-center justify-center py-2">
+        <div className="flex p-2 justify-center bg-zinc-100 rounded-full mb-2">
           <span className="block text-slate-600 dark:text-teal-200 font-extrabold text-xl tracking-wider">SP</span>
         </div>
       </div>
@@ -299,9 +299,11 @@ export function NavigationVertical({
 // Individual navigation link component
 function NavigationLinkItem({ 
   link, 
+  showLabel = false,
   onLinkClick 
 }: { 
-  link: NavigationLink
+  link: NavigationLink, 
+  showLabel?: boolean,
   onLinkClick?: (linkId: string) => void 
 }) {
   const handleClick = () => {
@@ -327,9 +329,11 @@ function NavigationLinkItem({
         ) + " w-7 h-7 block rounded-md"}>
         {link.icon}
       </div>
+      {showLabel &&
       <span className="text-xs block mt-1 leading-0">{link.label}</span>
+      }
       
-      {link.tooltip && (
+      {!showLabel && link.tooltip && (
         <div className="absolute left-full ml-2 px-2 py-1 bg-zinc-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
           {link.tooltip}
         </div>

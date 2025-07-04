@@ -15,6 +15,8 @@ export interface MaterialSymbolProps {
   opticalSize?: number
   /** Additional CSS classes */
   className?: string
+  /** Data slot attribute for button styling */
+  'data-slot'?: string
 }
 
 export function MaterialSymbol({
@@ -24,7 +26,8 @@ export function MaterialSymbol({
   weight = 400,
   grade = 0,
   opticalSize = 24,
-  className
+  className,
+  'data-slot': dataSlot
 }: MaterialSymbolProps) {
   const sizeClasses = {
     sm: '!text-sm', // 14px
@@ -46,6 +49,7 @@ export function MaterialSymbol({
       )}
       style={style}
       aria-hidden="true"
+      data-slot={dataSlot}
     >
       {name}
     </span>

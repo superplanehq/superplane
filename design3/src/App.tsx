@@ -21,12 +21,14 @@ function App() {
     {
       id: 'home',
       label: 'Home',
+      tooltip: 'Home',
       icon: <MaterialSymbol size='lg' opticalSize={20} weight={400} name="home" />,
       isActive: currentPath === '/',
     },
     {
       id: 'canvases',
       label: 'Canvases',
+      tooltip: 'Canvases',
       icon: <MaterialSymbol size='lg' opticalSize={20} weight={400} name="automation" />,
       isActive: currentPath === '/canvases',
     }

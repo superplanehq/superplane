@@ -19,7 +19,7 @@ import { WorkflowNode, WorkflowEdge } from '../types';
 import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
 import { Button } from './lib/Button/button';
-import { MaterialSymbol } from 'react-material-symbols';
+import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
 import { Heading } from './lib/Heading/heading';
 import { Text } from './lib/Text/text';
 
@@ -125,6 +125,18 @@ export function CanvasEditorPage({
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showMiniMap, setShowMiniMap] = useState(true)
 
+  // Get canvas name based on ID
+  const getCanvasName = (id: string) => {
+    const canvasNames: Record<string, string> = {
+      '1': 'Production Deployment Pipeline',
+      '2': 'Development Workflow',
+      '3': 'Testing Environment Setup',
+      '4': 'Staging Release Process',
+      'new': 'New Canvas'
+    }
+    return canvasNames[id] || `Canvas ${id}`
+  }
+
 
 
   // Mock user and organization data
@@ -180,6 +192,11 @@ export function CanvasEditorPage({
 
   const handleExport = () => {
     console.log('Exporting canvas...')
+  }
+
+  const handleShare = () => {
+    console.log('Sharing canvas...', { canvasId, canvasName: getCanvasName(canvasId) })
+    // TODO: Implement share functionality (copy link, email, etc.)
   }
 
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -279,11 +296,26 @@ export function CanvasEditorPage({
                  <div className="flex items-center space-x-4">
                    <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
                    <div>
-                     <Heading level={1} className="!text-xl mb-1">Canvas {canvasId}</Heading>
+                     <Heading level={1} className="!text-md mb-1">{getCanvasName(canvasId)}</Heading>
                    </div>
                  </div>
                  
-                 
+                 <div className="flex items-center space-x-3">
+                   <button
+                     onClick={handleShare}
+                     className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
+                   >
+                     <MaterialSymbol name="share" size="sm" />
+                     Share
+                   </button>
+                   <button
+                     onClick={handleSave}
+                     className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                   >
+                     <MaterialSymbol name="save" size="sm" />
+                     Save
+                   </button>
+                 </div>
                </div>
              </header>
 
