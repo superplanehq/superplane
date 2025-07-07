@@ -44,11 +44,8 @@ func (s *AuthorizationServer) GetUserRoles(ctx context.Context, req *pb.GetUserR
 }
 
 func (s *AuthorizationServer) CreateOrganizationGroup(ctx context.Context, req *pb.CreateOrganizationGroupRequest) (*pb.CreateOrganizationGroupResponse, error) {
-	// TODO: Get organization ID from context/headers
-	orgId := "org-id-placeholder" // This should be extracted from the request context
-
 	genericReq := auth.ConvertCreateOrganizationGroupRequest(req)
-	genericReq.DomainId = orgId
+	genericReq.DomainId = req.OrganizationId
 
 	genericResp, err := auth.CreateGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -59,11 +56,8 @@ func (s *AuthorizationServer) CreateOrganizationGroup(ctx context.Context, req *
 }
 
 func (s *AuthorizationServer) AddUserToOrganizationGroup(ctx context.Context, req *pb.AddUserToOrganizationGroupRequest) (*pb.AddUserToOrganizationGroupResponse, error) {
-	// TODO: Get organization ID from context/headers
-	orgId := "org-id-placeholder" // This should be extracted from the request context
-
 	genericReq := auth.ConvertAddUserToOrganizationGroupRequest(req)
-	genericReq.DomainId = orgId
+	genericReq.DomainId = req.OrganizationId
 
 	err := auth.AddUserToGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -74,11 +68,8 @@ func (s *AuthorizationServer) AddUserToOrganizationGroup(ctx context.Context, re
 }
 
 func (s *AuthorizationServer) RemoveUserFromOrganizationGroup(ctx context.Context, req *pb.RemoveUserFromOrganizationGroupRequest) (*pb.RemoveUserFromOrganizationGroupResponse, error) {
-	// TODO: Get organization ID from context/headers
-	orgId := "org-id-placeholder" // This should be extracted from the request context
-
 	genericReq := auth.ConvertRemoveUserFromOrganizationGroupRequest(req)
-	genericReq.DomainId = orgId
+	genericReq.DomainId = req.OrganizationId
 
 	err := auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -89,11 +80,8 @@ func (s *AuthorizationServer) RemoveUserFromOrganizationGroup(ctx context.Contex
 }
 
 func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest) (*pb.ListOrganizationGroupsResponse, error) {
-	// TODO: Get organization ID from context/headers
-	orgId := "org-id-placeholder" // This should be extracted from the request context
-
 	genericReq := auth.ConvertListOrganizationGroupsRequest(req)
-	genericReq.DomainId = orgId
+	genericReq.DomainId = req.OrganizationId
 
 	genericResp, err := auth.ListGroups(ctx, genericReq, s.authService)
 	if err != nil {
@@ -104,11 +92,8 @@ func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *p
 }
 
 func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req *pb.GetOrganizationGroupUsersRequest) (*pb.GetOrganizationGroupUsersResponse, error) {
-	// TODO: Get organization ID from context/headers
-	orgId := "org-id-placeholder" // This should be extracted from the request context
-
 	genericReq := auth.ConvertGetOrganizationGroupUsersRequest(req)
-	genericReq.DomainId = orgId
+	genericReq.DomainId = req.OrganizationId
 
 	genericResp, err := auth.GetGroupUsers(ctx, genericReq, s.authService)
 	if err != nil {
