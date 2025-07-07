@@ -215,40 +215,8 @@ CREATE TABLE public.organizations (
 );
 
 
---
--- Name: role_hierarchy_overrides; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.role_hierarchy_overrides (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid,
-    canvas_id uuid,
-    child_role character varying(100) NOT NULL,
-    parent_role character varying(100) NOT NULL,
-    is_active boolean NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    created_by uuid,
-    CONSTRAINT check_hierarchy_domain_exclusive CHECK ((((organization_id IS NOT NULL) AND (canvas_id IS NULL)) OR ((organization_id IS NULL) AND (canvas_id IS NOT NULL))))
-);
 
 
---
--- Name: role_permission_overrides; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.role_permission_overrides (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid,
-    canvas_id uuid,
-    role_name character varying(100) NOT NULL,
-    resource character varying(100) NOT NULL,
-    action character varying(100) NOT NULL,
-    is_active boolean NOT NULL,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now(),
-    created_by uuid,
-    CONSTRAINT check_domain_exclusive CHECK ((((organization_id IS NOT NULL) AND (canvas_id IS NULL)) OR ((organization_id IS NULL) AND (canvas_id IS NOT NULL))))
-);
 
 
 --
@@ -502,20 +470,8 @@ ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
 
 
---
--- Name: role_hierarchy_overrides role_hierarchy_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_hierarchy_overrides
-    ADD CONSTRAINT role_hierarchy_overrides_pkey PRIMARY KEY (id);
 
 
---
--- Name: role_permission_overrides role_permission_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_permission_overrides
-    ADD CONSTRAINT role_permission_overrides_pkey PRIMARY KEY (id);
 
 
 --
@@ -647,60 +603,20 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
 
 
---
--- Name: idx_role_hierarchy_overrides_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_hierarchy_overrides_canvas_id ON public.role_hierarchy_overrides USING btree (canvas_id) WHERE (canvas_id IS NOT NULL);
 
 
---
--- Name: idx_role_hierarchy_overrides_child_role; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_hierarchy_overrides_child_role ON public.role_hierarchy_overrides USING btree (child_role);
 
 
---
--- Name: idx_role_hierarchy_overrides_is_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_hierarchy_overrides_is_active ON public.role_hierarchy_overrides USING btree (is_active);
 
 
---
--- Name: idx_role_hierarchy_overrides_org_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_hierarchy_overrides_org_id ON public.role_hierarchy_overrides USING btree (organization_id) WHERE (organization_id IS NOT NULL);
 
 
---
--- Name: idx_role_permission_overrides_canvas_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_permission_overrides_canvas_id ON public.role_permission_overrides USING btree (canvas_id) WHERE (canvas_id IS NOT NULL);
 
 
---
--- Name: idx_role_permission_overrides_is_active; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_permission_overrides_is_active ON public.role_permission_overrides USING btree (is_active);
 
 
---
--- Name: idx_role_permission_overrides_org_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_permission_overrides_org_id ON public.role_permission_overrides USING btree (organization_id) WHERE (organization_id IS NOT NULL);
 
 
---
--- Name: idx_role_permission_overrides_role_name; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_role_permission_overrides_role_name ON public.role_permission_overrides USING btree (role_name);
 
 
 --
@@ -759,32 +675,12 @@ CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (
 CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 
---
--- Name: unique_canvas_hierarchy_override; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_canvas_hierarchy_override ON public.role_hierarchy_overrides USING btree (canvas_id, child_role, parent_role) WHERE (canvas_id IS NOT NULL);
 
 
---
--- Name: unique_canvas_permission_override; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_canvas_permission_override ON public.role_permission_overrides USING btree (canvas_id, role_name, resource, action) WHERE (canvas_id IS NOT NULL);
 
 
---
--- Name: unique_org_hierarchy_override; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_org_hierarchy_override ON public.role_hierarchy_overrides USING btree (organization_id, child_role, parent_role) WHERE (organization_id IS NOT NULL);
 
 
---
--- Name: unique_org_permission_override; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX unique_org_permission_override ON public.role_permission_overrides USING btree (organization_id, role_name, resource, action) WHERE (organization_id IS NOT NULL);
 
 
 --
@@ -835,36 +731,12 @@ ALTER TABLE ONLY public.event_sources
     ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
 
 
---
--- Name: role_hierarchy_overrides role_hierarchy_overrides_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_hierarchy_overrides
-    ADD CONSTRAINT role_hierarchy_overrides_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id) ON DELETE CASCADE;
 
 
---
--- Name: role_hierarchy_overrides role_hierarchy_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_hierarchy_overrides
-    ADD CONSTRAINT role_hierarchy_overrides_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
---
--- Name: role_permission_overrides role_permission_overrides_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_permission_overrides
-    ADD CONSTRAINT role_permission_overrides_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id) ON DELETE CASCADE;
 
 
---
--- Name: role_permission_overrides role_permission_overrides_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.role_permission_overrides
-    ADD CONSTRAINT role_permission_overrides_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
