@@ -215,10 +215,6 @@ CREATE TABLE public.organizations (
 );
 
 
-
-
-
-
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
@@ -470,10 +466,6 @@ ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
 
 
-
-
-
-
 --
 -- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
@@ -603,22 +595,6 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 --
 -- Name: uix_event_sources_canvas; Type: INDEX; Schema: public; Owner: -
 --
@@ -675,14 +651,6 @@ CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (
 CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 
-
-
-
-
-
-
-
-
 --
 -- Name: account_providers account_providers_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
@@ -729,14 +697,6 @@ ALTER TABLE ONLY public.connection_groups
 
 ALTER TABLE ONLY public.event_sources
     ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
-
-
-
-
-
-
 
 
 --
@@ -815,7 +775,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250704130000	f
+20250627174249	f
 \.
 
 
