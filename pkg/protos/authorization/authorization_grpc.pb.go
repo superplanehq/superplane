@@ -19,20 +19,27 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Authorization_ListUserPermissions_FullMethodName = "/Superplane.Authorization.Authorization/ListUserPermissions"
-	Authorization_AssignRole_FullMethodName          = "/Superplane.Authorization.Authorization/AssignRole"
-	Authorization_RemoveRole_FullMethodName          = "/Superplane.Authorization.Authorization/RemoveRole"
-	Authorization_ListRoles_FullMethodName           = "/Superplane.Authorization.Authorization/ListRoles"
-	Authorization_DescribeRole_FullMethodName        = "/Superplane.Authorization.Authorization/DescribeRole"
-	Authorization_GetUserRoles_FullMethodName        = "/Superplane.Authorization.Authorization/GetUserRoles"
-	Authorization_CreateGroup_FullMethodName         = "/Superplane.Authorization.Authorization/CreateGroup"
-	Authorization_AddUserToGroup_FullMethodName      = "/Superplane.Authorization.Authorization/AddUserToGroup"
-	Authorization_RemoveUserFromGroup_FullMethodName = "/Superplane.Authorization.Authorization/RemoveUserFromGroup"
-	Authorization_ListGroups_FullMethodName          = "/Superplane.Authorization.Authorization/ListGroups"
-	Authorization_GetGroupUsers_FullMethodName       = "/Superplane.Authorization.Authorization/GetGroupUsers"
-	Authorization_CreateRole_FullMethodName          = "/Superplane.Authorization.Authorization/CreateRole"
-	Authorization_UpdateRole_FullMethodName          = "/Superplane.Authorization.Authorization/UpdateRole"
-	Authorization_DeleteRole_FullMethodName          = "/Superplane.Authorization.Authorization/DeleteRole"
+	Authorization_ListUserPermissions_FullMethodName             = "/Superplane.Authorization.Authorization/ListUserPermissions"
+	Authorization_AssignRole_FullMethodName                      = "/Superplane.Authorization.Authorization/AssignRole"
+	Authorization_RemoveRole_FullMethodName                      = "/Superplane.Authorization.Authorization/RemoveRole"
+	Authorization_ListRoles_FullMethodName                       = "/Superplane.Authorization.Authorization/ListRoles"
+	Authorization_DescribeRole_FullMethodName                    = "/Superplane.Authorization.Authorization/DescribeRole"
+	Authorization_GetUserRoles_FullMethodName                    = "/Superplane.Authorization.Authorization/GetUserRoles"
+	Authorization_CreateOrganizationGroup_FullMethodName         = "/Superplane.Authorization.Authorization/CreateOrganizationGroup"
+	Authorization_CreateCanvasGroup_FullMethodName               = "/Superplane.Authorization.Authorization/CreateCanvasGroup"
+	Authorization_AddUserToOrganizationGroup_FullMethodName      = "/Superplane.Authorization.Authorization/AddUserToOrganizationGroup"
+	Authorization_AddUserToCanvasGroup_FullMethodName            = "/Superplane.Authorization.Authorization/AddUserToCanvasGroup"
+	Authorization_RemoveUserFromOrganizationGroup_FullMethodName = "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup"
+	Authorization_RemoveUserFromCanvasGroup_FullMethodName       = "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup"
+	Authorization_ListOrganizationGroups_FullMethodName          = "/Superplane.Authorization.Authorization/ListOrganizationGroups"
+	Authorization_ListCanvasGroups_FullMethodName                = "/Superplane.Authorization.Authorization/ListCanvasGroups"
+	Authorization_GetOrganizationGroupUsers_FullMethodName       = "/Superplane.Authorization.Authorization/GetOrganizationGroupUsers"
+	Authorization_GetCanvasGroupUsers_FullMethodName             = "/Superplane.Authorization.Authorization/GetCanvasGroupUsers"
+	Authorization_GetOrganizationGroup_FullMethodName            = "/Superplane.Authorization.Authorization/GetOrganizationGroup"
+	Authorization_GetCanvasGroup_FullMethodName                  = "/Superplane.Authorization.Authorization/GetCanvasGroup"
+	Authorization_CreateRole_FullMethodName                      = "/Superplane.Authorization.Authorization/CreateRole"
+	Authorization_UpdateRole_FullMethodName                      = "/Superplane.Authorization.Authorization/UpdateRole"
+	Authorization_DeleteRole_FullMethodName                      = "/Superplane.Authorization.Authorization/DeleteRole"
 )
 
 // AuthorizationClient is the client API for Authorization service.
@@ -57,21 +64,42 @@ type AuthorizationClient interface {
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(ctx context.Context, in *GetUserRolesRequest, opts ...grpc.CallOption) (*GetUserRolesResponse, error)
-	// Endpoint for creating a group within a domain (organization or canvas)
+	// Endpoint for creating a group within an organization
 	// Operation is synchronous and idempotent.
-	CreateGroup(ctx context.Context, in *CreateGroupRequest, opts ...grpc.CallOption) (*CreateGroupResponse, error)
-	// Endpoint for adding a user to a group
+	CreateOrganizationGroup(ctx context.Context, in *CreateOrganizationGroupRequest, opts ...grpc.CallOption) (*CreateOrganizationGroupResponse, error)
+	// Endpoint for creating a group within a canvas
 	// Operation is synchronous and idempotent.
-	AddUserToGroup(ctx context.Context, in *AddUserToGroupRequest, opts ...grpc.CallOption) (*AddUserToGroupResponse, error)
-	// Endpoint for removing a user from a group
+	CreateCanvasGroup(ctx context.Context, in *CreateCanvasGroupRequest, opts ...grpc.CallOption) (*CreateCanvasGroupResponse, error)
+	// Endpoint for adding a user to an organization group
 	// Operation is synchronous and idempotent.
-	RemoveUserFromGroup(ctx context.Context, in *RemoveUserFromGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromGroupResponse, error)
-	// Endpoint for listing groups within a domain
+	AddUserToOrganizationGroup(ctx context.Context, in *AddUserToOrganizationGroupRequest, opts ...grpc.CallOption) (*AddUserToOrganizationGroupResponse, error)
+	// Endpoint for adding a user to a canvas group
 	// Operation is synchronous and idempotent.
-	ListGroups(ctx context.Context, in *ListGroupsRequest, opts ...grpc.CallOption) (*ListGroupsResponse, error)
-	// Endpoint for getting users in a specific group
+	AddUserToCanvasGroup(ctx context.Context, in *AddUserToCanvasGroupRequest, opts ...grpc.CallOption) (*AddUserToCanvasGroupResponse, error)
+	// Endpoint for removing a user from an organization group
 	// Operation is synchronous and idempotent.
-	GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error)
+	RemoveUserFromOrganizationGroup(ctx context.Context, in *RemoveUserFromOrganizationGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromOrganizationGroupResponse, error)
+	// Endpoint for removing a user from a canvas group
+	// Operation is synchronous and idempotent.
+	RemoveUserFromCanvasGroup(ctx context.Context, in *RemoveUserFromCanvasGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromCanvasGroupResponse, error)
+	// Endpoint for listing groups within an organization
+	// Operation is synchronous and idempotent.
+	ListOrganizationGroups(ctx context.Context, in *ListOrganizationGroupsRequest, opts ...grpc.CallOption) (*ListOrganizationGroupsResponse, error)
+	// Endpoint for listing groups within a canvas
+	// Operation is synchronous and idempotent.
+	ListCanvasGroups(ctx context.Context, in *ListCanvasGroupsRequest, opts ...grpc.CallOption) (*ListCanvasGroupsResponse, error)
+	// Endpoint for getting users in a specific organization group
+	// Operation is synchronous and idempotent.
+	GetOrganizationGroupUsers(ctx context.Context, in *GetOrganizationGroupUsersRequest, opts ...grpc.CallOption) (*GetOrganizationGroupUsersResponse, error)
+	// Endpoint for getting users in a specific canvas group
+	// Operation is synchronous and idempotent.
+	GetCanvasGroupUsers(ctx context.Context, in *GetCanvasGroupUsersRequest, opts ...grpc.CallOption) (*GetCanvasGroupUsersResponse, error)
+	// Endpoint for getting details of a specific organization group
+	// Operation is synchronous and idempotent.
+	GetOrganizationGroup(ctx context.Context, in *GetOrganizationGroupRequest, opts ...grpc.CallOption) (*GetOrganizationGroupResponse, error)
+	// Endpoint for getting details of a specific canvas group
+	// Operation is synchronous and idempotent.
+	GetCanvasGroup(ctx context.Context, in *GetCanvasGroupRequest, opts ...grpc.CallOption) (*GetCanvasGroupResponse, error)
 	// Endpoint for creating a custom role
 	// Operation is synchronous and idempotent.
 	CreateRole(ctx context.Context, in *CreateRoleRequest, opts ...grpc.CallOption) (*CreateRoleResponse, error)
@@ -151,50 +179,120 @@ func (c *authorizationClient) GetUserRoles(ctx context.Context, in *GetUserRoles
 	return out, nil
 }
 
-func (c *authorizationClient) CreateGroup(ctx context.Context, in *CreateGroupRequest, opts ...grpc.CallOption) (*CreateGroupResponse, error) {
+func (c *authorizationClient) CreateOrganizationGroup(ctx context.Context, in *CreateOrganizationGroupRequest, opts ...grpc.CallOption) (*CreateOrganizationGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateGroupResponse)
-	err := c.cc.Invoke(ctx, Authorization_CreateGroup_FullMethodName, in, out, cOpts...)
+	out := new(CreateOrganizationGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_CreateOrganizationGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *authorizationClient) AddUserToGroup(ctx context.Context, in *AddUserToGroupRequest, opts ...grpc.CallOption) (*AddUserToGroupResponse, error) {
+func (c *authorizationClient) CreateCanvasGroup(ctx context.Context, in *CreateCanvasGroupRequest, opts ...grpc.CallOption) (*CreateCanvasGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AddUserToGroupResponse)
-	err := c.cc.Invoke(ctx, Authorization_AddUserToGroup_FullMethodName, in, out, cOpts...)
+	out := new(CreateCanvasGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_CreateCanvasGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *authorizationClient) RemoveUserFromGroup(ctx context.Context, in *RemoveUserFromGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromGroupResponse, error) {
+func (c *authorizationClient) AddUserToOrganizationGroup(ctx context.Context, in *AddUserToOrganizationGroupRequest, opts ...grpc.CallOption) (*AddUserToOrganizationGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RemoveUserFromGroupResponse)
-	err := c.cc.Invoke(ctx, Authorization_RemoveUserFromGroup_FullMethodName, in, out, cOpts...)
+	out := new(AddUserToOrganizationGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_AddUserToOrganizationGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *authorizationClient) ListGroups(ctx context.Context, in *ListGroupsRequest, opts ...grpc.CallOption) (*ListGroupsResponse, error) {
+func (c *authorizationClient) AddUserToCanvasGroup(ctx context.Context, in *AddUserToCanvasGroupRequest, opts ...grpc.CallOption) (*AddUserToCanvasGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListGroupsResponse)
-	err := c.cc.Invoke(ctx, Authorization_ListGroups_FullMethodName, in, out, cOpts...)
+	out := new(AddUserToCanvasGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_AddUserToCanvasGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *authorizationClient) GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error) {
+func (c *authorizationClient) RemoveUserFromOrganizationGroup(ctx context.Context, in *RemoveUserFromOrganizationGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromOrganizationGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetGroupUsersResponse)
-	err := c.cc.Invoke(ctx, Authorization_GetGroupUsers_FullMethodName, in, out, cOpts...)
+	out := new(RemoveUserFromOrganizationGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_RemoveUserFromOrganizationGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) RemoveUserFromCanvasGroup(ctx context.Context, in *RemoveUserFromCanvasGroupRequest, opts ...grpc.CallOption) (*RemoveUserFromCanvasGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveUserFromCanvasGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_RemoveUserFromCanvasGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) ListOrganizationGroups(ctx context.Context, in *ListOrganizationGroupsRequest, opts ...grpc.CallOption) (*ListOrganizationGroupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListOrganizationGroupsResponse)
+	err := c.cc.Invoke(ctx, Authorization_ListOrganizationGroups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) ListCanvasGroups(ctx context.Context, in *ListCanvasGroupsRequest, opts ...grpc.CallOption) (*ListCanvasGroupsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCanvasGroupsResponse)
+	err := c.cc.Invoke(ctx, Authorization_ListCanvasGroups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) GetOrganizationGroupUsers(ctx context.Context, in *GetOrganizationGroupUsersRequest, opts ...grpc.CallOption) (*GetOrganizationGroupUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrganizationGroupUsersResponse)
+	err := c.cc.Invoke(ctx, Authorization_GetOrganizationGroupUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) GetCanvasGroupUsers(ctx context.Context, in *GetCanvasGroupUsersRequest, opts ...grpc.CallOption) (*GetCanvasGroupUsersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCanvasGroupUsersResponse)
+	err := c.cc.Invoke(ctx, Authorization_GetCanvasGroupUsers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) GetOrganizationGroup(ctx context.Context, in *GetOrganizationGroupRequest, opts ...grpc.CallOption) (*GetOrganizationGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOrganizationGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_GetOrganizationGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) GetCanvasGroup(ctx context.Context, in *GetCanvasGroupRequest, opts ...grpc.CallOption) (*GetCanvasGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCanvasGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_GetCanvasGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -253,21 +351,42 @@ type AuthorizationServer interface {
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
 	GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error)
-	// Endpoint for creating a group within a domain (organization or canvas)
+	// Endpoint for creating a group within an organization
 	// Operation is synchronous and idempotent.
-	CreateGroup(context.Context, *CreateGroupRequest) (*CreateGroupResponse, error)
-	// Endpoint for adding a user to a group
+	CreateOrganizationGroup(context.Context, *CreateOrganizationGroupRequest) (*CreateOrganizationGroupResponse, error)
+	// Endpoint for creating a group within a canvas
 	// Operation is synchronous and idempotent.
-	AddUserToGroup(context.Context, *AddUserToGroupRequest) (*AddUserToGroupResponse, error)
-	// Endpoint for removing a user from a group
+	CreateCanvasGroup(context.Context, *CreateCanvasGroupRequest) (*CreateCanvasGroupResponse, error)
+	// Endpoint for adding a user to an organization group
 	// Operation is synchronous and idempotent.
-	RemoveUserFromGroup(context.Context, *RemoveUserFromGroupRequest) (*RemoveUserFromGroupResponse, error)
-	// Endpoint for listing groups within a domain
+	AddUserToOrganizationGroup(context.Context, *AddUserToOrganizationGroupRequest) (*AddUserToOrganizationGroupResponse, error)
+	// Endpoint for adding a user to a canvas group
 	// Operation is synchronous and idempotent.
-	ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error)
-	// Endpoint for getting users in a specific group
+	AddUserToCanvasGroup(context.Context, *AddUserToCanvasGroupRequest) (*AddUserToCanvasGroupResponse, error)
+	// Endpoint for removing a user from an organization group
 	// Operation is synchronous and idempotent.
-	GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error)
+	RemoveUserFromOrganizationGroup(context.Context, *RemoveUserFromOrganizationGroupRequest) (*RemoveUserFromOrganizationGroupResponse, error)
+	// Endpoint for removing a user from a canvas group
+	// Operation is synchronous and idempotent.
+	RemoveUserFromCanvasGroup(context.Context, *RemoveUserFromCanvasGroupRequest) (*RemoveUserFromCanvasGroupResponse, error)
+	// Endpoint for listing groups within an organization
+	// Operation is synchronous and idempotent.
+	ListOrganizationGroups(context.Context, *ListOrganizationGroupsRequest) (*ListOrganizationGroupsResponse, error)
+	// Endpoint for listing groups within a canvas
+	// Operation is synchronous and idempotent.
+	ListCanvasGroups(context.Context, *ListCanvasGroupsRequest) (*ListCanvasGroupsResponse, error)
+	// Endpoint for getting users in a specific organization group
+	// Operation is synchronous and idempotent.
+	GetOrganizationGroupUsers(context.Context, *GetOrganizationGroupUsersRequest) (*GetOrganizationGroupUsersResponse, error)
+	// Endpoint for getting users in a specific canvas group
+	// Operation is synchronous and idempotent.
+	GetCanvasGroupUsers(context.Context, *GetCanvasGroupUsersRequest) (*GetCanvasGroupUsersResponse, error)
+	// Endpoint for getting details of a specific organization group
+	// Operation is synchronous and idempotent.
+	GetOrganizationGroup(context.Context, *GetOrganizationGroupRequest) (*GetOrganizationGroupResponse, error)
+	// Endpoint for getting details of a specific canvas group
+	// Operation is synchronous and idempotent.
+	GetCanvasGroup(context.Context, *GetCanvasGroupRequest) (*GetCanvasGroupResponse, error)
 	// Endpoint for creating a custom role
 	// Operation is synchronous and idempotent.
 	CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error)
@@ -304,20 +423,41 @@ func (UnimplementedAuthorizationServer) DescribeRole(context.Context, *DescribeR
 func (UnimplementedAuthorizationServer) GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserRoles not implemented")
 }
-func (UnimplementedAuthorizationServer) CreateGroup(context.Context, *CreateGroupRequest) (*CreateGroupResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateGroup not implemented")
+func (UnimplementedAuthorizationServer) CreateOrganizationGroup(context.Context, *CreateOrganizationGroupRequest) (*CreateOrganizationGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateOrganizationGroup not implemented")
 }
-func (UnimplementedAuthorizationServer) AddUserToGroup(context.Context, *AddUserToGroupRequest) (*AddUserToGroupResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AddUserToGroup not implemented")
+func (UnimplementedAuthorizationServer) CreateCanvasGroup(context.Context, *CreateCanvasGroupRequest) (*CreateCanvasGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateCanvasGroup not implemented")
 }
-func (UnimplementedAuthorizationServer) RemoveUserFromGroup(context.Context, *RemoveUserFromGroupRequest) (*RemoveUserFromGroupResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RemoveUserFromGroup not implemented")
+func (UnimplementedAuthorizationServer) AddUserToOrganizationGroup(context.Context, *AddUserToOrganizationGroupRequest) (*AddUserToOrganizationGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddUserToOrganizationGroup not implemented")
 }
-func (UnimplementedAuthorizationServer) ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListGroups not implemented")
+func (UnimplementedAuthorizationServer) AddUserToCanvasGroup(context.Context, *AddUserToCanvasGroupRequest) (*AddUserToCanvasGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddUserToCanvasGroup not implemented")
 }
-func (UnimplementedAuthorizationServer) GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetGroupUsers not implemented")
+func (UnimplementedAuthorizationServer) RemoveUserFromOrganizationGroup(context.Context, *RemoveUserFromOrganizationGroupRequest) (*RemoveUserFromOrganizationGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveUserFromOrganizationGroup not implemented")
+}
+func (UnimplementedAuthorizationServer) RemoveUserFromCanvasGroup(context.Context, *RemoveUserFromCanvasGroupRequest) (*RemoveUserFromCanvasGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RemoveUserFromCanvasGroup not implemented")
+}
+func (UnimplementedAuthorizationServer) ListOrganizationGroups(context.Context, *ListOrganizationGroupsRequest) (*ListOrganizationGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListOrganizationGroups not implemented")
+}
+func (UnimplementedAuthorizationServer) ListCanvasGroups(context.Context, *ListCanvasGroupsRequest) (*ListCanvasGroupsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListCanvasGroups not implemented")
+}
+func (UnimplementedAuthorizationServer) GetOrganizationGroupUsers(context.Context, *GetOrganizationGroupUsersRequest) (*GetOrganizationGroupUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrganizationGroupUsers not implemented")
+}
+func (UnimplementedAuthorizationServer) GetCanvasGroupUsers(context.Context, *GetCanvasGroupUsersRequest) (*GetCanvasGroupUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCanvasGroupUsers not implemented")
+}
+func (UnimplementedAuthorizationServer) GetOrganizationGroup(context.Context, *GetOrganizationGroupRequest) (*GetOrganizationGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOrganizationGroup not implemented")
+}
+func (UnimplementedAuthorizationServer) GetCanvasGroup(context.Context, *GetCanvasGroupRequest) (*GetCanvasGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetCanvasGroup not implemented")
 }
 func (UnimplementedAuthorizationServer) CreateRole(context.Context, *CreateRoleRequest) (*CreateRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateRole not implemented")
@@ -456,92 +596,218 @@ func _Authorization_GetUserRoles_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_CreateGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateGroupRequest)
+func _Authorization_CreateOrganizationGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateOrganizationGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).CreateGroup(ctx, in)
+		return srv.(AuthorizationServer).CreateOrganizationGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_CreateGroup_FullMethodName,
+		FullMethod: Authorization_CreateOrganizationGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).CreateGroup(ctx, req.(*CreateGroupRequest))
+		return srv.(AuthorizationServer).CreateOrganizationGroup(ctx, req.(*CreateOrganizationGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_AddUserToGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AddUserToGroupRequest)
+func _Authorization_CreateCanvasGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateCanvasGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).AddUserToGroup(ctx, in)
+		return srv.(AuthorizationServer).CreateCanvasGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_AddUserToGroup_FullMethodName,
+		FullMethod: Authorization_CreateCanvasGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).AddUserToGroup(ctx, req.(*AddUserToGroupRequest))
+		return srv.(AuthorizationServer).CreateCanvasGroup(ctx, req.(*CreateCanvasGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_RemoveUserFromGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RemoveUserFromGroupRequest)
+func _Authorization_AddUserToOrganizationGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddUserToOrganizationGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).RemoveUserFromGroup(ctx, in)
+		return srv.(AuthorizationServer).AddUserToOrganizationGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_RemoveUserFromGroup_FullMethodName,
+		FullMethod: Authorization_AddUserToOrganizationGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).RemoveUserFromGroup(ctx, req.(*RemoveUserFromGroupRequest))
+		return srv.(AuthorizationServer).AddUserToOrganizationGroup(ctx, req.(*AddUserToOrganizationGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_ListGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListGroupsRequest)
+func _Authorization_AddUserToCanvasGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddUserToCanvasGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).ListGroups(ctx, in)
+		return srv.(AuthorizationServer).AddUserToCanvasGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_ListGroups_FullMethodName,
+		FullMethod: Authorization_AddUserToCanvasGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).ListGroups(ctx, req.(*ListGroupsRequest))
+		return srv.(AuthorizationServer).AddUserToCanvasGroup(ctx, req.(*AddUserToCanvasGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Authorization_GetGroupUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGroupUsersRequest)
+func _Authorization_RemoveUserFromOrganizationGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveUserFromOrganizationGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthorizationServer).GetGroupUsers(ctx, in)
+		return srv.(AuthorizationServer).RemoveUserFromOrganizationGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Authorization_GetGroupUsers_FullMethodName,
+		FullMethod: Authorization_RemoveUserFromOrganizationGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthorizationServer).GetGroupUsers(ctx, req.(*GetGroupUsersRequest))
+		return srv.(AuthorizationServer).RemoveUserFromOrganizationGroup(ctx, req.(*RemoveUserFromOrganizationGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_RemoveUserFromCanvasGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveUserFromCanvasGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).RemoveUserFromCanvasGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_RemoveUserFromCanvasGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).RemoveUserFromCanvasGroup(ctx, req.(*RemoveUserFromCanvasGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_ListOrganizationGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListOrganizationGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).ListOrganizationGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_ListOrganizationGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).ListOrganizationGroups(ctx, req.(*ListOrganizationGroupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_ListCanvasGroups_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCanvasGroupsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).ListCanvasGroups(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_ListCanvasGroups_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).ListCanvasGroups(ctx, req.(*ListCanvasGroupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_GetOrganizationGroupUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationGroupUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).GetOrganizationGroupUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_GetOrganizationGroupUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).GetOrganizationGroupUsers(ctx, req.(*GetOrganizationGroupUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_GetCanvasGroupUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCanvasGroupUsersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).GetCanvasGroupUsers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_GetCanvasGroupUsers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).GetCanvasGroupUsers(ctx, req.(*GetCanvasGroupUsersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_GetOrganizationGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOrganizationGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).GetOrganizationGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_GetOrganizationGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).GetOrganizationGroup(ctx, req.(*GetOrganizationGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_GetCanvasGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCanvasGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).GetCanvasGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_GetCanvasGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).GetCanvasGroup(ctx, req.(*GetCanvasGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -632,24 +898,52 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Authorization_GetUserRoles_Handler,
 		},
 		{
-			MethodName: "CreateGroup",
-			Handler:    _Authorization_CreateGroup_Handler,
+			MethodName: "CreateOrganizationGroup",
+			Handler:    _Authorization_CreateOrganizationGroup_Handler,
 		},
 		{
-			MethodName: "AddUserToGroup",
-			Handler:    _Authorization_AddUserToGroup_Handler,
+			MethodName: "CreateCanvasGroup",
+			Handler:    _Authorization_CreateCanvasGroup_Handler,
 		},
 		{
-			MethodName: "RemoveUserFromGroup",
-			Handler:    _Authorization_RemoveUserFromGroup_Handler,
+			MethodName: "AddUserToOrganizationGroup",
+			Handler:    _Authorization_AddUserToOrganizationGroup_Handler,
 		},
 		{
-			MethodName: "ListGroups",
-			Handler:    _Authorization_ListGroups_Handler,
+			MethodName: "AddUserToCanvasGroup",
+			Handler:    _Authorization_AddUserToCanvasGroup_Handler,
 		},
 		{
-			MethodName: "GetGroupUsers",
-			Handler:    _Authorization_GetGroupUsers_Handler,
+			MethodName: "RemoveUserFromOrganizationGroup",
+			Handler:    _Authorization_RemoveUserFromOrganizationGroup_Handler,
+		},
+		{
+			MethodName: "RemoveUserFromCanvasGroup",
+			Handler:    _Authorization_RemoveUserFromCanvasGroup_Handler,
+		},
+		{
+			MethodName: "ListOrganizationGroups",
+			Handler:    _Authorization_ListOrganizationGroups_Handler,
+		},
+		{
+			MethodName: "ListCanvasGroups",
+			Handler:    _Authorization_ListCanvasGroups_Handler,
+		},
+		{
+			MethodName: "GetOrganizationGroupUsers",
+			Handler:    _Authorization_GetOrganizationGroupUsers_Handler,
+		},
+		{
+			MethodName: "GetCanvasGroupUsers",
+			Handler:    _Authorization_GetCanvasGroupUsers_Handler,
+		},
+		{
+			MethodName: "GetOrganizationGroup",
+			Handler:    _Authorization_GetOrganizationGroup_Handler,
+		},
+		{
+			MethodName: "GetCanvasGroup",
+			Handler:    _Authorization_GetCanvasGroup_Handler,
 		},
 		{
 			MethodName: "CreateRole",

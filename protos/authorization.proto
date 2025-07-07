@@ -117,79 +117,185 @@ service Authorization {
   }
 
   //
-  // Endpoint for creating a group within a domain (organization or canvas)
+  // Endpoint for creating a group within an organization
   // Operation is synchronous and idempotent.
   //
-  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {
+  rpc CreateOrganizationGroup(CreateOrganizationGroupRequest) returns (CreateOrganizationGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/authorization/groups"
+      post: "/api/v1/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Create group";
-      description: "Creates a new group within a domain (organization or canvas) with a specific role";
+      description: "Creates a new group within an organization with a specific role";
       tags: "Authorization";
     };
   }
 
   //
-  // Endpoint for adding a user to a group
+  // Endpoint for creating a group within a canvas
   // Operation is synchronous and idempotent.
   //
-  rpc AddUserToGroup(AddUserToGroupRequest) returns (AddUserToGroupResponse) {
+  rpc CreateCanvasGroup(CreateCanvasGroupRequest) returns (CreateCanvasGroupResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/authorization/groups/users/add"
+      post: "/api/v1/canvases/{canvas_id}/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Add user to group";
-      description: "Adds a user to a group within any domain";
+      summary: "Create canvas group";
+      description: "Creates a new group within a canvas with a specific role";
       tags: "Authorization";
     };
   }
 
   //
-  // Endpoint for removing a user from a group
+  // Endpoint for adding a user to an organization group
   // Operation is synchronous and idempotent.
   //
-  rpc RemoveUserFromGroup(RemoveUserFromGroupRequest) returns (RemoveUserFromGroupResponse) {
+  rpc AddUserToOrganizationGroup(AddUserToOrganizationGroupRequest) returns (AddUserToOrganizationGroupResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/authorization/groups/users/remove"
+      post: "/api/v1/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Remove user from group";
-      description: "Removes a user from a group within any domain";
+      summary: "Add user to organization group";
+      description: "Adds a user to a group within an organization";
       tags: "Authorization";
     };
   }
 
   //
-  // Endpoint for listing groups within a domain
+  // Endpoint for adding a user to a canvas group
   // Operation is synchronous and idempotent.
   //
-  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
+  rpc AddUserToCanvasGroup(AddUserToCanvasGroupRequest) returns (AddUserToCanvasGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/authorization/groups"
+      post: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List groups";
-      description: "Returns a list of groups within a domain (organization or canvas)";
+      summary: "Add user to canvas group";
+      description: "Adds a user to a group within a canvas";
       tags: "Authorization";
     };
   }
 
   //
-  // Endpoint for getting users in a specific group
+  // Endpoint for removing a user from an organization group
   // Operation is synchronous and idempotent.
   //
-  rpc GetGroupUsers(GetGroupUsersRequest) returns (GetGroupUsersResponse) {
+  rpc RemoveUserFromOrganizationGroup(RemoveUserFromOrganizationGroupRequest) returns (RemoveUserFromOrganizationGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/authorization/groups/{group_name}/users"
+      delete: "/api/v1/groups/{group_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get group users";
-      description: "Returns users that belong to a specific group within any domain";
+      summary: "Remove user from organization group";
+      description: "Removes a user from a group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for removing a user from a canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc RemoveUserFromCanvasGroup(RemoveUserFromCanvasGroupRequest) returns (RemoveUserFromCanvasGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users/{user_id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove user from canvas group";
+      description: "Removes a user from a group within a canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for listing groups within an organization
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListOrganizationGroups(ListOrganizationGroupsRequest) returns (ListOrganizationGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization groups";
+      description: "Returns a list of groups within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for listing groups within a canvas
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListCanvasGroups(ListCanvasGroupsRequest) returns (ListCanvasGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas groups";
+      description: "Returns a list of groups within a canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting users in a specific organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetOrganizationGroupUsers(GetOrganizationGroupUsersRequest) returns (GetOrganizationGroupUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups/{group_name}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization group users";
+      description: "Returns users that belong to a specific group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting users in a specific canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetCanvasGroupUsers(GetCanvasGroupUsersRequest) returns (GetCanvasGroupUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas group users";
+      description: "Returns users that belong to a specific group within a canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting details of a specific organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetOrganizationGroup(GetOrganizationGroupRequest) returns (GetOrganizationGroupResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization group";
+      description: "Returns details of a specific group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting details of a specific canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetCanvasGroup(GetCanvasGroupRequest) returns (GetCanvasGroupResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas group";
+      description: "Returns details of a specific group within a canvas";
       tags: "Authorization";
     };
   }
@@ -312,53 +418,105 @@ message GetUserRolesResponse {
 }
 
 // Group management messages
-message CreateGroupRequest {
-  DomainType domain_type = 1;
-  string domain_id = 2;
-  string group_name = 3;
-  string role = 4;
+message CreateOrganizationGroupRequest {
+  string group_name = 1;
+  string role = 2;
 }
 
-message CreateGroupResponse {
+message CreateOrganizationGroupResponse {
   Group group = 1;
 }
 
-message AddUserToGroupRequest {
-  DomainType domain_type = 1;
-  string domain_id = 2;
-  string group_name = 3;
-  string user_id = 4;
+message AddUserToOrganizationGroupRequest {
+  string group_name = 1;
+  string user_id = 2;
 }
 
-message AddUserToGroupResponse {}
+message AddUserToOrganizationGroupResponse {}
 
-message RemoveUserFromGroupRequest {
-  DomainType domain_type = 1;
-  string domain_id = 2;
-  string group_name = 3;
-  string user_id = 4;
+message RemoveUserFromOrganizationGroupRequest {
+  string group_name = 1;
+  string user_id = 2;
 }
 
-message RemoveUserFromGroupResponse {}
+message RemoveUserFromOrganizationGroupResponse {}
 
-message ListGroupsRequest {
-  DomainType domain_type = 1;
-  string domain_id = 2;
-}
+message ListOrganizationGroupsRequest {}
 
-message ListGroupsResponse {
+message ListOrganizationGroupsResponse {
   repeated Group groups = 1;
 }
 
-message GetGroupUsersRequest {
-  DomainType domain_type = 1;
-  string domain_id = 2;
-  string group_name = 3;
+message GetOrganizationGroupUsersRequest {
+  string group_name = 1;
 }
 
-message GetGroupUsersResponse {
+message GetOrganizationGroupUsersResponse {
   repeated string user_ids = 1;
   Group group = 2;
+}
+
+// Group detail messages
+message GetOrganizationGroupRequest {
+  string group_name = 1;
+}
+
+message GetOrganizationGroupResponse {
+  Group group = 1;
+}
+
+// Canvas group management messages
+message CreateCanvasGroupRequest {
+  string canvas_id = 1;
+  string group_name = 2;
+  string role = 3;
+}
+
+message CreateCanvasGroupResponse {
+  Group group = 1;
+}
+
+message AddUserToCanvasGroupRequest {
+  string canvas_id = 1;
+  string group_name = 2;
+  string user_id = 3;
+}
+
+message AddUserToCanvasGroupResponse {}
+
+message RemoveUserFromCanvasGroupRequest {
+  string canvas_id = 1;
+  string group_name = 2;
+  string user_id = 3;
+}
+
+message RemoveUserFromCanvasGroupResponse {}
+
+message ListCanvasGroupsRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message GetCanvasGroupUsersRequest {
+  string canvas_id = 1;
+  string group_name = 2;
+}
+
+message GetCanvasGroupUsersResponse {
+  repeated string user_ids = 1;
+  Group group = 2;
+}
+
+message GetCanvasGroupRequest {
+  string canvas_id = 1;
+  string group_name = 2;
+}
+
+message GetCanvasGroupResponse {
+  Group group = 1;
 }
 
 // Custom role management messages
