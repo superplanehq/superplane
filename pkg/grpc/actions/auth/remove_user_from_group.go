@@ -10,7 +10,7 @@ import (
 )
 
 func RemoveUserFromGroup(ctx context.Context, req *GroupUserRequest, authService authorization.Authorization) error {
-	err := actions.ValidateUUIDs(req.DomainId, req.UserId)
+	err := actions.ValidateUUIDs(req.DomainID, req.UserID)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -25,7 +25,7 @@ func RemoveUserFromGroup(ctx context.Context, req *GroupUserRequest, authService
 		return err
 	}
 
-	err = authService.RemoveUserFromGroup(req.DomainId, domainType, req.UserId, req.GroupName)
+	err = authService.RemoveUserFromGroup(req.DomainID, domainType, req.UserID, req.GroupName)
 	if err != nil {
 		return status.Error(codes.Internal, "failed to remove user from group")
 	}

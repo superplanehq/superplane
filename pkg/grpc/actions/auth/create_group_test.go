@@ -22,7 +22,7 @@ func Test_CreateGroup(t *testing.T) {
 	t.Run("successful group creation", func(t *testing.T) {
 		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "test-group",
 			Role:       authorization.RoleOrgAdmin,
 		}
@@ -45,7 +45,7 @@ func Test_CreateGroup(t *testing.T) {
 		
 		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
+			DomainID:   canvasID,
 			GroupName:  "canvas-group",
 			Role:       authorization.RoleCanvasAdmin,
 		}
@@ -61,7 +61,7 @@ func Test_CreateGroup(t *testing.T) {
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "",
 			Role:       authorization.RoleOrgAdmin,
 		}

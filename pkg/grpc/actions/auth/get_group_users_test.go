@@ -32,15 +32,15 @@ func Test_GetGroupUsers(t *testing.T) {
 	t.Run("successful get group users", func(t *testing.T) {
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "test-group",
 		}
 
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Len(t, resp.UserIds, 1)
-		assert.Contains(t, resp.UserIds, r.User.String())
+		assert.Len(t, resp.UserIDs, 1)
+		assert.Contains(t, resp.UserIDs, r.User.String())
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
@@ -54,7 +54,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "",
 		}
 
@@ -66,7 +66,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "test-group",
 		}
 
@@ -88,15 +88,15 @@ func Test_GetGroupUsers(t *testing.T) {
 		
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
+			DomainID:   canvasID,
 			GroupName:  "canvas-group",
 		}
 
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Len(t, resp.UserIds, 1)
-		assert.Contains(t, resp.UserIds, r.User.String())
+		assert.Len(t, resp.UserIDs, 1)
+		assert.Contains(t, resp.UserIDs, r.User.String())
 		
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
@@ -112,14 +112,14 @@ func Test_GetGroupUsers(t *testing.T) {
 
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 			GroupName:  "empty-group",
 		}
 
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Empty(t, resp.UserIds)
+		assert.Empty(t, resp.UserIDs)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)

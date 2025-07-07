@@ -28,7 +28,7 @@ func Test_ListGroups(t *testing.T) {
 	t.Run("successful list groups", func(t *testing.T) {
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
+			DomainID:   orgID,
 		}
 
 		resp, err := ListGroups(ctx, req, authService)
@@ -57,7 +57,7 @@ func Test_ListGroups(t *testing.T) {
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
+			DomainID:   orgID,
 		}
 
 		_, err := ListGroups(ctx, req, authService)
@@ -78,7 +78,7 @@ func Test_ListGroups(t *testing.T) {
 		
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
+			DomainID:   canvasID,
 		}
 
 		resp, err := ListGroups(ctx, req, authService)

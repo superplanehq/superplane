@@ -11,13 +11,13 @@ import (
 )
 
 func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService authorization.Authorization) (*GetGroupUsersResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
+	err := actions.ValidateUUIDs(req.DomainID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
 	groupReq := &GroupRequest{
-		DomainId:   req.DomainId,
+		DomainID:   req.DomainID,
 		GroupName:  req.GroupName,
 		DomainType: req.DomainType,
 	}
@@ -32,7 +32,7 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		return nil, err
 	}
 
-	userIDs, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
+	userIDs, err := authService.GetGroupUsers(req.DomainID, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
@@ -41,12 +41,12 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 	group := &pb.Group{
 		Name:       req.GroupName,
 		DomainType: req.DomainType,
-		DomainId:   req.DomainId,
+		DomainId:   req.DomainID,
 		Role:       "", // TODO: get actual role from service
 	}
 
 	return &GetGroupUsersResponse{
-		UserIds: userIDs,
+		UserIDs: userIDs,
 		Group:   group,
 	}, nil
 }

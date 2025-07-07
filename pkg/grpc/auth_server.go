@@ -45,7 +45,7 @@ func (s *AuthorizationServer) GetUserRoles(ctx context.Context, req *pb.GetUserR
 
 func (s *AuthorizationServer) CreateOrganizationGroup(ctx context.Context, req *pb.CreateOrganizationGroupRequest) (*pb.CreateOrganizationGroupResponse, error) {
 	genericReq := auth.ConvertCreateOrganizationGroupRequest(req)
-	genericReq.DomainId = req.OrganizationId
+	genericReq.DomainID = req.OrganizationId
 
 	genericResp, err := auth.CreateGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -57,7 +57,7 @@ func (s *AuthorizationServer) CreateOrganizationGroup(ctx context.Context, req *
 
 func (s *AuthorizationServer) AddUserToOrganizationGroup(ctx context.Context, req *pb.AddUserToOrganizationGroupRequest) (*pb.AddUserToOrganizationGroupResponse, error) {
 	genericReq := auth.ConvertAddUserToOrganizationGroupRequest(req)
-	genericReq.DomainId = req.OrganizationId
+	genericReq.DomainID = req.OrganizationId
 
 	err := auth.AddUserToGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -69,7 +69,7 @@ func (s *AuthorizationServer) AddUserToOrganizationGroup(ctx context.Context, re
 
 func (s *AuthorizationServer) RemoveUserFromOrganizationGroup(ctx context.Context, req *pb.RemoveUserFromOrganizationGroupRequest) (*pb.RemoveUserFromOrganizationGroupResponse, error) {
 	genericReq := auth.ConvertRemoveUserFromOrganizationGroupRequest(req)
-	genericReq.DomainId = req.OrganizationId
+	genericReq.DomainID = req.OrganizationId
 
 	err := auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *AuthorizationServer) RemoveUserFromOrganizationGroup(ctx context.Contex
 
 func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest) (*pb.ListOrganizationGroupsResponse, error) {
 	genericReq := auth.ConvertListOrganizationGroupsRequest(req)
-	genericReq.DomainId = req.OrganizationId
+	genericReq.DomainID = req.OrganizationId
 
 	genericResp, err := auth.ListGroups(ctx, genericReq, s.authService)
 	if err != nil {
@@ -93,7 +93,7 @@ func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *p
 
 func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req *pb.GetOrganizationGroupUsersRequest) (*pb.GetOrganizationGroupUsersResponse, error) {
 	genericReq := auth.ConvertGetOrganizationGroupUsersRequest(req)
-	genericReq.DomainId = req.OrganizationId
+	genericReq.DomainID = req.OrganizationId
 
 	genericResp, err := auth.GetGroupUsers(ctx, genericReq, s.authService)
 	if err != nil {

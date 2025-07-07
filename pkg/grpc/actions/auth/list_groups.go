@@ -11,7 +11,7 @@ import (
 )
 
 func ListGroups(ctx context.Context, req *GroupRequest, authService authorization.Authorization) (*ListGroupsResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
+	err := actions.ValidateUUIDs(req.DomainID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
@@ -25,7 +25,7 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 		return nil, err
 	}
 
-	groupNames, err := authService.GetGroups(req.DomainId, domainType)
+	groupNames, err := authService.GetGroups(req.DomainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get groups")
 	}
@@ -38,7 +38,7 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 		groups[i] = &pb.Group{
 			Name:       groupName,
 			DomainType: req.DomainType,
-			DomainId:   req.DomainId,
+			DomainId:   req.DomainID,
 			Role:       "", // TODO: get actual role from service
 		}
 	}

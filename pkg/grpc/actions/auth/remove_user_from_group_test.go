@@ -32,8 +32,8 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	t.Run("successful remove user from group", func(t *testing.T) {
 		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
+			DomainID:   orgID,
+			UserID:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
@@ -44,8 +44,8 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
+			DomainID:   orgID,
+			UserID:     r.User.String(),
 			GroupName:  "",
 		}
 
@@ -57,8 +57,8 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
 		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
+			DomainID:   orgID,
+			UserID:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
@@ -80,8 +80,8 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		
 		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			UserId:     r.User.String(),
+			DomainID:   canvasID,
+			UserID:     r.User.String(),
 			GroupName:  "canvas-group",
 		}
 

@@ -12,7 +12,7 @@ import (
 )
 
 func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService authorization.Authorization) (*CreateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
+	err := actions.ValidateUUIDs(req.DomainID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -29,19 +29,19 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 
 	// TODO: once orgs/canvases are implemented, check if the domain exists
 
-	err = authService.CreateGroup(req.DomainId, domainType, req.GroupName, req.Role)
+	err = authService.CreateGroup(req.DomainID, domainType, req.GroupName, req.Role)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainId, err)
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainID, err)
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
-	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainId, req.DomainType.String())
+	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainID, req.DomainType.String())
 
 	// Create the group object for response
 	group := &pb.Group{
 		Name:       req.GroupName,
 		DomainType: req.DomainType,
-		DomainId:   req.DomainId,
+		DomainId:   req.DomainID,
 		Role:       req.Role,
 	}
 

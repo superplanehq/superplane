@@ -7,20 +7,20 @@ import (
 )
 
 type GroupRequest struct {
-	DomainId   string
+	DomainID   string
 	GroupName  string
 	DomainType pb.DomainType
 }
 
 type GroupUserRequest struct {
-	DomainId   string
+	DomainID   string
 	GroupName  string
 	DomainType pb.DomainType
-	UserId     string
+	UserID     string
 }
 
 type CreateGroupRequest struct {
-	DomainId   string
+	DomainID   string
 	GroupName  string
 	DomainType pb.DomainType
 	Role       string
@@ -35,13 +35,13 @@ type ListGroupsResponse struct {
 }
 
 type GetGroupUsersRequest struct {
-	DomainId   string
+	DomainID   string
 	GroupName  string
 	DomainType pb.DomainType
 }
 
 type GetGroupUsersResponse struct {
-	UserIds []string
+	UserIDs []string
 	Group   *pb.Group
 }
 
@@ -99,7 +99,7 @@ func ConvertDomainType(domainType pb.DomainType) (string, error) {
 // Organization group adapters
 func ConvertCreateOrganizationGroupRequest(req *pb.CreateOrganizationGroupRequest) *CreateGroupRequest {
 	return &CreateGroupRequest{
-		DomainId:   "", // Organization ID will be set by server
+		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 		Role:       req.Role,
@@ -114,25 +114,25 @@ func ConvertToCreateOrganizationGroupResponse(resp *CreateGroupResponse) *pb.Cre
 
 func ConvertAddUserToOrganizationGroupRequest(req *pb.AddUserToOrganizationGroupRequest) *GroupUserRequest {
 	return &GroupUserRequest{
-		DomainId:   "", // Organization ID will be set by server
+		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-		UserId:     req.UserId,
+		UserID:     req.UserId,
 	}
 }
 
 func ConvertRemoveUserFromOrganizationGroupRequest(req *pb.RemoveUserFromOrganizationGroupRequest) *GroupUserRequest {
 	return &GroupUserRequest{
-		DomainId:   "", // Organization ID will be set by server
+		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-		UserId:     req.UserId,
+		UserID:     req.UserId,
 	}
 }
 
 func ConvertListOrganizationGroupsRequest(req *pb.ListOrganizationGroupsRequest) *GroupRequest {
 	return &GroupRequest{
-		DomainId:   "", // Organization ID will be set by server
+		DomainID:   "", // Organization ID will be set by server
 		GroupName:  "", // Not needed for list
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 	}
@@ -140,7 +140,7 @@ func ConvertListOrganizationGroupsRequest(req *pb.ListOrganizationGroupsRequest)
 
 func ConvertGetOrganizationGroupUsersRequest(req *pb.GetOrganizationGroupUsersRequest) *GetGroupUsersRequest {
 	return &GetGroupUsersRequest{
-		DomainId:   "", // Organization ID will be set by server
+		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 	}
@@ -148,7 +148,7 @@ func ConvertGetOrganizationGroupUsersRequest(req *pb.GetOrganizationGroupUsersRe
 
 func ConvertToGetOrganizationGroupUsersResponse(resp *GetGroupUsersResponse) *pb.GetOrganizationGroupUsersResponse {
 	return &pb.GetOrganizationGroupUsersResponse{
-		UserIds: resp.UserIds,
+		UserIds: resp.UserIDs,
 		Group:   resp.Group,
 	}
 }
@@ -162,7 +162,7 @@ func ConvertToListOrganizationGroupsResponse(groups []*pb.Group) *pb.ListOrganiz
 // Canvas group adapters
 func ConvertCreateCanvasGroupRequest(req *pb.CreateCanvasGroupRequest) *CreateGroupRequest {
 	return &CreateGroupRequest{
-		DomainId:   req.CanvasId,
+		DomainID:   req.CanvasId,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 		Role:       req.Role,
@@ -177,25 +177,25 @@ func ConvertToCreateCanvasGroupResponse(resp *CreateGroupResponse) *pb.CreateCan
 
 func ConvertAddUserToCanvasGroupRequest(req *pb.AddUserToCanvasGroupRequest) *GroupUserRequest {
 	return &GroupUserRequest{
-		DomainId:   req.CanvasId,
+		DomainID:   req.CanvasId,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-		UserId:     req.UserId,
+		UserID:     req.UserId,
 	}
 }
 
 func ConvertRemoveUserFromCanvasGroupRequest(req *pb.RemoveUserFromCanvasGroupRequest) *GroupUserRequest {
 	return &GroupUserRequest{
-		DomainId:   req.CanvasId,
+		DomainID:   req.CanvasId,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-		UserId:     req.UserId,
+		UserID:     req.UserId,
 	}
 }
 
 func ConvertListCanvasGroupsRequest(req *pb.ListCanvasGroupsRequest) *GroupRequest {
 	return &GroupRequest{
-		DomainId:   req.CanvasId,
+		DomainID:   req.CanvasId,
 		GroupName:  "", // Not needed for list
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 	}
@@ -203,7 +203,7 @@ func ConvertListCanvasGroupsRequest(req *pb.ListCanvasGroupsRequest) *GroupReque
 
 func ConvertGetCanvasGroupUsersRequest(req *pb.GetCanvasGroupUsersRequest) *GetGroupUsersRequest {
 	return &GetGroupUsersRequest{
-		DomainId:   req.CanvasId,
+		DomainID:   req.CanvasId,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 	}
@@ -211,7 +211,7 @@ func ConvertGetCanvasGroupUsersRequest(req *pb.GetCanvasGroupUsersRequest) *GetG
 
 func ConvertToGetCanvasGroupUsersResponse(resp *GetGroupUsersResponse) *pb.GetCanvasGroupUsersResponse {
 	return &pb.GetCanvasGroupUsersResponse{
-		UserIds: resp.UserIds,
+		UserIds: resp.UserIDs,
 		Group:   resp.Group,
 	}
 }

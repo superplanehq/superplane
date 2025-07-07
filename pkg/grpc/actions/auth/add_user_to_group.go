@@ -10,7 +10,7 @@ import (
 )
 
 func AddUserToGroup(ctx context.Context, req *GroupUserRequest, authService authorization.Authorization) error {
-	err := actions.ValidateUUIDs(req.DomainId, req.UserId)
+	err := actions.ValidateUUIDs(req.DomainID, req.UserID)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -25,7 +25,7 @@ func AddUserToGroup(ctx context.Context, req *GroupUserRequest, authService auth
 		return err
 	}
 
-	err = authService.AddUserToGroup(req.DomainId, domainType, req.UserId, req.GroupName)
+	err = authService.AddUserToGroup(req.DomainID, domainType, req.UserID, req.GroupName)
 	if err != nil {
 		return status.Error(codes.Internal, err.Error())
 	}
