@@ -192,6 +192,53 @@ service Authorization {
       tags: "Authorization";
     };
   }
+
+  //
+  // Endpoint for creating a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/authorization/roles"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create role";
+      description: "Creates a new custom role with specified permissions";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for updating a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/authorization/roles/{role_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update role";
+      description: "Updates an existing custom role with new permissions";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for deleting a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/authorization/roles/{role_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete role";
+      description: "Deletes an existing custom role";
+      tags: "Authorization";
+    };
+  }
 }
 
 // User permissions listing messages
@@ -304,6 +351,35 @@ message GetGroupUsersRequest {
 message GetGroupUsersResponse {
   repeated string user_ids = 1;
 }
+
+// Custom role management messages
+message CreateRoleRequest {
+  string name = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Permission permissions = 4;
+  string inherited_role = 5;
+}
+
+message CreateRoleResponse {}
+
+message UpdateRoleRequest {
+  string role_name = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Permission permissions = 4;
+  string inherited_role = 5;
+}
+
+message UpdateRoleResponse {}
+
+message DeleteRoleRequest {
+  string role_name = 1;
+  DomainType domain_type = 2;
+  string domain_id = 3;
+}
+
+message DeleteRoleResponse {}
 
 // Core data structures
 message Role {
