@@ -20,7 +20,7 @@ func Test_CreateGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful group creation", func(t *testing.T) {
-		req := &pb.CreateGroupRequest{
+		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			GroupName:  "test-group",
@@ -43,7 +43,7 @@ func Test_CreateGroup(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 		
-		req := &pb.CreateGroupRequest{
+		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			GroupName:  "canvas-group",
@@ -59,7 +59,7 @@ func Test_CreateGroup(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.CreateGroupRequest{
+		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			GroupName:  "",

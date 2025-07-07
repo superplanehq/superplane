@@ -1251,6 +1251,12 @@ type ApiAuthorizationGetOrganizationGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
 	groupName string
+	organizationId *string
+}
+
+func (r ApiAuthorizationGetOrganizationGroupRequest) OrganizationId(organizationId string) ApiAuthorizationGetOrganizationGroupRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiAuthorizationGetOrganizationGroupRequest) Execute() (*AuthorizationGetOrganizationGroupResponse, *http.Response, error) {
@@ -1296,6 +1302,9 @@ func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupExecute(r Api
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -1362,6 +1371,12 @@ type ApiAuthorizationGetOrganizationGroupUsersRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
 	groupName string
+	organizationId *string
+}
+
+func (r ApiAuthorizationGetOrganizationGroupUsersRequest) OrganizationId(organizationId string) ApiAuthorizationGetOrganizationGroupUsersRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiAuthorizationGetOrganizationGroupUsersRequest) Execute() (*AuthorizationGetOrganizationGroupUsersResponse, *http.Response, error) {
@@ -1407,6 +1422,9 @@ func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupUsersExecute(
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -1715,6 +1733,12 @@ func (a *AuthorizationAPIService) AuthorizationListCanvasGroupsExecute(r ApiAuth
 type ApiAuthorizationListOrganizationGroupsRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
+	organizationId *string
+}
+
+func (r ApiAuthorizationListOrganizationGroupsRequest) OrganizationId(organizationId string) ApiAuthorizationListOrganizationGroupsRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiAuthorizationListOrganizationGroupsRequest) Execute() (*AuthorizationListOrganizationGroupsResponse, *http.Response, error) {
@@ -1757,6 +1781,9 @@ func (a *AuthorizationAPIService) AuthorizationListOrganizationGroupsExecute(r A
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -2321,6 +2348,12 @@ type ApiAuthorizationRemoveUserFromOrganizationGroupRequest struct {
 	ApiService *AuthorizationAPIService
 	groupName string
 	userId string
+	organizationId *string
+}
+
+func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) OrganizationId(organizationId string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -2369,6 +2402,9 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupEx
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

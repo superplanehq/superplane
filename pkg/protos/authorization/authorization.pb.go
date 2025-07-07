@@ -771,11 +771,12 @@ func (x *GetUserRolesResponse) GetRoles() []*Role {
 
 // Group management messages
 type CreateOrganizationGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	Role          string                 `protobuf:"bytes,2,opt,name=role,proto3" json:"role,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	Role           string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateOrganizationGroupRequest) Reset() {
@@ -806,6 +807,13 @@ func (x *CreateOrganizationGroupRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateOrganizationGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateOrganizationGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *CreateOrganizationGroupRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *CreateOrganizationGroupRequest) GetGroupName() string {
@@ -867,11 +875,12 @@ func (x *CreateOrganizationGroupResponse) GetGroup() *Group {
 }
 
 type AddUserToOrganizationGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AddUserToOrganizationGroupRequest) Reset() {
@@ -902,6 +911,13 @@ func (x *AddUserToOrganizationGroupRequest) ProtoReflect() protoreflect.Message 
 // Deprecated: Use AddUserToOrganizationGroupRequest.ProtoReflect.Descriptor instead.
 func (*AddUserToOrganizationGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AddUserToOrganizationGroupRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *AddUserToOrganizationGroupRequest) GetGroupName() string {
@@ -955,11 +971,12 @@ func (*AddUserToOrganizationGroupResponse) Descriptor() ([]byte, []int) {
 }
 
 type RemoveUserFromOrganizationGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RemoveUserFromOrganizationGroupRequest) Reset() {
@@ -990,6 +1007,13 @@ func (x *RemoveUserFromOrganizationGroupRequest) ProtoReflect() protoreflect.Mes
 // Deprecated: Use RemoveUserFromOrganizationGroupRequest.ProtoReflect.Descriptor instead.
 func (*RemoveUserFromOrganizationGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *RemoveUserFromOrganizationGroupRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *RemoveUserFromOrganizationGroupRequest) GetGroupName() string {
@@ -1043,9 +1067,10 @@ func (*RemoveUserFromOrganizationGroupResponse) Descriptor() ([]byte, []int) {
 }
 
 type ListOrganizationGroupsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListOrganizationGroupsRequest) Reset() {
@@ -1076,6 +1101,13 @@ func (x *ListOrganizationGroupsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListOrganizationGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListOrganizationGroupsRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListOrganizationGroupsRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 type ListOrganizationGroupsResponse struct {
@@ -1123,10 +1155,11 @@ func (x *ListOrganizationGroupsResponse) GetGroups() []*Group {
 }
 
 type GetOrganizationGroupUsersRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetOrganizationGroupUsersRequest) Reset() {
@@ -1157,6 +1190,13 @@ func (x *GetOrganizationGroupUsersRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetOrganizationGroupUsersRequest.ProtoReflect.Descriptor instead.
 func (*GetOrganizationGroupUsersRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *GetOrganizationGroupUsersRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *GetOrganizationGroupUsersRequest) GetGroupName() string {
@@ -1220,10 +1260,11 @@ func (x *GetOrganizationGroupUsersResponse) GetGroup() *Group {
 
 // Group detail messages
 type GetOrganizationGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	GroupName     string                 `protobuf:"bytes,1,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetOrganizationGroupRequest) Reset() {
@@ -1254,6 +1295,13 @@ func (x *GetOrganizationGroupRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetOrganizationGroupRequest.ProtoReflect.Descriptor instead.
 func (*GetOrganizationGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetOrganizationGroupRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *GetOrganizationGroupRequest) GetGroupName() string {
@@ -2462,35 +2510,41 @@ const file_authorization_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x124\n" +
-	"\x05roles\x18\x04 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"S\n" +
-	"\x1eCreateOrganizationGroupRequest\x12\x1d\n" +
+	"\x05roles\x18\x04 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"|\n" +
+	"\x1eCreateOrganizationGroupRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x01 \x01(\tR\tgroupName\x12\x12\n" +
-	"\x04role\x18\x02 \x01(\tR\x04role\"X\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x12\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\"X\n" +
 	"\x1fCreateOrganizationGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"[\n" +
-	"!AddUserToOrganizationGroupRequest\x12\x1d\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x84\x01\n" +
+	"!AddUserToOrganizationGroupRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x01 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"$\n" +
-	"\"AddUserToOrganizationGroupResponse\"`\n" +
-	"&RemoveUserFromOrganizationGroupRequest\x12\x1d\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\"$\n" +
+	"\"AddUserToOrganizationGroupResponse\"\x89\x01\n" +
+	"&RemoveUserFromOrganizationGroupRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x01 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\")\n" +
-	"'RemoveUserFromOrganizationGroupResponse\"\x1f\n" +
-	"\x1dListOrganizationGroupsRequest\"Y\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\")\n" +
+	"'RemoveUserFromOrganizationGroupResponse\"H\n" +
+	"\x1dListOrganizationGroupsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"Y\n" +
 	"\x1eListOrganizationGroupsResponse\x127\n" +
-	"\x06groups\x18\x01 \x03(\v2\x1f.Superplane.Authorization.GroupR\x06groups\"A\n" +
-	" GetOrganizationGroupUsersRequest\x12\x1d\n" +
+	"\x06groups\x18\x01 \x03(\v2\x1f.Superplane.Authorization.GroupR\x06groups\"j\n" +
+	" GetOrganizationGroupUsersRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x01 \x01(\tR\tgroupName\"u\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\"u\n" +
 	"!GetOrganizationGroupUsersResponse\x12\x19\n" +
 	"\buser_ids\x18\x01 \x03(\tR\auserIds\x125\n" +
-	"\x05group\x18\x02 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"<\n" +
-	"\x1bGetOrganizationGroupRequest\x12\x1d\n" +
+	"\x05group\x18\x02 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"e\n" +
+	"\x1bGetOrganizationGroupRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x01 \x01(\tR\tgroupName\"U\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\"U\n" +
 	"\x1cGetOrganizationGroupResponse\x125\n" +
 	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"j\n" +
 	"\x18CreateCanvasGroupRequest\x12\x1b\n" +

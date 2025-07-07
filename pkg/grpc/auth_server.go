@@ -43,24 +43,134 @@ func (s *AuthorizationServer) GetUserRoles(ctx context.Context, req *pb.GetUserR
 	return auth.GetUserRoles(ctx, req, s.authService)
 }
 
-func (s *AuthorizationServer) CreateGroup(ctx context.Context, req *pb.CreateGroupRequest) (*pb.CreateGroupResponse, error) {
-	return auth.CreateGroup(ctx, req, s.authService)
+func (s *AuthorizationServer) CreateOrganizationGroup(ctx context.Context, req *pb.CreateOrganizationGroupRequest) (*pb.CreateOrganizationGroupResponse, error) {
+	// TODO: Get organization ID from context/headers
+	orgId := "org-id-placeholder" // This should be extracted from the request context
+
+	genericReq := auth.ConvertCreateOrganizationGroupRequest(req)
+	genericReq.DomainId = orgId
+
+	genericResp, err := auth.CreateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToCreateOrganizationGroupResponse(genericResp), nil
 }
 
-func (s *AuthorizationServer) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (*pb.AddUserToGroupResponse, error) {
-	return auth.AddUserToGroup(ctx, req, s.authService)
+func (s *AuthorizationServer) AddUserToOrganizationGroup(ctx context.Context, req *pb.AddUserToOrganizationGroupRequest) (*pb.AddUserToOrganizationGroupResponse, error) {
+	// TODO: Get organization ID from context/headers
+	orgId := "org-id-placeholder" // This should be extracted from the request context
+
+	genericReq := auth.ConvertAddUserToOrganizationGroupRequest(req)
+	genericReq.DomainId = orgId
+
+	err := auth.AddUserToGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.AddUserToOrganizationGroupResponse{}, nil
 }
 
-func (s *AuthorizationServer) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (*pb.RemoveUserFromGroupResponse, error) {
-	return auth.RemoveUserFromGroup(ctx, req, s.authService)
+func (s *AuthorizationServer) RemoveUserFromOrganizationGroup(ctx context.Context, req *pb.RemoveUserFromOrganizationGroupRequest) (*pb.RemoveUserFromOrganizationGroupResponse, error) {
+	// TODO: Get organization ID from context/headers
+	orgId := "org-id-placeholder" // This should be extracted from the request context
+
+	genericReq := auth.ConvertRemoveUserFromOrganizationGroupRequest(req)
+	genericReq.DomainId = orgId
+
+	err := auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RemoveUserFromOrganizationGroupResponse{}, nil
 }
 
-func (s *AuthorizationServer) ListGroups(ctx context.Context, req *pb.ListGroupsRequest) (*pb.ListGroupsResponse, error) {
-	return auth.ListGroups(ctx, req, s.authService)
+func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *pb.ListOrganizationGroupsRequest) (*pb.ListOrganizationGroupsResponse, error) {
+	// TODO: Get organization ID from context/headers
+	orgId := "org-id-placeholder" // This should be extracted from the request context
+
+	genericReq := auth.ConvertListOrganizationGroupsRequest(req)
+	genericReq.DomainId = orgId
+
+	genericResp, err := auth.ListGroups(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToListOrganizationGroupsResponse(genericResp.Groups), nil
 }
 
-func (s *AuthorizationServer) GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest) (*pb.GetGroupUsersResponse, error) {
-	return auth.GetGroupUsers(ctx, req, s.authService)
+func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req *pb.GetOrganizationGroupUsersRequest) (*pb.GetOrganizationGroupUsersResponse, error) {
+	// TODO: Get organization ID from context/headers
+	orgId := "org-id-placeholder" // This should be extracted from the request context
+
+	genericReq := auth.ConvertGetOrganizationGroupUsersRequest(req)
+	genericReq.DomainId = orgId
+
+	genericResp, err := auth.GetGroupUsers(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToGetOrganizationGroupUsersResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) CreateCanvasGroup(ctx context.Context, req *pb.CreateCanvasGroupRequest) (*pb.CreateCanvasGroupResponse, error) {
+	genericReq := auth.ConvertCreateCanvasGroupRequest(req)
+
+	genericResp, err := auth.CreateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToCreateCanvasGroupResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) AddUserToCanvasGroup(ctx context.Context, req *pb.AddUserToCanvasGroupRequest) (*pb.AddUserToCanvasGroupResponse, error) {
+	genericReq := auth.ConvertAddUserToCanvasGroupRequest(req)
+
+	err := auth.AddUserToGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.AddUserToCanvasGroupResponse{}, nil
+}
+
+func (s *AuthorizationServer) RemoveUserFromCanvasGroup(ctx context.Context, req *pb.RemoveUserFromCanvasGroupRequest) (*pb.RemoveUserFromCanvasGroupResponse, error) {
+	genericReq := auth.ConvertRemoveUserFromCanvasGroupRequest(req)
+
+	err := auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.RemoveUserFromCanvasGroupResponse{}, nil
+}
+
+func (s *AuthorizationServer) ListCanvasGroups(ctx context.Context, req *pb.ListCanvasGroupsRequest) (*pb.ListCanvasGroupsResponse, error) {
+	genericReq := auth.ConvertListCanvasGroupsRequest(req)
+
+	genericResp, err := auth.ListGroups(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToListCanvasGroupsResponse(genericResp.Groups), nil
+}
+
+func (s *AuthorizationServer) GetCanvasGroupUsers(ctx context.Context, req *pb.GetCanvasGroupUsersRequest) (*pb.GetCanvasGroupUsersResponse, error) {
+	genericReq := auth.ConvertGetCanvasGroupUsersRequest(req)
+
+	genericResp, err := auth.GetGroupUsers(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToGetCanvasGroupUsersResponse(genericResp), nil
 }
 
 func (s *AuthorizationServer) CreateRole(ctx context.Context, req *pb.CreateRoleRequest) (*pb.CreateRoleResponse, error) {

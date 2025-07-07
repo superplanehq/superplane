@@ -419,8 +419,9 @@ message GetUserRolesResponse {
 
 // Group management messages
 message CreateOrganizationGroupRequest {
-  string group_name = 1;
-  string role = 2;
+  string organization_id = 1;
+  string group_name = 2;
+  string role = 3;
 }
 
 message CreateOrganizationGroupResponse {
@@ -428,27 +429,32 @@ message CreateOrganizationGroupResponse {
 }
 
 message AddUserToOrganizationGroupRequest {
-  string group_name = 1;
-  string user_id = 2;
+  string organization_id = 1;
+  string group_name = 2;
+  string user_id = 3;
 }
 
 message AddUserToOrganizationGroupResponse {}
 
 message RemoveUserFromOrganizationGroupRequest {
-  string group_name = 1;
-  string user_id = 2;
+  string organization_id = 1;
+  string group_name = 2;
+  string user_id = 3;
 }
 
 message RemoveUserFromOrganizationGroupResponse {}
 
-message ListOrganizationGroupsRequest {}
+message ListOrganizationGroupsRequest {
+  string organization_id = 1;
+}
 
 message ListOrganizationGroupsResponse {
   repeated Group groups = 1;
 }
 
 message GetOrganizationGroupUsersRequest {
-  string group_name = 1;
+  string organization_id = 1;
+  string group_name = 2;
 }
 
 message GetOrganizationGroupUsersResponse {
@@ -458,7 +464,8 @@ message GetOrganizationGroupUsersResponse {
 
 // Group detail messages
 message GetOrganizationGroupRequest {
-  string group_name = 1;
+  string organization_id = 1;
+  string group_name = 2;
 }
 
 message GetOrganizationGroupResponse {

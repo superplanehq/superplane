@@ -1597,6 +1597,14 @@
             }
           }
         },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "tags": [
           "Authorization"
         ]
@@ -1659,6 +1667,12 @@
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
           }
         ],
         "tags": [
@@ -1690,6 +1704,12 @@
             "name": "groupName",
             "in": "path",
             "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
             "type": "string"
           }
         ],
@@ -1766,6 +1786,12 @@
             "name": "userId",
             "in": "path",
             "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
             "type": "string"
           }
         ],
@@ -1946,6 +1972,9 @@
     "AuthorizationAddUserToOrganizationGroupBody": {
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string"
+        },
         "userId": {
           "type": "string"
         }
@@ -1992,6 +2021,9 @@
     "AuthorizationCreateOrganizationGroupRequest": {
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string"
+        },
         "groupName": {
           "type": "string"
         },

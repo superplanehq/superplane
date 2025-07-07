@@ -26,7 +26,7 @@ func Test_ListGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
-		req := &pb.ListGroupsRequest{
+		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
@@ -55,7 +55,7 @@ func Test_ListGroups(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pb.ListGroupsRequest{
+		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 		}
@@ -76,7 +76,7 @@ func Test_ListGroups(t *testing.T) {
 		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", authorization.RoleCanvasViewer)
 		require.NoError(t, err)
 		
-		req := &pb.ListGroupsRequest{
+		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 		}

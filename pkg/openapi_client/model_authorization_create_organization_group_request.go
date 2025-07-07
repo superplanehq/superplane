@@ -20,6 +20,7 @@ var _ MappedNullable = &AuthorizationCreateOrganizationGroupRequest{}
 
 // AuthorizationCreateOrganizationGroupRequest struct for AuthorizationCreateOrganizationGroupRequest
 type AuthorizationCreateOrganizationGroupRequest struct {
+	OrganizationId *string `json:"organizationId,omitempty"`
 	GroupName *string `json:"groupName,omitempty"`
 	Role *string `json:"role,omitempty"`
 }
@@ -39,6 +40,38 @@ func NewAuthorizationCreateOrganizationGroupRequest() *AuthorizationCreateOrgani
 func NewAuthorizationCreateOrganizationGroupRequestWithDefaults() *AuthorizationCreateOrganizationGroupRequest {
 	this := AuthorizationCreateOrganizationGroupRequest{}
 	return &this
+}
+
+// GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetOrganizationId() string {
+	if o == nil || IsNil(o.OrganizationId) {
+		var ret string
+		return ret
+	}
+	return *o.OrganizationId
+}
+
+// GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetOrganizationIdOk() (*string, bool) {
+	if o == nil || IsNil(o.OrganizationId) {
+		return nil, false
+	}
+	return o.OrganizationId, true
+}
+
+// HasOrganizationId returns a boolean if a field has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) HasOrganizationId() bool {
+	if o != nil && !IsNil(o.OrganizationId) {
+		return true
+	}
+
+	return false
+}
+
+// SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
+func (o *AuthorizationCreateOrganizationGroupRequest) SetOrganizationId(v string) {
+	o.OrganizationId = &v
 }
 
 // GetGroupName returns the GroupName field value if set, zero value otherwise.
@@ -115,6 +148,9 @@ func (o AuthorizationCreateOrganizationGroupRequest) MarshalJSON() ([]byte, erro
 
 func (o AuthorizationCreateOrganizationGroupRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.OrganizationId) {
+		toSerialize["organizationId"] = o.OrganizationId
+	}
 	if !IsNil(o.GroupName) {
 		toSerialize["groupName"] = o.GroupName
 	}

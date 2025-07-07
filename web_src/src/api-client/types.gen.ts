@@ -9,6 +9,7 @@ export type AuthorizationAddUserToCanvasGroupResponse = {
 };
 
 export type AuthorizationAddUserToOrganizationGroupBody = {
+    organizationId?: string;
     userId?: string;
 };
 
@@ -35,6 +36,7 @@ export type AuthorizationCreateCanvasGroupResponse = {
 };
 
 export type AuthorizationCreateOrganizationGroupRequest = {
+    organizationId?: string;
     groupName?: string;
     role?: string;
 };
@@ -1720,7 +1722,9 @@ export type SuperplaneDescribeCanvasResponse2 = SuperplaneDescribeCanvasResponse
 export type AuthorizationListOrganizationGroupsData = {
     body?: never;
     path?: never;
-    query?: never;
+    query?: {
+        organizationId?: string;
+    };
     url: '/api/v1/groups';
 };
 
@@ -1772,7 +1776,9 @@ export type AuthorizationGetOrganizationGroupData = {
     path: {
         groupName: string;
     };
-    query?: never;
+    query?: {
+        organizationId?: string;
+    };
     url: '/api/v1/groups/{groupName}';
 };
 
@@ -1799,7 +1805,9 @@ export type AuthorizationGetOrganizationGroupUsersData = {
     path: {
         groupName: string;
     };
-    query?: never;
+    query?: {
+        organizationId?: string;
+    };
     url: '/api/v1/groups/{groupName}/users';
 };
 
@@ -1854,7 +1862,9 @@ export type AuthorizationRemoveUserFromOrganizationGroupData = {
         groupName: string;
         userId: string;
     };
-    query?: never;
+    query?: {
+        organizationId?: string;
+    };
     url: '/api/v1/groups/{groupName}/users/{userId}';
 };
 

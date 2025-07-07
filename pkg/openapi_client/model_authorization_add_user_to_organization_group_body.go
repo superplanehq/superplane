@@ -20,6 +20,7 @@ var _ MappedNullable = &AuthorizationAddUserToOrganizationGroupBody{}
 
 // AuthorizationAddUserToOrganizationGroupBody struct for AuthorizationAddUserToOrganizationGroupBody
 type AuthorizationAddUserToOrganizationGroupBody struct {
+	OrganizationId *string `json:"organizationId,omitempty"`
 	UserId *string `json:"userId,omitempty"`
 }
 
@@ -38,6 +39,38 @@ func NewAuthorizationAddUserToOrganizationGroupBody() *AuthorizationAddUserToOrg
 func NewAuthorizationAddUserToOrganizationGroupBodyWithDefaults() *AuthorizationAddUserToOrganizationGroupBody {
 	this := AuthorizationAddUserToOrganizationGroupBody{}
 	return &this
+}
+
+// GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
+func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationId() string {
+	if o == nil || IsNil(o.OrganizationId) {
+		var ret string
+		return ret
+	}
+	return *o.OrganizationId
+}
+
+// GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationIdOk() (*string, bool) {
+	if o == nil || IsNil(o.OrganizationId) {
+		return nil, false
+	}
+	return o.OrganizationId, true
+}
+
+// HasOrganizationId returns a boolean if a field has been set.
+func (o *AuthorizationAddUserToOrganizationGroupBody) HasOrganizationId() bool {
+	if o != nil && !IsNil(o.OrganizationId) {
+		return true
+	}
+
+	return false
+}
+
+// SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
+func (o *AuthorizationAddUserToOrganizationGroupBody) SetOrganizationId(v string) {
+	o.OrganizationId = &v
 }
 
 // GetUserId returns the UserId field value if set, zero value otherwise.
@@ -82,6 +115,9 @@ func (o AuthorizationAddUserToOrganizationGroupBody) MarshalJSON() ([]byte, erro
 
 func (o AuthorizationAddUserToOrganizationGroupBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.OrganizationId) {
+		toSerialize["organizationId"] = o.OrganizationId
+	}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
 	}

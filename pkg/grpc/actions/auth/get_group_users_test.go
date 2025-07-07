@@ -30,7 +30,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful get group users", func(t *testing.T) {
-		req := &pb.GetGroupUsersRequest{
+		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			GroupName:  "test-group",
@@ -52,7 +52,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.GetGroupUsersRequest{
+		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			GroupName:  "",
@@ -64,7 +64,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pb.GetGroupUsersRequest{
+		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 			GroupName:  "test-group",
@@ -86,7 +86,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
 		
-		req := &pb.GetGroupUsersRequest{
+		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			GroupName:  "canvas-group",
@@ -110,7 +110,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		err = authService.CreateGroup(orgID, "org", "empty-group", authorization.RoleOrgViewer)
 		require.NoError(t, err)
 
-		req := &pb.GetGroupUsersRequest{
+		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			GroupName:  "empty-group",

@@ -26,40 +26,39 @@ func Test_AddUserToGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful add user to group", func(t *testing.T) {
-		req := &pb.AddUserToGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		resp, err := AddUserToGroup(ctx, req, authService)
+		err := AddUserToGroup(ctx, req, authService)
 		require.NoError(t, err)
-		assert.NotNil(t, resp)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.AddUserToGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		err := AddUserToGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pb.AddUserToGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		err := AddUserToGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -69,14 +68,14 @@ func Test_AddUserToGroup(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &pb.AddUserToGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			UserId:     r.User.String(),
 			GroupName:  "non-existent-group",
 		}
 
-		_, err = AddUserToGroup(ctx, req, authService)
+		err = AddUserToGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group non-existent-group does not exist")
 	})
@@ -90,15 +89,14 @@ func Test_AddUserToGroup(t *testing.T) {
 		err = authService.CreateGroup(canvasID, "canvas", "canvas-test-group", authorization.RoleCanvasAdmin)
 		require.NoError(t, err)
 
-		req := &pb.AddUserToGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			UserId:     r.User.String(),
 			GroupName:  "canvas-test-group",
 		}
 
-		resp, err := AddUserToGroup(ctx, req, authService)
+		err = AddUserToGroup(ctx, req, authService)
 		require.NoError(t, err)
-		assert.NotNil(t, resp)
 	})
 }

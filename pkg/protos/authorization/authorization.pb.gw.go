@@ -417,6 +417,8 @@ func local_request_Authorization_AddUserToCanvasGroup_0(ctx context.Context, mar
 	return msg, metadata, err
 }
 
+var filter_Authorization_RemoveUserFromOrganizationGroup_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0, "user_id": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
+
 func request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq RemoveUserFromOrganizationGroupRequest
@@ -439,6 +441,12 @@ func request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.Context
 	protoReq.UserId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_RemoveUserFromOrganizationGroup_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.RemoveUserFromOrganizationGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -465,6 +473,12 @@ func local_request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.C
 	protoReq.UserId, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_RemoveUserFromOrganizationGroup_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.RemoveUserFromOrganizationGroup(ctx, &protoReq)
 	return msg, metadata, err
@@ -539,12 +553,20 @@ func local_request_Authorization_RemoveUserFromCanvasGroup_0(ctx context.Context
 	return msg, metadata, err
 }
 
+var filter_Authorization_ListOrganizationGroups_0 = &utilities.DoubleArray{Encoding: map[string]int{}, Base: []int(nil), Check: []int(nil)}
+
 func request_Authorization_ListOrganizationGroups_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq ListOrganizationGroupsRequest
 		metadata runtime.ServerMetadata
 	)
 	io.Copy(io.Discard, req.Body)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_ListOrganizationGroups_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	msg, err := client.ListOrganizationGroups(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
@@ -554,6 +576,12 @@ func local_request_Authorization_ListOrganizationGroups_0(ctx context.Context, m
 		protoReq ListOrganizationGroupsRequest
 		metadata runtime.ServerMetadata
 	)
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_ListOrganizationGroups_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	msg, err := server.ListOrganizationGroups(ctx, &protoReq)
 	return msg, metadata, err
 }
@@ -595,6 +623,8 @@ func local_request_Authorization_ListCanvasGroups_0(ctx context.Context, marshal
 	return msg, metadata, err
 }
 
+var filter_Authorization_GetOrganizationGroupUsers_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+
 func request_Authorization_GetOrganizationGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetOrganizationGroupUsersRequest
@@ -609,6 +639,12 @@ func request_Authorization_GetOrganizationGroupUsers_0(ctx context.Context, mars
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_GetOrganizationGroupUsers_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.GetOrganizationGroupUsers(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -627,6 +663,12 @@ func local_request_Authorization_GetOrganizationGroupUsers_0(ctx context.Context
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_GetOrganizationGroupUsers_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.GetOrganizationGroupUsers(ctx, &protoReq)
 	return msg, metadata, err
@@ -685,6 +727,8 @@ func local_request_Authorization_GetCanvasGroupUsers_0(ctx context.Context, mars
 	return msg, metadata, err
 }
 
+var filter_Authorization_GetOrganizationGroup_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+
 func request_Authorization_GetOrganizationGroup_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq GetOrganizationGroupRequest
@@ -699,6 +743,12 @@ func request_Authorization_GetOrganizationGroup_0(ctx context.Context, marshaler
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_GetOrganizationGroup_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.GetOrganizationGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -717,6 +767,12 @@ func local_request_Authorization_GetOrganizationGroup_0(ctx context.Context, mar
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_GetOrganizationGroup_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.GetOrganizationGroup(ctx, &protoReq)
 	return msg, metadata, err

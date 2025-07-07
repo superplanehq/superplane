@@ -30,40 +30,39 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful remove user from group", func(t *testing.T) {
-		req := &pb.RemoveUserFromGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		resp, err := RemoveUserFromGroup(ctx, req, authService)
+		err := RemoveUserFromGroup(ctx, req, authService)
 		require.NoError(t, err)
-		assert.NotNil(t, resp)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.RemoveUserFromGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pb.RemoveUserFromGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -79,15 +78,14 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
 		
-		req := &pb.RemoveUserFromGroupRequest{
+		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 			UserId:     r.User.String(),
 			GroupName:  "canvas-group",
 		}
 
-		resp, err := RemoveUserFromGroup(ctx, req, authService)
+		err = RemoveUserFromGroup(ctx, req, authService)
 		require.NoError(t, err)
-		assert.NotNil(t, resp)
 	})
 }

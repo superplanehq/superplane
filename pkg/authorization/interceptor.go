@@ -64,11 +64,22 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		"/Superplane.Authorization.Authorization/CreateRole":          {Resource: "role", Action: "create", DomainType: "org"},
 		"/Superplane.Authorization.Authorization/UpdateRole":          {Resource: "role", Action: "update", DomainType: "org"},
 		"/Superplane.Authorization.Authorization/DeleteRole":          {Resource: "role", Action: "delete", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/CreateGroup":         {Resource: "group", Action: "create", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/AddUserToGroup":      {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/RemoveUserFromGroup": {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/ListGroups":          {Resource: "group", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/GetGroupUsers":       {Resource: "group", Action: "read", DomainType: "org"},
+		
+		// Organization group permissions
+		"/Superplane.Authorization.Authorization/CreateOrganizationGroup":         {Resource: "group", Action: "create", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/AddUserToOrganizationGroup":      {Resource: "group", Action: "update", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup": {Resource: "group", Action: "update", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/ListOrganizationGroups":          {Resource: "group", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/GetOrganizationGroupUsers":       {Resource: "group", Action: "read", DomainType: "org"},
+		"/Superplane.Authorization.Authorization/GetOrganizationGroup":            {Resource: "group", Action: "read", DomainType: "org"},
+		
+		// Canvas group permissions
+		"/Superplane.Authorization.Authorization/CreateCanvasGroup":         {Resource: "group", Action: "create", DomainType: "canvas"},
+		"/Superplane.Authorization.Authorization/AddUserToCanvasGroup":      {Resource: "group", Action: "update", DomainType: "canvas"},
+		"/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup": {Resource: "group", Action: "update", DomainType: "canvas"},
+		"/Superplane.Authorization.Authorization/ListCanvasGroups":          {Resource: "group", Action: "read", DomainType: "canvas"},
+		"/Superplane.Authorization.Authorization/GetCanvasGroupUsers":       {Resource: "group", Action: "read", DomainType: "canvas"},
+		"/Superplane.Authorization.Authorization/GetCanvasGroup":            {Resource: "group", Action: "read", DomainType: "canvas"},
 	}
 
 	return &AuthorizationInterceptor{

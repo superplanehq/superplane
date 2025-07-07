@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
+func ListGroups(ctx context.Context, req *GroupRequest, authService authorization.Authorization) (*ListGroupsResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
@@ -20,14 +20,9 @@ func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var domainType string
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainType = "org"
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainType = "canvas"
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	domainType, err := ConvertDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
 	}
 
 	groupNames, err := authService.GetGroups(req.DomainId, domainType)
@@ -48,7 +43,7 @@ func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService auth
 		}
 	}
 
-	return &pb.ListGroupsResponse{
+	return &ListGroupsResponse{
 		Groups: groups,
 	}, nil
 }

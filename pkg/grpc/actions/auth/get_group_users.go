@@ -10,28 +10,26 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authService authorization.Authorization) (*pb.GetGroupUsersResponse, error) {
+func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService authorization.Authorization) (*GetGroupUsersResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	if req.GroupName == "" {
-		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
+	groupReq := &GroupRequest{
+		DomainId:   req.DomainId,
+		GroupName:  req.GroupName,
+		DomainType: req.DomainType,
 	}
 
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
+	err = ValidateGroupRequest(groupReq)
+	if err != nil {
+		return nil, err
 	}
 
-	var domainType string
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainType = "org"
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainType = "canvas"
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	domainType, err := ConvertDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
 	}
 
 	userIDs, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
@@ -47,7 +45,7 @@ func GetGroupUsers(ctx context.Context, req *pb.GetGroupUsersRequest, authServic
 		Role:       "", // TODO: get actual role from service
 	}
 
-	return &pb.GetGroupUsersResponse{
+	return &GetGroupUsersResponse{
 		UserIds: userIDs,
 		Group:   group,
 	}, nil

@@ -5,39 +5,30 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest, authService authorization.Authorization) (*pb.AddUserToGroupResponse, error) {
+func AddUserToGroup(ctx context.Context, req *GroupUserRequest, authService authorization.Authorization) error {
 	err := actions.ValidateUUIDs(req.DomainId, req.UserId)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
+		return status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	if req.GroupName == "" {
-		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
+	err = ValidateGroupUserRequest(req)
+	if err != nil {
+		return err
 	}
 
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
-	var domainType string
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainType = "org"
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainType = "canvas"
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	domainType, err := ConvertDomainType(req.DomainType)
+	if err != nil {
+		return err
 	}
 
 	err = authService.AddUserToGroup(req.DomainId, domainType, req.UserId, req.GroupName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		return status.Error(codes.Internal, err.Error())
 	}
 
-	return &pb.AddUserToGroupResponse{}, nil
+	return nil
 }
