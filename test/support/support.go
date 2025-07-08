@@ -180,7 +180,7 @@ func CreateExecutionWithData(t *testing.T,
 	inputs map[string]any,
 ) *models.StageExecution {
 	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
-	execution, err := models.CreateStageExecution(stage.ID, event.ID)
+	execution, err := models.CreateStageExecution(stage.ID, event.ID, event.Message)
 	require.NoError(t, err)
 	return execution
 }

@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE stage_executions ADD COLUMN message TEXT DEFAULT '';
+
+COMMIT;

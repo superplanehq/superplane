@@ -39,6 +39,7 @@ type StageEvent struct {
 	State       string
 	StateReason string
 	CreatedAt   *time.Time
+	Message     string
 	Inputs      datatypes.JSONType[map[string]any]
 }
 
@@ -125,6 +126,7 @@ func CreateStageEventInTransaction(tx *gorm.DB, stageID uuid.UUID, event *Event,
 		SourceID:    event.SourceID,
 		SourceName:  event.SourceName,
 		SourceType:  event.SourceType,
+		Message:     event.Message,
 		State:       state,
 		StateReason: stateReason,
 		CreatedAt:   &now,
