@@ -52,40 +52,213 @@ func (s *SemaphoreIntegration) GetResource(resourceType, id string) (Integration
 	}
 }
 
-type CreateWorkflowParams struct {
+type CreateWorkflowRequest struct {
 	ProjectID    string            `json:"project_id"`
 	Reference    string            `json:"reference"`
 	PipelineFile string            `json:"pipeline_file"`
 	Parameters   map[string]string `json:"parameters"`
 }
 
-func (p *CreateWorkflowParams) For() string {
-	return ResourceTypeWorkflow
-}
-
 type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) CreateResource(resourceType string, params CreateParams) (IntegrationResource, error) {
+func (s *SemaphoreIntegration) CreateResource(resourceType string, params any) (IntegrationResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		return s.createWorkflow(params)
 	case ResourceTypeTaskTrigger:
 		return s.createTaskTrigger(params)
+	case ResourceTypeNotification:
+		return s.createNotification(params)
+	case ResourceTypeSecret:
+		return s.createSecret(params)
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s for create", resourceType)
 	}
+}
+
+func (s *SemaphoreIntegration) createSecret(params any) (IntegrationResource, error) {
+	URL := fmt.Sprintf("%s/api/v2/secrets", s.URL)
+
+	secret, ok := params.(*Secret)
+	if !ok {
+		return nil, fmt.Errorf("invalid params type %T", params)
+	}
+
+	secret.APIVersion = "v2"
+	secret.Kind = "Secret"
+	body, err := json.Marshal(secret)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling secret: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var response Secret
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+type Secret struct {
+	APIVersion string         `json:"apiVersion"`
+	Kind       string         `json:"kind"`
+	Metadata   SecretMetadata `json:"metadata"`
+	Spec       SecretSpec     `json:"spec"`
+}
+
+func (p *Secret) ID() string {
+	return p.Metadata.ID
+}
+
+func (p *Secret) Name() string {
+	return p.Metadata.Name
+}
+
+func (p *Secret) Type() string {
+	return ResourceTypeSecret
+}
+
+type SecretMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type SecretSpec struct {
+	Data SecretSpecData `json:"data"`
+}
+
+type SecretSpecData struct {
+	EnvVars []SecretSpecDataEnvVar `json:"env_vars"`
+}
+
+type SecretSpecDataEnvVar struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+func (s *SemaphoreIntegration) createNotification(params any) (IntegrationResource, error) {
+	URL := fmt.Sprintf("%s/api/v2/notifications", s.URL)
+
+	notification, ok := params.(*Notification)
+	if !ok {
+		return nil, fmt.Errorf("invalid params type %T", params)
+	}
+
+	notification.APIVersion = "v2"
+	notification.Kind = "Notification"
+	body, err := json.Marshal(notification)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling notification: %v", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var response Notification
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
+type Notification struct {
+	APIVersion string               `json:"apiVersion"`
+	Kind       string               `json:"kind"`
+	Metadata   NotificationMetadata `json:"metadata"`
+	Spec       NotificationSpec     `json:"spec"`
+}
+
+func (p *Notification) ID() string {
+	return p.Metadata.ID
+}
+
+func (p *Notification) Name() string {
+	return p.Metadata.Name
+}
+
+func (p *Notification) Type() string {
+	return ResourceTypeNotification
+}
+
+type NotificationMetadata struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type NotificationRule struct {
+	Name   string                 `json:"name"`
+	Filter NotificationRuleFilter `json:"filter"`
+	Notify NotificationRuleNotify `json:"notify"`
+}
+
+type NotificationRuleNotify struct {
+	Webhook NotificationNotifyWebhook `json:"webhook"`
+}
+
+type NotificationNotifyWebhook struct {
+	URL    string `json:"url"`
+	Secret string `json:"secret"`
+}
+
+type NotificationRuleFilter struct {
+	Branches  []string `json:"branches"`
+	Pipelines []string `json:"pipelines"`
+	Projects  []string `json:"projects"`
+	Results   []string `json:"results"`
+}
+
+type NotificationSpec struct {
+	Rules []NotificationRule `json:"rules"`
 }
 
 type TaskTriggerParams struct {
 	ProjectID   string
 	TaskID      string
 	TaskTrigger *TaskTrigger
-}
-
-func (p *TaskTriggerParams) For() string {
-	return ResourceTypeTaskTrigger
 }
 
 type TaskTrigger struct {
@@ -111,14 +284,18 @@ type TaskTriggerParameter struct {
 	Value string `json:"value"`
 }
 
-func (s *SemaphoreIntegration) createTaskTrigger(createParams CreateParams) (IntegrationResource, error) {
-	params := createParams.(*TaskTriggerParams)
-	URL := fmt.Sprintf("%s/api/v2/projects/%s/tasks/%s/triggers", s.URL, params.ProjectID, params.TaskID)
+func (s *SemaphoreIntegration) createTaskTrigger(params any) (IntegrationResource, error) {
+	p, ok := params.(*TaskTriggerParams)
+	if !ok {
+		return nil, fmt.Errorf("invalid params type %T", params)
+	}
+
+	URL := fmt.Sprintf("%s/api/v2/projects/%s/tasks/%s/triggers", s.URL, p.ProjectID, p.TaskID)
 
 	body, err := json.Marshal(&TaskTrigger{
 		APIVersion: "v2",
 		Kind:       "TaskTrigger",
-		Spec:       params.TaskTrigger.Spec,
+		Spec:       p.TaskTrigger.Spec,
 	})
 
 	if err != nil {
@@ -159,7 +336,7 @@ func (s *SemaphoreIntegration) createTaskTrigger(createParams CreateParams) (Int
 	return &SemaphoreWorkflow{WfID: trigger.Metadata.WorkflowID}, nil
 }
 
-func (s *SemaphoreIntegration) createWorkflow(params CreateParams) (IntegrationResource, error) {
+func (s *SemaphoreIntegration) createWorkflow(params any) (IntegrationResource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", s.URL)
 
 	body, err := json.Marshal(&params)

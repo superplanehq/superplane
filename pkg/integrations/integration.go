@@ -10,17 +10,19 @@ import (
 )
 
 const (
-	ResourceTypeTask        = "task"
-	ResourceTypeTaskTrigger = "task-trigger"
-	ResourceTypeProject     = "project"
-	ResourceTypeWorkflow    = "workflow"
-	ResourceTypePipeline    = "pipeline"
-	ResourceTypeRepository  = "repository"
+	ResourceTypeTask         = "task"
+	ResourceTypeTaskTrigger  = "task-trigger"
+	ResourceTypeProject      = "project"
+	ResourceTypeWorkflow     = "workflow"
+	ResourceTypeNotification = "notification"
+	ResourceTypeSecret       = "secret"
+	ResourceTypePipeline     = "pipeline"
+	ResourceTypeRepository   = "repository"
 )
 
 type Integration interface {
 	GetResource(resourceType, id string) (IntegrationResource, error)
-	CreateResource(resourceType string, params CreateParams) (IntegrationResource, error)
+	CreateResource(resourceType string, params any) (IntegrationResource, error)
 	ListResources(resourceType string) ([]IntegrationResource, error)
 }
 
@@ -28,11 +30,6 @@ type IntegrationResource interface {
 	ID() string
 	Name() string
 	Type() string
-}
-
-// TODO: don't like this, think of a better way to do it
-type CreateParams interface {
-	For() string
 }
 
 func NewIntegration(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (Integration, error) {

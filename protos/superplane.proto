@@ -479,7 +479,9 @@ message EventSource {
   }
 
   message Spec {
-    // No additional configuration needed as per the YAML example
+    IntegrationRef integration = 1;
+    repeated Filter filters = 2;
+    FilterOperator filter_operator = 3;
   }
 
   Metadata metadata = 1;
@@ -671,42 +673,42 @@ message ConnectionGroup {
   Spec spec = 2;
 }
 
+enum FilterType {
+  FILTER_TYPE_UNKNOWN = 0;
+  FILTER_TYPE_DATA = 1;
+  FILTER_TYPE_HEADER = 2;
+}
+
+message Filter {
+  FilterType type = 1;
+  DataFilter data = 2;
+  HeaderFilter header = 3;
+}
+
+message DataFilter {
+  string expression = 1;
+}
+
+message HeaderFilter {
+  string expression = 1;
+}
+
+//
+// Filters can be combined in two ways:
+//   - FILTER_OPERATOR_AND: all filters must be true (default)
+//   - FILTER_OPERATOR_OR: at least one filter must be true
+//
+enum FilterOperator {
+  FILTER_OPERATOR_AND = 0;
+  FILTER_OPERATOR_OR = 1;
+}
+
 message Connection {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_EVENT_SOURCE = 1;
     TYPE_STAGE = 2;
     TYPE_CONNECTION_GROUP = 3;
-  }
-
-  enum FilterType {
-    FILTER_TYPE_UNKNOWN = 0;
-    FILTER_TYPE_DATA = 1;
-    FILTER_TYPE_HEADER = 2;
-  }
-
-  message Filter {
-    FilterType type = 1;
-    DataFilter data = 2;
-    HeaderFilter header = 3;
-  }
-
-  message DataFilter {
-    string expression = 1;
-  }
-
-  message HeaderFilter {
-    string expression = 1;
-  }
-
-  //
-  // Filters can be combined in two ways:
-  //   - FILTER_OPERATOR_AND: all filters must be true (default)
-  //   - FILTER_OPERATOR_OR: at least one filter must be true
-  //
-  enum FilterOperator {
-    FILTER_OPERATOR_AND = 0;
-    FILTER_OPERATOR_OR = 1;
   }
 
   Type type = 1;
@@ -814,6 +816,13 @@ message CreateStageRequest {
   string canvas_id_or_name = 2;
 }
 
+message IntegrationRef {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string id = 3;
+  string name = 4;
+}
+
 message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
@@ -840,13 +849,6 @@ message ExecutorSpec {
 
   message HTTPResponsePolicy {
     repeated uint32 status_codes = 1;
-  }
-
-  message IntegrationRef {
-    Authorization.DomainType domain_type = 1;
-    string domain_id = 2;
-    string id = 3;
-    string name = 4;
   }
 
   Type type = 1;

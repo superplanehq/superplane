@@ -13,9 +13,23 @@ CREATE TABLE integrations (
   auth_type   CHARACTER VARYING(64) NOT NULL,
   auth        jsonb NOT NULL DEFAULT '{}',
   oidc        jsonb NOT NULL DEFAULT '{}',
+  state       CHARACTER VARYING(64) NOT NULL,
 
   PRIMARY KEY (id),
   UNIQUE (domain_type, domain_id, name)
 );
+
+CREATE TABLE integration_resources (
+  id             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  type           CHARACTER VARYING(64) NOT NULL,
+  name           CHARACTER VARYING(128) NOT NULL,
+  integration_id uuid NOT NULL,
+  data           bytea,
+  created_at     TIMESTAMP NOT NULL,
+  updated_at     TIMESTAMP,
+
+  PRIMARY KEY (id),
+  FOREIGN KEY (integration_id) REFERENCES integrations(id)
+)
 
 COMMIT;

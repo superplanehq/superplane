@@ -5,15 +5,18 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 )
 
 type EventSource struct {
-	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID  uuid.UUID
-	Name      string
-	Key       []byte
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
+	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID       uuid.UUID
+	Name           string
+	Key            []byte
+	Filters        datatypes.JSONSlice[Filter]
+	FilterOperator string
+	CreatedAt      *time.Time
+	UpdatedAt      *time.Time
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {

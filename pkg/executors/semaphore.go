@@ -94,7 +94,7 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec) (Response, err
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
 
-	resource, err := e.integration.CreateResource(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowParams{
+	resource, err := e.integration.CreateResource(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowRequest{
 		ProjectID:    spec.Semaphore.ProjectID,
 		Reference:    "refs/heads/" + spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,

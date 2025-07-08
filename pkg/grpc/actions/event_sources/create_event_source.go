@@ -30,22 +30,42 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	}
 
 	logger := logging.ForCanvas(canvas)
-	// Extract name from EventSource metadata
+
+	//
+	// Validate request
+	//
 	if req.EventSource == nil || req.EventSource.Metadata == nil || req.EventSource.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
+	if req.EventSource.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "event source spec is required")
+	}
+
+	filters := []models.Filter{}
+	if req.EventSource.Spec.Filters != nil {
+		filters, err = actions.ValidateFilters(req.EventSource.Spec.Filters)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+	}
+
+	//
+	// Create new source
+	//
 	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.EventSource.Metadata.Name)
 	if err != nil {
 		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
 		return nil, status.Error(codes.Internal, "error generating key")
 	}
 
-	// TODO: Store key in secrethub secret and create a webhook notification
-	// using Notifications API for semaphore event sources. This webhook should point
-	// to the created secret, as designed in the API.
+	eventSource, err := canvas.CreateEventSourceWithFilters(
+		req.EventSource.Metadata.Name,
+		encryptedKey,
+		filters,
+		actions.ProtoToFilterOperator(req.EventSource.Spec.FilterOperator),
+	)
 
-	eventSource, err := canvas.CreateEventSource(req.EventSource.Metadata.Name, encryptedKey)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())

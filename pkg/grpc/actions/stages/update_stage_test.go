@@ -48,10 +48,10 @@ func Test__UpdateStage(t *testing.T) {
 					{
 						Name: r.Source.Name,
 						Type: protos.Connection_TYPE_EVENT_SOURCE,
-						Filters: []*protos.Connection_Filter{
+						Filters: []*protos.Filter{
 							{
-								Type: protos.Connection_FILTER_TYPE_DATA,
-								Data: &protos.Connection_DataFilter{
+								Type: protos.FilterType_FILTER_TYPE_DATA,
+								Data: &protos.DataFilter{
 									Expression: "test == 1",
 								},
 							},
@@ -136,10 +136,10 @@ func Test__UpdateStage(t *testing.T) {
 						{
 							Name: r.Source.Name,
 							Type: protos.Connection_TYPE_EVENT_SOURCE,
-							Filters: []*protos.Connection_Filter{
+							Filters: []*protos.Filter{
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "",
 									},
 								},
@@ -205,17 +205,17 @@ func Test__UpdateStage(t *testing.T) {
 						{
 							Name:           r.Source.Name,
 							Type:           protos.Connection_TYPE_EVENT_SOURCE,
-							FilterOperator: protos.Connection_FILTER_OPERATOR_OR,
-							Filters: []*protos.Connection_Filter{
+							FilterOperator: protos.FilterOperator_FILTER_OPERATOR_OR,
+							Filters: []*protos.Filter{
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "test == 42",
 									},
 								},
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "status == 'active'",
 									},
 								},
@@ -236,7 +236,7 @@ func Test__UpdateStage(t *testing.T) {
 		require.Len(t, res.Stage.Spec.Connections, 1)
 		assert.Equal(t, r.Source.Name, res.Stage.Spec.Connections[0].Name)
 		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, res.Stage.Spec.Connections[0].Type)
-		assert.Equal(t, protos.Connection_FILTER_OPERATOR_OR, res.Stage.Spec.Connections[0].FilterOperator)
+		assert.Equal(t, protos.FilterOperator_FILTER_OPERATOR_OR, res.Stage.Spec.Connections[0].FilterOperator)
 		require.Len(t, res.Stage.Spec.Connections[0].Filters, 2)
 		assert.Equal(t, "test == 42", res.Stage.Spec.Connections[0].Filters[0].Data.Expression)
 		assert.Equal(t, "status == 'active'", res.Stage.Spec.Connections[0].Filters[1].Data.Expression)

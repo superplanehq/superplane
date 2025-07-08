@@ -9,13 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	FilterTypeData    = "data"
-	FilterTypeHeader  = "header"
-	FilterOperatorAnd = "and"
-	FilterOperatorOr  = "or"
-)
-
 type Connection struct {
 	ID             uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()"`
 	TargetID       uuid.UUID
@@ -23,7 +16,7 @@ type Connection struct {
 	SourceID       uuid.UUID
 	SourceName     string
 	SourceType     string
-	Filters        datatypes.JSONSlice[ConnectionFilter]
+	Filters        datatypes.JSONSlice[Filter]
 	FilterOperator string
 }
 
@@ -72,43 +65,6 @@ func (c *Connection) any(event *Event) (bool, error) {
 	}
 
 	return false, nil
-}
-
-type ConnectionFilter struct {
-	Type   string
-	Data   *DataFilter
-	Header *HeaderFilter
-}
-
-func (f *ConnectionFilter) EvaluateExpression(event *Event) (bool, error) {
-	switch f.Type {
-	case FilterTypeData:
-		return event.EvaluateBoolExpression(f.Data.Expression, FilterTypeData)
-	case FilterTypeHeader:
-		return event.EvaluateBoolExpression(f.Header.Expression, FilterTypeHeader)
-	default:
-		return false, fmt.Errorf("invalid filter type: %s", f.Type)
-	}
-}
-
-func (f *ConnectionFilter) Evaluate(event *Event) (bool, error) {
-	switch f.Type {
-	case FilterTypeData:
-		return f.EvaluateExpression(event)
-	case FilterTypeHeader:
-		return f.EvaluateExpression(event)
-
-	default:
-		return false, fmt.Errorf("invalid filter type: %s", f.Type)
-	}
-}
-
-type DataFilter struct {
-	Expression string
-}
-
-type HeaderFilter struct {
-	Expression string
 }
 
 func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]Connection, error) {

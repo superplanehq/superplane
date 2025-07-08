@@ -33,7 +33,7 @@ func ListIntegrationResources(ctx context.Context, encryptor crypto.Encryptor, r
 	if err != nil {
 		integration, err = models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, req.IdOrName)
 	} else {
-		integration, err = models.FindIntegrationByID(authorization.DomainCanvas, canvas.ID, uuid.MustParse(req.IdOrName))
+		integration, err = models.FindDomainIntegrationByID(authorization.DomainCanvas, canvas.ID, uuid.MustParse(req.IdOrName))
 	}
 
 	if err != nil {

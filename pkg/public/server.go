@@ -18,6 +18,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/integrations"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -258,14 +259,26 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Health check
 	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
 
+	//
 	// Webhook endpoints (they have their own authentication)
+	//
+	// Any verification that happens here must be quick
+	// so we always respond with a 200 OK to the event origin.
+	// All the event processing happen on the workers.
+	//
+	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
 	publicRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
+		HandleFunc(s.BasePath+"/integrations/{integrationID}/semaphore", s.HandleSemaphoreIntegrationWebhook).
+		Headers("Content-Type", "application/json").
+		Methods("POST")
+
+	publicRoute.
+		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreSourceWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -448,12 +461,6 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
-	//
-	// Any verification that happens here must be quick
-	// so we always respond with a 200 OK to the event origin.
-	// All the event processing happen on the workers.
-	//
-
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)
@@ -477,67 +484,41 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//
-	// Only read up to the maximum event size we allow,
-	// and only proceed if payload is below that.
-	//
-	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		if _, ok := err.(*http.MaxBytesError); ok {
-			http.Error(
-				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
-				http.StatusRequestEntityTooLarge,
-			)
-
-			return
-		}
-
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return
-	}
-
-	headers, err := parseHeaders(&r.Header)
-	if err != nil {
-		http.Error(w, "Error parsing headers", http.StatusBadRequest)
-		return
-	}
-
-	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.Name))
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	signature = strings.Replace(signature, "sha256=", "", 1)
-	if err := crypto.VerifySignature(key, body, signature); err != nil {
-		log.Errorf("Invalid signature: %v", err)
-		http.Error(w, "Invalid signature", http.StatusForbidden)
-		return
-	}
-
-	//
-	// Here, we know the event is for a valid organization/source,
-	// and comes from GitHub, so we just want to save it and give a response back.
-	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
-		http.Error(w, "Error receiving event", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	s.handleWebhook(w, r, source.ID.String(), source.Name, source.Key, signature)
 }
 
-func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
-	//
-	// Any verification that happens here must be quick
-	// so we always respond with a 200 OK to the event origin.
-	// All the event processing happen on the workers.
-	//
+func (s *Server) HandleSemaphoreIntegrationWebhook(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	integrationIDFromRequest := vars["integrationID"]
+	integrationID, err := uuid.Parse(integrationIDFromRequest)
+	if err != nil {
+		http.Error(w, "integration ID not found", http.StatusNotFound)
+		return
+	}
 
+	signature := r.Header.Get("X-Semaphore-Signature-256")
+	if signature == "" {
+		http.Error(w, "Missing X-Semaphore-Signature-256 header", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: is it OK to use only the ID here?
+	integration, err := models.FindIntegrationByID(integrationID)
+	if err != nil {
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	secret, err := integration.FindResource(integrations.ResourceTypeSecret)
+	if err != nil {
+		http.Error(w, "key not found", http.StatusNotFound)
+		return
+	}
+
+	s.handleWebhook(w, r, integrationID.String(), integration.Name, secret.Data, signature)
+}
+
+func (s *Server) HandleSemaphoreSourceWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)
@@ -558,6 +539,10 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	s.handleWebhook(w, r, source.ID.String(), source.Name, source.Key, signature)
+}
+
+func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, sourceID, sourceName string, encryptedKey []byte, signature string) {
 	//
 	// Only read up to the maximum event size we allow,
 	// and only proceed if payload is below that.
@@ -587,7 +572,7 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.Name))
+	key, err := s.encryptor.Decrypt(r.Context(), encryptedKey, []byte(sourceName))
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -605,7 +590,7 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 	// Here, we know the event is for a valid organization/source,
 	// and comes from Semaphore, so we just want to save it and give a response back.
 	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
+	if _, err := models.CreateEvent(uuid.MustParse(sourceID), sourceName, models.SourceTypeEventSource, body, headers); err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
 	}

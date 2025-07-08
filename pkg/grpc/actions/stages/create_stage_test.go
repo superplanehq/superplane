@@ -322,16 +322,16 @@ func Test__CreateStage(t *testing.T) {
 						{
 							Name: r.Source.Name,
 							Type: pb.Connection_TYPE_EVENT_SOURCE,
-							Filters: []*pb.Connection_Filter{
+							Filters: []*pb.Filter{
 								{
-									Type: pb.Connection_FILTER_TYPE_DATA,
-									Data: &pb.Connection_DataFilter{
+									Type: pb.FilterType_FILTER_TYPE_DATA,
+									Data: &pb.DataFilter{
 										Expression: "test == 12",
 									},
 								},
 								{
-									Type: pb.Connection_FILTER_TYPE_HEADER,
-									Header: &pb.Connection_HeaderFilter{
+									Type: pb.FilterType_FILTER_TYPE_HEADER,
+									Header: &pb.HeaderFilter{
 										Expression: "test == 12",
 									},
 								},
@@ -360,7 +360,7 @@ func Test__CreateStage(t *testing.T) {
 		// Check that we have a connection to the source
 		require.Len(t, res.Stage.Spec.Connections, 1)
 		assert.Len(t, res.Stage.Spec.Connections[0].Filters, 2)
-		assert.Equal(t, pb.Connection_FILTER_OPERATOR_AND, res.Stage.Spec.Connections[0].FilterOperator)
+		assert.Equal(t, pb.FilterOperator_FILTER_OPERATOR_AND, res.Stage.Spec.Connections[0].FilterOperator)
 
 		// Assert metadata and conditions are correct
 		require.NotNil(t, res.Stage.Metadata)

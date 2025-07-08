@@ -303,7 +303,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
 				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.ConnectionFilter{
+				Filters: []models.Filter{
 					{
 						Type: models.FilterTypeData,
 						Data: &models.DataFilter{
@@ -321,7 +321,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
 				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.ConnectionFilter{
+				Filters: []models.Filter{
 					{
 						Type: models.FilterTypeData,
 						Data: &models.DataFilter{

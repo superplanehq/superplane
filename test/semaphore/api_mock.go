@@ -17,7 +17,7 @@ type SemaphoreAPIMock struct {
 	Workflows map[string]Pipeline
 
 	LastTaskTrigger *integrations.TaskTrigger
-	LastRunWorkflow *integrations.CreateWorkflowParams
+	LastRunWorkflow *integrations.CreateWorkflowRequest
 }
 
 type Pipeline struct {
@@ -140,7 +140,7 @@ func (s *SemaphoreAPIMock) RunWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var params integrations.CreateWorkflowParams
+	var params integrations.CreateWorkflowRequest
 	err = json.Unmarshal(body, &params)
 	if err != nil {
 		w.WriteHeader(500)
