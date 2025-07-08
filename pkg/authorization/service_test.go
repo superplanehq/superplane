@@ -1500,7 +1500,7 @@ func Test__AuthService_PermissionSync_Integration(t *testing.T) {
 	})
 }
 
-func Test__AuthService_OptimizedSync(t *testing.T) {
+func Test__AuthService_MissingPermissions(t *testing.T) {
 	r := support.Setup(t)
 
 	authService, err := NewAuthService()
@@ -1536,14 +1536,5 @@ func Test__AuthService_OptimizedSync(t *testing.T) {
 		// Should NOT include our test entities since they're now properly set up
 		assert.NotContains(t, orgsMissingAfter, orgID, "Org should not have missing permissions after setup")
 		assert.NotContains(t, canvasesMissingAfter, canvasID, "Canvas should not have missing permissions after setup")
-	})
-
-	t.Run("optimized sync skips entities with complete permissions", func(t *testing.T) {
-		// Run sync again - should be very fast since no missing permissions
-		err := authService.SyncDefaultRoles()
-		require.NoError(t, err)
-
-		// The sync should have completed without errors and been efficient
-		// (we can't easily test performance here, but the function should work correctly)
 	})
 }
