@@ -138,11 +138,5 @@ func GetOrganizationIDs() ([]string, error) {
 		return nil, err
 	}
 
-	// Convert UUIDs to strings
-	var stringIDs []string
-	for _, id := range orgIDs {
-		stringIDs = append(stringIDs, id)
-	}
-
-	return stringIDs, nil
+	return orgIDs, nil
 }
