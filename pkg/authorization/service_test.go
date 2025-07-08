@@ -1182,7 +1182,6 @@ func Test__AuthService_DetectMissingPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should detect missing permissions for existing org and canvas
-		// The optimized version only returns entities that actually have missing permissions
 		assert.GreaterOrEqual(t, len(missingOrgs), 0, "Should detect orgs with missing permissions")
 		assert.GreaterOrEqual(t, len(missingCanvases), 0, "Should detect canvases with missing permissions")
 	})
