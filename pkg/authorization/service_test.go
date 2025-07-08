@@ -1,7 +1,7 @@
 package authorization
 
 import (
-	"strings"
+	"slices"
 	"testing"
 
 	"github.com/google/uuid"
@@ -1202,25 +1202,8 @@ func Test__AuthService_DetectMissingPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should not detect any missing permissions for the setup org and canvas
-		orgFound := false
-		canvasFound := false
-
-		for _, missing := range missingOrgs {
-			if strings.Contains(missing, orgID) {
-				orgFound = true
-				break
-			}
-		}
-
-		for _, missing := range missingCanvases {
-			if strings.Contains(missing, canvasID) {
-				canvasFound = true
-				break
-			}
-		}
-
-		assert.False(t, orgFound, "Should not find missing permissions for setup org")
-		assert.False(t, canvasFound, "Should not find missing permissions for setup canvas")
+		assert.False(t, slices.Contains(missingOrgs, orgID), "Should not find missing permissions for setup org")
+		assert.False(t, slices.Contains(missingCanvases, canvasID), "Should not find missing permissions for setup canvas")
 	})
 
 	t.Run("detect missing permissions after partial setup", func(t *testing.T) {
@@ -1516,7 +1499,6 @@ func Test__AuthService_PermissionSync_Integration(t *testing.T) {
 		assert.False(t, allowed)
 	})
 }
-
 
 func Test__AuthService_OptimizedSync(t *testing.T) {
 	r := support.Setup(t)
