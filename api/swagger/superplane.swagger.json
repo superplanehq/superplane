@@ -2685,6 +2685,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputValue"
           }
+        },
+        "message": {
+          "type": "string"
         }
       }
     },
@@ -2970,6 +2973,9 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneKeyValuePair"
           }
+        },
+        "message": {
+          "type": "string"
         }
       }
     },

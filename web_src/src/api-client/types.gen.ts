@@ -417,6 +417,7 @@ export type SuperplaneExecution = {
     startedAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
+    message?: string;
 };
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
@@ -524,6 +525,7 @@ export type SuperplaneStageEvent = {
     approvals?: Array<SuperplaneStageEventApproval>;
     execution?: SuperplaneExecution;
     inputs?: Array<SuperplaneKeyValuePair>;
+    message?: string;
 };
 
 export type SuperplaneStageEventApproval = {
