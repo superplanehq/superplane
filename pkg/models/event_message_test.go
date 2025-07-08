@@ -21,15 +21,15 @@ func TestGenerateEventMessage(t *testing.T) {
 		},
 		{
 			name:     "GitHub push event",
-			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123"}],"repository":{"name":"my-repo"}}`,
+			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123","message":"Add new feature"}],"repository":{"name":"my-repo"}}`,
 			headers:  `{"X-Hub-Signature-256":"sha256=abc123"}`,
-			expected: "1 commit pushed to refs/heads/main in my-repo",
+			expected: "Add new feature",
 		},
 		{
 			name:     "GitHub push event multiple commits",
-			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123"},{"id":"def456"}],"repository":{"name":"my-repo"}}`,
+			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123","message":"Fix bug"},{"id":"def456","message":"Add tests"}],"repository":{"name":"my-repo"}}`,
 			headers:  `{"X-Hub-Signature-256":"sha256=abc123"}`,
-			expected: "2 commits pushed to refs/heads/main in my-repo",
+			expected: "Add tests",
 		},
 		{
 			name:     "Semaphore pipeline passed",

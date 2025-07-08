@@ -196,7 +196,8 @@ CREATE TABLE public.events (
     received_at timestamp without time zone NOT NULL,
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
-    headers jsonb DEFAULT '{}'::jsonb NOT NULL
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    message text DEFAULT ''::text
 );
 
 
@@ -267,7 +268,8 @@ CREATE TABLE public.stage_events (
     state character varying(64) NOT NULL,
     state_reason character varying(64),
     created_at timestamp without time zone NOT NULL,
-    inputs jsonb DEFAULT '{}'::jsonb NOT NULL
+    inputs jsonb DEFAULT '{}'::jsonb NOT NULL,
+    message text DEFAULT ''::text
 );
 
 
@@ -286,7 +288,8 @@ CREATE TABLE public.stage_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
-    finished_at timestamp without time zone
+    finished_at timestamp without time zone,
+    message text DEFAULT ''::text
 );
 
 
@@ -775,7 +778,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250627174249	f
+20250708114513	f
 \.
 
 

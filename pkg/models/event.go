@@ -407,7 +407,9 @@ func generateGitHubEventMessage(payload map[string]interface{}) string {
 				commitCount := len(commits)
 				if commitCount > 0 {
 					lastCommit := commits[commitCount-1].(map[string]interface{})
-					return lastCommit["message"].(string)
+					if message, ok := lastCommit["message"].(string); ok && message != "" {
+						return message
+					}
 				}
 			}
 			return fmt.Sprintf("Push to %s in %s", ref, repoName)
