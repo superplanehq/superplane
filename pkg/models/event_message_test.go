@@ -1,0 +1,204 @@
+package models
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGenerateEventMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		raw      string
+		headers  string
+		expected string
+	}{
+		{
+			name:     "GitHub pull request opened",
+			raw:      `{"action":"opened","pull_request":{"title":"Add new feature"},"repository":{"name":"my-repo"}}`,
+			headers:  `{"X-Hub-Signature-256":"sha256=abc123"}`,
+			expected: "Pull request opened: Add new feature in my-repo",
+		},
+		{
+			name:     "GitHub push event",
+			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123"}],"repository":{"name":"my-repo"}}`,
+			headers:  `{"X-Hub-Signature-256":"sha256=abc123"}`,
+			expected: "1 commit pushed to refs/heads/main in my-repo",
+		},
+		{
+			name:     "GitHub push event multiple commits",
+			raw:      `{"ref":"refs/heads/main","commits":[{"id":"abc123"},{"id":"def456"}],"repository":{"name":"my-repo"}}`,
+			headers:  `{"X-Hub-Signature-256":"sha256=abc123"}`,
+			expected: "2 commits pushed to refs/heads/main in my-repo",
+		},
+		{
+			name:     "Semaphore pipeline passed",
+			raw:      `{"workflow":{"name":"my-workflow"},"pipeline":{"name":"my-pipeline","state":"passed"}}`,
+			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
+			expected: "Pipeline my-pipeline passed in my-workflow",
+		},
+		{
+			name:     "Semaphore pipeline failed",
+			raw:      `{"workflow":{"name":"my-workflow"},"pipeline":{"name":"my-pipeline","state":"failed"}}`,
+			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
+			expected: "Pipeline my-pipeline failed in my-workflow",
+		},
+		{
+			name:     "Semaphore job passed",
+			raw:      `{"job":{"name":"my-job","status":"passed"}}`,
+			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
+			expected: "Job my-job passed",
+		},
+		{
+			name:     "Unknown event",
+			raw:      `{"unknown":"data"}`,
+			headers:  `{"Content-Type":"application/json"}`,
+			expected: "Event received",
+		},
+		{
+			name:     "Invalid JSON",
+			raw:      `{invalid json}`,
+			headers:  `{"Content-Type":"application/json"}`,
+			expected: "Event received",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateEventMessage(SourceTypeEventSource, []byte(tt.raw), []byte(tt.headers))
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGenerateGitHubEventMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  map[string]interface{}
+		expected string
+	}{
+		{
+			name: "Pull request closed",
+			payload: map[string]interface{}{
+				"action": "closed",
+				"pull_request": map[string]interface{}{
+					"title": "Fix bug",
+				},
+				"repository": map[string]interface{}{
+					"name": "test-repo",
+				},
+			},
+			expected: "Pull request closed: Fix bug in test-repo",
+		},
+		{
+			name: "Issue opened",
+			payload: map[string]interface{}{
+				"action": "opened",
+				"issue": map[string]interface{}{
+					"title": "Bug report",
+				},
+				"repository": map[string]interface{}{
+					"name": "test-repo",
+				},
+			},
+			expected: "Issue opened: Bug report in test-repo",
+		},
+		{
+			name: "Repository with no action",
+			payload: map[string]interface{}{
+				"repository": map[string]interface{}{
+					"name": "test-repo",
+				},
+			},
+			expected: "GitHub event in test-repo",
+		},
+		{
+			name:     "No repository info",
+			payload:  map[string]interface{}{"action": "opened"},
+			expected: "GitHub event received",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateGitHubEventMessage(tt.payload)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGenerateSemaphoreEventMessage(t *testing.T) {
+	tests := []struct {
+		name     string
+		payload  map[string]interface{}
+		expected string
+	}{
+		{
+			name: "Pipeline running",
+			payload: map[string]interface{}{
+				"workflow": map[string]interface{}{
+					"name": "test-workflow",
+				},
+				"pipeline": map[string]interface{}{
+					"name":  "test-pipeline",
+					"state": "running",
+				},
+			},
+			expected: "Pipeline test-pipeline started in test-workflow",
+		},
+		{
+			name: "Pipeline canceled",
+			payload: map[string]interface{}{
+				"workflow": map[string]interface{}{
+					"name": "test-workflow",
+				},
+				"pipeline": map[string]interface{}{
+					"name":  "test-pipeline",
+					"state": "canceled",
+				},
+			},
+			expected: "Pipeline test-pipeline canceled in test-workflow",
+		},
+		{
+			name: "Job failed",
+			payload: map[string]interface{}{
+				"job": map[string]interface{}{
+					"name":   "test-job",
+					"status": "failed",
+				},
+			},
+			expected: "Job test-job failed",
+		},
+		{
+			name: "Job canceled",
+			payload: map[string]interface{}{
+				"job": map[string]interface{}{
+					"name":   "test-job",
+					"status": "canceled",
+				},
+			},
+			expected: "Job test-job canceled",
+		},
+		{
+			name: "Workflow without pipeline",
+			payload: map[string]interface{}{
+				"workflow": map[string]interface{}{
+					"name": "test-workflow",
+				},
+			},
+			expected: "Workflow test-workflow event",
+		},
+		{
+			name:     "No workflow or job info",
+			payload:  map[string]interface{}{"unknown": "data"},
+			expected: "Semaphore event received",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateSemaphoreEventMessage(tt.payload)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

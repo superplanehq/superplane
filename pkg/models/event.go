@@ -40,6 +40,7 @@ type Event struct {
 	ReceivedAt *time.Time
 	Raw        datatypes.JSON
 	Headers    datatypes.JSON
+	Message    string
 }
 
 type headerVisitor struct{}
@@ -193,11 +194,11 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	return v, nil
 }
 
-func CreateEvent(sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte) (*Event, error) {
-	return CreateEventInTransaction(database.Conn(), sourceID, sourceName, sourceType, raw, headers)
+func CreateEvent(sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte, message string) (*Event, error) {
+	return CreateEventInTransaction(database.Conn(), sourceID, sourceName, sourceType, raw, headers, message)
 }
 
-func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte) (*Event, error) {
+func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte, message string) (*Event, error) {
 	now := time.Now()
 
 	event := Event{
@@ -208,6 +209,7 @@ func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourc
 		ReceivedAt: &now,
 		Raw:        datatypes.JSON(raw),
 		Headers:    datatypes.JSON(headers),
+		Message:    message,
 	}
 
 	err := tx.
@@ -317,4 +319,156 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 	variables["headers"] = headers
 
 	return variables, nil
+}
+
+// GenerateEventMessage generates a human-readable message for an event based on its source type and payload
+func GenerateEventMessage(sourceType string, raw []byte, headers []byte) string {
+	// Parse the event payload
+	var payload map[string]interface{}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return "Event received"
+	}
+
+	// Parse headers to determine event source type
+	var headerMap map[string]interface{}
+	if err := json.Unmarshal(headers, &headerMap); err != nil {
+		return "Event received"
+	}
+
+	// Check headers for GitHub webhook signature
+	if _, hasGitHubSig := headerMap["X-Hub-Signature-256"]; hasGitHubSig {
+		return generateGitHubEventMessage(payload)
+	}
+
+	// Check headers for Semaphore webhook signature
+	if _, hasSemaphoreSig := headerMap["X-Semaphore-Signature-256"]; hasSemaphoreSig {
+		return generateSemaphoreEventMessage(payload)
+	}
+
+	// Check for specific event types in payload
+	if eventType, ok := payload["event_type"].(string); ok {
+		switch eventType {
+		case "github":
+			return generateGitHubEventMessage(payload)
+		case "semaphore":
+			return generateSemaphoreEventMessage(payload)
+		}
+	}
+
+	return "Event received"
+}
+
+// generateGitHubEventMessage generates a message for GitHub webhook events
+func generateGitHubEventMessage(payload map[string]interface{}) string {
+	action, _ := payload["action"].(string)
+
+	if repo, ok := payload["repository"].(map[string]interface{}); ok {
+		repoName, _ := repo["name"].(string)
+
+		if action != "" && repoName != "" {
+			switch action {
+			case "opened":
+				if pr, ok := payload["pull_request"].(map[string]interface{}); ok {
+					if title, ok := pr["title"].(string); ok {
+						return fmt.Sprintf("Pull request opened: %s in %s", title, repoName)
+					}
+				}
+				if issue, ok := payload["issue"].(map[string]interface{}); ok {
+					if title, ok := issue["title"].(string); ok {
+						return fmt.Sprintf("Issue opened: %s in %s", title, repoName)
+					}
+				}
+				return fmt.Sprintf("Pull request opened in %s", repoName)
+			case "closed":
+				if pr, ok := payload["pull_request"].(map[string]interface{}); ok {
+					if title, ok := pr["title"].(string); ok {
+						return fmt.Sprintf("Pull request closed: %s in %s", title, repoName)
+					}
+				}
+				return fmt.Sprintf("Pull request closed in %s", repoName)
+			case "synchronize":
+				if pr, ok := payload["pull_request"].(map[string]interface{}); ok {
+					if title, ok := pr["title"].(string); ok {
+						return fmt.Sprintf("Pull request updated: %s in %s", title, repoName)
+					}
+				}
+				return fmt.Sprintf("Pull request updated in %s", repoName)
+			case "push":
+				if ref, ok := payload["ref"].(string); ok {
+					return fmt.Sprintf("Push to %s in %s", ref, repoName)
+				}
+				return fmt.Sprintf("Push to %s", repoName)
+			}
+		}
+
+		// Handle push events
+		if ref, ok := payload["ref"].(string); ok {
+			if commits, ok := payload["commits"].([]interface{}); ok {
+				commitCount := len(commits)
+				if commitCount > 0 {
+					lastCommit := commits[commitCount-1].(map[string]interface{})
+					return lastCommit["message"].(string)
+				}
+			}
+			return fmt.Sprintf("Push to %s in %s", ref, repoName)
+		}
+
+		return fmt.Sprintf("GitHub event in %s", repoName)
+	}
+
+	return "GitHub event received"
+}
+
+// generateSemaphoreEventMessage generates a message for Semaphore webhook events
+func generateSemaphoreEventMessage(payload map[string]interface{}) string {
+	if workflow, ok := payload["workflow"].(map[string]interface{}); ok {
+		workflowName, _ := workflow["name"].(string)
+
+		if pipeline, ok := payload["pipeline"].(map[string]interface{}); ok {
+			pipelineName, _ := pipeline["name"].(string)
+			state, _ := pipeline["state"].(string)
+
+			if workflowName != "" && pipelineName != "" {
+				switch state {
+				case "passed":
+					return fmt.Sprintf("Pipeline %s passed in %s", pipelineName, workflowName)
+				case "failed":
+					return fmt.Sprintf("Pipeline %s failed in %s", pipelineName, workflowName)
+				case "running":
+					return fmt.Sprintf("Pipeline %s started in %s", pipelineName, workflowName)
+				case "canceled":
+					return fmt.Sprintf("Pipeline %s canceled in %s", pipelineName, workflowName)
+				default:
+					return fmt.Sprintf("Pipeline %s %s in %s", pipelineName, state, workflowName)
+				}
+			}
+		}
+
+		if workflowName != "" {
+			return fmt.Sprintf("Workflow %s event", workflowName)
+		}
+	}
+
+	// Handle job events
+	if job, ok := payload["job"].(map[string]interface{}); ok {
+		jobName, _ := job["name"].(string)
+		status, _ := job["status"].(string)
+
+		if jobName != "" && status != "" {
+			switch status {
+			case "passed":
+				return fmt.Sprintf("Job %s passed", jobName)
+			case "failed":
+				return fmt.Sprintf("Job %s failed", jobName)
+			case "running":
+				return fmt.Sprintf("Job %s started", jobName)
+			case "canceled":
+				return fmt.Sprintf("Job %s canceled", jobName)
+			default:
+				return fmt.Sprintf("Job %s %s", jobName, status)
+			}
+		}
+	}
+
+	return "Semaphore event received"
 }

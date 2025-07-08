@@ -814,6 +814,7 @@ message StageEvent {
   repeated StageEventApproval approvals = 7;
   Execution execution = 8;
   repeated KeyValuePair inputs = 9;
+  string message = 10;
 }
 
 message KeyValuePair {
@@ -848,6 +849,7 @@ message Execution {
   google.protobuf.Timestamp started_at = 6;
   google.protobuf.Timestamp finished_at = 7;
   repeated OutputValue outputs = 8;
+  string message = 9;
 }
 
 message StageEventApproval {

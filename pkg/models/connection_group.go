@@ -71,7 +71,13 @@ func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGro
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, eventData, []byte(`{}`))
+	// Generate message for connection group event
+	message := fmt.Sprintf("Connection group %s processed", g.Name)
+	if stateReason == ConnectionGroupFieldSetStateReasonOK {
+		message = fmt.Sprintf("Connection group %s completed successfully", g.Name)
+	}
+
+	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, eventData, []byte(`{}`), message)
 	if err != nil {
 		return err
 	}
