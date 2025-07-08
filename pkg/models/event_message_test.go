@@ -33,19 +33,19 @@ func TestGenerateEventMessage(t *testing.T) {
 		},
 		{
 			name:     "Semaphore pipeline passed",
-			raw:      `{"workflow":{"name":"my-workflow"},"pipeline":{"name":"my-pipeline","state":"passed"}}`,
+			raw:      `{"pipeline":{"name":"my-pipeline","result":"passed"}}`,
 			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
-			expected: "Pipeline my-pipeline passed in my-workflow",
+			expected: "Pipeline my-pipeline passed",
 		},
 		{
 			name:     "Semaphore pipeline failed",
-			raw:      `{"workflow":{"name":"my-workflow"},"pipeline":{"name":"my-pipeline","state":"failed"}}`,
+			raw:      `{"pipeline":{"name":"my-pipeline","result":"failed"}}`,
 			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
-			expected: "Pipeline my-pipeline failed in my-workflow",
+			expected: "Pipeline my-pipeline failed",
 		},
 		{
 			name:     "Semaphore job passed",
-			raw:      `{"job":{"name":"my-job","status":"passed"}}`,
+			raw:      `{"blocks":[{"jobs":[{"name":"my-job","result":"passed"}]}]}`,
 			headers:  `{"X-Semaphore-Signature-256":"sha256=abc123"}`,
 			expected: "Job my-job passed",
 		},
@@ -136,60 +136,92 @@ func TestGenerateSemaphoreEventMessage(t *testing.T) {
 		{
 			name: "Pipeline running",
 			payload: map[string]interface{}{
-				"workflow": map[string]interface{}{
-					"name": "test-workflow",
-				},
 				"pipeline": map[string]interface{}{
-					"name":  "test-pipeline",
-					"state": "running",
+					"name":   "test-pipeline",
+					"result": "running",
 				},
 			},
-			expected: "Pipeline test-pipeline started in test-workflow",
+			expected: "Pipeline test-pipeline started",
 		},
 		{
-			name: "Pipeline canceled",
+			name: "Pipeline passed with commit message",
 			payload: map[string]interface{}{
-				"workflow": map[string]interface{}{
-					"name": "test-workflow",
+				"pipeline": map[string]interface{}{
+					"name":   "test-pipeline",
+					"result": "passed",
 				},
+				"revision": map[string]interface{}{
+					"commit_message": "Add new feature",
+				},
+			},
+			expected: "Pipeline test-pipeline passed: Add new feature",
+		},
+		{
+			name: "Pipeline failed with empty commit message",
+			payload: map[string]interface{}{
+				"pipeline": map[string]interface{}{
+					"name":   "test-pipeline",
+					"result": "failed",
+				},
+				"revision": map[string]interface{}{
+					"commit_message": "empty",
+				},
+			},
+			expected: "Pipeline test-pipeline failed",
+		},
+		{
+			name: "Pipeline canceled using state field",
+			payload: map[string]interface{}{
 				"pipeline": map[string]interface{}{
 					"name":  "test-pipeline",
 					"state": "canceled",
 				},
 			},
-			expected: "Pipeline test-pipeline canceled in test-workflow",
+			expected: "Pipeline test-pipeline canceled",
 		},
 		{
 			name: "Job failed",
 			payload: map[string]interface{}{
-				"job": map[string]interface{}{
-					"name":   "test-job",
-					"status": "failed",
+				"blocks": []interface{}{
+					map[string]interface{}{
+						"jobs": []interface{}{
+							map[string]interface{}{
+								"name":   "test-job",
+								"result": "failed",
+							},
+						},
+					},
 				},
 			},
 			expected: "Job test-job failed",
 		},
 		{
-			name: "Job canceled",
+			name: "Job passed",
 			payload: map[string]interface{}{
-				"job": map[string]interface{}{
-					"name":   "test-job",
-					"status": "canceled",
+				"blocks": []interface{}{
+					map[string]interface{}{
+						"jobs": []interface{}{
+							map[string]interface{}{
+								"name":   "test-job",
+								"result": "passed",
+							},
+						},
+					},
 				},
 			},
-			expected: "Job test-job canceled",
+			expected: "Job test-job passed",
 		},
 		{
-			name: "Workflow without pipeline",
+			name: "Pipeline without status",
 			payload: map[string]interface{}{
-				"workflow": map[string]interface{}{
-					"name": "test-workflow",
+				"pipeline": map[string]interface{}{
+					"name": "test-pipeline",
 				},
 			},
-			expected: "Workflow test-workflow event",
+			expected: "Pipeline test-pipeline event",
 		},
 		{
-			name:     "No workflow or job info",
+			name:     "No pipeline or job info",
 			payload:  map[string]interface{}{"unknown": "data"},
 			expected: "Semaphore event received",
 		},

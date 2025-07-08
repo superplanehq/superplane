@@ -421,54 +421,144 @@ func generateGitHubEventMessage(payload map[string]interface{}) string {
 
 // generateSemaphoreEventMessage generates a message for Semaphore webhook events
 func generateSemaphoreEventMessage(payload map[string]interface{}) string {
-	if workflow, ok := payload["workflow"].(map[string]interface{}); ok {
-		workflowName, _ := workflow["name"].(string)
-
-		if pipeline, ok := payload["pipeline"].(map[string]interface{}); ok {
-			pipelineName, _ := pipeline["name"].(string)
-			state, _ := pipeline["state"].(string)
-
-			if workflowName != "" && pipelineName != "" {
-				switch state {
-				case "passed":
-					return fmt.Sprintf("Pipeline %s passed in %s", pipelineName, workflowName)
-				case "failed":
-					return fmt.Sprintf("Pipeline %s failed in %s", pipelineName, workflowName)
-				case "running":
-					return fmt.Sprintf("Pipeline %s started in %s", pipelineName, workflowName)
-				case "canceled":
-					return fmt.Sprintf("Pipeline %s canceled in %s", pipelineName, workflowName)
-				default:
-					return fmt.Sprintf("Pipeline %s %s in %s", pipelineName, state, workflowName)
-				}
-			}
-		}
-
-		if workflowName != "" {
-			return fmt.Sprintf("Workflow %s event", workflowName)
-		}
+	commitMessage := extractCommitMessage(payload)
+	
+	if pipelineMsg := generatePipelineMessage(payload, commitMessage); pipelineMsg != "" {
+		return pipelineMsg
 	}
-
-	// Handle job events
-	if job, ok := payload["job"].(map[string]interface{}); ok {
-		jobName, _ := job["name"].(string)
-		status, _ := job["status"].(string)
-
-		if jobName != "" && status != "" {
-			switch status {
-			case "passed":
-				return fmt.Sprintf("Job %s passed", jobName)
-			case "failed":
-				return fmt.Sprintf("Job %s failed", jobName)
-			case "running":
-				return fmt.Sprintf("Job %s started", jobName)
-			case "canceled":
-				return fmt.Sprintf("Job %s canceled", jobName)
-			default:
-				return fmt.Sprintf("Job %s %s", jobName, status)
-			}
-		}
+	
+	if jobMsg := generateJobMessage(payload); jobMsg != "" {
+		return jobMsg
 	}
-
+	
 	return "Semaphore event received"
+}
+
+// extractCommitMessage extracts the commit message from the revision object
+func extractCommitMessage(payload map[string]interface{}) string {
+	revision, ok := payload["revision"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	
+	commitMessage, _ := revision["commit_message"].(string)
+	if commitMessage == "empty" {
+		return ""
+	}
+	
+	return commitMessage
+}
+
+// generatePipelineMessage generates a message for pipeline events
+func generatePipelineMessage(payload map[string]interface{}, commitMessage string) string {
+	pipeline, ok := payload["pipeline"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	
+	pipelineName, _ := pipeline["name"].(string)
+	if pipelineName == "" {
+		return ""
+	}
+	
+	status := getPipelineStatus(pipeline)
+	if status == "" {
+		return fmt.Sprintf("Pipeline %s event", pipelineName)
+	}
+	
+	baseMessage := formatPipelineStatus(pipelineName, status)
+	return addCommitContext(baseMessage, commitMessage)
+}
+
+// getPipelineStatus extracts the pipeline status, preferring result over state
+func getPipelineStatus(pipeline map[string]interface{}) string {
+	if result, ok := pipeline["result"].(string); ok && result != "" {
+		return result
+	}
+	
+	if state, ok := pipeline["state"].(string); ok && state != "" {
+		return state
+	}
+	
+	return ""
+}
+
+// formatPipelineStatus formats the pipeline status message
+func formatPipelineStatus(pipelineName, status string) string {
+	switch status {
+	case "passed":
+		return fmt.Sprintf("Pipeline %s passed", pipelineName)
+	case "failed":
+		return fmt.Sprintf("Pipeline %s failed", pipelineName)
+	case "running":
+		return fmt.Sprintf("Pipeline %s started", pipelineName)
+	case "canceled":
+		return fmt.Sprintf("Pipeline %s canceled", pipelineName)
+	case "stopped":
+		return fmt.Sprintf("Pipeline %s stopped", pipelineName)
+	default:
+		return fmt.Sprintf("Pipeline %s %s", pipelineName, status)
+	}
+}
+
+// generateJobMessage generates a message for job events from blocks
+func generateJobMessage(payload map[string]interface{}) string {
+	blocks, ok := payload["blocks"].([]interface{})
+	if !ok {
+		return ""
+	}
+	
+	for _, block := range blocks {
+		blockMap, ok := block.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		
+		jobs, ok := blockMap["jobs"].([]interface{})
+		if !ok {
+			continue
+		}
+		
+		for _, job := range jobs {
+			jobMap, ok := job.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			
+			jobName, _ := jobMap["name"].(string)
+			result, _ := jobMap["result"].(string)
+			
+			if jobName != "" && result != "" {
+				return formatJobStatus(jobName, result)
+			}
+		}
+	}
+	
+	return ""
+}
+
+// formatJobStatus formats the job status message
+func formatJobStatus(jobName, result string) string {
+	switch result {
+	case "passed":
+		return fmt.Sprintf("Job %s passed", jobName)
+	case "failed":
+		return fmt.Sprintf("Job %s failed", jobName)
+	case "running":
+		return fmt.Sprintf("Job %s started", jobName)
+	case "canceled":
+		return fmt.Sprintf("Job %s canceled", jobName)
+	case "stopped":
+		return fmt.Sprintf("Job %s stopped", jobName)
+	default:
+		return fmt.Sprintf("Job %s %s", jobName, result)
+	}
+}
+
+// addCommitContext adds commit message context to the base message if available
+func addCommitContext(baseMessage, commitMessage string) string {
+	if commitMessage != "" {
+		return fmt.Sprintf("%s: %s", baseMessage, commitMessage)
+	}
+	return baseMessage
 }
