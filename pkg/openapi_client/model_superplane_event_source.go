@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneEventSource{}
 // SuperplaneEventSource struct for SuperplaneEventSource
 type SuperplaneEventSource struct {
 	Metadata *SuperplaneEventSourceMetadata `json:"metadata,omitempty"`
-	Spec map[string]interface{} `json:"spec,omitempty"`
+	Spec *SuperplaneEventSourceSpec `json:"spec,omitempty"`
 }
 
 // NewSuperplaneEventSource instantiates a new SuperplaneEventSource object
@@ -74,19 +74,19 @@ func (o *SuperplaneEventSource) SetMetadata(v SuperplaneEventSourceMetadata) {
 }
 
 // GetSpec returns the Spec field value if set, zero value otherwise.
-func (o *SuperplaneEventSource) GetSpec() map[string]interface{} {
+func (o *SuperplaneEventSource) GetSpec() SuperplaneEventSourceSpec {
 	if o == nil || IsNil(o.Spec) {
-		var ret map[string]interface{}
+		var ret SuperplaneEventSourceSpec
 		return ret
 	}
-	return o.Spec
+	return *o.Spec
 }
 
 // GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSource) GetSpecOk() (map[string]interface{}, bool) {
+func (o *SuperplaneEventSource) GetSpecOk() (*SuperplaneEventSourceSpec, bool) {
 	if o == nil || IsNil(o.Spec) {
-		return map[string]interface{}{}, false
+		return nil, false
 	}
 	return o.Spec, true
 }
@@ -100,9 +100,9 @@ func (o *SuperplaneEventSource) HasSpec() bool {
 	return false
 }
 
-// SetSpec gets a reference to the given map[string]interface{} and assigns it to the Spec field.
-func (o *SuperplaneEventSource) SetSpec(v map[string]interface{}) {
-	o.Spec = v
+// SetSpec gets a reference to the given SuperplaneEventSourceSpec and assigns it to the Spec field.
+func (o *SuperplaneEventSource) SetSpec(v SuperplaneEventSourceSpec) {
+	o.Spec = &v
 }
 
 func (o SuperplaneEventSource) MarshalJSON() ([]byte, error) {

@@ -70,9 +70,9 @@ type ValueDefinition struct {
 }
 
 type ValueDefinitionFrom struct {
-	EventData     *ValueDefinitionFromEventData     `json:"event_data"`
-	LastExecution *ValueDefinitionFromLastExecution `json:"last_execution"`
-	Secret        *ValueDefinitionFromSecret        `json:"secret"`
+	EventData     *ValueDefinitionFromEventData     `json:"event_data,omitempty"`
+	LastExecution *ValueDefinitionFromLastExecution `json:"last_execution,omitempty"`
+	Secret        *ValueDefinitionFromSecret        `json:"secret,omitempty"`
 }
 
 type ValueDefinitionFromEventData struct {

@@ -22,8 +22,8 @@ var _ MappedNullable = &SuperplaneConnection{}
 type SuperplaneConnection struct {
 	Type *SuperplaneConnectionType `json:"type,omitempty"`
 	Name *string `json:"name,omitempty"`
-	Filters []ConnectionFilter `json:"filters,omitempty"`
-	FilterOperator *ConnectionFilterOperator `json:"filterOperator,omitempty"`
+	Filters []SuperplaneFilter `json:"filters,omitempty"`
+	FilterOperator *SuperplaneFilterOperator `json:"filterOperator,omitempty"`
 }
 
 // NewSuperplaneConnection instantiates a new SuperplaneConnection object
@@ -34,7 +34,7 @@ func NewSuperplaneConnection() *SuperplaneConnection {
 	this := SuperplaneConnection{}
 	var type_ SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
 	this.Type = &type_
-	var filterOperator ConnectionFilterOperator = CONNECTIONFILTEROPERATOR_FILTER_OPERATOR_AND
+	var filterOperator SuperplaneFilterOperator = SUPERPLANEFILTEROPERATOR_FILTER_OPERATOR_AND
 	this.FilterOperator = &filterOperator
 	return &this
 }
@@ -46,7 +46,7 @@ func NewSuperplaneConnectionWithDefaults() *SuperplaneConnection {
 	this := SuperplaneConnection{}
 	var type_ SuperplaneConnectionType = SUPERPLANECONNECTIONTYPE_TYPE_UNKNOWN
 	this.Type = &type_
-	var filterOperator ConnectionFilterOperator = CONNECTIONFILTEROPERATOR_FILTER_OPERATOR_AND
+	var filterOperator SuperplaneFilterOperator = SUPERPLANEFILTEROPERATOR_FILTER_OPERATOR_AND
 	this.FilterOperator = &filterOperator
 	return &this
 }
@@ -116,9 +116,9 @@ func (o *SuperplaneConnection) SetName(v string) {
 }
 
 // GetFilters returns the Filters field value if set, zero value otherwise.
-func (o *SuperplaneConnection) GetFilters() []ConnectionFilter {
+func (o *SuperplaneConnection) GetFilters() []SuperplaneFilter {
 	if o == nil || IsNil(o.Filters) {
-		var ret []ConnectionFilter
+		var ret []SuperplaneFilter
 		return ret
 	}
 	return o.Filters
@@ -126,7 +126,7 @@ func (o *SuperplaneConnection) GetFilters() []ConnectionFilter {
 
 // GetFiltersOk returns a tuple with the Filters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneConnection) GetFiltersOk() ([]ConnectionFilter, bool) {
+func (o *SuperplaneConnection) GetFiltersOk() ([]SuperplaneFilter, bool) {
 	if o == nil || IsNil(o.Filters) {
 		return nil, false
 	}
@@ -142,15 +142,15 @@ func (o *SuperplaneConnection) HasFilters() bool {
 	return false
 }
 
-// SetFilters gets a reference to the given []ConnectionFilter and assigns it to the Filters field.
-func (o *SuperplaneConnection) SetFilters(v []ConnectionFilter) {
+// SetFilters gets a reference to the given []SuperplaneFilter and assigns it to the Filters field.
+func (o *SuperplaneConnection) SetFilters(v []SuperplaneFilter) {
 	o.Filters = v
 }
 
 // GetFilterOperator returns the FilterOperator field value if set, zero value otherwise.
-func (o *SuperplaneConnection) GetFilterOperator() ConnectionFilterOperator {
+func (o *SuperplaneConnection) GetFilterOperator() SuperplaneFilterOperator {
 	if o == nil || IsNil(o.FilterOperator) {
-		var ret ConnectionFilterOperator
+		var ret SuperplaneFilterOperator
 		return ret
 	}
 	return *o.FilterOperator
@@ -158,7 +158,7 @@ func (o *SuperplaneConnection) GetFilterOperator() ConnectionFilterOperator {
 
 // GetFilterOperatorOk returns a tuple with the FilterOperator field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneConnection) GetFilterOperatorOk() (*ConnectionFilterOperator, bool) {
+func (o *SuperplaneConnection) GetFilterOperatorOk() (*SuperplaneFilterOperator, bool) {
 	if o == nil || IsNil(o.FilterOperator) {
 		return nil, false
 	}
@@ -174,8 +174,8 @@ func (o *SuperplaneConnection) HasFilterOperator() bool {
 	return false
 }
 
-// SetFilterOperator gets a reference to the given ConnectionFilterOperator and assigns it to the FilterOperator field.
-func (o *SuperplaneConnection) SetFilterOperator(v ConnectionFilterOperator) {
+// SetFilterOperator gets a reference to the given SuperplaneFilterOperator and assigns it to the FilterOperator field.
+func (o *SuperplaneConnection) SetFilterOperator(v SuperplaneFilterOperator) {
 	o.FilterOperator = &v
 }
 

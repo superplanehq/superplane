@@ -33,7 +33,7 @@ spec:
   # SuperPlane needs to create a Semaphore notification to monitor the result of executions.
   # For a GitHub integration, SuperPlane would create the webhook, ...
   #
-  type: semaphore
+  type: TYPE_SEMAPHORE
 
   #
   # URL where the integration lives.
@@ -51,7 +51,7 @@ spec:
     #
     # Any type of bearer token (personal API token, service account token, ...).
     #
-    use: token
+    use: AUTH_TYPE_TOKEN
     token:
       valueFrom:
         secret:
@@ -105,16 +105,13 @@ spec:
   integration:
     domain: ORGANIZATION
     name: semaphore-integration
-  filters:
-    - type: FILTER_TYPE_DATA
-      data:
-        expression: 'project.name == "my-specific-project"'
+    # resource:
+    #   type: project
+    #   name: my-semaphore-project
+    resource:
+      type: repository
+      name: my-github-repository
 ```
-
-NOTE: This is a bit weird. Creating an event source should give you a key used to sign events. In this case, you wouldn't receive a key because you're not gonna push anything, it's already being pushed. The only thing you are doing is applying some filters on an existing source (the integration), so you can maybe re-use it in your canvas.
-
-To me, it's clear that an integration is(has) an event source, and ideally, you should only use the `EventSource` resource directly when a integration for what you need doesn't exist. What we do seem to need is a way to "share" filters somehow, so you can "create an event source" from an integration.
-
 
 ## GitHub
 

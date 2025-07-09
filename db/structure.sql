@@ -180,7 +180,9 @@ CREATE TABLE public.event_sources (
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    key bytea NOT NULL
+    key bytea NOT NULL,
+    integration_resource_id uuid,
+    state character varying(64) NOT NULL
 );
 
 
@@ -197,6 +199,20 @@ CREATE TABLE public.events (
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
     headers jsonb DEFAULT '{}'::jsonb NOT NULL
+);
+
+
+--
+-- Name: integration_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integration_resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    type character varying(64) NOT NULL,
+    name character varying(128) NOT NULL,
+    integration_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone
 );
 
 
@@ -471,6 +487,14 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: integration_resources integration_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_resources
+    ADD CONSTRAINT integration_resources_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: integrations integrations_domain_type_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -733,6 +757,22 @@ ALTER TABLE ONLY public.connection_groups
 
 ALTER TABLE ONLY public.event_sources
     ADD CONSTRAINT event_sources_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
+
+
+--
+-- Name: event_sources event_sources_integration_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_sources
+    ADD CONSTRAINT event_sources_integration_resource_id_fkey FOREIGN KEY (integration_resource_id) REFERENCES public.integration_resources(id);
+
+
+--
+-- Name: integration_resources integration_resources_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integration_resources
+    ADD CONSTRAINT integration_resources_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
 
 
 --

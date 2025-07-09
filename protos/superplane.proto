@@ -480,8 +480,6 @@ message EventSource {
 
   message Spec {
     IntegrationRef integration = 1;
-    repeated Filter filters = 2;
-    FilterOperator filter_operator = 3;
   }
 
   Metadata metadata = 1;
@@ -818,9 +816,8 @@ message CreateStageRequest {
 
 message IntegrationRef {
   Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string id = 3;
-  string name = 4;
+  string name = 2;
+  IntegrationResource resource = 3;
 }
 
 message ExecutorSpec {

@@ -85,10 +85,10 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 		go w.Start()
 	}
 
-	if os.Getenv("START_PENDING_INTEGRATIONS_WORKER") == "yes" {
-		log.Println("Starting Pending Integrations Worker")
+	if os.Getenv("START_PENDING_EVENT_SOURCES_WORKER") == "yes" {
+		log.Println("Starting Pending Event Sources Worker")
 
-		w, err := workers.NewPendingIntegrationsWorker(encryptor, baseURL)
+		w, err := workers.NewPendingEventSourcesWorker(encryptor, baseURL)
 		if err != nil {
 			panic(err)
 		}

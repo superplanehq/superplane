@@ -5,18 +5,23 @@ import (
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+const (
+	EventSourceStatePending = "pending"
+	EventSourceStateReady   = "ready"
 )
 
 type EventSource struct {
-	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID       uuid.UUID
-	Name           string
-	Key            []byte
-	Filters        datatypes.JSONSlice[Filter]
-	FilterOperator string
-	CreatedAt      *time.Time
-	UpdatedAt      *time.Time
+	ID                    uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID              uuid.UUID
+	IntegrationResourceID *uuid.UUID
+	Name                  string
+	Key                   []byte
+	State                 string
+	CreatedAt             *time.Time
+	UpdatedAt             *time.Time
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {
@@ -24,6 +29,17 @@ func (s *EventSource) UpdateKey(key []byte) error {
 	s.Key = key
 	s.UpdatedAt = &now
 	return database.Conn().Save(s).Error
+}
+
+func (s *EventSource) UpdateState(state string) error {
+	return s.UpdateStateInTransaction(database.Conn(), state)
+}
+
+func (s *EventSource) UpdateStateInTransaction(tx *gorm.DB, state string) error {
+	now := time.Now()
+	s.State = state
+	s.UpdatedAt = &now
+	return tx.Save(s).Error
 }
 
 func FindEventSource(id uuid.UUID) (*EventSource, error) {
@@ -52,4 +68,19 @@ func (c *Canvas) ListEventSources() ([]EventSource, error) {
 	}
 
 	return sources, nil
+}
+
+func ListPendingEventSources() ([]EventSource, error) {
+	eventSources := []EventSource{}
+
+	err := database.Conn().
+		Where("state = ?", EventSourceStatePending).
+		Find(&eventSources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return eventSources, nil
 }

@@ -12,10 +12,10 @@ import (
 func Test__InputBuilder(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"))
+	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), nil)
 	require.NoError(t, err)
 	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"))
+	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"), nil)
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {

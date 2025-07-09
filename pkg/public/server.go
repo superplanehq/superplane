@@ -18,7 +18,6 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/integrations"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -273,12 +272,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Methods("POST")
 
 	publicRoute.
-		HandleFunc(s.BasePath+"/integrations/{integrationID}/semaphore", s.HandleSemaphoreIntegrationWebhook).
-		Headers("Content-Type", "application/json").
-		Methods("POST")
-
-	publicRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreSourceWebhook).
+		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
@@ -487,38 +481,7 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 	s.handleWebhook(w, r, source.ID.String(), source.Name, source.Key, signature)
 }
 
-func (s *Server) HandleSemaphoreIntegrationWebhook(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	integrationIDFromRequest := vars["integrationID"]
-	integrationID, err := uuid.Parse(integrationIDFromRequest)
-	if err != nil {
-		http.Error(w, "integration ID not found", http.StatusNotFound)
-		return
-	}
-
-	signature := r.Header.Get("X-Semaphore-Signature-256")
-	if signature == "" {
-		http.Error(w, "Missing X-Semaphore-Signature-256 header", http.StatusBadRequest)
-		return
-	}
-
-	// TODO: is it OK to use only the ID here?
-	integration, err := models.FindIntegrationByID(integrationID)
-	if err != nil {
-		http.Error(w, "integration not found", http.StatusNotFound)
-		return
-	}
-
-	secret, err := integration.FindResource(integrations.ResourceTypeSecret)
-	if err != nil {
-		http.Error(w, "key not found", http.StatusNotFound)
-		return
-	}
-
-	s.handleWebhook(w, r, integrationID.String(), integration.Name, secret.Data, signature)
-}
-
-func (s *Server) HandleSemaphoreSourceWebhook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)

@@ -47,6 +47,10 @@ func (s *SemaphoreIntegration) GetResource(resourceType, id string) (Integration
 		return s.getTask(id)
 	case ResourceTypeProject:
 		return s.getProject(id)
+	case ResourceTypeSecret:
+		return s.getSecret(id)
+	case ResourceTypeNotification:
+		return s.getNotification(id)
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s for get", resourceType)
 	}
@@ -79,14 +83,14 @@ func (s *SemaphoreIntegration) CreateResource(resourceType string, params any) (
 }
 
 func (s *SemaphoreIntegration) createSecret(params any) (IntegrationResource, error) {
-	URL := fmt.Sprintf("%s/api/v2/secrets", s.URL)
+	URL := fmt.Sprintf("%s/api/v1beta/secrets", s.URL)
 
 	secret, ok := params.(*Secret)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
 	}
 
-	secret.APIVersion = "v2"
+	secret.APIVersion = "v1beta"
 	secret.Kind = "Secret"
 	body, err := json.Marshal(secret)
 	if err != nil {
@@ -123,11 +127,43 @@ func (s *SemaphoreIntegration) createSecret(params any) (IntegrationResource, er
 	return &response, nil
 }
 
+func (s *SemaphoreIntegration) getSecret(id string) (IntegrationResource, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", s.URL, id)
+	req, err := http.NewRequest(http.MethodGet, URL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var response Secret
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
 type Secret struct {
 	APIVersion string         `json:"apiVersion"`
 	Kind       string         `json:"kind"`
 	Metadata   SecretMetadata `json:"metadata"`
-	Spec       SecretSpec     `json:"spec"`
+	Data       SecretSpecData `json:"data"`
 }
 
 func (p *Secret) ID() string {
@@ -147,10 +183,6 @@ type SecretMetadata struct {
 	Name string `json:"name"`
 }
 
-type SecretSpec struct {
-	Data SecretSpecData `json:"data"`
-}
-
 type SecretSpecData struct {
 	EnvVars []SecretSpecDataEnvVar `json:"env_vars"`
 }
@@ -160,15 +192,47 @@ type SecretSpecDataEnvVar struct {
 	Value string `json:"value"`
 }
 
+func (s *SemaphoreIntegration) getNotification(id string) (IntegrationResource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", s.URL, id)
+	req, err := http.NewRequest(http.MethodPost, URL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	var response Notification
+	err = json.Unmarshal(responseBody, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %v", err)
+	}
+
+	return &response, nil
+}
+
 func (s *SemaphoreIntegration) createNotification(params any) (IntegrationResource, error) {
-	URL := fmt.Sprintf("%s/api/v2/notifications", s.URL)
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications", s.URL)
 
 	notification, ok := params.(*Notification)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
 	}
 
-	notification.APIVersion = "v2"
+	notification.APIVersion = "v1alpha"
 	notification.Kind = "Notification"
 	body, err := json.Marshal(notification)
 	if err != nil {
@@ -237,11 +301,23 @@ type NotificationRule struct {
 
 type NotificationRuleNotify struct {
 	Webhook NotificationNotifyWebhook `json:"webhook"`
+
+	// TODO
+	// we don't really need this, but if it's not in the request,
+	// the API does not work properly.
+	// Once it's fixed, or we migrate to v2 API, remove it from here.
+	//
+	Slack NotificationNotifySlack `json:"slack"`
+}
+
+type NotificationNotifySlack struct {
+	Endpoint string   `json:"endpoint,omitempty"`
+	Channels []string `json:"channels,omitempty"`
 }
 
 type NotificationNotifyWebhook struct {
-	URL    string `json:"url"`
-	Secret string `json:"secret"`
+	Endpoint string `json:"endpoint"`
+	Secret   string `json:"secret"`
 }
 
 type NotificationRuleFilter struct {
@@ -451,7 +527,7 @@ func (s *SemaphoreIntegration) getPipeline(id string) (IntegrationResource, erro
 }
 
 func (s *SemaphoreIntegration) getProject(id string) (IntegrationResource, error) {
-	URL := fmt.Sprintf("%s/api/v2/projects/%s", s.URL, id)
+	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", s.URL, id)
 	req, err := http.NewRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)

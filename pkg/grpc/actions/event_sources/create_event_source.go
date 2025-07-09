@@ -3,11 +3,15 @@ package eventsources
 import (
 	"context"
 	"errors"
+	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -38,16 +42,9 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
-	if req.EventSource.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "event source spec is required")
-	}
-
-	filters := []models.Filter{}
-	if req.EventSource.Spec.Filters != nil {
-		filters, err = actions.ValidateFilters(req.EventSource.Spec.Filters)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
+	resourceId, err := validateIntegrationResource(ctx, encryptor, canvas, req.EventSource.Spec)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	//
@@ -59,13 +56,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 		return nil, status.Error(codes.Internal, "error generating key")
 	}
 
-	eventSource, err := canvas.CreateEventSourceWithFilters(
-		req.EventSource.Metadata.Name,
-		encryptedKey,
-		filters,
-		actions.ProtoToFilterOperator(req.EventSource.Spec.FilterOperator),
-	)
-
+	eventSource, err := canvas.CreateEventSource(req.EventSource.Metadata.Name, encryptedKey, resourceId)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -91,6 +82,54 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	return response, nil
 }
 
+func validateIntegrationResource(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, spec *pb.EventSource_Spec) (*uuid.UUID, error) {
+	//
+	// It is OK to have an event source without an integration
+	//
+	if spec == nil {
+		return nil, nil
+	}
+
+	if spec.Integration == nil {
+		return nil, nil
+	}
+
+	if spec.Integration.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "integration name is required")
+	}
+
+	if spec.Integration.Resource == nil {
+		return nil, status.Error(codes.InvalidArgument, "integration resource is required")
+	}
+
+	// TODO: support for canvas level integration
+	record, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, spec.Integration.Name)
+	if err != nil {
+		return nil, fmt.Errorf("integration not found: %v", err)
+	}
+
+	integration, err := integrations.NewIntegration(ctx, record, encryptor)
+	if err != nil {
+		return nil, fmt.Errorf("error building integration: %v", err)
+	}
+
+	resourceRef := spec.Integration.Resource
+	resourceType := protoToResourceType(resourceRef.Type)
+	resource, err := integration.GetResource(resourceType, resourceRef.Name)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s not found: %v", resourceType, resourceRef.Name, err)
+	}
+
+	// TODO: resource IDs can be of other types
+	resourceID := uuid.MustParse(resource.ID())
+	_, err = record.CreateResource(resourceType, resourceID, resourceRef.Name)
+	if err != nil {
+		return nil, fmt.Errorf("error creating integration resource: %v", err)
+	}
+
+	return &resourceID, nil
+}
+
 func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 	return &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
@@ -112,4 +151,17 @@ func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name 
 	}
 
 	return plainKey, encrypted, nil
+}
+
+func protoToResourceType(resourceType pb.IntegrationResource_Type) string {
+	switch resourceType {
+	case pb.IntegrationResource_TYPE_PROJECT:
+		return integrations.ResourceTypeProject
+	case pb.IntegrationResource_TYPE_TASK:
+		return integrations.ResourceTypeTask
+	case pb.IntegrationResource_TYPE_REPOSITORY:
+		return integrations.ResourceTypeRepository
+	default:
+		return ""
+	}
 }

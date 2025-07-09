@@ -59,7 +59,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"))
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), nil)
 		require.NoError(t, err)
 	}
 

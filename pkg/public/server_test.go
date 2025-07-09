@@ -52,7 +52,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"))
+	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"), nil)
 	require.NoError(t, err)
 
 	validEvent := []byte(`{"action": "created"}`)
@@ -184,7 +184,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"))
+	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"), nil)
 	require.NoError(t, err)
 
 	// No need to include organization ID in the payload anymore

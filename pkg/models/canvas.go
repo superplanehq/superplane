@@ -30,22 +30,17 @@ func (Canvas) TableName() string {
 }
 
 // NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSource(name string, key []byte) (*EventSource, error) {
-	return c.CreateEventSourceWithFilters(name, key, []Filter{}, FilterOperatorAnd)
-}
-
-// NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSourceWithFilters(name string, key []byte, filters []Filter, filterOperator string) (*EventSource, error) {
+func (c *Canvas) CreateEventSource(name string, key []byte, resourceId *uuid.UUID) (*EventSource, error) {
 	now := time.Now()
 
 	eventSource := EventSource{
-		Name:           name,
-		CanvasID:       c.ID,
-		CreatedAt:      &now,
-		UpdatedAt:      &now,
-		Key:            key,
-		Filters:        datatypes.NewJSONSlice(filters),
-		FilterOperator: filterOperator,
+		Name:                  name,
+		CanvasID:              c.ID,
+		CreatedAt:             &now,
+		UpdatedAt:             &now,
+		Key:                   key,
+		IntegrationResourceID: resourceId,
+		State:                 EventSourceStatePending,
 	}
 
 	err := database.Conn().

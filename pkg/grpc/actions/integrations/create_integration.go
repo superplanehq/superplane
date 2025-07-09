@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -17,6 +19,11 @@ import (
 )
 
 func CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
+	if !userIsSet {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+
 	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -41,6 +48,7 @@ func CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	integration.CreatedBy = uuid.MustParse(userID)
 	integration, err = models.CreateIntegration(integration)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
@@ -152,9 +160,9 @@ func serializeIntegration(integration models.Integration) *pb.Integration {
 
 func integrationTypeToProto(integrationType string) pb.Integration_Type {
 	switch integrationType {
-	case "semaphore":
+	case models.IntegrationTypeSemaphore:
 		return pb.Integration_TYPE_SEMAPHORE
-	case "github":
+	case models.IntegrationTypeGithub:
 		return pb.Integration_TYPE_GITHUB
 	default:
 		return pb.Integration_TYPE_NONE
@@ -163,9 +171,9 @@ func integrationTypeToProto(integrationType string) pb.Integration_Type {
 
 func integrationAuthTypeToProto(authType string) pb.Integration_AuthType {
 	switch authType {
-	case "token":
+	case models.IntegrationAuthTypeToken:
 		return pb.Integration_AUTH_TYPE_TOKEN
-	case "oidc":
+	case models.IntegrationAuthTypeOIDC:
 		return pb.Integration_AUTH_TYPE_OIDC
 	default:
 		return pb.Integration_AUTH_TYPE_NONE

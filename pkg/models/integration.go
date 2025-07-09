@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
-	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -17,13 +16,10 @@ const (
 
 	IntegrationAuthTypeToken = "token"
 	IntegrationAuthTypeOIDC  = "oidc"
-
-	IntegrationStatePending = "pending"
-	IntegrationStateActive  = "active"
 )
 
 type Integration struct {
-	ID         uuid.UUID
+	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name       string
 	DomainType string
 	DomainID   uuid.UUID
@@ -31,8 +27,7 @@ type Integration struct {
 	URL        string
 	AuthType   string
 	Auth       datatypes.JSONType[IntegrationAuth]
-	OIDC       datatypes.JSONType[IntegrationOIDC]
-	State      string
+	OIDC       datatypes.JSONType[IntegrationOIDC] `gorm:"column:oidc"`
 	CreatedAt  *time.Time
 	CreatedBy  uuid.UUID
 	UpdatedAt  *time.Time
@@ -54,7 +49,6 @@ func CreateIntegration(integration *Integration) (*Integration, error) {
 	now := time.Now()
 	integration.CreatedAt = &now
 	integration.UpdatedAt = &now
-	integration.State = IntegrationStatePending
 
 	err := database.Conn().
 		Clauses(clause.Returning{}).
@@ -72,21 +66,27 @@ func CreateIntegration(integration *Integration) (*Integration, error) {
 	return nil, err
 }
 
-func (i *Integration) UpdateStateInTransaction(tx *gorm.DB, state string) error {
+func (i *Integration) CreateResource(resourceType string, id uuid.UUID, name string) (*IntegrationResource, error) {
 	now := time.Now()
-	i.State = state
-	i.UpdatedAt = &now
+
+	resource := IntegrationResource{
+		ID:            id,
+		Name:          name,
+		CreatedAt:     &now,
+		IntegrationID: i.ID,
+		Type:          resourceType,
+	}
 
 	err := database.Conn().
 		Clauses(clause.Returning{}).
-		Save(&i).
+		Create(&resource).
 		Error
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &resource, nil
 }
 
 func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (*Integration, error) {
@@ -106,10 +106,12 @@ func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (
 	return &integration, nil
 }
 
-func FindIntegrationByID(id uuid.UUID) (*Integration, error) {
+func FindIntegrationByID(domainType string, domainID uuid.UUID, id uuid.UUID) (*Integration, error) {
 	integration := Integration{}
 
 	err := database.Conn().
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
 		Where("id = ?", id).
 		First(&integration).
 		Error
@@ -136,21 +138,6 @@ func FindDomainIntegrationByID(domainType string, domainID, id uuid.UUID) (*Inte
 	}
 
 	return &integration, nil
-}
-
-func ListPendingIntegrations() ([]Integration, error) {
-	integrations := []Integration{}
-
-	err := database.Conn().
-		Where("state = ?", IntegrationStatePending).
-		Find(&integrations).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return integrations, nil
 }
 
 func ListIntegrations(domainType string, domainID uuid.UUID) ([]*Integration, error) {

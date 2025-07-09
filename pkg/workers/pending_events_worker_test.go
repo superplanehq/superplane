@@ -132,7 +132,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`))
+		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), nil)
 		require.NoError(t, err)
 
 		//
