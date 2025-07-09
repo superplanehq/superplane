@@ -27,8 +27,6 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		return nil, err
 	}
 
-	// TODO: once orgs/canvases are implemented, check if the domain exists
-
 	err = authService.CreateGroup(req.DomainID, domainType, req.GroupName, req.Role)
 	if err != nil {
 		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainID, err)
