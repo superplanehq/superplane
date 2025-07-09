@@ -12,6 +12,7 @@ import (
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
@@ -629,8 +630,333 @@ func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 	return a.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
 }
 
+func (a *AuthService) SyncDefaultRoles() error {
+	if err := a.syncOrganizationDefaultRoles(); err != nil {
+		return fmt.Errorf("failed to sync organization default roles: %w", err)
+	}
+
+	if err := a.syncCanvasDefaultRoles(); err != nil {
+		return fmt.Errorf("failed to sync canvas default roles: %w", err)
+	}
+
+	log.Info("Successfully synced default roles for all organizations and canvases")
+	return nil
+}
+
+func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
+	missingOrgPerms, err := a.detectMissingOrganizationPermissions()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
+	}
+
+	missingCanvasPerms, err := a.detectMissingCanvasPermissions()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect missing canvas permissions: %w", err)
+	}
+
+	return missingOrgPerms, missingCanvasPerms, nil
+}
+
+func (a *AuthService) detectMissingOrganizationPermissions() ([]string, error) {
+	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organizations with missing permissions: %w", err)
+	}
+
+	var missingPerms []string
+	for _, orgID := range orgIDs {
+		domain := fmt.Sprintf("org:%s", orgID)
+
+		missingInOrg, err := a.findMissingPermissionsInDomain(domain, a.orgPolicyTemplates)
+		if err != nil {
+			log.Errorf("Error checking permissions for org %s: %v", orgID, err)
+			continue
+		}
+
+		if len(missingInOrg) > 0 {
+			missingPerms = append(missingPerms, fmt.Sprintf("Organization %s: %d missing permissions", orgID, len(missingInOrg)))
+		}
+	}
+
+	return missingPerms, nil
+}
+
+func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
+	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get canvases with missing permissions: %w", err)
+	}
+
+	var missingPerms []string
+	for _, canvasID := range canvasIDs {
+		domain := fmt.Sprintf("canvas:%s", canvasID)
+
+		missingInCanvas, err := a.findMissingPermissionsInDomain(domain, a.canvasPolicyTemplates)
+		if err != nil {
+			log.Errorf("Error checking permissions for canvas %s: %v", canvasID, err)
+			continue
+		}
+
+		if len(missingInCanvas) > 0 {
+			missingPerms = append(missingPerms, fmt.Sprintf("Canvas %s: %d missing permissions", canvasID, len(missingInCanvas)))
+		}
+	}
+
+	return missingPerms, nil
+}
+
+func (a *AuthService) getAllOrganizations() ([]models.Organization, error) {
+	return models.ListOrganizations()
+}
+
+func (a *AuthService) getAllCanvases() ([]models.Canvas, error) {
+	return models.ListCanvases()
+}
+
+// Optimized function to get only organization IDs that have missing permissions
+func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
+	// Get all organization IDs first (lightweight query)
+	orgs, err := models.GetOrganizationIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organization IDs: %w", err)
+	}
+
+	var missingOrgIDs []string
+	for _, orgID := range orgs {
+		domain := fmt.Sprintf("org:%s", orgID)
+		hasMissing, err := a.domainHasMissingPermissions(domain, a.orgPolicyTemplates)
+		if err != nil {
+			log.Warnf("Error checking permissions for org %s: %v", orgID, err)
+			continue
+		}
+		if hasMissing {
+			missingOrgIDs = append(missingOrgIDs, orgID)
+		}
+	}
+
+	return missingOrgIDs, nil
+}
+
+// Optimized function to get only canvas IDs that have missing permissions
+func (a *AuthService) getCanvasesWithMissingPermissions() ([]string, error) {
+	// Get all canvas IDs first (lightweight query)
+	canvases, err := models.GetCanvasIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get canvas IDs: %w", err)
+	}
+
+	var missingCanvasIDs []string
+	for _, canvasID := range canvases {
+		domain := fmt.Sprintf("canvas:%s", canvasID)
+		hasMissing, err := a.domainHasMissingPermissions(domain, a.canvasPolicyTemplates)
+		if err != nil {
+			log.Warnf("Error checking permissions for canvas %s: %v", canvasID, err)
+			continue
+		}
+		if hasMissing {
+			missingCanvasIDs = append(missingCanvasIDs, canvasID)
+		}
+	}
+
+	return missingCanvasIDs, nil
+}
+
+// Helper function to check if a domain has missing permissions
+func (a *AuthService) domainHasMissingPermissions(domain string, policyTemplates [][5]string) (bool, error) {
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Check grouping policy
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return false, err
+			}
+			if !exists {
+				return true, nil // Found at least one missing permission
+			}
+		} else if policy[0] == "p" {
+			// Check permission policy
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return false, err
+			}
+			if !exists {
+				return true, nil // Found at least one missing permission
+			}
+		}
+	}
+	return false, nil // No missing permissions found
+}
+
+func (a *AuthService) findMissingPermissionsInDomain(domain string, policyTemplates [][5]string) ([]string, error) {
+	var missingPolicies []string
+
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Check grouping policy: g,lower_role,higher_role,domain
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check grouping policy: %w", err)
+			}
+			if !exists {
+				missingPolicies = append(missingPolicies, fmt.Sprintf("Grouping: %s -> %s in %s", policy[1], policy[2], domain))
+			}
+		} else if policy[0] == "p" {
+			// Check permission policy: p,role,domain,resource,action
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return nil, fmt.Errorf("failed to check policy: %w", err)
+			}
+			if !exists {
+				missingPolicies = append(missingPolicies, fmt.Sprintf("Policy: %s on %s.%s in %s", policy[1], policy[3], policy[4], domain))
+			}
+		}
+	}
+
+	return missingPolicies, nil
+}
+
+func (a *AuthService) syncOrganizationDefaultRoles() error {
+	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to get organizations with missing permissions: %w", err)
+	}
+
+	if len(orgIDs) == 0 {
+		log.Debug("No organizations with missing permissions found")
+		return nil
+	}
+
+	log.Infof("Found %d organizations with missing permissions", len(orgIDs))
+
+	for _, orgID := range orgIDs {
+		if err := a.syncOrganizationRoles(orgID); err != nil {
+			log.Errorf("Failed to sync roles for organization %s: %v", orgID, err)
+			continue
+		}
+		log.Infof("Synced default roles for organization %s", orgID)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncCanvasDefaultRoles() error {
+	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to get canvases with missing permissions: %w", err)
+	}
+
+	if len(canvasIDs) == 0 {
+		log.Debug("No canvases with missing permissions found")
+		return nil
+	}
+
+	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
+
+	for _, canvasID := range canvasIDs {
+		if err := a.syncCanvasRoles(canvasID); err != nil {
+			log.Errorf("Failed to sync roles for canvas %s: %v", canvasID, err)
+			continue
+		}
+		log.Infof("Synced default roles for canvas %s", canvasID)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncOrganizationRoles(orgID string) error {
+	domain := fmt.Sprintf("org:%s", orgID)
+
+	// First, apply default permissions from CSV templates
+	err := a.applyDefaultPolicies(domain, a.orgPolicyTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to apply default org policies: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncCanvasRoles(canvasID string) error {
+	domain := fmt.Sprintf("canvas:%s", canvasID)
+
+	// First, apply default permissions from CSV templates
+	err := a.applyDefaultPolicies(domain, a.canvasPolicyTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to apply default canvas policies: %w", err)
+	}
+
+	return nil
+}
+
 func (a *AuthService) EnableCache(enable bool) {
 	a.enforcer.EnableCache(enable)
+}
+
+// Helper function to apply default policies from templates
+func (a *AuthService) applyDefaultPolicies(domain string, policyTemplates [][5]string) error {
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Add grouping policy only if it doesn't exist
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return fmt.Errorf("failed to check grouping policy: %w", err)
+			}
+			if !exists {
+				_, err := a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
+				if err != nil {
+					return fmt.Errorf("failed to add grouping policy: %w", err)
+				}
+			}
+		} else if policy[0] == "p" {
+			// Add permission policy only if it doesn't exist
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return fmt.Errorf("failed to check policy: %w", err)
+			}
+			if !exists {
+				_, err := a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
+				if err != nil {
+					return fmt.Errorf("failed to add policy: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Example usage function for checking and syncing missing permissions
+func (a *AuthService) CheckAndSyncMissingPermissions() error {
+	// First, detect missing permissions
+	missingOrgs, missingCanvases, err := a.DetectMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to detect missing permissions: %w", err)
+	}
+
+	if len(missingOrgs) > 0 {
+		log.Infof("Found %d organizations with missing permissions:", len(missingOrgs))
+		for _, org := range missingOrgs {
+			log.Info(org)
+		}
+	}
+
+	if len(missingCanvases) > 0 {
+		log.Infof("Found %d canvases with missing permissions:", len(missingCanvases))
+		for _, canvas := range missingCanvases {
+			log.Info(canvas)
+		}
+	}
+
+	// If there are missing permissions, sync them
+	if len(missingOrgs) > 0 || len(missingCanvases) > 0 {
+		log.Info("Syncing missing default roles...")
+		if err := a.SyncDefaultRoles(); err != nil {
+			return fmt.Errorf("failed to sync default roles: %w", err)
+		}
+		log.Info("Successfully synced all missing permissions")
+	} else {
+		log.Info("No missing permissions found - all organizations and canvases are up to date")
+	}
+
+	return nil
 }
 
 // CreateCustomRole creates a new custom role for a domain

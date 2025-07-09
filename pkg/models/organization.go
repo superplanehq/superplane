@@ -125,3 +125,18 @@ func HardDeleteOrganization(id string) error {
 		Delete(&Organization{}).
 		Error
 }
+
+// GetOrganizationIDs returns only the IDs of all non-deleted organizations
+func GetOrganizationIDs() ([]string, error) {
+	var orgIDs []string
+	err := database.Conn().Model(&Organization{}).
+		Select("id").
+		Where("deleted_at IS NULL").
+		Pluck("id", &orgIDs).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return orgIDs, nil
+}
