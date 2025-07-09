@@ -380,3 +380,17 @@ func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string) (*Canvas,
 
 	return nil, err
 }
+
+// GetCanvasIDs returns only the IDs of all canvases
+func GetCanvasIDs() ([]string, error) {
+	var canvasIDs []string
+	err := database.Conn().Model(&Canvas{}).
+		Select("id").
+		Pluck("id", &canvasIDs).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasIDs, nil
+}
