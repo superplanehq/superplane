@@ -41,8 +41,7 @@ func Test_ListGroups(t *testing.T) {
 			assert.NotEmpty(t, group.Name)
 			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, group.DomainType)
 			assert.Equal(t, orgID, group.DomainId)
-			// Role is empty for now as noted in TODO
-			assert.Equal(t, "", group.Role)
+			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Role)
 		}
 
 		// Check specific group names
@@ -67,7 +66,7 @@ func Test_ListGroups(t *testing.T) {
 
 	t.Run("successful canvas groups list", func(t *testing.T) {
 		canvasID := uuid.New().String()
-		
+
 		// Setup canvas roles and create canvas groups
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
@@ -75,7 +74,7 @@ func Test_ListGroups(t *testing.T) {
 		require.NoError(t, err)
 		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", authorization.RoleCanvasViewer)
 		require.NoError(t, err)
-		
+
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,
@@ -85,14 +84,14 @@ func Test_ListGroups(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
-		
+
 		// Check that groups have the correct structure
 		for _, group := range resp.Groups {
 			assert.NotEmpty(t, group.Name)
 			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, group.DomainType)
 			assert.Equal(t, canvasID, group.DomainId)
 		}
-		
+
 		// Check specific group names
 		groupNames := make([]string, len(resp.Groups))
 		for i, group := range resp.Groups {

@@ -47,8 +47,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		assert.Equal(t, "test-group", resp.Group.Name)
 		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.DomainType)
 		assert.Equal(t, orgID, resp.Group.DomainId)
-		// Role is empty for now as noted in TODO
-		assert.Equal(t, "", resp.Group.Role)
+		assert.Equal(t, "org_admin", resp.Group.Role)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
@@ -77,7 +76,7 @@ func Test_GetGroupUsers(t *testing.T) {
 
 	t.Run("successful canvas group get users", func(t *testing.T) {
 		canvasID := uuid.New().String()
-		
+
 		// Setup canvas roles and create canvas group
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
@@ -85,7 +84,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		require.NoError(t, err)
 		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
-		
+
 		req := &GetGroupUsersRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,
@@ -97,7 +96,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.UserIDs, 1)
 		assert.Contains(t, resp.UserIDs, r.User.String())
-		
+
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
 		assert.Equal(t, "canvas-group", resp.Group.Name)
