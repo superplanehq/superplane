@@ -104,7 +104,10 @@ func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req
 }
 
 func (s *AuthorizationServer) CreateCanvasGroup(ctx context.Context, req *pb.CreateCanvasGroupRequest) (*pb.CreateCanvasGroupResponse, error) {
-	genericReq := auth.ConvertCreateCanvasGroupRequest(req)
+	genericReq, err := auth.ConvertCreateCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
 	genericResp, err := auth.CreateGroup(ctx, genericReq, s.authService)
 	if err != nil {
@@ -115,9 +118,12 @@ func (s *AuthorizationServer) CreateCanvasGroup(ctx context.Context, req *pb.Cre
 }
 
 func (s *AuthorizationServer) AddUserToCanvasGroup(ctx context.Context, req *pb.AddUserToCanvasGroupRequest) (*pb.AddUserToCanvasGroupResponse, error) {
-	genericReq := auth.ConvertAddUserToCanvasGroupRequest(req)
+	genericReq, err := auth.ConvertAddUserToCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
-	err := auth.AddUserToGroup(ctx, genericReq, s.authService)
+	err = auth.AddUserToGroup(ctx, genericReq, s.authService)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +132,12 @@ func (s *AuthorizationServer) AddUserToCanvasGroup(ctx context.Context, req *pb.
 }
 
 func (s *AuthorizationServer) RemoveUserFromCanvasGroup(ctx context.Context, req *pb.RemoveUserFromCanvasGroupRequest) (*pb.RemoveUserFromCanvasGroupResponse, error) {
-	genericReq := auth.ConvertRemoveUserFromCanvasGroupRequest(req)
+	genericReq, err := auth.ConvertRemoveUserFromCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
-	err := auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
+	err = auth.RemoveUserFromGroup(ctx, genericReq, s.authService)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +146,10 @@ func (s *AuthorizationServer) RemoveUserFromCanvasGroup(ctx context.Context, req
 }
 
 func (s *AuthorizationServer) ListCanvasGroups(ctx context.Context, req *pb.ListCanvasGroupsRequest) (*pb.ListCanvasGroupsResponse, error) {
-	genericReq := auth.ConvertListCanvasGroupsRequest(req)
+	genericReq, err := auth.ConvertListCanvasGroupsRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
 	genericResp, err := auth.ListGroups(ctx, genericReq, s.authService)
 	if err != nil {
@@ -148,7 +160,10 @@ func (s *AuthorizationServer) ListCanvasGroups(ctx context.Context, req *pb.List
 }
 
 func (s *AuthorizationServer) GetCanvasGroupUsers(ctx context.Context, req *pb.GetCanvasGroupUsersRequest) (*pb.GetCanvasGroupUsersResponse, error) {
-	genericReq := auth.ConvertGetCanvasGroupUsersRequest(req)
+	genericReq, err := auth.ConvertGetCanvasGroupUsersRequest(req)
+	if err != nil {
+		return nil, err
+	}
 
 	genericResp, err := auth.GetGroupUsers(ctx, genericReq, s.authService)
 	if err != nil {

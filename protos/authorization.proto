@@ -138,7 +138,7 @@ service Authorization {
   //
   rpc CreateCanvasGroup(CreateCanvasGroupRequest) returns (CreateCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/groups"
+      post: "/api/v1/canvases/{canvas_id_or_name}/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -170,7 +170,7 @@ service Authorization {
   //
   rpc AddUserToCanvasGroup(AddUserToCanvasGroupRequest) returns (AddUserToCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users"
+      post: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -201,7 +201,7 @@ service Authorization {
   //
   rpc RemoveUserFromCanvasGroup(RemoveUserFromCanvasGroupRequest) returns (RemoveUserFromCanvasGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users/{user_id}"
+      delete: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from canvas group";
@@ -231,7 +231,7 @@ service Authorization {
   //
   rpc ListCanvasGroups(ListCanvasGroupsRequest) returns (ListCanvasGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/groups"
+      get: "/api/v1/canvases/{canvas_id_or_name}/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas groups";
@@ -261,7 +261,7 @@ service Authorization {
   //
   rpc GetCanvasGroupUsers(GetCanvasGroupUsersRequest) returns (GetCanvasGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/groups/{group_name}/users"
+      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group users";
@@ -291,7 +291,7 @@ service Authorization {
   //
   rpc GetCanvasGroup(GetCanvasGroupRequest) returns (GetCanvasGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id}/groups/{group_name}"
+      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group";
@@ -474,7 +474,7 @@ message GetOrganizationGroupResponse {
 
 // Canvas group management messages
 message CreateCanvasGroupRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
   string group_name = 2;
   string role = 3;
 }
@@ -484,7 +484,7 @@ message CreateCanvasGroupResponse {
 }
 
 message AddUserToCanvasGroupRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
   string group_name = 2;
   string user_id = 3;
 }
@@ -492,7 +492,7 @@ message AddUserToCanvasGroupRequest {
 message AddUserToCanvasGroupResponse {}
 
 message RemoveUserFromCanvasGroupRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
   string group_name = 2;
   string user_id = 3;
 }
@@ -500,7 +500,7 @@ message RemoveUserFromCanvasGroupRequest {
 message RemoveUserFromCanvasGroupResponse {}
 
 message ListCanvasGroupsRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
 }
 
 message ListCanvasGroupsResponse {
@@ -508,7 +508,7 @@ message ListCanvasGroupsResponse {
 }
 
 message GetCanvasGroupUsersRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
   string group_name = 2;
 }
 
@@ -518,7 +518,7 @@ message GetCanvasGroupUsersResponse {
 }
 
 message GetCanvasGroupRequest {
-  string canvas_id = 1;
+  string canvas_id_or_name = 1;
   string group_name = 2;
 }
 

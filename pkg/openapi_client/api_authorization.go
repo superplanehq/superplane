@@ -27,7 +27,7 @@ type AuthorizationAPIService service
 type ApiAuthorizationAddUserToCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 	groupName string
 	body *AuthorizationAddUserToCanvasGroupBody
 }
@@ -47,15 +47,15 @@ AuthorizationAddUserToCanvasGroup Add user to canvas group
 Adds a user to a group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @param groupName
  @return ApiAuthorizationAddUserToCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroup(ctx context.Context, canvasId string, groupName string) ApiAuthorizationAddUserToCanvasGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationAddUserToCanvasGroupRequest {
 	return ApiAuthorizationAddUserToCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 	}
 }
@@ -75,8 +75,8 @@ func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroupExecute(r Api
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -393,7 +393,7 @@ func (a *AuthorizationAPIService) AuthorizationAssignRoleExecute(r ApiAuthorizat
 type ApiAuthorizationCreateCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 	body *AuthorizationCreateCanvasGroupBody
 }
 
@@ -412,14 +412,14 @@ AuthorizationCreateCanvasGroup Create canvas group
 Creates a new group within a canvas with a specific role
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @return ApiAuthorizationCreateCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroup(ctx context.Context, canvasId string) ApiAuthorizationCreateCanvasGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroup(ctx context.Context, canvasIdOrName string) ApiAuthorizationCreateCanvasGroupRequest {
 	return ApiAuthorizationCreateCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 	}
 }
 
@@ -438,8 +438,8 @@ func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroupExecute(r ApiAut
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1020,7 +1020,7 @@ func (a *AuthorizationAPIService) AuthorizationDescribeRoleExecute(r ApiAuthoriz
 type ApiAuthorizationGetCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 	groupName string
 }
 
@@ -1034,15 +1034,15 @@ AuthorizationGetCanvasGroup Get canvas group
 Returns details of a specific group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @param groupName
  @return ApiAuthorizationGetCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationGetCanvasGroup(ctx context.Context, canvasId string, groupName string) ApiAuthorizationGetCanvasGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationGetCanvasGroupRequest {
 	return ApiAuthorizationGetCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 	}
 }
@@ -1062,8 +1062,8 @@ func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupExecute(r ApiAuthor
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups/{groupName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1135,7 +1135,7 @@ func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupExecute(r ApiAuthor
 type ApiAuthorizationGetCanvasGroupUsersRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 	groupName string
 }
 
@@ -1149,15 +1149,15 @@ AuthorizationGetCanvasGroupUsers Get canvas group users
 Returns users that belong to a specific group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @param groupName
  @return ApiAuthorizationGetCanvasGroupUsersRequest
 */
-func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsers(ctx context.Context, canvasId string, groupName string) ApiAuthorizationGetCanvasGroupUsersRequest {
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsers(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationGetCanvasGroupUsersRequest {
 	return ApiAuthorizationGetCanvasGroupUsersRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 	}
 }
@@ -1177,8 +1177,8 @@ func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsersExecute(r ApiA
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1622,7 +1622,7 @@ func (a *AuthorizationAPIService) AuthorizationGetUserRolesExecute(r ApiAuthoriz
 type ApiAuthorizationListCanvasGroupsRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 }
 
 func (r ApiAuthorizationListCanvasGroupsRequest) Execute() (*AuthorizationListCanvasGroupsResponse, *http.Response, error) {
@@ -1635,14 +1635,14 @@ AuthorizationListCanvasGroups List canvas groups
 Returns a list of groups within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @return ApiAuthorizationListCanvasGroupsRequest
 */
-func (a *AuthorizationAPIService) AuthorizationListCanvasGroups(ctx context.Context, canvasId string) ApiAuthorizationListCanvasGroupsRequest {
+func (a *AuthorizationAPIService) AuthorizationListCanvasGroups(ctx context.Context, canvasIdOrName string) ApiAuthorizationListCanvasGroupsRequest {
 	return ApiAuthorizationListCanvasGroupsRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 	}
 }
 
@@ -1661,8 +1661,8 @@ func (a *AuthorizationAPIService) AuthorizationListCanvasGroupsExecute(r ApiAuth
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -2227,7 +2227,7 @@ func (a *AuthorizationAPIService) AuthorizationRemoveRoleExecute(r ApiAuthorizat
 type ApiAuthorizationRemoveUserFromCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	canvasId string
+	canvasIdOrName string
 	groupName string
 	userId string
 }
@@ -2242,16 +2242,16 @@ AuthorizationRemoveUserFromCanvasGroup Remove user from canvas group
 Removes a user from a group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasId
+ @param canvasIdOrName
  @param groupName
  @param userId
  @return ApiAuthorizationRemoveUserFromCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx context.Context, canvasId string, groupName string, userId string) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string, userId string) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
 	return ApiAuthorizationRemoveUserFromCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasId: canvasId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 		userId: userId,
 	}
@@ -2272,8 +2272,8 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasId}/groups/{groupName}/users/{userId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasId"+"}", url.PathEscape(parameterValueToString(r.canvasId, "canvasId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 

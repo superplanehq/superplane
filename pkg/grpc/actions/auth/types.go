@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -86,6 +88,17 @@ func ValidateCreateGroupRequest(req *CreateGroupRequest) error {
 	return nil
 }
 
+func ConvertCanvasIdOrNameToId(canvasIdOrName string) (string, error) {
+	if _, err := uuid.Parse(canvasIdOrName); err != nil {
+		canvas, err := models.FindCanvasByName(canvasIdOrName)
+		if err != nil {
+			return "", status.Error(codes.NotFound, "canvas not found")
+		}
+		return canvas.ID.String(), nil
+	}
+	return canvasIdOrName, nil
+}
+
 func ConvertDomainType(domainType pb.DomainType) (string, error) {
 	switch domainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
@@ -161,13 +174,17 @@ func ConvertToListOrganizationGroupsResponse(groups []*pb.Group) *pb.ListOrganiz
 }
 
 // Canvas group adapters
-func ConvertCreateCanvasGroupRequest(req *pb.CreateCanvasGroupRequest) *CreateGroupRequest {
+func ConvertCreateCanvasGroupRequest(req *pb.CreateCanvasGroupRequest) (*CreateGroupRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
 	return &CreateGroupRequest{
-		DomainID:   req.CanvasId,
+		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 		Role:       req.Role,
-	}
+	}, nil
 }
 
 func ConvertToCreateCanvasGroupResponse(resp *CreateGroupResponse) *pb.CreateCanvasGroupResponse {
@@ -176,38 +193,54 @@ func ConvertToCreateCanvasGroupResponse(resp *CreateGroupResponse) *pb.CreateCan
 	}
 }
 
-func ConvertAddUserToCanvasGroupRequest(req *pb.AddUserToCanvasGroupRequest) *GroupUserRequest {
+func ConvertAddUserToCanvasGroupRequest(req *pb.AddUserToCanvasGroupRequest) (*GroupUserRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
 	return &GroupUserRequest{
-		DomainID:   req.CanvasId,
+		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 		UserID:     req.UserId,
-	}
+	}, nil
 }
 
-func ConvertRemoveUserFromCanvasGroupRequest(req *pb.RemoveUserFromCanvasGroupRequest) *GroupUserRequest {
+func ConvertRemoveUserFromCanvasGroupRequest(req *pb.RemoveUserFromCanvasGroupRequest) (*GroupUserRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
 	return &GroupUserRequest{
-		DomainID:   req.CanvasId,
+		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 		UserID:     req.UserId,
-	}
+	}, nil
 }
 
-func ConvertListCanvasGroupsRequest(req *pb.ListCanvasGroupsRequest) *GroupRequest {
+func ConvertListCanvasGroupsRequest(req *pb.ListCanvasGroupsRequest) (*GroupRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
 	return &GroupRequest{
-		DomainID:   req.CanvasId,
+		DomainID:   canvasID,
 		GroupName:  "", // Not needed for list
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-	}
+	}, nil
 }
 
-func ConvertGetCanvasGroupUsersRequest(req *pb.GetCanvasGroupUsersRequest) *GetGroupUsersRequest {
+func ConvertGetCanvasGroupUsersRequest(req *pb.GetCanvasGroupUsersRequest) (*GetGroupUsersRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
 	return &GetGroupUsersRequest{
-		DomainID:   req.CanvasId,
+		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-	}
+	}, nil
 }
 
 func ConvertToGetCanvasGroupUsersResponse(resp *GetGroupUsersResponse) *pb.GetCanvasGroupUsersResponse {

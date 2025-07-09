@@ -1357,12 +1357,12 @@ func (x *GetOrganizationGroupResponse) GetGroup() *Group {
 
 // Canvas group management messages
 type CreateCanvasGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	GroupName     string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	Role          string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	Role           string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *CreateCanvasGroupRequest) Reset() {
@@ -1395,9 +1395,9 @@ func (*CreateCanvasGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{25}
 }
 
-func (x *CreateCanvasGroupRequest) GetCanvasId() string {
+func (x *CreateCanvasGroupRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -1461,12 +1461,12 @@ func (x *CreateCanvasGroupResponse) GetGroup() *Group {
 }
 
 type AddUserToCanvasGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	GroupName     string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *AddUserToCanvasGroupRequest) Reset() {
@@ -1499,9 +1499,9 @@ func (*AddUserToCanvasGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{27}
 }
 
-func (x *AddUserToCanvasGroupRequest) GetCanvasId() string {
+func (x *AddUserToCanvasGroupRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -1557,12 +1557,12 @@ func (*AddUserToCanvasGroupResponse) Descriptor() ([]byte, []int) {
 }
 
 type RemoveUserFromCanvasGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	GroupName     string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *RemoveUserFromCanvasGroupRequest) Reset() {
@@ -1595,9 +1595,9 @@ func (*RemoveUserFromCanvasGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{29}
 }
 
-func (x *RemoveUserFromCanvasGroupRequest) GetCanvasId() string {
+func (x *RemoveUserFromCanvasGroupRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -1653,10 +1653,10 @@ func (*RemoveUserFromCanvasGroupResponse) Descriptor() ([]byte, []int) {
 }
 
 type ListCanvasGroupsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListCanvasGroupsRequest) Reset() {
@@ -1689,9 +1689,9 @@ func (*ListCanvasGroupsRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{31}
 }
 
-func (x *ListCanvasGroupsRequest) GetCanvasId() string {
+func (x *ListCanvasGroupsRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -1741,11 +1741,11 @@ func (x *ListCanvasGroupsResponse) GetGroups() []*Group {
 }
 
 type GetCanvasGroupUsersRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	GroupName     string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetCanvasGroupUsersRequest) Reset() {
@@ -1778,9 +1778,9 @@ func (*GetCanvasGroupUsersRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{33}
 }
 
-func (x *GetCanvasGroupUsersRequest) GetCanvasId() string {
+func (x *GetCanvasGroupUsersRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -1845,11 +1845,11 @@ func (x *GetCanvasGroupUsersResponse) GetGroup() *Group {
 }
 
 type GetCanvasGroupRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CanvasId      string                 `protobuf:"bytes,1,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	GroupName     string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetCanvasGroupRequest) Reset() {
@@ -1882,9 +1882,9 @@ func (*GetCanvasGroupRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *GetCanvasGroupRequest) GetCanvasId() string {
+func (x *GetCanvasGroupRequest) GetCanvasIdOrName() string {
 	if x != nil {
-		return x.CanvasId
+		return x.CanvasIdOrName
 	}
 	return ""
 }
@@ -2546,39 +2546,39 @@ const file_authorization_proto_rawDesc = "" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"U\n" +
 	"\x1cGetOrganizationGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"j\n" +
-	"\x18CreateCanvasGroupRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"x\n" +
+	"\x18CreateCanvasGroupRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x12\n" +
 	"\x04role\x18\x03 \x01(\tR\x04role\"R\n" +
 	"\x19CreateCanvasGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"r\n" +
-	"\x1bAddUserToCanvasGroupRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x80\x01\n" +
+	"\x1bAddUserToCanvasGroupRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\"\x1e\n" +
-	"\x1cAddUserToCanvasGroupResponse\"w\n" +
-	" RemoveUserFromCanvasGroupRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
+	"\x1cAddUserToCanvasGroupResponse\"\x85\x01\n" +
+	" RemoveUserFromCanvasGroupRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
 	"\auser_id\x18\x03 \x01(\tR\x06userId\"#\n" +
-	"!RemoveUserFromCanvasGroupResponse\"6\n" +
-	"\x17ListCanvasGroupsRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\"S\n" +
+	"!RemoveUserFromCanvasGroupResponse\"D\n" +
+	"\x17ListCanvasGroupsRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"S\n" +
 	"\x18ListCanvasGroupsResponse\x127\n" +
-	"\x06groups\x18\x01 \x03(\v2\x1f.Superplane.Authorization.GroupR\x06groups\"X\n" +
-	"\x1aGetCanvasGroupUsersRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
+	"\x06groups\x18\x01 \x03(\v2\x1f.Superplane.Authorization.GroupR\x06groups\"f\n" +
+	"\x1aGetCanvasGroupUsersRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"o\n" +
 	"\x1bGetCanvasGroupUsersResponse\x12\x19\n" +
 	"\buser_ids\x18\x01 \x03(\tR\auserIds\x125\n" +
-	"\x05group\x18\x02 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"S\n" +
-	"\x15GetCanvasGroupRequest\x12\x1b\n" +
-	"\tcanvas_id\x18\x01 \x01(\tR\bcanvasId\x12\x1d\n" +
+	"\x05group\x18\x02 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"a\n" +
+	"\x15GetCanvasGroupRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"O\n" +
 	"\x16GetCanvasGroupResponse\x125\n" +
@@ -2627,7 +2627,7 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x022\xe9,\n" +
+	"\x12DOMAIN_TYPE_CANVAS\x10\x022\x9a-\n" +
 	"\rAuthorization\x12\xa4\x02\n" +
 	"\x13ListUserPermissions\x124.Superplane.Authorization.ListUserPermissionsRequest\x1a5.Superplane.Authorization.ListUserPermissionsResponse\"\x9f\x01\x92Ac\n" +
 	"\rAuthorization\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x023\x121/api/v1/authorization/users/{user_id}/permissions\x12\xf1\x01\n" +
@@ -2645,29 +2645,29 @@ const file_authorization_proto_rawDesc = "" +
 	"\fGetUserRoles\x12-.Superplane.Authorization.GetUserRolesRequest\x1a..Superplane.Authorization.GetUserRolesResponse\"\x8c\x01\x92AV\n" +
 	"\rAuthorization\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02-\x12+/api/v1/authorization/users/{user_id}/roles\x12\x8a\x02\n" +
 	"\x17CreateOrganizationGroup\x128.Superplane.Authorization.CreateOrganizationGroupRequest\x1a9.Superplane.Authorization.CreateOrganizationGroupResponse\"z\x92A^\n" +
-	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/groups\x12\x8e\x02\n" +
-	"\x11CreateCanvasGroup\x122.Superplane.Authorization.CreateCanvasGroupRequest\x1a3.Superplane.Authorization.CreateCanvasGroupResponse\"\x8f\x01\x92A^\n" +
-	"\rAuthorization\x12\x13Create canvas group\x1a8Creates a new group within a canvas with a specific role\x82\xd3\xe4\x93\x02(:\x01*\"#/api/v1/canvases/{canvas_id}/groups\x12\xa7\x02\n" +
+	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/groups\x12\x96\x02\n" +
+	"\x11CreateCanvasGroup\x122.Superplane.Authorization.CreateCanvasGroupRequest\x1a3.Superplane.Authorization.CreateCanvasGroupResponse\"\x97\x01\x92A^\n" +
+	"\rAuthorization\x12\x13Create canvas group\x1a8Creates a new group within a canvas with a specific role\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/canvases/{canvas_id_or_name}/groups\x12\xa7\x02\n" +
 	"\x1aAddUserToOrganizationGroup\x12;.Superplane.Authorization.AddUserToOrganizationGroupRequest\x1a<.Superplane.Authorization.AddUserToOrganizationGroupResponse\"\x8d\x01\x92A^\n" +
-	"\rAuthorization\x12\x1eAdd user to organization group\x1a-Adds a user to a group within an organization\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/groups/{group_name}/users\x12\x9d\x02\n" +
-	"\x14AddUserToCanvasGroup\x125.Superplane.Authorization.AddUserToCanvasGroupRequest\x1a6.Superplane.Authorization.AddUserToCanvasGroupResponse\"\x95\x01\x92AQ\n" +
-	"\rAuthorization\x12\x18Add user to canvas group\x1a&Adds a user to a group within a canvas\x82\xd3\xe4\x93\x02;:\x01*\"6/api/v1/canvases/{canvas_id}/groups/{group_name}/users\x12\xc7\x02\n" +
+	"\rAuthorization\x12\x1eAdd user to organization group\x1a-Adds a user to a group within an organization\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/groups/{group_name}/users\x12\xa5\x02\n" +
+	"\x14AddUserToCanvasGroup\x125.Superplane.Authorization.AddUserToCanvasGroupRequest\x1a6.Superplane.Authorization.AddUserToCanvasGroupResponse\"\x9d\x01\x92AQ\n" +
+	"\rAuthorization\x12\x18Add user to canvas group\x1a&Adds a user to a group within a canvas\x82\xd3\xe4\x93\x02C:\x01*\">/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\xc7\x02\n" +
 	"\x1fRemoveUserFromOrganizationGroup\x12@.Superplane.Authorization.RemoveUserFromOrganizationGroupRequest\x1aA.Superplane.Authorization.RemoveUserFromOrganizationGroupResponse\"\x9e\x01\x92Ah\n" +
-	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02-*+/api/v1/groups/{group_name}/users/{user_id}\x12\xbd\x02\n" +
-	"\x19RemoveUserFromCanvasGroup\x12:.Superplane.Authorization.RemoveUserFromCanvasGroupRequest\x1a;.Superplane.Authorization.RemoveUserFromCanvasGroupResponse\"\xa6\x01\x92A[\n" +
-	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02B*@/api/v1/canvases/{canvas_id}/groups/{group_name}/users/{user_id}\x12\x80\x02\n" +
+	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02-*+/api/v1/groups/{group_name}/users/{user_id}\x12\xc5\x02\n" +
+	"\x19RemoveUserFromCanvasGroup\x12:.Superplane.Authorization.RemoveUserFromCanvasGroupRequest\x1a;.Superplane.Authorization.RemoveUserFromCanvasGroupResponse\"\xae\x01\x92A[\n" +
+	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02J*H/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}\x12\x80\x02\n" +
 	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"s\x92AZ\n" +
-	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xf6\x01\n" +
-	"\x10ListCanvasGroups\x121.Superplane.Authorization.ListCanvasGroupsRequest\x1a2.Superplane.Authorization.ListCanvasGroupsResponse\"{\x92AM\n" +
-	"\rAuthorization\x12\x12List canvas groups\x1a(Returns a list of groups within a canvas\x82\xd3\xe4\x93\x02%\x12#/api/v1/canvases/{canvas_id}/groups\x12\xb6\x02\n" +
+	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xff\x01\n" +
+	"\x10ListCanvasGroups\x121.Superplane.Authorization.ListCanvasGroupsRequest\x1a2.Superplane.Authorization.ListCanvasGroupsResponse\"\x83\x01\x92AM\n" +
+	"\rAuthorization\x12\x12List canvas groups\x1a(Returns a list of groups within a canvas\x82\xd3\xe4\x93\x02-\x12+/api/v1/canvases/{canvas_id_or_name}/groups\x12\xb6\x02\n" +
 	"\x19GetOrganizationGroupUsers\x12:.Superplane.Authorization.GetOrganizationGroupUsersRequest\x1a;.Superplane.Authorization.GetOrganizationGroupUsersResponse\"\x9f\x01\x92As\n" +
-	"\rAuthorization\x12\x1cGet organization group users\x1aDReturns users that belong to a specific group within an organization\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xac\x02\n" +
-	"\x13GetCanvasGroupUsers\x124.Superplane.Authorization.GetCanvasGroupUsersRequest\x1a5.Superplane.Authorization.GetCanvasGroupUsersResponse\"\xa7\x01\x92Af\n" +
-	"\rAuthorization\x12\x16Get canvas group users\x1a=Returns users that belong to a specific group within a canvas\x82\xd3\xe4\x93\x028\x126/api/v1/canvases/{canvas_id}/groups/{group_name}/users\x12\x91\x02\n" +
+	"\rAuthorization\x12\x1cGet organization group users\x1aDReturns users that belong to a specific group within an organization\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xb4\x02\n" +
+	"\x13GetCanvasGroupUsers\x124.Superplane.Authorization.GetCanvasGroupUsersRequest\x1a5.Superplane.Authorization.GetCanvasGroupUsersResponse\"\xaf\x01\x92Af\n" +
+	"\rAuthorization\x12\x16Get canvas group users\x1a=Returns users that belong to a specific group within a canvas\x82\xd3\xe4\x93\x02@\x12>/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\x91\x02\n" +
 	"\x14GetOrganizationGroup\x125.Superplane.Authorization.GetOrganizationGroupRequest\x1a6.Superplane.Authorization.GetOrganizationGroupResponse\"\x89\x01\x92Ac\n" +
-	"\rAuthorization\x12\x16Get organization group\x1a:Returns details of a specific group within an organization\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/groups/{group_name}\x12\x87\x02\n" +
-	"\x0eGetCanvasGroup\x12/.Superplane.Authorization.GetCanvasGroupRequest\x1a0.Superplane.Authorization.GetCanvasGroupResponse\"\x91\x01\x92AV\n" +
-	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x022\x120/api/v1/canvases/{canvas_id}/groups/{group_name}\x12\xe4\x01\n" +
+	"\rAuthorization\x12\x16Get organization group\x1a:Returns details of a specific group within an organization\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/groups/{group_name}\x12\x8f\x02\n" +
+	"\x0eGetCanvasGroup\x12/.Superplane.Authorization.GetCanvasGroupRequest\x1a0.Superplane.Authorization.GetCanvasGroupResponse\"\x99\x01\x92AV\n" +
+	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x02:\x128/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}\x12\xe4\x01\n" +
 	"\n" +
 	"CreateRole\x12+.Superplane.Authorization.CreateRoleRequest\x1a,.Superplane.Authorization.CreateRoleResponse\"{\x92AR\n" +
 	"\rAuthorization\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/authorization/roles\x12\xf1\x01\n" +
