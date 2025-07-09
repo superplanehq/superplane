@@ -323,29 +323,24 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 
 // GenerateEventMessage generates a human-readable message for an event based on its source type and payload
 func GenerateEventMessage(sourceType string, raw []byte, headers []byte) string {
-	// Parse the event payload
 	var payload map[string]interface{}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return "Event received"
 	}
 
-	// Parse headers to determine event source type
 	var headerMap map[string]interface{}
 	if err := json.Unmarshal(headers, &headerMap); err != nil {
 		return "Event received"
 	}
 
-	// Check headers for GitHub webhook signature
 	if _, hasGitHubSig := headerMap["X-Hub-Signature-256"]; hasGitHubSig {
 		return generateGitHubEventMessage(payload)
 	}
 
-	// Check headers for Semaphore webhook signature
 	if _, hasSemaphoreSig := headerMap["X-Semaphore-Signature-256"]; hasSemaphoreSig {
 		return generateSemaphoreEventMessage(payload)
 	}
 
-	// Check for specific event types in payload
 	if eventType, ok := payload["event_type"].(string); ok {
 		switch eventType {
 		case "github":
@@ -401,7 +396,6 @@ func generateGitHubEventMessage(payload map[string]interface{}) string {
 			}
 		}
 
-		// Handle push events
 		if ref, ok := payload["ref"].(string); ok {
 			if commits, ok := payload["commits"].([]interface{}); ok {
 				commitCount := len(commits)
@@ -424,15 +418,15 @@ func generateGitHubEventMessage(payload map[string]interface{}) string {
 // generateSemaphoreEventMessage generates a message for Semaphore webhook events
 func generateSemaphoreEventMessage(payload map[string]interface{}) string {
 	commitMessage := extractCommitMessage(payload)
-	
+
 	if pipelineMsg := generatePipelineMessage(payload, commitMessage); pipelineMsg != "" {
 		return pipelineMsg
 	}
-	
+
 	if jobMsg := generateJobMessage(payload); jobMsg != "" {
 		return jobMsg
 	}
-	
+
 	return "Semaphore event received"
 }
 
@@ -442,12 +436,12 @@ func extractCommitMessage(payload map[string]interface{}) string {
 	if !ok {
 		return ""
 	}
-	
+
 	commitMessage, _ := revision["commit_message"].(string)
 	if commitMessage == "empty" {
 		return ""
 	}
-	
+
 	return commitMessage
 }
 
@@ -457,17 +451,17 @@ func generatePipelineMessage(payload map[string]interface{}, commitMessage strin
 	if !ok {
 		return ""
 	}
-	
+
 	pipelineName, _ := pipeline["name"].(string)
 	if pipelineName == "" {
 		return ""
 	}
-	
+
 	status := getPipelineStatus(pipeline)
 	if status == "" {
 		return fmt.Sprintf("Pipeline %s event", pipelineName)
 	}
-	
+
 	baseMessage := formatPipelineStatus(pipelineName, status)
 	return addCommitContext(baseMessage, commitMessage)
 }
@@ -477,11 +471,11 @@ func getPipelineStatus(pipeline map[string]interface{}) string {
 	if result, ok := pipeline["result"].(string); ok && result != "" {
 		return result
 	}
-	
+
 	if state, ok := pipeline["state"].(string); ok && state != "" {
 		return state
 	}
-	
+
 	return ""
 }
 
@@ -509,33 +503,33 @@ func generateJobMessage(payload map[string]interface{}) string {
 	if !ok {
 		return ""
 	}
-	
+
 	for _, block := range blocks {
 		blockMap, ok := block.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		jobs, ok := blockMap["jobs"].([]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		for _, job := range jobs {
 			jobMap, ok := job.(map[string]interface{})
 			if !ok {
 				continue
 			}
-			
+
 			jobName, _ := jobMap["name"].(string)
 			result, _ := jobMap["result"].(string)
-			
+
 			if jobName != "" && result != "" {
 				return formatJobStatus(jobName, result)
 			}
 		}
 	}
-	
+
 	return ""
 }
 
