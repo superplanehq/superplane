@@ -30,16 +30,23 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 		return nil, status.Error(codes.Internal, "failed to get groups")
 	}
 
-	// Convert group names to Group objects
 	groups := make([]*pb.Group, len(groupNames))
 	for i, groupName := range groupNames {
-		// Get the role for this group - for now we'll leave it empty as the interface doesn't provide it
-		// TODO: Update authorization service to return group details including roles
+		roles, err := authService.GetGroupRoles(req.DomainID, domainType, groupName)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to get group roles")
+		}
+
+		var role string
+		if len(roles) > 0 {
+			role = roles[0]
+		}
+
 		groups[i] = &pb.Group{
 			Name:       groupName,
 			DomainType: req.DomainType,
 			DomainId:   req.DomainID,
-			Role:       "", // TODO: get actual role from service
+			Role:       role,
 		}
 	}
 
