@@ -144,7 +144,7 @@ func CreateFieldSet(t *testing.T, fields map[string]string, connectionGroup *mod
 	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
 	require.NoError(t, err)
 
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`))
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`), "")
 	require.NoError(t, err)
 	fieldSet.AttachEvent(database.Conn(), event)
 	return fieldSet
@@ -161,7 +161,7 @@ func CreateStageEventWithData(t *testing.T,
 	headers []byte,
 	inputs map[string]any,
 ) *models.StageEvent {
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers, "")
 	require.NoError(t, err)
 	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)
@@ -180,7 +180,7 @@ func CreateExecutionWithData(t *testing.T,
 	inputs map[string]any,
 ) *models.StageExecution {
 	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
-	execution, err := models.CreateStageExecution(stage.ID, event.ID)
+	execution, err := models.CreateStageExecution(stage.ID, event.ID, event.Message)
 	require.NoError(t, err)
 	return execution
 }

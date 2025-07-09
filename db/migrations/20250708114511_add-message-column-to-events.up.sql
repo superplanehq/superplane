@@ -1,0 +1,5 @@
+BEGIN;
+
+ALTER TABLE events ADD COLUMN message TEXT DEFAULT '';
+
+COMMIT;

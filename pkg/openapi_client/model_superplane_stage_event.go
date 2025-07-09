@@ -30,6 +30,7 @@ type SuperplaneStageEvent struct {
 	Approvals []SuperplaneStageEventApproval `json:"approvals,omitempty"`
 	Execution *SuperplaneExecution `json:"execution,omitempty"`
 	Inputs []SuperplaneKeyValuePair `json:"inputs,omitempty"`
+	Message *string `json:"message,omitempty"`
 }
 
 // NewSuperplaneStageEvent instantiates a new SuperplaneStageEvent object
@@ -349,6 +350,38 @@ func (o *SuperplaneStageEvent) SetInputs(v []SuperplaneKeyValuePair) {
 	o.Inputs = v
 }
 
+// GetMessage returns the Message field value if set, zero value otherwise.
+func (o *SuperplaneStageEvent) GetMessage() string {
+	if o == nil || IsNil(o.Message) {
+		var ret string
+		return ret
+	}
+	return *o.Message
+}
+
+// GetMessageOk returns a tuple with the Message field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneStageEvent) GetMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.Message) {
+		return nil, false
+	}
+	return o.Message, true
+}
+
+// HasMessage returns a boolean if a field has been set.
+func (o *SuperplaneStageEvent) HasMessage() bool {
+	if o != nil && !IsNil(o.Message) {
+		return true
+	}
+
+	return false
+}
+
+// SetMessage gets a reference to the given string and assigns it to the Message field.
+func (o *SuperplaneStageEvent) SetMessage(v string) {
+	o.Message = &v
+}
+
 func (o SuperplaneStageEvent) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -385,6 +418,9 @@ func (o SuperplaneStageEvent) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Inputs) {
 		toSerialize["inputs"] = o.Inputs
+	}
+	if !IsNil(o.Message) {
+		toSerialize["message"] = o.Message
 	}
 	return toSerialize, nil
 }

@@ -114,7 +114,7 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 	var execution *models.StageExecution
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		execution, err = models.CreateStageExecutionInTransaction(tx, stage.ID, event.ID)
+		execution, err = models.CreateStageExecutionInTransaction(tx, stage.ID, event.ID, event.Message)
 		if err != nil {
 			return fmt.Errorf("error creating stage execution: %v", err)
 		}

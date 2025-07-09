@@ -3981,6 +3981,7 @@ type StageEvent struct {
 	Approvals     []*StageEventApproval  `protobuf:"bytes,7,rep,name=approvals,proto3" json:"approvals,omitempty"`
 	Execution     *Execution             `protobuf:"bytes,8,opt,name=execution,proto3" json:"execution,omitempty"`
 	Inputs        []*KeyValuePair        `protobuf:"bytes,9,rep,name=inputs,proto3" json:"inputs,omitempty"`
+	Message       string                 `protobuf:"bytes,10,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4076,6 +4077,13 @@ func (x *StageEvent) GetInputs() []*KeyValuePair {
 		return x.Inputs
 	}
 	return nil
+}
+
+func (x *StageEvent) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 type KeyValuePair struct {
@@ -4192,6 +4200,7 @@ type Execution struct {
 	StartedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
 	FinishedAt    *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=finished_at,json=finishedAt,proto3" json:"finished_at,omitempty"`
 	Outputs       []*OutputValue         `protobuf:"bytes,8,rep,name=outputs,proto3" json:"outputs,omitempty"`
+	Message       string                 `protobuf:"bytes,9,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4280,6 +4289,13 @@ func (x *Execution) GetOutputs() []*OutputValue {
 		return x.Outputs
 	}
 	return nil
+}
+
+func (x *Execution) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 type StageEventApproval struct {
@@ -6626,7 +6642,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x06states\x18\x03 \x03(\x0e2\x1c.Superplane.StageEvent.StateR\x06states\x12G\n" +
 	"\rstate_reasons\x18\x04 \x03(\x0e2\".Superplane.StageEvent.StateReasonR\fstateReasons\"I\n" +
 	"\x17ListStageEventsResponse\x12.\n" +
-	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\xfd\x05\n" +
+	"\x06events\x18\x01 \x03(\v2\x16.Superplane.StageEventR\x06events\"\x97\x06\n" +
 	"\n" +
 	"StageEvent\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -6639,7 +6655,9 @@ const file_superplane_proto_rawDesc = "" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12<\n" +
 	"\tapprovals\x18\a \x03(\v2\x1e.Superplane.StageEventApprovalR\tapprovals\x123\n" +
 	"\texecution\x18\b \x01(\v2\x15.Superplane.ExecutionR\texecution\x120\n" +
-	"\x06inputs\x18\t \x03(\v2\x18.Superplane.KeyValuePairR\x06inputs\"U\n" +
+	"\x06inputs\x18\t \x03(\v2\x18.Superplane.KeyValuePairR\x06inputs\x12\x18\n" +
+	"\amessage\x18\n" +
+	" \x01(\tR\amessage\"U\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +
@@ -6658,7 +6676,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"7\n" +
 	"\vOutputValue\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value\"\xa7\x04\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"\xc1\x04\n" +
 	"\tExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12!\n" +
 	"\freference_id\x18\x02 \x01(\tR\vreferenceId\x121\n" +
@@ -6670,7 +6688,8 @@ const file_superplane_proto_rawDesc = "" +
 	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12;\n" +
 	"\vfinished_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"finishedAt\x121\n" +
-	"\aoutputs\x18\b \x03(\v2\x17.Superplane.OutputValueR\aoutputs\"T\n" +
+	"\aoutputs\x18\b \x03(\v2\x17.Superplane.OutputValueR\aoutputs\x12\x18\n" +
+	"\amessage\x18\t \x01(\tR\amessage\"T\n" +
 	"\x05State\x12\x11\n" +
 	"\rSTATE_UNKNOWN\x10\x00\x12\x11\n" +
 	"\rSTATE_PENDING\x10\x01\x12\x11\n" +

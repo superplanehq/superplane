@@ -523,7 +523,8 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 	// Here, we know the event is for a valid organization/source,
 	// and comes from GitHub, so we just want to save it and give a response back.
 	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
+	message := models.GenerateEventMessage(models.SourceTypeEventSource, body, headers)
+	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers, message); err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
 	}
@@ -605,7 +606,8 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 	// Here, we know the event is for a valid organization/source,
 	// and comes from Semaphore, so we just want to save it and give a response back.
 	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
+	message := models.GenerateEventMessage(models.SourceTypeEventSource, body, headers)
+	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers, message); err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
 	}

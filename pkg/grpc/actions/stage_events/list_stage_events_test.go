@@ -68,7 +68,7 @@ func Test__ListStageEvents(t *testing.T) {
 			"VERSION": "v1",
 		})
 
-		execution, err := models.CreateStageExecution(r.Stage.ID, eventWithExecution.ID)
+		execution, err := models.CreateStageExecution(r.Stage.ID, eventWithExecution.ID, "")
 		require.NoError(t, err)
 		require.NoError(t, eventWithExecution.UpdateState(models.StageEventStateWaiting, models.StageEventStateReasonExecution))
 		require.NoError(t, execution.UpdateOutputs(map[string]any{

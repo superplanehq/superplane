@@ -29,6 +29,7 @@ type SuperplaneExecution struct {
 	StartedAt *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Outputs []SuperplaneOutputValue `json:"outputs,omitempty"`
+	Message *string `json:"message,omitempty"`
 }
 
 // NewSuperplaneExecution instantiates a new SuperplaneExecution object
@@ -312,6 +313,38 @@ func (o *SuperplaneExecution) SetOutputs(v []SuperplaneOutputValue) {
 	o.Outputs = v
 }
 
+// GetMessage returns the Message field value if set, zero value otherwise.
+func (o *SuperplaneExecution) GetMessage() string {
+	if o == nil || IsNil(o.Message) {
+		var ret string
+		return ret
+	}
+	return *o.Message
+}
+
+// GetMessageOk returns a tuple with the Message field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecution) GetMessageOk() (*string, bool) {
+	if o == nil || IsNil(o.Message) {
+		return nil, false
+	}
+	return o.Message, true
+}
+
+// HasMessage returns a boolean if a field has been set.
+func (o *SuperplaneExecution) HasMessage() bool {
+	if o != nil && !IsNil(o.Message) {
+		return true
+	}
+
+	return false
+}
+
+// SetMessage gets a reference to the given string and assigns it to the Message field.
+func (o *SuperplaneExecution) SetMessage(v string) {
+	o.Message = &v
+}
+
 func (o SuperplaneExecution) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -345,6 +378,9 @@ func (o SuperplaneExecution) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Outputs) {
 		toSerialize["outputs"] = o.Outputs
+	}
+	if !IsNil(o.Message) {
+		toSerialize["message"] = o.Message
 	}
 	return toSerialize, nil
 }

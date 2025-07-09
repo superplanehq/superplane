@@ -32,6 +32,7 @@ type StageExecution struct {
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
 	Outputs      datatypes.JSONType[map[string]any]
+	Message      string
 
 	//
 	// TODO: not so sure about this column
@@ -149,7 +150,15 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		return fmt.Errorf("error marshaling event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, raw, []byte(`{}`))
+	// Generate message for stage completion event
+	var message string
+	if result == StageExecutionResultPassed {
+		message = fmt.Sprintf("Stage %s completed successfully", stage.Name)
+	} else {
+		message = fmt.Sprintf("Stage %s failed", stage.Name)
+	}
+
+	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, raw, []byte(`{}`), message)
 	if err != nil {
 		return fmt.Errorf("error creating event: %v", err)
 	}
@@ -241,11 +250,11 @@ func ListStageExecutionsInState(state string) ([]StageExecution, error) {
 	return executions, nil
 }
 
-func CreateStageExecution(stageID, stageEventID uuid.UUID) (*StageExecution, error) {
-	return CreateStageExecutionInTransaction(database.Conn(), stageID, stageEventID)
+func CreateStageExecution(stageID, stageEventID uuid.UUID, message string) (*StageExecution, error) {
+	return CreateStageExecutionInTransaction(database.Conn(), stageID, stageEventID, message)
 }
 
-func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.UUID) (*StageExecution, error) {
+func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.UUID, message string) (*StageExecution, error) {
 	now := time.Now()
 	execution := StageExecution{
 		StageID:      stageID,
@@ -253,6 +262,7 @@ func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.U
 		State:        StageExecutionPending,
 		CreatedAt:    &now,
 		UpdatedAt:    &now,
+		Message:      message,
 	}
 
 	err := tx.
