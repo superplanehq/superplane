@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"github.com/superplanehq/superplane/pkg/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -88,9 +89,9 @@ func ValidateCreateGroupRequest(req *CreateGroupRequest) error {
 func ConvertDomainType(domainType pb.DomainType) (string, error) {
 	switch domainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return "org", nil
+		return authorization.DomainOrg, nil
 	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		return "canvas", nil
+		return authorization.DomainCanvas, nil
 	default:
 		return "", status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
