@@ -2232,6 +2232,37 @@
       ],
       "default": "TIMEOUT_BEHAVIOR_NONE"
     },
+    "SuperplaneApprovalRequirement": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneApprovalRequirementType"
+        },
+        "name": {
+          "type": "string",
+          "title": "username, role name, or group name"
+        },
+        "id": {
+          "type": "string",
+          "title": "user ID, role name, or group name (alternative to name)"
+        },
+        "count": {
+          "type": "integer",
+          "format": "int64",
+          "title": "number of approvals required from this requirement"
+        }
+      }
+    },
+    "SuperplaneApprovalRequirementType": {
+      "type": "string",
+      "enum": [
+        "TYPE_UNKNOWN",
+        "TYPE_USER",
+        "TYPE_ROLE",
+        "TYPE_GROUP"
+      ],
+      "default": "TYPE_UNKNOWN"
+    },
     "SuperplaneApproveStageEventBody": {
       "type": "object"
     },
@@ -2290,6 +2321,13 @@
         "count": {
           "type": "integer",
           "format": "int64"
+        },
+        "requiredFrom": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneApprovalRequirement"
+          }
         }
       }
     },

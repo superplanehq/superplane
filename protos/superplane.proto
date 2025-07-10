@@ -660,6 +660,21 @@ message Condition {
 
 message ConditionApproval {
   uint32 count = 1;
+  repeated ApprovalRequirement required_from = 2;
+}
+
+message ApprovalRequirement {
+  enum Type {
+    TYPE_UNKNOWN = 0;
+    TYPE_USER = 1;
+    TYPE_ROLE = 2;
+    TYPE_GROUP = 3;
+  }
+  
+  Type type = 1;
+  string name = 2;    // username, role name, or group name
+  string id = 3;      // user ID, role name, or group name (alternative to name)
+  uint32 count = 4;   // number of approvals required from this requirement
 }
 
 message ConditionTimeWindow {

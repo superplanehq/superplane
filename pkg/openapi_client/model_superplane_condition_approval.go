@@ -21,6 +21,7 @@ var _ MappedNullable = &SuperplaneConditionApproval{}
 // SuperplaneConditionApproval struct for SuperplaneConditionApproval
 type SuperplaneConditionApproval struct {
 	Count *int64 `json:"count,omitempty"`
+	RequiredFrom []SuperplaneApprovalRequirement `json:"requiredFrom,omitempty"`
 }
 
 // NewSuperplaneConditionApproval instantiates a new SuperplaneConditionApproval object
@@ -72,6 +73,38 @@ func (o *SuperplaneConditionApproval) SetCount(v int64) {
 	o.Count = &v
 }
 
+// GetRequiredFrom returns the RequiredFrom field value if set, zero value otherwise.
+func (o *SuperplaneConditionApproval) GetRequiredFrom() []SuperplaneApprovalRequirement {
+	if o == nil || IsNil(o.RequiredFrom) {
+		var ret []SuperplaneApprovalRequirement
+		return ret
+	}
+	return o.RequiredFrom
+}
+
+// GetRequiredFromOk returns a tuple with the RequiredFrom field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneConditionApproval) GetRequiredFromOk() ([]SuperplaneApprovalRequirement, bool) {
+	if o == nil || IsNil(o.RequiredFrom) {
+		return nil, false
+	}
+	return o.RequiredFrom, true
+}
+
+// HasRequiredFrom returns a boolean if a field has been set.
+func (o *SuperplaneConditionApproval) HasRequiredFrom() bool {
+	if o != nil && !IsNil(o.RequiredFrom) {
+		return true
+	}
+
+	return false
+}
+
+// SetRequiredFrom gets a reference to the given []SuperplaneApprovalRequirement and assigns it to the RequiredFrom field.
+func (o *SuperplaneConditionApproval) SetRequiredFrom(v []SuperplaneApprovalRequirement) {
+	o.RequiredFrom = v
+}
+
 func (o SuperplaneConditionApproval) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o SuperplaneConditionApproval) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Count) {
 		toSerialize["count"] = o.Count
+	}
+	if !IsNil(o.RequiredFrom) {
+		toSerialize["requiredFrom"] = o.RequiredFrom
 	}
 	return toSerialize, nil
 }
