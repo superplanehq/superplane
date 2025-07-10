@@ -17,6 +17,7 @@ import { Link } from './lib/Link/link'
 import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Description, Label } from './lib/Fieldset/fieldset'
 import { ControlledTabs, Tabs, type Tab } from './lib/Tabs/tabs'
+import { Textarea } from './lib/Textarea/textarea'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -29,7 +30,7 @@ export function OrganizationSettings({
   onSignOut, 
   onSwitchOrganization 
 }: OrganizationSettingsProps) {
-  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'users' | 'teams' | 'roles' | 'tokens' | 'integrations' | 'billing' | 'security'>('roles')
+  const [activeTab, setActiveTab] = useState<'profile' | 'general' | 'members' | 'groups' | 'roles' | 'tokens' | 'integrations' | 'api_token' | 'security'>('general')
   const [selectedTeam, setSelectedTeam] = useState<{ id: string; name: string; description: string } | null>(null)
   const [isCreatingRole, setIsCreatingRole] = useState(false)
   const [activeRoleTab, setActiveRoleTab] = useState<'organization' | 'canvas'>('organization')
@@ -80,8 +81,8 @@ export function OrganizationSettings({
     }
   ]
 
-  // Mock data for users
-  const users = [
+  // Mock data for members
+  const members = [
     {
       id: '1',
       name: 'John Doe',
@@ -121,8 +122,8 @@ export function OrganizationSettings({
     }
   ]
 
-  // Mock data for teams
-  const teams = [
+  // Mock data for groups
+  const groups = [
     {
       id: '1',
       name: 'Engineering',
@@ -302,104 +303,301 @@ export function OrganizationSettings({
     }
   ]
 
-  // Organization permissions data
+  // Organization permissions data categorized
   const organizationPermissions = [
     {
-      id: 'org_view',
-      name: 'View Organization',
-      description: 'View organization details and basic information'
+      category: 'General',
+      icon: 'business',
+      permissions: [
+        {
+          id: 'organization.view',
+          name: 'View Organization',
+          description: 'Access to the organization. This permission is needed to access any page within the organization domain.'
+        },
+        {
+          id: 'organization.general_settings.view',
+          name: 'View General Settings',
+          description: 'View general settings for the organization.'
+        },
+        {
+          id: 'organization.general_settings.manage',
+          name: 'Manage General Settings',
+          description: 'Manage general settings of the organization.'
+        },
+        {
+          id: 'organization.change_owner',
+          name: 'Change Owner',
+          description: 'Change the owner of the organization.'
+        },
+        {
+          id: 'organization.delete',
+          name: 'Delete Organization',
+          description: 'Delete the organization.'
+        }
+      ]
     },
     {
-      id: 'org_manage_settings',
-      name: 'Manage Organization Settings',
-      description: 'Modify organization settings and configuration'
+      category: 'People & Groups',
+      icon: 'groups',
+      permissions: [
+        {
+          id: 'organization.people.view',
+          name: 'View People',
+          description: 'View list of people within the organization, together with the roles they have.'
+        },
+        {
+          id: 'organization.people.invite',
+          name: 'Invite People',
+          description: 'Invite new people to the organization.'
+        },
+        {
+          id: 'organization.people.manage',
+          name: 'Manage People',
+          description: 'Remove people from the organization, or change their roles within the organization.'
+        },
+        {
+          id: 'organization.groups.view',
+          name: 'View Groups',
+          description: 'View user groups within the organization.'
+        },
+        {
+          id: 'organization.groups.manage',
+          name: 'Manage Groups',
+          description: 'Manage groups within the organization and modify group members.'
+        }
+      ]
     },
     {
-      id: 'org_manage_members',
-      name: 'Manage Members',
-      description: 'Invite, remove, and manage organization members'
+      category: 'Roles & Permissions',
+      icon: 'admin_panel_settings',
+      permissions: [
+        {
+          id: 'organization.custom_roles.view',
+          name: 'View Custom Roles',
+          description: 'View roles within the organization and permissions they carry.'
+        },
+        {
+          id: 'organization.custom_roles.manage',
+          name: 'Manage Custom Roles',
+          description: 'Modify definition of roles within the organization.'
+        }
+      ]
     },
     {
-      id: 'org_manage_teams',
-      name: 'Manage Teams',
-      description: 'Create, edit, and delete teams within the organization'
+      category: 'Projects & Resources',
+      icon: 'folder',
+      permissions: [
+        {
+          id: 'organization.projects.create',
+          name: 'Create Projects',
+          description: 'Create a new project within the organization.'
+        },
+        {
+          id: 'organization.dashboards.view',
+          name: 'View Dashboards',
+          description: 'View the existing dashboards within the organization.'
+        },
+        {
+          id: 'organization.dashboards.manage',
+          name: 'Manage Dashboards',
+          description: 'Create new dashboard views.'
+        }
+      ]
     },
     {
-      id: 'org_manage_roles',
-      name: 'Manage Roles',
-      description: 'Create, edit, and assign custom roles'
+      category: 'Security & Compliance',
+      icon: 'security',
+      permissions: [
+        {
+          id: 'organization.audit_logs.view',
+          name: 'View Audit Logs',
+          description: 'View audit logs.'
+        },
+        {
+          id: 'organization.audit_logs.manage',
+          name: 'Manage Audit Logs',
+          description: 'Manage audit log settings for the organization (such as log streams).'
+        },
+        {
+          id: 'organization.activity_monitor.view',
+          name: 'View Activity Monitor',
+          description: 'View organization\'s activity monitor.'
+        },
+        {
+          id: 'organization.secrets.view',
+          name: 'View Secrets',
+          description: 'View secrets within the organization.'
+        },
+        {
+          id: 'organization.secrets.manage',
+          name: 'Manage Secrets',
+          description: 'Manage secrets within the organization.'
+        },
+        {
+          id: 'organization.secrets_policy_settings.view',
+          name: 'View Secrets Policy',
+          description: 'View existing secrets policy settings.'
+        },
+        {
+          id: 'organization.secrets_policy_settings.manage',
+          name: 'Manage Secrets Policy',
+          description: 'Manage secrets policy settings within the organization.'
+        },
+        {
+          id: 'organization.ip_allow_list.view',
+          name: 'View IP Allow List',
+          description: 'View the IP allow list.'
+        },
+        {
+          id: 'organization.ip_allow_list.manage',
+          name: 'Manage IP Allow List',
+          description: 'Modify the IP allow list for the organization.'
+        }
+      ]
     },
     {
-      id: 'org_manage_billing',
-      name: 'Manage Billing',
-      description: 'Access and manage billing information and subscriptions'
+      category: 'Integrations & External Services',
+      icon: 'extension',
+      permissions: [
+        {
+          id: 'organization.okta.view',
+          name: 'View Okta Integration',
+          description: 'View Okta integration settings for the organization.'
+        },
+        {
+          id: 'organization.okta.manage',
+          name: 'Manage Okta Integration',
+          description: 'Modify existing Okta integrations, or create a new one.'
+        },
+        {
+          id: 'organization.self_hosted_agents.view',
+          name: 'View Self-Hosted Agents',
+          description: 'View the list of self-hosted agents within the organization.'
+        },
+        {
+          id: 'organization.self_hosted_agents.manage',
+          name: 'Manage Self-Hosted Agents',
+          description: 'Manage self-hosted agents within the organization.'
+        },
+        {
+          id: 'organization.pre_flight_checks.view',
+          name: 'View Pre-Flight Checks',
+          description: 'View pre-flight checks within the organization.'
+        },
+        {
+          id: 'organization.pre_flight_checks.manage',
+          name: 'Manage Pre-Flight Checks',
+          description: 'Modify pre-flight checks within the organization.'
+        }
+      ]
     },
     {
-      id: 'org_view_security',
-      name: 'View Security Settings',
-      description: 'View security settings and audit logs'
+      category: 'Billing & Support',
+      icon: 'payment',
+      permissions: [
+        {
+          id: 'organization.plans_and_billing.view',
+          name: 'View Plans & Billing',
+          description: 'View the billing page.'
+        },
+        {
+          id: 'organization.plans_and_billing.manage',
+          name: 'Manage Plans & Billing',
+          description: 'Modify billing information or subscription plan.'
+        },
+        {
+          id: 'organization.contact_support',
+          name: 'Contact Support',
+          description: 'Contact support on behalf of the organization.'
+        }
+      ]
     },
     {
-      id: 'org_manage_integrations',
-      name: 'Manage Integrations',
-      description: 'Configure and manage third-party integrations'
+      category: 'Notifications',
+      icon: 'notifications',
+      permissions: [
+        {
+          id: 'organization.notifications.view',
+          name: 'View Notifications',
+          description: 'View organization notification settings.'
+        },
+        {
+          id: 'organization.notifications.manage',
+          name: 'Manage Notifications',
+          description: 'Modify organization notification settings.'
+        }
+      ]
     }
   ]
 
-  // Canvas permissions data
+  // Canvas permissions data categorized
   const canvasPermissions = [
     {
-      id: 'canvas_view',
-      name: 'View Canvases',
-      description: 'View existing canvases and their content'
+      category: 'Basic Operations',
+      icon: 'palette',
+      permissions: [
+        {
+          id: 'canvas_view',
+          name: 'View Canvases',
+          description: 'View existing canvases and their content'
+        },
+        {
+          id: 'canvas_create',
+          name: 'Create Canvases',
+          description: 'Create new canvases and projects'
+        },
+        {
+          id: 'canvas_edit',
+          name: 'Edit Canvases',
+          description: 'Modify canvas content, structure, and properties'
+        },
+        {
+          id: 'canvas_delete',
+          name: 'Delete Canvases',
+          description: 'Remove canvases and associated data permanently'
+        }
+      ]
     },
     {
-      id: 'canvas_create',
-      name: 'Create Canvases',
-      description: 'Create new canvases and projects'
+      category: 'Sharing & Collaboration',
+      icon: 'share',
+      permissions: [
+        {
+          id: 'canvas_share',
+          name: 'Share Canvases',
+          description: 'Share canvases with others and manage access permissions'
+        },
+        {
+          id: 'canvas_comment',
+          name: 'Comment on Canvases',
+          description: 'Add comments and feedback on canvas elements'
+        },
+        {
+          id: 'canvas_collaborate',
+          name: 'Real-time Collaboration',
+          description: 'Participate in real-time collaborative editing sessions'
+        }
+      ]
     },
     {
-      id: 'canvas_edit',
-      name: 'Edit Canvases',
-      description: 'Modify canvas content, structure, and properties'
-    },
-    {
-      id: 'canvas_delete',
-      name: 'Delete Canvases',
-      description: 'Remove canvases and associated data permanently'
-    },
-    {
-      id: 'canvas_share',
-      name: 'Share Canvases',
-      description: 'Share canvases with others and manage access permissions'
-    },
-    {
-      id: 'canvas_export',
-      name: 'Export Canvases',
-      description: 'Export canvases to various formats and download data'
-    },
-    {
-      id: 'canvas_comment',
-      name: 'Comment on Canvases',
-      description: 'Add comments and feedback on canvas elements'
-    },
-    {
-      id: 'canvas_collaborate',
-      name: 'Real-time Collaboration',
-      description: 'Participate in real-time collaborative editing sessions'
+      category: 'Export & Integration',
+      icon: 'download',
+      permissions: [
+        {
+          id: 'canvas_export',
+          name: 'Export Canvases',
+          description: 'Export canvases to various formats and download data'
+        }
+      ]
     }
   ]
 
   const tabs = [
     { id: 'profile', label: 'Profile', icon: 'person' },
     { id: 'general', label: 'General', icon: 'settings' },
-    { id: 'users', label: 'Users', icon: 'group' },
-    { id: 'teams', label: 'Teams', icon: 'group' },
-    { id: 'roles', label: 'Roles', icon: 'admin_panel_settings' },
-    { id: 'tokens', label: 'Tokens', icon: 'key' },
-    { id: 'integrations', label: 'Integrations', icon: 'extension' },
-    { id: 'billing', label: 'Billing', icon: 'credit_card' },
-    { id: 'security', label: 'Security', icon: 'security' },
+    { id: 'members', label: 'Members', icon: 'group' },
+    { id: 'groups', label: 'Groups', icon: 'group' },
+    { id: 'roles', label: 'Roles', icon: 'admin_panel_settings' }
   ]
 
   const renderTabContent = () => {
@@ -441,27 +639,26 @@ export function OrganizationSettings({
                       placeholder="Enter role name"
                       value={newRoleName}
                       onChange={(e) => setNewRoleName(e.target.value)}
-                      className="max-w-md"
+                      className="max-w-lg"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                       Description
                     </label>
-                    <Input
-                      type="text"
+                    <Textarea
                       placeholder="Describe what this role can do"
                       value={newRoleDescription}
                       onChange={(e) => setNewRoleDescription(e.target.value)}
                       className="max-w-lg"
                     />
                   </div>
-                </div>
+                
 
                 {/* Permissions */}
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-                  <div className="mb-4">
-                    <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+               
+                  <div className="pt-4 mb-4">
+                    <Subheading level={2} className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
                       {activeRoleTab === 'organization' ? 'Organization' : 'Canvas'} Permissions
                     </Subheading>
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
@@ -469,13 +666,23 @@ export function OrganizationSettings({
                     </Text>
                   </div>
                   
-                  <div className="space-y-4">
-                    {(activeRoleTab === 'organization' ? organizationPermissions : canvasPermissions).map((permission) => (
-                        <CheckboxField key={permission.id}>
-                          <Checkbox name={permission.id} value=" " />
-                          <Label>{permission.name}</Label>
-                          <Description>{permission.description}</Description>
-                        </CheckboxField>
+                  <div className="space-y-6">
+                    {(activeRoleTab === 'organization' ? organizationPermissions : canvasPermissions).map((category) => (
+                      <div key={category.category} className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <MaterialSymbol name={category.icon} size="sm" className="text-zinc-600 dark:text-zinc-400" />
+                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
+                        </div>
+                        <div className="space-y-3 ml-8">
+                          {category.permissions.map((permission) => (
+                            <CheckboxField key={permission.id}>
+                              <Checkbox name={permission.id} value=" " />
+                              <Label>{permission.name}</Label>
+                              <Description>{permission.description}</Description>
+                            </CheckboxField>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -507,13 +714,10 @@ export function OrganizationSettings({
             <div className="flex items-center justify-between">
               <div>
                 <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-1">
-                  Role Management
+                  Roles
                 </Heading>
               </div>
-              <Button color="blue" className='flex items-center' onClick={handleCreateRole}>
-                <MaterialSymbol name="add" />
-                {buttonText}
-              </Button>
+              
             </div>
 
             {/* Role Tabs */}
@@ -523,9 +727,18 @@ export function OrganizationSettings({
               onTabChange={(tabId) => setActiveRoleTab(tabId as 'organization' | 'canvas')}
               variant="underline"
             />
-
+            
             {/* Roles Table */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
+              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+                <InputGroup>
+                  <Input name="search" placeholder="Search Teams…" aria-label="Search" className="w-xs" />
+                </InputGroup>
+                <Button color="blue" className='flex items-center' onClick={handleCreateRole}>
+                  <MaterialSymbol name="add" />
+                  {buttonText}
+                </Button>
+              </div>
               {/* Table Header */}
               <div className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
                 <div className="grid grid-cols-4 gap-4 px-6 py-3">
@@ -579,13 +792,13 @@ export function OrganizationSettings({
           </div>
         )
 
-      case 'users':
+      case 'members':
         return (
           <div className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
               
               <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-              Users
+              members
             </Heading>
             </div>
 
@@ -594,7 +807,7 @@ export function OrganizationSettings({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                    Add Users
+                    Add members
                   </Subheading>
                   
                 </div>
@@ -616,7 +829,7 @@ export function OrganizationSettings({
               </div>
             </div>
 
-            {/* Users List */}
+            {/* members List */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
               <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
                 <div className="flex items-center justify-between">
@@ -641,7 +854,7 @@ export function OrganizationSettings({
 
               {/* Table Body */}
               <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {users.map((user) => (
+                {members.map((user) => (
                   <div key={user.id} className="grid grid-cols-5 gap-4 px-6 py-4 items-center">
                     <div className="flex items-center gap-3">
                       <Avatar
@@ -708,7 +921,7 @@ export function OrganizationSettings({
           </div>
         )
 
-      case 'teams':
+      case 'groups':
         if (selectedTeam) {
           // Team detail view
           const teamMembers = getTeamMembers(selectedTeam.id)
@@ -735,7 +948,7 @@ export function OrganizationSettings({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                    Add Users
+                    Add members
                   </Subheading>
                   
                 </div>
@@ -853,18 +1066,19 @@ export function OrganizationSettings({
               <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
                 Teams
               </Heading>
-              <Button color="blue" className='flex items-center'>
-                <MaterialSymbol name="add" />
-                Create New Team
-              </Button>
+              
             </div>
 
             {/* Teams Table View */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
                 <InputGroup>
                   <Input name="search" placeholder="Search Teams…" aria-label="Search" className="w-xs" />
                 </InputGroup>
+                <Button color="blue" className='flex items-center'>
+                  <MaterialSymbol name="add" />
+                  Create New Team
+                </Button>
               </div>
 
               {/* Table Header */}
@@ -880,7 +1094,7 @@ export function OrganizationSettings({
 
               {/* Table Body */}
               <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {teams.map((team) => (
+                {groups.map((team) => (
                   <div 
                     key={team.id} 
                     className="grid grid-cols-5 gap-4 px-6 py-4 items-center hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer transition-colors"
@@ -915,7 +1129,7 @@ export function OrganizationSettings({
                     </div>
                     <div className="flex justify-end">
                       <Dropdown>
-                        <DropdownButton plain onClick={(e) => e.stopPropagation()}>
+                        <DropdownButton plain onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                           <MaterialSymbol name="more_vert" size="sm" />
                         </DropdownButton>
                         <DropdownMenu>
@@ -980,53 +1194,7 @@ export function OrganizationSettings({
           </div>
         )
 
-      case 'billing':
-        return (
-          <div className="space-y-6">
-            <Subheading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-              Billing & Subscription
-            </Subheading>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-              <Text className="text-center text-zinc-500 dark:text-zinc-400">
-                Billing settings would go here...
-              </Text>
-            </div>
-          </div>
-        )
-
-      case 'security':
-        return (
-          <div className="space-y-6">
-            <Subheading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-              Security Settings
-            </Subheading>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-              <Text className="text-center text-zinc-500 dark:text-zinc-400">
-                Security settings would go here...
-              </Text>
-            </div>
-          </div>
-        )
-
-      case 'tokens':
-        return (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <Subheading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                API Tokens
-              </Subheading>
-              <Button color="blue">
-                <MaterialSymbol name="add" />
-                Create Token
-              </Button>
-            </div>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-              <Text className="text-center text-zinc-500 dark:text-zinc-400">
-                No API tokens created yet.
-              </Text>
-            </div>
-          </div>
-        )
+      
 
       case 'integrations':
         return (
@@ -1088,9 +1256,9 @@ export function OrganizationSettings({
               Profile settings
             </button>
             <button
-              onClick={() => setActiveTab('profile')}
+              onClick={() => setActiveTab('api_token')}
               className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'profile'
+                activeTab === 'api_token'
                   ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white'
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
               }`}
