@@ -18,6 +18,14 @@ import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Description, Label } from './lib/Fieldset/fieldset'
 import { ControlledTabs, Tabs, type Tab } from './lib/Tabs/tabs'
 import { Textarea } from './lib/Textarea/textarea'
+import { 
+  Table, 
+  TableHead, 
+  TableBody, 
+  TableRow, 
+  TableHeader, 
+  TableCell 
+} from './lib/Table/table'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -786,63 +794,66 @@ export function OrganizationSettings({
             
             {/* Roles Table */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+              <div className="px-6 py-4 flex items-center justify-between">
                 <InputGroup>
-                  <Input name="search" placeholder="Search Teams…" aria-label="Search" className="w-xs" />
+                  <Input name="search" placeholder="Search Roles…" aria-label="Search" className="w-xs" />
                 </InputGroup>
                 <Button color="blue" className='flex items-center' onClick={handleCreateRole}>
                   <MaterialSymbol name="add" />
                   {buttonText}
                 </Button>
               </div>
-              {/* Table Header */}
-              <div className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                <div className="grid grid-cols-4 gap-4 px-6 py-3">
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Role name</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Permissions</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Status</div>
-                  <div></div>
-                </div>
-              </div>
-
-              {/* Table Body */}
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {currentRoles.map((role) => (
-                  <div key={role.id} className="grid grid-cols-4 gap-4 px-6 py-4 items-center">
-                    <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                      {role.name}
-                    </div>
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {role.permissions}
-                    </div>
-                    <div>
-                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                        {role.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-end">
-                      <Dropdown>
-                        <DropdownButton plain>
-                          <MaterialSymbol name="more_vert" size="sm" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          <DropdownItem>
-                            <MaterialSymbol name="edit" />
-                            Edit
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="copy" />
-                            Duplicate
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="delete" />
-                            Delete
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </div>
-                ))}
+              <div className="px-6">
+                <Table dense>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>Role name</TableHeader>
+                      <TableHeader>Permissions</TableHeader>
+                      <TableHeader>Status</TableHeader>
+                      <TableHeader></TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {currentRoles.map((role) => (
+                      <TableRow key={role.id}>
+                        <TableCell className="font-medium">
+                          {role.name}
+                        </TableCell>
+                        <TableCell>
+                          {role.permissions}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                            {role.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <Dropdown>
+                              <DropdownButton  plain>
+                                <MaterialSymbol name="more_vert" size="sm" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>
+                                  <MaterialSymbol name="edit" />
+                                  Edit
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="copy" />
+                                  Duplicate
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="delete" />
+                                  Delete
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </div>
@@ -853,7 +864,7 @@ export function OrganizationSettings({
           <div className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
               
-              <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+            <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
               members
             </Heading>
             </div>
@@ -876,102 +887,113 @@ export function OrganizationSettings({
                   placeholder="Enter email address"
                   className="flex-1"
                 />
-                <select className="border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-sm">
-                  <option>Member</option>
-                  <option>Admin</option>
-                  <option>Owner</option>
-                </select>
+                <Dropdown>
+                  <DropdownButton  outline className="flex items-center text-sm">
+                    Member
+                    <MaterialSymbol name="keyboard_arrow_down" />
+                  </DropdownButton>
+                  <DropdownMenu>
+                    <DropdownItem>Member</DropdownItem>
+                    <DropdownItem>Admin</DropdownItem>
+                    <DropdownItem>Owner</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
                 <Button color="blue">Send Invite</Button>
               </div>
             </div>
 
-            {/* members List */}
+            {/* Members List */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+              <div className="px-6 py-4 ">
                 <div className="flex items-center justify-between">
-                <InputGroup>
-                    <Input name="search" placeholder="Search&hellip;" aria-label="Search" className="w-xs" />
+                  <InputGroup>
+                    <Input name="search" placeholder="Search members…" aria-label="Search" className="w-xs" />
                   </InputGroup>
-                  
-                  
                 </div>
               </div>
-
-              {/* Table Header */}
-              <div className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                <div className="grid grid-cols-5 gap-4 px-6 py-3">
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Name</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Email</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Role</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Status</div>
-                  <div></div>
-                </div>
-              </div>
-
-              {/* Table Body */}
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {members.map((user) => (
-                  <div key={user.id} className="grid grid-cols-5 gap-4 px-6 py-4 items-center">
-                    <div className="flex items-center gap-3">
-                      <Avatar
-                        src={user.avatar}
-                        initials={user.initials}
-                        className="size-8"
-                      />
-                      <div>
-                        <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                          {user.name}
-                        </div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Last active: {user.lastActive}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {user.email}
-                    </div>
-                    <div>
-                      <select 
-                        defaultValue={user.role}
-                        className="text-sm border border-zinc-300 dark:border-zinc-600 rounded-md px-2 py-1 bg-white dark:bg-zinc-800"
-                      >
-                        <option>Owner</option>
-                        <option>Admin</option>
-                        <option>Member</option>
-                      </select>
-                    </div>
-                    <div>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        user.status === 'Active'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                      }`}>
-                        {user.status}
-                      </span>
-                    </div>
-                    <div className="flex justify-end">
-                      <Dropdown>
-                        <DropdownButton plain>
-                          <MaterialSymbol name="more_vert" size="sm" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          <DropdownItem>
-                            <MaterialSymbol name="edit" />
-                            Edit
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="block" />
-                            Suspend
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="delete" />
-                            Remove
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </div>
-                ))}
+              <div className="px-6">
+                <Table dense>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>Name</TableHeader>
+                      <TableHeader>Email</TableHeader>
+                      <TableHeader>Role</TableHeader>
+                      <TableHeader>Status</TableHeader>
+                      <TableHeader></TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {members.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar
+                              src={user.avatar}
+                              initials={user.initials}
+                              className="size-8"
+                            />
+                            <div>
+                              <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                                {user.name}
+                              </div>
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Last active: {user.lastActive}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {user.email}
+                        </TableCell>
+                        <TableCell>
+                          <Dropdown>
+                            <DropdownButton  outline className="flex items-center gap-2 text-sm">
+                              {user.role}
+                              <MaterialSymbol name="keyboard_arrow_down" />
+                            </DropdownButton>
+                            <DropdownMenu>
+                              <DropdownItem>Owner</DropdownItem>
+                              <DropdownItem>Admin</DropdownItem>
+                              <DropdownItem>Member</DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            user.status === 'Active'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                          }`}>
+                            {user.status}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <Dropdown>
+                              <DropdownButton  plain className="flex items-center gap-2 text-sm">
+                                <MaterialSymbol name="more_vert" size="sm" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>
+                                  <MaterialSymbol name="edit" />
+                                  Edit
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="block" />
+                                  Suspend
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="delete" />
+                                  Remove
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </div>
@@ -1017,98 +1039,110 @@ export function OrganizationSettings({
                   placeholder="Enter email address"
                   className="flex-1"
                 />
-                <select className="border border-zinc-300 dark:border-zinc-600 rounded-md px-3 py-2 bg-white dark:bg-zinc-800 text-sm">
-                  <option>Member</option>
-                  <option>Admin</option>
-                  <option>Owner</option>
-                </select>
+                <Dropdown>
+                  <DropdownButton  outline className="flex items-center gap-2 text-sm">
+                    Member
+                    <MaterialSymbol name="keyboard_arrow_down" />
+                  </DropdownButton>
+                  <DropdownMenu>
+                    <DropdownItem>Member</DropdownItem>
+                    <DropdownItem>Admin</DropdownItem>
+                    <DropdownItem>Owner</DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
                 <Button color="blue">Send Invite</Button>
               </div>
             </div>
               {/* Team members table */}
               <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+                <div className="px-6 py-4 ">
                   <div className="flex items-center justify-between">
                     <InputGroup>
-                      <Input name="search" placeholder="Search&hellip;" aria-label="Search" className="w-xs" />
+                      <Input name="search" placeholder="Search team members…" aria-label="Search" className="w-xs" />
                     </InputGroup>
-                    
                   </div>
                 </div>
-
-                {/* Table Header */}
-                <div className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                  <div className="grid grid-cols-5 gap-4 px-6 py-3">
-                    <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Name</div>
-                    <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Email</div>
-                    <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Role</div>
-                    <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Status</div>
-                    <div></div>
-                  </div>
-                </div>
-
-                {/* Table Body */}
-                <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                  {teamMembers.map((member) => (
-                    <div key={member.id} className="grid grid-cols-5 gap-4 px-6 py-4 items-center">
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          src={member.avatar}
-                          initials={member.initials}
-                          className="size-8"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                            {member.name}
-                          </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Joined {member.joinedDate}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {member.email}
-                      </div>
-                      <div>
-                        <select 
-                          defaultValue={member.role}
-                          className="text-sm border border-zinc-300 dark:border-zinc-600 rounded-md px-2 py-1 bg-white dark:bg-zinc-800"
-                        >
-                          <option>Team Lead</option>
-                          <option>Senior Developer</option>
-                          <option>Developer</option>
-                          <option>Designer</option>
-                          <option>DevOps Engineer</option>
-                        </select>
-                      </div>
-                      <div>
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                          {member.status}
-                        </span>
-                      </div>
-                      <div className="flex justify-end">
-                        <Dropdown>
-                          <DropdownButton plain>
-                            <MaterialSymbol name="more_vert" size="sm" />
-                          </DropdownButton>
-                          <DropdownMenu>
-                            <DropdownItem>
-                              <MaterialSymbol name="edit" />
-                              Edit Member
-                            </DropdownItem>
-                            <DropdownItem>
-                              <MaterialSymbol name="security" />
-                              Change Role
-                            </DropdownItem>
-                            <DropdownItem>
-                              <MaterialSymbol name="person_remove" />
-                              Remove from Team
-                            </DropdownItem>
-                          </DropdownMenu>
-                        </Dropdown>
-                      </div>
-                    </div>
-                  ))}
+                <div className="px-6">
+                  <Table dense>
+                    <TableHead>
+                      <TableRow>
+                        <TableHeader>Name</TableHeader>
+                        <TableHeader>Email</TableHeader>
+                        <TableHeader>Role</TableHeader>
+                        <TableHeader>Status</TableHeader>
+                        <TableHeader></TableHeader>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {teamMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <Avatar
+                                src={member.avatar}
+                                initials={member.initials}
+                                className="size-8"
+                              />
+                              <div>
+                                <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                                  {member.name}
+                                </div>
+                                <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                  Joined {member.joinedDate}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {member.email}
+                          </TableCell>
+                          <TableCell>
+                            <Dropdown>
+                              <DropdownButton  outline className="flex items-center gap-2 text-sm">
+                                {member.role}
+                                <MaterialSymbol name="keyboard_arrow_down" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>Team Lead</DropdownItem>
+                                <DropdownItem>Senior Developer</DropdownItem>
+                                <DropdownItem>Developer</DropdownItem>
+                                <DropdownItem>Designer</DropdownItem>
+                                <DropdownItem>DevOps Engineer</DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
+                              {member.status}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex justify-end">
+                              <Dropdown>
+                                <DropdownButton  plain className="flex items-center gap-2 text-sm">
+                                  <MaterialSymbol name="more_vert" size="sm" />
+                                </DropdownButton>
+                                <DropdownMenu>
+                                  <DropdownItem>
+                                    <MaterialSymbol name="edit" />
+                                    Edit Member
+                                  </DropdownItem>
+                                  <DropdownItem>
+                                    <MaterialSymbol name="security" />
+                                    Change Role
+                                  </DropdownItem>
+                                  <DropdownItem>
+                                    <MaterialSymbol name="person_remove" />
+                                    Remove from Team
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </div>
@@ -1127,93 +1161,102 @@ export function OrganizationSettings({
 
             {/* Teams Table View */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
+              <div className="px-6 py-4  flex items-center justify-between">
                 <InputGroup>
-                  <Input name="search" placeholder="Search Teams…" aria-label="Search" className="w-xs" />
+                  <Input name="search" placeholder="Search Groups&hellip;" aria-label="Search" className="w-xs" />
                 </InputGroup>
                 <Button color="blue" className='flex items-center'>
                   <MaterialSymbol name="add" />
-                  Create New Team
+                  Create New Group
                 </Button>
               </div>
-
-              {/* Table Header */}
-              <div className="border-b border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50">
-                <div className="grid grid-cols-5 gap-4 px-6 py-3">
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Team name</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Description</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Members</div>
-                  <div className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Role</div>
-                  <div></div>
-                </div>
-              </div>
-
-              {/* Table Body */}
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
-                {groups.map((team) => (
-                  <div 
-                    key={team.id} 
-                    className="grid grid-cols-5 gap-4 px-6 py-4 items-center hover:bg-zinc-50 dark:hover:bg-zinc-700/50 cursor-pointer transition-colors"
-                    onClick={() => handleTeamClick(team)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Avatar className='w-9' square initials={team.name.charAt(0)} />
-                      <div>
-                        <Link href={`#`} className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                          {team.name}
-                        </Link>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Created {team.created}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {team.description}
-                    </div>
-                    <div className="text-sm text-zinc-600 dark:text-zinc-400">
-                      {team.memberCount} members
-                    </div>
-                    <div>
-                      <select 
-                        defaultValue={team.role}
-                        className="text-sm border border-zinc-300 dark:border-zinc-600 rounded-md px-2 py-1 bg-white dark:bg-zinc-800"
-                        onClick={(e) => e.stopPropagation()}
+              <div className="px-6">
+                <Table dense>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>Team name</TableHeader>
+                      <TableHeader>Description</TableHeader>
+                      <TableHeader>Members</TableHeader>
+                      <TableHeader>Role</TableHeader>
+                      <TableHeader></TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {groups.map((team) => (
+                      <TableRow 
+                        key={team.id} 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleTeamClick(team)}
                       >
-                        <option>Admin</option>
-                        <option>Member</option>
-                      </select>
-                    </div>
-                    <div className="flex justify-end">
-                      <Dropdown>
-                        <DropdownButton plain onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                          <MaterialSymbol name="more_vert" size="sm" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          <DropdownItem onClick={() => handleTeamClick(team)}>
-                            <MaterialSymbol name="group" />
-                            View Members
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="edit" />
-                            Edit Team
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="person_add" />
-                            Add Members
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="security" />
-                            Change Role
-                          </DropdownItem>
-                          <DropdownItem>
-                            <MaterialSymbol name="delete" />
-                            Delete Team
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </div>
-                  </div>
-                ))}
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <Avatar className='w-9' square initials={team.name.charAt(0)} />
+                            <div>
+                              <Link href={`#`} className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400">
+                                {team.name}
+                              </Link>
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                                Created {team.created}
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {team.description}
+                        </TableCell>
+                        <TableCell>
+                          {team.memberCount} members
+                        </TableCell>
+                        <TableCell>
+                          <Dropdown>
+                            <DropdownButton  outline 
+                              className="flex items-center gap-2 text-sm"
+                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                            >
+                              {team.role}
+                              <MaterialSymbol name="keyboard_arrow_down" />
+                            </DropdownButton>
+                            <DropdownMenu>
+                              <DropdownItem>Admin</DropdownItem>
+                              <DropdownItem>Member</DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            <Dropdown>
+                              <DropdownButton  plain onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                                <MaterialSymbol name="more_vert" size="sm" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem onClick={() => handleTeamClick(team)}>
+                                  <MaterialSymbol name="group" />
+                                  View Members
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="edit" />
+                                  Edit Team
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="person_add" />
+                                  Add Members
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="security" />
+                                  Change Role
+                                </DropdownItem>
+                                <DropdownItem>
+                                  <MaterialSymbol name="delete" />
+                                  Delete Team
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </div>
           </div>
@@ -1233,18 +1276,36 @@ export function OrganizationSettings({
                 <Input
                   type="text"
                   defaultValue={currentOrganization.name}
-                  className="max-w-md"
+                  className="max-w-lg"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Description
                 </label>
-                <Input
-                  type="text"
+                <Textarea
                   placeholder="Enter organization description"
                   className="max-w-lg"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                  Company Logo
+                </label>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center justify-center w-16 h-16 bg-zinc-100 dark:bg-zinc-700 rounded-lg border border-zinc-200 dark:border-zinc-600">
+                    <MaterialSymbol name="business" className="text-zinc-400 dark:text-zinc-500" />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button plain className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                      <MaterialSymbol name="upload" size="sm" className="mr-2" />
+                      Upload logo
+                    </Button>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Recommended: Square image, at least 256x256px
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
