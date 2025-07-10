@@ -182,14 +182,41 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 			return nil, fmt.Errorf("missing approval settings")
 		}
 
-		if condition.Approval.Count == 0 {
-			return nil, fmt.Errorf("invalid approval condition: count must be greater than 0")
+		if condition.Approval.Count == 0 && len(condition.Approval.RequiredFrom) == 0 {
+			return nil, fmt.Errorf("invalid approval condition: count must be greater than 0 or required_from must be specified")
+		}
+
+		var requirements []models.ApprovalRequirement
+		for _, req := range condition.Approval.RequiredFrom {
+			if req.Count == 0 {
+				return nil, fmt.Errorf("invalid approval requirement: count must be greater than 0")
+			}
+
+			var reqType string
+			switch req.Type {
+			case pb.ApprovalRequirement_TYPE_USER:
+				reqType = models.ApprovalRequirementTypeUser
+			case pb.ApprovalRequirement_TYPE_ROLE:
+				reqType = models.ApprovalRequirementTypeRole
+			case pb.ApprovalRequirement_TYPE_GROUP:
+				reqType = models.ApprovalRequirementTypeGroup
+			default:
+				return nil, fmt.Errorf("invalid approval requirement type")
+			}
+
+			requirements = append(requirements, models.ApprovalRequirement{
+				Type:  reqType,
+				Name:  req.Name,
+				ID:    req.Id,
+				Count: int(req.Count),
+			})
 		}
 
 		return &models.StageCondition{
 			Type: models.StageConditionTypeApproval,
 			Approval: &models.ApprovalCondition{
-				Count: int(condition.Approval.Count),
+				Count:        int(condition.Approval.Count),
+				RequiredFrom: requirements,
 			},
 		}, nil
 
@@ -374,10 +401,33 @@ func serializeConditions(conditions []models.StageCondition) ([]*pb.Condition, e
 func serializeCondition(condition models.StageCondition) (*pb.Condition, error) {
 	switch condition.Type {
 	case models.StageConditionTypeApproval:
+		var pbRequirements []*pb.ApprovalRequirement
+		for _, req := range condition.Approval.RequiredFrom {
+			var reqType pb.ApprovalRequirement_Type
+			switch req.Type {
+			case models.ApprovalRequirementTypeUser:
+				reqType = pb.ApprovalRequirement_TYPE_USER
+			case models.ApprovalRequirementTypeRole:
+				reqType = pb.ApprovalRequirement_TYPE_ROLE
+			case models.ApprovalRequirementTypeGroup:
+				reqType = pb.ApprovalRequirement_TYPE_GROUP
+			default:
+				return nil, fmt.Errorf("invalid approval requirement type: %s", req.Type)
+			}
+
+			pbRequirements = append(pbRequirements, &pb.ApprovalRequirement{
+				Type:  reqType,
+				Name:  req.Name,
+				Id:    req.ID,
+				Count: uint32(req.Count),
+			})
+		}
+
 		return &pb.Condition{
 			Type: pb.Condition_CONDITION_TYPE_APPROVAL,
 			Approval: &pb.ConditionApproval{
-				Count: uint32(condition.Approval.Count),
+				Count:        uint32(condition.Approval.Count),
+				RequiredFrom: pbRequirements,
 			},
 		}, nil
 

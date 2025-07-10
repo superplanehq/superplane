@@ -11,6 +11,7 @@ import (
 type User struct {
 	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	Name      string    `json:"name"`
+	Username  string    `json:"username" gorm:"unique"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -58,6 +59,12 @@ func FindUserByEmail(email string) (*User, error) {
 		Joins("JOIN account_providers ON users.id = account_providers.user_id").
 		Where("account_providers.email = ? AND account_providers.email != '' AND account_providers.email IS NOT NULL", email).
 		First(&user).Error
+	return &user, err
+}
+
+func FindUserByUsername(username string) (*User, error) {
+	var user User
+	err := database.Conn().Where("username = ?", username).First(&user).Error
 	return &user, err
 }
 

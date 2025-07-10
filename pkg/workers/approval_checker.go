@@ -64,17 +64,8 @@ func (ac *ApprovalChecker) checkUserRequirement(approvals []models.StageEventApp
 				continue
 			}
 
-			accountProviders, err := user.GetAccountProviders()
-			if err != nil {
-				ac.Logger.Warnf("Error loading account providers for user %s: %v", approval.ApprovedBy.String(), err)
-				continue
-			}
-
-			for _, provider := range accountProviders {
-				if provider.Username == requirement.Name {
-					matchingApprovals++
-					break
-				}
+			if user.Username == requirement.Name {
+				matchingApprovals++
 			}
 		}
 	}

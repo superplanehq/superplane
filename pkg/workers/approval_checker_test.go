@@ -188,3 +188,35 @@ func TestApprovalChecker_CheckUserRequirement_NilApprovedBy(t *testing.T) {
 		t.Fatalf("Expected requirement not to be satisfied with nil approver")
 	}
 }
+
+func TestApprovalChecker_CheckUserRequirement_EmptyName(t *testing.T) {
+	checker := &ApprovalChecker{
+		CanvasID: uuid.New(),
+		Logger:   log.NewEntry(log.New()),
+	}
+
+	userID := uuid.New()
+	now := time.Now()
+	approvals := []models.StageEventApproval{
+		{
+			StageEventID: uuid.New(),
+			ApprovedAt:   &now,
+			ApprovedBy:   &userID,
+		},
+	}
+
+	requirement := models.ApprovalRequirement{
+		Type:  models.ApprovalRequirementTypeUser,
+		Name:  "", // Empty name should not match
+		Count: 1,
+	}
+
+	satisfied, err := checker.checkUserRequirement(approvals, requirement)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if satisfied {
+		t.Fatalf("Expected requirement not to be satisfied with empty name")
+	}
+}
