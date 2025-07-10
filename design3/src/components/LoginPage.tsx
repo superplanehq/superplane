@@ -12,9 +12,6 @@ interface LoginPageProps {
 }
 
 export function LoginPage({ onLogin }: LoginPageProps = {}) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,7 +22,7 @@ export function LoginPage({ onLogin }: LoginPageProps = {}) {
     await new Promise(resolve => setTimeout(resolve, 1000))
     
     console.log('Login attempt:', { email, password, rememberMe })
-    setIsLoading(false)
+    //setIsLoading(false)
     
     // Call onLogin callback if provided
     if (onLogin) {
@@ -40,7 +37,7 @@ export function LoginPage({ onLogin }: LoginPageProps = {}) {
     await new Promise(resolve => setTimeout(resolve, 500))
     
     console.log('GitHub login successful')
-    setIsLoading(false)
+    //setIsLoading(false)
     
     // Call onLogin callback if provided
     if (onLogin) {

@@ -4,7 +4,9 @@ import { Avatar } from '../Avatar/avatar'
 import { Badge } from '../Badge/badge'
 import { Text } from '../Text/text'
 import { Heading } from '../Heading/heading'
+import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import clsx from 'clsx'
+import { Link } from '../Link/link'
 
 export interface User {
   id: string
@@ -29,6 +31,12 @@ export interface NavigationOrgProps {
   onUserMenuAction?: (action: 'profile' | 'settings' | 'signout') => void
   onOrganizationMenuAction?: (action: 'settings' | 'billing' | 'members') => void
   className?: string
+  breadcrumbs?: {
+    parentLabel: string
+    parentIcon: string
+    parentLink: string
+    currentLabel: string
+  }
 }
 
 export function NavigationOrg({
@@ -37,7 +45,8 @@ export function NavigationOrg({
   onHelpClick,
   onUserMenuAction,
   onOrganizationMenuAction,
-  className
+  className,
+  breadcrumbs
 }: NavigationOrgProps) {
   const [isMainMenuOpen, setIsMainMenuOpen] = useState(false)
 
@@ -48,13 +57,31 @@ export function NavigationOrg({
     )}>
       <div className="p-2">
         <div className="flex justify-between items-center">
-          {/* Logo */}
-          <div className="flex items-center">
+          {/* Logo and Breadcrumbs */}
+          <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
               <Heading level={1} className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-0 ml-3">
                 SuperPlane
               </Heading>
             </div>
+            
+            {/* Breadcrumbs */}
+            {breadcrumbs && (
+              <nav className="flex items-center space-x-2 text-sm ml-2">
+                <div className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mr-4" />
+                <Link
+                  href={breadcrumbs.parentLink}
+                  className="text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-100 transition-colors flex items-center"
+                >
+                  <MaterialSymbol name={breadcrumbs.parentIcon} className="text-blue-700 mr-1" size="sm" />
+                  {breadcrumbs.parentLabel}
+                </Link>
+                <span className="text-zinc-400">/</span>
+                <span className="text-zinc-900 dark:text-zinc-100 font-medium">
+                  {breadcrumbs.currentLabel}
+                </span>
+              </nav>
+            )}
           </div>
 
           {/* Right side */}

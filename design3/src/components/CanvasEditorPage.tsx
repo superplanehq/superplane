@@ -14,6 +14,7 @@ import {
   Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import { NavigationOrg, type User, type Organization } from './lib/Navigation/navigation-org';
 import { WorkflowNode, WorkflowEdge } from '../types';
 import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
@@ -117,6 +118,51 @@ export function CanvasEditorPage({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showMiniMap, setShowMiniMap] = useState(true)
+
+  // Mock user and organization data
+  const currentUser: User = {
+    id: '1',
+    name: 'John Doe',
+    email: 'john@superplane.com',
+    initials: 'JD',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
+  }
+
+  const currentOrganization: Organization = {
+    id: '1',
+    name: 'Acme Corporation',
+    plan: 'Pro Plan',
+    initials: 'AC',
+  }
+
+  // Navigation handlers
+  const handleHelpClick = () => {
+    console.log('Opening help documentation...')
+  }
+
+  const handleUserMenuAction = (action: 'profile' | 'settings' | 'signout') => {
+    switch (action) {
+      case 'profile':
+        console.log('Navigating to user profile...')
+        break
+      case 'settings':
+        console.log('Opening account settings...')
+        break
+      case 'signout':
+        console.log('Signing out...')
+        break
+    }
+  }
+
+  const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members') => {
+    if (action === 'settings') {
+      // Navigate to settings page
+      window.history.pushState(null, '', '/settings')
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    } else {
+      console.log(`Organization action: ${action}`)
+    }
+  }
 
   // Get canvas name based on ID
   const getCanvasName = (id: string) => {
@@ -223,42 +269,40 @@ export function CanvasEditorPage({
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          {/* Breadcrumbs */}
-          <nav className="flex items-center space-x-2 text-sm">
-            <button
-              onClick={onBack}
-              className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
-            >
-              Canvases
-            </button>
-            <MaterialSymbol name="chevron_right" className="text-zinc-400" size="sm" />
-            <span className="text-zinc-900 dark:text-zinc-100 font-medium">
-              {getCanvasName(canvasId)}
-            </span>
-          </nav>
-          
-          {/* Actions */}
-          <div className="flex items-center space-x-3">
-            <button
-              onClick={handleShare}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
-            >
-              <MaterialSymbol name="share" size="sm" />
-              Share
-            </button>
-            <button
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              <MaterialSymbol name="save" size="sm" />
-              Save
-            </button>
-          </div>
+      {/* Navigation */}
+      <NavigationOrg
+        user={currentUser}
+        organization={currentOrganization}
+        breadcrumbs={{
+          parentLabel: "Canvases",
+          parentIcon: "automation",
+          parentLink: "/canvases",
+          currentLabel: getCanvasName(canvasId),
+        }}
+        onHelpClick={handleHelpClick}
+        onUserMenuAction={handleUserMenuAction}
+        onOrganizationMenuAction={handleOrganizationMenuAction}
+      />
+
+      {/* Action Bar */}
+      <div className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-3">
+        <div className="flex items-center justify-end space-x-3">
+          <button
+            onClick={handleShare}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
+          >
+            <MaterialSymbol name="share" size="sm" />
+            Share
+          </button>
+          <button
+            onClick={handleSave}
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            <MaterialSymbol name="save" size="sm" />
+            Save
+          </button>
         </div>
-      </header>
+      </div>
 
       {/* React Flow Canvas */}
       <div className="flex-1 flex">

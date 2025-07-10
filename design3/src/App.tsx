@@ -16,7 +16,11 @@ import type { NavigationLink } from './components/lib/Navigation/navigation-vert
 import './App.css'
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  // Check localStorage for existing authentication state
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    const savedAuth = localStorage.getItem('superplane_auth')
+    return savedAuth === 'true'
+  })
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
 
   // Central navigation links configuration
@@ -72,29 +76,47 @@ function App() {
     setCurrentPath('/settings')
   }
 
+  // Handle user login
+  const handleLogin = () => {
+    setIsLoggedIn(true)
+    localStorage.setItem('superplane_auth', 'true')
+    // Optionally store additional user data
+    localStorage.setItem('superplane_login_timestamp', new Date().toISOString())
+  }
+
+  // Handle user logout
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    localStorage.removeItem('superplane_auth')
+    localStorage.removeItem('superplane_login_timestamp')
+    // Navigate to root path on logout
+    window.history.pushState(null, '', '/')
+    setCurrentPath('/')
+  }
+
 
   if (!isLoggedIn) {
-    return <LoginPage onLogin={() => setIsLoggedIn(true)} />
+    return <LoginPage onLogin={handleLogin} />
   }
 
   // Route based on current path
   if (currentPath === '/org-sidebar') {
-    return <OrganizationPageSidebar onSignOut={() => setIsLoggedIn(false)} />
+    return <OrganizationPageSidebar onSignOut={handleLogout} />
   }
 
   if (currentPath === '/org-tabs') {
-    return <OrganizationPage onSignOut={() => setIsLoggedIn(false)} />
+    return <OrganizationPage onSignOut={handleLogout} />
   }
 
   if (currentPath.startsWith('/workspace/')) {
     // For now, route to sidebar organization page for workspaces
-    return <OrganizationPageSidebar onSignOut={() => setIsLoggedIn(false)} />
+    return <OrganizationPageSidebar onSignOut={handleLogout} />
   }
 
   if (currentPath === '/studio') {
     return (
       <StudioPage 
-        onSignOut={() => setIsLoggedIn(false)} 
+        onSignOut={handleLogout} 
       />
     )
   }
@@ -102,7 +124,7 @@ function App() {
   if (currentPath === '/administration') {
     return (
       <AdministrationPage 
-        onSignOut={() => setIsLoggedIn(false)} 
+        onSignOut={handleLogout} 
       />
     )
   }
@@ -110,7 +132,7 @@ function App() {
   if (currentPath === '/settings') {
     return (
       <SettingsPage 
-        onSignOut={() => setIsLoggedIn(false)}
+        onSignOut={handleLogout}
         navigationLinks={navigationLinks}
         onLinkClick={handleLinkClick}
         onConfigurationClick={handleConfigurationClick}
@@ -121,7 +143,7 @@ function App() {
   if (currentPath === '/canvases') {
     return (
       <CanvasesPage 
-        onSignOut={() => setIsLoggedIn(false)}
+        onSignOut={handleLogout}
         navigationLinks={navigationLinks}
         onLinkClick={handleLinkClick}
         onConfigurationClick={handleConfigurationClick}
@@ -135,10 +157,6 @@ function App() {
     return (
       <CanvasEditorPage 
         canvasId={canvasId}
-        onSignOut={() => setIsLoggedIn(false)}
-        navigationLinks={navigationLinks}
-        onLinkClick={handleLinkClick}
-        onConfigurationClick={handleConfigurationClick}
         onBack={() => {
           window.history.pushState(null, '', '/canvases')
           setCurrentPath('/canvases')
@@ -151,7 +169,6 @@ function App() {
   if (currentPath === '/legacy-dashboard') {
     return (
       <DashboardPage 
-        onSignOut={() => setIsLoggedIn(false)} 
         onWorkspaceSelect={handleWorkspaceSelect}
       />
     )
@@ -161,10 +178,6 @@ function App() {
   if (currentPath === '/legacy-home') {
     return (
       <HomePage 
-        onSignOut={() => setIsLoggedIn(false)}
-        navigationLinks={navigationLinks}
-        onLinkClick={handleLinkClick}
-        onConfigurationClick={handleConfigurationClick}
       />
     )
   }
@@ -173,7 +186,6 @@ function App() {
   if (currentPath === '/workspaces') {
     return (
       <MainLandingPage 
-        onSignOut={() => setIsLoggedIn(false)}
         onNavigate={(page) => {
           window.history.pushState(null, '', `/${page}`)
           setCurrentPath(`/${page}`)
@@ -185,7 +197,6 @@ function App() {
   // Default to organization app after login
   return (
     <HomePage  
-      onSignOut={() => setIsLoggedIn(false)}
      
     />
   )

@@ -377,7 +377,7 @@ interface Canvas {
                       {/* Canvases Display */}
                       {viewMode === 'grid' ? (
                         /* Grid View */
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                           {filteredCanvases.map((canvas) => (
                             <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow group">
                               <div className="p-6 flex flex-col justify-between h-full">
