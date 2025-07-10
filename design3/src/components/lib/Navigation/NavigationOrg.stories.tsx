@@ -306,3 +306,58 @@ export const TabletView: Story = {
     }
   }
 }
+
+export const WithBreadcrumbs: Story = {
+  args: {
+    user: defaultUser,
+    organization: defaultOrganization,
+    breadcrumbs: [
+      { label: 'Canvases', href: '/canvases', icon: 'folder' },
+      { label: 'Canvas name', current: true }
+    ]
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Navigation with breadcrumbs showing current page location.'
+      }
+    }
+  }
+}
+
+export const DeepBreadcrumbs: Story = {
+  args: {
+    user: defaultUser,
+    organization: defaultOrganization,
+    breadcrumbs: [
+      { label: 'Teams', href: '/teams', icon: 'group' },
+      { label: 'Engineering', href: '/teams/engineering' },
+      { label: 'Frontend Team', current: true }
+    ]
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Navigation with multiple levels of breadcrumbs.'
+      }
+    }
+  }
+}
+
+export const WorkflowBreadcrumbs: Story = {
+  args: {
+    user: defaultUser,
+    organization: defaultOrganization,
+    breadcrumbs: [
+      { label: 'Workflows', href: '/workflows', icon: 'account_tree' },
+      { label: 'Customer Onboarding', current: true }
+    ]
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Navigation with workflow-specific breadcrumbs.'
+      }
+    }
+  }
+}
