@@ -20,7 +20,7 @@ var _ MappedNullable = &AuthorizationListOrganizationGroupsResponse{}
 
 // AuthorizationListOrganizationGroupsResponse struct for AuthorizationListOrganizationGroupsResponse
 type AuthorizationListOrganizationGroupsResponse struct {
-	Groups []string `json:"groups,omitempty"`
+	Groups []AuthorizationGroup `json:"groups,omitempty"`
 }
 
 // NewAuthorizationListOrganizationGroupsResponse instantiates a new AuthorizationListOrganizationGroupsResponse object
@@ -41,9 +41,9 @@ func NewAuthorizationListOrganizationGroupsResponseWithDefaults() *Authorization
 }
 
 // GetGroups returns the Groups field value if set, zero value otherwise.
-func (o *AuthorizationListOrganizationGroupsResponse) GetGroups() []string {
+func (o *AuthorizationListOrganizationGroupsResponse) GetGroups() []AuthorizationGroup {
 	if o == nil || IsNil(o.Groups) {
-		var ret []string
+		var ret []AuthorizationGroup
 		return ret
 	}
 	return o.Groups
@@ -51,7 +51,7 @@ func (o *AuthorizationListOrganizationGroupsResponse) GetGroups() []string {
 
 // GetGroupsOk returns a tuple with the Groups field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationListOrganizationGroupsResponse) GetGroupsOk() ([]string, bool) {
+func (o *AuthorizationListOrganizationGroupsResponse) GetGroupsOk() ([]AuthorizationGroup, bool) {
 	if o == nil || IsNil(o.Groups) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *AuthorizationListOrganizationGroupsResponse) HasGroups() bool {
 	return false
 }
 
-// SetGroups gets a reference to the given []string and assigns it to the Groups field.
-func (o *AuthorizationListOrganizationGroupsResponse) SetGroups(v []string) {
+// SetGroups gets a reference to the given []AuthorizationGroup and assigns it to the Groups field.
+func (o *AuthorizationListOrganizationGroupsResponse) SetGroups(v []AuthorizationGroup) {
 	o.Groups = v
 }
 

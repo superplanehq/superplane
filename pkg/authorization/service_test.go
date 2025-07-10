@@ -344,20 +344,20 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		groupName := "engineering-team"
 
 		// Create group
-		err := authService.CreateGroup(orgID, groupName, RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, DomainOrg, groupName, RoleOrgAdmin)
 		require.NoError(t, err)
 
 		// Add users to group
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 
-		err = authService.AddUserToGroup(orgID, user1, groupName)
+		err = authService.AddUserToGroup(orgID, DomainOrg, user1, groupName)
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(orgID, user2, groupName)
+		err = authService.AddUserToGroup(orgID, DomainOrg, user2, groupName)
 		require.NoError(t, err)
 
 		// Get group users
-		users, err := authService.GetGroupUsers(orgID, groupName)
+		users, err := authService.GetGroupUsers(orgID, DomainOrg, groupName)
 		require.NoError(t, err)
 		assert.Contains(t, users, user1)
 		assert.Contains(t, users, user2)
@@ -368,54 +368,58 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		assert.True(t, allowed)
 
 		// Remove user from group
-		err = authService.RemoveUserFromGroup(orgID, user1, groupName)
+		err = authService.RemoveUserFromGroup(orgID, DomainOrg, user1, groupName)
 		require.NoError(t, err)
 
 		// Verify removal
-		users, err = authService.GetGroupUsers(orgID, groupName)
+		users, err = authService.GetGroupUsers(orgID, DomainOrg, groupName)
 		require.NoError(t, err)
 		assert.NotContains(t, users, user1)
 		assert.Contains(t, users, user2)
 	})
 
 	t.Run("create group with invalid role", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, "test-group", "invalid_role")
+		err := authService.CreateGroup(orgID, DomainOrg, "test-group", "invalid_role")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
 
 	t.Run("add user to non-existent group", func(t *testing.T) {
 		userID := uuid.New().String()
-		err := authService.AddUserToGroup(orgID, userID, "non-existent-group")
+		err := authService.AddUserToGroup(orgID, DomainOrg, userID, "non-existent-group")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "does not exist")
 	})
 
 	t.Run("get groups and roles", func(t *testing.T) {
 		// Create multiple groups
-		err := authService.CreateGroup(orgID, "admins", RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, DomainOrg, "admins", RoleOrgAdmin)
 		require.NoError(t, err)
-		err = authService.CreateGroup(orgID, "viewers", RoleOrgViewer)
+		err = authService.CreateGroup(orgID, DomainOrg, "viewers", RoleOrgViewer)
 		require.NoError(t, err)
 
 		// Add users to make groups detectable
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, user1, "admins")
+		err = authService.AddUserToGroup(orgID, DomainOrg, user1, "admins")
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(orgID, user2, "viewers")
+		err = authService.AddUserToGroup(orgID, DomainOrg, user2, "viewers")
 		require.NoError(t, err)
 
 		// Get all groups
-		groups, err := authService.GetGroups(orgID)
+		groups, err := authService.GetGroups(orgID, DomainOrg)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "admins")
 		assert.Contains(t, groups, "viewers")
 
-		// Get group roles
-		roles, err := authService.GetGroupRoles(orgID, "admins")
+		// Get group role
+		role, err := authService.GetGroupRole(orgID, DomainOrg, "admins")
 		require.NoError(t, err)
-		assert.Contains(t, roles, RoleOrgAdmin)
+		assert.Equal(t, role, RoleOrgAdmin)
+
+		role, err = authService.GetGroupRole(orgID, DomainOrg, "viewers")
+		require.NoError(t, err)
+		assert.Equal(t, role, RoleOrgViewer)
 	})
 }
 
@@ -617,11 +621,11 @@ func Test__AuthService_DuplicateAssignments(t *testing.T) {
 		groupName := "duplicate-test-group"
 
 		// First creation
-		err := authService.CreateGroup(orgID, groupName, RoleOrgViewer)
+		err := authService.CreateGroup(orgID, DomainOrg, groupName, RoleOrgViewer)
 		require.NoError(t, err)
 
 		// Duplicate creation should fail
-		err = authService.CreateGroup(orgID, groupName, RoleOrgViewer)
+		err = authService.CreateGroup(orgID, DomainOrg, groupName, RoleOrgViewer)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 	})

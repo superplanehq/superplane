@@ -24,59 +24,181 @@ import (
 // AuthorizationAPIService AuthorizationAPI service
 type AuthorizationAPIService service
 
-type ApiAuthorizationAddUserToGroupRequest struct {
+type ApiAuthorizationAddUserToCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
+	canvasIdOrName string
 	groupName string
-	body *AuthorizationAddUserToGroupBody
+	body *AuthorizationAddUserToCanvasGroupBody
 }
 
-func (r ApiAuthorizationAddUserToGroupRequest) Body(body AuthorizationAddUserToGroupBody) ApiAuthorizationAddUserToGroupRequest {
+func (r ApiAuthorizationAddUserToCanvasGroupRequest) Body(body AuthorizationAddUserToCanvasGroupBody) ApiAuthorizationAddUserToCanvasGroupRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAuthorizationAddUserToGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.AuthorizationAddUserToGroupExecute(r)
+func (r ApiAuthorizationAddUserToCanvasGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationAddUserToCanvasGroupExecute(r)
 }
 
 /*
-AuthorizationAddUserToGroup Add user to group
+AuthorizationAddUserToCanvasGroup Add user to canvas group
 
-Adds a user to an organization group
+Adds a user to a group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
+ @param canvasIdOrName
  @param groupName
- @return ApiAuthorizationAddUserToGroupRequest
+ @return ApiAuthorizationAddUserToCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationAddUserToGroup(ctx context.Context, orgId string, groupName string) ApiAuthorizationAddUserToGroupRequest {
-	return ApiAuthorizationAddUserToGroupRequest{
+func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationAddUserToCanvasGroupRequest {
+	return ApiAuthorizationAddUserToCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 	}
 }
 
 // Execute executes the request
 //  @return map[string]interface{}
-func (a *AuthorizationAPIService) AuthorizationAddUserToGroupExecute(r ApiAuthorizationAddUserToGroupRequest) (map[string]interface{}, *http.Response, error) {
+func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroupExecute(r ApiAuthorizationAddUserToCanvasGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
+		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
 		localVarReturnValue  map[string]interface{}
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationAddUserToGroup")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationAddUserToCanvasGroup")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationAddUserToOrganizationGroupRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	groupName string
+	body *AuthorizationAddUserToOrganizationGroupBody
+}
+
+func (r ApiAuthorizationAddUserToOrganizationGroupRequest) Body(body AuthorizationAddUserToOrganizationGroupBody) ApiAuthorizationAddUserToOrganizationGroupRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiAuthorizationAddUserToOrganizationGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationAddUserToOrganizationGroupExecute(r)
+}
+
+/*
+AuthorizationAddUserToOrganizationGroup Add user to organization group
+
+Adds a user to a group within an organization
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiAuthorizationAddUserToOrganizationGroupRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationAddUserToOrganizationGroup(ctx context.Context, groupName string) ApiAuthorizationAddUserToOrganizationGroupRequest {
+	return ApiAuthorizationAddUserToOrganizationGroupRequest{
+		ApiService: a,
+		ctx: ctx,
+		groupName: groupName,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *AuthorizationAPIService) AuthorizationAddUserToOrganizationGroupExecute(r ApiAuthorizationAddUserToOrganizationGroupRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationAddUserToOrganizationGroup")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -268,56 +390,174 @@ func (a *AuthorizationAPIService) AuthorizationAssignRoleExecute(r ApiAuthorizat
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAuthorizationCreateGroupRequest struct {
+type ApiAuthorizationCreateCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
-	body *AuthorizationCreateGroupBody
+	canvasIdOrName string
+	body *AuthorizationCreateCanvasGroupBody
 }
 
-func (r ApiAuthorizationCreateGroupRequest) Body(body AuthorizationCreateGroupBody) ApiAuthorizationCreateGroupRequest {
+func (r ApiAuthorizationCreateCanvasGroupRequest) Body(body AuthorizationCreateCanvasGroupBody) ApiAuthorizationCreateCanvasGroupRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiAuthorizationCreateGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.AuthorizationCreateGroupExecute(r)
+func (r ApiAuthorizationCreateCanvasGroupRequest) Execute() (*AuthorizationCreateCanvasGroupResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationCreateCanvasGroupExecute(r)
 }
 
 /*
-AuthorizationCreateGroup Create group
+AuthorizationCreateCanvasGroup Create canvas group
 
-Creates a new group within an organization with a specific role
+Creates a new group within a canvas with a specific role
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
- @return ApiAuthorizationCreateGroupRequest
+ @param canvasIdOrName
+ @return ApiAuthorizationCreateCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationCreateGroup(ctx context.Context, orgId string) ApiAuthorizationCreateGroupRequest {
-	return ApiAuthorizationCreateGroupRequest{
+func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroup(ctx context.Context, canvasIdOrName string) ApiAuthorizationCreateCanvasGroupRequest {
+	return ApiAuthorizationCreateCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
+		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return map[string]interface{}
-func (a *AuthorizationAPIService) AuthorizationCreateGroupExecute(r ApiAuthorizationCreateGroupRequest) (map[string]interface{}, *http.Response, error) {
+//  @return AuthorizationCreateCanvasGroupResponse
+func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroupExecute(r ApiAuthorizationCreateCanvasGroupRequest) (*AuthorizationCreateCanvasGroupResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  map[string]interface{}
+		localVarReturnValue  *AuthorizationCreateCanvasGroupResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationCreateGroup")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationCreateCanvasGroup")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{"application/json"}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	// body params
+	localVarPostBody = r.body
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationCreateOrganizationGroupRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	body *AuthorizationCreateOrganizationGroupRequest
+}
+
+func (r ApiAuthorizationCreateOrganizationGroupRequest) Body(body AuthorizationCreateOrganizationGroupRequest) ApiAuthorizationCreateOrganizationGroupRequest {
+	r.body = &body
+	return r
+}
+
+func (r ApiAuthorizationCreateOrganizationGroupRequest) Execute() (*AuthorizationCreateOrganizationGroupResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationCreateOrganizationGroupExecute(r)
+}
+
+/*
+AuthorizationCreateOrganizationGroup Create group
+
+Creates a new group within an organization with a specific role
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @return ApiAuthorizationCreateOrganizationGroupRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationCreateOrganizationGroup(ctx context.Context) ApiAuthorizationCreateOrganizationGroupRequest {
+	return ApiAuthorizationCreateOrganizationGroupRequest{
+		ApiService: a,
+		ctx: ctx,
+	}
+}
+
+// Execute executes the request
+//  @return AuthorizationCreateOrganizationGroupResponse
+func (a *AuthorizationAPIService) AuthorizationCreateOrganizationGroupExecute(r ApiAuthorizationCreateOrganizationGroupRequest) (*AuthorizationCreateOrganizationGroupResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodPost
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *AuthorizationCreateOrganizationGroupResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationCreateOrganizationGroup")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -777,59 +1017,414 @@ func (a *AuthorizationAPIService) AuthorizationDescribeRoleExecute(r ApiAuthoriz
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAuthorizationGetGroupUsersRequest struct {
+type ApiAuthorizationGetCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
+	canvasIdOrName string
 	groupName string
 }
 
-func (r ApiAuthorizationGetGroupUsersRequest) Execute() (*AuthorizationGetGroupUsersResponse, *http.Response, error) {
-	return r.ApiService.AuthorizationGetGroupUsersExecute(r)
+func (r ApiAuthorizationGetCanvasGroupRequest) Execute() (*AuthorizationGetCanvasGroupResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationGetCanvasGroupExecute(r)
 }
 
 /*
-AuthorizationGetGroupUsers Get group users
+AuthorizationGetCanvasGroup Get canvas group
 
-Returns users that belong to a specific group
+Returns details of a specific group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
+ @param canvasIdOrName
  @param groupName
- @return ApiAuthorizationGetGroupUsersRequest
+ @return ApiAuthorizationGetCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationGetGroupUsers(ctx context.Context, orgId string, groupName string) ApiAuthorizationGetGroupUsersRequest {
-	return ApiAuthorizationGetGroupUsersRequest{
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationGetCanvasGroupRequest {
+	return ApiAuthorizationGetCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 	}
 }
 
 // Execute executes the request
-//  @return AuthorizationGetGroupUsersResponse
-func (a *AuthorizationAPIService) AuthorizationGetGroupUsersExecute(r ApiAuthorizationGetGroupUsersRequest) (*AuthorizationGetGroupUsersResponse, *http.Response, error) {
+//  @return AuthorizationGetCanvasGroupResponse
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupExecute(r ApiAuthorizationGetCanvasGroupRequest) (*AuthorizationGetCanvasGroupResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *AuthorizationGetGroupUsersResponse
+		localVarReturnValue  *AuthorizationGetCanvasGroupResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationGetGroupUsers")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationGetCanvasGroup")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationGetCanvasGroupUsersRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	canvasIdOrName string
+	groupName string
+}
+
+func (r ApiAuthorizationGetCanvasGroupUsersRequest) Execute() (*AuthorizationGetCanvasGroupUsersResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationGetCanvasGroupUsersExecute(r)
+}
+
+/*
+AuthorizationGetCanvasGroupUsers Get canvas group users
+
+Returns users that belong to a specific group within a canvas
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @param groupName
+ @return ApiAuthorizationGetCanvasGroupUsersRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsers(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationGetCanvasGroupUsersRequest {
+	return ApiAuthorizationGetCanvasGroupUsersRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+		groupName: groupName,
+	}
+}
+
+// Execute executes the request
+//  @return AuthorizationGetCanvasGroupUsersResponse
+func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsersExecute(r ApiAuthorizationGetCanvasGroupUsersRequest) (*AuthorizationGetCanvasGroupUsersResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *AuthorizationGetCanvasGroupUsersResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationGetCanvasGroupUsers")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationGetOrganizationGroupRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	groupName string
+	organizationId *string
+}
+
+func (r ApiAuthorizationGetOrganizationGroupRequest) OrganizationId(organizationId string) ApiAuthorizationGetOrganizationGroupRequest {
+	r.organizationId = &organizationId
+	return r
+}
+
+func (r ApiAuthorizationGetOrganizationGroupRequest) Execute() (*AuthorizationGetOrganizationGroupResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationGetOrganizationGroupExecute(r)
+}
+
+/*
+AuthorizationGetOrganizationGroup Get organization group
+
+Returns details of a specific group within an organization
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiAuthorizationGetOrganizationGroupRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroup(ctx context.Context, groupName string) ApiAuthorizationGetOrganizationGroupRequest {
+	return ApiAuthorizationGetOrganizationGroupRequest{
+		ApiService: a,
+		ctx: ctx,
+		groupName: groupName,
+	}
+}
+
+// Execute executes the request
+//  @return AuthorizationGetOrganizationGroupResponse
+func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupExecute(r ApiAuthorizationGetOrganizationGroupRequest) (*AuthorizationGetOrganizationGroupResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *AuthorizationGetOrganizationGroupResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationGetOrganizationGroup")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/groups/{groupName}"
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationGetOrganizationGroupUsersRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	groupName string
+	organizationId *string
+}
+
+func (r ApiAuthorizationGetOrganizationGroupUsersRequest) OrganizationId(organizationId string) ApiAuthorizationGetOrganizationGroupUsersRequest {
+	r.organizationId = &organizationId
+	return r
+}
+
+func (r ApiAuthorizationGetOrganizationGroupUsersRequest) Execute() (*AuthorizationGetOrganizationGroupUsersResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationGetOrganizationGroupUsersExecute(r)
+}
+
+/*
+AuthorizationGetOrganizationGroupUsers Get organization group users
+
+Returns users that belong to a specific group within an organization
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @return ApiAuthorizationGetOrganizationGroupUsersRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupUsers(ctx context.Context, groupName string) ApiAuthorizationGetOrganizationGroupUsersRequest {
+	return ApiAuthorizationGetOrganizationGroupUsersRequest{
+		ApiService: a,
+		ctx: ctx,
+		groupName: groupName,
+	}
+}
+
+// Execute executes the request
+//  @return AuthorizationGetOrganizationGroupUsersResponse
+func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupUsersExecute(r ApiAuthorizationGetOrganizationGroupUsersRequest) (*AuthorizationGetOrganizationGroupUsersResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *AuthorizationGetOrganizationGroupUsersResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationGetOrganizationGroupUsers")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -1024,10 +1619,126 @@ func (a *AuthorizationAPIService) AuthorizationGetUserRolesExecute(r ApiAuthoriz
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
+type ApiAuthorizationListCanvasGroupsRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	canvasIdOrName string
+}
+
+func (r ApiAuthorizationListCanvasGroupsRequest) Execute() (*AuthorizationListCanvasGroupsResponse, *http.Response, error) {
+	return r.ApiService.AuthorizationListCanvasGroupsExecute(r)
+}
+
+/*
+AuthorizationListCanvasGroups List canvas groups
+
+Returns a list of groups within a canvas
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param canvasIdOrName
+ @return ApiAuthorizationListCanvasGroupsRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationListCanvasGroups(ctx context.Context, canvasIdOrName string) ApiAuthorizationListCanvasGroupsRequest {
+	return ApiAuthorizationListCanvasGroupsRequest{
+		ApiService: a,
+		ctx: ctx,
+		canvasIdOrName: canvasIdOrName,
+	}
+}
+
+// Execute executes the request
+//  @return AuthorizationListCanvasGroupsResponse
+func (a *AuthorizationAPIService) AuthorizationListCanvasGroupsExecute(r ApiAuthorizationListCanvasGroupsRequest) (*AuthorizationListCanvasGroupsResponse, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodGet
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  *AuthorizationListCanvasGroupsResponse
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationListCanvasGroups")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
 type ApiAuthorizationListOrganizationGroupsRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
+	organizationId *string
+}
+
+func (r ApiAuthorizationListOrganizationGroupsRequest) OrganizationId(organizationId string) ApiAuthorizationListOrganizationGroupsRequest {
+	r.organizationId = &organizationId
+	return r
 }
 
 func (r ApiAuthorizationListOrganizationGroupsRequest) Execute() (*AuthorizationListOrganizationGroupsResponse, *http.Response, error) {
@@ -1040,14 +1751,12 @@ AuthorizationListOrganizationGroups List organization groups
 Returns a list of groups within an organization
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
  @return ApiAuthorizationListOrganizationGroupsRequest
 */
-func (a *AuthorizationAPIService) AuthorizationListOrganizationGroups(ctx context.Context, orgId string) ApiAuthorizationListOrganizationGroupsRequest {
+func (a *AuthorizationAPIService) AuthorizationListOrganizationGroups(ctx context.Context) ApiAuthorizationListOrganizationGroupsRequest {
 	return ApiAuthorizationListOrganizationGroupsRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
 	}
 }
 
@@ -1066,13 +1775,15 @@ func (a *AuthorizationAPIService) AuthorizationListOrganizationGroupsExecute(r A
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -1513,34 +2224,34 @@ func (a *AuthorizationAPIService) AuthorizationRemoveRoleExecute(r ApiAuthorizat
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiAuthorizationRemoveUserFromGroupRequest struct {
+type ApiAuthorizationRemoveUserFromCanvasGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
-	orgId string
+	canvasIdOrName string
 	groupName string
 	userId string
 }
 
-func (r ApiAuthorizationRemoveUserFromGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.AuthorizationRemoveUserFromGroupExecute(r)
+func (r ApiAuthorizationRemoveUserFromCanvasGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationRemoveUserFromCanvasGroupExecute(r)
 }
 
 /*
-AuthorizationRemoveUserFromGroup Remove user from group
+AuthorizationRemoveUserFromCanvasGroup Remove user from canvas group
 
-Removes a user from an organization group
+Removes a user from a group within a canvas
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param orgId
+ @param canvasIdOrName
  @param groupName
  @param userId
- @return ApiAuthorizationRemoveUserFromGroupRequest
+ @return ApiAuthorizationRemoveUserFromCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroup(ctx context.Context, orgId string, groupName string, userId string) ApiAuthorizationRemoveUserFromGroupRequest {
-	return ApiAuthorizationRemoveUserFromGroupRequest{
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string, userId string) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
+	return ApiAuthorizationRemoveUserFromCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
-		orgId: orgId,
+		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
 		userId: userId,
 	}
@@ -1548,21 +2259,21 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroup(ctx context.C
 
 // Execute executes the request
 //  @return map[string]interface{}
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroupExecute(r ApiAuthorizationRemoveUserFromGroupRequest) (map[string]interface{}, *http.Response, error) {
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(r ApiAuthorizationRemoveUserFromCanvasGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodPatch
+		localVarHTTPMethod   = http.MethodDelete
 		localVarPostBody     interface{}
 		formFiles            []formFile
 		localVarReturnValue  map[string]interface{}
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationRemoveUserFromGroup")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationRemoveUserFromCanvasGroup")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/organizations/{orgId}/groups/{groupName}/users/{userId}"
-	localVarPath = strings.Replace(localVarPath, "{"+"orgId"+"}", url.PathEscape(parameterValueToString(r.orgId, "orgId")), -1)
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
@@ -1570,6 +2281,130 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromGroupExecute(r ApiA
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	// to determine the Content-Type header
+	localVarHTTPContentTypes := []string{}
+
+	// set Content-Type header
+	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
+	if localVarHTTPContentType != "" {
+		localVarHeaderParams["Content-Type"] = localVarHTTPContentType
+	}
+
+	// to determine the Accept header
+	localVarHTTPHeaderAccepts := []string{"application/json"}
+
+	// set Accept header
+	localVarHTTPHeaderAccept := selectHeaderAccept(localVarHTTPHeaderAccepts)
+	if localVarHTTPHeaderAccept != "" {
+		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
+	}
+	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
+	if err != nil {
+		return localVarReturnValue, nil, err
+	}
+
+	localVarHTTPResponse, err := a.client.callAPI(req)
+	if err != nil || localVarHTTPResponse == nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	localVarBody, err := io.ReadAll(localVarHTTPResponse.Body)
+	localVarHTTPResponse.Body.Close()
+	localVarHTTPResponse.Body = io.NopCloser(bytes.NewBuffer(localVarBody))
+	if err != nil {
+		return localVarReturnValue, localVarHTTPResponse, err
+	}
+
+	if localVarHTTPResponse.StatusCode >= 300 {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: localVarHTTPResponse.Status,
+		}
+			var v RpcStatus
+			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+			if err != nil {
+				newErr.error = err.Error()
+				return localVarReturnValue, localVarHTTPResponse, newErr
+			}
+					newErr.error = formatErrorMessage(localVarHTTPResponse.Status, &v)
+					newErr.model = v
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	err = a.client.decode(&localVarReturnValue, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
+	if err != nil {
+		newErr := &GenericOpenAPIError{
+			body:  localVarBody,
+			error: err.Error(),
+		}
+		return localVarReturnValue, localVarHTTPResponse, newErr
+	}
+
+	return localVarReturnValue, localVarHTTPResponse, nil
+}
+
+type ApiAuthorizationRemoveUserFromOrganizationGroupRequest struct {
+	ctx context.Context
+	ApiService *AuthorizationAPIService
+	groupName string
+	userId string
+	organizationId *string
+}
+
+func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) OrganizationId(organizationId string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
+	r.organizationId = &organizationId
+	return r
+}
+
+func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.AuthorizationRemoveUserFromOrganizationGroupExecute(r)
+}
+
+/*
+AuthorizationRemoveUserFromOrganizationGroup Remove user from organization group
+
+Removes a user from a group within an organization
+
+ @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
+ @param groupName
+ @param userId
+ @return ApiAuthorizationRemoveUserFromOrganizationGroupRequest
+*/
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroup(ctx context.Context, groupName string, userId string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
+	return ApiAuthorizationRemoveUserFromOrganizationGroupRequest{
+		ApiService: a,
+		ctx: ctx,
+		groupName: groupName,
+		userId: userId,
+	}
+}
+
+// Execute executes the request
+//  @return map[string]interface{}
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupExecute(r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) (map[string]interface{}, *http.Response, error) {
+	var (
+		localVarHTTPMethod   = http.MethodDelete
+		localVarPostBody     interface{}
+		formFiles            []formFile
+		localVarReturnValue  map[string]interface{}
+	)
+
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "AuthorizationAPIService.AuthorizationRemoveUserFromOrganizationGroup")
+	if err != nil {
+		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
+	}
+
+	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users/{userId}"
+	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
+
+	localVarHeaderParams := make(map[string]string)
+	localVarQueryParams := url.Values{}
+	localVarFormParams := url.Values{}
+
+	if r.organizationId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
