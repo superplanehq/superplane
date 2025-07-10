@@ -713,7 +713,7 @@ export function OrganizationSettings({
                   <div className="space-y-6">
                     {(activeRoleTab === 'organization' ? organizationPermissions : canvasPermissions).map((category) => (
                       <div key={category.category} className="space-y-4">
-                        <div className="flex items-center pb-2">
+                        <div className="flex items-center mb-3">
                           <div className="flex items-center">
                             <h3 className="text-md font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
                           </div>
