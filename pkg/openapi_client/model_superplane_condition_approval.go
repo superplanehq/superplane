@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneConditionApproval{}
 // SuperplaneConditionApproval struct for SuperplaneConditionApproval
 type SuperplaneConditionApproval struct {
 	Count *int64 `json:"count,omitempty"`
-	RequiredFrom []SuperplaneApprovalRequirement `json:"requiredFrom,omitempty"`
+	From []SuperplaneApprovalRequirement `json:"from,omitempty"`
 }
 
 // NewSuperplaneConditionApproval instantiates a new SuperplaneConditionApproval object
@@ -73,36 +73,36 @@ func (o *SuperplaneConditionApproval) SetCount(v int64) {
 	o.Count = &v
 }
 
-// GetRequiredFrom returns the RequiredFrom field value if set, zero value otherwise.
-func (o *SuperplaneConditionApproval) GetRequiredFrom() []SuperplaneApprovalRequirement {
-	if o == nil || IsNil(o.RequiredFrom) {
+// GetFrom returns the From field value if set, zero value otherwise.
+func (o *SuperplaneConditionApproval) GetFrom() []SuperplaneApprovalRequirement {
+	if o == nil || IsNil(o.From) {
 		var ret []SuperplaneApprovalRequirement
 		return ret
 	}
-	return o.RequiredFrom
+	return o.From
 }
 
-// GetRequiredFromOk returns a tuple with the RequiredFrom field value if set, nil otherwise
+// GetFromOk returns a tuple with the From field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneConditionApproval) GetRequiredFromOk() ([]SuperplaneApprovalRequirement, bool) {
-	if o == nil || IsNil(o.RequiredFrom) {
+func (o *SuperplaneConditionApproval) GetFromOk() ([]SuperplaneApprovalRequirement, bool) {
+	if o == nil || IsNil(o.From) {
 		return nil, false
 	}
-	return o.RequiredFrom, true
+	return o.From, true
 }
 
-// HasRequiredFrom returns a boolean if a field has been set.
-func (o *SuperplaneConditionApproval) HasRequiredFrom() bool {
-	if o != nil && !IsNil(o.RequiredFrom) {
+// HasFrom returns a boolean if a field has been set.
+func (o *SuperplaneConditionApproval) HasFrom() bool {
+	if o != nil && !IsNil(o.From) {
 		return true
 	}
 
 	return false
 }
 
-// SetRequiredFrom gets a reference to the given []SuperplaneApprovalRequirement and assigns it to the RequiredFrom field.
-func (o *SuperplaneConditionApproval) SetRequiredFrom(v []SuperplaneApprovalRequirement) {
-	o.RequiredFrom = v
+// SetFrom gets a reference to the given []SuperplaneApprovalRequirement and assigns it to the From field.
+func (o *SuperplaneConditionApproval) SetFrom(v []SuperplaneApprovalRequirement) {
+	o.From = v
 }
 
 func (o SuperplaneConditionApproval) MarshalJSON() ([]byte, error) {
@@ -118,8 +118,8 @@ func (o SuperplaneConditionApproval) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Count) {
 		toSerialize["count"] = o.Count
 	}
-	if !IsNil(o.RequiredFrom) {
-		toSerialize["requiredFrom"] = o.RequiredFrom
+	if !IsNil(o.From) {
+		toSerialize["from"] = o.From
 	}
 	return toSerialize, nil
 }

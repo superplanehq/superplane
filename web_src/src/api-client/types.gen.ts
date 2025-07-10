@@ -271,7 +271,7 @@ export type SuperplaneCondition = {
 
 export type SuperplaneConditionApproval = {
     count?: number;
-    requiredFrom?: Array<SuperplaneApprovalRequirement>;
+    from?: Array<SuperplaneApprovalRequirement>;
 };
 
 export type SuperplaneConditionTimeWindow = {

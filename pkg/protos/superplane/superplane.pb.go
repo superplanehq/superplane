@@ -3109,7 +3109,7 @@ func (x *Condition) GetTimeWindow() *ConditionTimeWindow {
 type ConditionApproval struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Count         uint32                 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
-	RequiredFrom  []*ApprovalRequirement `protobuf:"bytes,2,rep,name=required_from,json=requiredFrom,proto3" json:"required_from,omitempty"`
+	From          []*ApprovalRequirement `protobuf:"bytes,2,rep,name=from,proto3" json:"from,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3151,9 +3151,9 @@ func (x *ConditionApproval) GetCount() uint32 {
 	return 0
 }
 
-func (x *ConditionApproval) GetRequiredFrom() []*ApprovalRequirement {
+func (x *ConditionApproval) GetFrom() []*ApprovalRequirement {
 	if x != nil {
-		return x.RequiredFrom
+		return x.From
 	}
 	return nil
 }
@@ -3163,7 +3163,7 @@ type ApprovalRequirement struct {
 	Type          ApprovalRequirement_Type `protobuf:"varint,1,opt,name=type,proto3,enum=Superplane.ApprovalRequirement_Type" json:"type,omitempty"`
 	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`    // username, role name, or group name
 	Id            string                   `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`        // user ID, role name, or group name (alternative to name)
-	Count         uint32                   `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"` // number of approvals required from this requirement
+	Count         uint32                   `protobuf:"varint,4,opt,name=count,proto3" json:"count,omitempty"` // number of approvals required from this requirement (optional for TYPE_USER)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6652,10 +6652,10 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04Type\x12\x1a\n" +
 	"\x16CONDITION_TYPE_UNKNOWN\x10\x00\x12\x1b\n" +
 	"\x17CONDITION_TYPE_APPROVAL\x10\x01\x12\x1e\n" +
-	"\x1aCONDITION_TYPE_TIME_WINDOW\x10\x02\"o\n" +
+	"\x1aCONDITION_TYPE_TIME_WINDOW\x10\x02\"^\n" +
 	"\x11ConditionApproval\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\rR\x05count\x12D\n" +
-	"\rrequired_from\x18\x02 \x03(\v2\x1f.Superplane.ApprovalRequirementR\frequiredFrom\"\xd1\x01\n" +
+	"\x05count\x18\x01 \x01(\rR\x05count\x123\n" +
+	"\x04from\x18\x02 \x03(\v2\x1f.Superplane.ApprovalRequirementR\x04from\"\xd1\x01\n" +
 	"\x13ApprovalRequirement\x128\n" +
 	"\x04type\x18\x01 \x01(\x0e2$.Superplane.ApprovalRequirement.TypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +
@@ -7109,7 +7109,7 @@ var file_superplane_proto_depIdxs = []int32{
 	5,   // 40: Superplane.Condition.type:type_name -> Superplane.Condition.Type
 	61,  // 41: Superplane.Condition.approval:type_name -> Superplane.ConditionApproval
 	63,  // 42: Superplane.Condition.time_window:type_name -> Superplane.ConditionTimeWindow
-	62,  // 43: Superplane.ConditionApproval.required_from:type_name -> Superplane.ApprovalRequirement
+	62,  // 43: Superplane.ConditionApproval.from:type_name -> Superplane.ApprovalRequirement
 	6,   // 44: Superplane.ApprovalRequirement.type:type_name -> Superplane.ApprovalRequirement.Type
 	51,  // 45: Superplane.CreateStageRequest.stage:type_name -> Superplane.Stage
 	7,   // 46: Superplane.ExecutorSpec.type:type_name -> Superplane.ExecutorSpec.Type

@@ -2249,7 +2249,7 @@
         "count": {
           "type": "integer",
           "format": "int64",
-          "title": "number of approvals required from this requirement"
+          "title": "number of approvals required from this requirement (optional for TYPE_USER)"
         }
       }
     },
