@@ -14,6 +14,7 @@ import { AdministrationPage } from './components/AdministrationPage'
 import { MaterialSymbol } from './components/lib/MaterialSymbol/material-symbol'
 import type { NavigationLink } from './components/lib/Navigation/navigation-vertical'
 import './App.css'
+import { OrganizationSettings } from './components/OrganizationSettings'
 
 function App() {
   // Check localStorage for existing authentication state
@@ -75,6 +76,7 @@ function App() {
     window.history.pushState(null, '', '/settings')
     setCurrentPath('/settings')
   }
+  
 
   // Handle user login
   const handleLogin = () => {
@@ -100,10 +102,14 @@ function App() {
   }
 
   // Route based on current path
+  if (currentPath === '/settings') {
+    return <OrganizationSettings onSignOut={handleLogout} />
+  }
+  // Route based on current path
   if (currentPath === '/org-sidebar') {
     return <OrganizationPageSidebar onSignOut={handleLogout} />
   }
-
+  
   if (currentPath === '/org-tabs') {
     return <OrganizationPage onSignOut={handleLogout} />
   }
@@ -129,7 +135,7 @@ function App() {
     )
   }
 
-  if (currentPath === '/settings') {
+  if (currentPath === '/settings2') {
     return (
       <SettingsPage 
         onSignOut={handleLogout}
@@ -144,9 +150,7 @@ function App() {
     return (
       <CanvasesPage 
         onSignOut={handleLogout}
-        navigationLinks={navigationLinks}
-        onLinkClick={handleLinkClick}
-        onConfigurationClick={handleConfigurationClick}
+        
       />
     )
   }
@@ -186,10 +190,7 @@ function App() {
   if (currentPath === '/workspaces') {
     return (
       <MainLandingPage 
-        onNavigate={(page) => {
-          window.history.pushState(null, '', `/${page}`)
-          setCurrentPath(`/${page}`)
-        }}
+        
       />
     )
   }

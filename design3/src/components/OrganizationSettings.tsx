@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol'
 import { Avatar } from './lib/Avatar/avatar'
-import { Subheading } from './lib/Heading/heading'
+import { Heading, Subheading } from './lib/Heading/heading'
 import { Text } from './lib/Text/text'
 import { Button } from './lib/Button/button'
-import { Input } from './lib/Input/input'
-import { Switch } from './lib/Switch/switch'
+import { Input, InputGroup } from './lib/Input/input'
 import { 
   Dropdown, 
   DropdownButton, 
   DropdownMenu, 
   DropdownItem
 } from './lib/Dropdown/dropdown'
+import { NavigationOrg } from './lib/Navigation/navigation-org'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -114,11 +114,41 @@ export function OrganizationSettings({
   ]
 
   const currentUser = {
-    email: 'john@acme.com'
+    id: '1',
+    name: 'John Doe',
+    email: 'john@acme.com',
+    initials: 'JD',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
   }
 
   const currentOrganization = {
-    name: 'Acme corporation'
+    id: '1',
+    name: 'Confluent',
+    plan: 'Pro Plan',
+    initials: 'C',
+  }
+
+  // Navigation handlers
+  const handleUserMenuAction = (action: 'profile' | 'settings' | 'signout') => {
+    switch (action) {
+      case 'profile':
+        console.log('Navigating to user profile...')
+        break
+      case 'settings':
+        console.log('Opening account settings...')
+        break
+      case 'signout':
+        onSignOut?.()
+        break
+    }
+  }
+
+  const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members') => {
+    if (action === 'settings') {
+      console.log('Already on organization settings page')
+    } else {
+      console.log(`Organization action: ${action}`)
+    }
   }
 
   const tabs = [
@@ -206,11 +236,12 @@ export function OrganizationSettings({
 
       case 'users':
         return (
-          <div className="space-y-6">
+          <div className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
-              <Subheading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                User Management
-              </Subheading>
+              
+              <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+              Users
+            </Heading>
             </div>
 
             {/* Add Members Section */}
@@ -218,16 +249,11 @@ export function OrganizationSettings({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                    Add Members
+                    Add Users
                   </Subheading>
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    Invite new team members to your organization
-                  </Text>
+                  
                 </div>
-                <Button color="blue">
-                  <MaterialSymbol name="person_add" />
-                  Invite Member
-                </Button>
+                
               </div>
               
               <div className="flex gap-3">
@@ -249,16 +275,11 @@ export function OrganizationSettings({
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
               <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
                 <div className="flex items-center justify-between">
-                  <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white">
-                    Organization Members ({users.length})
-                  </Subheading>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      className="w-64"
-                    />
-                  </div>
+                <InputGroup>
+                    <Input name="search" placeholder="Search&hellip;" aria-label="Search" className="w-xs" />
+                  </InputGroup>
+                  
+                  
                 </div>
               </div>
 
@@ -432,7 +453,7 @@ export function OrganizationSettings({
                 </Text>
                 <Button color="blue">
                   <MaterialSymbol name="add" />
-                  Add Team
+                  Create new team
                 </Button>
               </div>
             </div>
@@ -440,9 +461,9 @@ export function OrganizationSettings({
             {/* Teams Table View (Alternative) */}
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
               <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
-                <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white">
-                  All Teams ({teams.length})
-                </Subheading>
+              <InputGroup>
+                    <Input name="search" placeholder="Search Teams&hellip;" aria-label="Search" className="w-xs" />
+                  </InputGroup>
               </div>
 
               {/* Table Header */}
@@ -526,11 +547,11 @@ export function OrganizationSettings({
 
       case 'general':
         return (
-          <div className="space-y-6">
-            <Subheading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+          <div className="space-y-6 pt-6">
+            <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
               General Settings
-            </Subheading>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6">
+            </Heading>
+            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6 max-w-xl">
               <div>
                 <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Organization Name
@@ -623,27 +644,30 @@ export function OrganizationSettings({
   }
 
   return (
-    <div className="flex h-screen bg-zinc-50 dark:bg-zinc-900">
-      {/* Back to portal button */}
-      <div className="absolute top-4 left-4 z-10">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
-        >
-          <MaterialSymbol name="arrow_back" size="sm" />
-          Back to portal
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <div className="w-80 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 pt-16">
-        {/* User Account Section */}
-        <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-teal-500 flex items-center justify-center">
-              <MaterialSymbol name="person" className="text-white" size="sm" />
-            </div>
-            <div>
+    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900">
+      {/* Navigation */}
+      <NavigationOrg
+        user={currentUser}
+        organization={currentOrganization}
+        onUserMenuAction={handleUserMenuAction}
+        onOrganizationMenuAction={handleOrganizationMenuAction}
+      />
+      
+      <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar */}
+        
+        <div className="w-80 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700">
+          {/* User Account Section */}
+        
+          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+          
+            <div className="flex items-center gap-3 mb-4">
+              <Avatar 
+                className='w-8 h-8'
+                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&amp;h=64&amp;fit=crop&amp;crop=face"
+                alt="My Account"
+              />
+              <div>
               <div className="text-sm font-medium text-zinc-900 dark:text-white">My Account</div>
             </div>
           </div>
@@ -657,7 +681,17 @@ export function OrganizationSettings({
                   : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
               }`}
             >
-              Profile
+              Profile settings
+            </button>
+            <button
+              onClick={() => setActiveTab('profile')}
+              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
+                activeTab === 'profile'
+                  ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white'
+                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
+              }`}
+            >
+              API Token
             </button>
           </nav>
         </div>
@@ -665,9 +699,12 @@ export function OrganizationSettings({
         {/* Organization Section */}
         <div className="px-6 py-4">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center">
-              <MaterialSymbol name="business" className="text-zinc-600 dark:text-zinc-400" size="sm" />
-            </div>
+          <Avatar 
+                className='w-8 h-8'
+                src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Confluent%2C_Inc._logo.svg"
+                alt="My Account"
+              />
+            
             <div>
               <div className="text-sm font-medium text-zinc-900 dark:text-white">{currentOrganization.name}</div>
             </div>
@@ -692,17 +729,11 @@ export function OrganizationSettings({
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        {/* User email header */}
-        <div className="px-8 pt-16 pb-2">
-          <Text className="text-sm text-purple-600 dark:text-purple-400 font-medium">
-            {currentUser.email}
-          </Text>
-        </div>
-        
-        <div className="px-8 pb-8">
-          {renderTabContent()}
+        {/* Main Content */}
+        <div className="flex-1 overflow-auto">
+          <div className="px-8 pb-8">
+            {renderTabContent()}
+          </div>
         </div>
       </div>
     </div>
