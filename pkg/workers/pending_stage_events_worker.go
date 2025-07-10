@@ -159,30 +159,54 @@ func (w *PendingStageEventsWorker) checkApprovalCondition(logger *log.Entry, eve
 		return false, err
 	}
 
-	//
-	// The event has the necessary amount of approvals,
-	// so we can proceed to the next condition.
-	//
-	if len(approvals) >= int(condition.Count) {
-		logger.Infof("Approval condition met for event %s", event.ID)
+	if len(condition.RequiredFrom) == 0 {
+		if len(approvals) >= condition.Count {
+			logger.Infof("Approval condition met for event %s", event.ID)
+			return true, nil
+		}
+
+		logger.Infof(
+			"Approval condition not met for event %s - %d/%d",
+			event.ID,
+			len(approvals),
+			condition.Count,
+		)
+
+		return false, event.UpdateState(
+			models.StageEventStateWaiting,
+			models.StageEventStateReasonApproval,
+		)
+	}
+
+	satisfied, err := w.checkApprovalRequirements(logger, event, approvals, condition)
+	if err != nil {
+		return false, err
+	}
+
+	if satisfied {
+		logger.Infof("Approval requirements met for event %s", event.ID)
 		return true, nil
 	}
 
-	logger.Infof(
-		"Approval condition not met for event %s - %d/%d",
-		event.ID,
-		len(approvals),
-		condition.Count,
-	)
-
-	//
-	// The event does not have the necessary amount of approvals,
-	// so we move it to the waiting state, and do not proceed to the next condition.
-	//
+	logger.Infof("Approval requirements not met for event %s", event.ID)
 	return false, event.UpdateState(
 		models.StageEventStateWaiting,
 		models.StageEventStateReasonApproval,
 	)
+}
+
+func (w *PendingStageEventsWorker) checkApprovalRequirements(logger *log.Entry, event *models.StageEvent, approvals []models.StageEventApproval, condition *models.ApprovalCondition) (bool, error) {
+	stage, err := models.FindStageByID(event.StageID.String())
+	if err != nil {
+		return false, fmt.Errorf("error finding stage: %v", err)
+	}
+
+	checker := &ApprovalChecker{
+		CanvasID: stage.CanvasID,
+		Logger:   logger,
+	}
+
+	return checker.CheckRequirements(approvals, condition.RequiredFrom)
 }
 
 func (w *PendingStageEventsWorker) checkTimeWindowCondition(logger *log.Entry, event *models.StageEvent, condition *models.TimeWindowCondition) (bool, error) {
