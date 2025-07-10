@@ -159,25 +159,6 @@ func (w *PendingStageEventsWorker) checkApprovalCondition(logger *log.Entry, eve
 		return false, err
 	}
 
-	if len(condition.RequiredFrom) == 0 {
-		if len(approvals) >= condition.Count {
-			logger.Infof("Approval condition met for event %s", event.ID)
-			return true, nil
-		}
-
-		logger.Infof(
-			"Approval condition not met for event %s - %d/%d",
-			event.ID,
-			len(approvals),
-			condition.Count,
-		)
-
-		return false, event.UpdateState(
-			models.StageEventStateWaiting,
-			models.StageEventStateReasonApproval,
-		)
-	}
-
 	satisfied, err := w.checkApprovalRequirements(logger, event, approvals, condition)
 	if err != nil {
 		return false, err
@@ -206,7 +187,7 @@ func (w *PendingStageEventsWorker) checkApprovalRequirements(logger *log.Entry, 
 		Logger:   logger,
 	}
 
-	return checker.CheckRequirements(approvals, condition.RequiredFrom)
+	return checker.CheckRequirements(approvals, condition.From)
 }
 
 func (w *PendingStageEventsWorker) checkTimeWindowCondition(logger *log.Entry, event *models.StageEvent, condition *models.TimeWindowCondition) (bool, error) {

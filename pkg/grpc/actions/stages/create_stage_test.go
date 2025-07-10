@@ -306,8 +306,10 @@ func Test__CreateStage(t *testing.T) {
 					Executor: executor,
 					Conditions: []*pb.Condition{
 						{
-							Type:     pb.Condition_CONDITION_TYPE_APPROVAL,
-							Approval: &pb.ConditionApproval{Count: 1},
+							Type: pb.Condition_CONDITION_TYPE_APPROVAL,
+							Approval: &pb.ConditionApproval{
+								From: []*pb.ApprovalRequirement{{Type: pb.ApprovalRequirement_TYPE_USER, Name: r.User.String()}},
+							},
 						},
 						{
 							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
@@ -367,7 +369,7 @@ func Test__CreateStage(t *testing.T) {
 		require.NotNil(t, res.Stage.Spec)
 		require.Len(t, res.Stage.Spec.Conditions, 2)
 		assert.Equal(t, pb.Condition_CONDITION_TYPE_APPROVAL, res.Stage.Spec.Conditions[0].Type)
-		assert.Equal(t, uint32(1), res.Stage.Spec.Conditions[0].Approval.Count)
+		assert.Equal(t, uint32(1), res.Stage.Spec.Conditions[0].Approval.From[0].Count)
 		assert.Equal(t, pb.Condition_CONDITION_TYPE_TIME_WINDOW, res.Stage.Spec.Conditions[1].Type)
 		assert.Equal(t, "08:00", res.Stage.Spec.Conditions[1].TimeWindow.Start)
 		assert.Equal(t, "17:00", res.Stage.Spec.Conditions[1].TimeWindow.End)

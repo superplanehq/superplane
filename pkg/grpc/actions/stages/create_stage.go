@@ -182,12 +182,12 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 			return nil, fmt.Errorf("missing approval settings")
 		}
 
-		if condition.Approval.Count == 0 && len(condition.Approval.RequiredFrom) == 0 {
-			return nil, fmt.Errorf("invalid approval condition: count must be greater than 0 or required_from must be specified")
+		if len(condition.Approval.From) == 0 {
+			return nil, fmt.Errorf("invalid approval condition: from must be specified")
 		}
 
 		var requirements []models.ApprovalRequirement
-		for _, req := range condition.Approval.RequiredFrom {
+		for _, req := range condition.Approval.From {
 			if req.Count == 0 {
 				return nil, fmt.Errorf("invalid approval requirement: count must be greater than 0")
 			}
@@ -215,8 +215,7 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 		return &models.StageCondition{
 			Type: models.StageConditionTypeApproval,
 			Approval: &models.ApprovalCondition{
-				Count:        int(condition.Approval.Count),
-				RequiredFrom: requirements,
+				From: requirements,
 			},
 		}, nil
 
@@ -402,7 +401,7 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	switch condition.Type {
 	case models.StageConditionTypeApproval:
 		var pbRequirements []*pb.ApprovalRequirement
-		for _, req := range condition.Approval.RequiredFrom {
+		for _, req := range condition.Approval.From {
 			var reqType pb.ApprovalRequirement_Type
 			switch req.Type {
 			case models.ApprovalRequirementTypeUser:
@@ -426,8 +425,7 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 		return &pb.Condition{
 			Type: pb.Condition_CONDITION_TYPE_APPROVAL,
 			Approval: &pb.ConditionApproval{
-				Count:        uint32(condition.Approval.Count),
-				RequiredFrom: pbRequirements,
+				From: pbRequirements,
 			},
 		}, nil
 

@@ -3108,8 +3108,7 @@ func (x *Condition) GetTimeWindow() *ConditionTimeWindow {
 
 type ConditionApproval struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Count         uint32                 `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
-	From          []*ApprovalRequirement `protobuf:"bytes,2,rep,name=from,proto3" json:"from,omitempty"`
+	From          []*ApprovalRequirement `protobuf:"bytes,1,rep,name=from,proto3" json:"from,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3142,13 +3141,6 @@ func (x *ConditionApproval) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ConditionApproval.ProtoReflect.Descriptor instead.
 func (*ConditionApproval) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{47}
-}
-
-func (x *ConditionApproval) GetCount() uint32 {
-	if x != nil {
-		return x.Count
-	}
-	return 0
 }
 
 func (x *ConditionApproval) GetFrom() []*ApprovalRequirement {
@@ -6652,10 +6644,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04Type\x12\x1a\n" +
 	"\x16CONDITION_TYPE_UNKNOWN\x10\x00\x12\x1b\n" +
 	"\x17CONDITION_TYPE_APPROVAL\x10\x01\x12\x1e\n" +
-	"\x1aCONDITION_TYPE_TIME_WINDOW\x10\x02\"^\n" +
-	"\x11ConditionApproval\x12\x14\n" +
-	"\x05count\x18\x01 \x01(\rR\x05count\x123\n" +
-	"\x04from\x18\x02 \x03(\v2\x1f.Superplane.ApprovalRequirementR\x04from\"\xd1\x01\n" +
+	"\x1aCONDITION_TYPE_TIME_WINDOW\x10\x02\"H\n" +
+	"\x11ConditionApproval\x123\n" +
+	"\x04from\x18\x01 \x03(\v2\x1f.Superplane.ApprovalRequirementR\x04from\"\xd1\x01\n" +
 	"\x13ApprovalRequirement\x128\n" +
 	"\x04type\x18\x01 \x01(\x0e2$.Superplane.ApprovalRequirement.TypeR\x04type\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x0e\n" +

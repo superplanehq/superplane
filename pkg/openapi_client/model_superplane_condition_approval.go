@@ -20,7 +20,6 @@ var _ MappedNullable = &SuperplaneConditionApproval{}
 
 // SuperplaneConditionApproval struct for SuperplaneConditionApproval
 type SuperplaneConditionApproval struct {
-	Count *int64 `json:"count,omitempty"`
 	From []SuperplaneApprovalRequirement `json:"from,omitempty"`
 }
 
@@ -39,38 +38,6 @@ func NewSuperplaneConditionApproval() *SuperplaneConditionApproval {
 func NewSuperplaneConditionApprovalWithDefaults() *SuperplaneConditionApproval {
 	this := SuperplaneConditionApproval{}
 	return &this
-}
-
-// GetCount returns the Count field value if set, zero value otherwise.
-func (o *SuperplaneConditionApproval) GetCount() int64 {
-	if o == nil || IsNil(o.Count) {
-		var ret int64
-		return ret
-	}
-	return *o.Count
-}
-
-// GetCountOk returns a tuple with the Count field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneConditionApproval) GetCountOk() (*int64, bool) {
-	if o == nil || IsNil(o.Count) {
-		return nil, false
-	}
-	return o.Count, true
-}
-
-// HasCount returns a boolean if a field has been set.
-func (o *SuperplaneConditionApproval) HasCount() bool {
-	if o != nil && !IsNil(o.Count) {
-		return true
-	}
-
-	return false
-}
-
-// SetCount gets a reference to the given int64 and assigns it to the Count field.
-func (o *SuperplaneConditionApproval) SetCount(v int64) {
-	o.Count = &v
 }
 
 // GetFrom returns the From field value if set, zero value otherwise.
@@ -115,9 +82,6 @@ func (o SuperplaneConditionApproval) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneConditionApproval) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Count) {
-		toSerialize["count"] = o.Count
-	}
 	if !IsNil(o.From) {
 		toSerialize["from"] = o.From
 	}

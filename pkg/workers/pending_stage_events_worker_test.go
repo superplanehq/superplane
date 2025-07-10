@@ -69,7 +69,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		// Create stage that requires approval.
 		//
 		conditions := []models.StageCondition{
-			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
+			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, Name: r.User.String()}}}},
 		}
 
 		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
@@ -103,7 +103,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		// Create stage that requires approval.
 		//
 		conditions := []models.StageCondition{
-			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
+			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, Name: r.User.String()}}}},
 		}
 		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{

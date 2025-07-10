@@ -270,7 +270,6 @@ export type SuperplaneCondition = {
 };
 
 export type SuperplaneConditionApproval = {
-    count?: number;
     from?: Array<SuperplaneApprovalRequirement>;
 };
 

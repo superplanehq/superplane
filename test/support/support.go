@@ -66,8 +66,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	if options.Stage {
 		conditions := []models.StageCondition{
 			{
-				Type:     models.StageConditionTypeApproval,
-				Approval: &models.ApprovalCondition{Count: options.Approvals},
+				Type: models.StageConditionTypeApproval,
+				Approval: &models.ApprovalCondition{
+					From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, Name: r.User.String()}},
+				},
 			},
 		}
 

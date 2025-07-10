@@ -659,8 +659,7 @@ message Condition {
 }
 
 message ConditionApproval {
-  uint32 count = 1;
-  repeated ApprovalRequirement from = 2;
+  repeated ApprovalRequirement from = 1;
 }
 
 message ApprovalRequirement {

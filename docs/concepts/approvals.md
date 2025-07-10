@@ -23,17 +23,14 @@ name: production-deployment
 conditions:
   - type: approval
     approval:
-      count: 2  # Ignored when required_from is specified
-      required_from:
-        # Require approval from specific user
+      from:
+        # Require approval from specific user, no count is required
         - type: user
           id: "12345678-1234-1234-1234-123456789abc"
-          count: 1
         
-        # Require approval from user by username
+        # Require approval from user by username, no count is required
         - type: user
           name: "john.doe"
-          count: 1
           
         # Require approvals from users with specific role
         - type: role

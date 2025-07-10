@@ -191,8 +191,7 @@ func (c *TimeWindowCondition) inTimeWindow(now time.Time) bool {
 }
 
 type ApprovalCondition struct {
-	Count        int                   `json:"count"`
-	RequiredFrom []ApprovalRequirement `json:"required_from,omitempty"`
+	From []ApprovalRequirement `json:"from,omitempty"`
 }
 
 type ApprovalRequirement struct {
@@ -265,13 +264,20 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 }
 
 func (s *Stage) ApprovalsRequired() int {
+	var count int
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {
-			return condition.Approval.Count
+			for _, requirement := range condition.Approval.From {
+				if requirement.Type == ApprovalRequirementTypeUser {
+					count += 1
+					continue
+				}
+				count += requirement.Count
+			}
 		}
 	}
 
-	return 0
+	return count
 }
 
 func (s *Stage) HasApprovalCondition() bool {

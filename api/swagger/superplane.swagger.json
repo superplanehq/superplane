@@ -2318,11 +2318,7 @@
     "SuperplaneConditionApproval": {
       "type": "object",
       "properties": {
-        "count": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "requiredFrom": {
+        "from": {
           "type": "array",
           "items": {
             "type": "object",
