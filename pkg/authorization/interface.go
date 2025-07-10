@@ -13,7 +13,7 @@ type GroupManager interface {
 	RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error
 	GetGroupUsers(domainID string, domainType string, group string) ([]string, error)
 	GetGroups(domainID string, domainType string) ([]string, error)
-	GetGroupRoles(domainID string, domainType string, group string) ([]string, error)
+	GetGroupRole(domainID string, domainType string, group string) (string, error)
 }
 
 // Role management interface

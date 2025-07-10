@@ -37,14 +37,9 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
 
-	roles, err := authService.GetGroupRoles(req.DomainID, domainType, req.GroupName)
+	role, err := authService.GetGroupRole(req.DomainID, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group roles")
-	}
-
-	var role string
-	if len(roles) > 0 {
-		role = roles[0]
 	}
 
 	group := &pb.Group{

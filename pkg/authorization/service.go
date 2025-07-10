@@ -230,7 +230,7 @@ func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, e
 	return groups, nil
 }
 
-func (a *AuthService) GetGroupRoles(domainID string, domainType string, group string) ([]string, error) {
+func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
@@ -240,7 +240,7 @@ func (a *AuthService) GetGroupRoles(domainID string, domainType string, group st
 			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "role:"))
 		}
 	}
-	return unprefixedRoles, nil
+	return unprefixedRoles[0], nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {

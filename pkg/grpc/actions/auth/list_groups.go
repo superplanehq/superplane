@@ -32,14 +32,9 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 
 	groups := make([]*pb.Group, len(groupNames))
 	for i, groupName := range groupNames {
-		roles, err := authService.GetGroupRoles(req.DomainID, domainType, groupName)
+		role, err := authService.GetGroupRole(req.DomainID, domainType, groupName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to get group roles")
-		}
-
-		var role string
-		if len(roles) > 0 {
-			role = roles[0]
 		}
 
 		groups[i] = &pb.Group{

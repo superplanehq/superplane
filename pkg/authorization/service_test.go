@@ -412,10 +412,14 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		assert.Contains(t, groups, "admins")
 		assert.Contains(t, groups, "viewers")
 
-		// Get group roles
-		roles, err := authService.GetGroupRoles(orgID, DomainOrg, "admins")
+		// Get group role
+		role, err := authService.GetGroupRole(orgID, DomainOrg, "admins")
 		require.NoError(t, err)
-		assert.Contains(t, roles, RoleOrgAdmin)
+		assert.Equal(t, role, RoleOrgAdmin)
+
+		role, err = authService.GetGroupRole(orgID, DomainOrg, "viewers")
+		require.NoError(t, err)
+		assert.Equal(t, role, RoleOrgViewer)
 	})
 }
 
