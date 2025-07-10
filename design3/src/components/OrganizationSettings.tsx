@@ -36,6 +36,7 @@ export function OrganizationSettings({
   const [activeRoleTab, setActiveRoleTab] = useState<'organization' | 'canvas'>('organization')
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
   
   // Mock data for organization roles
   const organizationRoles = [
@@ -278,15 +279,58 @@ export function OrganizationSettings({
     setIsCreatingRole(false)
     setNewRoleName('')
     setNewRoleDescription('')
+    setSelectedPermissions(new Set())
   }
 
   const handleSaveRole = () => {
     // Here you would typically save the role to your backend
     console.log('Creating role:', {
       name: newRoleName,
-      description: newRoleDescription
+      description: newRoleDescription,
+      permissions: Array.from(selectedPermissions)
     })
     handleBackToRoles()
+  }
+
+  const handlePermissionToggle = (permissionId: string) => {
+    setSelectedPermissions(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(permissionId)) {
+        newSet.delete(permissionId)
+      } else {
+        newSet.add(permissionId)
+      }
+      return newSet
+    })
+  }
+
+  const handleCategoryToggle = (categoryPermissions: { id: string; name: string; description: string }[]) => {
+    const allSelected = categoryPermissions.every(permission => selectedPermissions.has(permission.id))
+    
+    setSelectedPermissions(prev => {
+      const newSet = new Set(prev)
+      if (allSelected) {
+        // Uncheck all permissions in this category
+        categoryPermissions.forEach(permission => {
+          newSet.delete(permission.id)
+        })
+      } else {
+        // Check all permissions in this category
+        categoryPermissions.forEach(permission => {
+          newSet.add(permission.id)
+        })
+      }
+      return newSet
+    })
+  }
+
+  const isCategorySelected = (categoryPermissions: { id: string; name: string; description: string }[]) => {
+    return categoryPermissions.every(permission => selectedPermissions.has(permission.id))
+  }
+
+  const isCategoryIndeterminate = (categoryPermissions: { id: string; name: string; description: string }[]) => {
+    const selectedCount = categoryPermissions.filter(permission => selectedPermissions.has(permission.id)).length
+    return selectedCount > 0 && selectedCount < categoryPermissions.length
   }
 
   // Role tabs configuration
@@ -658,9 +702,9 @@ export function OrganizationSettings({
                 {/* Permissions */}
                
                   <div className="pt-4 mb-4">
-                    <Subheading level={2} className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
+                    <Heading level={2} className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
                       {activeRoleTab === 'organization' ? 'Organization' : 'Canvas'} Permissions
-                    </Subheading>
+                    </Heading>
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                       Select the permissions this role should have {activeRoleTab === 'organization' ? 'within the organization' : 'for canvas operations'}.
                     </Text>
@@ -669,14 +713,26 @@ export function OrganizationSettings({
                   <div className="space-y-6">
                     {(activeRoleTab === 'organization' ? organizationPermissions : canvasPermissions).map((category) => (
                       <div key={category.category} className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <MaterialSymbol name={category.icon} size="sm" className="text-zinc-600 dark:text-zinc-400" />
-                          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
+                        <div className="flex items-center pb-2">
+                          <div className="flex items-center">
+                            <h3 className="text-md font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
+                          </div>
+                          <Link 
+                            href="#"
+                            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-3"
+                            onClick={() => handleCategoryToggle(category.permissions)}
+                          >
+                            {isCategorySelected(category.permissions) ? 'Deselect all' : 'Select all'}
+                          </Link>
                         </div>
-                        <div className="space-y-3 ml-8">
+                        <div className="space-y-3">
                           {category.permissions.map((permission) => (
                             <CheckboxField key={permission.id}>
-                              <Checkbox name={permission.id} value=" " />
+                              <Checkbox 
+                                name={permission.id} 
+                                checked={selectedPermissions.has(permission.id)}
+                                onChange={() => handlePermissionToggle(permission.id)}
+                              />
                               <Label>{permission.name}</Label>
                               <Description>{permission.description}</Description>
                             </CheckboxField>
