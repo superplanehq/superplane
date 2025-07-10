@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { LoginPage } from './components/LoginPage'
+import { OrganizationApp } from './components/OrganizationApp'
 import { HomePage } from './components/HomePage'
 import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
@@ -146,8 +147,8 @@ function App() {
     )
   }
 
-  // Special route for dashboard
-  if (currentPath === '/dashboard') {
+  // Special route for legacy dashboard
+  if (currentPath === '/legacy-dashboard') {
     return (
       <DashboardPage 
         onSignOut={() => setIsLoggedIn(false)} 
@@ -156,13 +157,36 @@ function App() {
     )
   }
 
-  // Default to home page after login
+  // Route for legacy home page
+  if (currentPath === '/legacy-home') {
+    return (
+      <HomePage 
+        onSignOut={() => setIsLoggedIn(false)}
+        navigationLinks={navigationLinks}
+        onLinkClick={handleLinkClick}
+        onConfigurationClick={handleConfigurationClick}
+      />
+    )
+  }
+
+  // Route for main landing page (workspaces view)
+  if (currentPath === '/workspaces') {
+    return (
+      <MainLandingPage 
+        onSignOut={() => setIsLoggedIn(false)}
+        onNavigate={(page) => {
+          window.history.pushState(null, '', `/${page}`)
+          setCurrentPath(`/${page}`)
+        }}
+      />
+    )
+  }
+
+  // Default to organization app after login
   return (
-    <HomePage 
+    <HomePage  
       onSignOut={() => setIsLoggedIn(false)}
-      navigationLinks={navigationLinks}
-      onLinkClick={handleLinkClick}
-      onConfigurationClick={handleConfigurationClick}
+     
     />
   )
 }

@@ -110,9 +110,9 @@ export function SettingsPage({
 
   const currentOrganization: Organization = {
     id: '1',
-    name: 'Development Team',
+    name: 'Acme Corporation',
     plan: 'Pro Plan',
-    initials: 'DT',
+    initials: 'AC',
   }
 
   // Navigation handlers
@@ -135,7 +135,12 @@ export function SettingsPage({
   }
 
   const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members') => {
-    console.log(`Organization action: ${action}`)
+    if (action === 'settings') {
+      // Already on settings page
+      console.log('Already on organization settings page')
+    } else {
+      console.log(`Organization action: ${action}`)
+    }
   }
 
   const handleLinkClick = (linkId: string) => {
@@ -231,13 +236,13 @@ export function SettingsPage({
       <NavigationVertical
         user={currentUser}
         organization={currentOrganization}
-        showOrganization={false}
+        showOrganization={true}
         links={navigationLinks}
         onHelpClick={handleHelpClick}
         onUserMenuAction={handleUserMenuAction}
         onOrganizationMenuAction={handleOrganizationMenuAction}
         onLinkClick={handleLinkClick}
-        onConfigurationClick={onConfigurationClick}
+        onConfigurationClick={undefined}
       />
 
       {/* Main Content */}

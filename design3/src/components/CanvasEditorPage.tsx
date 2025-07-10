@@ -14,7 +14,6 @@ import {
   Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { NavigationVertical, type User, type Organization, type NavigationLink } from './lib/Navigation/navigation-vertical'
 import { WorkflowNode, WorkflowEdge } from '../types';
 import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
@@ -31,10 +30,6 @@ const nodeTypes = {
 
 interface CanvasEditorPageProps {
   canvasId: string
-  onSignOut?: () => void
-  navigationLinks?: NavigationLink[]
-  onLinkClick?: (linkId: string) => void
-  onConfigurationClick?: () => void
   onBack?: () => void
 }
 
@@ -117,10 +112,6 @@ const initialEdges: WorkflowEdge[] = [
  */
 export function CanvasEditorPage({ 
   canvasId, 
-  onSignOut, 
-  navigationLinks = [], 
-  onLinkClick,
-  onConfigurationClick,
   onBack
 }: CanvasEditorPageProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
@@ -141,52 +132,6 @@ export function CanvasEditorPage({
 
 
 
-  // Mock user and organization data
-  const currentUser: User = {
-    id: '1',
-    name: 'John Doe',
-    email: 'john@superplane.com',
-    initials: 'JD',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face',
-  }
-
-  const currentOrganization: Organization = {
-    id: '1',
-    name: 'Development Team',
-    plan: 'Pro Plan',
-    initials: 'DT',
-  }
-
-  // Navigation handlers
-  const handleHelpClick = () => {
-    console.log('Opening help documentation...')
-  }
-
-  const handleUserMenuAction = (action: 'profile' | 'settings' | 'signout') => {
-    switch (action) {
-      case 'profile':
-        console.log('Navigating to user profile...')
-        break
-      case 'settings':
-        console.log('Opening account settings...')
-        break
-      case 'signout':
-        onSignOut?.()
-        break
-    }
-  }
-
-  const handleOrganizationMenuAction = (action: 'settings' | 'billing' | 'members') => {
-    console.log(`Organization action: ${action}`)
-  }
-
-  const handleLinkClick = (linkId: string) => {
-    if (onLinkClick) {
-      onLinkClick(linkId)
-    } else {
-      console.log(`Navigation link clicked: ${linkId}`)
-    }
-  }
 
   const handleSave = () => {
     console.log('Saving canvas...', { nodes, edges })
@@ -277,95 +222,86 @@ export function CanvasEditorPage({
   );
 
   return (
-    <div className="flex min-h-screen h-full bg-gray-50">
-     {/* Vertical Navigation */}
-           <NavigationVertical
-             user={currentUser}
-             organization={currentOrganization}
-             showOrganization={false}
-             links={navigationLinks}
-             onHelpClick={handleHelpClick}
-             onUserMenuAction={handleUserMenuAction}
-             onOrganizationMenuAction={handleOrganizationMenuAction}
-             onLinkClick={handleLinkClick}
-             onConfigurationClick={onConfigurationClick}
-           />
-     
-           {/* Main Content */}
-           <div className="flex-1 flex flex-col">
-             {/* Header */}
-             <header className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-4">
-               <div className="flex items-center justify-between">
-                 <div className="flex items-center space-x-4">
-                   <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700" />
-                   <div>
-                     <Subheading level={1} className="font-normal mb-1">{getCanvasName(canvasId)}</Subheading>
-                   </div>
-                 </div>
-                 
-                 <div className="flex items-center space-x-3">
-                   <button
-                     onClick={handleShare}
-                     className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
-                   >
-                     <MaterialSymbol name="share" size="sm" />
-                     Share
-                   </button>
-                   <button
-                     onClick={handleSave}
-                     className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                   >
-                     <MaterialSymbol name="save" size="sm" />
-                     Save
-                   </button>
-                 </div>
-               </div>
-             </header>
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-4">
+        <div className="flex items-center justify-between">
+          {/* Breadcrumbs */}
+          <nav className="flex items-center space-x-2 text-sm">
+            <button
+              onClick={onBack}
+              className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
+            >
+              Canvases
+            </button>
+            <MaterialSymbol name="chevron_right" className="text-zinc-400" size="sm" />
+            <span className="text-zinc-900 dark:text-zinc-100 font-medium">
+              {getCanvasName(canvasId)}
+            </span>
+          </nav>
+          
+          {/* Actions */}
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleShare}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
+            >
+              <MaterialSymbol name="share" size="sm" />
+              Share
+            </button>
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <MaterialSymbol name="save" size="sm" />
+              Save
+            </button>
+          </div>
+        </div>
+      </header>
 
-              {/* React Flow Canvas */}
-              <div className='absolute  left-0 top-0 w-96 h-full z-50'> 
-                <ComponentSidebar
-                  isOpen={false}
-                  onClose={() => setSidebarOpen(false)}
-                  onNodeAdd={addNode}
-                />
-              </div>
-              <div className="flex-1" ref={reactFlowWrapper}>
-                <ReactFlowProvider>
-                  <ReactFlow
-                    nodes={nodes}
-                    edges={edges}
-                    onNodesChange={onNodesChange}
-                    onEdgesChange={onEdgesChange}
-                    onConnect={onConnect}
-                    onNodeClick={onNodeClick}
-                    nodeTypes={nodeTypes}
-                    connectionLineType={ConnectionLineType.SmoothStep}
-                    fitView
-                    attributionPosition="bottom-left"
-                    className="bg-gray-50"
-                  >
-                    <Controls 
-                      className="bg-white border border-gray-300 rounded-lg shadow-sm"
-                      showInteractive={false}
-                    />
-                    <Background 
-                      variant={BackgroundVariant.Dots} 
-                      gap={20} 
-                      size={1}
-                      color="#e5e7eb"
-                    />
-                  </ReactFlow>
-                </ReactFlowProvider>
-              </div>
-            </div>
+      {/* React Flow Canvas */}
+      <div className="flex-1 flex">
+        {/* Component Sidebar */}
+        <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
+          <ComponentSidebar
+            isOpen={true}
+            onClose={() => setSidebarOpen(false)}
+            onNodeAdd={addNode}
+          />
+        </div>
+        
+        {/* Canvas Area */}
+        <div className="flex-1" ref={reactFlowWrapper}>
+          <ReactFlowProvider>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onEdgesChange={onEdgesChange}
+              onConnect={onConnect}
+              onNodeClick={onNodeClick}
+              nodeTypes={nodeTypes}
+              connectionLineType={ConnectionLineType.SmoothStep}
+              fitView
+              attributionPosition="bottom-left"
+              className="bg-gray-50"
+            >
+              <Controls 
+                className="bg-white border border-gray-300 rounded-lg shadow-sm"
+                showInteractive={false}
+              />
+              <Background 
+                variant={BackgroundVariant.Dots} 
+                gap={20} 
+                size={1}
+                color="#e5e7eb"
+              />
+            </ReactFlow>
+          </ReactFlowProvider>
+        </div>
+      </div>
 
-      {/* Component Sidebar */}
-      <ComponentSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        onNodeAdd={addNode}
-      />
     </div>
   );
 };

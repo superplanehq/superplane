@@ -4,7 +4,7 @@ import { Avatar } from '../Avatar/avatar'
 import { Badge } from '../Badge/badge'
 import { Text } from '../Text/text'
 import { Heading } from '../Heading/heading'
-
+import clsx from 'clsx'
 
 export interface User {
   id: string
