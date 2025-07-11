@@ -183,7 +183,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                     <div key={index} className="flex items-start w-full">
                       <div className='text-gray-600 w-1/4 text-left'>Manual approval</div>
                       <div className="block w-full text-left">
-                        {condition.approval ? `Required: ${condition.approval.count} approvals` : 'Enabled'}
+                        {condition.approval ? `Required: ${condition.approval.from?.reduce((sum, req) => sum + (req.count || 1), 0) || 0} approvals` : 'Enabled'}
                       </div>
                     </div>
                   ))}

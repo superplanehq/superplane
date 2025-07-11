@@ -68,7 +68,7 @@ func Test__DescribeStage(t *testing.T) {
 		require.Len(t, response.Stage.Spec.Inputs, 1)
 		require.Len(t, response.Stage.Spec.InputMappings, 1)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, response.Stage.Spec.Conditions[0].Type)
-		assert.Equal(t, uint32(1), response.Stage.Spec.Conditions[0].Approval.Count)
+		assert.Equal(t, uint32(1), response.Stage.Spec.Conditions[0].Approval.From[0].Count)
 	})
 
 	t.Run("with ID", func(t *testing.T) {
@@ -88,6 +88,6 @@ func Test__DescribeStage(t *testing.T) {
 		require.Len(t, response.Stage.Spec.Inputs, 1)
 		require.Len(t, response.Stage.Spec.InputMappings, 1)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, response.Stage.Spec.Conditions[0].Type)
-		assert.Equal(t, uint32(1), response.Stage.Spec.Conditions[0].Approval.Count)
+		assert.Equal(t, uint32(1), response.Stage.Spec.Conditions[0].Approval.From[0].Count)
 	})
 }

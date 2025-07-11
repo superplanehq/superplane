@@ -32,8 +32,10 @@ func Test__UpdateStage(t *testing.T) {
 				Executor: executor,
 				Conditions: []*protos.Condition{
 					{
-						Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
-						Approval: &protos.ConditionApproval{Count: 1},
+						Type: protos.Condition_CONDITION_TYPE_APPROVAL,
+						Approval: &protos.ConditionApproval{
+							From: []*protos.ApprovalRequirement{{Type: protos.ApprovalRequirement_TYPE_USER, Name: r.User.String()}},
+						},
 					},
 					{
 						Type: protos.Condition_CONDITION_TYPE_TIME_WINDOW,

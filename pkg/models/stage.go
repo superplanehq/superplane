@@ -20,6 +20,10 @@ const (
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
+
+	ApprovalRequirementTypeUser  = "user"
+	ApprovalRequirementTypeRole  = "role"
+	ApprovalRequirementTypeGroup = "group"
 )
 
 type Stage struct {
@@ -187,7 +191,14 @@ func (c *TimeWindowCondition) inTimeWindow(now time.Time) bool {
 }
 
 type ApprovalCondition struct {
-	Count int `json:"count"`
+	From []ApprovalRequirement `json:"from,omitempty"`
+}
+
+type ApprovalRequirement struct {
+	Type  string `json:"type"`  // "user", "role", or "group"
+	Name  string `json:"name"`  // username, role name, or group name
+	ID    string `json:"id"`    // user ID, role name, or group name (alternative to name)
+	Count int    `json:"count"` // number of approvals required from this requirement
 }
 
 type ExecutorSpec struct {
@@ -253,13 +264,20 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 }
 
 func (s *Stage) ApprovalsRequired() int {
+	var count int
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {
-			return condition.Approval.Count
+			for _, requirement := range condition.Approval.From {
+				if requirement.Type == ApprovalRequirementTypeUser {
+					count++
+					continue
+				}
+				count += requirement.Count
+			}
 		}
 	}
 
-	return 0
+	return count
 }
 
 func (s *Stage) HasApprovalCondition() bool {

@@ -319,7 +319,8 @@ CREATE TABLE public.users (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    username character varying(255) NOT NULL
 );
 
 
@@ -547,6 +548,14 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
 -- Name: idx_account_providers_provider; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -593,6 +602,13 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
+
+
+--
+-- Name: idx_users_username; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_users_username ON public.users USING btree (username);
 
 
 --
@@ -775,7 +791,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250627174249	f
+20250710170208	f
 \.
 
 

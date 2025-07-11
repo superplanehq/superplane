@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneConditionApproval{}
 
 // SuperplaneConditionApproval struct for SuperplaneConditionApproval
 type SuperplaneConditionApproval struct {
-	Count *int64 `json:"count,omitempty"`
+	From []SuperplaneApprovalRequirement `json:"from,omitempty"`
 }
 
 // NewSuperplaneConditionApproval instantiates a new SuperplaneConditionApproval object
@@ -40,36 +40,36 @@ func NewSuperplaneConditionApprovalWithDefaults() *SuperplaneConditionApproval {
 	return &this
 }
 
-// GetCount returns the Count field value if set, zero value otherwise.
-func (o *SuperplaneConditionApproval) GetCount() int64 {
-	if o == nil || IsNil(o.Count) {
-		var ret int64
+// GetFrom returns the From field value if set, zero value otherwise.
+func (o *SuperplaneConditionApproval) GetFrom() []SuperplaneApprovalRequirement {
+	if o == nil || IsNil(o.From) {
+		var ret []SuperplaneApprovalRequirement
 		return ret
 	}
-	return *o.Count
+	return o.From
 }
 
-// GetCountOk returns a tuple with the Count field value if set, nil otherwise
+// GetFromOk returns a tuple with the From field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneConditionApproval) GetCountOk() (*int64, bool) {
-	if o == nil || IsNil(o.Count) {
+func (o *SuperplaneConditionApproval) GetFromOk() ([]SuperplaneApprovalRequirement, bool) {
+	if o == nil || IsNil(o.From) {
 		return nil, false
 	}
-	return o.Count, true
+	return o.From, true
 }
 
-// HasCount returns a boolean if a field has been set.
-func (o *SuperplaneConditionApproval) HasCount() bool {
-	if o != nil && !IsNil(o.Count) {
+// HasFrom returns a boolean if a field has been set.
+func (o *SuperplaneConditionApproval) HasFrom() bool {
+	if o != nil && !IsNil(o.From) {
 		return true
 	}
 
 	return false
 }
 
-// SetCount gets a reference to the given int64 and assigns it to the Count field.
-func (o *SuperplaneConditionApproval) SetCount(v int64) {
-	o.Count = &v
+// SetFrom gets a reference to the given []SuperplaneApprovalRequirement and assigns it to the From field.
+func (o *SuperplaneConditionApproval) SetFrom(v []SuperplaneApprovalRequirement) {
+	o.From = v
 }
 
 func (o SuperplaneConditionApproval) MarshalJSON() ([]byte, error) {
@@ -82,8 +82,8 @@ func (o SuperplaneConditionApproval) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneConditionApproval) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Count) {
-		toSerialize["count"] = o.Count
+	if !IsNil(o.From) {
+		toSerialize["from"] = o.From
 	}
 	return toSerialize, nil
 }
