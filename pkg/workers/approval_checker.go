@@ -2,7 +2,6 @@ package workers
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,7 +15,6 @@ type ApprovalChecker struct {
 }
 
 func (ac *ApprovalChecker) CheckRequirements(approvals []models.StageEventApproval, requirements []models.ApprovalRequirement) (bool, error) {
-	// Check each requirement individually
 	for _, req := range requirements {
 		satisfied, err := ac.checkRequirement(approvals, req)
 		if err != nil {
@@ -82,7 +80,6 @@ func (ac *ApprovalChecker) checkRoleRequirement(approvals []models.StageEventApp
 		roleName = requirement.ID
 	}
 
-	// Track unique users who have already been counted
 	countedUsers := make(map[string]bool)
 
 	for _, approval := range approvals {
@@ -91,20 +88,17 @@ func (ac *ApprovalChecker) checkRoleRequirement(approvals []models.StageEventApp
 		}
 
 		userID := approval.ApprovedBy.String()
-		
-		// Skip if we've already counted this user
+
 		if countedUsers[userID] {
 			continue
 		}
 
-		// Get user roles for this canvas
 		userRoles, err := authService.GetUserRolesForCanvas(userID, ac.CanvasID.String())
 		if err != nil {
 			ac.Logger.Warnf("Error getting roles for user %s: %v", userID, err)
 			continue
 		}
 
-		// Check if user has the required role
 		hasRole := false
 		for _, role := range userRoles {
 			if role.Name == roleName {
@@ -127,7 +121,6 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		return false, fmt.Errorf("error creating auth service: %v", err)
 	}
 
-	// Get canvas to find organization ID
 	canvas, err := models.FindCanvasByID(ac.CanvasID.String())
 	if err != nil {
 		return false, fmt.Errorf("error finding canvas: %v", err)
@@ -138,21 +131,16 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		groupName = requirement.ID
 	}
 
-	// Get all users in the group
 	groupUsers, err := authService.GetGroupUsers(canvas.OrganizationID.String(), groupName)
 	if err != nil {
 		return false, fmt.Errorf("error getting group users: %v", err)
 	}
 
-	// Convert group users to a map for faster lookup
 	groupUserMap := make(map[string]bool)
 	for _, userID := range groupUsers {
-		// Remove "user:" prefix if present
-		cleanUserID := strings.TrimPrefix(userID, "user:")
-		groupUserMap[cleanUserID] = true
+		groupUserMap[userID] = true
 	}
 
-	// Track unique users who have already been counted
 	countedUsers := make(map[string]bool)
 
 	for _, approval := range approvals {
@@ -161,13 +149,11 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		}
 
 		userID := approval.ApprovedBy.String()
-		
-		// Skip if we've already counted this user
+
 		if countedUsers[userID] {
 			continue
 		}
 
-		// Check if user is in the group
 		if groupUserMap[userID] {
 			countedUsers[userID] = true
 		}
