@@ -269,7 +269,7 @@ func (s *Stage) ApprovalsRequired() int {
 		if condition.Type == StageConditionTypeApproval {
 			for _, requirement := range condition.Approval.From {
 				if requirement.Type == ApprovalRequirementTypeUser {
-					count += 1
+					count++
 					continue
 				}
 				count += requirement.Count
