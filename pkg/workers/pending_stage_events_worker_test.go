@@ -103,7 +103,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		// Create stage that requires approval.
 		//
 		conditions := []models.StageCondition{
-			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, Name: r.User.String()}}}},
+			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, ID: r.User.String()}}}},
 		}
 		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
 			{
@@ -123,7 +123,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		// Create a pending stage event, approve it, and trigger the worker.
 		//
 		event := support.CreateStageEvent(t, r.Source, stage)
-		require.NoError(t, event.Approve(uuid.New()))
+		require.NoError(t, event.Approve(r.User))
 		err = w.Tick()
 		require.NoError(t, err)
 

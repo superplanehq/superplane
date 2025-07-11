@@ -46,9 +46,15 @@ func Setup(t *testing.T) *ResourceRegistry {
 
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
+	user := &models.User{
+		ID:       uuid.New(),
+		Name:     "test",
+		Username: "test",
+	}
+	database.Conn().Create(user)
 
 	r := ResourceRegistry{
-		User: uuid.New(),
+		User: user.ID,
 	}
 
 	var err error

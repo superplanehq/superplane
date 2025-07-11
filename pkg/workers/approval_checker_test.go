@@ -106,6 +106,7 @@ func TestApprovalChecker_CheckRequirements_UserRequirementCountNotMet(t *testing
 	}
 
 	userID := uuid.New()
+	anotherUserID := uuid.New()
 	now := time.Now()
 
 	approvals := []models.StageEventApproval{
@@ -118,9 +119,12 @@ func TestApprovalChecker_CheckRequirements_UserRequirementCountNotMet(t *testing
 
 	requirements := []models.ApprovalRequirement{
 		{
-			Type:  models.ApprovalRequirementTypeUser,
-			ID:    userID.String(),
-			Count: 2, // Requires 2 approvals but only has 1
+			Type: models.ApprovalRequirementTypeUser,
+			ID:   userID.String(),
+		},
+		{
+			Type: models.ApprovalRequirementTypeUser,
+			ID:   anotherUserID.String(),
 		},
 	}
 
