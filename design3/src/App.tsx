@@ -6,6 +6,8 @@ import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
+import { CanvasEditorPage2 } from './components/CanvasEditorPage2'
+import { CanvasEditorPage3 } from './components/CanvasEditorPage3'
 import { CanvasMembersPage } from './components/CanvasMembersPage'
 import { DashboardPage } from './components/DashboardPage'
 import { OrganizationPage } from './components/OrganizationPage'
@@ -112,6 +114,7 @@ function App() {
   if (currentPath === '/settings') {
     return <OrganizationSettings onSignOut={handleLogout} />
   }
+ 
   // Route based on current path
   if (currentPath === '/org-sidebar') {
     return <OrganizationPageSidebar onSignOut={handleLogout} />
@@ -181,6 +184,32 @@ function App() {
     const canvasId = currentPath.split('/canvas/')[1]
     return (
       <CanvasEditorPage 
+        canvasId={canvasId}
+        onBack={() => {
+          window.history.pushState(null, '', '/canvases')
+          setCurrentPath('/canvases')
+        }}
+      />
+    )
+  }
+  // Canvas editor route
+  if (currentPath.startsWith('/canvas2/')) {
+    const canvasId = currentPath.split('/canvas2/')[1]
+    return (
+      <CanvasEditorPage2 
+        canvasId={canvasId}
+        onBack={() => {
+          window.history.pushState(null, '', '/canvases')
+          setCurrentPath('/canvases')
+        }}
+      />
+    )
+  }
+  // Canvas editor route
+  if (currentPath.startsWith('/canvas3/')) {
+    const canvasId = currentPath.split('/canvas3/')[1]
+    return (
+      <CanvasEditorPage3 
         canvasId={canvasId}
         onBack={() => {
           window.history.pushState(null, '', '/canvases')

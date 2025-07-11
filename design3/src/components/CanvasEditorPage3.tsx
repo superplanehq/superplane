@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import * as Headless from '@headlessui/react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -37,7 +38,8 @@ import {
   DropdownMenu, 
   DropdownItem,
   DropdownLabel,
-  DropdownDescription
+  DropdownDescription,
+  DropdownDivider
 } from './lib/Dropdown/dropdown';
 import { 
   Table, 
@@ -47,6 +49,8 @@ import {
   TableHeader, 
   TableCell 
 } from './lib/Table/table';
+import { Divider } from './lib/Divider/divider';
+import { Link } from './lib/Link/link';
 
 
 // Node types for React Flow
@@ -136,7 +140,7 @@ const initialEdges: WorkflowEdge[] = [
  * - Includes proper accessibility features
  * - Handles loading and error states
  */
-export function CanvasEditorPage({ 
+export function CanvasEditorPage3({ 
   canvasId, 
   onBack
 }: CanvasEditorPageProps) {
@@ -368,39 +372,51 @@ export function CanvasEditorPage({
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Navigation */}
-      <NavigationOrg
-        user={currentUser}
-        organization={currentOrganization}
-        breadcrumbs={[
-          {
-            label: "Canvases",
-            icon: "automation",
-            href: "/canvases",
-            current: false
-          },
-          {
-            label: getCanvasName(canvasId),
-            current: true,
-            starred: isCanvasStarred,
-            dropdown: [
-              {
-                label: "Manage Members",
-                onClick: handleMembers
-              },
-              {
-                label: "Delete",
-                onClick: handleDelete
-              }
-            ],
-            onStarToggle: setIsStarred
-          }
+      <nav className="flex items-center bg-zinc-200 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+       <div className='flex border-r border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900'>
+       <Link  href="/canvases"
+          className='px-3 py-1 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-950 dark:text-white' 
+        >
+          <MaterialSymbol size='lg' opticalSize={20} weight={400} name="arrow_back" />
+        </Link>
+        </div>
+        <div className='flex px-2 hover:bg-zinc-300 dark:hover:bg-zinc-800'>
+          <Dropdown>
+            <Headless.MenuButton
+              className="flex items-center gap-3 rounded-xl border border-transparent p-1 data-active:border-zinc-200 data-hover:border-zinc-200 dark:data-active:border-zinc-700 dark:data-hover:border-zinc-700"
+              aria-label="Account options"
+            >
+              <span className="block text-left">
+                <span className="block text-md font-bold text-zinc-950 dark:text-white">
+                {getCanvasName(canvasId)}
+                </span>
+              </span>
+              <MaterialSymbol className='text-zinc-950 dark:text-white' size='lg' opticalSize={20} weight={400} name="expand_all" />
+            </Headless.MenuButton>
+            <DropdownMenu className="min-w-(--button-width)">
+              <DropdownItem href="/canvas-editor3">Other Canvas 1</DropdownItem>
+              <DropdownItem href="/canvas-editor3">Other Canvas 2</DropdownItem>
+              <DropdownItem href="/canvas-editor3">Other Canvas 3</DropdownItem>
+              <DropdownItem href="/canvas-editor3">Other Canvas 4</DropdownItem>
+              <DropdownItem href="/canvas-editor3">Other Canvas 5</DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
+        <Button plain>
+          <MaterialSymbol size='lg' opticalSize={20} weight={400} name="star" />
+        </Button>
+        <Dropdown>
+          <DropdownButton plain aria-label="More options">
+            <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
+          </DropdownButton>
+          <DropdownMenu className="min-w-(--button-width)">
+            <DropdownItem href="/canvas-editor3">Manage members</DropdownItem>
+            <DropdownItem href="/canvas-editor3">Delete</DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
         
-        ]}
-        onHelpClick={handleHelpClick}
-        onUserMenuAction={handleUserMenuAction}
-        onOrganizationMenuAction={handleOrganizationMenuAction}
-      />
-
+        
+      </nav>
       
 
       {/* React Flow Canvas */}
@@ -447,7 +463,6 @@ export function CanvasEditorPage({
 
       {/* Canvas Members Modal */}
       <Dialog 
-        className='bg-white dark:bg-zinc-900'
         open={showMembersModal} 
         onClose={() => setShowMembersModal(false)}
         size="3xl"
@@ -467,7 +482,7 @@ export function CanvasEditorPage({
           {/* Search */}
           <div className="mb-6">
             {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
@@ -510,87 +525,86 @@ export function CanvasEditorPage({
           </div>
 
           {/* Members Table */}
-          <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden px-6 py-2">
-            <Table dense>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Member</TableHeader>
-                  <TableHeader>Email</TableHeader>
-                  <TableHeader>Role</TableHeader>
-                  <TableHeader>Last Active</TableHeader>
-                  <TableHeader></TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {canvasMembers
-                  .filter(member =>
-                    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    member.email.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          src={member.avatar}
-                          initials={member.initials}
-                          className="size-8"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                            {member.name}
-                          </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {member.role}
-                          </div>
+          <Table dense className='bg-white dark:bg-zinc-800'>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Member</TableHeader>
+                <TableHeader>Email</TableHeader>
+                <TableHeader>Role</TableHeader>
+                <TableHeader>Last Active</TableHeader>
+                <TableHeader></TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {canvasMembers
+                .filter(member =>
+                  member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  member.email.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={member.avatar}
+                        initials={member.initials}
+                        className="size-8"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                          {member.name}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {member.role}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {member.email}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Dropdown>
-                        <DropdownButton outline className="flex items-center gap-2 text-sm">
-                          {member.role}
-                          <MaterialSymbol name="keyboard_arrow_down" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          <DropdownItem>
-                            <DropdownLabel>Member</DropdownLabel>
-                            <DropdownDescription>Member role description.</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem>
-                            <DropdownLabel>Admin</DropdownLabel>
-                            <DropdownDescription>Admin role description.</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem>
-                            <DropdownLabel>Editor</DropdownLabel>
-                            <DropdownDescription>Editor role description.</DropdownDescription>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                        {member.lastActive}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <Button plain onClick={() => console.log('Remove member', member.id)}>
-                              <MaterialSymbol name="close" size="md" />
-                        </Button>
-                        
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {member.email}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Dropdown>
+                      <DropdownButton outline className="flex items-center gap-2 text-sm">
+                        {member.role}
+                        <MaterialSymbol name="keyboard_arrow_down" />
+                      </DropdownButton>
+                      <DropdownMenu>
+                        <DropdownItem>
+                          <DropdownLabel>Member</DropdownLabel>
+                          <DropdownDescription>Member role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Admin</DropdownLabel>
+                          <DropdownDescription>Admin role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Editor</DropdownLabel>
+                          <DropdownDescription>Editor role description.</DropdownDescription>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {member.lastActive}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button plain onClick={() => console.log('Remove member', member.id)}>
+                            <MaterialSymbol name="close" size="md" />
+                      </Button>
+                      
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
           {/* Empty State */}
           {canvasMembers.filter(member =>
             member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

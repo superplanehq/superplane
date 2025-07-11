@@ -254,7 +254,8 @@ export function OrganizationSettings({
   const currentOrganization = {
     id: '1',
     name: 'Confluent',
-    avatar: 'https://confluent.io/favicon.ico'
+    avatar: 'https://confluent.io/favicon.ico',
+    initials: 'C'
   }
 
   // Navigation handlers
@@ -722,7 +723,7 @@ export function OrganizationSettings({
                 </div>
 
                 {/* Basic Information */}
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-4">
+                <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                       Role Name *
@@ -834,8 +835,8 @@ export function OrganizationSettings({
             />
             
             {/* Roles Table */}
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 flex items-center justify-between">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="px-6 pt-6 pb-4 flex items-center justify-between">
                 <InputGroup>
                   <Input name="search" placeholder="Search Roles…" aria-label="Search" className="w-xs" />
                 </InputGroup>
@@ -844,7 +845,7 @@ export function OrganizationSettings({
                   {buttonText}
                 </Button>
               </div>
-              <div className="px-6">
+              <div className="px-6 pb-6">
                 <Table dense>
                   <TableHead>
                     <TableRow>
@@ -935,7 +936,7 @@ export function OrganizationSettings({
             </div>
 
             {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
@@ -968,15 +969,15 @@ export function OrganizationSettings({
             </div>
 
             {/* Members List */}
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4 ">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="px-6 pt-6 pb-4 ">
                 <div className="flex items-center justify-between">
                   <InputGroup>
                     <Input name="search" placeholder="Search members…" aria-label="Search" className="w-xs" />
                   </InputGroup>
                 </div>
               </div>
-              <div className="px-6">
+              <div className="px-6 pb-6">
                 <Table dense>
                   <TableHead>
                     <TableRow>
@@ -1119,7 +1120,7 @@ export function OrganizationSettings({
                 </Heading>
               </div>
               {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
@@ -1151,15 +1152,15 @@ export function OrganizationSettings({
               </div>
             </div>
               {/* Team members table */}
-              <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-                <div className="px-6 py-4 ">
+              <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+                <div className="px-6 pt-6 pb-4 ">
                   <div className="flex items-center justify-between">
                     <InputGroup>
                       <Input name="search" placeholder="Search team members…" aria-label="Search" className="w-xs" />
                     </InputGroup>
                   </div>
                 </div>
-                <div className="px-6">
+                <div className="px-6 pb-6">
                   <Table dense>
                     <TableHead>
                       <TableRow>
@@ -1289,8 +1290,8 @@ export function OrganizationSettings({
             </div>
 
             {/* Teams Table View */}
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-              <div className="px-6 py-4  flex items-center justify-between">
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <div className="px-6 pt-6 pb-4  flex items-center justify-between">
                 <InputGroup>
                   <Input name="search" placeholder="Search Groups&hellip;" aria-label="Search" className="w-xs" />
                 </InputGroup>
@@ -1299,7 +1300,7 @@ export function OrganizationSettings({
                   Create New Group
                 </Button>
               </div>
-              <div className="px-6">
+              <div className="px-6 pb-6">
                 <Table dense>
                   <TableHead>
                     <TableRow>
@@ -1429,7 +1430,7 @@ export function OrganizationSettings({
             <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
               General
             </Heading>
-            <Fieldset className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6 max-w-xl">
+            <Fieldset className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6 max-w-xl">
               <Field>
                 <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Organization Name
@@ -1540,7 +1541,7 @@ export function OrganizationSettings({
   }
 
   return (
-    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-900">
+    <div className="flex flex-col h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Navigation */}
       <NavigationOrg
         user={currentUser}
@@ -1551,7 +1552,7 @@ export function OrganizationSettings({
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <Sidebar className='w-70 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'>
+        <Sidebar className='w-70 bg-white dark:bg-zinc-950 border-r bw-1 border-zinc-200 dark:border-zinc-800'>
           
           <SidebarBody>
             
@@ -1562,7 +1563,7 @@ export function OrganizationSettings({
                         src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&amp;h=64&amp;fit=crop&amp;crop=face"
                         alt="My Account"
                       />
-                    <SidebarLabel>My Account</SidebarLabel>
+                    <SidebarLabel className='text-zinc-900 dark:text-white'>My Account</SidebarLabel>
                 </div>
                 <SidebarItem className={`${activeTab === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => setActiveTab('profile')}>
                 <span className='px-7'>
@@ -1577,7 +1578,7 @@ export function OrganizationSettings({
                 
                 
               </SidebarSection>
-            <SidebarDivider/>
+            <SidebarDivider className='dark:border-zinc-800'/>
             <SidebarSection>
               <div className='flex items-center gap-3 text-sm font-bold py-3'>
                   <Avatar 
@@ -1586,7 +1587,7 @@ export function OrganizationSettings({
                       src="https://www.confluent.io/favicon.ico"
                       alt="Confluent"
                     />
-                  <SidebarLabel>Confluent</SidebarLabel>
+                  <SidebarLabel className='text-zinc-900 dark:text-white'>Confluent</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem 
@@ -1606,7 +1607,7 @@ export function OrganizationSettings({
         
 
         {/* Main Content */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-900">
           <div className="px-8 pb-8">
             {renderTabContent()}
           </div>

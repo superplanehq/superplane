@@ -136,7 +136,7 @@ const initialEdges: WorkflowEdge[] = [
  * - Includes proper accessibility features
  * - Handles loading and error states
  */
-export function CanvasEditorPage({ 
+export function CanvasEditorPage2({ 
   canvasId, 
   onBack
 }: CanvasEditorPageProps) {
@@ -371,6 +371,7 @@ export function CanvasEditorPage({
       <NavigationOrg
         user={currentUser}
         organization={currentOrganization}
+        breadcrumbsVariant='centered'
         breadcrumbs={[
           {
             label: "Canvases",
@@ -447,7 +448,6 @@ export function CanvasEditorPage({
 
       {/* Canvas Members Modal */}
       <Dialog 
-        className='bg-white dark:bg-zinc-900'
         open={showMembersModal} 
         onClose={() => setShowMembersModal(false)}
         size="3xl"
@@ -467,7 +467,7 @@ export function CanvasEditorPage({
           {/* Search */}
           <div className="mb-6">
             {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
@@ -510,87 +510,86 @@ export function CanvasEditorPage({
           </div>
 
           {/* Members Table */}
-          <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden px-6 py-2">
-            <Table dense>
-              <TableHead>
-                <TableRow>
-                  <TableHeader>Member</TableHeader>
-                  <TableHeader>Email</TableHeader>
-                  <TableHeader>Role</TableHeader>
-                  <TableHeader>Last Active</TableHeader>
-                  <TableHeader></TableHeader>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {canvasMembers
-                  .filter(member =>
-                    member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    member.email.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                  .map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          src={member.avatar}
-                          initials={member.initials}
-                          className="size-8"
-                        />
-                        <div>
-                          <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                            {member.name}
-                          </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            {member.role}
-                          </div>
+          <Table dense className='bg-white dark:bg-zinc-800'>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Member</TableHeader>
+                <TableHeader>Email</TableHeader>
+                <TableHeader>Role</TableHeader>
+                <TableHeader>Last Active</TableHeader>
+                <TableHeader></TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {canvasMembers
+                .filter(member =>
+                  member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  member.email.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={member.avatar}
+                        initials={member.initials}
+                        className="size-8"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                          {member.name}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {member.role}
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {member.email}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Dropdown>
-                        <DropdownButton outline className="flex items-center gap-2 text-sm">
-                          {member.role}
-                          <MaterialSymbol name="keyboard_arrow_down" />
-                        </DropdownButton>
-                        <DropdownMenu>
-                          <DropdownItem>
-                            <DropdownLabel>Member</DropdownLabel>
-                            <DropdownDescription>Member role description.</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem>
-                            <DropdownLabel>Admin</DropdownLabel>
-                            <DropdownDescription>Admin role description.</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem>
-                            <DropdownLabel>Editor</DropdownLabel>
-                            <DropdownDescription>Editor role description.</DropdownDescription>
-                          </DropdownItem>
-                        </DropdownMenu>
-                      </Dropdown>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                        {member.lastActive}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <Button plain onClick={() => console.log('Remove member', member.id)}>
-                              <MaterialSymbol name="close" size="md" />
-                        </Button>
-                        
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {member.email}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Dropdown>
+                      <DropdownButton outline className="flex items-center gap-2 text-sm">
+                        {member.role}
+                        <MaterialSymbol name="keyboard_arrow_down" />
+                      </DropdownButton>
+                      <DropdownMenu>
+                        <DropdownItem>
+                          <DropdownLabel>Member</DropdownLabel>
+                          <DropdownDescription>Member role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Admin</DropdownLabel>
+                          <DropdownDescription>Admin role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Editor</DropdownLabel>
+                          <DropdownDescription>Editor role description.</DropdownDescription>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {member.lastActive}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button plain onClick={() => console.log('Remove member', member.id)}>
+                            <MaterialSymbol name="close" size="md" />
+                      </Button>
+                      
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
           {/* Empty State */}
           {canvasMembers.filter(member =>
             member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

@@ -10,6 +10,8 @@ import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Input, InputGroup } from './lib/Input/input'
 import { Label } from './lib/Fieldset/fieldset'
 import { Link } from './lib/Link/link'
+import { Divider } from './lib/Divider/divider'
+import Tippy from '@tippyjs/react'
 
 interface CanvasesPageProps {
   onSignOut?: () => void
@@ -54,6 +56,7 @@ interface Canvas {
     id: '1',
     name: 'Confluent',
     initials: 'C',
+    avatar: 'https://confluent.io/favicon.ico',
   }
 
   // Navigation handlers
@@ -241,28 +244,34 @@ interface Canvas {
       {/* Main Content */}
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className='flex flex-row flex-grow-1 justify-items-between'>
-          <nav className='w-18 h-full bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col flex-grow-1'>
+          <nav className='w-18 h-full bg-zinc-50 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col flex-grow-1'>
                 {/* Top Section - Logo */}
               
           
               
                   <div className="flex-shrink-0 flex flex-col items-center text-center">
                   <Link href='/' className='flex flex-col items-center py-2 mb-2 mt-2'>
-                      <div className='text-zinc-700 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-7 h-7 block rounded-md'>
+                      <div className='text-zinc-700 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-200 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 block rounded-md flex items-center justify-center'>
                         <MaterialSymbol name="home" size='lg'/>
                       </div>
-                      <span className="text-xs block">Home</span>
+                      <span className="text-xs block text-zinc-700 dark:text-zinc-300">Home</span>
                     
               
                   </Link>
                     <Link href='/canvases' className='flex flex-col items-center py-2 rounded-md'>
-                      <div className='text-zinc-700 hover:text-zinc-800 bg-blue-100 dark:bg-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 rounded-md flex items-center justify-center'>
-                        <MaterialSymbol name="automation" size='lg'/>
+                      <div className='text-zinc-700 hover:text-zinc-800 bg-blue-100 dark:bg-zinc-800 hover:bg-blue-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 rounded-md flex items-center justify-center'>
+                        <MaterialSymbol fill={1} name="automation" size='lg'/>
                       </div>
-                      <span className="text-xs block">Canvases</span>
+                      <span className="text-xs block text-zinc-700 dark:text-zinc-300">Canvases</span>
                     
               
                   </Link>
+                  <Divider className='my-4'/>
+                    <Tippy placement="right" className="text-xs bg-zinc-900 dark:bg-zinc-800 text-zinc-200 dark:text-zinc-200 p-2 rounded-md" content="Create new canvas">
+                      <Button plain>
+                        <MaterialSymbol name="add" size='lg'/>
+                      </Button>
+                    </Tippy>
                   </div>
                 
           
@@ -380,7 +389,7 @@ interface Canvas {
                         /* Grid View */
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                           {filteredCanvases.map((canvas) => (
-                            <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow group">
+                            <div key={canvas.id} className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow group">
                               <div className="p-6 flex flex-col justify-between h-full">
                                 <div>
                                   {/* Header */}
@@ -452,10 +461,10 @@ interface Canvas {
                         </div>
                       ) : (
                         /* List View */
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           {filteredCanvases.map((canvas) => (
-                            <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-sm transition-shadow group">
-                              <div className="p-4">
+                            <div key={canvas.id} className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-sm transition-shadow group">
+                              <div className="p-4 pl-6">
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center space-x-4 flex-1">
                                     {/* Icon */}
@@ -483,32 +492,35 @@ interface Canvas {
                                       </div>
                                       
                                       {canvas.description && (
-                                        <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1">
+                                        <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
                                           {canvas.description}
                                         </Text>
                                       )}
                                       
-                                      <div className="flex items-center space-x-4 text-xs text-zinc-500">
-                                        <span>Created {canvas.createdAt}</span>
-                                        <span>•</span>
-                                        <span>Updated {canvas.updatedAt}</span>
-                                        <span>•</span>
-                                        <div className="flex items-center space-x-2">
-                                          <Avatar
-                                            src={canvas.createdBy.avatar}
-                                            initials={canvas.createdBy.initials}
-                                            alt={canvas.createdBy.name}
-                                            className="w-4 h-4"
-                                          />
-                                          <span>by {canvas.createdBy.name}</span>
-                                        </div>
-                                      </div>
+                                      
                                     </div>
                                   </div>
                                   
                                   {/* Actions */}
                                   <div className="flex items-center space-x-2 flex-shrink-0">
-                                    <Button plain className="text-zinc-400 hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className='flex items-center space-x-2'>
+                                      
+                                      <div className="text-zinc-500 text-right">
+                                        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
+                                          Created by <strong>{canvas.createdBy.name}</strong>
+                                        </p>
+                                        <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
+                                          Updated {canvas.updatedAt}
+                                        </p>                                    
+                                      </div>
+                                      <Avatar
+                                        src={canvas.createdBy.avatar}
+                                        initials={canvas.createdBy.initials}
+                                        alt={canvas.createdBy.name}
+                                        className="w-6 h-6 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
+                                      />
+                                    </div>
+                                    <Button plain className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <MaterialSymbol name="more_vert" />
                                     </Button>
                                   </div>

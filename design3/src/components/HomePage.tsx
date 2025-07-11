@@ -10,6 +10,8 @@ import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Input, InputGroup } from './lib/Input/input'
 import { Label } from './lib/Fieldset/fieldset'
 import { Link } from './lib/Link/link'
+import { Divider } from './lib/Divider/divider'
+import Tippy from '@tippyjs/react'
 
 interface HomePageProps {
   onSignOut?: () => void
@@ -241,7 +243,7 @@ interface Canvas {
       {/* Main Content */}
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className='flex flex-row flex-grow-1 justify-items-between'>
-          <nav className='w-18 h-full bg-zinc-50 dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 flex flex-col flex-grow-1'>
+          <nav className='w-18 h-full bg-zinc-50 dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800 flex flex-col flex-grow-1'>
                 {/* Top Section - Logo */}
               
           
@@ -250,22 +252,27 @@ interface Canvas {
                   <div className='flex flex-col items-center py-2 mb-2 mt-2'>
                      <Link href='/'>  
                       <div className='text-zinc-700 hover:text-zinc-800 bg-blue-100 dark:bg-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 rounded-md flex items-center justify-center'>
-                        <MaterialSymbol name="home" size='lg'/>
+                        <MaterialSymbol fill={1} name="home" size='lg'/>
                       </div>
-                      <span className="text-xs block">Home</span>
+                      <span className="text-xs block text-zinc-700 dark:text-zinc-300">Home</span>
                     </Link>
                     
               
                   </div>
                     <div className='flex flex-col items-center py-2 rounded-md'>
-                    <Link href='/canvases' className='text-zinc-700 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-7 h-7 block rounded-md'>
-                        <MaterialSymbol name="automation" size='lg'/>
+                    <Link href='/canvases' className='text-zinc-700 hover:text-zinc-800 hover:bg-blue-200 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 block rounded-md flex items-center justify-center'>
+                        <MaterialSymbol  name="automation" size='lg'/>
                       </Link>
-                      <span className="text-xs block">Canvases</span>
+                      <span className="text-xs block text-zinc-700 dark:text-zinc-300">Canvases</span>
                     
               
                   </div>
-                  
+                  <Divider className='my-4'/>
+                  <Tippy placement="right" className="text-xs bg-zinc-900 dark:bg-zinc-800 text-zinc-100 dark:text-zinc-200 p-2 rounded-md" content="Create new canvas">
+                    <Button plain>
+                      <MaterialSymbol name="add" size='lg'/>
+                    </Button>
+                  </Tippy>
                   </div>
                  
           
