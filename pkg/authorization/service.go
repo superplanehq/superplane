@@ -106,13 +106,21 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
-func (a *AuthService) CreateGroup(orgID string, groupName string, role string) error {
-	validRoles := []string{RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner}
-	if !contains(validRoles, role) {
-		return fmt.Errorf("invalid role %s for organization", role)
+func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string) error {
+	validRoles := map[string][]string{
+		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
+		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
 	}
 
-	domain := fmt.Sprintf("org:%s", orgID)
+	if roles, exists := validRoles[domainType]; exists {
+		if !contains(roles, role) {
+			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+		}
+	} else {
+		return fmt.Errorf("invalid domain type %s", domainType)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
 	prefixedRole := fmt.Sprintf("role:%s", role)
 
@@ -122,15 +130,15 @@ func (a *AuthService) CreateGroup(orgID string, groupName string, role string) e
 	}
 
 	if !ruleAdded {
-		return fmt.Errorf("group %s already exists with role %s in organization %s", groupName, role, orgID)
+		return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
 	}
 
-	log.Infof("Created group %s with role %s in organization %s", groupName, role, orgID)
+	log.Infof("Created group %s with role %s in %s %s", groupName, role, domainType, domainID)
 	return nil
 }
 
-func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) error {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
@@ -148,7 +156,7 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 	}
 
 	if !groupExists {
-		return fmt.Errorf("group %s does not exist in organization %s", group, orgID)
+		return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
 	}
 
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
@@ -163,8 +171,8 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 	return nil
 }
 
-func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group string) error {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
@@ -180,8 +188,8 @@ func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group str
 	return nil
 }
 
-func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
@@ -198,8 +206,8 @@ func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error
 	return users, nil
 }
 
-func (a *AuthService) GetGroups(orgID string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups: %w", err)
@@ -222,8 +230,8 @@ func (a *AuthService) GetGroups(orgID string) ([]string, error) {
 	return groups, nil
 }
 
-func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
 	unprefixedRoles := []string{}
@@ -232,7 +240,7 @@ func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error
 			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "role:"))
 		}
 	}
-	return unprefixedRoles, nil
+	return unprefixedRoles[0], nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {

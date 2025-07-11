@@ -7,6 +7,9 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbSuperplane "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -27,48 +30,54 @@ type AuthorizationInterceptor struct {
 func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterceptor {
 	rules := map[string]AuthorizationRule{
 		// Superplane rules
-		"/Superplane.Superplane/CreateCanvas":                 {Resource: "canvas", Action: "create", DomainType: "org"},
-		"/Superplane.Superplane/DescribeCanvas":               {Resource: "canvas", Action: "read", DomainType: "org"},
-		"/Superplane.Superplane/ListCanvases":                 {Resource: "canvas", Action: "read", DomainType: "org"},
-		"/Superplane.Superplane/CreateEventSource":            {Resource: "eventsource", Action: "create", DomainType: "canvas"},
-		"/Superplane.Superplane/DescribeEventSource":          {Resource: "eventsource", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/ListEventSources":             {Resource: "eventsource", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/CreateStage":                  {Resource: "stage", Action: "create", DomainType: "canvas"},
-		"/Superplane.Superplane/DescribeStage":                {Resource: "stage", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/UpdateStage":                  {Resource: "stage", Action: "update", DomainType: "canvas"},
-		"/Superplane.Superplane/ListStages":                   {Resource: "stage", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/CreateConnectionGroup":        {Resource: "connectiongroup", Action: "create", DomainType: "canvas"},
-		"/Superplane.Superplane/DescribeConnectionGroup":      {Resource: "connectiongroup", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/ListConnectionGroups":         {Resource: "connectiongroup", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/CreateSecret":                 {Resource: "secret", Action: "create", DomainType: "canvas"},
-		"/Superplane.Superplane/UpdateSecret":                 {Resource: "secret", Action: "update", DomainType: "canvas"},
-		"/Superplane.Superplane/DescribeSecret":               {Resource: "secret", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/ListSecrets":                  {Resource: "secret", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/DeleteSecret":                 {Resource: "secret", Action: "delete", DomainType: "canvas"},
-		"/Superplane.Superplane/ApproveStageEvent":            {Resource: "stageevent", Action: "approve", DomainType: "canvas"},
-		"/Superplane.Superplane/ListStageEvents":              {Resource: "stageevent", Action: "read", DomainType: "canvas"},
-		"/Superplane.Superplane/ListConnectionGroupFieldSets": {Resource: "connectiongroupfieldset", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_CreateCanvas_FullMethodName:                 {Resource: "canvas", Action: "create", DomainType: "org"},
+		pbSuperplane.Superplane_DescribeCanvas_FullMethodName:               {Resource: "canvas", Action: "read", DomainType: "org"},
+		pbSuperplane.Superplane_ListCanvases_FullMethodName:                 {Resource: "canvas", Action: "read", DomainType: "org"},
+		pbSuperplane.Superplane_CreateEventSource_FullMethodName:            {Resource: "eventsource", Action: "create", DomainType: "canvas"},
+		pbSuperplane.Superplane_DescribeEventSource_FullMethodName:          {Resource: "eventsource", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListEventSources_FullMethodName:             {Resource: "eventsource", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_CreateStage_FullMethodName:                  {Resource: "stage", Action: "create", DomainType: "canvas"},
+		pbSuperplane.Superplane_DescribeStage_FullMethodName:                {Resource: "stage", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_UpdateStage_FullMethodName:                  {Resource: "stage", Action: "update", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListStages_FullMethodName:                   {Resource: "stage", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_CreateConnectionGroup_FullMethodName:        {Resource: "connectiongroup", Action: "create", DomainType: "canvas"},
+		pbSuperplane.Superplane_DescribeConnectionGroup_FullMethodName:      {Resource: "connectiongroup", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListConnectionGroups_FullMethodName:         {Resource: "connectiongroup", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_CreateSecret_FullMethodName:                 {Resource: "secret", Action: "create", DomainType: "canvas"},
+		pbSuperplane.Superplane_UpdateSecret_FullMethodName:                 {Resource: "secret", Action: "update", DomainType: "canvas"},
+		pbSuperplane.Superplane_DescribeSecret_FullMethodName:               {Resource: "secret", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListSecrets_FullMethodName:                  {Resource: "secret", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_DeleteSecret_FullMethodName:                 {Resource: "secret", Action: "delete", DomainType: "canvas"},
+		pbSuperplane.Superplane_ApproveStageEvent_FullMethodName:            {Resource: "stageevent", Action: "approve", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListStageEvents_FullMethodName:              {Resource: "stageevent", Action: "read", DomainType: "canvas"},
+		pbSuperplane.Superplane_ListConnectionGroupFieldSets_FullMethodName: {Resource: "connectiongroupfieldset", Action: "read", DomainType: "canvas"},
+		pbAuth.Authorization_CreateCanvasGroup_FullMethodName:               {Resource: "group", Action: "create", DomainType: "canvas"},
+		pbAuth.Authorization_AddUserToCanvasGroup_FullMethodName:            {Resource: "group", Action: "update", DomainType: "canvas"},
+		pbAuth.Authorization_RemoveUserFromCanvasGroup_FullMethodName:       {Resource: "group", Action: "update", DomainType: "canvas"},
+		pbAuth.Authorization_ListCanvasGroups_FullMethodName:                {Resource: "group", Action: "read", DomainType: "canvas"},
+		pbAuth.Authorization_GetCanvasGroupUsers_FullMethodName:             {Resource: "group", Action: "read", DomainType: "canvas"},
+		pbAuth.Authorization_GetCanvasGroup_FullMethodName:                  {Resource: "group", Action: "read", DomainType: "canvas"},
 
 		// Organization rules
-		"/Superplane.Organizations.Organizations/DescribeOrganization": {Resource: "org", Action: "read", DomainType: "org"},
-		"/Superplane.Organizations.Organizations/UpdateOrganization":   {Resource: "org", Action: "update", DomainType: "org"},
-		"/Superplane.Organizations.Organizations/DeleteOrganization":   {Resource: "org", Action: "delete", DomainType: "org"},
-
-		// Authorization rules
-		"/Superplane.Authorization.Authorization/ListUserPermissions":    {Resource: "user", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/AssignRole":             {Resource: "role", Action: "assign", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/RemoveRole":             {Resource: "role", Action: "remove", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/ListRoles":              {Resource: "role", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/DescribeRole":           {Resource: "role", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/GetUserRoles":           {Resource: "user", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/CreateRole":             {Resource: "role", Action: "create", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/UpdateRole":             {Resource: "role", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/DeleteRole":             {Resource: "role", Action: "delete", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/CreateGroup":            {Resource: "group", Action: "create", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/AddUserToGroup":         {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/RemoveUserFromGroup":    {Resource: "group", Action: "update", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/ListOrganizationGroups": {Resource: "group", Action: "read", DomainType: "org"},
-		"/Superplane.Authorization.Authorization/GetGroupUsers":          {Resource: "group", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_ListUserPermissions_FullMethodName:             {Resource: "user", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_AssignRole_FullMethodName:                      {Resource: "role", Action: "assign", DomainType: "org"},
+		pbAuth.Authorization_RemoveRole_FullMethodName:                      {Resource: "role", Action: "remove", DomainType: "org"},
+		pbAuth.Authorization_ListRoles_FullMethodName:                       {Resource: "role", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_DescribeRole_FullMethodName:                    {Resource: "role", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_GetUserRoles_FullMethodName:                    {Resource: "user", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_CreateRole_FullMethodName:                      {Resource: "role", Action: "create", DomainType: "org"},
+		pbAuth.Authorization_UpdateRole_FullMethodName:                      {Resource: "role", Action: "update", DomainType: "org"},
+		pbAuth.Authorization_DeleteRole_FullMethodName:                      {Resource: "role", Action: "delete", DomainType: "org"},
+		pbAuth.Authorization_CreateOrganizationGroup_FullMethodName:         {Resource: "group", Action: "create", DomainType: "org"},
+		pbAuth.Authorization_AddUserToOrganizationGroup_FullMethodName:      {Resource: "group", Action: "update", DomainType: "org"},
+		pbAuth.Authorization_RemoveUserFromOrganizationGroup_FullMethodName: {Resource: "group", Action: "update", DomainType: "org"},
+		pbAuth.Authorization_ListOrganizationGroups_FullMethodName:          {Resource: "group", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_GetOrganizationGroupUsers_FullMethodName:       {Resource: "group", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_GetOrganizationGroup_FullMethodName:            {Resource: "group", Action: "read", DomainType: "org"},
+		pbOrganization.Organizations_DescribeOrganization_FullMethodName:    {Resource: "org", Action: "read", DomainType: "org"},
+		pbOrganization.Organizations_ListOrganizations_FullMethodName:       {Resource: "org", Action: "read", DomainType: "org"},
+		pbOrganization.Organizations_UpdateOrganization_FullMethodName:      {Resource: "org", Action: "update", DomainType: "org"},
+		pbOrganization.Organizations_DeleteOrganization_FullMethodName:      {Resource: "org", Action: "delete", DomainType: "org"},
 	}
 
 	return &AuthorizationInterceptor{

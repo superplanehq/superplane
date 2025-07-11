@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the AuthorizationCreateGroupBody type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AuthorizationCreateGroupBody{}
+// checks if the AuthorizationCreateCanvasGroupBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AuthorizationCreateCanvasGroupBody{}
 
-// AuthorizationCreateGroupBody struct for AuthorizationCreateGroupBody
-type AuthorizationCreateGroupBody struct {
+// AuthorizationCreateCanvasGroupBody struct for AuthorizationCreateCanvasGroupBody
+type AuthorizationCreateCanvasGroupBody struct {
 	GroupName *string `json:"groupName,omitempty"`
 	Role *string `json:"role,omitempty"`
 }
 
-// NewAuthorizationCreateGroupBody instantiates a new AuthorizationCreateGroupBody object
+// NewAuthorizationCreateCanvasGroupBody instantiates a new AuthorizationCreateCanvasGroupBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAuthorizationCreateGroupBody() *AuthorizationCreateGroupBody {
-	this := AuthorizationCreateGroupBody{}
+func NewAuthorizationCreateCanvasGroupBody() *AuthorizationCreateCanvasGroupBody {
+	this := AuthorizationCreateCanvasGroupBody{}
 	return &this
 }
 
-// NewAuthorizationCreateGroupBodyWithDefaults instantiates a new AuthorizationCreateGroupBody object
+// NewAuthorizationCreateCanvasGroupBodyWithDefaults instantiates a new AuthorizationCreateCanvasGroupBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAuthorizationCreateGroupBodyWithDefaults() *AuthorizationCreateGroupBody {
-	this := AuthorizationCreateGroupBody{}
+func NewAuthorizationCreateCanvasGroupBodyWithDefaults() *AuthorizationCreateCanvasGroupBody {
+	this := AuthorizationCreateCanvasGroupBody{}
 	return &this
 }
 
 // GetGroupName returns the GroupName field value if set, zero value otherwise.
-func (o *AuthorizationCreateGroupBody) GetGroupName() string {
+func (o *AuthorizationCreateCanvasGroupBody) GetGroupName() string {
 	if o == nil || IsNil(o.GroupName) {
 		var ret string
 		return ret
@@ -52,7 +52,7 @@ func (o *AuthorizationCreateGroupBody) GetGroupName() string {
 
 // GetGroupNameOk returns a tuple with the GroupName field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationCreateGroupBody) GetGroupNameOk() (*string, bool) {
+func (o *AuthorizationCreateCanvasGroupBody) GetGroupNameOk() (*string, bool) {
 	if o == nil || IsNil(o.GroupName) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *AuthorizationCreateGroupBody) GetGroupNameOk() (*string, bool) {
 }
 
 // HasGroupName returns a boolean if a field has been set.
-func (o *AuthorizationCreateGroupBody) HasGroupName() bool {
+func (o *AuthorizationCreateCanvasGroupBody) HasGroupName() bool {
 	if o != nil && !IsNil(o.GroupName) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *AuthorizationCreateGroupBody) HasGroupName() bool {
 }
 
 // SetGroupName gets a reference to the given string and assigns it to the GroupName field.
-func (o *AuthorizationCreateGroupBody) SetGroupName(v string) {
+func (o *AuthorizationCreateCanvasGroupBody) SetGroupName(v string) {
 	o.GroupName = &v
 }
 
 // GetRole returns the Role field value if set, zero value otherwise.
-func (o *AuthorizationCreateGroupBody) GetRole() string {
+func (o *AuthorizationCreateCanvasGroupBody) GetRole() string {
 	if o == nil || IsNil(o.Role) {
 		var ret string
 		return ret
@@ -84,7 +84,7 @@ func (o *AuthorizationCreateGroupBody) GetRole() string {
 
 // GetRoleOk returns a tuple with the Role field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationCreateGroupBody) GetRoleOk() (*string, bool) {
+func (o *AuthorizationCreateCanvasGroupBody) GetRoleOk() (*string, bool) {
 	if o == nil || IsNil(o.Role) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *AuthorizationCreateGroupBody) GetRoleOk() (*string, bool) {
 }
 
 // HasRole returns a boolean if a field has been set.
-func (o *AuthorizationCreateGroupBody) HasRole() bool {
+func (o *AuthorizationCreateCanvasGroupBody) HasRole() bool {
 	if o != nil && !IsNil(o.Role) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *AuthorizationCreateGroupBody) HasRole() bool {
 }
 
 // SetRole gets a reference to the given string and assigns it to the Role field.
-func (o *AuthorizationCreateGroupBody) SetRole(v string) {
+func (o *AuthorizationCreateCanvasGroupBody) SetRole(v string) {
 	o.Role = &v
 }
 
-func (o AuthorizationCreateGroupBody) MarshalJSON() ([]byte, error) {
+func (o AuthorizationCreateCanvasGroupBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o AuthorizationCreateGroupBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o AuthorizationCreateGroupBody) ToMap() (map[string]interface{}, error) {
+func (o AuthorizationCreateCanvasGroupBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.GroupName) {
 		toSerialize["groupName"] = o.GroupName
@@ -124,38 +124,38 @@ func (o AuthorizationCreateGroupBody) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableAuthorizationCreateGroupBody struct {
-	value *AuthorizationCreateGroupBody
+type NullableAuthorizationCreateCanvasGroupBody struct {
+	value *AuthorizationCreateCanvasGroupBody
 	isSet bool
 }
 
-func (v NullableAuthorizationCreateGroupBody) Get() *AuthorizationCreateGroupBody {
+func (v NullableAuthorizationCreateCanvasGroupBody) Get() *AuthorizationCreateCanvasGroupBody {
 	return v.value
 }
 
-func (v *NullableAuthorizationCreateGroupBody) Set(val *AuthorizationCreateGroupBody) {
+func (v *NullableAuthorizationCreateCanvasGroupBody) Set(val *AuthorizationCreateCanvasGroupBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAuthorizationCreateGroupBody) IsSet() bool {
+func (v NullableAuthorizationCreateCanvasGroupBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAuthorizationCreateGroupBody) Unset() {
+func (v *NullableAuthorizationCreateCanvasGroupBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAuthorizationCreateGroupBody(val *AuthorizationCreateGroupBody) *NullableAuthorizationCreateGroupBody {
-	return &NullableAuthorizationCreateGroupBody{value: val, isSet: true}
+func NewNullableAuthorizationCreateCanvasGroupBody(val *AuthorizationCreateCanvasGroupBody) *NullableAuthorizationCreateCanvasGroupBody {
+	return &NullableAuthorizationCreateCanvasGroupBody{value: val, isSet: true}
 }
 
-func (v NullableAuthorizationCreateGroupBody) MarshalJSON() ([]byte, error) {
+func (v NullableAuthorizationCreateCanvasGroupBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAuthorizationCreateGroupBody) UnmarshalJSON(src []byte) error {
+func (v *NullableAuthorizationCreateCanvasGroupBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }
