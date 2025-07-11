@@ -77,21 +77,30 @@ func (ac *ApprovalChecker) checkRoleRequirement(approvals []models.StageEventApp
 		return false, fmt.Errorf("error creating auth service: %v", err)
 	}
 
-	matchingApprovals := 0
 	roleName := requirement.Name
 	if requirement.ID != "" {
 		roleName = requirement.ID
 	}
+
+	// Track unique users who have already been counted
+	countedUsers := make(map[string]bool)
 
 	for _, approval := range approvals {
 		if approval.ApprovedBy == nil {
 			continue
 		}
 
+		userID := approval.ApprovedBy.String()
+		
+		// Skip if we've already counted this user
+		if countedUsers[userID] {
+			continue
+		}
+
 		// Get user roles for this canvas
-		userRoles, err := authService.GetUserRolesForCanvas(approval.ApprovedBy.String(), ac.CanvasID.String())
+		userRoles, err := authService.GetUserRolesForCanvas(userID, ac.CanvasID.String())
 		if err != nil {
-			ac.Logger.Warnf("Error getting roles for user %s: %v", approval.ApprovedBy.String(), err)
+			ac.Logger.Warnf("Error getting roles for user %s: %v", userID, err)
 			continue
 		}
 
@@ -105,11 +114,11 @@ func (ac *ApprovalChecker) checkRoleRequirement(approvals []models.StageEventApp
 		}
 
 		if hasRole {
-			matchingApprovals++
+			countedUsers[userID] = true
 		}
 	}
 
-	return matchingApprovals >= requirement.Count, nil
+	return len(countedUsers) >= requirement.Count, nil
 }
 
 func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventApproval, requirement models.ApprovalRequirement) (bool, error) {
@@ -124,7 +133,6 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		return false, fmt.Errorf("error finding canvas: %v", err)
 	}
 
-	matchingApprovals := 0
 	groupName := requirement.Name
 	if requirement.ID != "" {
 		groupName = requirement.ID
@@ -144,15 +152,26 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		groupUserMap[cleanUserID] = true
 	}
 
+	// Track unique users who have already been counted
+	countedUsers := make(map[string]bool)
+
 	for _, approval := range approvals {
 		if approval.ApprovedBy == nil {
 			continue
 		}
 
-		if groupUserMap[approval.ApprovedBy.String()] {
-			matchingApprovals++
+		userID := approval.ApprovedBy.String()
+		
+		// Skip if we've already counted this user
+		if countedUsers[userID] {
+			continue
+		}
+
+		// Check if user is in the group
+		if groupUserMap[userID] {
+			countedUsers[userID] = true
 		}
 	}
 
-	return matchingApprovals >= requirement.Count, nil
+	return len(countedUsers) >= requirement.Count, nil
 }
