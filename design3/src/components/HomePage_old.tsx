@@ -9,17 +9,16 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from './lib/Drop
 import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Input, InputGroup } from './lib/Input/input'
 import { Label } from './lib/Fieldset/fieldset'
-import { Link } from './lib/Link/link'
 
-interface CanvasesPageProps {
+interface HomePageProps {
   onSignOut?: () => void
   onLinkClick?: (linkId: string) => void
 }
 
-export function CanvasesPage({ 
+export function HomePage({ 
   onSignOut, 
   onLinkClick
-}: CanvasesPageProps) {
+}: HomePageProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
@@ -247,22 +246,22 @@ interface Canvas {
           
               
                   <div className="flex-shrink-0 flex flex-col items-center text-center">
-                  <Link href='/' className='flex flex-col items-center py-2 mb-2 mt-2'>
+                  <div className='flex flex-col items-center py-2 mb-2 mt-2'>
                       <div className='text-zinc-700 hover:text-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-7 h-7 block rounded-md'>
                         <MaterialSymbol name="home" size='lg'/>
                       </div>
                       <span className="text-xs block">Home</span>
                     
               
-                  </Link>
-                    <Link href='/canvases' className='flex flex-col items-center py-2 rounded-md'>
+                  </div>
+                    <div className='flex flex-col items-center py-2 rounded-md'>
                       <div className='text-zinc-700 hover:text-zinc-800 bg-blue-100 dark:bg-zinc-800 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 w-8 h-8 rounded-md flex items-center justify-center'>
                         <MaterialSymbol name="automation" size='lg'/>
                       </div>
                       <span className="text-xs block">Canvases</span>
                     
               
-                  </Link>
+                  </div>
                   </div>
                 
           
@@ -378,7 +377,7 @@ interface Canvas {
                       {/* Canvases Display */}
                       {viewMode === 'grid' ? (
                         /* Grid View */
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-6">
                           {filteredCanvases.map((canvas) => (
                             <div key={canvas.id} className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 hover:shadow-md transition-shadow group">
                               <div className="p-6 flex flex-col justify-between h-full">
