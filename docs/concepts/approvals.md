@@ -2,21 +2,9 @@
 
 Superplane supports flexible approval workflows for stage events. You can configure approval requirements that specify exactly who needs to approve before a stage can execute.
 
-## Basic Approval Configuration
+## Approval Requirements
 
-For simple approval workflows, you can specify just a count:
-
-```yaml
-name: my-stage
-conditions:
-  - type: approval
-    approval:
-      count: 2  # Requires 2 approvals from any canvas admin
-```
-
-## Advanced Approval Requirements
-
-For more sophisticated approval workflows, you can specify detailed requirements using the `required_from` field:
+For more sophisticated approval workflows, you can specify detailed requirements using the `from` field:
 
 ```yaml
 name: production-deployment
@@ -53,14 +41,12 @@ You can require approvals from specific users in two ways:
 ```yaml
 - type: user
   id: "12345678-1234-1234-1234-123456789abc"
-  count: 1
 ```
 
 **By Username:**
 ```yaml
 - type: user
   name: "john.doe"
-  count: 1
 ```
 
 ### Role Requirements
@@ -96,7 +82,7 @@ When a stage event is created and has approval conditions:
 
 1. The event enters the "waiting" state with reason "approval"
 2. Users with appropriate permissions can approve the event
-3. The system checks all requirements defined in `required_from`
+3. The system checks all requirements defined in `from`
 4. ALL requirements must be satisfied for the event to proceed
 5. Once satisfied, the event moves to the next condition or begins execution
 
