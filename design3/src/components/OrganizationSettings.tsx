@@ -9,7 +9,9 @@ import {
   Dropdown, 
   DropdownButton, 
   DropdownMenu, 
-  DropdownItem
+  DropdownItem,
+  DropdownLabel,
+  DropdownDescription
 } from './lib/Dropdown/dropdown'
 import { NavigationOrg } from './lib/Navigation/navigation-org'
 import { Breadcrumbs } from './lib/Breadcrumbs/breadcrumbs'
@@ -959,9 +961,18 @@ export function OrganizationSettings({
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
-                    <DropdownItem>Member</DropdownItem>
-                    <DropdownItem>Admin</DropdownItem>
-                    <DropdownItem>Owner</DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Member</DropdownLabel>
+                        <DropdownDescription>Member role description.</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Admin</DropdownLabel>
+                      <DropdownDescription>Admin role description.</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Owner</DropdownLabel>
+                      <DropdownDescription>Owner role description.</DropdownDescription>
+                    </DropdownItem>
                   </DropdownMenu>
                 </Dropdown>
                 <Button color="blue">Send Invite</Button>
@@ -1050,9 +1061,18 @@ export function OrganizationSettings({
                               <MaterialSymbol name="keyboard_arrow_down" />
                             </DropdownButton>
                             <DropdownMenu>
-                              <DropdownItem>Owner</DropdownItem>
-                              <DropdownItem>Admin</DropdownItem>
-                              <DropdownItem>Member</DropdownItem>
+                              <DropdownItem>
+                                <DropdownLabel>Owner</DropdownLabel>
+                                <DropdownDescription>Owner role description.</DropdownDescription>
+                              </DropdownItem>
+                              <DropdownItem>
+                                <DropdownLabel>Admin</DropdownLabel>
+                                <DropdownDescription>Admin role description.</DropdownDescription>
+                              </DropdownItem>
+                              <DropdownItem>
+                                <DropdownLabel>Member</DropdownLabel>
+                                <DropdownDescription>Member role description.</DropdownDescription>
+                              </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>
                         </TableCell>
@@ -1111,46 +1131,64 @@ export function OrganizationSettings({
                 ]}
                 showDivider={false}
               />
-
+              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
               {/* Team header */}
-              <div className='flex items-center gap-3'>
-                <Avatar className='w-9' square initials={selectedTeam.name.charAt(0)} />
-                <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                  {selectedTeam.name}
-                </Heading>
-              </div>
-              {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                    Add members
+              <div className='flex items-center justify-between'>
+                <div className='flex items-start gap-3'>
+                <Avatar className='w-12 bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-700' square initials={selectedTeam.name.charAt(0)}/>
+                <div className='flex flex-col'>
+                  <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+                    {selectedTeam.name}
+                  </Heading>
+                  <Subheading level={3} className="text-lg !font-normal text-zinc-900 dark:text-white">
+                    {selectedTeam.description}
                   </Subheading>
-                  
+                  </div>
                 </div>
-                
-              </div>
-              
-              <div className="flex gap-3">
-                <Input
-                  type="email"
-                  placeholder="Enter email address"
-                  className="flex-1"
-                />
                 <Dropdown>
-                  <DropdownButton  outline className="flex items-center gap-2 text-sm">
-                    Member
+                  <DropdownButton  outline 
+                    className="flex items-center gap-2 text-sm"
+                    onClick={(e: React.MouseEvent) => e.stopPropagation()}
+                  >
+                    {selectedTeam.role}
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
-                    <DropdownItem>Member</DropdownItem>
-                    <DropdownItem>Admin</DropdownItem>
-                    <DropdownItem>Owner</DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Admin</DropdownLabel>
+                      <DropdownDescription>Admin role description.</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Member</DropdownLabel>
+                      <DropdownDescription>Member role description.</DropdownDescription>
+                    </DropdownItem>
                   </DropdownMenu>
                 </Dropdown>
-                <Button color="blue">Send Invite</Button>
               </div>
-            </div>
+              {/* Add Members Section */}
+              <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+                      Add members
+                    </Subheading>
+                    
+                  </div>
+                  
+                </div>
+                
+                <div className="flex gap-3">
+                  <Input
+                    type="email"
+                    placeholder="Enter email address"
+                    className="flex-1"
+                  />
+                  
+                  <Button color="blue" className='flex items-center gap-2'>
+                    <MaterialSymbol name="add" />
+                    Add</Button>
+                </div>
+              </div>
               {/* Team members table */}
               <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                 <div className="px-6 pt-6 pb-4 ">
@@ -1182,15 +1220,7 @@ export function OrganizationSettings({
                             <MaterialSymbol name={getSortIcon('email', 'teamMembers')} size="sm" className="text-zinc-400" />
                           </div>
                         </TableHeader>
-                        <TableHeader 
-                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-                          onClick={() => handleSort('role', 'teamMembers')}
-                        >
-                          <div className="flex items-center gap-2">
-                            Role
-                            <MaterialSymbol name={getSortIcon('role', 'teamMembers')} size="sm" className="text-zinc-400" />
-                          </div>
-                        </TableHeader>
+                        
                         <TableHeader 
                           className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                           onClick={() => handleSort('status', 'teamMembers')}
@@ -1226,21 +1256,7 @@ export function OrganizationSettings({
                           <TableCell>
                             {member.email}
                           </TableCell>
-                          <TableCell>
-                            <Dropdown>
-                              <DropdownButton  outline className="flex items-center gap-2 text-sm">
-                                {member.role}
-                                <MaterialSymbol name="keyboard_arrow_down" />
-                              </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>Team Lead</DropdownItem>
-                                <DropdownItem>Senior Developer</DropdownItem>
-                                <DropdownItem>Developer</DropdownItem>
-                                <DropdownItem>Designer</DropdownItem>
-                                <DropdownItem>DevOps Engineer</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </TableCell>
+                          
                           <TableCell>
                             <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                               {member.status}
@@ -1275,6 +1291,7 @@ export function OrganizationSettings({
                   </Table>
                 </div>
               </div>
+            </div>
             </div>
           )
         }
@@ -1318,7 +1335,7 @@ export function OrganizationSettings({
                         onClick={() => handleSort('description', 'teams')}
                       >
                         <div className="flex items-center gap-2">
-                          Description
+                          Created
                           <MaterialSymbol name={getSortIcon('description', 'teams')} size="sm" className="text-zinc-400" />
                         </div>
                       </TableHeader>
@@ -1358,13 +1375,13 @@ export function OrganizationSettings({
                                 {team.name}
                               </Link>
                               <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                                Created {team.created}
+                                {team.description}
                               </div>
                             </div>
                           </div>
                         </TableCell>
                         <TableCell>
-                          {team.description}
+                         {team.created}
                         </TableCell>
                         <TableCell>
                           {team.memberCount} members
@@ -1379,8 +1396,14 @@ export function OrganizationSettings({
                               <MaterialSymbol name="keyboard_arrow_down" />
                             </DropdownButton>
                             <DropdownMenu>
-                              <DropdownItem>Admin</DropdownItem>
-                              <DropdownItem>Member</DropdownItem>
+                              <DropdownItem>
+                                  <DropdownLabel>Admin</DropdownLabel>
+                                <DropdownDescription>Admin role description.</DropdownDescription>
+                              </DropdownItem>
+                              <DropdownItem>
+                                <DropdownLabel>Member</DropdownLabel>
+                                <DropdownDescription>Member role description.</DropdownDescription>
+                              </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>
                         </TableCell>
