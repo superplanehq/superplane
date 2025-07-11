@@ -424,12 +424,12 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 
 	t.Run("user in group satisfies group requirement", func(t *testing.T) {
 		groupName := "engineering-team"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
@@ -461,7 +461,7 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 
 	t.Run("user not in group does not satisfy group requirement", func(t *testing.T) {
 		groupName := "different-team"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
@@ -501,17 +501,17 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 		database.Conn().Create(user2)
 
 		groupName := "approval-team"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), user2ID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, user2ID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user2 to group: %v", err)
 		}
@@ -574,12 +574,12 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 
 	t.Run("group requirement with ID instead of name", func(t *testing.T) {
 		groupName := "id-based-group"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
@@ -648,12 +648,12 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 		database.Conn().Create(user2)
 
 		groupName := "mixed-team"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
@@ -862,12 +862,12 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 
 	t.Run("same user NOT counted multiple times for group requirement", func(t *testing.T) {
 		groupName := "duplicate-approval-test"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
@@ -995,23 +995,23 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 		database.Conn().Create(user3)
 
 		groupName := "unique-counting-test"
-		err := authService.CreateGroup(orgID.String(), groupName, authorization.RoleOrgViewer)
+		err := authService.CreateGroup(canvasID.String(), authorization.DomainCanvas, groupName, authorization.RoleCanvasViewer)
 		if err != nil {
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
 		// Add all users to group
-		err = authService.AddUserToGroup(orgID.String(), userID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), user2ID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, user2ID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user2 to group: %v", err)
 		}
 
-		err = authService.AddUserToGroup(orgID.String(), user3ID.String(), groupName)
+		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, user3ID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user3 to group: %v", err)
 		}

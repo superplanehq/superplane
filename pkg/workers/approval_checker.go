@@ -131,7 +131,7 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		groupName = requirement.ID
 	}
 
-	groupUsers, err := authService.GetGroupUsers(canvas.OrganizationID.String(), groupName)
+	groupUsers, err := authService.GetGroupUsers(canvas.OrganizationID.String(), authorization.DomainCanvas, groupName)
 	if err != nil {
 		return false, fmt.Errorf("error getting group users: %v", err)
 	}
