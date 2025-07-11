@@ -6,6 +6,7 @@ import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
+import { CanvasMembersPage } from './components/CanvasMembersPage'
 import { DashboardPage } from './components/DashboardPage'
 import { OrganizationPage } from './components/OrganizationPage'
 import { OrganizationPageSidebar } from './components/OrganizationPageSidebar'
@@ -91,6 +92,12 @@ function App() {
     setIsLoggedIn(false)
     localStorage.removeItem('superplane_auth')
     localStorage.removeItem('superplane_login_timestamp')
+    
+    // Reset GitHub login state
+    localStorage.removeItem('github_auth_token')
+    localStorage.removeItem('github_user_data')
+    localStorage.removeItem('github_login_timestamp')
+    
     // Navigate to root path on logout
     window.history.pushState(null, '', '/')
     setCurrentPath('/')
@@ -151,6 +158,20 @@ function App() {
       <CanvasesPage 
         onSignOut={handleLogout}
         
+      />
+    )
+  }
+
+  // Canvas members route - must come before canvas editor route
+  if (currentPath.match(/^\/canvas\/[^\/]+\/members$/)) {
+    const canvasId = currentPath.split('/canvas/')[1].split('/members')[0]
+    return (
+      <CanvasMembersPage 
+        canvasId={canvasId}
+        onBack={() => {
+          window.history.pushState(null, '', `/canvas/${canvasId}`)
+          setCurrentPath(`/canvas/${canvasId}`)
+        }}
       />
     )
   }

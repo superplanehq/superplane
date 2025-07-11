@@ -6,7 +6,18 @@ import { Text } from '../Text/text'
 import { Heading } from '../Heading/heading'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Breadcrumbs, type BreadcrumbItem } from '../Breadcrumbs/breadcrumbs'
+import { 
+  Dropdown, 
+  DropdownButton, 
+  DropdownMenu, 
+  DropdownItem, 
+  DropdownHeader, 
+  DropdownDivider,
+  DropdownSection,
+  DropdownLabel
+} from '../Dropdown/dropdown'
 import clsx from 'clsx'
+import { Link } from '../Link/link'
 
 export interface User {
   id: string
@@ -43,7 +54,6 @@ export function NavigationOrg({
   className,
   breadcrumbs
 }: NavigationOrgProps) {
-  const [isMainMenuOpen, setIsMainMenuOpen] = useState(false)
 
   return (
     <nav className={clsx(
@@ -55,9 +65,11 @@ export function NavigationOrg({
           {/* Logo and Breadcrumbs */}
           <div className="flex items-center space-x-4">
             <div className="flex-shrink-0">
-              <Heading level={1} className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-0 ml-3">
-                SuperPlane
-              </Heading>
+              <Link href="/">
+                <Heading level={1} className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-0 ml-3">
+                  SuperPlane
+                </Heading>
+              </Link>
             </div>
             
             {/* Breadcrumbs */}
@@ -85,176 +97,133 @@ export function NavigationOrg({
             </Button>
 
             {/* Merged Account Dropdown */}
-            <div className="relative">
-              <Button
+            <Dropdown>
+              <DropdownButton 
                 plain
-                onClick={() => setIsMainMenuOpen(!isMainMenuOpen)}
                 className="flex items-center gap-x-2 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
               >
-                
                 {/* Organization Avatar with User Avatar Overlay */}
-                 {/* Organization Avatar (larger, background) */}
-           
-                    <img
-                        src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Confluent%2C_Inc._logo.svg"
-                        alt="Confluent, Inc."
-                        width={96}
-                      />
-               
-                  {/* User Avatar (smaller, overlapping in bottom-right) */}
-                  
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Confluent%2C_Inc._logo.svg"
+                  alt="Confluent, Inc."
+                  width={96}
+                />
+                
+                {/* User Avatar (smaller, overlapping in bottom-right) */}
+                <Avatar
+                  src={user.avatar}
+                  initials={user.initials}
+                  alt={user.name}
+                  className="w-7 h-7 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
+                />
+              </DropdownButton>
+
+              <DropdownMenu className="w-64">
+                {/* User Section */}
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
                     <Avatar
                       src={user.avatar}
                       initials={user.initials}
                       alt={user.name}
-                      className="w-7 h-7 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
+                      className="w-10 h-10"
                     />
-                  
-              </Button>
-
-              {/* Merged Dropdown Menu */}
-              {isMainMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-zinc-800 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-                  <div className="py-1">
-                    {/* User Section */}
-                    <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-                      <div className="flex items-center space-x-3">
-                        <Avatar
-                          src={user.avatar}
-                          initials={user.initials}
-                          alt={user.name}
-                          className="w-10 h-10"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <Text className="font-medium truncate">{user.name}</Text>
-                          <Text className="text-sm text-zinc-500 truncate">{user.email}</Text>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* User Actions */}
-                    <div className="py-1">
-                      <button
-                        onClick={() => {
-                          onUserMenuAction?.('profile')
-                          setIsMainMenuOpen(false)
-                        }}
-                        className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                      >
-                        <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Your Profile
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          onUserMenuAction?.('settings')
-                          setIsMainMenuOpen(false)
-                        }}
-                        className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                      >
-                        <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Account Settings
-                      </button>
-                    </div>
-
-                    {/* Divider */}
-                    <div className="border-t border-zinc-200 dark:border-zinc-700">
-                      {/* Organization Section */}
-                      <div className="px-4 py-3 border-b border-zinc-200 dark:border-zinc-700">
-                        <div className="flex items-center space-x-3">
-                          <Avatar
-                            src={organization.avatar}
-                            initials={organization.initials}
-                            alt={organization.name}
-                            className="w-8 h-8"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <Text className="font-medium truncate">{organization.name}</Text>
-                            {organization.plan && (
-                              <Badge color="blue" className="text-xs mt-1">{organization.plan}</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Organization Actions */}
-                      <div className="py-1">
-                        <button
-                          onClick={() => {
-                            onOrganizationMenuAction?.('settings')
-                            setIsMainMenuOpen(false)
-                          }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                        >
-                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          Organization Settings
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            onOrganizationMenuAction?.('members')
-                            setIsMainMenuOpen(false)
-                          }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                        >
-                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0" />
-                          </svg>
-                          Manage Members
-                        </button>
-                        
-                        <button
-                          onClick={() => {
-                            onOrganizationMenuAction?.('billing')
-                            setIsMainMenuOpen(false)
-                          }}
-                          className="flex items-center w-full px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                        >
-                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                          </svg>
-                          Billing & Plans
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sign Out Section */}
-                    <div className="border-t border-zinc-200 dark:border-zinc-700">
-                      <button
-                        onClick={() => {
-                          onUserMenuAction?.('signout')
-                          setIsMainMenuOpen(false)
-                        }}
-                        className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                      >
-                        <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Sign Out
-                      </button>
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate">{user.name}</Text>
+                      <Text className="text-sm text-zinc-500 truncate">{user.email}</Text>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
+                </DropdownHeader>
+
+                {/* User Actions */}
+                <DropdownSection>
+                  <DropdownItem onClick={() => onUserMenuAction?.('profile')}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Your Profile</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  
+                  <DropdownItem onClick={() => onUserMenuAction?.('settings')}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="settings" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Account Settings</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                <DropdownDivider />
+
+                {/* Organization Section */}
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      src={organization.avatar}
+                      initials={organization.initials}
+                      alt={organization.name}
+                      className="w-8 h-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate">{organization.name}</Text>
+                      {organization.plan && (
+                        <Badge color="blue" className="text-xs mt-1">{organization.plan}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </DropdownHeader>
+
+                {/* Organization Actions */}
+                <DropdownSection>
+                  <DropdownItem href='/settings'>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="business" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Organization Settings</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  
+                  <DropdownItem href='/settings/members'>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Members</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  <DropdownItem href='/settings/groups'>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="group" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Groups</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  <DropdownItem href='/settings/roles'>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="shield" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Roles</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  
+                  <DropdownItem href='/settings/billing'>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="credit_card" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Billing & Plans</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+
+                <DropdownDivider />
+
+                {/* Sign Out Section */}
+                <DropdownSection>
+                  <DropdownItem onClick={() => onUserMenuAction?.('signout')}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="logout" data-slot="icon" size='sm'/>
+                      <DropdownLabel>Sign Out</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+              </DropdownMenu>
+            </Dropdown>
           </div>
         </div>
       </div>
-
-      {/* Click outside to close dropdown */}
-      {isMainMenuOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setIsMainMenuOpen(false)}
-        />
-      )}
     </nav>
   )
 }

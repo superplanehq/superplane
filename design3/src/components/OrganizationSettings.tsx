@@ -15,7 +15,7 @@ import { NavigationOrg } from './lib/Navigation/navigation-org'
 import { Breadcrumbs } from './lib/Breadcrumbs/breadcrumbs'
 import { Link } from './lib/Link/link'
 import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
-import { Description, Label } from './lib/Fieldset/fieldset'
+import { Description, Field, Fieldset, Label } from './lib/Fieldset/fieldset'
 import { ControlledTabs, Tabs, type Tab } from './lib/Tabs/tabs'
 import { Textarea } from './lib/Textarea/textarea'
 import { 
@@ -26,6 +26,7 @@ import {
   TableHeader, 
   TableCell 
 } from './lib/Table/table'
+import { Sidebar, SidebarBody, SidebarDivider, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from './lib/Sidebar/sidebar'
 
 interface OrganizationSettingsProps {
   onBack?: () => void
@@ -45,6 +46,15 @@ export function OrganizationSettings({
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null
+    direction: 'asc' | 'desc'
+    table: 'roles' | 'members' | 'teams' | 'teamMembers'
+  }>({
+    key: null,
+    direction: 'asc',
+    table: 'roles'
+  })
   
   // Mock data for organization roles
   const organizationRoles = [
@@ -244,8 +254,7 @@ export function OrganizationSettings({
   const currentOrganization = {
     id: '1',
     name: 'Confluent',
-    plan: 'Pro Plan',
-    initials: 'C',
+    avatar: 'https://confluent.io/favicon.ico'
   }
 
   // Navigation handlers
@@ -339,6 +348,38 @@ export function OrganizationSettings({
   const isCategoryIndeterminate = (categoryPermissions: { id: string; name: string; description: string }[]) => {
     const selectedCount = categoryPermissions.filter(permission => selectedPermissions.has(permission.id)).length
     return selectedCount > 0 && selectedCount < categoryPermissions.length
+  }
+
+  const handleSort = (key: string, table: 'roles' | 'members' | 'teams' | 'teamMembers') => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc',
+      table
+    }))
+  }
+
+  const getSortedData = (data: any[], table: 'roles' | 'members' | 'teams' | 'teamMembers') => {
+    if (!sortConfig.key || sortConfig.table !== table) return data
+
+    return [...data].sort((a, b) => {
+      const aValue = a[sortConfig.key!]
+      const bValue = b[sortConfig.key!]
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }
+
+  const getSortIcon = (columnKey: string, table: 'roles' | 'members' | 'teams' | 'teamMembers') => {
+    if (sortConfig.table !== table || sortConfig.key !== columnKey) {
+      return 'unfold_more'
+    }
+    return sortConfig.direction === 'asc' ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
   }
 
   // Role tabs configuration
@@ -662,7 +703,7 @@ export function OrganizationSettings({
               {/* Breadcrumbs navigation */}
               <Breadcrumbs
                 items={[
-                  { label: 'Roles', icon: 'admin_panel_settings', onClick: handleBackToRoles },
+                  { label: 'Roles', onClick: handleBackToRoles },
                   { label: activeRoleTab === 'organization' ? 'Organization roles' : 'Canvas roles', onClick: handleBackToRoles },
                   { label: activeRoleTab === 'organization' ? 'New organization role' : 'New canvas role', current: true }
                 ]}
@@ -807,14 +848,38 @@ export function OrganizationSettings({
                 <Table dense>
                   <TableHead>
                     <TableRow>
-                      <TableHeader>Role name</TableHeader>
-                      <TableHeader>Permissions</TableHeader>
-                      <TableHeader>Status</TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('name', 'roles')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Role name
+                          <MaterialSymbol name={getSortIcon('name', 'roles')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('permissions', 'roles')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Permissions
+                          <MaterialSymbol name={getSortIcon('permissions', 'roles')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('status', 'roles')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Status
+                          <MaterialSymbol name={getSortIcon('status', 'roles')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
                       <TableHeader></TableHeader>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {currentRoles.map((role) => (
+                    {getSortedData(currentRoles, 'roles').map((role) => (
                       <TableRow key={role.id}>
                         <TableCell className="font-medium">
                           {role.name}
@@ -915,15 +980,47 @@ export function OrganizationSettings({
                 <Table dense>
                   <TableHead>
                     <TableRow>
-                      <TableHeader>Name</TableHeader>
-                      <TableHeader>Email</TableHeader>
-                      <TableHeader>Role</TableHeader>
-                      <TableHeader>Status</TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('name', 'members')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Name
+                          <MaterialSymbol name={getSortIcon('name', 'members')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('email', 'members')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Email
+                          <MaterialSymbol name={getSortIcon('email', 'members')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('role', 'members')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Role
+                          <MaterialSymbol name={getSortIcon('role', 'members')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('status', 'members')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Status
+                          <MaterialSymbol name={getSortIcon('status', 'members')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
                       <TableHeader></TableHeader>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {members.map((user) => (
+                    {getSortedData(members, 'members').map((user) => (
                       <TableRow key={user.id}>
                         <TableCell>
                           <div className="flex items-center gap-3">
@@ -1008,7 +1105,7 @@ export function OrganizationSettings({
               {/* Breadcrumbs navigation */}
               <Breadcrumbs
                 items={[
-                  { label: 'Teams', icon: 'group', onClick: handleBackToTeams },
+                  { label: 'Groups', onClick: handleBackToTeams },
                   { label: selectedTeam.name, current: true }
                 ]}
                 showDivider={false}
@@ -1066,15 +1163,47 @@ export function OrganizationSettings({
                   <Table dense>
                     <TableHead>
                       <TableRow>
-                        <TableHeader>Name</TableHeader>
-                        <TableHeader>Email</TableHeader>
-                        <TableHeader>Role</TableHeader>
-                        <TableHeader>Status</TableHeader>
+                        <TableHeader 
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                          onClick={() => handleSort('name', 'teamMembers')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Name
+                            <MaterialSymbol name={getSortIcon('name', 'teamMembers')} size="sm" className="text-zinc-400" />
+                          </div>
+                        </TableHeader>
+                        <TableHeader 
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                          onClick={() => handleSort('email', 'teamMembers')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Email
+                            <MaterialSymbol name={getSortIcon('email', 'teamMembers')} size="sm" className="text-zinc-400" />
+                          </div>
+                        </TableHeader>
+                        <TableHeader 
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                          onClick={() => handleSort('role', 'teamMembers')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Role
+                            <MaterialSymbol name={getSortIcon('role', 'teamMembers')} size="sm" className="text-zinc-400" />
+                          </div>
+                        </TableHeader>
+                        <TableHeader 
+                          className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                          onClick={() => handleSort('status', 'teamMembers')}
+                        >
+                          <div className="flex items-center gap-2">
+                            Status
+                            <MaterialSymbol name={getSortIcon('status', 'teamMembers')} size="sm" className="text-zinc-400" />
+                          </div>
+                        </TableHeader>
                         <TableHeader></TableHeader>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {teamMembers.map((member) => (
+                      {getSortedData(teamMembers, 'teamMembers').map((member) => (
                         <TableRow key={member.id}>
                           <TableCell>
                             <div className="flex items-center gap-3">
@@ -1154,7 +1283,7 @@ export function OrganizationSettings({
           <div className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
               <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                Teams
+                Groups
               </Heading>
               
             </div>
@@ -1174,15 +1303,47 @@ export function OrganizationSettings({
                 <Table dense>
                   <TableHead>
                     <TableRow>
-                      <TableHeader>Team name</TableHeader>
-                      <TableHeader>Description</TableHeader>
-                      <TableHeader>Members</TableHeader>
-                      <TableHeader>Role</TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('name', 'teams')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Team name
+                          <MaterialSymbol name={getSortIcon('name', 'teams')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('description', 'teams')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Description
+                          <MaterialSymbol name={getSortIcon('description', 'teams')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('memberCount', 'teams')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Members
+                          <MaterialSymbol name={getSortIcon('memberCount', 'teams')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
+                      <TableHeader 
+                        className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                        onClick={() => handleSort('role', 'teams')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Role
+                          <MaterialSymbol name={getSortIcon('role', 'teams')} size="sm" className="text-zinc-400" />
+                        </div>
+                      </TableHeader>
                       <TableHeader></TableHeader>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {groups.map((team) => (
+                    {getSortedData(groups, 'teams').map((team) => (
                       <TableRow 
                         key={team.id} 
                         className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
@@ -1266,48 +1427,94 @@ export function OrganizationSettings({
         return (
           <div className="space-y-6 pt-6">
             <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-              General Settings
+              General
             </Heading>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6 max-w-xl">
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+            <Fieldset className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 space-y-6 max-w-xl">
+              <Field>
+                <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Organization Name
-                </label>
+                </Label>
                 <Input
                   type="text"
                   defaultValue={currentOrganization.name}
                   className="max-w-lg"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              </Field>
+              <Field>
+                <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Description
-                </label>
+                </Label>
                 <Textarea
                   placeholder="Enter organization description"
                   className="max-w-lg"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Company Logo
-                </label>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-16 h-16 bg-zinc-100 dark:bg-zinc-700 rounded-lg border border-zinc-200 dark:border-zinc-600">
-                    <MaterialSymbol name="business" className="text-zinc-400 dark:text-zinc-500" />
+              </Field>
+              <Field>
+                
+                <div className="flex items-start gap-4">
+                  
+                  <div className='w-1/2 flex-col gap-2'>
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Company Logo
+                  </Label>
+                    <div className="flex-none grow-0">
+                      <div className="inline-block h-15 py-4 bg-white dark:bg-zinc-700 rounded-lg border border-zinc-200 dark:border-zinc-600 border-dashed px-4">  
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Confluent%2C_Inc._logo.svg"
+                            alt="Confluent, Inc."
+                            className='h-full'
+                          />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                          Upload new 
+                        </Link>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          &bull;
+                        </span>
+                        <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                          Remove  
+                        </Link>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Rectangle image 96X20px
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <Button plain className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
-                      <MaterialSymbol name="upload" size="sm" className="mr-2" />
-                      Upload logo
-                    </Button>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                      Recommended: Square image, at least 256x256px
-                    </p>
+                  <div className='w-1/2 flex-col gap-2'>
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Company Icon
+                  </Label> 
+                    <div className="flex-none grow-0 ">
+                      <div className="w-15 h-15inline-block py-4 bg-white dark:bg-zinc-700 rounded-lg border border-zinc-200 dark:border-zinc-600 border-dashed px-4">
+                        <img
+                            src="https://confluent.io/favicon.ico"
+                            alt="Confluent, Inc."
+                            height={24}
+                          />
+                      </div>
+                    </div>
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                          Upload new 
+                        </Link>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                          &bull;
+                        </span>
+                        <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
+                          Remove  
+                        </Link>
+                      </div>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Square image 64X64px
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </Field>
+              
+            </Fieldset>
           </div>
         )
 
@@ -1344,79 +1551,59 @@ export function OrganizationSettings({
       
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        
-        <div className="w-80 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700">
-          {/* User Account Section */}
-        
-          <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-700">
+        <Sidebar className='w-70 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'>
           
-            <div className="flex items-center gap-3 mb-4">
-              <Avatar 
-                className='w-8 h-8'
-                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&amp;h=64&amp;fit=crop&amp;crop=face"
-                alt="My Account"
-              />
-              <div>
-              <div className="text-sm font-medium text-zinc-900 dark:text-white">My Account</div>
-            </div>
-          </div>
-          
-          <nav className="space-y-1">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'profile'
-                  ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-              }`}
-            >
-              Profile settings
-            </button>
-            <button
-              onClick={() => setActiveTab('api_token')}
-              className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                activeTab === 'api_token'
-                  ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-              }`}
-            >
-              API Token
-            </button>
-          </nav>
-        </div>
-
-        {/* Organization Section */}
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-3 mb-4">
-          <Avatar 
-                className='w-8 h-8'
-                src="https://upload.wikimedia.org/wikipedia/commons/a/ab/Confluent%2C_Inc._logo.svg"
-                alt="My Account"
-              />
+          <SidebarBody>
             
-            <div>
-              <div className="text-sm font-medium text-zinc-900 dark:text-white">{currentOrganization.name}</div>
-            </div>
-            <MaterialSymbol name="expand_more" className="text-zinc-400 ml-auto" size="sm" />
-          </div>
-          
-          <nav className="space-y-1">
-            {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-                  activeTab === tab.id
-                    ? 'bg-zinc-100 dark:bg-zinc-700 text-zinc-900 dark:text-white'
-                    : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
+              <SidebarSection>
+                <div className='flex items-center gap-3 text-sm font-bold py-3'>
+                    <Avatar 
+                        className='w-6 h-6'
+                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&amp;h=64&amp;fit=crop&amp;crop=face"
+                        alt="My Account"
+                      />
+                    <SidebarLabel>My Account</SidebarLabel>
+                </div>
+                <SidebarItem className={`${activeTab === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => setActiveTab('profile')}>
+                <span className='px-7'>
+                  <SidebarLabel>My Profile</SidebarLabel>
+                </span>
+                </SidebarItem>
+                <SidebarItem className={`${activeTab === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => setActiveTab('api_token')}>
+                <span className='px-7'>
+                <SidebarLabel>API Token</SidebarLabel>
+                </span>
+                </SidebarItem>
+                
+                
+              </SidebarSection>
+            <SidebarDivider/>
+            <SidebarSection>
+              <div className='flex items-center gap-3 text-sm font-bold py-3'>
+                  <Avatar 
+                      className='w-6 h-6'
+                      slot="icon"
+                      src="https://www.confluent.io/favicon.ico"
+                      alt="Confluent"
+                    />
+                  <SidebarLabel>Confluent</SidebarLabel>
+              </div>
+              {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
+                <SidebarItem 
+                  key={tab.id} onClick={() => setActiveTab(tab.id as any)} 
+                  className={`${activeTab === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
+                >
+                  <span className={`px-7 ${activeTab === tab.id ? 'font-semibold' : 'font-normal'}`}>
+                    <SidebarLabel>{tab.label}</SidebarLabel>
+                  </span>
+                </SidebarItem>
+              ))}
+              
+              
+            </SidebarSection>
+          </SidebarBody>
+        </Sidebar>
+        
 
         {/* Main Content */}
         <div className="flex-1 overflow-auto">

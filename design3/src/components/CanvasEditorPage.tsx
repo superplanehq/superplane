@@ -22,6 +22,31 @@ import { Button } from './lib/Button/button';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
 import { Heading, Subheading } from './lib/Heading/heading';
 import { Text } from './lib/Text/text';
+import { 
+  Dialog, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogBody, 
+  DialogActions 
+} from './lib/Dialog/dialog';
+import { Avatar } from './lib/Avatar/avatar';
+import { Input, InputGroup } from './lib/Input/input';
+import { 
+  Dropdown, 
+  DropdownButton, 
+  DropdownMenu, 
+  DropdownItem,
+  DropdownLabel,
+  DropdownDescription
+} from './lib/Dropdown/dropdown';
+import { 
+  Table, 
+  TableHead, 
+  TableBody, 
+  TableRow, 
+  TableHeader, 
+  TableCell 
+} from './lib/Table/table';
 
 
 // Node types for React Flow
@@ -130,9 +155,8 @@ export function CanvasEditorPage({
 
   const currentOrganization: Organization = {
     id: '1',
-    name: 'Acme Corporation',
-    plan: 'Pro Plan',
-    initials: 'AC',
+    name: 'Confluent',
+    initials: 'C',
   }
 
   // Navigation handlers
@@ -179,8 +203,8 @@ export function CanvasEditorPage({
 
 
 
-  const handleSave = () => {
-    console.log('Saving canvas...', { nodes, edges })
+  const handleDelete = () => {
+    console.log('Deleting canvas...', { nodes, edges })
   }
 
   const handleExport = () => {
@@ -192,9 +216,58 @@ export function CanvasEditorPage({
     // TODO: Implement share functionality (copy link, email, etc.)
   }
 
+  const handleMembers = () => {
+    console.log('Opening canvas members modal...', { canvasId, canvasName: getCanvasName(canvasId) })
+    setShowMembersModal(true)
+  }
+
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCanvasStarred, setIsCanvasStarred] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+
+  // Mock data for canvas members
+  const canvasMembers = [
+    {
+      id: '1',
+      name: 'John Doe',
+      email: 'john@acme.com',
+      role: 'Editor',
+      permission: 'Can edit',
+      lastActive: '2 hours ago',
+      initials: 'JD',
+      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
+    },
+    {
+      id: '2',
+      name: 'Jane Smith',
+      email: 'jane@acme.com',
+      role: 'Viewer',
+      permission: 'Can view',
+      lastActive: '1 day ago',
+      initials: 'JS'
+    },
+    {
+      id: '3',
+      name: 'Bob Wilson',
+      email: 'bob@acme.com',
+      role: 'Editor',
+      permission: 'Can edit',
+      lastActive: '3 days ago',
+      initials: 'BW'
+    },
+    {
+      id: '4',
+      name: 'Alice Johnson',
+      email: 'alice@acme.com',
+      role: 'Owner',
+      permission: 'Full access',
+      lastActive: '5 minutes ago',
+      initials: 'AJ'
+    }
+  ];
 
   /**
    * Handle new connections between nodes
@@ -267,42 +340,67 @@ export function CanvasEditorPage({
     [setNodes]
   );
 
+  /**
+   * Handle canvas star toggle
+   * Updates the local state and could sync with backend
+   */
+  const setIsStarred = useCallback((starred: boolean) => {
+    setIsCanvasStarred(starred);
+    
+    // TODO: Sync with backend API
+    console.log(`Canvas ${canvasId} ${starred ? 'starred' : 'unstarred'}:`, {
+      canvasId,
+      canvasName: getCanvasName(canvasId),
+      starred
+    });
+    
+    // Example API call (commented out):
+    // try {
+    //   await updateCanvasStar(canvasId, starred);
+    // } catch (error) {
+    //   console.error('Failed to update canvas star status:', error);
+    //   // Revert the state if API call fails
+    //   setIsCanvasStarred(!starred);
+    // }
+  }, [canvasId]);
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       {/* Navigation */}
       <NavigationOrg
         user={currentUser}
         organization={currentOrganization}
-        breadcrumbs={{
-          parentLabel: "Canvases",
-          parentIcon: "automation",
-          parentLink: "/canvases",
-          currentLabel: getCanvasName(canvasId),
-        }}
+        breadcrumbs={[
+          {
+            label: "Canvases",
+            icon: "automation",
+            href: "/canvases",
+            current: false
+          },
+          {
+            label: getCanvasName(canvasId),
+            current: true,
+            starred: isCanvasStarred,
+            dropdown: [
+              {
+                label: "Manage Members",
+                onClick: handleMembers
+              },
+              {
+                label: "Delete",
+                onClick: handleDelete
+              }
+            ],
+            onStarToggle: setIsStarred
+          }
+        
+        ]}
         onHelpClick={handleHelpClick}
         onUserMenuAction={handleUserMenuAction}
         onOrganizationMenuAction={handleOrganizationMenuAction}
       />
 
-      {/* Action Bar */}
-      <div className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-3">
-        <div className="flex items-center justify-end space-x-3">
-          <button
-            onClick={handleShare}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-300 rounded-md hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:bg-zinc-800 dark:text-zinc-300 dark:border-zinc-600 dark:hover:bg-zinc-700"
-          >
-            <MaterialSymbol name="share" size="sm" />
-            Share
-          </button>
-          <button
-            onClick={handleSave}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          >
-            <MaterialSymbol name="save" size="sm" />
-            Save
-          </button>
-        </div>
-      </div>
+      
 
       {/* React Flow Canvas */}
       <div className="flex-1 flex">
@@ -345,6 +443,167 @@ export function CanvasEditorPage({
           </ReactFlowProvider>
         </div>
       </div>
+
+      {/* Canvas Members Modal */}
+      <Dialog 
+        open={showMembersModal} 
+        onClose={() => setShowMembersModal(false)}
+        size="3xl"
+      >
+        <DialogTitle className='flex items-center justify-between'>
+          Canvas Members
+
+        <Button plain onClick={() => setShowMembersModal(false)}>
+          <MaterialSymbol name="close" size='lg' />
+        </Button>
+        </DialogTitle>
+        <DialogDescription>
+          Manage who has access to "{getCanvasName(canvasId)}" and what they can do.
+        </DialogDescription>
+        
+        <DialogBody>
+          {/* Search */}
+          <div className="mb-6">
+            {/* Add Members Section */}
+            <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+                    Add members
+                  </Subheading>
+                  
+                </div>
+                
+              </div>
+              
+              <div className="flex gap-3">
+                <Input
+                  type="email"
+                  placeholder="Enter email address"
+                  className="flex-1"
+                />
+                <Dropdown>
+                  <DropdownButton  outline className="flex items-center text-sm">
+                    Member
+                    <MaterialSymbol name="keyboard_arrow_down" />
+                  </DropdownButton>
+                  <DropdownMenu>
+                    <DropdownItem>
+                      <DropdownLabel>Member</DropdownLabel>
+                      <DropdownDescription>Member role description.</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Admin</DropdownLabel>
+                      <DropdownDescription>Admin role description.</DropdownDescription>
+                    </DropdownItem>
+                    <DropdownItem>
+                      <DropdownLabel>Editor</DropdownLabel>
+                      <DropdownDescription>Editor role description.</DropdownDescription>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+                <Button color="blue">Send Invite</Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Members Table */}
+          <Table dense className='bg-white dark:bg-zinc-800'>
+            <TableHead>
+              <TableRow>
+                <TableHeader>Member</TableHeader>
+                <TableHeader>Email</TableHeader>
+                <TableHeader>Role</TableHeader>
+                <TableHeader>Last Active</TableHeader>
+                <TableHeader></TableHeader>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {canvasMembers
+                .filter(member =>
+                  member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  member.email.toLowerCase().includes(searchQuery.toLowerCase())
+                )
+                .map((member) => (
+                <TableRow key={member.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Avatar
+                        src={member.avatar}
+                        initials={member.initials}
+                        className="size-8"
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-white">
+                          {member.name}
+                        </div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                          {member.role}
+                        </div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                      {member.email}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Dropdown>
+                      <DropdownButton outline className="flex items-center gap-2 text-sm">
+                        {member.role}
+                        <MaterialSymbol name="keyboard_arrow_down" />
+                      </DropdownButton>
+                      <DropdownMenu>
+                        <DropdownItem>
+                          <DropdownLabel>Member</DropdownLabel>
+                          <DropdownDescription>Member role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Admin</DropdownLabel>
+                          <DropdownDescription>Admin role description.</DropdownDescription>
+                        </DropdownItem>
+                        <DropdownItem>
+                          <DropdownLabel>Editor</DropdownLabel>
+                          <DropdownDescription>Editor role description.</DropdownDescription>
+                        </DropdownItem>
+                      </DropdownMenu>
+                    </Dropdown>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {member.lastActive}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex justify-end">
+                      <Button plain onClick={() => console.log('Remove member', member.id)}>
+                            <MaterialSymbol name="close" size="md" />
+                      </Button>
+                      
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {/* Empty State */}
+          {canvasMembers.filter(member =>
+            member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            member.email.toLowerCase().includes(searchQuery.toLowerCase())
+          ).length === 0 && searchQuery && (
+            <div className="text-center py-8">
+              <MaterialSymbol name="search_off" className="text-zinc-400 text-4xl mb-2" />
+              <p className="text-zinc-500 dark:text-zinc-400">
+                No members found matching "{searchQuery}"
+              </p>
+            </div>
+          )}
+        </DialogBody>
+        
+       
+      </Dialog>
 
     </div>
   );
