@@ -114,7 +114,7 @@ func Test__CreateStage(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid condition: invalid approval condition: count must be greater than 0", s.Message())
+		assert.Equal(t, "invalid condition: invalid approval condition: from must be specified", s.Message())
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {

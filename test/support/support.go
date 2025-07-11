@@ -63,12 +63,20 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		require.NoError(t, err)
 	}
 
+	approvalConditions := make([]models.ApprovalRequirement, options.Approvals)
+	for i := 0; i < options.Approvals; i++ {
+		approvalConditions[i] = models.ApprovalRequirement{
+			Type: models.ApprovalRequirementTypeUser,
+			Name: r.User.String(),
+		}
+	}
+
 	if options.Stage {
 		conditions := []models.StageCondition{
 			{
 				Type: models.StageConditionTypeApproval,
 				Approval: &models.ApprovalCondition{
-					From: []models.ApprovalRequirement{{Type: models.ApprovalRequirementTypeUser, Name: r.User.String()}},
+					From: approvalConditions,
 				},
 			},
 		}

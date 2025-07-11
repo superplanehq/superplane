@@ -188,7 +188,7 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 
 		var requirements []models.ApprovalRequirement
 		for _, req := range condition.Approval.From {
-			if req.Count == 0 {
+			if req.Count <= 0 && req.Type != pb.ApprovalRequirement_TYPE_USER {
 				return nil, fmt.Errorf("invalid approval requirement: count must be greater than 0")
 			}
 
@@ -196,6 +196,7 @@ func validateCondition(condition *pb.Condition) (*models.StageCondition, error) 
 			switch req.Type {
 			case pb.ApprovalRequirement_TYPE_USER:
 				reqType = models.ApprovalRequirementTypeUser
+				req.Count = 1
 			case pb.ApprovalRequirement_TYPE_ROLE:
 				reqType = models.ApprovalRequirementTypeRole
 			case pb.ApprovalRequirement_TYPE_GROUP:
@@ -406,6 +407,7 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 			switch req.Type {
 			case models.ApprovalRequirementTypeUser:
 				reqType = pb.ApprovalRequirement_TYPE_USER
+				req.Count = 1
 			case models.ApprovalRequirementTypeRole:
 				reqType = pb.ApprovalRequirement_TYPE_ROLE
 			case models.ApprovalRequirementTypeGroup:

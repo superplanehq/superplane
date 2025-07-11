@@ -46,8 +46,6 @@ func (ac *ApprovalChecker) checkRequirement(approvals []models.StageEventApprova
 }
 
 func (ac *ApprovalChecker) checkUserRequirement(approvals []models.StageEventApproval, requirement models.ApprovalRequirement) (bool, error) {
-	matchingApprovals := 0
-
 	for _, approval := range approvals {
 		if approval.ApprovedBy == nil {
 			continue
@@ -55,7 +53,7 @@ func (ac *ApprovalChecker) checkUserRequirement(approvals []models.StageEventApp
 
 		if requirement.ID != "" {
 			if approval.ApprovedBy.String() == requirement.ID {
-				matchingApprovals++
+				return true, nil
 			}
 		} else if requirement.Name != "" {
 			user, err := models.FindUserByID(approval.ApprovedBy.String())
@@ -65,12 +63,12 @@ func (ac *ApprovalChecker) checkUserRequirement(approvals []models.StageEventApp
 			}
 
 			if user.Username == requirement.Name {
-				matchingApprovals++
+				return true, nil
 			}
 		}
 	}
 
-	return matchingApprovals >= requirement.Count, nil
+	return false, nil
 }
 
 func (ac *ApprovalChecker) checkRoleRequirement(approvals []models.StageEventApproval, requirement models.ApprovalRequirement) (bool, error) {
