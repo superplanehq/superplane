@@ -121,17 +121,12 @@ func (ac *ApprovalChecker) checkGroupRequirement(approvals []models.StageEventAp
 		return false, fmt.Errorf("error creating auth service: %v", err)
 	}
 
-	canvas, err := models.FindCanvasByID(ac.CanvasID.String())
-	if err != nil {
-		return false, fmt.Errorf("error finding canvas: %v", err)
-	}
-
 	groupName := requirement.Name
 	if requirement.ID != "" {
 		groupName = requirement.ID
 	}
 
-	groupUsers, err := authService.GetGroupUsers(canvas.OrganizationID.String(), authorization.DomainCanvas, groupName)
+	groupUsers, err := authService.GetGroupUsers(ac.CanvasID.String(), authorization.DomainCanvas, groupName)
 	if err != nil {
 		return false, fmt.Errorf("error getting group users: %v", err)
 	}

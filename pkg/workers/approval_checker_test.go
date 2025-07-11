@@ -324,6 +324,8 @@ func TestApprovalChecker_CheckRoleRequirement_DatabaseIntegration(t *testing.T) 
 	})
 
 	t.Run("multiple users with role satisfy count requirement", func(t *testing.T) {
+		// Clean up users table only to avoid duplicate username constraint
+		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
 			ID:       user2ID,
@@ -492,6 +494,8 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 	})
 
 	t.Run("multiple users in group satisfy count requirement", func(t *testing.T) {
+		// Clean up users table only to avoid duplicate username constraint
+		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
 			ID:       user2ID,
@@ -639,6 +643,8 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 	}
 
 	t.Run("mixed requirements - role and group", func(t *testing.T) {
+		// Clean up users table only to avoid duplicate username constraint
+		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
 			ID:       user2ID,
@@ -904,6 +910,8 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 	})
 
 	t.Run("unique users are counted correctly for role requirement", func(t *testing.T) {
+		// Clean up users table only to avoid duplicate username constraint
+		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2', 'test3')")
 		user2ID := uuid.New()
 		user2 := &models.User{
 			ID:       user2ID,
@@ -978,6 +986,8 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 	})
 
 	t.Run("unique users are counted correctly for group requirement", func(t *testing.T) {
+		// Clean up users table only to avoid duplicate username constraint
+		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2', 'test3')")
 		user2ID := uuid.New()
 		user2 := &models.User{
 			ID:       user2ID,
