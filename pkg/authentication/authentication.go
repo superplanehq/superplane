@@ -431,7 +431,8 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
 	if err != nil {
 		user = &models.User{
-			Name: gothUser.Name,
+			Name:     gothUser.Name,
+			Username: gothUser.NickName,
 		}
 
 		if err := user.Create(); err != nil {
