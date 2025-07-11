@@ -28,6 +28,13 @@ import {
   TableHeader, 
   TableCell 
 } from './lib/Table/table'
+import { 
+  Dialog, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogBody, 
+  DialogActions 
+} from './lib/Dialog/dialog'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarHeader, SidebarItem, SidebarLabel, SidebarSection, SidebarSpacer } from './lib/Sidebar/sidebar'
 
 interface OrganizationSettingsProps {
@@ -57,6 +64,18 @@ export function OrganizationSettings({
     direction: 'asc',
     table: 'roles'
   })
+  
+  // Inline editing state
+  const [isEditingGroupName, setIsEditingGroupName] = useState(false)
+  const [isEditingGroupDescription, setIsEditingGroupDescription] = useState(false)
+  const [editedGroupName, setEditedGroupName] = useState('')
+  const [editedGroupDescription, setEditedGroupDescription] = useState('')
+  
+  // Create group modal state
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
+  const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupDescription, setNewGroupDescription] = useState('')
+  const [newGroupRole, setNewGroupRole] = useState('Member')
   
   // Mock data for organization roles
   const organizationRoles = [
@@ -289,6 +308,85 @@ export function OrganizationSettings({
 
   const handleBackToTeams = () => {
     setSelectedTeam(null)
+  }
+
+  // Inline editing handlers
+  const handleEditGroupName = () => {
+    if (selectedTeam) {
+      setEditedGroupName(selectedTeam.name)
+      setIsEditingGroupName(true)
+    }
+  }
+
+  const handleSaveGroupName = () => {
+    if (selectedTeam && editedGroupName.trim()) {
+      // Update the group name - in a real app this would call an API
+      setSelectedTeam({ ...selectedTeam, name: editedGroupName.trim() })
+      setIsEditingGroupName(false)
+      console.log('Saving group name:', editedGroupName)
+    }
+  }
+
+  const handleCancelGroupName = () => {
+    setIsEditingGroupName(false)
+    setEditedGroupName('')
+  }
+
+  const handleEditGroupDescription = () => {
+    if (selectedTeam) {
+      setEditedGroupDescription(selectedTeam.description)
+      setIsEditingGroupDescription(true)
+    }
+  }
+
+  const handleSaveGroupDescription = () => {
+    if (selectedTeam && editedGroupDescription.trim()) {
+      // Update the group description - in a real app this would call an API
+      setSelectedTeam({ ...selectedTeam, description: editedGroupDescription.trim() })
+      setIsEditingGroupDescription(false)
+      console.log('Saving group description:', editedGroupDescription)
+    }
+  }
+
+  const handleCancelGroupDescription = () => {
+    setIsEditingGroupDescription(false)
+    setEditedGroupDescription('')
+  }
+
+  // Create group modal handlers
+  const handleCreateGroupClick = () => {
+    setShowCreateGroupModal(true)
+  }
+
+  const handleCreateGroupCancel = () => {
+    setShowCreateGroupModal(false)
+    setNewGroupName('')
+    setNewGroupDescription('')
+    setNewGroupRole('Member')
+  }
+
+  const handleCreateGroupSubmit = () => {
+    if (newGroupName.trim()) {
+      // Create new group object
+      const newGroup = {
+        id: (groups.length + 1).toString(),
+        name: newGroupName.trim(),
+        description: newGroupDescription.trim() || 'No description provided',
+        memberCount: 0,
+        created: 'Just now'
+      }
+      
+      // Set as selected team to show the group page
+      setSelectedTeam(newGroup)
+      
+      // Close modal and reset form
+      setShowCreateGroupModal(false)
+      setNewGroupName('')
+      setNewGroupDescription('')
+      setNewGroupRole('Member')
+      
+      console.log('Created new group:', newGroup)
+    }
   }
 
   const handleCreateRole = () => {
@@ -1133,16 +1231,85 @@ export function OrganizationSettings({
               />
               <div className="bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
               {/* Team header */}
-              <div className='flex items-center justify-between'>
+              <div className='flex items-start justify-between'>
                 <div className='flex items-start gap-3'>
-                <Avatar className='w-12 bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-700' square initials={selectedTeam.name.charAt(0)}/>
-                <div className='flex flex-col'>
-                  <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                    {selectedTeam.name}
-                  </Heading>
-                  <Subheading level={3} className="text-lg !font-normal text-zinc-900 dark:text-white">
-                    {selectedTeam.description}
-                  </Subheading>
+                  <Avatar className='w-12 bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-700' square initials={selectedTeam.name.charAt(0)}/>
+                  <div className='flex flex-col space-y-2'>
+                    {/* Group Name - Inline Edit */}
+                    <div className="group">
+                      {isEditingGroupName ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={editedGroupName}
+                            onChange={(e) => setEditedGroupName(e.target.value)}
+                            className="text-2xl font-semibold bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveGroupName()
+                              if (e.key === 'Escape') handleCancelGroupName()
+                            }}
+                            autoFocus
+                          />
+                          <Button plain onClick={handleSaveGroupName} className="text-green-600 hover:text-green-700">
+                            <MaterialSymbol name="check" size="sm" />
+                          </Button>
+                          <Button plain onClick={handleCancelGroupName} className="text-red-600 hover:text-red-700">
+                            <MaterialSymbol name="close" size="sm" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
+                            {selectedTeam.name}
+                          </Heading>
+                          <Button 
+                            plain 
+                            onClick={handleEditGroupName}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                          >
+                            <MaterialSymbol name="edit" size="sm" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Group Description - Inline Edit */}
+                    <div className="group">
+                      {isEditingGroupDescription ? (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="text"
+                            value={editedGroupDescription}
+                            onChange={(e) => setEditedGroupDescription(e.target.value)}
+                            className="text-lg bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleSaveGroupDescription()
+                              if (e.key === 'Escape') handleCancelGroupDescription()
+                            }}
+                            autoFocus
+                          />
+                          <Button plain onClick={handleSaveGroupDescription} className="text-green-600 hover:text-green-700">
+                            <MaterialSymbol name="check" size="sm" />
+                          </Button>
+                          <Button plain onClick={handleCancelGroupDescription} className="text-red-600 hover:text-red-700">
+                            <MaterialSymbol name="close" size="sm" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <Subheading level={3} className="text-lg !font-normal text-zinc-600 dark:text-zinc-400">
+                            {selectedTeam.description}
+                          </Subheading>
+                          <Button 
+                            plain 
+                            onClick={handleEditGroupDescription}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                          >
+                            <MaterialSymbol name="edit" size="sm" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <Dropdown>
@@ -1150,7 +1317,7 @@ export function OrganizationSettings({
                     className="flex items-center gap-2 text-sm"
                     onClick={(e: React.MouseEvent) => e.stopPropagation()}
                   >
-                    {selectedTeam.role}
+                    Admin
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
@@ -1312,7 +1479,7 @@ export function OrganizationSettings({
                 <InputGroup>
                   <Input name="search" placeholder="Search Groups&hellip;" aria-label="Search" className="w-xs" />
                 </InputGroup>
-                <Button color="blue" className='flex items-center'>
+                <Button color="blue" className='flex items-center' onClick={handleCreateGroupClick}>
                   <MaterialSymbol name="add" />
                   Create New Group
                 </Button>
@@ -1636,6 +1803,79 @@ export function OrganizationSettings({
           </div>
         </div>
       </div>
+
+      {/* Create Group Modal */}
+      <Dialog open={showCreateGroupModal} onClose={handleCreateGroupCancel} size="lg">
+        <DialogTitle>Create New Group</DialogTitle>
+        <DialogDescription>
+          Create a new group to organize team members and manage permissions.
+        </DialogDescription>
+        
+        <DialogBody>
+          <div className="space-y-6">
+            {/* Group Name */}
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Group Name *
+              </Label>
+              <Input
+                type="text"
+                placeholder="Enter group name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                className="w-full"
+                autoFocus
+              />
+            </Field>
+
+            {/* Group Description */}
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Description
+              </Label>
+              <Textarea
+                placeholder="Enter group description (optional)"
+                value={newGroupDescription}
+                onChange={(e) => setNewGroupDescription(e.target.value)}
+                className="w-full"
+                rows={3}
+              />
+            </Field>
+
+            {/* Initial Role */}
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Your Role in this Group
+              </Label>
+              <Dropdown>
+                <DropdownButton outline className="flex items-center gap-2 text-sm w-full justify-between">
+                  {newGroupRole}
+                  <MaterialSymbol name="keyboard_arrow_down" />
+                </DropdownButton>
+                <DropdownMenu>
+                  <DropdownItem onClick={() => setNewGroupRole('Admin')}>
+                    <DropdownLabel>Admin</DropdownLabel>
+                    <DropdownDescription>Full control over group settings and members</DropdownDescription>
+                  </DropdownItem>
+                  <DropdownItem onClick={() => setNewGroupRole('Member')}>
+                    <DropdownLabel>Member</DropdownLabel>
+                    <DropdownDescription>Standard group member permissions</DropdownDescription>
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
+            </Field>
+          </div>
+        </DialogBody>
+        
+        <DialogActions>
+          <Button color="blue" onClick={handleCreateGroupSubmit} disabled={!newGroupName.trim()}>
+            Create Group
+          </Button>
+          <Button plain onClick={handleCreateGroupCancel}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }
