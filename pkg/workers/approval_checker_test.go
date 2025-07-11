@@ -176,7 +176,7 @@ func TestApprovalChecker_CheckUserRequirement_NilApprovedBy(t *testing.T) {
 		{
 			StageEventID: uuid.New(),
 			ApprovedAt:   &now,
-			ApprovedBy:   nil, // Nil approver should be ignored
+			ApprovedBy:   nil,
 		},
 	}
 
@@ -214,7 +214,7 @@ func TestApprovalChecker_CheckUserRequirement_EmptyName(t *testing.T) {
 
 	requirement := models.ApprovalRequirement{
 		Type:  models.ApprovalRequirementTypeUser,
-		Name:  "", // Empty name should not match
+		Name:  "",
 		Count: 1,
 	}
 
@@ -324,7 +324,7 @@ func TestApprovalChecker_CheckRoleRequirement_DatabaseIntegration(t *testing.T) 
 	})
 
 	t.Run("multiple users with role satisfy count requirement", func(t *testing.T) {
-		// Clean up users table only to avoid duplicate username constraint
+
 		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
@@ -494,7 +494,7 @@ func TestApprovalChecker_CheckGroupRequirement_DatabaseIntegration(t *testing.T)
 	})
 
 	t.Run("multiple users in group satisfy count requirement", func(t *testing.T) {
-		// Clean up users table only to avoid duplicate username constraint
+
 		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
@@ -643,7 +643,7 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 	}
 
 	t.Run("mixed requirements - role and group", func(t *testing.T) {
-		// Clean up users table only to avoid duplicate username constraint
+
 		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2')")
 		user2ID := uuid.New()
 		user2 := &models.User{
@@ -845,14 +845,14 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			{
 				StageEventID: uuid.New(),
 				ApprovedAt:   &now,
-				ApprovedBy:   &userID, // Same user approving twice
+				ApprovedBy:   &userID,
 			},
 		}
 
 		requirement := models.ApprovalRequirement{
 			Type:  models.ApprovalRequirementTypeRole,
 			Name:  authorization.RoleCanvasAdmin,
-			Count: 2, // Requiring 2 approvals
+			Count: 2,
 		}
 
 		satisfied, err := checker.checkRoleRequirement(approvals, requirement)
@@ -860,7 +860,6 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		// Should NOT be satisfied because same user should only count once
 		if satisfied {
 			t.Fatalf("Expected requirement to NOT be satisfied - same user should only count once")
 		}
@@ -888,14 +887,14 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			{
 				StageEventID: uuid.New(),
 				ApprovedAt:   &now,
-				ApprovedBy:   &userID, // Same user approving twice
+				ApprovedBy:   &userID,
 			},
 		}
 
 		requirement := models.ApprovalRequirement{
 			Type:  models.ApprovalRequirementTypeGroup,
 			Name:  groupName,
-			Count: 2, // Requiring 2 approvals
+			Count: 2,
 		}
 
 		satisfied, err := checker.checkGroupRequirement(approvals, requirement)
@@ -903,14 +902,13 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		// Should NOT be satisfied because same user should only count once
 		if satisfied {
 			t.Fatalf("Expected requirement to NOT be satisfied - same user should only count once")
 		}
 	})
 
 	t.Run("unique users are counted correctly for role requirement", func(t *testing.T) {
-		// Clean up users table only to avoid duplicate username constraint
+
 		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2', 'test3')")
 		user2ID := uuid.New()
 		user2 := &models.User{
@@ -928,7 +926,6 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 		}
 		database.Conn().Create(user3)
 
-		// Assign role to all users
 		err := authService.AssignRole(userID.String(), authorization.RoleCanvasAdmin, canvasID.String(), authorization.DomainCanvas)
 		if err != nil {
 			t.Fatalf("Failed to assign role: %v", err)
@@ -954,7 +951,7 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			{
 				StageEventID: uuid.New(),
 				ApprovedAt:   &now,
-				ApprovedBy:   &userID, // Same user approving twice - should only count once
+				ApprovedBy:   &userID,
 			},
 			{
 				StageEventID: uuid.New(),
@@ -971,7 +968,7 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 		requirement := models.ApprovalRequirement{
 			Type:  models.ApprovalRequirementTypeRole,
 			Name:  authorization.RoleCanvasAdmin,
-			Count: 3, // Requiring 3 unique approvals
+			Count: 3,
 		}
 
 		satisfied, err := checker.checkRoleRequirement(approvals, requirement)
@@ -979,14 +976,13 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		// Should be satisfied because we have 3 unique users despite duplicate approval
 		if !satisfied {
 			t.Fatalf("Expected requirement to be satisfied with 3 unique users")
 		}
 	})
 
 	t.Run("unique users are counted correctly for group requirement", func(t *testing.T) {
-		// Clean up users table only to avoid duplicate username constraint
+
 		database.Conn().Exec("DELETE FROM users WHERE username IN ('test2', 'test3')")
 		user2ID := uuid.New()
 		user2 := &models.User{
@@ -1010,7 +1006,6 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			t.Fatalf("Failed to create group: %v", err)
 		}
 
-		// Add all users to group
 		err = authService.AddUserToGroup(canvasID.String(), authorization.DomainCanvas, userID.String(), groupName)
 		if err != nil {
 			t.Fatalf("Failed to add user to group: %v", err)
@@ -1036,7 +1031,7 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			{
 				StageEventID: uuid.New(),
 				ApprovedAt:   &now,
-				ApprovedBy:   &userID, // Same user approving twice - should only count once
+				ApprovedBy:   &userID,
 			},
 			{
 				StageEventID: uuid.New(),
@@ -1053,7 +1048,7 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 		requirement := models.ApprovalRequirement{
 			Type:  models.ApprovalRequirementTypeGroup,
 			Name:  groupName,
-			Count: 3, // Requiring 3 unique approvals
+			Count: 3,
 		}
 
 		satisfied, err := checker.checkGroupRequirement(approvals, requirement)
@@ -1061,7 +1056,6 @@ func TestApprovalChecker_CheckRequirements_EdgeCases_DatabaseIntegration(t *test
 			t.Fatalf("Expected no error, got %v", err)
 		}
 
-		// Should be satisfied because we have 3 unique users despite duplicate approval
 		if !satisfied {
 			t.Fatalf("Expected requirement to be satisfied with 3 unique users")
 		}
