@@ -22,7 +22,6 @@ var _ MappedNullable = &SuperplaneIntegrationRef{}
 type SuperplaneIntegrationRef struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	Name *string `json:"name,omitempty"`
-	Resource *SuperplaneIntegrationResource `json:"resource,omitempty"`
 }
 
 // NewSuperplaneIntegrationRef instantiates a new SuperplaneIntegrationRef object
@@ -110,38 +109,6 @@ func (o *SuperplaneIntegrationRef) SetName(v string) {
 	o.Name = &v
 }
 
-// GetResource returns the Resource field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationRef) GetResource() SuperplaneIntegrationResource {
-	if o == nil || IsNil(o.Resource) {
-		var ret SuperplaneIntegrationResource
-		return ret
-	}
-	return *o.Resource
-}
-
-// GetResourceOk returns a tuple with the Resource field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationRef) GetResourceOk() (*SuperplaneIntegrationResource, bool) {
-	if o == nil || IsNil(o.Resource) {
-		return nil, false
-	}
-	return o.Resource, true
-}
-
-// HasResource returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationRef) HasResource() bool {
-	if o != nil && !IsNil(o.Resource) {
-		return true
-	}
-
-	return false
-}
-
-// SetResource gets a reference to the given SuperplaneIntegrationResource and assigns it to the Resource field.
-func (o *SuperplaneIntegrationRef) SetResource(v SuperplaneIntegrationResource) {
-	o.Resource = &v
-}
-
 func (o SuperplaneIntegrationRef) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -157,9 +124,6 @@ func (o SuperplaneIntegrationRef) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
-	}
-	if !IsNil(o.Resource) {
-		toSerialize["resource"] = o.Resource
 	}
 	return toSerialize, nil
 }

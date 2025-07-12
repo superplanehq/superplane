@@ -13,14 +13,11 @@ func Test__SpecBuilder_Build(t *testing.T) {
 	t.Run("semaphore spec", func(t *testing.T) {
 		builder := SpecBuilder{}
 		spec := models.ExecutorSpec{
-			Type: models.ExecutorSpecTypeSemaphore,
 			Semaphore: &models.SemaphoreExecutorSpec{
-				OrganizationURL: "http://localhost:8000",
-				APIToken:        "${{ secrets.TOKEN }}",
-				ProjectID:       "demo-project",
-				TaskID:          "demo-task",
-				Branch:          "main",
-				PipelineFile:    ".semaphore/run.yml",
+				ProjectID:    "demo-project",
+				TaskID:       "demo-task",
+				Branch:       "main",
+				PipelineFile: ".semaphore/run.yml",
 				Parameters: map[string]string{
 					"PARAM_1": "${{ inputs.VAR_1 }}",
 				},
@@ -29,9 +26,6 @@ func Test__SpecBuilder_Build(t *testing.T) {
 
 		v, err := builder.Build(spec, map[string]any{"VAR_1": "hello"}, map[string]string{"TOKEN": "token"})
 		require.NoError(t, err)
-		assert.Equal(t, v.Type, models.ExecutorSpecTypeSemaphore)
-		assert.Equal(t, v.Semaphore.OrganizationURL, "http://localhost:8000")
-		assert.Equal(t, v.Semaphore.APIToken, "token")
 		assert.Equal(t, v.Semaphore.ProjectID, "demo-project")
 		assert.Equal(t, v.Semaphore.TaskID, "demo-task")
 		assert.Equal(t, v.Semaphore.Branch, "main")
@@ -42,7 +36,6 @@ func Test__SpecBuilder_Build(t *testing.T) {
 	t.Run("http spec", func(t *testing.T) {
 		builder := SpecBuilder{}
 		spec := models.ExecutorSpec{
-			Type: models.ExecutorSpecTypeHTTP,
 			HTTP: &models.HTTPExecutorSpec{
 				URL: "http://localhost:8000",
 				Headers: map[string]string{
@@ -62,7 +55,6 @@ func Test__SpecBuilder_Build(t *testing.T) {
 
 		v, err := builder.Build(spec, map[string]any{"VAR_A": "hello", "VAR_B": "hi"}, map[string]string{"TOKEN": "mytoken"})
 		require.NoError(t, err)
-		assert.Equal(t, v.Type, models.ExecutorSpecTypeHTTP)
 		assert.Equal(t, v.HTTP.URL, "http://localhost:8000")
 		assert.Equal(t, v.HTTP.Headers, map[string]string{
 			"Content-Type":  "application/json",

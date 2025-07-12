@@ -6,7 +6,9 @@ import (
 	"sort"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -258,5 +260,16 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 		return pb.Connection_TYPE_CONNECTION_GROUP
 	default:
 		return pb.Connection_TYPE_UNKNOWN
+	}
+}
+
+func DomainTypeToProto(domainType string) pbAuth.DomainType {
+	switch domainType {
+	case authorization.DomainCanvas:
+		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
+	case authorization.DomainOrg:
+		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
+	default:
+		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
 }

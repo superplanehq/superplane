@@ -82,7 +82,6 @@ executor:
   type: TYPE_SEMAPHORE
   integration:
     domain: ORGANIZATION
-    # domain: CANVAS
     name: semaphore-integration
   semaphore:
     projectId: f5808f38-bc99-4b11-9edd-6969d4664802
@@ -105,12 +104,10 @@ spec:
   integration:
     domain: ORGANIZATION
     name: semaphore-integration
-    # resource:
-    #   type: project
-    #   name: my-semaphore-project
-    resource:
-      type: repository
-      name: my-github-repository
+  semaphore:
+    project: semaphore-demo-go
+  # github:
+  #   repository: semaphore-demo-go
 ```
 
 ## GitHub

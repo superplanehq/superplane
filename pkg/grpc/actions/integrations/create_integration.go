@@ -120,7 +120,7 @@ func validateAuth(auth *pb.Integration_Auth) (*models.IntegrationAuth, string, e
 		// TODO: validate secret existence
 
 		return &models.IntegrationAuth{
-			Token: models.IntegrationAuthToken{
+			Token: &models.IntegrationAuthToken{
 				ValueFrom: models.ValueDefinitionFrom{
 					Secret: &models.ValueDefinitionFromSecret{
 						Name: auth.Token.ValueFrom.Secret.Name,
@@ -141,20 +141,44 @@ func validateAuth(auth *pb.Integration_Auth) (*models.IntegrationAuth, string, e
 func serializeIntegration(integration models.Integration) *pb.Integration {
 	return &pb.Integration{
 		Metadata: &pb.Integration_Metadata{
-			Id:        integration.ID.String(),
-			Name:      integration.Name,
-			CreatedAt: timestamppb.New(*integration.CreatedAt),
+			Id:         integration.ID.String(),
+			Name:       integration.Name,
+			DomainType: actions.DomainTypeToProto(integration.DomainType),
+			DomainId:   integration.DomainID.String(),
+			CreatedAt:  timestamppb.New(*integration.CreatedAt),
+			CreatedBy:  integration.CreatedBy.String(),
 		},
 		Spec: &pb.Integration_Spec{
 			Type: integrationTypeToProto(integration.Type),
 			Url:  integration.URL,
-			Auth: &pb.Integration_Auth{
-				Use: integrationAuthTypeToProto(integration.AuthType),
-			},
+			Auth: serializeIntegrationAuth(integration.AuthType, integration.Auth.Data()),
 			Oidc: &pb.Integration_OIDC{
 				Enabled: integration.OIDC.Data().Enabled,
 			},
 		},
+	}
+}
+
+func serializeIntegrationAuth(authType string, auth models.IntegrationAuth) *pb.Integration_Auth {
+	switch authType {
+	case models.IntegrationAuthTypeToken:
+		return &pb.Integration_Auth{
+			Use: pb.Integration_AUTH_TYPE_TOKEN,
+			Token: &pb.Integration_Auth_Token{
+				ValueFrom: &pb.ValueFrom{
+					Secret: &pb.ValueFromSecret{
+						Name: auth.Token.ValueFrom.Secret.Name,
+						Key:  auth.Token.ValueFrom.Secret.Key,
+					},
+				},
+			},
+		}
+	case models.IntegrationAuthTypeOIDC:
+		return &pb.Integration_Auth{
+			Use: pb.Integration_AUTH_TYPE_OIDC,
+		}
+	default:
+		return nil
 	}
 }
 

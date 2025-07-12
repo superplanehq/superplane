@@ -25,7 +25,7 @@ type SuperplaneService struct {
 func NewSuperplaneService(encryptor crypto.Encryptor, authService authorization.Authorization) *SuperplaneService {
 	return &SuperplaneService{
 		encryptor:            encryptor,
-		specValidator:        executors.SpecValidator{},
+		specValidator:        executors.SpecValidator{Encryptor: encryptor},
 		authorizationService: authService,
 	}
 }
@@ -51,7 +51,7 @@ func (s *SuperplaneService) ResetEventSourceKey(ctx context.Context, req *pb.Res
 }
 
 func (s *SuperplaneService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return stages.CreateStage(ctx, s.specValidator, req)
+	return stages.CreateStage(ctx, s.encryptor, s.specValidator, req)
 }
 
 func (s *SuperplaneService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -132,8 +132,4 @@ func (s *SuperplaneService) DescribeIntegration(ctx context.Context, req *pb.Des
 
 func (s *SuperplaneService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
 	return integrations.ListIntegrations(ctx, req)
-}
-
-func (s *SuperplaneService) ListIntegrationResources(ctx context.Context, req *pb.ListIntegrationResourcesRequest) (*pb.ListIntegrationResourcesResponse, error) {
-	return integrations.ListIntegrationResources(ctx, s.encryptor, req)
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -19,10 +18,7 @@ import (
 const ExecutionFinishedRoutingKey = "execution-finished"
 
 func Test__ExecutionPoller(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source:       true,
-		SemaphoreAPI: true,
-	})
+	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
 	defer r.Close()
 
@@ -33,16 +29,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+	executor, resource := support.Executor(r)
+	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 	require.NoError(t, err)
-	stage, err := r.Canvas.FindStageByName("stage-1")
-	require.NoError(t, err)
-
-	encryptor := &crypto.NoOpEncryptor{}
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionPoller(encryptor)
+	w := NewExecutionPoller(r.Encryptor)
 
 	t.Run("failed pipeline -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
@@ -107,8 +99,8 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		err = r.Canvas.CreateStage("stage-with-output", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
+		executor, resource := support.Executor(r)
+		stageWithOutput, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-output", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,
@@ -118,8 +110,6 @@ func Test__ExecutionPoller(t *testing.T) {
 			{Name: "MY_OUTPUT", Required: true},
 		}, []models.ValueDefinition{})
 
-		require.NoError(t, err)
-		stageWithOutput, err := r.Canvas.FindStageByName("stage-with-output")
 		require.NoError(t, err)
 
 		//

@@ -32,10 +32,10 @@ docs/AuthorizationRoleAssignment.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventSourceAPI.md
+docs/EventSourceSpecSemaphore.md
 docs/ExecutionResult.md
 docs/ExecutorSpecHTTP.md
 docs/ExecutorSpecHTTPResponsePolicy.md
-docs/ExecutorSpecSemaphore.md
 docs/GroupByField.md
 docs/InputMappingWhen.md
 docs/InputMappingWhenTriggeredBy.md
@@ -101,6 +101,7 @@ docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneExecution.md
 docs/SuperplaneExecutionState.md
 docs/SuperplaneExecutorSpec.md
+docs/SuperplaneExecutorSpecSemaphore.md
 docs/SuperplaneExecutorSpecType.md
 docs/SuperplaneFilter.md
 docs/SuperplaneFilterOperator.md
@@ -111,8 +112,6 @@ docs/SuperplaneInputMapping.md
 docs/SuperplaneIntegration.md
 docs/SuperplaneIntegrationMetadata.md
 docs/SuperplaneIntegrationRef.md
-docs/SuperplaneIntegrationResource.md
-docs/SuperplaneIntegrationResourceType.md
 docs/SuperplaneIntegrationSpec.md
 docs/SuperplaneIntegrationType.md
 docs/SuperplaneKeyValuePair.md
@@ -120,7 +119,6 @@ docs/SuperplaneListCanvasesResponse.md
 docs/SuperplaneListConnectionGroupFieldSetsResponse.md
 docs/SuperplaneListConnectionGroupsResponse.md
 docs/SuperplaneListEventSourcesResponse.md
-docs/SuperplaneListIntegrationResourcesResponse.md
 docs/SuperplaneListIntegrationsResponse.md
 docs/SuperplaneListSecretsResponse.md
 docs/SuperplaneListStageEventsResponse.md
@@ -165,10 +163,10 @@ model_authorization_permission.go
 model_authorization_remove_role_request.go
 model_authorization_role.go
 model_authorization_role_assignment.go
+model_event_source_spec_semaphore.go
 model_execution_result.go
 model_executor_spec_http.go
 model_executor_spec_http_response_policy.go
-model_executor_spec_semaphore.go
 model_group_by_field.go
 model_input_mapping_when.go
 model_input_mapping_when_triggered_by.go
@@ -230,6 +228,7 @@ model_superplane_event_source_spec.go
 model_superplane_execution.go
 model_superplane_execution_state.go
 model_superplane_executor_spec.go
+model_superplane_executor_spec_semaphore.go
 model_superplane_executor_spec_type.go
 model_superplane_filter.go
 model_superplane_filter_operator.go
@@ -240,8 +239,6 @@ model_superplane_input_mapping.go
 model_superplane_integration.go
 model_superplane_integration_metadata.go
 model_superplane_integration_ref.go
-model_superplane_integration_resource.go
-model_superplane_integration_resource_type.go
 model_superplane_integration_spec.go
 model_superplane_integration_type.go
 model_superplane_key_value_pair.go
@@ -249,7 +246,6 @@ model_superplane_list_canvases_response.go
 model_superplane_list_connection_group_field_sets_response.go
 model_superplane_list_connection_groups_response.go
 model_superplane_list_event_sources_response.go
-model_superplane_list_integration_resources_response.go
 model_superplane_list_integrations_response.go
 model_superplane_list_secrets_response.go
 model_superplane_list_stage_events_response.go

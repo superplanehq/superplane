@@ -5,18 +5,20 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
-type IntegrationResource struct {
-	ID            uuid.UUID
+type Resource struct {
+	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	ExternalID    string
 	Name          string
 	IntegrationID uuid.UUID
 	Type          string
 	CreatedAt     *time.Time
 }
 
-func FindIntegrationResourceByID(id uuid.UUID) (*IntegrationResource, error) {
-	var resource IntegrationResource
+func FindResourceByID(id uuid.UUID) (*Resource, error) {
+	var resource Resource
 
 	err := database.Conn().
 		Where("id = ?", id).
@@ -30,10 +32,14 @@ func FindIntegrationResourceByID(id uuid.UUID) (*IntegrationResource, error) {
 	return &resource, nil
 }
 
-func FindIntegrationResource(integrationID uuid.UUID, resourceType, name string) (*IntegrationResource, error) {
-	var resource IntegrationResource
+func FindResource(integrationID uuid.UUID, resourceType, name string) (*Resource, error) {
+	return FindResourceInTransaction(database.Conn(), integrationID, resourceType, name)
+}
 
-	err := database.Conn().
+func FindResourceInTransaction(tx *gorm.DB, integrationID uuid.UUID, resourceType, name string) (*Resource, error) {
+	var resource Resource
+
+	err := tx.
 		Where("integration_id = ?", integrationID).
 		Where("type = ?", resourceType).
 		Where("name = ?", name).

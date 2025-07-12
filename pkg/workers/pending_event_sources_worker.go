@@ -51,12 +51,12 @@ func (w *PendingEventSourcesWorker) Tick() error {
 }
 
 func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventSource) error {
-	if eventSource.IntegrationResourceID == nil {
+	if eventSource.ResourceID == nil {
 		log.Infof("Event source %s is not tied to any integration - skipping", eventSource.ID)
 		return eventSource.UpdateState(models.EventSourceStateReady)
 	}
 
-	resource, err := models.FindIntegrationResourceByID(*eventSource.IntegrationResourceID)
+	resource, err := models.FindResourceByID(*eventSource.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error finding integration resource: %v", err)
 	}
@@ -75,14 +75,14 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 	}
 }
 
-func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.EventSource, integration *models.Integration, resource *models.IntegrationResource) error {
+func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.EventSource, integration *models.Integration, resource *models.Resource) error {
 	semaphore, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating integration: %v", err)
 	}
 
 	now := time.Now()
-	resources := []models.IntegrationResource{}
+	resources := []models.Resource{}
 
 	//
 	// Create Semaphore secret to store the event source key.
@@ -98,7 +98,7 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 		return fmt.Errorf("error creating semaphore secret: %v", err)
 	}
 
-	resources = append(resources, models.IntegrationResource{
+	resources = append(resources, models.Resource{
 		ID:            uuid.MustParse(secret.ID()),
 		Name:          secret.Name(),
 		IntegrationID: integration.ID,
@@ -114,7 +114,7 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 		return fmt.Errorf("error creating notification: %v", err)
 	}
 
-	resources = append(resources, models.IntegrationResource{
+	resources = append(resources, models.Resource{
 		ID:            uuid.MustParse(notification.ID()),
 		Name:          notification.Name(),
 		IntegrationID: integration.ID,
@@ -135,7 +135,7 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 	})
 }
 
-func (w *PendingEventSourcesWorker) createSemaphoreSecret(semaphore integrations.Integration, name string, key []byte) (integrations.IntegrationResource, error) {
+func (w *PendingEventSourcesWorker) createSemaphoreSecret(semaphore integrations.Integration, name string, key []byte) (integrations.Resource, error) {
 	//
 	// Check if secret already exists.
 	//
@@ -171,7 +171,7 @@ func (w *PendingEventSourcesWorker) createSemaphoreSecret(semaphore integrations
 	return secret, nil
 }
 
-func (w *PendingEventSourcesWorker) createSemaphoreNotification(semaphore integrations.Integration, name string, resource models.IntegrationResource, eventSource models.EventSource) (integrations.IntegrationResource, error) {
+func (w *PendingEventSourcesWorker) createSemaphoreNotification(semaphore integrations.Integration, name string, resource models.Resource, eventSource models.EventSource) (integrations.Resource, error) {
 	notification, err := semaphore.GetResource(integrations.ResourceTypeNotification, name)
 	if err == nil {
 		log.Infof("Semaphore notification %s already exists - %s", notification.Name(), notification.ID())

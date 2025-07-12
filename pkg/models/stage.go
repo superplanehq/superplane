@@ -23,7 +23,7 @@ const (
 )
 
 type Stage struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;"`
+	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	CanvasID  uuid.UUID
 	Name      string
 	CreatedAt *time.Time
@@ -32,7 +32,6 @@ type Stage struct {
 	UpdatedBy uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]
-	ExecutorSpec  datatypes.JSONType[ExecutorSpec]
 	Inputs        datatypes.JSONSlice[InputDefinition]
 	InputMappings datatypes.JSONSlice[InputMapping]
 	Outputs       datatypes.JSONSlice[OutputDefinition]
@@ -190,41 +189,6 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-type ExecutorSpec struct {
-	Type        string                 `json:"type"`
-	Integration *IntegrationRef        `json:"integration,omitempty"`
-	Semaphore   *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
-	HTTP        *HTTPExecutorSpec      `json:"http,omitempty"`
-}
-
-type IntegrationRef struct {
-	DomainType string  `json:"domain_type"`
-	DomainID   string  `json:"domain_id"`
-	ID         *string `json:"id,omitempty"`
-	Name       *string `json:"name,omitempty"`
-}
-
-type SemaphoreExecutorSpec struct {
-	APIToken        string            `json:"api_token"`
-	OrganizationURL string            `json:"organization_url"`
-	ProjectID       string            `json:"project_id"`
-	Branch          string            `json:"branch"`
-	PipelineFile    string            `json:"pipeline_file"`
-	Parameters      map[string]string `json:"parameters"`
-	TaskID          string            `json:"task_id"`
-}
-
-type HTTPExecutorSpec struct {
-	URL            string              `json:"url"`
-	Payload        map[string]string   `json:"payload"`
-	Headers        map[string]string   `json:"headers"`
-	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
-}
-
-type HTTPResponsePolicy struct {
-	StatusCodes []uint32 `json:"status_codes"`
-}
-
 func FindStageByID(id string) (*Stage, error) {
 	return FindStageByIDInTransaction(database.Conn(), id)
 }
@@ -278,6 +242,21 @@ func (s *Stage) HasApprovalCondition() bool {
 	}
 
 	return false
+}
+
+func (s *Stage) GetExecutor() (*StageExecutor, error) {
+	var executor StageExecutor
+
+	err := database.Conn().
+		Where("stage_id = ?", s.ID).
+		First(&executor).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &executor, nil
 }
 
 func (s *Stage) MissingRequiredOutputs(outputs map[string]any) []string {

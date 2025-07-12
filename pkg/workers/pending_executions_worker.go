@@ -65,12 +65,18 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
+	stageExecutor, err := stage.GetExecutor()
+	if err != nil {
+		return fmt.Errorf("error getting executor for stage: %v", err)
+	}
+
+	executorSpec := stageExecutor.Spec.Data()
+	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(*spec, execution, w.JwtSigner, w.Encryptor)
+	executor, err := executors.NewExecutor(stageExecutor, execution, w.JwtSigner, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}

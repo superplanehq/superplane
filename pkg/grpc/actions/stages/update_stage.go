@@ -55,7 +55,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	executor, err := specValidator.Validate(req.Stage.Spec.Executor)
+	executor, resource, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -92,6 +92,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		userID,
 		conditions,
 		*executor,
+		resource,
 		connections,
 		inputValidator.SerializeInputs(),
 		inputValidator.SerializeInputMappings(),

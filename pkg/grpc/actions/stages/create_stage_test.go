@@ -21,18 +21,22 @@ const StageCreatedRoutingKey = "stage-created"
 
 func Test__CreateStage(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	specValidator := executors.SpecValidator{}
+	specValidator := executors.SpecValidator{
+		Encryptor: r.Encryptor,
+	}
+
+	executor := support.ProtoExecutor(r)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 				},
 			},
 		})
@@ -44,14 +48,14 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(context.Background(), r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 				},
 			},
 		})
@@ -64,14 +68,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: "source-does-not-exist",
@@ -90,14 +94,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -119,14 +123,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -151,14 +155,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -185,14 +189,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -219,14 +223,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -254,14 +258,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,
@@ -294,9 +298,8 @@ func Test__CreateStage(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		executor := support.ProtoExecutor()
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -349,12 +352,12 @@ func Test__CreateStage(t *testing.T) {
 		assert.NotNil(t, res.Stage.Metadata.CreatedAt)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.Metadata.CanvasId)
 		assert.Equal(t, "test", res.Stage.Metadata.Name)
+
 		// Assert executor is correct
 		require.NotNil(t, res.Stage.Spec)
 		assert.Equal(t, executor.Type, res.Stage.Spec.Executor.Type)
 		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Spec.Executor.Semaphore.Branch)
 		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Spec.Executor.Semaphore.PipelineFile)
-		assert.Equal(t, executor.Semaphore.OrganizationUrl, res.Stage.Spec.Executor.Semaphore.OrganizationUrl)
 		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Spec.Executor.Semaphore.Parameters)
 
 		// Check that we have a connection to the source
@@ -377,14 +380,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
 					Name: "test",
 				},
 				Spec: &pb.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*pb.Connection{
 						{
 							Name: r.Source.Name,

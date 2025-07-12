@@ -71,12 +71,17 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
-	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
+	stageExecutor, err := stage.GetExecutor()
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(*spec, *execution, nil, w.Encryptor)
+	spec, err := w.SpecBuilder.Build(stageExecutor.Spec.Data(), inputMap, secrets)
+	if err != nil {
+		return err
+	}
+
+	executor, err := executors.NewExecutor(stageExecutor, *execution, nil, w.Encryptor)
 	if err != nil {
 		return err
 	}

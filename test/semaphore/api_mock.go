@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ import (
 type SemaphoreAPIMock struct {
 	Server    *httptest.Server
 	Workflows map[string]Pipeline
+	Projects  []string
 
 	LastTaskTrigger *integrations.TaskTrigger
 	LastRunWorkflow *integrations.CreateWorkflowRequest
@@ -26,7 +28,10 @@ type Pipeline struct {
 }
 
 func NewSemaphoreAPIMock() *SemaphoreAPIMock {
-	return &SemaphoreAPIMock{Workflows: map[string]Pipeline{}}
+	return &SemaphoreAPIMock{
+		Projects:  []string{"demo-project", "demo-project-2"},
+		Workflows: map[string]Pipeline{},
+	}
 }
 
 func (s *SemaphoreAPIMock) Close() {
@@ -46,6 +51,11 @@ func (s *SemaphoreAPIMock) Init() {
 
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1alpha/pipelines") {
 			s.DescribePipeline(w, r)
+			return
+		}
+
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1alpha/projects") {
+			s.DescribeProject(w, r)
 			return
 		}
 
@@ -79,6 +89,25 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 	}
 
 	data, _ := json.Marshal(integrations.SemaphoreWorkflow{InitialPplID: pipeline.ID})
+	w.Write(data)
+}
+
+func (s *SemaphoreAPIMock) DescribeProject(w http.ResponseWriter, r *http.Request) {
+	path := strings.Split(r.URL.Path, "/")
+	projectName := path[4]
+
+	if !slices.Contains(s.Projects, projectName) {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	data, _ := json.Marshal(integrations.SemaphoreProject{
+		Metadata: &integrations.SemaphoreProjectMetadata{
+			ProjectName: projectName,
+			ProjectID:   uuid.New().String(),
+		},
+	})
+
 	w.Write(data)
 }
 

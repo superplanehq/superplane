@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -34,7 +35,7 @@ type Integration struct {
 }
 
 type IntegrationAuth struct {
-	Token IntegrationAuthToken `json:"token"`
+	Token *IntegrationAuthToken `json:"token"`
 }
 
 type IntegrationAuthToken struct {
@@ -66,18 +67,22 @@ func CreateIntegration(integration *Integration) (*Integration, error) {
 	return nil, err
 }
 
-func (i *Integration) CreateResource(resourceType string, id uuid.UUID, name string) (*IntegrationResource, error) {
+func (i *Integration) CreateResource(resourceType, externalID, name string) (*Resource, error) {
+	return i.CreateResourceInTransaction(database.Conn(), resourceType, externalID, name)
+}
+
+func (i *Integration) CreateResourceInTransaction(tx *gorm.DB, resourceType, externalID, name string) (*Resource, error) {
 	now := time.Now()
 
-	resource := IntegrationResource{
-		ID:            id,
+	resource := Resource{
+		ExternalID:    externalID,
 		Name:          name,
 		CreatedAt:     &now,
 		IntegrationID: i.ID,
 		Type:          resourceType,
 	}
 
-	err := database.Conn().
+	err := tx.
 		Clauses(clause.Returning{}).
 		Create(&resource).
 		Error

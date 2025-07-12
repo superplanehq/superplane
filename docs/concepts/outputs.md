@@ -45,8 +45,6 @@ spec:
   executor:
     type: TYPE_SEMAPHORE
     semaphore:
-      organizationUrl: https://myorg.semaphoreci.com
-      apiToken: XXXX
       projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
       taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
       branch: main

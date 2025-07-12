@@ -26,14 +26,13 @@ func Test__TimeWindowWorker(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, r.Canvas.CreateStage("stage-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
+	executor, resource := support.Executor(r)
+	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), conditions, executor, &resource, []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,
 		},
-	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-	stage, err := r.Canvas.FindStageByName("stage-1")
+	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 	require.NoError(t, err)
 
 	t.Run("event is not in time window -> does nothing", func(t *testing.T) {

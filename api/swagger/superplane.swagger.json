@@ -1011,56 +1011,6 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/integrations/{idOrName}/resources/{resourceType}": {
-      "get": {
-        "summary": "List integration resources for a canvas integration",
-        "description": "List integration resources for a canvas integration",
-        "operationId": "Superplane_ListIntegrationResources",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneListIntegrationResourcesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "resourceType",
-            "in": "path",
-            "required": true,
-            "type": "string",
-            "enum": [
-              "TYPE_NONE",
-              "TYPE_PROJECT",
-              "TYPE_TASK",
-              "TYPE_REPOSITORY"
-            ]
-          }
-        ],
-        "tags": [
-          "Integration"
-        ]
-      }
-    },
     "/api/v1/canvases/{canvasIdOrName}/secrets": {
       "get": {
         "summary": "List secrets",
@@ -1946,6 +1896,14 @@
         }
       }
     },
+    "EventSourceSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        }
+      }
+    },
     "ExecutionResult": {
       "type": "string",
       "enum": [
@@ -1987,35 +1945,6 @@
             "type": "integer",
             "format": "int64"
           }
-        }
-      }
-    },
-    "ExecutorSpecSemaphore": {
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "apiToken": {
-          "type": "string"
-        },
-        "organizationUrl": {
-          "type": "string"
         }
       }
     },
@@ -2656,6 +2585,9 @@
       "properties": {
         "integration": {
           "$ref": "#/definitions/SuperplaneIntegrationRef"
+        },
+        "semaphore": {
+          "$ref": "#/definitions/EventSourceSpecSemaphore"
         }
       }
     },
@@ -2715,10 +2647,33 @@
           "$ref": "#/definitions/SuperplaneIntegrationRef"
         },
         "semaphore": {
-          "$ref": "#/definitions/ExecutorSpecSemaphore"
+          "$ref": "#/definitions/SuperplaneExecutorSpecSemaphore"
         },
         "http": {
           "$ref": "#/definitions/ExecutorSpecHTTP"
+        }
+      }
+    },
+    "SuperplaneExecutorSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pipelineFile": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -2840,35 +2795,8 @@
         },
         "name": {
           "type": "string"
-        },
-        "resource": {
-          "$ref": "#/definitions/SuperplaneIntegrationResource"
         }
       }
-    },
-    "SuperplaneIntegrationResource": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/SuperplaneIntegrationResourceType"
-        },
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneIntegrationResourceType": {
-      "type": "string",
-      "enum": [
-        "TYPE_NONE",
-        "TYPE_PROJECT",
-        "TYPE_TASK",
-        "TYPE_REPOSITORY"
-      ],
-      "default": "TYPE_NONE"
     },
     "SuperplaneIntegrationSpec": {
       "type": "object",
@@ -2951,18 +2879,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventSource"
-          }
-        }
-      }
-    },
-    "SuperplaneListIntegrationResourcesResponse": {
-      "type": "object",
-      "properties": {
-        "resources": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneIntegrationResource"
           }
         }
       }

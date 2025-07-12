@@ -321,7 +321,8 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		Source: true,
 	})
 
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+	executor, resource := support.Executor(r)
+	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,
@@ -330,9 +331,6 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		{Name: "version", Required: true},
 		{Name: "sha", Required: true},
 	}, []models.ValueDefinition{})
-
-	require.NoError(t, err)
-	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
 
 	signer := jwt.NewSigner("test")

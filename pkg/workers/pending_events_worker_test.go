@@ -19,6 +19,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
+	executor, resource := support.Executor(r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
 		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
@@ -37,7 +38,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		stage1, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -64,7 +65,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		stage2, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -114,9 +115,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Two pending stage events are created: one for each stage.
 		//
-		stage1, _ := r.Canvas.FindStageByName("stage-1")
-		stage2, _ := r.Canvas.FindStageByName("stage-2")
-
 		stage1Events, err := stage1.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, stage1Events, 1)
@@ -202,7 +200,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-3", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -233,10 +231,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 		}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
-		firstStage, err := r.Canvas.FindStageByName("stage-3")
-		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		_, err = r.Canvas.CreateStage(r.Encryptor, "stage-4", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
@@ -298,7 +294,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-5", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
@@ -316,7 +312,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		secondStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-6", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
@@ -352,14 +348,11 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// A pending stage event should be created only for the first stage
 		//
-
-		firstStage, _ := r.Canvas.FindStageByName("stage-5")
 		events, err := firstStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 		assert.Equal(t, r.Source.ID, events[0].SourceID)
 
-		secondStage, _ := r.Canvas.FindStageByName("stage-6")
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)

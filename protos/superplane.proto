@@ -95,17 +95,6 @@ service Superplane {
     };
   }
 
-  rpc ListIntegrationResources(ListIntegrationResourcesRequest) returns (ListIntegrationResourcesResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}/resources/{resource_type}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List integration resources for a canvas integration";
-      description: "List integration resources for a canvas integration";
-      tags: "Integration";
-    };
-  }
-
   rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/integrations"
@@ -352,29 +341,6 @@ message ListIntegrationsResponse {
   repeated Integration integrations = 1;
 }
 
-message ListIntegrationResourcesRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
-  IntegrationResource.Type resource_type = 3;
-}
-
-message ListIntegrationResourcesResponse {
-  repeated IntegrationResource resources = 1;
-}
-
-message IntegrationResource {
-  enum Type {
-    TYPE_NONE = 0;
-    TYPE_PROJECT = 1;
-    TYPE_TASK = 2;
-    TYPE_REPOSITORY = 3;
-  }
-
-  Type type = 1;
-  string id = 2;
-  string name = 3;
-}
-
 message DescribeIntegrationRequest {
   string canvas_id_or_name = 1;
   string id_or_name = 2;
@@ -479,7 +445,12 @@ message EventSource {
   }
 
   message Spec {
+    message Semaphore {
+      string project = 1;
+    }
+
     IntegrationRef integration = 1;
+    Semaphore semaphore = 2;
   }
 
   Metadata metadata = 1;
@@ -817,7 +788,6 @@ message CreateStageRequest {
 message IntegrationRef {
   Authorization.DomainType domain_type = 1;
   string name = 2;
-  IntegrationResource resource = 3;
 }
 
 message ExecutorSpec {
@@ -833,8 +803,6 @@ message ExecutorSpec {
     string pipeline_file = 3;
     string task_id = 4;
     map<string, string> parameters = 5;
-    string api_token = 6;
-    string organization_url = 7;
   }
 
   message HTTP {

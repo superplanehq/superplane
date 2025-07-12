@@ -22,7 +22,7 @@ var _ MappedNullable = &SuperplaneExecutorSpec{}
 type SuperplaneExecutorSpec struct {
 	Type *SuperplaneExecutorSpecType `json:"type,omitempty"`
 	Integration *SuperplaneIntegrationRef `json:"integration,omitempty"`
-	Semaphore *ExecutorSpecSemaphore `json:"semaphore,omitempty"`
+	Semaphore *SuperplaneExecutorSpecSemaphore `json:"semaphore,omitempty"`
 	Http *ExecutorSpecHTTP `json:"http,omitempty"`
 }
 
@@ -112,9 +112,9 @@ func (o *SuperplaneExecutorSpec) SetIntegration(v SuperplaneIntegrationRef) {
 }
 
 // GetSemaphore returns the Semaphore field value if set, zero value otherwise.
-func (o *SuperplaneExecutorSpec) GetSemaphore() ExecutorSpecSemaphore {
+func (o *SuperplaneExecutorSpec) GetSemaphore() SuperplaneExecutorSpecSemaphore {
 	if o == nil || IsNil(o.Semaphore) {
-		var ret ExecutorSpecSemaphore
+		var ret SuperplaneExecutorSpecSemaphore
 		return ret
 	}
 	return *o.Semaphore
@@ -122,7 +122,7 @@ func (o *SuperplaneExecutorSpec) GetSemaphore() ExecutorSpecSemaphore {
 
 // GetSemaphoreOk returns a tuple with the Semaphore field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecutorSpec) GetSemaphoreOk() (*ExecutorSpecSemaphore, bool) {
+func (o *SuperplaneExecutorSpec) GetSemaphoreOk() (*SuperplaneExecutorSpecSemaphore, bool) {
 	if o == nil || IsNil(o.Semaphore) {
 		return nil, false
 	}
@@ -138,8 +138,8 @@ func (o *SuperplaneExecutorSpec) HasSemaphore() bool {
 	return false
 }
 
-// SetSemaphore gets a reference to the given ExecutorSpecSemaphore and assigns it to the Semaphore field.
-func (o *SuperplaneExecutorSpec) SetSemaphore(v ExecutorSpecSemaphore) {
+// SetSemaphore gets a reference to the given SuperplaneExecutorSpecSemaphore and assigns it to the Semaphore field.
+func (o *SuperplaneExecutorSpec) SetSemaphore(v SuperplaneExecutorSpecSemaphore) {
 	o.Semaphore = &v
 }
 

@@ -14,14 +14,14 @@ const (
 )
 
 type EventSource struct {
-	ID                    uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID              uuid.UUID
-	IntegrationResourceID *uuid.UUID
-	Name                  string
-	Key                   []byte
-	State                 string
-	CreatedAt             *time.Time
-	UpdatedAt             *time.Time
+	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID   uuid.UUID
+	ResourceID *uuid.UUID
+	Name       string
+	Key        []byte
+	State      string
+	CreatedAt  *time.Time
+	UpdatedAt  *time.Time
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {

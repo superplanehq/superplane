@@ -1,7 +1,7 @@
 package support
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -9,9 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
+	"gorm.io/datatypes"
 )
 
 type ResourceRegistry struct {
@@ -20,6 +24,8 @@ type ResourceRegistry struct {
 	Source           *models.EventSource
 	Stage            *models.Stage
 	Organization     *models.Organization
+	Integration      *models.Integration
+	Encryptor        crypto.Encryptor
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -30,10 +36,9 @@ func (r *ResourceRegistry) Close() {
 }
 
 type SetupOptions struct {
-	Source       bool
-	Stage        bool
-	SemaphoreAPI bool
-	Approvals    int
+	Source    bool
+	Stage     bool
+	Approvals int
 }
 
 func Setup(t *testing.T) *ResourceRegistry {
@@ -48,7 +53,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
 	r := ResourceRegistry{
-		User: uuid.New(),
+		User:      uuid.New(),
+		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
 	var err error
@@ -63,6 +69,43 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		require.NoError(t, err)
 	}
 
+	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
+	r.SemaphoreAPIMock.Init()
+	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+
+	//
+	// Create Semaphore integration
+	//
+	secretData := map[string]string{"key": "test"}
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+
+	secret, err := models.CreateSecret(randomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	require.NoError(t, err)
+
+	integration, err := models.CreateIntegration(&models.Integration{
+		Name:       randomName("integration"),
+		CreatedBy:  r.User,
+		Type:       models.IntegrationTypeSemaphore,
+		DomainType: "canvas",
+		DomainID:   r.Canvas.ID,
+		URL:        r.SemaphoreAPIMock.Server.URL,
+		AuthType:   models.IntegrationAuthTypeToken,
+		Auth: datatypes.NewJSONType(models.IntegrationAuth{
+			Token: &models.IntegrationAuthToken{
+				ValueFrom: models.ValueDefinitionFrom{
+					Secret: &models.ValueDefinitionFromSecret{
+						Name: secret.Name,
+						Key:  "key",
+					},
+				},
+			},
+		}),
+	})
+
+	require.NoError(t, err)
+	r.Integration = integration
+
 	if options.Stage {
 		conditions := []models.StageCondition{
 			{
@@ -71,10 +114,12 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1",
+		executor, resource := Executor(&r)
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1",
 			r.User.String(),
 			conditions,
-			ExecutorSpec(),
+			executor,
+			&resource,
 			[]models.Connection{
 				{
 					SourceType: models.SourceTypeEventSource,
@@ -102,14 +147,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		)
 
 		require.NoError(t, err)
-		r.Stage, err = r.Canvas.FindStageByName("stage-1")
-		require.NoError(t, err)
-	}
-
-	if options.SemaphoreAPI {
-		r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-		r.SemaphoreAPIMock.Init()
-		log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+		r.Stage = stage
 	}
 
 	return &r
@@ -185,39 +223,45 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func ExecutorSpec() models.ExecutorSpec {
-	return ExecutorSpecWithURL("http://localhost:8000")
+func Executor(r *ResourceRegistry) (models.StageExecutor, models.Resource) {
+	return models.StageExecutor{
+			Type: models.ExecutorSpecTypeSemaphore,
+			Spec: datatypes.NewJSONType(models.ExecutorSpec{
+				Semaphore: &models.SemaphoreExecutorSpec{
+					ProjectID:    "demo-project",
+					Branch:       "main",
+					PipelineFile: ".semaphore/run.yml",
+					Parameters: map[string]string{
+						"PARAM_1": "VALUE_1",
+						"PARAM_2": "VALUE_2",
+					},
+				},
+			}),
+		}, models.Resource{
+			Type:          integrations.ResourceTypeProject,
+			ExternalID:    uuid.NewString(),
+			IntegrationID: r.Integration.ID,
+			Name:          "demo-project",
+		}
 }
 
-func ExecutorSpecWithURL(URL string) models.ExecutorSpec {
-	return models.ExecutorSpec{
-		Type: models.ExecutorSpecTypeSemaphore,
-		Semaphore: &models.SemaphoreExecutorSpec{
-			OrganizationURL: URL,
-			APIToken:        base64.StdEncoding.EncodeToString([]byte("token")),
-			ProjectID:       "demo-project",
-			TaskID:          "demo-task",
-			Branch:          "main",
-			PipelineFile:    ".semaphore/run.yml",
-			Parameters: map[string]string{
-				"PARAM_1": "VALUE_1",
-				"PARAM_2": "VALUE_2",
-			},
+func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
+	return &pb.ExecutorSpec{
+		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+		Integration: &pb.IntegrationRef{
+			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
+			Name:       r.Integration.Name,
+		},
+		Semaphore: &pb.ExecutorSpec_Semaphore{
+			ProjectId:    "demo-project",
+			TaskId:       "task",
+			Branch:       "main",
+			PipelineFile: ".semaphore/semaphore.yml",
+			Parameters:   map[string]string{},
 		},
 	}
 }
 
-func ProtoExecutor() *protos.ExecutorSpec {
-	return &protos.ExecutorSpec{
-		Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
-		Semaphore: &protos.ExecutorSpec_Semaphore{
-			OrganizationUrl: "http://localhost:8000",
-			ApiToken:        "test",
-			ProjectId:       "test",
-			TaskId:          "task",
-			Branch:          "main",
-			PipelineFile:    ".semaphore/semaphore.yml",
-			Parameters:      map[string]string{},
-		},
-	}
+func randomName(prefix string) string {
+	return prefix + "-" + uuid.New().String()
 }

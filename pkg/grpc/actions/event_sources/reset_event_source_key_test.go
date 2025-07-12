@@ -7,7 +7,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -16,10 +15,9 @@ import (
 
 func Test__ResetEventSourceKey(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	encryptor := crypto.NewNoOpEncryptor()
 
 	t.Run("canvas that does not exist -> error", func(t *testing.T) {
-		_, err := ResetEventSourceKey(context.Background(), encryptor, &protos.ResetEventSourceKeyRequest{
+		_, err := ResetEventSourceKey(context.Background(), r.Encryptor, &protos.ResetEventSourceKeyRequest{
 			CanvasIdOrName: uuid.New().String(),
 			IdOrName:       r.Source.Name,
 		})
@@ -31,7 +29,7 @@ func Test__ResetEventSourceKey(t *testing.T) {
 	})
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
-		_, err := ResetEventSourceKey(context.Background(), encryptor, &protos.ResetEventSourceKeyRequest{
+		_, err := ResetEventSourceKey(context.Background(), r.Encryptor, &protos.ResetEventSourceKeyRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			IdOrName:       uuid.New().String(),
 		})
@@ -43,7 +41,7 @@ func Test__ResetEventSourceKey(t *testing.T) {
 	})
 
 	t.Run("key is reset using source id", func(t *testing.T) {
-		response, err := ResetEventSourceKey(context.Background(), encryptor, &protos.ResetEventSourceKeyRequest{
+		response, err := ResetEventSourceKey(context.Background(), r.Encryptor, &protos.ResetEventSourceKeyRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			IdOrName:       r.Source.ID.String(),
 		})
@@ -59,7 +57,7 @@ func Test__ResetEventSourceKey(t *testing.T) {
 	})
 
 	t.Run("key is reset using source name", func(t *testing.T) {
-		response, err := ResetEventSourceKey(context.Background(), encryptor, &protos.ResetEventSourceKeyRequest{
+		response, err := ResetEventSourceKey(context.Background(), r.Encryptor, &protos.ResetEventSourceKeyRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			IdOrName:       r.Source.Name,
 		})

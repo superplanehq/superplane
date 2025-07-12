@@ -22,20 +22,20 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 	})
 
 	amqpURL, _ := config.RabbitMQURL()
+	executor, resource := support.Executor(r)
 
 	t.Run("stage does not require approval -> creates execution", func(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-no-approval-1")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
+
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -72,14 +72,12 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-1", r.User.String(), conditions, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-with-approval-1")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//
@@ -105,14 +103,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		conditions := []models.StageCondition{
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
+
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-2", r.User.String(), conditions, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-with-approval-2")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
@@ -158,14 +155,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
+
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window", r.User.String(), conditions, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-with-time-window")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//
@@ -207,14 +203,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
+
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window-2", r.User.String(), conditions, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-with-time-window-2")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//
@@ -250,14 +245,12 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-3", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-no-approval-3")
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//

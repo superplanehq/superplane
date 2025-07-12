@@ -81,7 +81,8 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Create stage, connected to our two sources
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
+		executor, resource := support.Executor(r)
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   docsSource.ID,
 				SourceName: docsSource.Name,
@@ -154,8 +155,6 @@ func Test__InputBuilder(t *testing.T) {
 			},
 		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 
-		require.NoError(t, err)
-		stage, err := r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)
 
 		//

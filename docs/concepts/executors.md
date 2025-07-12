@@ -39,8 +39,6 @@ The Semaphore Executor allows you to trigger Semaphore pipelines when a stage is
 executor:
   type: TYPE_SEMAPHORE
   semaphore:
-    organizationUrl: https://myorg.semaphoreci.com
-    apiToken: ${{ secrets.API_TOKEN }}
     projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
     taskId: fd67cfb1-e06c-4896-a517-c648f878330a
     branch: sxmoon

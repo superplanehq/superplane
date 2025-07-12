@@ -21,12 +21,12 @@ const (
 )
 
 type Integration interface {
-	GetResource(resourceType, id string) (IntegrationResource, error)
-	CreateResource(resourceType string, params any) (IntegrationResource, error)
-	ListResources(resourceType string) ([]IntegrationResource, error)
+	GetResource(resourceType, id string) (Resource, error)
+	CreateResource(resourceType string, params any) (Resource, error)
+	ListResources(resourceType string) ([]Resource, error)
 }
 
-type IntegrationResource interface {
+type Resource interface {
 	ID() string
 	Name() string
 	Type() string

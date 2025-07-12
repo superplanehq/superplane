@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -18,7 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -48,11 +49,6 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	spec, err := specValidator.Validate(req.Stage.Spec.Executor)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
 	inputValidator := inputs.NewValidator(
 		inputs.WithInputs(req.Stage.Spec.Inputs),
 		inputs.WithOutputs(req.Stage.Spec.Outputs),
@@ -80,11 +76,18 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.CreateStage(
+	executor, resource, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	stage, err := canvas.CreateStage(
+		encryptor,
 		req.Stage.Metadata.Name,
 		userID,
 		conditions,
-		*spec,
+		*executor,
+		resource,
 		connections,
 		inputValidator.SerializeInputs(),
 		inputValidator.SerializeInputMappings(),
@@ -97,11 +100,6 @@ func CreateStage(ctx context.Context, specValidator executors.SpecValidator, req
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		return nil, err
-	}
-
-	stage, err := canvas.FindStageByName(req.Stage.Metadata.Name)
-	if err != nil {
 		return nil, err
 	}
 
@@ -221,7 +219,12 @@ func serializeStage(
 	outputs []*pb.OutputDefinition,
 	inputMappings []*pb.InputMapping,
 ) (*pb.Stage, error) {
-	executor, err := serializeExecutorSpec(stage.ExecutorSpec.Data())
+	stageExecutor, err := stage.GetExecutor()
+	if err != nil {
+		return nil, err
+	}
+
+	executor, err := serializeExecutor(stageExecutor)
 	if err != nil {
 		return nil, err
 	}
@@ -396,17 +399,19 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	}
 }
 
-func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, error) {
+func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error) {
+	executorSpec := executor.Spec.Data()
+
 	switch executor.Type {
 	case models.ExecutorSpecTypeHTTP:
 		return &pb.ExecutorSpec{
 			Type: pb.ExecutorSpec_TYPE_HTTP,
 			Http: &pb.ExecutorSpec_HTTP{
-				Url:     executor.HTTP.URL,
-				Headers: executor.HTTP.Headers,
-				Payload: executor.HTTP.Payload,
+				Url:     executorSpec.HTTP.URL,
+				Headers: executorSpec.HTTP.Headers,
+				Payload: executorSpec.HTTP.Payload,
 				ResponsePolicy: &pb.ExecutorSpec_HTTPResponsePolicy{
-					StatusCodes: executor.HTTP.ResponsePolicy.StatusCodes,
+					StatusCodes: executorSpec.HTTP.ResponsePolicy.StatusCodes,
 				},
 			},
 		}, nil
@@ -414,13 +419,11 @@ func serializeExecutorSpec(executor models.ExecutorSpec) (*pb.ExecutorSpec, erro
 		return &pb.ExecutorSpec{
 			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: &pb.ExecutorSpec_Semaphore{
-				OrganizationUrl: executor.Semaphore.OrganizationURL,
-				ApiToken:        executor.Semaphore.APIToken,
-				ProjectId:       executor.Semaphore.ProjectID,
-				Branch:          executor.Semaphore.Branch,
-				PipelineFile:    executor.Semaphore.PipelineFile,
-				Parameters:      executor.Semaphore.Parameters,
-				TaskId:          executor.Semaphore.TaskID,
+				ProjectId:    executorSpec.Semaphore.ProjectID,
+				Branch:       executorSpec.Semaphore.Branch,
+				PipelineFile: executorSpec.Semaphore.PipelineFile,
+				Parameters:   executorSpec.Semaphore.Parameters,
+				TaskId:       executorSpec.Semaphore.TaskID,
 			},
 		}, nil
 

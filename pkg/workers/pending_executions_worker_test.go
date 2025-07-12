@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,13 +13,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
+	"gorm.io/datatypes"
 )
 
 const ExecutionStartedRoutingKey = "execution-started"
 
 func Test__PendingExecutionsWorker(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Stage: true, SemaphoreAPI: true, Approvals: 1,
+		Source:    true,
+		Approvals: 1,
 	})
 
 	defer r.Close()
@@ -33,20 +34,17 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 
-	t.Run("semaphore task is triggered with simple parameters", func(t *testing.T) {
+	t.Run("semaphore workflow is triggered with simple parameters", func(t *testing.T) {
 		//
-		// Create stage that trigger Semaphore task.
+		// Create stage that runs Semaphore workflow.
 		//
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
+		executor, resource := support.Executor(r)
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
 			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-task")
-
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//
@@ -70,27 +68,32 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		assert.NotEmpty(t, execution.StartedAt)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.SemaphoreAPIMock.LastTaskTrigger
+		req := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, req)
-		assert.Equal(t, "main", req.Spec.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
+		assert.Equal(t, "refs/heads/main", req.Reference)
+		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"PARAM_1": "VALUE_1",
 			"PARAM_2": "VALUE_2",
 		})
 	})
 
-	t.Run("semaphore task with resolved parameters is triggered", func(t *testing.T) {
+	t.Run("semaphore workflow with resolved parameters is triggered", func(t *testing.T) {
 		//
-		// Create stage that trigger Semaphore task.
+		// Create stage that runs Semaphore workflow.
 		//
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		spec.Semaphore.Parameters = map[string]string{
+		executor, resource := support.Executor(r)
+		semaphoreSpec := executor.Spec.Data().Semaphore
+		semaphoreSpec.Parameters = map[string]string{
 			"REF":      "${{ inputs.REF }}",
 			"REF_TYPE": "${{ inputs.REF_TYPE }}",
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
+		executor.Spec = datatypes.NewJSONType(models.ExecutorSpec{
+			Semaphore: semaphoreSpec,
+		})
+
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,
@@ -122,9 +125,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-task-2")
+		}, []models.OutputDefinition{}, []models.ValueDefinition{})
 		require.NoError(t, err)
 
 		//
@@ -154,10 +155,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		assert.NotEmpty(t, execution.StartedAt)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.SemaphoreAPIMock.LastTaskTrigger
+		req := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, req)
-		assert.Equal(t, "main", req.Spec.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
+		assert.Equal(t, "refs/heads/main", req.Reference)
+		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"REF":      "refs/heads/test",
 			"REF_TYPE": "branch",
@@ -165,7 +166,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, trigger *integrations.TaskTrigger, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
 		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
 		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
@@ -175,14 +176,14 @@ func assertParameters(t *testing.T, trigger *integrations.TaskTrigger, execution
 		all[k] = v
 	}
 
-	assert.Len(t, trigger.Spec.Parameters, len(all)+1)
+	assert.Len(t, req.Parameters, len(all)+1)
 	for name, value := range all {
-		assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p integrations.TaskTriggerParameter) bool {
-			return p.Name == name && p.Value == value
-		}))
+		v, ok := req.Parameters[name]
+		assert.True(t, ok)
+		assert.Equal(t, value, v)
 	}
 
-	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p integrations.TaskTriggerParameter) bool {
-		return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
-	}))
+	v, ok := req.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"]
+	assert.True(t, ok)
+	assert.NotEmpty(t, v)
 }

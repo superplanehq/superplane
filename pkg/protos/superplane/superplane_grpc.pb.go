@@ -25,7 +25,6 @@ const (
 	Superplane_CreateConnectionGroup_FullMethodName        = "/Superplane.Superplane/CreateConnectionGroup"
 	Superplane_ListIntegrations_FullMethodName             = "/Superplane.Superplane/ListIntegrations"
 	Superplane_DescribeIntegration_FullMethodName          = "/Superplane.Superplane/DescribeIntegration"
-	Superplane_ListIntegrationResources_FullMethodName     = "/Superplane.Superplane/ListIntegrationResources"
 	Superplane_CreateIntegration_FullMethodName            = "/Superplane.Superplane/CreateIntegration"
 	Superplane_CreateEventSource_FullMethodName            = "/Superplane.Superplane/CreateEventSource"
 	Superplane_ResetEventSourceKey_FullMethodName          = "/Superplane.Superplane/ResetEventSourceKey"
@@ -58,7 +57,6 @@ type SuperplaneClient interface {
 	CreateConnectionGroup(ctx context.Context, in *CreateConnectionGroupRequest, opts ...grpc.CallOption) (*CreateConnectionGroupResponse, error)
 	ListIntegrations(ctx context.Context, in *ListIntegrationsRequest, opts ...grpc.CallOption) (*ListIntegrationsResponse, error)
 	DescribeIntegration(ctx context.Context, in *DescribeIntegrationRequest, opts ...grpc.CallOption) (*DescribeIntegrationResponse, error)
-	ListIntegrationResources(ctx context.Context, in *ListIntegrationResourcesRequest, opts ...grpc.CallOption) (*ListIntegrationResourcesResponse, error)
 	CreateIntegration(ctx context.Context, in *CreateIntegrationRequest, opts ...grpc.CallOption) (*CreateIntegrationResponse, error)
 	CreateEventSource(ctx context.Context, in *CreateEventSourceRequest, opts ...grpc.CallOption) (*CreateEventSourceResponse, error)
 	ResetEventSourceKey(ctx context.Context, in *ResetEventSourceKeyRequest, opts ...grpc.CallOption) (*ResetEventSourceKeyResponse, error)
@@ -143,16 +141,6 @@ func (c *superplaneClient) DescribeIntegration(ctx context.Context, in *Describe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(DescribeIntegrationResponse)
 	err := c.cc.Invoke(ctx, Superplane_DescribeIntegration_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *superplaneClient) ListIntegrationResources(ctx context.Context, in *ListIntegrationResourcesRequest, opts ...grpc.CallOption) (*ListIntegrationResourcesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListIntegrationResourcesResponse)
-	err := c.cc.Invoke(ctx, Superplane_ListIntegrationResources_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +357,6 @@ type SuperplaneServer interface {
 	CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error)
 	ListIntegrations(context.Context, *ListIntegrationsRequest) (*ListIntegrationsResponse, error)
 	DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error)
-	ListIntegrationResources(context.Context, *ListIntegrationResourcesRequest) (*ListIntegrationResourcesResponse, error)
 	CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error)
 	CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error)
 	ResetEventSourceKey(context.Context, *ResetEventSourceKeyRequest) (*ResetEventSourceKeyResponse, error)
@@ -416,9 +403,6 @@ func (UnimplementedSuperplaneServer) ListIntegrations(context.Context, *ListInte
 }
 func (UnimplementedSuperplaneServer) DescribeIntegration(context.Context, *DescribeIntegrationRequest) (*DescribeIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeIntegration not implemented")
-}
-func (UnimplementedSuperplaneServer) ListIntegrationResources(context.Context, *ListIntegrationResourcesRequest) (*ListIntegrationResourcesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListIntegrationResources not implemented")
 }
 func (UnimplementedSuperplaneServer) CreateIntegration(context.Context, *CreateIntegrationRequest) (*CreateIntegrationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateIntegration not implemented")
@@ -604,24 +588,6 @@ func _Superplane_DescribeIntegration_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).DescribeIntegration(ctx, req.(*DescribeIntegrationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Superplane_ListIntegrationResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListIntegrationResourcesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SuperplaneServer).ListIntegrationResources(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Superplane_ListIntegrationResources_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SuperplaneServer).ListIntegrationResources(ctx, req.(*ListIntegrationResourcesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1016,10 +982,6 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DescribeIntegration",
 			Handler:    _Superplane_DescribeIntegration_Handler,
-		},
-		{
-			MethodName: "ListIntegrationResources",
-			Handler:    _Superplane_ListIntegrationResources_Handler,
 		},
 		{
 			MethodName: "CreateIntegration",

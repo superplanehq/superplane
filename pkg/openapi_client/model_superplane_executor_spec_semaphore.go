@@ -15,39 +15,37 @@ import (
 	"encoding/json"
 )
 
-// checks if the ExecutorSpecSemaphore type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ExecutorSpecSemaphore{}
+// checks if the SuperplaneExecutorSpecSemaphore type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneExecutorSpecSemaphore{}
 
-// ExecutorSpecSemaphore struct for ExecutorSpecSemaphore
-type ExecutorSpecSemaphore struct {
+// SuperplaneExecutorSpecSemaphore struct for SuperplaneExecutorSpecSemaphore
+type SuperplaneExecutorSpecSemaphore struct {
 	ProjectId *string `json:"projectId,omitempty"`
 	Branch *string `json:"branch,omitempty"`
 	PipelineFile *string `json:"pipelineFile,omitempty"`
 	TaskId *string `json:"taskId,omitempty"`
 	Parameters *map[string]string `json:"parameters,omitempty"`
-	ApiToken *string `json:"apiToken,omitempty"`
-	OrganizationUrl *string `json:"organizationUrl,omitempty"`
 }
 
-// NewExecutorSpecSemaphore instantiates a new ExecutorSpecSemaphore object
+// NewSuperplaneExecutorSpecSemaphore instantiates a new SuperplaneExecutorSpecSemaphore object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewExecutorSpecSemaphore() *ExecutorSpecSemaphore {
-	this := ExecutorSpecSemaphore{}
+func NewSuperplaneExecutorSpecSemaphore() *SuperplaneExecutorSpecSemaphore {
+	this := SuperplaneExecutorSpecSemaphore{}
 	return &this
 }
 
-// NewExecutorSpecSemaphoreWithDefaults instantiates a new ExecutorSpecSemaphore object
+// NewSuperplaneExecutorSpecSemaphoreWithDefaults instantiates a new SuperplaneExecutorSpecSemaphore object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewExecutorSpecSemaphoreWithDefaults() *ExecutorSpecSemaphore {
-	this := ExecutorSpecSemaphore{}
+func NewSuperplaneExecutorSpecSemaphoreWithDefaults() *SuperplaneExecutorSpecSemaphore {
+	this := SuperplaneExecutorSpecSemaphore{}
 	return &this
 }
 
 // GetProjectId returns the ProjectId field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetProjectId() string {
+func (o *SuperplaneExecutorSpecSemaphore) GetProjectId() string {
 	if o == nil || IsNil(o.ProjectId) {
 		var ret string
 		return ret
@@ -57,7 +55,7 @@ func (o *ExecutorSpecSemaphore) GetProjectId() string {
 
 // GetProjectIdOk returns a tuple with the ProjectId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetProjectIdOk() (*string, bool) {
+func (o *SuperplaneExecutorSpecSemaphore) GetProjectIdOk() (*string, bool) {
 	if o == nil || IsNil(o.ProjectId) {
 		return nil, false
 	}
@@ -65,7 +63,7 @@ func (o *ExecutorSpecSemaphore) GetProjectIdOk() (*string, bool) {
 }
 
 // HasProjectId returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasProjectId() bool {
+func (o *SuperplaneExecutorSpecSemaphore) HasProjectId() bool {
 	if o != nil && !IsNil(o.ProjectId) {
 		return true
 	}
@@ -74,12 +72,12 @@ func (o *ExecutorSpecSemaphore) HasProjectId() bool {
 }
 
 // SetProjectId gets a reference to the given string and assigns it to the ProjectId field.
-func (o *ExecutorSpecSemaphore) SetProjectId(v string) {
+func (o *SuperplaneExecutorSpecSemaphore) SetProjectId(v string) {
 	o.ProjectId = &v
 }
 
 // GetBranch returns the Branch field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetBranch() string {
+func (o *SuperplaneExecutorSpecSemaphore) GetBranch() string {
 	if o == nil || IsNil(o.Branch) {
 		var ret string
 		return ret
@@ -89,7 +87,7 @@ func (o *ExecutorSpecSemaphore) GetBranch() string {
 
 // GetBranchOk returns a tuple with the Branch field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetBranchOk() (*string, bool) {
+func (o *SuperplaneExecutorSpecSemaphore) GetBranchOk() (*string, bool) {
 	if o == nil || IsNil(o.Branch) {
 		return nil, false
 	}
@@ -97,7 +95,7 @@ func (o *ExecutorSpecSemaphore) GetBranchOk() (*string, bool) {
 }
 
 // HasBranch returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasBranch() bool {
+func (o *SuperplaneExecutorSpecSemaphore) HasBranch() bool {
 	if o != nil && !IsNil(o.Branch) {
 		return true
 	}
@@ -106,12 +104,12 @@ func (o *ExecutorSpecSemaphore) HasBranch() bool {
 }
 
 // SetBranch gets a reference to the given string and assigns it to the Branch field.
-func (o *ExecutorSpecSemaphore) SetBranch(v string) {
+func (o *SuperplaneExecutorSpecSemaphore) SetBranch(v string) {
 	o.Branch = &v
 }
 
 // GetPipelineFile returns the PipelineFile field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetPipelineFile() string {
+func (o *SuperplaneExecutorSpecSemaphore) GetPipelineFile() string {
 	if o == nil || IsNil(o.PipelineFile) {
 		var ret string
 		return ret
@@ -121,7 +119,7 @@ func (o *ExecutorSpecSemaphore) GetPipelineFile() string {
 
 // GetPipelineFileOk returns a tuple with the PipelineFile field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetPipelineFileOk() (*string, bool) {
+func (o *SuperplaneExecutorSpecSemaphore) GetPipelineFileOk() (*string, bool) {
 	if o == nil || IsNil(o.PipelineFile) {
 		return nil, false
 	}
@@ -129,7 +127,7 @@ func (o *ExecutorSpecSemaphore) GetPipelineFileOk() (*string, bool) {
 }
 
 // HasPipelineFile returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasPipelineFile() bool {
+func (o *SuperplaneExecutorSpecSemaphore) HasPipelineFile() bool {
 	if o != nil && !IsNil(o.PipelineFile) {
 		return true
 	}
@@ -138,12 +136,12 @@ func (o *ExecutorSpecSemaphore) HasPipelineFile() bool {
 }
 
 // SetPipelineFile gets a reference to the given string and assigns it to the PipelineFile field.
-func (o *ExecutorSpecSemaphore) SetPipelineFile(v string) {
+func (o *SuperplaneExecutorSpecSemaphore) SetPipelineFile(v string) {
 	o.PipelineFile = &v
 }
 
 // GetTaskId returns the TaskId field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetTaskId() string {
+func (o *SuperplaneExecutorSpecSemaphore) GetTaskId() string {
 	if o == nil || IsNil(o.TaskId) {
 		var ret string
 		return ret
@@ -153,7 +151,7 @@ func (o *ExecutorSpecSemaphore) GetTaskId() string {
 
 // GetTaskIdOk returns a tuple with the TaskId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetTaskIdOk() (*string, bool) {
+func (o *SuperplaneExecutorSpecSemaphore) GetTaskIdOk() (*string, bool) {
 	if o == nil || IsNil(o.TaskId) {
 		return nil, false
 	}
@@ -161,7 +159,7 @@ func (o *ExecutorSpecSemaphore) GetTaskIdOk() (*string, bool) {
 }
 
 // HasTaskId returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasTaskId() bool {
+func (o *SuperplaneExecutorSpecSemaphore) HasTaskId() bool {
 	if o != nil && !IsNil(o.TaskId) {
 		return true
 	}
@@ -170,12 +168,12 @@ func (o *ExecutorSpecSemaphore) HasTaskId() bool {
 }
 
 // SetTaskId gets a reference to the given string and assigns it to the TaskId field.
-func (o *ExecutorSpecSemaphore) SetTaskId(v string) {
+func (o *SuperplaneExecutorSpecSemaphore) SetTaskId(v string) {
 	o.TaskId = &v
 }
 
 // GetParameters returns the Parameters field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetParameters() map[string]string {
+func (o *SuperplaneExecutorSpecSemaphore) GetParameters() map[string]string {
 	if o == nil || IsNil(o.Parameters) {
 		var ret map[string]string
 		return ret
@@ -185,7 +183,7 @@ func (o *ExecutorSpecSemaphore) GetParameters() map[string]string {
 
 // GetParametersOk returns a tuple with the Parameters field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetParametersOk() (*map[string]string, bool) {
+func (o *SuperplaneExecutorSpecSemaphore) GetParametersOk() (*map[string]string, bool) {
 	if o == nil || IsNil(o.Parameters) {
 		return nil, false
 	}
@@ -193,7 +191,7 @@ func (o *ExecutorSpecSemaphore) GetParametersOk() (*map[string]string, bool) {
 }
 
 // HasParameters returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasParameters() bool {
+func (o *SuperplaneExecutorSpecSemaphore) HasParameters() bool {
 	if o != nil && !IsNil(o.Parameters) {
 		return true
 	}
@@ -202,75 +200,11 @@ func (o *ExecutorSpecSemaphore) HasParameters() bool {
 }
 
 // SetParameters gets a reference to the given map[string]string and assigns it to the Parameters field.
-func (o *ExecutorSpecSemaphore) SetParameters(v map[string]string) {
+func (o *SuperplaneExecutorSpecSemaphore) SetParameters(v map[string]string) {
 	o.Parameters = &v
 }
 
-// GetApiToken returns the ApiToken field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetApiToken() string {
-	if o == nil || IsNil(o.ApiToken) {
-		var ret string
-		return ret
-	}
-	return *o.ApiToken
-}
-
-// GetApiTokenOk returns a tuple with the ApiToken field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetApiTokenOk() (*string, bool) {
-	if o == nil || IsNil(o.ApiToken) {
-		return nil, false
-	}
-	return o.ApiToken, true
-}
-
-// HasApiToken returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasApiToken() bool {
-	if o != nil && !IsNil(o.ApiToken) {
-		return true
-	}
-
-	return false
-}
-
-// SetApiToken gets a reference to the given string and assigns it to the ApiToken field.
-func (o *ExecutorSpecSemaphore) SetApiToken(v string) {
-	o.ApiToken = &v
-}
-
-// GetOrganizationUrl returns the OrganizationUrl field value if set, zero value otherwise.
-func (o *ExecutorSpecSemaphore) GetOrganizationUrl() string {
-	if o == nil || IsNil(o.OrganizationUrl) {
-		var ret string
-		return ret
-	}
-	return *o.OrganizationUrl
-}
-
-// GetOrganizationUrlOk returns a tuple with the OrganizationUrl field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *ExecutorSpecSemaphore) GetOrganizationUrlOk() (*string, bool) {
-	if o == nil || IsNil(o.OrganizationUrl) {
-		return nil, false
-	}
-	return o.OrganizationUrl, true
-}
-
-// HasOrganizationUrl returns a boolean if a field has been set.
-func (o *ExecutorSpecSemaphore) HasOrganizationUrl() bool {
-	if o != nil && !IsNil(o.OrganizationUrl) {
-		return true
-	}
-
-	return false
-}
-
-// SetOrganizationUrl gets a reference to the given string and assigns it to the OrganizationUrl field.
-func (o *ExecutorSpecSemaphore) SetOrganizationUrl(v string) {
-	o.OrganizationUrl = &v
-}
-
-func (o ExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
+func (o SuperplaneExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -278,7 +212,7 @@ func (o ExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ExecutorSpecSemaphore) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneExecutorSpecSemaphore) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.ProjectId) {
 		toSerialize["projectId"] = o.ProjectId
@@ -295,47 +229,41 @@ func (o ExecutorSpecSemaphore) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Parameters) {
 		toSerialize["parameters"] = o.Parameters
 	}
-	if !IsNil(o.ApiToken) {
-		toSerialize["apiToken"] = o.ApiToken
-	}
-	if !IsNil(o.OrganizationUrl) {
-		toSerialize["organizationUrl"] = o.OrganizationUrl
-	}
 	return toSerialize, nil
 }
 
-type NullableExecutorSpecSemaphore struct {
-	value *ExecutorSpecSemaphore
+type NullableSuperplaneExecutorSpecSemaphore struct {
+	value *SuperplaneExecutorSpecSemaphore
 	isSet bool
 }
 
-func (v NullableExecutorSpecSemaphore) Get() *ExecutorSpecSemaphore {
+func (v NullableSuperplaneExecutorSpecSemaphore) Get() *SuperplaneExecutorSpecSemaphore {
 	return v.value
 }
 
-func (v *NullableExecutorSpecSemaphore) Set(val *ExecutorSpecSemaphore) {
+func (v *NullableSuperplaneExecutorSpecSemaphore) Set(val *SuperplaneExecutorSpecSemaphore) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableExecutorSpecSemaphore) IsSet() bool {
+func (v NullableSuperplaneExecutorSpecSemaphore) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableExecutorSpecSemaphore) Unset() {
+func (v *NullableSuperplaneExecutorSpecSemaphore) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableExecutorSpecSemaphore(val *ExecutorSpecSemaphore) *NullableExecutorSpecSemaphore {
-	return &NullableExecutorSpecSemaphore{value: val, isSet: true}
+func NewNullableSuperplaneExecutorSpecSemaphore(val *SuperplaneExecutorSpecSemaphore) *NullableSuperplaneExecutorSpecSemaphore {
+	return &NullableSuperplaneExecutorSpecSemaphore{value: val, isSet: true}
 }
 
-func (v NullableExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableExecutorSpecSemaphore) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneExecutorSpecSemaphore) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

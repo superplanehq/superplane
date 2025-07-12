@@ -17,12 +17,14 @@ import (
 
 func Test__UpdateStage(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	specValidator := executors.SpecValidator{}
+	specValidator := executors.SpecValidator{
+		Encryptor: r.Encryptor,
+	}
 
 	// Create a stage first that we'll update in tests
-	executor := support.ProtoExecutor()
+	executor := support.ProtoExecutor(r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	stage, err := CreateStage(ctx, specValidator, &protos.CreateStageRequest{
+	stage, err := CreateStage(ctx, r.Encryptor, specValidator, &protos.CreateStageRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		Stage: &protos.Stage{
 			Metadata: &protos.Stage_Metadata{
@@ -108,7 +110,7 @@ func Test__UpdateStage(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: "source-does-not-exist",
@@ -131,7 +133,7 @@ func Test__UpdateStage(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: r.Source.Name,
@@ -162,7 +164,7 @@ func Test__UpdateStage(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: r.Source.Name,
@@ -183,23 +185,19 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage is updated", func(t *testing.T) {
+		executor.Semaphore = &protos.ExecutorSpec_Semaphore{
+			ProjectId:    "demo-project-2",
+			Branch:       "other",
+			PipelineFile: ".semaphore/other.yml",
+			Parameters:   map[string]string{},
+		}
+
 		res, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: &protos.ExecutorSpec{
-						Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
-						Semaphore: &protos.ExecutorSpec_Semaphore{
-							OrganizationUrl: "http://localhost:8000",
-							ApiToken:        "test",
-							ProjectId:       "test-2",
-							TaskId:          "task-2",
-							Branch:          "other",
-							PipelineFile:    ".semaphore/other.yml",
-							Parameters:      map[string]string{},
-						},
-					},
+					Executor:   executor,
 					Conditions: []*protos.Condition{},
 					Connections: []*protos.Connection{
 						{
@@ -243,11 +241,9 @@ func Test__UpdateStage(t *testing.T) {
 
 		// Executor spec is updated
 		assert.Equal(t, protos.ExecutorSpec_TYPE_SEMAPHORE, res.Stage.Spec.Executor.Type)
-		assert.Equal(t, "task-2", res.Stage.Spec.Executor.Semaphore.TaskId)
-		assert.Equal(t, "test-2", res.Stage.Spec.Executor.Semaphore.ProjectId)
+		assert.Equal(t, "demo-project-2", res.Stage.Spec.Executor.Semaphore.ProjectId)
 		assert.Equal(t, "other", res.Stage.Spec.Executor.Semaphore.Branch)
 		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Semaphore.PipelineFile)
-		assert.Equal(t, "http://localhost:8000", res.Stage.Spec.Executor.Semaphore.OrganizationUrl)
 
 		// Conditions are updated
 		require.Empty(t, res.Stage.Spec.Conditions)
