@@ -106,7 +106,7 @@ func (v *SpecValidator) validateSemaphoreExecutorSpec(ctx context.Context, canva
 		return nil, nil, fmt.Errorf("error building integration: %v", err)
 	}
 
-	resource, err := i.GetResource(integrations.ResourceTypeProject, in.Semaphore.ProjectId)
+	resource, err := i.Get(integrations.ResourceTypeProject, in.Semaphore.ProjectId)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s %s not found: %v", integrations.ResourceTypeProject, in.Semaphore.ProjectId, err)
 	}
@@ -123,7 +123,7 @@ func (v *SpecValidator) validateSemaphoreExecutorSpec(ctx context.Context, canva
 				},
 			}),
 		}, &models.Resource{
-			ExternalID:    resource.ID(),
+			ExternalID:    resource.Id(),
 			Name:          resource.Name(),
 			IntegrationID: integration.ID,
 			Type:          integrations.ResourceTypeProject,

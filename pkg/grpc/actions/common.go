@@ -27,9 +27,9 @@ func ValidateUUIDs(ids ...string) error {
 
 func ExecutionResultToProto(result string) pb.Execution_Result {
 	switch result {
-	case models.StageExecutionResultFailed:
+	case models.ResultFailed:
 		return pb.Execution_RESULT_FAILED
-	case models.StageExecutionResultPassed:
+	case models.ResultPassed:
 		return pb.Execution_RESULT_PASSED
 	default:
 		return pb.Execution_RESULT_UNKNOWN

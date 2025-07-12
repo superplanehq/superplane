@@ -1,12 +1,12 @@
 package workers
 
 import (
+	"slices"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,14 +14,12 @@ import (
 )
 
 type ExecutionPoller struct {
-	Encryptor   crypto.Encryptor
-	SpecBuilder executors.SpecBuilder
+	Encryptor crypto.Encryptor
 }
 
 func NewExecutionPoller(encryptor crypto.Encryptor) *ExecutionPoller {
 	return &ExecutionPoller{
-		Encryptor:   encryptor,
-		SpecBuilder: executors.SpecBuilder{},
+		Encryptor: encryptor,
 	}
 }
 
@@ -32,12 +30,12 @@ func (w *ExecutionPoller) Start() error {
 			log.Errorf("Error processing started executions: %v", err)
 		}
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(time.Second)
 	}
 }
 
 func (w *ExecutionPoller) Tick() error {
-	executions, err := models.ListStageExecutionsInState(models.StageExecutionStarted)
+	executions, err := models.ListExecutionsInState(models.ExecutionStarted)
 	if err != nil {
 		return err
 	}
@@ -61,44 +59,29 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		return err
 	}
 
-	inputMap, err := execution.GetInputs()
+	resources, err := execution.Resources()
 	if err != nil {
 		return err
 	}
 
-	secrets, err := stage.FindSecrets(w.Encryptor)
-	if err != nil {
-		return err
-	}
-
-	stageExecutor, err := stage.GetExecutor()
-	if err != nil {
-		return err
-	}
-
-	spec, err := w.SpecBuilder.Build(stageExecutor.Spec.Data(), inputMap, secrets)
-	if err != nil {
-		return err
-	}
-
-	executor, err := executors.NewExecutor(stageExecutor, *execution, nil, w.Encryptor)
-	if err != nil {
-		return err
-	}
-
-	status, err := executor.Check(*spec, execution.ReferenceID)
-	if err != nil {
-		return err
-	}
-
-	if !status.Finished() {
-		logger.Info("Not finished yet")
+	//
+	// If the execution still has resources to finish, skip.
+	//
+	if slices.ContainsFunc(resources, func(resource models.ExecutionResource) bool {
+		return resource.State == models.ExecutionResourcePending
+	}) {
+		logger.Infof("Execution resources are not finished yet")
 		return nil
 	}
 
-	result := models.StageExecutionResultFailed
-	if status.Successful() {
-		result = models.StageExecutionResultPassed
+	//
+	// If any resource failed, mark the execution as failed.
+	//
+	result := models.ResultPassed
+	if slices.ContainsFunc(resources, func(resource models.ExecutionResource) bool {
+		return resource.Result == models.ResultFailed
+	}) {
+		result = models.ResultFailed
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -111,7 +94,7 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 		missingOutputs := stage.MissingRequiredOutputs(outputs)
 		if len(missingOutputs) > 0 {
 			logger.Infof("Missing outputs %v - marking the execution as failed", missingOutputs)
-			result = models.StageExecutionResultFailed
+			result = models.ResultFailed
 		}
 
 		if err := execution.FinishInTransaction(tx, stage, result); err != nil {

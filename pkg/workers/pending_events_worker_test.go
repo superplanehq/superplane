@@ -14,7 +14,11 @@ import (
 const EventCreatedRoutingKey = "stage-event-created"
 
 func Test__PendingEventsWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
+
 	w := PendingEventsWorker{}
 
 	eventData := []byte(`{"ref":"v1"}`)
@@ -38,7 +42,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		stage1, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage1, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -65,7 +69,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		stage2, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage2, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -200,7 +204,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-3", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-3", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -232,7 +236,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		_, err = r.Canvas.CreateStage(r.Encryptor, "stage-4", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		_, err = r.Canvas.CreateStage(r.Encryptor, "stage-4", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   firstStage.ID,
 				SourceType: models.SourceTypeStage,
@@ -294,7 +298,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-5", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-5", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,
@@ -312,7 +316,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		secondStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-6", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		secondStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-6", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:       r.Source.ID,
 				SourceType:     models.SourceTypeEventSource,

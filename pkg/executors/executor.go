@@ -16,7 +16,7 @@ var expressionRegex = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
 type Executor interface {
 	Name() string
 	Execute(models.ExecutorSpec) (Response, error)
-	Check(models.ExecutorSpec, string) (Response, error)
+	Check(string) (Response, error)
 }
 
 type Response interface {
@@ -26,7 +26,7 @@ type Response interface {
 	Id() string
 }
 
-func NewExecutor(executor *models.StageExecutor, execution models.StageExecution, jwtSigner *jwt.Signer, encryptor crypto.Encryptor) (Executor, error) {
+func NewExecutor(executor *models.StageExecutor, execution *models.StageExecution, jwtSigner *jwt.Signer, encryptor crypto.Encryptor) (Executor, error) {
 	switch executor.Type {
 	case models.ExecutorSpecTypeSemaphore:
 		r, err := executor.FindIntegration()

@@ -4,10 +4,8 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -15,7 +13,7 @@ import (
 )
 
 func Test__ListEventSources(t *testing.T) {
-	r := support.Setup(t)
+	r := support.SetupWithOptions(t, support.SetupOptions{})
 
 	t.Run("no canvas ID -> error", func(t *testing.T) {
 		_, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{})
@@ -26,14 +24,8 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("no event sources -> empty list", func(t *testing.T) {
-		org, err := models.CreateOrganization(uuid.New(), "test", "test")
-		require.NoError(t, err)
-
-		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas")
-		require.NoError(t, err)
-
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
-			CanvasIdOrName: canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -42,6 +34,9 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("with event source -> list", func(t *testing.T) {
+		source, err := r.Canvas.CreateEventSource("event-source-1", []byte("key"), nil)
+		require.NoError(t, err)
+
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -49,7 +44,8 @@ func Test__ListEventSources(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)
-		assert.Equal(t, r.Source.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, source.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, "event-source-1", res.EventSources[0].Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), res.EventSources[0].Metadata.CanvasId)
 		assert.NotEmpty(t, res.EventSources[0].Metadata.CreatedAt)
 	})

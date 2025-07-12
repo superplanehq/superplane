@@ -26,7 +26,7 @@ func NewSemaphoreIntegration(URL, token string) (Integration, error) {
 	}, nil
 }
 
-func (s *SemaphoreIntegration) ListResources(resourceType string) ([]Resource, error) {
+func (s *SemaphoreIntegration) List(resourceType string) ([]Resource, error) {
 	switch resourceType {
 	case ResourceTypeTask:
 		return s.listTasks()
@@ -37,7 +37,7 @@ func (s *SemaphoreIntegration) ListResources(resourceType string) ([]Resource, e
 	}
 }
 
-func (s *SemaphoreIntegration) GetResource(resourceType, id string) (Resource, error) {
+func (s *SemaphoreIntegration) Get(resourceType, id string) (Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		return s.getWorkflow(id)
@@ -67,7 +67,7 @@ type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) CreateResource(resourceType string, params any) (Resource, error) {
+func (s *SemaphoreIntegration) Create(resourceType string, params any) (Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		return s.createWorkflow(params)
@@ -166,7 +166,7 @@ type Secret struct {
 	Data       SecretSpecData `json:"data"`
 }
 
-func (p *Secret) ID() string {
+func (p *Secret) Id() string {
 	return p.Metadata.ID
 }
 
@@ -276,7 +276,7 @@ type Notification struct {
 	Spec       NotificationSpec     `json:"spec"`
 }
 
-func (p *Notification) ID() string {
+func (p *Notification) Id() string {
 	return p.Metadata.ID
 }
 
@@ -571,7 +571,7 @@ type SemaphoreWorkflow struct {
 	InitialPplID string `json:"initial_ppl_id"`
 }
 
-func (s *SemaphoreWorkflow) ID() string {
+func (s *SemaphoreWorkflow) Id() string {
 	return s.WfID
 }
 
@@ -587,7 +587,7 @@ type SemaphoreProject struct {
 	Metadata *SemaphoreProjectMetadata `json:"metadata"`
 }
 
-func (s *SemaphoreProject) ID() string {
+func (s *SemaphoreProject) Id() string {
 	return s.Metadata.ProjectID
 }
 
@@ -616,7 +616,7 @@ type SemaphorePipeline struct {
 	Result       string `json:"result"`
 }
 
-func (s *SemaphorePipeline) ID() string {
+func (s *SemaphorePipeline) Id() string {
 	return s.PipelineID
 }
 

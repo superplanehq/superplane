@@ -36,16 +36,18 @@ func (r *ResourceRegistry) Close() {
 }
 
 type SetupOptions struct {
-	Source    bool
-	Stage     bool
-	Approvals int
+	Source      bool
+	Stage       bool
+	Approvals   int
+	Integration bool
 }
 
 func Setup(t *testing.T) *ResourceRegistry {
 	return SetupWithOptions(t, SetupOptions{
-		Source:    true,
-		Stage:     true,
-		Approvals: 1,
+		Source:      true,
+		Stage:       true,
+		Integration: true,
+		Approvals:   1,
 	})
 }
 
@@ -73,38 +75,37 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.SemaphoreAPIMock.Init()
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 
-	//
-	// Create Semaphore integration
-	//
-	secretData := map[string]string{"key": "test"}
-	data, err := json.Marshal(secretData)
-	require.NoError(t, err)
+	if options.Integration {
+		secretData := map[string]string{"key": "test"}
+		data, err := json.Marshal(secretData)
+		require.NoError(t, err)
 
-	secret, err := models.CreateSecret(randomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
-	require.NoError(t, err)
+		secret, err := models.CreateSecret(randomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+		require.NoError(t, err)
 
-	integration, err := models.CreateIntegration(&models.Integration{
-		Name:       randomName("integration"),
-		CreatedBy:  r.User,
-		Type:       models.IntegrationTypeSemaphore,
-		DomainType: "canvas",
-		DomainID:   r.Canvas.ID,
-		URL:        r.SemaphoreAPIMock.Server.URL,
-		AuthType:   models.IntegrationAuthTypeToken,
-		Auth: datatypes.NewJSONType(models.IntegrationAuth{
-			Token: &models.IntegrationAuthToken{
-				ValueFrom: models.ValueDefinitionFrom{
-					Secret: &models.ValueDefinitionFromSecret{
-						Name: secret.Name,
-						Key:  "key",
+		integration, err := models.CreateIntegration(&models.Integration{
+			Name:       randomName("integration"),
+			CreatedBy:  r.User,
+			Type:       models.IntegrationTypeSemaphore,
+			DomainType: "canvas",
+			DomainID:   r.Canvas.ID,
+			URL:        r.SemaphoreAPIMock.Server.URL,
+			AuthType:   models.IntegrationAuthTypeToken,
+			Auth: datatypes.NewJSONType(models.IntegrationAuth{
+				Token: &models.IntegrationAuthToken{
+					ValueFrom: models.ValueDefinitionFrom{
+						Secret: &models.ValueDefinitionFromSecret{
+							Name: secret.Name,
+							Key:  "key",
+						},
 					},
 				},
-			},
-		}),
-	})
+			}),
+		})
 
-	require.NoError(t, err)
-	r.Integration = integration
+		require.NoError(t, err)
+		r.Integration = integration
+	}
 
 	if options.Stage {
 		conditions := []models.StageCondition{
@@ -118,8 +119,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1",
 			r.User.String(),
 			conditions,
-			executor,
-			&resource,
+			*executor,
+			resource,
 			[]models.Connection{
 				{
 					SourceType: models.SourceTypeEventSource,
@@ -223,8 +224,8 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (models.StageExecutor, models.Resource) {
-	return models.StageExecutor{
+func Executor(r *ResourceRegistry) (*models.StageExecutor, *models.Resource) {
+	return &models.StageExecutor{
 			Type: models.ExecutorSpecTypeSemaphore,
 			Spec: datatypes.NewJSONType(models.ExecutorSpec{
 				Semaphore: &models.SemaphoreExecutorSpec{
@@ -237,7 +238,7 @@ func Executor(r *ResourceRegistry) (models.StageExecutor, models.Resource) {
 					},
 				},
 			}),
-		}, models.Resource{
+		}, &models.Resource{
 			Type:          integrations.ResourceTypeProject,
 			ExternalID:    uuid.NewString(),
 			IntegrationID: r.Integration.ID,

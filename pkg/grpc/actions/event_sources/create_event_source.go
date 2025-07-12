@@ -65,7 +65,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var resourceID *uuid.UUID
 		if integration != nil && resource != nil {
-			r, err := integration.CreateResourceInTransaction(tx, resource.Type(), resource.ID(), resource.Name())
+			r, err := integration.CreateResourceInTransaction(tx, resource.Type(), resource.Id(), resource.Name())
 			if err != nil {
 				return err
 			}
@@ -129,7 +129,7 @@ func validateIntegrationResource(ctx context.Context, encryptor crypto.Encryptor
 		return nil, nil, fmt.Errorf("error building integration: %v", err)
 	}
 
-	resource, err := integration.GetResource(resourceType, resourceName)
+	resource, err := integration.Get(resourceType, resourceName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("%s %s not found: %v", resourceType, resourceName, err)
 	}

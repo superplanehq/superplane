@@ -10,7 +10,10 @@ import (
 )
 
 func Test__TimeWindowWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
 
 	//
 	// Stage's time window is on week days, 08:00-17:00
@@ -27,7 +30,7 @@ func Test__TimeWindowWorker(t *testing.T) {
 	}
 
 	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), conditions, executor, &resource, []models.Connection{
+	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), conditions, *executor, resource, []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,

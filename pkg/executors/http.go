@@ -15,7 +15,7 @@ import (
 const MaxHTTPResponseSize = 8 * 1024
 
 type HTTPExecutor struct {
-	execution models.StageExecution
+	execution *models.StageExecution
 	jwtSigner *jwt.Signer
 }
 
@@ -53,7 +53,7 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	return nil
 }
 
-func NewHTTPExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
+func NewHTTPExecutor(execution *models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
 	return &HTTPExecutor{
 		execution: execution,
 		jwtSigner: jwtSigner,
@@ -105,7 +105,7 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 	}, nil
 }
 
-func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
+func (e *HTTPExecutor) Check(id string) (Response, error) {
 	return nil, nil
 }
 

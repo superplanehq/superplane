@@ -2597,9 +2597,6 @@
         "id": {
           "type": "string"
         },
-        "referenceId": {
-          "type": "string"
-        },
         "state": {
           "$ref": "#/definitions/SuperplaneExecutionState"
         },
@@ -2624,6 +2621,21 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputValue"
           }
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneExecutionResource"
+          }
+        }
+      }
+    },
+    "SuperplaneExecutionResource": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
         }
       }
     },

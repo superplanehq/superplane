@@ -99,6 +99,7 @@ docs/SuperplaneEventSource.md
 docs/SuperplaneEventSourceMetadata.md
 docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneExecution.md
+docs/SuperplaneExecutionResource.md
 docs/SuperplaneExecutionState.md
 docs/SuperplaneExecutorSpec.md
 docs/SuperplaneExecutorSpecSemaphore.md
@@ -226,6 +227,7 @@ model_superplane_event_source.go
 model_superplane_event_source_metadata.go
 model_superplane_event_source_spec.go
 model_superplane_execution.go
+model_superplane_execution_resource.go
 model_superplane_execution_state.go
 model_superplane_executor_spec.go
 model_superplane_executor_spec_semaphore.go

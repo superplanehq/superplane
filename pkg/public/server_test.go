@@ -318,11 +318,12 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 
 func Test__HandleExecutionOutputs(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true,
+		Source:      true,
+		Integration: true,
 	})
 
 	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 		{
 			SourceID:   r.Source.ID,
 			SourceType: models.SourceTypeEventSource,

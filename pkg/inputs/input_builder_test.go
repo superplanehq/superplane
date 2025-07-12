@@ -10,7 +10,9 @@ import (
 )
 
 func Test__InputBuilder(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Integration: true,
+	})
 
 	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), nil)
 	require.NoError(t, err)
@@ -82,7 +84,7 @@ func Test__InputBuilder(t *testing.T) {
 		// Create stage, connected to our two sources
 		//
 		executor, resource := support.Executor(r)
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   docsSource.ID,
 				SourceName: docsSource.Name,
@@ -181,7 +183,7 @@ func Test__InputBuilder(t *testing.T) {
 		// Mock a completed previous execution of the stage
 		//
 		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
-		execution.Finish(stage, models.StageExecutionResultPassed)
+		execution.Finish(stage, models.ResultPassed)
 
 		//
 		// Build inputs from docs source event

@@ -16,7 +16,11 @@ import (
 const ExecutionCreatedRoutingKey = "execution-created"
 
 func Test__PendingStageEventsWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
+
 	w, _ := NewPendingStageEventsWorker(func() time.Time {
 		return time.Now()
 	})
@@ -28,7 +32,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -54,13 +58,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -72,7 +76,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-1", r.User.String(), conditions, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-1", r.User.String(), conditions, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -104,7 +108,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-2", r.User.String(), conditions, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-2", r.User.String(), conditions, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -131,13 +135,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -156,7 +160,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window", r.User.String(), conditions, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window", r.User.String(), conditions, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -204,7 +208,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window-2", r.User.String(), conditions, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window-2", r.User.String(), conditions, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -231,13 +235,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -245,7 +249,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-3", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-3", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,

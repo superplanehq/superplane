@@ -20,8 +20,9 @@ const ExecutionStartedRoutingKey = "execution-started"
 
 func Test__PendingExecutionsWorker(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source:    true,
-		Approvals: 1,
+		Source:      true,
+		Integration: true,
+		Approvals:   1,
 	})
 
 	defer r.Close()
@@ -39,7 +40,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		// Create stage that runs Semaphore workflow.
 		//
 		executor, resource := support.Executor(r)
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceType: models.SourceTypeEventSource,
@@ -63,9 +64,12 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		require.NoError(t, err)
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionStarted, execution.State)
-		assert.NotEmpty(t, execution.ReferenceID)
+		assert.Equal(t, models.ExecutionStarted, execution.State)
 		assert.NotEmpty(t, execution.StartedAt)
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, models.ExecutionResourcePending, resources[0].State)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
 		req := r.SemaphoreAPIMock.LastRunWorkflow
@@ -93,7 +97,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 			Semaphore: semaphoreSpec,
 		})
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, executor, &resource, []models.Connection{
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
 			{
 				SourceID:   r.Source.ID,
 				SourceName: r.Source.Name,
@@ -150,9 +154,12 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		require.NoError(t, err)
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionStarted, execution.State)
-		assert.NotEmpty(t, execution.ReferenceID)
+		assert.Equal(t, models.ExecutionStarted, execution.State)
 		assert.NotEmpty(t, execution.StartedAt)
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, models.ExecutionResourcePending, resources[0].State)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
 		req := r.SemaphoreAPIMock.LastRunWorkflow

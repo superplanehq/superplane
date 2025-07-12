@@ -99,7 +99,7 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 	}
 
 	resources = append(resources, models.Resource{
-		ID:            uuid.MustParse(secret.ID()),
+		ID:            uuid.MustParse(secret.Id()),
 		Name:          secret.Name(),
 		IntegrationID: integration.ID,
 		Type:          secret.Type(),
@@ -115,7 +115,7 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 	}
 
 	resources = append(resources, models.Resource{
-		ID:            uuid.MustParse(notification.ID()),
+		ID:            uuid.MustParse(notification.Id()),
 		Name:          notification.Name(),
 		IntegrationID: integration.ID,
 		Type:          notification.Type(),
@@ -139,16 +139,16 @@ func (w *PendingEventSourcesWorker) createSemaphoreSecret(semaphore integrations
 	//
 	// Check if secret already exists.
 	//
-	secret, err := semaphore.GetResource(integrations.ResourceTypeSecret, name)
+	secret, err := semaphore.Get(integrations.ResourceTypeSecret, name)
 	if err == nil {
-		log.Infof("Semaphore secret %s already exists - %s", secret.Name(), secret.ID())
+		log.Infof("Semaphore secret %s already exists - %s", secret.Name(), secret.Id())
 		return secret, nil
 	}
 
 	//
 	// Secret does not exist, create it.
 	//
-	secret, err = semaphore.CreateResource(integrations.ResourceTypeSecret, &integrations.Secret{
+	secret, err = semaphore.Create(integrations.ResourceTypeSecret, &integrations.Secret{
 		Metadata: integrations.SecretMetadata{
 			Name: name,
 		},
@@ -166,19 +166,19 @@ func (w *PendingEventSourcesWorker) createSemaphoreSecret(semaphore integrations
 		return nil, fmt.Errorf("error creating secret: %v", err)
 	}
 
-	log.Infof("Created Semaphore secret %s - %s", secret.Name(), secret.ID())
+	log.Infof("Created Semaphore secret %s - %s", secret.Name(), secret.Id())
 
 	return secret, nil
 }
 
 func (w *PendingEventSourcesWorker) createSemaphoreNotification(semaphore integrations.Integration, name string, resource models.Resource, eventSource models.EventSource) (integrations.Resource, error) {
-	notification, err := semaphore.GetResource(integrations.ResourceTypeNotification, name)
+	notification, err := semaphore.Get(integrations.ResourceTypeNotification, name)
 	if err == nil {
-		log.Infof("Semaphore notification %s already exists - %s", notification.Name(), notification.ID())
+		log.Infof("Semaphore notification %s already exists - %s", notification.Name(), notification.Id())
 		return notification, nil
 	}
 
-	notification, err = semaphore.CreateResource(integrations.ResourceTypeNotification, &integrations.Notification{
+	notification, err = semaphore.Create(integrations.ResourceTypeNotification, &integrations.Notification{
 		Metadata: integrations.NotificationMetadata{
 			Name: name,
 		},
@@ -207,7 +207,7 @@ func (w *PendingEventSourcesWorker) createSemaphoreNotification(semaphore integr
 		return nil, fmt.Errorf("error creating notification: %v", err)
 	}
 
-	log.Infof("Created Semaphore notification %s", notification.ID())
+	log.Infof("Created Semaphore notification %s", notification.Id())
 
 	return notification, nil
 }

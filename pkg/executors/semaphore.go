@@ -12,7 +12,7 @@ import (
 
 type SemaphoreExecutor struct {
 	integration integrations.Integration
-	execution   models.StageExecution
+	execution   *models.StageExecution
 	jwtSigner   *jwt.Signer
 }
 
@@ -52,7 +52,7 @@ func (r *SemaphoreResponse) Outputs() map[string]any {
 	return nil
 }
 
-func NewSemaphoreExecutor(integration integrations.Integration, execution models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
+func NewSemaphoreExecutor(integration integrations.Integration, execution *models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
 	return &SemaphoreExecutor{
 		integration: integration,
 		execution:   execution,
@@ -72,14 +72,14 @@ func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec) (Response, error) 
 	return e.triggerTask(spec)
 }
 
-func (e *SemaphoreExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
-	resource, err := e.integration.GetResource(integrations.ResourceTypeWorkflow, id)
+func (e *SemaphoreExecutor) Check(id string) (Response, error) {
+	resource, err := e.integration.Get(integrations.ResourceTypeWorkflow, id)
 	if err != nil {
 		return nil, fmt.Errorf("workflow %s not found", id)
 	}
 
 	workflow := resource.(*integrations.SemaphoreWorkflow)
-	resource, err = e.integration.GetResource(integrations.ResourceTypePipeline, workflow.InitialPplID)
+	resource, err = e.integration.Get(integrations.ResourceTypePipeline, workflow.InitialPplID)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 	}
@@ -94,7 +94,7 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec) (Response, err
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
 
-	resource, err := e.integration.CreateResource(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowRequest{
+	resource, err := e.integration.Create(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowRequest{
 		ProjectID:    spec.Semaphore.ProjectID,
 		Reference:    "refs/heads/" + spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
@@ -105,7 +105,7 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec) (Response, err
 		return nil, err
 	}
 
-	return &SemaphoreResponse{wfID: resource.ID(), pipeline: nil}, nil
+	return &SemaphoreResponse{wfID: resource.Id(), pipeline: nil}, nil
 }
 
 func (e *SemaphoreExecutor) triggerTask(spec models.ExecutorSpec) (Response, error) {
@@ -114,7 +114,7 @@ func (e *SemaphoreExecutor) triggerTask(spec models.ExecutorSpec) (Response, err
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
 
-	resource, err := e.integration.CreateResource(integrations.ResourceTypeTaskTrigger, &integrations.TaskTriggerParams{
+	resource, err := e.integration.Create(integrations.ResourceTypeTaskTrigger, &integrations.TaskTriggerParams{
 		ProjectID: spec.Semaphore.ProjectID,
 		TaskID:    spec.Semaphore.TaskID,
 		TaskTrigger: &integrations.TaskTrigger{
@@ -130,7 +130,7 @@ func (e *SemaphoreExecutor) triggerTask(spec models.ExecutorSpec) (Response, err
 		return nil, err
 	}
 
-	return &SemaphoreResponse{wfID: resource.ID(), pipeline: nil}, nil
+	return &SemaphoreResponse{wfID: resource.Id(), pipeline: nil}, nil
 }
 
 func (e *SemaphoreExecutor) taskTriggerParameters(parameters map[string]string) ([]integrations.TaskTriggerParameter, error) {

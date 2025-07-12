@@ -98,7 +98,6 @@ func Test__ListStageEvents(t *testing.T) {
 		assert.Equal(t, protos.StageEvent_STATE_REASON_EXECUTION, e.StateReason)
 		require.NotNil(t, e.Execution)
 		assert.Equal(t, execution.ID.String(), e.Execution.Id)
-		assert.Empty(t, e.Execution.ReferenceId)
 		assert.Equal(t, protos.Execution_STATE_PENDING, e.Execution.State)
 		assert.Equal(t, protos.Execution_RESULT_UNKNOWN, e.Execution.Result)
 		assert.NotNil(t, e.Execution.CreatedAt)

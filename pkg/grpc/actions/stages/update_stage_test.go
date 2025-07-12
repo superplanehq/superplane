@@ -16,7 +16,10 @@ import (
 )
 
 func Test__UpdateStage(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
 	specValidator := executors.SpecValidator{
 		Encryptor: r.Encryptor,
 	}

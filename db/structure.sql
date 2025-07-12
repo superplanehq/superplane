@@ -203,6 +203,23 @@ CREATE TABLE public.events (
 
 
 --
+-- Name: execution_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.execution_resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    external_id character varying(128) NOT NULL,
+    stage_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    parent_resource_id uuid NOT NULL,
+    state character varying(64) NOT NULL,
+    result character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: integrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -316,7 +333,6 @@ CREATE TABLE public.stage_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     stage_id uuid NOT NULL,
     stage_event_id uuid NOT NULL,
-    reference_id character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
     outputs jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -497,6 +513,14 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.events
     ADD CONSTRAINT events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: execution_resources execution_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_pkey PRIMARY KEY (id);
 
 
 --
@@ -786,6 +810,22 @@ ALTER TABLE ONLY public.event_sources
 
 ALTER TABLE ONLY public.event_sources
     ADD CONSTRAINT event_sources_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.resources(id);
+
+
+--
+-- Name: execution_resources execution_resources_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.stage_executions(id);
+
+
+--
+-- Name: execution_resources execution_resources_parent_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_parent_resource_id_fkey FOREIGN KEY (parent_resource_id) REFERENCES public.resources(id);
 
 
 --

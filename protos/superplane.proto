@@ -957,13 +957,17 @@ message Execution {
   }
 
   string id = 1;
-  string reference_id = 2;
-  State state = 3;
-  Result result = 4;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp started_at = 6;
-  google.protobuf.Timestamp finished_at = 7;
-  repeated OutputValue outputs = 8;
+  State state = 2;
+  Result result = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp finished_at = 6;
+  repeated OutputValue outputs = 7;
+  repeated ExecutionResource resources = 8;
+}
+
+message ExecutionResource {
+  string id = 1;
 }
 
 message StageEventApproval {

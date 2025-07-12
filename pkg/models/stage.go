@@ -334,7 +334,7 @@ func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[stri
 		Select("e.*").
 		Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = e.id").
 		Where("e.stage_id = ?", s.ID).
-		Where("ex.state = ?", StageExecutionFinished).
+		Where("ex.state = ?", ExecutionFinished).
 		Where("ex.result IN ?", results).
 		Order("ex.finished_at DESC").
 		Limit(1).

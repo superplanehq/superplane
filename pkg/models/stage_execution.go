@@ -13,12 +13,15 @@ import (
 )
 
 const (
-	StageExecutionPending  = "pending"
-	StageExecutionStarted  = "started"
-	StageExecutionFinished = "finished"
+	ExecutionPending  = "pending"
+	ExecutionStarted  = "started"
+	ExecutionFinished = "finished"
 
-	StageExecutionResultPassed = "passed"
-	StageExecutionResultFailed = "failed"
+	ExecutionResourcePending  = "pending"
+	ExecutionResourceFinished = "finished"
+
+	ResultPassed = "passed"
+	ResultFailed = "failed"
 )
 
 type StageExecution struct {
@@ -32,17 +35,6 @@ type StageExecution struct {
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
 	Outputs      datatypes.JSONType[map[string]any]
-
-	//
-	// TODO: not so sure about this column
-	// TODO: maybe we can use a special execution tag for this?
-	// The ID of the "thing" that is running.
-	// For now, since we only have workflow/task runs,
-	// this is always a Semaphore workflow ID, but we want to support other types of executions in the future,
-	// so keeping the name generic for now, and also not using uuid.UUID for this column, since we can't guarantee
-	// that all IDs will be UUIDs.
-	//
-	ReferenceID string
 }
 
 func (e *StageExecution) GetInputs() (map[string]any, error) {
@@ -84,18 +76,7 @@ func (e *StageExecution) Start() error {
 	now := time.Now()
 
 	return database.Conn().Model(e).
-		Update("state", StageExecutionStarted).
-		Update("started_at", &now).
-		Update("updated_at", &now).
-		Error
-}
-
-func (e *StageExecution) StartWithReferenceID(referenceID string) error {
-	now := time.Now()
-
-	return database.Conn().Model(e).
-		Update("reference_id", referenceID).
-		Update("state", StageExecutionStarted).
+		Update("state", ExecutionStarted).
 		Update("started_at", &now).
 		Update("updated_at", &now).
 		Error
@@ -116,7 +97,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	err := tx.Model(e).
 		Clauses(clause.Returning{}).
 		Update("result", result).
-		Update("state", StageExecutionFinished).
+		Update("state", ExecutionFinished).
 		Update("updated_at", &now).
 		Update("finished_at", &now).
 		Error
@@ -165,21 +146,6 @@ func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 		Error
 }
 
-func FindExecutionByReference(referenceId string) (*StageExecution, error) {
-	var execution StageExecution
-
-	err := database.Conn().
-		Where("reference_id = ?", referenceId).
-		First(&execution).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &execution, nil
-}
-
 func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {
 	var execution StageExecution
 
@@ -226,7 +192,7 @@ func FindExecutionInState(stageID uuid.UUID, states []string) (*StageExecution, 
 	return &execution, nil
 }
 
-func ListStageExecutionsInState(state string) ([]StageExecution, error) {
+func ListExecutionsInState(state string) ([]StageExecution, error) {
 	var executions []StageExecution
 
 	err := database.Conn().
@@ -250,7 +216,7 @@ func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.U
 	execution := StageExecution{
 		StageID:      stageID,
 		StageEventID: stageEventID,
-		State:        StageExecutionPending,
+		State:        ExecutionPending,
 		CreatedAt:    &now,
 		UpdatedAt:    &now,
 	}
@@ -265,4 +231,93 @@ func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.U
 	}
 
 	return &execution, nil
+}
+
+type ExecutionResource struct {
+	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	ExternalID       string
+	ExecutionID      uuid.UUID
+	StageID          uuid.UUID
+	ParentResourceID uuid.UUID
+	State            string
+	Result           string
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+}
+
+func PendingExecutionResources() ([]ExecutionResource, error) {
+	var resources []ExecutionResource
+
+	err := database.Conn().
+		Where("state = ?", ExecutionResourcePending).
+		Find(&resources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
+func (e *ExecutionResource) Finish(result string) error {
+	return database.Conn().
+		Model(e).
+		Clauses(clause.Returning{}).
+		Update("state", ExecutionResourceFinished).
+		Update("result", result).
+		Update("updated_at", time.Now()).
+		Error
+}
+
+func (e *StageExecution) Resources() ([]ExecutionResource, error) {
+	var resources []ExecutionResource
+
+	err := database.Conn().
+		Where("execution_id = ?", e.ID).
+		Find(&resources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
+func (e *StageExecution) FindResource(externalID string) (*ExecutionResource, error) {
+	var resource ExecutionResource
+
+	err := database.Conn().
+		Where("execution_id = ?", e.ID).
+		Where("external_id = ?", externalID).
+		First(&resource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
+func (e *StageExecution) AddResource(externalID string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
+	r := &ExecutionResource{
+		ExecutionID:      e.ID,
+		StageID:          e.StageID,
+		ExternalID:       externalID,
+		ParentResourceID: parentResourceID,
+		State:            ExecutionResourcePending,
+	}
+
+	err := database.Conn().
+		Clauses(clause.Returning{}).
+		Create(r).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }

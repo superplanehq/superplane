@@ -84,8 +84,8 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 	// TODO: this could probably be built into the query that we do above.
 	//
 	_, err := models.FindExecutionInState(event.StageID, []string{
-		models.StageExecutionPending,
-		models.StageExecutionStarted,
+		models.ExecutionPending,
+		models.ExecutionStarted,
 	})
 
 	// TODO: move to waiting state too?

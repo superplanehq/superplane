@@ -31,7 +31,7 @@ func Test_Semaphore(t *testing.T) {
 		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, execution, signer)
+		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -67,7 +67,7 @@ func Test_Semaphore(t *testing.T) {
 		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, execution, signer)
+		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 

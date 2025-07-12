@@ -50,4 +50,23 @@ CREATE TABLE stage_executors (
   FOREIGN KEY (resource_id) REFERENCES resources(id)
 );
 
+ALTER TABLE stage_executions
+  DROP COLUMN reference_id;
+
+CREATE TABLE execution_resources (
+  id                 uuid NOT NULL DEFAULT uuid_generate_v4(),
+  external_id        CHARACTER VARYING(128) NOT NULL,
+  stage_id           uuid NOT NULL,
+  execution_id       uuid NOT NULL,
+  parent_resource_id uuid NOT NULL,
+  state              CHARACTER VARYING(64) NOT NULL,
+  result             CHARACTER VARYING(64) NOT NULL,
+  created_at         TIMESTAMP NOT NULL,
+  updated_at         TIMESTAMP NOT NULL,
+
+  PRIMARY KEY (id),
+  FOREIGN KEY (execution_id) REFERENCES stage_executions(id),
+  FOREIGN KEY (parent_resource_id) REFERENCES resources(id)
+);
+
 COMMIT;

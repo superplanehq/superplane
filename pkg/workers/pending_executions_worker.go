@@ -31,7 +31,7 @@ func (w *PendingExecutionsWorker) Start() {
 }
 
 func (w *PendingExecutionsWorker) Tick() error {
-	executions, err := models.ListStageExecutionsInState(models.StageExecutionPending)
+	executions, err := models.ListExecutionsInState(models.ExecutionPending)
 	if err != nil {
 		return fmt.Errorf("error listing pending stage executions: %v", err)
 	}
@@ -76,7 +76,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, execution, w.JwtSigner, w.Encryptor)
+	executor, err := executors.NewExecutor(stageExecutor, &execution, w.JwtSigner, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}
@@ -92,7 +92,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	response, err := executor.Execute(*spec)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		err := execution.Finish(stage, models.StageExecutionResultFailed)
+		err := execution.Finish(stage, models.ResultFailed)
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
 		}
@@ -105,7 +105,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return w.handleSyncResource(logger, response, execution, stage)
 	}
 
-	return w.handleAsyncResource(logger, response, stage, execution)
+	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
 }
 
 func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
@@ -116,9 +116,9 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 		}
 	}
 
-	result := models.StageExecutionResultFailed
+	result := models.ResultFailed
 	if response.Successful() {
-		result = models.StageExecutionResultPassed
+		result = models.ResultPassed
 	}
 
 	//
@@ -127,7 +127,7 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 	missingOutputs := stage.MissingRequiredOutputs(outputs)
 	if len(missingOutputs) > 0 {
 		logger.Infof("Execution has missing outputs %v - marking the execution as failed", missingOutputs)
-		result = models.StageExecutionResultFailed
+		result = models.ResultFailed
 	}
 
 	err := execution.Finish(stage, result)
@@ -140,10 +140,10 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
-func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {
-	err := execution.StartWithReferenceID(response.Id())
+func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, executor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
+	_, err := execution.AddResource(response.Id(), executor.ResourceID)
 	if err != nil {
-		return fmt.Errorf("error moving execution to started state: %v", err)
+		return fmt.Errorf("error adding resource to execution: %v", err)
 	}
 
 	err = messages.NewExecutionStartedMessage(stage.CanvasID.String(), &execution).Publish()
