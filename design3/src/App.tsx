@@ -18,6 +18,7 @@ import { MaterialSymbol } from './components/lib/MaterialSymbol/material-symbol'
 import type { NavigationLink } from './components/lib/Navigation/navigation-vertical'
 import './App.css'
 import { OrganizationSettings } from './components/OrganizationSettings'
+import { CreateOrganizationPage } from './components/CreateOrganizationPage'
 
 function App() {
   // Check localStorage for existing authentication state
@@ -26,6 +27,12 @@ function App() {
     return savedAuth === 'true'
   })
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
+  
+  // Check if user has an organization
+  const [hasOrganization, setHasOrganization] = useState(() => {
+    const savedOrg = localStorage.getItem('superplane_organization')
+    return savedOrg !== null
+  })
 
   // Central navigation links configuration
   const navigationLinks: NavigationLink[] = [
@@ -87,6 +94,10 @@ function App() {
     localStorage.setItem('superplane_auth', 'true')
     // Optionally store additional user data
     localStorage.setItem('superplane_login_timestamp', new Date().toISOString())
+    
+    // Navigate to root path after login - will redirect to create org if no org exists
+    window.history.pushState(null, '', '/')
+    setCurrentPath('/')
   }
 
   // Handle user logout
@@ -100,7 +111,22 @@ function App() {
     localStorage.removeItem('github_user_data')
     localStorage.removeItem('github_login_timestamp')
     
+    // Reset organization state
+    localStorage.removeItem('superplane_organization')
+    setHasOrganization(false)
+    
     // Navigate to root path on logout
+    window.history.pushState(null, '', '/')
+    setCurrentPath('/')
+  }
+
+  // Handle organization creation
+  const handleOrganizationCreated = (organizationData: { name: string; url: string }) => {
+    // Store organization data
+    localStorage.setItem('superplane_organization', JSON.stringify(organizationData))
+    setHasOrganization(true)
+    
+    // Navigate to home page after organization creation
     window.history.pushState(null, '', '/')
     setCurrentPath('/')
   }
@@ -110,7 +136,16 @@ function App() {
     return <LoginPage onLogin={handleLogin} />
   }
 
+  // If logged in but no organization, show create organization page
+  if (!hasOrganization) {
+    return <CreateOrganizationPage onSuccess={handleOrganizationCreated} />
+  }
+
   // Route based on current path
+  if (currentPath === '/create-organization') {
+    return <CreateOrganizationPage onSuccess={handleOrganizationCreated} />
+  }
+  
   if (currentPath === '/settings') {
     return <OrganizationSettings onSignOut={handleLogout} />
   }

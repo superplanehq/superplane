@@ -20,6 +20,7 @@ import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Description, Field, Fieldset, Label } from './lib/Fieldset/fieldset'
 import { ControlledTabs, Tabs, type Tab } from './lib/Tabs/tabs'
 import { Textarea } from './lib/Textarea/textarea'
+import { AddMembersSection } from './AddMembersSection'
 import { 
   Table, 
   TableHead, 
@@ -76,6 +77,7 @@ export function OrganizationSettings({
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupDescription, setNewGroupDescription] = useState('')
   const [newGroupRole, setNewGroupRole] = useState('Member')
+  
   
   // Mock data for organization roles
   const organizationRoles = [
@@ -388,6 +390,8 @@ export function OrganizationSettings({
       console.log('Created new group:', newGroup)
     }
   }
+
+
 
   const handleCreateRole = () => {
     setIsCreatingRole(true)
@@ -1031,51 +1035,10 @@ export function OrganizationSettings({
             <div className="flex items-center justify-between">
               
             <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-              members
+              Members
             </Heading>
             </div>
-
-            {/* Add Members Section */}
-            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                    Add members
-                  </Subheading>
-                  
-                </div>
-                
-              </div>
-              
-              <div className="flex gap-3">
-                <Input
-                  type="email"
-                  placeholder="Enter email address"
-                  className="flex-1"
-                />
-                <Dropdown>
-                  <DropdownButton  outline className="flex items-center text-sm">
-                    Member
-                    <MaterialSymbol name="keyboard_arrow_down" />
-                  </DropdownButton>
-                  <DropdownMenu>
-                    <DropdownItem>
-                      <DropdownLabel>Member</DropdownLabel>
-                        <DropdownDescription>Member role description.</DropdownDescription>
-                    </DropdownItem>
-                    <DropdownItem>
-                      <DropdownLabel>Admin</DropdownLabel>
-                      <DropdownDescription>Admin role description.</DropdownDescription>
-                    </DropdownItem>
-                    <DropdownItem>
-                      <DropdownLabel>Owner</DropdownLabel>
-                      <DropdownDescription>Owner role description.</DropdownDescription>
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
-                <Button color="blue">Send Invite</Button>
-              </div>
-            </div>
+            <AddMembersSection/>
 
             {/* Members List */}
             <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
@@ -1229,7 +1192,7 @@ export function OrganizationSettings({
                 ]}
                 showDivider={false}
               />
-              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
+              <div className="bg-zinc-100 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
               {/* Team header */}
               <div className='flex items-start justify-between'>
                 <div className='flex items-start gap-3'>
@@ -1312,8 +1275,9 @@ export function OrganizationSettings({
                     </div>
                   </div>
                 </div>
+                <div className='flex items-center gap-2'>
                 <Dropdown>
-                  <DropdownButton  outline 
+                  <DropdownButton  color='white'
                     className="flex items-center gap-2 text-sm"
                     onClick={(e: React.MouseEvent) => e.stopPropagation()}
                   >
@@ -1331,31 +1295,18 @@ export function OrganizationSettings({
                     </DropdownItem>
                   </DropdownMenu>
                 </Dropdown>
+                <Dropdown>
+                <DropdownButton plain aria-label="More options">
+                  <MaterialSymbol name="more_vert" size="sm" />
+                </DropdownButton>
+                <DropdownMenu>
+                  <DropdownItem href="">Delete group</DropdownItem>
+                </DropdownMenu>
+                </Dropdown>
+                </div>
               </div>
               {/* Add Members Section */}
-              <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <Subheading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                      Add members
-                    </Subheading>
-                    
-                  </div>
-                  
-                </div>
-                
-                <div className="flex gap-3">
-                  <Input
-                    type="email"
-                    placeholder="Enter email address"
-                    className="flex-1"
-                  />
-                  
-                  <Button color="blue" className='flex items-center gap-2'>
-                    <MaterialSymbol name="add" />
-                    Add</Button>
-                </div>
-              </div>
+              <AddMembersSection showRoleSelection={false}/>
               {/* Team members table */}
               <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
                 <div className="px-6 pt-6 pb-4 ">
@@ -1463,7 +1414,7 @@ export function OrganizationSettings({
           )
         }
 
-        // Teams list view
+        // Groups list view
         return (
           <div className="space-y-6 pt-6">
             <div className="flex items-center justify-between">
@@ -1473,7 +1424,7 @@ export function OrganizationSettings({
               
             </div>
 
-            {/* Teams Table View */}
+            {/* Groups Table View */}
             <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
               <div className="px-6 pt-6 pb-4  flex items-center justify-between">
                 <InputGroup>
@@ -1876,6 +1827,7 @@ export function OrganizationSettings({
           </Button>
         </DialogActions>
       </Dialog>
+
     </div>
   )
 }

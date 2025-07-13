@@ -4,7 +4,7 @@ export interface MaterialSymbolProps {
   /** The name of the Material Symbol (e.g., 'home', 'settings', 'person') */
   name: string
   /** Size variant */
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | '4xl'
   /** Fill variant (0 = outlined, 1 = filled) */
   fill?: 0 | 1
   /** Weight variant (100-700) */
@@ -33,7 +33,8 @@ export function MaterialSymbol({
     sm: '!text-sm', // 14px
     md: '!text-base', // 16px
     lg: '!text-xl', // 20px
-    xl: '!text-2xl' // 24px
+    xl: '!text-2xl', // 24px
+    '4xl': '!text-4xl' // 32px
   }
 
   const style = {

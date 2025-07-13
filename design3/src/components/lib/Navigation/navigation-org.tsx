@@ -36,8 +36,8 @@ export interface Organization {
 }
 
 export interface NavigationOrgProps {
-  user: User
-  organization: Organization
+  user?: User
+  organization?: Organization
   onHelpClick?: () => void
   onUserMenuAction?: (action: 'profile' | 'settings' | 'signout') => void
   onOrganizationMenuAction?: (action: 'settings' | 'billing' | 'members') => void
@@ -87,17 +87,20 @@ export function NavigationOrg({
               {/* Right side */}
               <div className="flex items-center space-x-4">
                 {/* Help Icon */}
-                <Button
-                  plain
-                  onClick={onHelpClick}
-                  className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 flex items-center"
-                  aria-label="Help"
-                >
-                  <MaterialSymbol name="help" size='lg'/>
-                </Button>
+                {onHelpClick && (
+                  <Button
+                    plain
+                    onClick={onHelpClick}
+                    className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 flex items-center"
+                    aria-label="Help"
+                  >
+                    <MaterialSymbol name="help" size='lg'/>
+                  </Button>
+                )}
 
-                {/* Merged Account Dropdown */}
-                <Dropdown>
+                {/* Merged Account Dropdown - only show if user and organization are provided */}
+                {user && organization && (
+                  <Dropdown>
                   <DropdownButton 
                     plain
                     className="flex items-center gap-x-2 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
@@ -220,6 +223,7 @@ export function NavigationOrg({
                     </DropdownSection>
                   </DropdownMenu>
                 </Dropdown>
+                )}
               </div>
             </div>
             
@@ -252,17 +256,20 @@ export function NavigationOrg({
             {/* Right side */}
             <div className="flex items-center space-x-4">
               {/* Help Icon */}
-              <Button
-                plain
-                onClick={onHelpClick}
-                className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 flex items-center"
-                aria-label="Help"
-              >
-                <MaterialSymbol name="help" size='lg'/>
-              </Button>
+              {onHelpClick && (
+                <Button
+                  plain
+                  onClick={onHelpClick}
+                  className="text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300 flex items-center"
+                  aria-label="Help"
+                >
+                  <MaterialSymbol name="help" size='lg'/>
+                </Button>
+              )}
 
-              {/* Merged Account Dropdown */}
-              <Dropdown>
+              {/* Merged Account Dropdown - only show if user and organization are provided */}
+              {user && organization && (
+                <Dropdown>
                 <DropdownButton 
                   plain
                   className="flex items-center gap-x-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
@@ -386,6 +393,7 @@ export function NavigationOrg({
                   </DropdownSection>
                 </DropdownMenu>
               </Dropdown>
+              )}
             </div>
           </div>
         )}
