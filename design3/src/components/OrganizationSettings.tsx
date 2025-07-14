@@ -74,6 +74,7 @@ export function OrganizationSettings({
   
   // Create group modal state
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false)
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupDescription, setNewGroupDescription] = useState('')
   const [newGroupRole, setNewGroupRole] = useState('Member')
@@ -357,11 +358,19 @@ export function OrganizationSettings({
 
   // Create group modal handlers
   const handleCreateGroupClick = () => {
-    setShowCreateGroupModal(true)
+    setIsCreatingGroup(true)
   }
 
   const handleCreateGroupCancel = () => {
     setShowCreateGroupModal(false)
+    setIsCreatingGroup(false)
+    setNewGroupName('')
+    setNewGroupDescription('')
+    setNewGroupRole('Member')
+  }
+
+  const handleBackToGroups = () => {
+    setIsCreatingGroup(false)
     setNewGroupName('')
     setNewGroupDescription('')
     setNewGroupRole('Member')
@@ -381,8 +390,9 @@ export function OrganizationSettings({
       // Set as selected team to show the group page
       setSelectedTeam(newGroup)
       
-      // Close modal and reset form
+      // Close modal/form and reset
       setShowCreateGroupModal(false)
+      setIsCreatingGroup(false)
       setNewGroupName('')
       setNewGroupDescription('')
       setNewGroupRole('Member')
@@ -1410,6 +1420,111 @@ export function OrganizationSettings({
                 </div>
               </div>
             </div>
+            </div>
+          )
+        }
+
+        // Groups list view or create group view
+        if (isCreatingGroup) {
+          // Create group view
+          return (
+            <div className="space-y-6 pt-6">
+              {/* Breadcrumbs navigation */}
+              <Breadcrumbs
+                items={[
+                  { label: 'Groups', onClick: handleBackToGroups },
+                  { label: 'Create new group', current: true }
+                ]}
+                showDivider={false}
+              />
+              
+              {/* Create Group Form */}
+             
+                <div>
+                  <Heading level={2} className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
+                    Create new group
+                  </Heading>
+                  <Text className="text-zinc-600 dark:text-zinc-400">
+                    Groups help you organize team members and manage permissions effectively.
+                  </Text>
+                </div>
+                <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
+                {/* Group Name */}
+                <Field className="max-w-lg">
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Group name *
+                  </Label>
+                  <Input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Enter group name"
+                    className="w-full"
+                  />
+                </Field>
+
+                {/* Group Description */}
+                <Field className="max-w-lg">
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Group description
+                  </Label>
+                  <Textarea
+                    value={newGroupDescription}
+                    onChange={(e) => setNewGroupDescription(e.target.value)}
+                    placeholder="Describe the purpose and responsibilities of this group"
+                    rows={3}
+                    className="w-full"
+                  />
+                </Field>
+
+                {/* Group Role */}
+                <Field className="max-w-lg">
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Role
+                  </Label>
+                  <Dropdown>
+                    <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
+                      {newGroupRole}
+                      <MaterialSymbol name="keyboard_arrow_down" />
+                    </DropdownButton>
+                    <DropdownMenu>
+                      <DropdownItem onClick={() => setNewGroupRole('Owner')}>
+                        <DropdownLabel>Owner</DropdownLabel>
+                        <DropdownDescription>Full access to organization settings</DropdownDescription>
+                      </DropdownItem>
+                      <DropdownItem onClick={() => setNewGroupRole('Admin')}>
+                        <DropdownLabel>Admin</DropdownLabel>
+                        <DropdownDescription>Can manage members and organization settings</DropdownDescription>
+                      </DropdownItem>
+                      <DropdownItem onClick={() => setNewGroupRole('Member')}>
+                        <DropdownLabel>Member</DropdownLabel>
+                        <DropdownDescription>Standard member access</DropdownDescription>
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </Field>
+                </div>
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4 justify-end">
+                  
+                  <Button 
+                    plain 
+                    onClick={handleBackToGroups}
+                    className="flex items-center gap-2"
+                  >
+                   
+                    Cancel
+                  </Button>
+                  <Button 
+                    color="blue" 
+                    onClick={handleCreateGroupSubmit}
+                    disabled={!newGroupName.trim()}
+                    className="flex items-center gap-2"
+                  >
+                    <MaterialSymbol name="add" size="sm" />
+                    Create Group
+                  </Button>
+                </div>
             </div>
           )
         }
