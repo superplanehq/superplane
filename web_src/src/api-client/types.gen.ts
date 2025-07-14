@@ -283,6 +283,15 @@ export type SpecGroupBy = {
 
 export type SpecTimeoutBehavior = 'TIMEOUT_BEHAVIOR_NONE' | 'TIMEOUT_BEHAVIOR_DROP' | 'TIMEOUT_BEHAVIOR_EMIT';
 
+export type SuperplaneApprovalRequirement = {
+    type?: SuperplaneApprovalRequirementType;
+    name?: string;
+    id?: string;
+    count?: number;
+};
+
+export type SuperplaneApprovalRequirementType = 'TYPE_UNKNOWN' | 'TYPE_USER' | 'TYPE_ROLE' | 'TYPE_GROUP';
+
 export type SuperplaneApproveStageEventBody = {
     [key: string]: unknown;
 };
@@ -309,7 +318,7 @@ export type SuperplaneCondition = {
 };
 
 export type SuperplaneConditionApproval = {
-    count?: number;
+    from?: Array<SuperplaneApprovalRequirement>;
 };
 
 export type SuperplaneConditionTimeWindow = {

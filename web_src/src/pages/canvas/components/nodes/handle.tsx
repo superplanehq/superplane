@@ -194,12 +194,14 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: S
   }
 
   function ApprovalContent({ approval }: { approval: SuperplaneConditionApproval }) {
+    const totalCount = approval.from?.reduce((sum, req) => sum + (req.count || 1), 0) || 0;
+    
     return (
       <div className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-1 rounded mr-1 mb-1 border border-emerald-200 flex flex-col">
         <div className="font-bold mb-0.5">Approval Required</div>
         <div className="flex items-center gap-1">
           <span className="font-medium">Approvers needed:</span> 
-          <span className="bg-emerald-200 px-1.5 py-0.5 rounded-full">{approval.count}</span>
+          <span className="bg-emerald-200 px-1.5 py-0.5 rounded-full">{totalCount}</span>
         </div>
       </div>
     );

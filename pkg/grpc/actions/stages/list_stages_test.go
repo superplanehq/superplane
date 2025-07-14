@@ -55,7 +55,7 @@ func Test__ListStages(t *testing.T) {
 		assert.NotEmpty(t, res.Stages[0].Spec.Executor)
 		require.Len(t, res.Stages[0].Spec.Conditions, 1)
 		assert.Equal(t, protos.Condition_CONDITION_TYPE_APPROVAL, res.Stages[0].Spec.Conditions[0].Type)
-		assert.Equal(t, uint32(1), res.Stages[0].Spec.Conditions[0].Approval.Count)
+		assert.Equal(t, uint32(1), res.Stages[0].Spec.Conditions[0].Approval.From[0].Count)
 		assert.Len(t, res.Stages[0].Spec.Connections, 1)
 	})
 }

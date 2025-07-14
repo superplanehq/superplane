@@ -1,0 +1,37 @@
+# Example of stage with advanced approval requirements
+name: production-deployment
+conditions:
+  - type: approval
+    approval:
+      # Legacy count field for backward compatibility - ignored when required_from is specified
+      count: 2
+      # New approval requirements system
+      required_from:
+        # Require 1 approval from specific user by ID
+        - type: user
+          id: "12345678-1234-1234-1234-123456789abc"
+          count: 1
+        
+        # Require 1 approval from user by username (from any account provider)
+        - type: user
+          name: "john.doe"
+          count: 1
+          
+        # Require 2 approvals from users with canvas_admin role
+        - type: role
+          name: "canvas_admin"
+          count: 2
+          
+        # Require 1 approval from users in the "security-team" group
+        - type: group
+          name: "security-team"
+          count: 1
+
+executor_spec:
+  type: semaphore
+  semaphore:
+    api_token: "${SEMAPHORE_API_TOKEN}"
+    organization_url: "https://mycompany.semaphoreci.com"
+    project_id: "production-app"
+    branch: "main"
+    pipeline_file: ".semaphore/deploy.yml"
