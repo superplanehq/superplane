@@ -2627,7 +2627,7 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x022\x9a-\n" +
+	"\x12DOMAIN_TYPE_CANVAS\x10\x022\xc4.\n" +
 	"\rAuthorization\x12\xa4\x02\n" +
 	"\x13ListUserPermissions\x124.Superplane.Authorization.ListUserPermissionsRequest\x1a5.Superplane.Authorization.ListUserPermissionsResponse\"\x9f\x01\x92Ac\n" +
 	"\rAuthorization\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x023\x121/api/v1/authorization/users/{user_id}/permissions\x12\xf1\x01\n" +
@@ -2643,31 +2643,31 @@ const file_authorization_proto_rawDesc = "" +
 	"\fDescribeRole\x12-.Superplane.Authorization.DescribeRoleRequest\x1a..Superplane.Authorization.DescribeRoleResponse\"\xa7\x01\x92Ax\n" +
 	"\rAuthorization\x12\rDescribe role\x1aXReturns detailed information about a specific role including permissions and inheritance\x82\xd3\xe4\x93\x02&\x12$/api/v1/authorization/roles/describe\x12\xfc\x01\n" +
 	"\fGetUserRoles\x12-.Superplane.Authorization.GetUserRolesRequest\x1a..Superplane.Authorization.GetUserRolesResponse\"\x8c\x01\x92AV\n" +
-	"\rAuthorization\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02-\x12+/api/v1/authorization/users/{user_id}/roles\x12\x8a\x02\n" +
-	"\x17CreateOrganizationGroup\x128.Superplane.Authorization.CreateOrganizationGroupRequest\x1a9.Superplane.Authorization.CreateOrganizationGroupResponse\"z\x92A^\n" +
-	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/groups\x12\x96\x02\n" +
-	"\x11CreateCanvasGroup\x122.Superplane.Authorization.CreateCanvasGroupRequest\x1a3.Superplane.Authorization.CreateCanvasGroupResponse\"\x97\x01\x92A^\n" +
-	"\rAuthorization\x12\x13Create canvas group\x1a8Creates a new group within a canvas with a specific role\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/canvases/{canvas_id_or_name}/groups\x12\xa7\x02\n" +
-	"\x1aAddUserToOrganizationGroup\x12;.Superplane.Authorization.AddUserToOrganizationGroupRequest\x1a<.Superplane.Authorization.AddUserToOrganizationGroupResponse\"\x8d\x01\x92A^\n" +
-	"\rAuthorization\x12\x1eAdd user to organization group\x1a-Adds a user to a group within an organization\x82\xd3\xe4\x93\x02&:\x01*\"!/api/v1/groups/{group_name}/users\x12\xa5\x02\n" +
-	"\x14AddUserToCanvasGroup\x125.Superplane.Authorization.AddUserToCanvasGroupRequest\x1a6.Superplane.Authorization.AddUserToCanvasGroupResponse\"\x9d\x01\x92AQ\n" +
-	"\rAuthorization\x12\x18Add user to canvas group\x1a&Adds a user to a group within a canvas\x82\xd3\xe4\x93\x02C:\x01*\">/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\xc7\x02\n" +
-	"\x1fRemoveUserFromOrganizationGroup\x12@.Superplane.Authorization.RemoveUserFromOrganizationGroupRequest\x1aA.Superplane.Authorization.RemoveUserFromOrganizationGroupResponse\"\x9e\x01\x92Ah\n" +
-	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02-*+/api/v1/groups/{group_name}/users/{user_id}\x12\xc5\x02\n" +
-	"\x19RemoveUserFromCanvasGroup\x12:.Superplane.Authorization.RemoveUserFromCanvasGroupRequest\x1a;.Superplane.Authorization.RemoveUserFromCanvasGroupResponse\"\xae\x01\x92A[\n" +
-	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02J*H/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}\x12\x80\x02\n" +
-	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"s\x92AZ\n" +
-	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xff\x01\n" +
-	"\x10ListCanvasGroups\x121.Superplane.Authorization.ListCanvasGroupsRequest\x1a2.Superplane.Authorization.ListCanvasGroupsResponse\"\x83\x01\x92AM\n" +
-	"\rAuthorization\x12\x12List canvas groups\x1a(Returns a list of groups within a canvas\x82\xd3\xe4\x93\x02-\x12+/api/v1/canvases/{canvas_id_or_name}/groups\x12\xb6\x02\n" +
-	"\x19GetOrganizationGroupUsers\x12:.Superplane.Authorization.GetOrganizationGroupUsersRequest\x1a;.Superplane.Authorization.GetOrganizationGroupUsersResponse\"\x9f\x01\x92As\n" +
-	"\rAuthorization\x12\x1cGet organization group users\x1aDReturns users that belong to a specific group within an organization\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xb4\x02\n" +
-	"\x13GetCanvasGroupUsers\x124.Superplane.Authorization.GetCanvasGroupUsersRequest\x1a5.Superplane.Authorization.GetCanvasGroupUsersResponse\"\xaf\x01\x92Af\n" +
-	"\rAuthorization\x12\x16Get canvas group users\x1a=Returns users that belong to a specific group within a canvas\x82\xd3\xe4\x93\x02@\x12>/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\x91\x02\n" +
-	"\x14GetOrganizationGroup\x125.Superplane.Authorization.GetOrganizationGroupRequest\x1a6.Superplane.Authorization.GetOrganizationGroupResponse\"\x89\x01\x92Ac\n" +
-	"\rAuthorization\x12\x16Get organization group\x1a:Returns details of a specific group within an organization\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/groups/{group_name}\x12\x8f\x02\n" +
-	"\x0eGetCanvasGroup\x12/.Superplane.Authorization.GetCanvasGroupRequest\x1a0.Superplane.Authorization.GetCanvasGroupResponse\"\x99\x01\x92AV\n" +
-	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x02:\x128/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}\x12\xe4\x01\n" +
+	"\rAuthorization\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02-\x12+/api/v1/authorization/users/{user_id}/roles\x12\x99\x02\n" +
+	"\x17CreateOrganizationGroup\x128.Superplane.Authorization.CreateOrganizationGroupRequest\x1a9.Superplane.Authorization.CreateOrganizationGroupResponse\"\x88\x01\x92A^\n" +
+	"\rAuthorization\x12\fCreate group\x1a?Creates a new group within an organization with a specific role\x82\xd3\xe4\x93\x02!:\x01*\"\x1c/api/v1/authorization/groups\x12\xa4\x02\n" +
+	"\x11CreateCanvasGroup\x122.Superplane.Authorization.CreateCanvasGroupRequest\x1a3.Superplane.Authorization.CreateCanvasGroupResponse\"\xa5\x01\x92A^\n" +
+	"\rAuthorization\x12\x13Create canvas group\x1a8Creates a new group within a canvas with a specific role\x82\xd3\xe4\x93\x02>:\x01*\"9/api/v1/authorization/canvases/{canvas_id_or_name}/groups\x12\xb5\x02\n" +
+	"\x1aAddUserToOrganizationGroup\x12;.Superplane.Authorization.AddUserToOrganizationGroupRequest\x1a<.Superplane.Authorization.AddUserToOrganizationGroupResponse\"\x9b\x01\x92A^\n" +
+	"\rAuthorization\x12\x1eAdd user to organization group\x1a-Adds a user to a group within an organization\x82\xd3\xe4\x93\x024:\x01*\"//api/v1/authorization/groups/{group_name}/users\x12\xb3\x02\n" +
+	"\x14AddUserToCanvasGroup\x125.Superplane.Authorization.AddUserToCanvasGroupRequest\x1a6.Superplane.Authorization.AddUserToCanvasGroupResponse\"\xab\x01\x92AQ\n" +
+	"\rAuthorization\x12\x18Add user to canvas group\x1a&Adds a user to a group within a canvas\x82\xd3\xe4\x93\x02Q:\x01*\"L/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\xd5\x02\n" +
+	"\x1fRemoveUserFromOrganizationGroup\x12@.Superplane.Authorization.RemoveUserFromOrganizationGroupRequest\x1aA.Superplane.Authorization.RemoveUserFromOrganizationGroupResponse\"\xac\x01\x92Ah\n" +
+	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02;*9/api/v1/authorization/groups/{group_name}/users/{user_id}\x12\xd3\x02\n" +
+	"\x19RemoveUserFromCanvasGroup\x12:.Superplane.Authorization.RemoveUserFromCanvasGroupRequest\x1a;.Superplane.Authorization.RemoveUserFromCanvasGroupResponse\"\xbc\x01\x92A[\n" +
+	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02X*V/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}\x12\x8f\x02\n" +
+	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x81\x01\x92AZ\n" +
+	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/authorization/groups\x12\x8d\x02\n" +
+	"\x10ListCanvasGroups\x121.Superplane.Authorization.ListCanvasGroupsRequest\x1a2.Superplane.Authorization.ListCanvasGroupsResponse\"\x91\x01\x92AM\n" +
+	"\rAuthorization\x12\x12List canvas groups\x1a(Returns a list of groups within a canvas\x82\xd3\xe4\x93\x02;\x129/api/v1/authorization/canvases/{canvas_id_or_name}/groups\x12\xc4\x02\n" +
+	"\x19GetOrganizationGroupUsers\x12:.Superplane.Authorization.GetOrganizationGroupUsersRequest\x1a;.Superplane.Authorization.GetOrganizationGroupUsersResponse\"\xad\x01\x92As\n" +
+	"\rAuthorization\x12\x1cGet organization group users\x1aDReturns users that belong to a specific group within an organization\x82\xd3\xe4\x93\x021\x12//api/v1/authorization/groups/{group_name}/users\x12\xc2\x02\n" +
+	"\x13GetCanvasGroupUsers\x124.Superplane.Authorization.GetCanvasGroupUsersRequest\x1a5.Superplane.Authorization.GetCanvasGroupUsersResponse\"\xbd\x01\x92Af\n" +
+	"\rAuthorization\x12\x16Get canvas group users\x1a=Returns users that belong to a specific group within a canvas\x82\xd3\xe4\x93\x02N\x12L/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\x9f\x02\n" +
+	"\x14GetOrganizationGroup\x125.Superplane.Authorization.GetOrganizationGroupRequest\x1a6.Superplane.Authorization.GetOrganizationGroupResponse\"\x97\x01\x92Ac\n" +
+	"\rAuthorization\x12\x16Get organization group\x1a:Returns details of a specific group within an organization\x82\xd3\xe4\x93\x02+\x12)/api/v1/authorization/groups/{group_name}\x12\x9d\x02\n" +
+	"\x0eGetCanvasGroup\x12/.Superplane.Authorization.GetCanvasGroupRequest\x1a0.Superplane.Authorization.GetCanvasGroupResponse\"\xa7\x01\x92AV\n" +
+	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}\x12\xe4\x01\n" +
 	"\n" +
 	"CreateRole\x12+.Superplane.Authorization.CreateRoleRequest\x1a,.Superplane.Authorization.CreateRoleResponse\"{\x92AR\n" +
 	"\rAuthorization\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/authorization/roles\x12\xf1\x01\n" +

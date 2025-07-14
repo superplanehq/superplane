@@ -31,6 +31,462 @@
     "application/json"
   ],
   "paths": {
+    "/api/v1/authorization/canvases/{canvasIdOrName}/groups": {
+      "get": {
+        "summary": "List canvas groups",
+        "description": "Returns a list of groups within a canvas",
+        "operationId": "Authorization_ListCanvasGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationListCanvasGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Create canvas group",
+        "description": "Creates a new group within a canvas with a specific role",
+        "operationId": "Authorization_CreateCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateCanvasGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}": {
+      "get": {
+        "summary": "Get canvas group",
+        "description": "Returns details of a specific group within a canvas",
+        "operationId": "Authorization_GetCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users": {
+      "get": {
+        "summary": "Get canvas group users",
+        "description": "Returns users that belong to a specific group within a canvas",
+        "operationId": "Authorization_GetCanvasGroupUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetCanvasGroupUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Add user to canvas group",
+        "description": "Adds a user to a group within a canvas",
+        "operationId": "Authorization_AddUserToCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}": {
+      "delete": {
+        "summary": "Remove user from canvas group",
+        "description": "Removes a user from a group within a canvas",
+        "operationId": "Authorization_RemoveUserFromCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/groups": {
+      "get": {
+        "summary": "List organization groups",
+        "description": "Returns a list of groups within an organization",
+        "operationId": "Authorization_ListOrganizationGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Create group",
+        "description": "Creates a new group within an organization with a specific role",
+        "operationId": "Authorization_CreateOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/groups/{groupName}": {
+      "get": {
+        "summary": "Get organization group",
+        "description": "Returns details of a specific group within an organization",
+        "operationId": "Authorization_GetOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/groups/{groupName}/users": {
+      "get": {
+        "summary": "Get organization group users",
+        "description": "Returns users that belong to a specific group within an organization",
+        "operationId": "Authorization_GetOrganizationGroupUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetOrganizationGroupUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Add user to organization group",
+        "description": "Adds a user to a group within an organization",
+        "operationId": "Authorization_AddUserToOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/groups/{groupName}/users/{userId}": {
+      "delete": {
+        "summary": "Remove user from organization group",
+        "description": "Removes a user from a group within an organization",
+        "operationId": "Authorization_RemoveUserFromOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
     "/api/v1/authorization/roles": {
       "get": {
         "summary": "List roles",
@@ -827,240 +1283,6 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/groups": {
-      "get": {
-        "summary": "List canvas groups",
-        "description": "Returns a list of groups within a canvas",
-        "operationId": "Authorization_ListCanvasGroups",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListCanvasGroupsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create canvas group",
-        "description": "Creates a new group within a canvas with a specific role",
-        "operationId": "Authorization_CreateCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}": {
-      "get": {
-        "summary": "Get canvas group",
-        "description": "Returns details of a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get canvas group users",
-        "description": "Returns users that belong to a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Add user to canvas group",
-        "description": "Adds a user to a group within a canvas",
-        "operationId": "Authorization_AddUserToCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove user from canvas group",
-        "description": "Removes a user from a group within a canvas",
-        "operationId": "Authorization_RemoveUserFromCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/canvases/{canvasIdOrName}/secrets": {
       "get": {
         "summary": "List secrets",
@@ -1575,228 +1797,6 @@
         ],
         "tags": [
           "Canvas"
-        ]
-      }
-    },
-    "/api/v1/groups": {
-      "get": {
-        "summary": "List organization groups",
-        "description": "Returns a list of groups within an organization",
-        "operationId": "Authorization_ListOrganizationGroups",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create group",
-        "description": "Creates a new group within an organization with a specific role",
-        "operationId": "Authorization_CreateOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/groups/{groupName}": {
-      "get": {
-        "summary": "Get organization group",
-        "description": "Returns details of a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get organization group users",
-        "description": "Returns users that belong to a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Add user to organization group",
-        "description": "Adds a user to a group within an organization",
-        "operationId": "Authorization_AddUserToOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/groups/{groupName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove user from organization group",
-        "description": "Removes a user from a group within an organization",
-        "operationId": "Authorization_RemoveUserFromOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
         ]
       }
     },

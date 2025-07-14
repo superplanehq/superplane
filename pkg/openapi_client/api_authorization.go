@@ -75,7 +75,7 @@ func (a *AuthorizationAPIService) AuthorizationAddUserToCanvasGroupExecute(r Api
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
@@ -198,7 +198,7 @@ func (a *AuthorizationAPIService) AuthorizationAddUserToOrganizationGroupExecute
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -438,7 +438,7 @@ func (a *AuthorizationAPIService) AuthorizationCreateCanvasGroupExecute(r ApiAut
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -557,7 +557,7 @@ func (a *AuthorizationAPIService) AuthorizationCreateOrganizationGroupExecute(r 
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups"
+	localVarPath := localBasePath + "/api/v1/authorization/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -1062,7 +1062,7 @@ func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupExecute(r ApiAuthor
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
@@ -1177,7 +1177,7 @@ func (a *AuthorizationAPIService) AuthorizationGetCanvasGroupUsersExecute(r ApiA
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
@@ -1295,7 +1295,7 @@ func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupExecute(r Api
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1415,7 +1415,7 @@ func (a *AuthorizationAPIService) AuthorizationGetOrganizationGroupUsersExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1661,7 +1661,7 @@ func (a *AuthorizationAPIService) AuthorizationListCanvasGroupsExecute(r ApiAuth
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -1775,7 +1775,7 @@ func (a *AuthorizationAPIService) AuthorizationListOrganizationGroupsExecute(r A
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups"
+	localVarPath := localBasePath + "/api/v1/authorization/groups"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -2272,7 +2272,7 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
@@ -2394,7 +2394,7 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupEx
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/groups/{groupName}/users/{userId}"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users/{userId}"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 

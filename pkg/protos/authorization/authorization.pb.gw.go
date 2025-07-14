@@ -1080,7 +1080,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1100,7 +1100,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1120,7 +1120,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1140,7 +1140,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1160,7 +1160,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1180,7 +1180,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1200,7 +1200,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListOrganizationGroups", runtime.WithHTTPPathPattern("/api/v1/groups"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListOrganizationGroups", runtime.WithHTTPPathPattern("/api/v1/authorization/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1220,7 +1220,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListCanvasGroups", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListCanvasGroups", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1240,7 +1240,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1260,7 +1260,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroupUsers", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1280,7 +1280,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1300,7 +1300,7 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1520,7 +1520,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1537,7 +1537,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/CreateCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1554,7 +1554,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1571,7 +1571,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/AddUserToCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1588,7 +1588,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1605,7 +1605,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1622,7 +1622,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListOrganizationGroups", runtime.WithHTTPPathPattern("/api/v1/groups"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListOrganizationGroups", runtime.WithHTTPPathPattern("/api/v1/authorization/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1639,7 +1639,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListCanvasGroups", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/ListCanvasGroups", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1656,7 +1656,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1673,7 +1673,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroupUsers", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroupUsers", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1690,7 +1690,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1707,7 +1707,7 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/GetCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1781,18 +1781,18 @@ var (
 	pattern_Authorization_ListRoles_0                       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "roles"}, ""))
 	pattern_Authorization_DescribeRole_0                    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 2, 4}, []string{"api", "v1", "authorization", "roles", "describe"}, ""))
 	pattern_Authorization_GetUserRoles_0                    = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "users", "user_id", "roles"}, ""))
-	pattern_Authorization_CreateOrganizationGroup_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "groups"}, ""))
-	pattern_Authorization_CreateCanvasGroup_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups"}, ""))
-	pattern_Authorization_AddUserToOrganizationGroup_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "groups", "group_name", "users"}, ""))
-	pattern_Authorization_AddUserToCanvasGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups", "group_name", "users"}, ""))
-	pattern_Authorization_RemoveUserFromOrganizationGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "groups", "group_name", "users", "user_id"}, ""))
-	pattern_Authorization_RemoveUserFromCanvasGroup_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6, 1, 0, 4, 1, 5, 7}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups", "group_name", "users", "user_id"}, ""))
-	pattern_Authorization_ListOrganizationGroups_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "groups"}, ""))
-	pattern_Authorization_ListCanvasGroups_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups"}, ""))
-	pattern_Authorization_GetOrganizationGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "groups", "group_name", "users"}, ""))
-	pattern_Authorization_GetCanvasGroupUsers_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups", "group_name", "users"}, ""))
-	pattern_Authorization_GetOrganizationGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "groups", "group_name"}, ""))
-	pattern_Authorization_GetCanvasGroup_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "canvases", "canvas_id_or_name", "groups", "group_name"}, ""))
+	pattern_Authorization_CreateOrganizationGroup_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "groups"}, ""))
+	pattern_Authorization_CreateCanvasGroup_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups"}, ""))
+	pattern_Authorization_AddUserToOrganizationGroup_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "group_name", "users"}, ""))
+	pattern_Authorization_AddUserToCanvasGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users"}, ""))
+	pattern_Authorization_RemoveUserFromOrganizationGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6}, []string{"api", "v1", "authorization", "groups", "group_name", "users", "user_id"}, ""))
+	pattern_Authorization_RemoveUserFromCanvasGroup_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7, 1, 0, 4, 1, 5, 8}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users", "user_id"}, ""))
+	pattern_Authorization_ListOrganizationGroups_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "groups"}, ""))
+	pattern_Authorization_ListCanvasGroups_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups"}, ""))
+	pattern_Authorization_GetOrganizationGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "group_name", "users"}, ""))
+	pattern_Authorization_GetCanvasGroupUsers_0             = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users"}, ""))
+	pattern_Authorization_GetOrganizationGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "authorization", "groups", "group_name"}, ""))
+	pattern_Authorization_GetCanvasGroup_0                  = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name"}, ""))
 	pattern_Authorization_CreateRole_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "roles"}, ""))
 	pattern_Authorization_UpdateRole_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "authorization", "roles", "role_name"}, ""))
 	pattern_Authorization_DeleteRole_0                      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "authorization", "roles", "role_name"}, ""))

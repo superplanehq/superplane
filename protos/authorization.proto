@@ -122,7 +122,7 @@ service Authorization {
   //
   rpc CreateOrganizationGroup(CreateOrganizationGroupRequest) returns (CreateOrganizationGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups"
+      post: "/api/v1/authorization/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -138,7 +138,7 @@ service Authorization {
   //
   rpc CreateCanvasGroup(CreateCanvasGroupRequest) returns (CreateCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/groups"
+      post: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -154,7 +154,7 @@ service Authorization {
   //
   rpc AddUserToOrganizationGroup(AddUserToOrganizationGroupRequest) returns (AddUserToOrganizationGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups/{group_name}/users"
+      post: "/api/v1/authorization/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -170,7 +170,7 @@ service Authorization {
   //
   rpc AddUserToCanvasGroup(AddUserToCanvasGroupRequest) returns (AddUserToCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
+      post: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -186,7 +186,7 @@ service Authorization {
   //
   rpc RemoveUserFromOrganizationGroup(RemoveUserFromOrganizationGroupRequest) returns (RemoveUserFromOrganizationGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/groups/{group_name}/users/{user_id}"
+      delete: "/api/v1/authorization/groups/{group_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from organization group";
@@ -201,7 +201,7 @@ service Authorization {
   //
   rpc RemoveUserFromCanvasGroup(RemoveUserFromCanvasGroupRequest) returns (RemoveUserFromCanvasGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"
+      delete: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from canvas group";
@@ -216,7 +216,7 @@ service Authorization {
   //
   rpc ListOrganizationGroups(ListOrganizationGroupsRequest) returns (ListOrganizationGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups"
+      get: "/api/v1/authorization/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization groups";
@@ -231,7 +231,7 @@ service Authorization {
   //
   rpc ListCanvasGroups(ListCanvasGroupsRequest) returns (ListCanvasGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas groups";
@@ -246,7 +246,7 @@ service Authorization {
   //
   rpc GetOrganizationGroupUsers(GetOrganizationGroupUsersRequest) returns (GetOrganizationGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}/users"
+      get: "/api/v1/authorization/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization group users";
@@ -261,7 +261,7 @@ service Authorization {
   //
   rpc GetCanvasGroupUsers(GetCanvasGroupUsersRequest) returns (GetCanvasGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group users";
@@ -276,7 +276,7 @@ service Authorization {
   //
   rpc GetOrganizationGroup(GetOrganizationGroupRequest) returns (GetOrganizationGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}"
+      get: "/api/v1/authorization/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization group";
@@ -291,7 +291,7 @@ service Authorization {
   //
   rpc GetCanvasGroup(GetCanvasGroupRequest) returns (GetCanvasGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group";
