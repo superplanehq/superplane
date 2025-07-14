@@ -69,7 +69,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Verify resource eventually goes to the finished state, with result = failed.
 		//
 		require.Eventually(t, func() bool {
-			e, err := execution.FindResource(workflowID)
+			e, err := models.FindExecutionResource(workflowID, resource.ID)
 			if err != nil {
 				return false
 			}
@@ -110,7 +110,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Verify execution eventually goes to the finished state, with result = failed.
 		//
 		require.Eventually(t, func() bool {
-			e, err := execution.FindResource(workflowID)
+			e, err := models.FindExecutionResource(workflowID, resource.ID)
 			if err != nil {
 				return false
 			}

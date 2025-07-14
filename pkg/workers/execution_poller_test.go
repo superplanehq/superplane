@@ -33,7 +33,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
 	require.NoError(t, err)
 
-	resource, err = models.FindResource(r.Integration.ID, resource.Type, resource.Name)
+	resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
@@ -111,7 +111,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		}, []models.ValueDefinition{})
 
 		require.NoError(t, err)
-		resource, err = models.FindResource(r.Integration.ID, resource.Type, resource.Name)
+		resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)
 		require.NoError(t, err)
 
 		//

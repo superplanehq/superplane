@@ -20,10 +20,10 @@ var _ MappedNullable = &SuperplaneExecutorSpecSemaphore{}
 
 // SuperplaneExecutorSpecSemaphore struct for SuperplaneExecutorSpecSemaphore
 type SuperplaneExecutorSpecSemaphore struct {
-	ProjectId *string `json:"projectId,omitempty"`
+	Project *string `json:"project,omitempty"`
+	Task *string `json:"task,omitempty"`
 	Branch *string `json:"branch,omitempty"`
 	PipelineFile *string `json:"pipelineFile,omitempty"`
-	TaskId *string `json:"taskId,omitempty"`
 	Parameters *map[string]string `json:"parameters,omitempty"`
 }
 
@@ -44,36 +44,68 @@ func NewSuperplaneExecutorSpecSemaphoreWithDefaults() *SuperplaneExecutorSpecSem
 	return &this
 }
 
-// GetProjectId returns the ProjectId field value if set, zero value otherwise.
-func (o *SuperplaneExecutorSpecSemaphore) GetProjectId() string {
-	if o == nil || IsNil(o.ProjectId) {
+// GetProject returns the Project field value if set, zero value otherwise.
+func (o *SuperplaneExecutorSpecSemaphore) GetProject() string {
+	if o == nil || IsNil(o.Project) {
 		var ret string
 		return ret
 	}
-	return *o.ProjectId
+	return *o.Project
 }
 
-// GetProjectIdOk returns a tuple with the ProjectId field value if set, nil otherwise
+// GetProjectOk returns a tuple with the Project field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecutorSpecSemaphore) GetProjectIdOk() (*string, bool) {
-	if o == nil || IsNil(o.ProjectId) {
+func (o *SuperplaneExecutorSpecSemaphore) GetProjectOk() (*string, bool) {
+	if o == nil || IsNil(o.Project) {
 		return nil, false
 	}
-	return o.ProjectId, true
+	return o.Project, true
 }
 
-// HasProjectId returns a boolean if a field has been set.
-func (o *SuperplaneExecutorSpecSemaphore) HasProjectId() bool {
-	if o != nil && !IsNil(o.ProjectId) {
+// HasProject returns a boolean if a field has been set.
+func (o *SuperplaneExecutorSpecSemaphore) HasProject() bool {
+	if o != nil && !IsNil(o.Project) {
 		return true
 	}
 
 	return false
 }
 
-// SetProjectId gets a reference to the given string and assigns it to the ProjectId field.
-func (o *SuperplaneExecutorSpecSemaphore) SetProjectId(v string) {
-	o.ProjectId = &v
+// SetProject gets a reference to the given string and assigns it to the Project field.
+func (o *SuperplaneExecutorSpecSemaphore) SetProject(v string) {
+	o.Project = &v
+}
+
+// GetTask returns the Task field value if set, zero value otherwise.
+func (o *SuperplaneExecutorSpecSemaphore) GetTask() string {
+	if o == nil || IsNil(o.Task) {
+		var ret string
+		return ret
+	}
+	return *o.Task
+}
+
+// GetTaskOk returns a tuple with the Task field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneExecutorSpecSemaphore) GetTaskOk() (*string, bool) {
+	if o == nil || IsNil(o.Task) {
+		return nil, false
+	}
+	return o.Task, true
+}
+
+// HasTask returns a boolean if a field has been set.
+func (o *SuperplaneExecutorSpecSemaphore) HasTask() bool {
+	if o != nil && !IsNil(o.Task) {
+		return true
+	}
+
+	return false
+}
+
+// SetTask gets a reference to the given string and assigns it to the Task field.
+func (o *SuperplaneExecutorSpecSemaphore) SetTask(v string) {
+	o.Task = &v
 }
 
 // GetBranch returns the Branch field value if set, zero value otherwise.
@@ -140,38 +172,6 @@ func (o *SuperplaneExecutorSpecSemaphore) SetPipelineFile(v string) {
 	o.PipelineFile = &v
 }
 
-// GetTaskId returns the TaskId field value if set, zero value otherwise.
-func (o *SuperplaneExecutorSpecSemaphore) GetTaskId() string {
-	if o == nil || IsNil(o.TaskId) {
-		var ret string
-		return ret
-	}
-	return *o.TaskId
-}
-
-// GetTaskIdOk returns a tuple with the TaskId field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *SuperplaneExecutorSpecSemaphore) GetTaskIdOk() (*string, bool) {
-	if o == nil || IsNil(o.TaskId) {
-		return nil, false
-	}
-	return o.TaskId, true
-}
-
-// HasTaskId returns a boolean if a field has been set.
-func (o *SuperplaneExecutorSpecSemaphore) HasTaskId() bool {
-	if o != nil && !IsNil(o.TaskId) {
-		return true
-	}
-
-	return false
-}
-
-// SetTaskId gets a reference to the given string and assigns it to the TaskId field.
-func (o *SuperplaneExecutorSpecSemaphore) SetTaskId(v string) {
-	o.TaskId = &v
-}
-
 // GetParameters returns the Parameters field value if set, zero value otherwise.
 func (o *SuperplaneExecutorSpecSemaphore) GetParameters() map[string]string {
 	if o == nil || IsNil(o.Parameters) {
@@ -214,17 +214,17 @@ func (o SuperplaneExecutorSpecSemaphore) MarshalJSON() ([]byte, error) {
 
 func (o SuperplaneExecutorSpecSemaphore) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.ProjectId) {
-		toSerialize["projectId"] = o.ProjectId
+	if !IsNil(o.Project) {
+		toSerialize["project"] = o.Project
+	}
+	if !IsNil(o.Task) {
+		toSerialize["task"] = o.Task
 	}
 	if !IsNil(o.Branch) {
 		toSerialize["branch"] = o.Branch
 	}
 	if !IsNil(o.PipelineFile) {
 		toSerialize["pipelineFile"] = o.PipelineFile
-	}
-	if !IsNil(o.TaskId) {
-		toSerialize["taskId"] = o.TaskId
 	}
 	if !IsNil(o.Parameters) {
 		toSerialize["parameters"] = o.Parameters

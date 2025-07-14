@@ -20,10 +20,10 @@ type ExecutorSpec struct {
 }
 
 type SemaphoreExecutorSpec struct {
-	// TODO: no need to specify it here
-	// we should get this from the resource and not from here
-	ProjectID string `json:"project_id"`
-	TaskID    string `json:"task_id"`
+	// TODO: not exactly sure we should store this here
+	// or if we should have the resource referenced by this executor
+	// be a task instead of a project.
+	TaskId *string `json:"task_id,omitempty"`
 
 	Branch       string            `json:"branch"`
 	PipelineFile string            `json:"pipeline_file"`
@@ -39,6 +39,21 @@ type HTTPExecutorSpec struct {
 
 type HTTPResponsePolicy struct {
 	StatusCodes []uint32 `json:"status_codes"`
+}
+
+func (e *StageExecutor) GetResource() (*Resource, error) {
+	var resource Resource
+
+	err := database.Conn().
+		Where("id = ?", e.ResourceID).
+		First(&resource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
 }
 
 func (e *StageExecutor) FindIntegration() (*Integration, error) {

@@ -10,11 +10,23 @@ import (
 
 type Resource struct {
 	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	ExternalID    string
-	Name          string
 	IntegrationID uuid.UUID
-	Type          string
+	ExternalID    string
+	ResourceName  string `gorm:"column:name"`
+	ResourceType  string `gorm:"column:type"`
 	CreatedAt     *time.Time
+}
+
+func (r *Resource) Id() string {
+	return r.ExternalID
+}
+
+func (r *Resource) Name() string {
+	return r.ResourceName
+}
+
+func (r *Resource) Type() string {
+	return r.ResourceType
 }
 
 func FindResourceByID(id uuid.UUID) (*Resource, error) {

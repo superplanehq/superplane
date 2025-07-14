@@ -229,7 +229,6 @@ func Executor(r *ResourceRegistry) (*models.StageExecutor, *models.Resource) {
 			Type: models.ExecutorSpecTypeSemaphore,
 			Spec: datatypes.NewJSONType(models.ExecutorSpec{
 				Semaphore: &models.SemaphoreExecutorSpec{
-					ProjectID:    "demo-project",
 					Branch:       "main",
 					PipelineFile: ".semaphore/run.yml",
 					Parameters: map[string]string{
@@ -239,10 +238,10 @@ func Executor(r *ResourceRegistry) (*models.StageExecutor, *models.Resource) {
 				},
 			}),
 		}, &models.Resource{
-			Type:          integrations.ResourceTypeProject,
+			ResourceType:  integrations.ResourceTypeProject,
 			ExternalID:    uuid.NewString(),
 			IntegrationID: r.Integration.ID,
-			Name:          "demo-project",
+			ResourceName:  "demo-project",
 		}
 }
 
@@ -254,8 +253,7 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 			Name:       r.Integration.Name,
 		},
 		Semaphore: &pb.ExecutorSpec_Semaphore{
-			ProjectId:    "demo-project",
-			TaskId:       "task",
+			Project:      "demo-project",
 			Branch:       "main",
 			PipelineFile: ".semaphore/semaphore.yml",
 			Parameters:   map[string]string{},

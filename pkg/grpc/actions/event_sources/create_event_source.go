@@ -146,7 +146,7 @@ func validateIntegration(canvas *models.Canvas, integrationRef *pb.IntegrationRe
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	// TODO: support for canvas level integration
+	// TODO: support for organization level integration
 	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationRef.Name)
 	if err != nil {
 		return nil, fmt.Errorf("integration not found: %v", err)
@@ -162,7 +162,7 @@ func getResourceTypeAndName(integrationRecord *models.Integration, spec *pb.Even
 			return "", "", status.Error(codes.InvalidArgument, "missing semaphore resource")
 		}
 
-		return spec.Semaphore.Project, integrations.ResourceTypeProject, nil
+		return integrations.ResourceTypeProject, spec.Semaphore.Project, nil
 
 	default:
 		return "", "", status.Error(codes.InvalidArgument, "unsupported integration type")

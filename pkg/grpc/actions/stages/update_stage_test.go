@@ -189,7 +189,7 @@ func Test__UpdateStage(t *testing.T) {
 
 	t.Run("stage is updated", func(t *testing.T) {
 		executor.Semaphore = &protos.ExecutorSpec_Semaphore{
-			ProjectId:    "demo-project-2",
+			Project:      "demo-project-2",
 			Branch:       "other",
 			PipelineFile: ".semaphore/other.yml",
 			Parameters:   map[string]string{},
@@ -244,7 +244,7 @@ func Test__UpdateStage(t *testing.T) {
 
 		// Executor spec is updated
 		assert.Equal(t, protos.ExecutorSpec_TYPE_SEMAPHORE, res.Stage.Spec.Executor.Type)
-		assert.Equal(t, "demo-project-2", res.Stage.Spec.Executor.Semaphore.ProjectId)
+		assert.Equal(t, "demo-project-2", res.Stage.Spec.Executor.Semaphore.Project)
 		assert.Equal(t, "other", res.Stage.Spec.Executor.Semaphore.Branch)
 		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Semaphore.PipelineFile)
 

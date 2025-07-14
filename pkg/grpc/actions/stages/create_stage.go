@@ -416,15 +416,25 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 			},
 		}, nil
 	case models.ExecutorSpecTypeSemaphore:
+		resource, err := executor.GetResource()
+		if err != nil {
+			return nil, err
+		}
+
+		spec := &pb.ExecutorSpec_Semaphore{
+			Project:      resource.ResourceName,
+			Branch:       executorSpec.Semaphore.Branch,
+			PipelineFile: executorSpec.Semaphore.PipelineFile,
+			Parameters:   executorSpec.Semaphore.Parameters,
+		}
+
+		if executorSpec.Semaphore.TaskId != nil {
+			spec.Task = *executorSpec.Semaphore.TaskId
+		}
+
 		return &pb.ExecutorSpec{
-			Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
-			Semaphore: &pb.ExecutorSpec_Semaphore{
-				ProjectId:    executorSpec.Semaphore.ProjectID,
-				Branch:       executorSpec.Semaphore.Branch,
-				PipelineFile: executorSpec.Semaphore.PipelineFile,
-				Parameters:   executorSpec.Semaphore.Parameters,
-				TaskId:       executorSpec.Semaphore.TaskID,
-			},
+			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
+			Semaphore: spec,
 		}, nil
 
 	default:

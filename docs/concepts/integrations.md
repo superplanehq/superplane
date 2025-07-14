@@ -81,10 +81,9 @@ spec:
 executor:
   type: TYPE_SEMAPHORE
   integration:
-    domain: ORGANIZATION
     name: semaphore-integration
   semaphore:
-    projectId: f5808f38-bc99-4b11-9edd-6969d4664802
+    project: semaphore-demo-go
     branch: main
     pipelineFile: .semaphore/semaphore.yml
     parameters: {}
@@ -102,7 +101,6 @@ metadata:
   canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
 spec:
   integration:
-    domain: ORGANIZATION
     name: semaphore-integration
   semaphore:
     project: semaphore-demo-go

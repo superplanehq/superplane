@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -99,10 +98,10 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 	}
 
 	resources = append(resources, models.Resource{
-		ID:            uuid.MustParse(secret.Id()),
-		Name:          secret.Name(),
+		ExternalID:    secret.Id(),
+		ResourceName:  secret.Name(),
 		IntegrationID: integration.ID,
-		Type:          secret.Type(),
+		ResourceType:  secret.Type(),
 		CreatedAt:     &now,
 	})
 
@@ -115,10 +114,10 @@ func (w *PendingEventSourcesWorker) processSemaphoreSource(eventSource models.Ev
 	}
 
 	resources = append(resources, models.Resource{
-		ID:            uuid.MustParse(notification.Id()),
-		Name:          notification.Name(),
+		ExternalID:    notification.Id(),
+		ResourceName:  notification.Name(),
 		IntegrationID: integration.ID,
-		Type:          notification.Type(),
+		ResourceType:  notification.Type(),
 		CreatedAt:     &now,
 	})
 
@@ -185,11 +184,11 @@ func (w *PendingEventSourcesWorker) createSemaphoreNotification(semaphore integr
 		Spec: integrations.NotificationSpec{
 			Rules: []integrations.NotificationRule{
 				{
-					Name: fmt.Sprintf("webhooks-for-%s", resource.Name),
+					Name: fmt.Sprintf("webhooks-for-%s", resource.Name()),
 					Filter: integrations.NotificationRuleFilter{
 						Branches:  []string{},
 						Pipelines: []string{},
-						Projects:  []string{resource.Name},
+						Projects:  []string{resource.ResourceName},
 						Results:   []string{},
 					},
 					Notify: integrations.NotificationRuleNotify{

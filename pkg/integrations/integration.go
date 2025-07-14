@@ -21,9 +21,9 @@ const (
 )
 
 type Integration interface {
-	Get(resourceType, id string) (Resource, error)
+	Get(resourceType, id string, parentIDs ...string) (Resource, error)
 	Create(resourceType string, params any) (Resource, error)
-	List(resourceType string) ([]Resource, error)
+	List(resourceType string, parentIDs ...string) ([]Resource, error)
 }
 
 type Resource interface {

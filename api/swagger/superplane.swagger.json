@@ -2669,16 +2669,16 @@
     "SuperplaneExecutorSpecSemaphore": {
       "type": "object",
       "properties": {
-        "projectId": {
+        "project": {
+          "type": "string"
+        },
+        "task": {
           "type": "string"
         },
         "branch": {
           "type": "string"
         },
         "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
           "type": "string"
         },
         "parameters": {

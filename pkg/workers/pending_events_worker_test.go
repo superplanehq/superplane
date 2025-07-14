@@ -19,7 +19,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		Integration: true,
 	})
 
-	w := PendingEventsWorker{}
+	w := NewPendingEventsWorker(r.Encryptor)
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)

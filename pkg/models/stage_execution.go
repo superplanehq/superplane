@@ -285,12 +285,12 @@ func (e *StageExecution) Resources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
-func (e *StageExecution) FindResource(externalID string) (*ExecutionResource, error) {
+func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	var resource ExecutionResource
 
 	err := database.Conn().
-		Where("execution_id = ?", e.ID).
 		Where("external_id = ?", externalID).
+		Where("parent_resource_id = ?", parentResourceID).
 		First(&resource).
 		Error
 

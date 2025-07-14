@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -64,7 +65,11 @@ func (e *HTTPExecutor) Name() string {
 	return models.ExecutorSpecTypeHTTP
 }
 
-func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
+func (e *HTTPExecutor) HandleWebhook(data []byte) (Response, error) {
+	return nil, nil
+}
+
+func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, _ integrations.Resource) (Response, error) {
 	payload, err := e.buildPayload(spec.HTTP)
 	if err != nil {
 		return nil, fmt.Errorf("error building parameters: %v", err)

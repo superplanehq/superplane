@@ -15,8 +15,9 @@ var expressionRegex = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
 
 type Executor interface {
 	Name() string
-	Execute(models.ExecutorSpec) (Response, error)
+	Execute(models.ExecutorSpec, integrations.Resource) (Response, error)
 	Check(string) (Response, error)
+	HandleWebhook([]byte) (Response, error)
 }
 
 type Response interface {

@@ -6944,10 +6944,10 @@ func (x *InputMapping_WhenTriggeredBy) GetConnection() string {
 
 type ExecutorSpec_Semaphore struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	Branch        string                 `protobuf:"bytes,2,opt,name=branch,proto3" json:"branch,omitempty"`
-	PipelineFile  string                 `protobuf:"bytes,3,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
-	TaskId        string                 `protobuf:"bytes,4,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	Project       string                 `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`
+	Task          string                 `protobuf:"bytes,2,opt,name=task,proto3" json:"task,omitempty"`
+	Branch        string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
+	PipelineFile  string                 `protobuf:"bytes,4,opt,name=pipeline_file,json=pipelineFile,proto3" json:"pipeline_file,omitempty"`
 	Parameters    map[string]string      `protobuf:"bytes,5,rep,name=parameters,proto3" json:"parameters,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -6983,9 +6983,16 @@ func (*ExecutorSpec_Semaphore) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{61, 0}
 }
 
-func (x *ExecutorSpec_Semaphore) GetProjectId() string {
+func (x *ExecutorSpec_Semaphore) GetProject() string {
 	if x != nil {
-		return x.ProjectId
+		return x.Project
+	}
+	return ""
+}
+
+func (x *ExecutorSpec_Semaphore) GetTask() string {
+	if x != nil {
+		return x.Task
 	}
 	return ""
 }
@@ -7000,13 +7007,6 @@ func (x *ExecutorSpec_Semaphore) GetBranch() string {
 func (x *ExecutorSpec_Semaphore) GetPipelineFile() string {
 	if x != nil {
 		return x.PipelineFile
-	}
-	return ""
-}
-
-func (x *ExecutorSpec_Semaphore) GetTaskId() string {
-	if x != nil {
-		return x.TaskId
 	}
 	return ""
 }
@@ -7453,18 +7453,17 @@ const file_superplane_proto_rawDesc = "" +
 	"\x0eIntegrationRef\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xf5\a\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xeb\a\n" +
 	"\fExecutorSpec\x121\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1d.Superplane.ExecutorSpec.TypeR\x04type\x12<\n" +
 	"\vintegration\x18\x02 \x01(\v2\x1a.Superplane.IntegrationRefR\vintegration\x12@\n" +
 	"\tsemaphore\x18\x03 \x01(\v2\".Superplane.ExecutorSpec.SemaphoreR\tsemaphore\x121\n" +
-	"\x04http\x18\x04 \x01(\v2\x1d.Superplane.ExecutorSpec.HTTPR\x04http\x1a\x93\x02\n" +
-	"\tSemaphore\x12\x1d\n" +
-	"\n" +
-	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x16\n" +
-	"\x06branch\x18\x02 \x01(\tR\x06branch\x12#\n" +
-	"\rpipeline_file\x18\x03 \x01(\tR\fpipelineFile\x12\x17\n" +
-	"\atask_id\x18\x04 \x01(\tR\x06taskId\x12R\n" +
+	"\x04http\x18\x04 \x01(\v2\x1d.Superplane.ExecutorSpec.HTTPR\x04http\x1a\x89\x02\n" +
+	"\tSemaphore\x12\x18\n" +
+	"\aproject\x18\x01 \x01(\tR\aproject\x12\x12\n" +
+	"\x04task\x18\x02 \x01(\tR\x04task\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch\x12#\n" +
+	"\rpipeline_file\x18\x04 \x01(\tR\fpipelineFile\x12R\n" +
 	"\n" +
 	"parameters\x18\x05 \x03(\v22.Superplane.ExecutorSpec.Semaphore.ParametersEntryR\n" +
 	"parameters\x1a=\n" +

@@ -84,3 +84,22 @@ func ListPendingEventSources() ([]EventSource, error) {
 
 	return eventSources, nil
 }
+
+func FindExecutorFromSource(sourceID uuid.UUID) (*StageExecutor, error) {
+	var executor StageExecutor
+
+	err := database.Conn().
+		Table("event_sources").
+		Select("stage_executors.*").
+		Joins("INNER JOIN resources ON resources.id = event_sources.resource_id").
+		Joins("INNER JOIN stage_executors ON stage_executors.resource_id = resources.id").
+		Where("event_sources.id = ?", sourceID).
+		First(&executor).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &executor, nil
+}

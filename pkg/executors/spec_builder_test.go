@@ -14,8 +14,6 @@ func Test__SpecBuilder_Build(t *testing.T) {
 		builder := SpecBuilder{}
 		spec := models.ExecutorSpec{
 			Semaphore: &models.SemaphoreExecutorSpec{
-				ProjectID:    "demo-project",
-				TaskID:       "demo-task",
 				Branch:       "main",
 				PipelineFile: ".semaphore/run.yml",
 				Parameters: map[string]string{
@@ -26,8 +24,6 @@ func Test__SpecBuilder_Build(t *testing.T) {
 
 		v, err := builder.Build(spec, map[string]any{"VAR_1": "hello"}, map[string]string{"TOKEN": "token"})
 		require.NoError(t, err)
-		assert.Equal(t, v.Semaphore.ProjectID, "demo-project")
-		assert.Equal(t, v.Semaphore.TaskID, "demo-task")
 		assert.Equal(t, v.Semaphore.Branch, "main")
 		assert.Equal(t, v.Semaphore.PipelineFile, ".semaphore/run.yml")
 		assert.Equal(t, map[string]string{"PARAM_1": "hello"}, v.Semaphore.Parameters)

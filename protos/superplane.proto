@@ -798,10 +798,10 @@ message ExecutorSpec {
   }
 
   message Semaphore {
-    string project_id = 1;
-    string branch = 2;
-    string pipeline_file = 3;
-    string task_id = 4;
+    string project = 1;
+    string task = 2;
+    string branch = 3;
+    string pipeline_file = 4;
     map<string, string> parameters = 5;
   }
 

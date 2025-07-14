@@ -25,7 +25,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 
 	if os.Getenv("START_PENDING_EVENTS_WORKER") == "yes" {
 		log.Println("Starting Pending Events Worker")
-		w := workers.PendingEventsWorker{}
+		w := workers.NewPendingEventsWorker(encryptor)
 		go w.Start()
 	}
 

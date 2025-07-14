@@ -43,7 +43,6 @@ func (w *ExecutionPoller) Tick() error {
 	for _, execution := range executions {
 		e := execution
 		logger := logging.ForExecution(&e)
-		logger.Infof("Processing")
 		err := w.ProcessExecution(logger, &e)
 		if err != nil {
 			return err
@@ -70,7 +69,6 @@ func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.
 	if slices.ContainsFunc(resources, func(resource models.ExecutionResource) bool {
 		return resource.State == models.ExecutionResourcePending
 	}) {
-		logger.Infof("Execution resources are not finished yet")
 		return nil
 	}
 

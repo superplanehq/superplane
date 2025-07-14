@@ -202,9 +202,9 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		return nil, err
 	}
 
-	for _, v := range resources {
+	for _, r := range resources {
 		e.Resources = append(e.Resources, &pb.ExecutionResource{
-			Id: v.ID.String(),
+			Id: r.ExternalID,
 		})
 	}
 

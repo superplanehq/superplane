@@ -76,10 +76,10 @@ func (i *Integration) CreateResourceInTransaction(tx *gorm.DB, resourceType, ext
 
 	resource := Resource{
 		ExternalID:    externalID,
-		Name:          name,
+		ResourceName:  name,
 		CreatedAt:     &now,
 		IntegrationID: i.ID,
-		Type:          resourceType,
+		ResourceType:  resourceType,
 	}
 
 	err := tx.

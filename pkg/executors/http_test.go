@@ -40,7 +40,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		})
+		}, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -65,7 +65,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		})
+		}, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -94,7 +94,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		})
+		}, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -127,7 +127,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		})
+		}, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -153,7 +153,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		})
+		}, nil)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)

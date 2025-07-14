@@ -18,7 +18,7 @@ type SemaphoreAPIMock struct {
 	Workflows map[string]Pipeline
 	Projects  []string
 
-	LastTaskTrigger *integrations.TaskTrigger
+	LastRunTask     *integrations.RunTaskRequest
 	LastRunWorkflow *integrations.CreateWorkflowRequest
 }
 
@@ -64,8 +64,8 @@ func (s *SemaphoreAPIMock) Init() {
 			return
 		}
 
-		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/triggers") {
-			s.TriggerTask(w, r)
+		if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/run_now") {
+			s.RunTask(w, r)
 			return
 		}
 
@@ -136,29 +136,28 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotFound)
 }
 
-func (s *SemaphoreAPIMock) TriggerTask(w http.ResponseWriter, r *http.Request) {
+func (s *SemaphoreAPIMock) RunTask(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	var trigger integrations.TaskTrigger
-	err = json.Unmarshal(body, &trigger)
+	var runTaskRequest integrations.RunTaskRequest
+	err = json.Unmarshal(body, &runTaskRequest)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	trigger.Metadata.WorkflowID = uuid.New().String()
-	trigger.Metadata.Status = "PASSED"
-	data, err := json.Marshal(trigger)
+	response := integrations.RunTaskResponse{WorkflowID: uuid.New().String()}
+	data, err := json.Marshal(response)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	s.LastTaskTrigger = &trigger
+	s.LastRunTask = &runTaskRequest
 	w.Write(data)
 }
 

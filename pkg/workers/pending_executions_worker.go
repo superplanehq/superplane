@@ -70,6 +70,11 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error getting executor for stage: %v", err)
 	}
 
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return fmt.Errorf("error getting resource for stage executor: %v", err)
+	}
+
 	executorSpec := stageExecutor.Spec.Data()
 	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
 	if err != nil {
@@ -81,15 +86,10 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error creating executor: %v", err)
 	}
 
-	err = execution.Start()
-	if err != nil {
-		return fmt.Errorf("error moving execution to started state: %v", err)
-	}
-
 	//
 	// If we get an error calling the executor, we fail the execution.
 	//
-	response, err := executor.Execute(*spec)
+	response, err := executor.Execute(*spec, resource)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
 		err := execution.Finish(stage, models.ResultFailed)
@@ -144,6 +144,11 @@ func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, respons
 	_, err := execution.AddResource(response.Id(), executor.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
+	}
+
+	err = execution.Start()
+	if err != nil {
+		return fmt.Errorf("error moving execution to started state: %v", err)
 	}
 
 	err = messages.NewExecutionStartedMessage(stage.CanvasID.String(), &execution).Publish()

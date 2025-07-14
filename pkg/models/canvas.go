@@ -270,7 +270,7 @@ func (c *Canvas) createStageExecutor(tx *gorm.DB, encryptor crypto.Encryptor, st
 	// Check if there is already a resource created for this.
 	// If not, create one and attach it to a new event source.
 	//
-	r, err := FindResourceInTransaction(tx, resource.IntegrationID, resource.Type, resource.Name)
+	r, err := FindResourceInTransaction(tx, resource.IntegrationID, resource.ResourceType, resource.ResourceName)
 	if err != nil {
 		if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
@@ -283,12 +283,12 @@ func (c *Canvas) createStageExecutor(tx *gorm.DB, encryptor crypto.Encryptor, st
 			return fmt.Errorf("error creating executor resource: %v", err)
 		}
 
-		_, key, err := genNewEventSourceKey(context.Background(), encryptor, resource.Name)
+		_, key, err := genNewEventSourceKey(context.Background(), encryptor, resource.ResourceName)
 		if err != nil {
 			return err
 		}
 
-		_, err = c.CreateEventSourceInTransaction(tx, r.Name, key, &r.ID)
+		_, err = c.CreateEventSourceInTransaction(tx, r.ResourceName, key, &r.ID)
 		if err != nil {
 			return fmt.Errorf("error creating event source for resource: %v", err)
 		}
