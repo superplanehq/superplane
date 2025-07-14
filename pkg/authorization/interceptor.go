@@ -75,7 +75,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAuth.Authorization_GetOrganizationGroupUsers_FullMethodName:       {Resource: "group", Action: "read", DomainType: "org"},
 		pbAuth.Authorization_GetOrganizationGroup_FullMethodName:            {Resource: "group", Action: "read", DomainType: "org"},
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName:    {Resource: "org", Action: "read", DomainType: "org"},
-		pbOrganization.Organizations_ListOrganizations_FullMethodName:       {Resource: "org", Action: "read", DomainType: "org"},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:      {Resource: "org", Action: "update", DomainType: "org"},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:      {Resource: "org", Action: "delete", DomainType: "org"},
 	}
