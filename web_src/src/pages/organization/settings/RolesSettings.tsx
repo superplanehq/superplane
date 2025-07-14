@@ -24,6 +24,7 @@ import {
 } from '../../../api-client/sdk.gen'
 import { AuthorizationRole } from '../../../api-client/types.gen'
 import { Tabs } from '@/components/Tabs/tabs'
+import { capitalizeFirstLetter } from '@/utils/text'
 
 interface RolesSettingsProps {
   organizationId: string
@@ -97,9 +98,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     navigate(`/organization/${organizationId}/settings/create-role`)
   }
 
-  const capitalizeFirstLetter = (str: string) => {
-    return str.charAt(0).toUpperCase() + str.slice(1)
-  }
+
 
   const filteredRoles = useMemo(() => roles.filter((role) => {
     if (activeRoleTab === 'organization') {
