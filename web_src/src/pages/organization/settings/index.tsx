@@ -5,6 +5,9 @@ import { GeneralSettings } from './GeneralSettings'
 import { MembersSettings } from './MembersSettings'
 import { GroupsSettings } from './GroupsSettings'
 import { RolesSettings } from './RolesSettings'
+import { AddMembersPage } from './AddMembersPage'
+import { CreateGroupPage } from './CreateGroupPage'
+import { CreateRolePage } from './CreateRolePage'
 
 export function OrganizationSettings() {
   const { orgId } = useParams<{ orgId: string }>()
@@ -98,6 +101,9 @@ export function OrganizationSettings() {
               <Route path="members" element={<MembersSettings organizationId={orgId} />} />
               <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
               <Route path="roles" element={<RolesSettings organizationId={orgId} />} />
+              <Route path="add-members" element={<AddMembersPage />} />
+              <Route path="create-group" element={<CreateGroupPage />} />
+              <Route path="create-role" element={<CreateRolePage />} />
               <Route path="profile" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Profile Settings</h1><p>Profile settings coming soon...</p></div>} />
               <Route path="api_token" element={<div className="pt-6"><h1 className="text-2xl font-semibold">API Token</h1><p>API token management coming soon...</p></div>} />
               <Route path="billing" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Billing & Plans</h1><p>Billing management coming soon...</p></div>} />

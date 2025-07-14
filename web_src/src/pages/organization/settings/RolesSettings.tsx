@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
 import { Input, InputGroup } from '../../../components/Input/input'
@@ -28,10 +29,10 @@ interface RolesSettingsProps {
 }
 
 export function RolesSettings({ organizationId }: RolesSettingsProps) {
+  const navigate = useNavigate()
   const [roles, setRoles] = useState<AuthorizationRole[]>([])
   const [loadingRoles, setLoadingRoles] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isCreatingRole, setIsCreatingRole] = useState(false)
 
   useEffect(() => {
     const fetchRoles = async () => {
@@ -58,39 +59,8 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     fetchRoles()
   }, [organizationId])
 
-  const handleCreateRole = async () => {
-    const roleName = prompt('Enter role name:')
-    if (!roleName?.trim()) return
-
-    setIsCreatingRole(true)
-    setError(null)
-
-    try {
-      await authorizationCreateRole({
-        body: {
-          name: roleName,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId,
-          permissions: [] // Empty permissions for now
-        }
-      })
-
-      // Refresh roles list
-      const response = await authorizationListRoles({
-        query: {
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        }
-      })
-      if (response.data?.roles) {
-        setRoles(response.data.roles)
-      }
-    } catch (err) {
-      console.error('Error creating role:', err)
-      setError('Failed to create role')
-    } finally {
-      setIsCreatingRole(false)
-    }
+  const handleCreateRole = () => {
+    navigate(`/organization/${organizationId}/settings/create-role`)
   }
 
   return (
@@ -118,10 +88,9 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
             color="blue" 
             className='flex items-center'
             onClick={handleCreateRole}
-            disabled={isCreatingRole}
           >
             <MaterialSymbol name="add" />
-            {isCreatingRole ? 'Creating...' : 'New role'}
+            New role
           </Button>
         </div>
         <div className="px-6 pb-6">

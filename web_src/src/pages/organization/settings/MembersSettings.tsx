@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
@@ -15,10 +16,10 @@ interface MembersSettingsProps {
 }
 
 export function MembersSettings({ organizationId }: MembersSettingsProps) {
+  const navigate = useNavigate()
   const [groups, setGroups] = useState<AuthorizationGroup[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -42,37 +43,12 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
     fetchGroups()
   }, [organizationId])
 
-  const handleCreateGroup = async () => {
-    const groupName = prompt('Enter group name:')
-    if (!groupName?.trim()) return
+  const handleCreateGroup = () => {
+    navigate(`/organization/${organizationId}/settings/create-group`)
+  }
 
-    const role = prompt('Enter role for this group (optional):') || 'member'
-
-    setIsCreatingGroup(true)
-    setError(null)
-
-    try {
-      await authorizationCreateOrganizationGroup({
-        body: {
-          organizationId,
-          groupName,
-          role
-        }
-      })
-
-      // Refresh groups list
-      const response = await authorizationListOrganizationGroups({
-        query: { organizationId }
-      })
-      if (response.data?.groups) {
-        setGroups(response.data.groups)
-      }
-    } catch (err) {
-      console.error('Error creating group:', err)
-      setError('Failed to create group')
-    } finally {
-      setIsCreatingGroup(false)
-    }
+  const handleAddMembers = () => {
+    navigate(`/organization/${organizationId}/settings/add-members`)
   }
 
   return (
@@ -109,9 +85,8 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
             <Button 
               color="blue"
               onClick={handleCreateGroup}
-              disabled={isCreatingGroup}
             >
-              {isCreatingGroup ? 'Creating...' : 'Create Your First Group'}
+              Create Your First Group
             </Button>
           </div>
         </div>
@@ -164,10 +139,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                     <Button 
                       outline 
                       className="flex-1 text-sm"
-                      onClick={() => {
-                        // TODO: Implement add member functionality
-                        console.log('Add member to group:', group.name)
-                      }}
+                      onClick={handleAddMembers}
                     >
                       <MaterialSymbol name="person_add" className="mr-2" />
                       Add Member

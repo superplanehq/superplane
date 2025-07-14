@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
 import { Input, InputGroup } from '../../../components/Input/input'
@@ -30,10 +31,10 @@ interface GroupsSettingsProps {
 }
 
 export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
+  const navigate = useNavigate()
   const [groups, setGroups] = useState<AuthorizationGroup[]>([])
   const [loadingGroups, setLoadingGroups] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isCreatingGroup, setIsCreatingGroup] = useState(false)
 
   useEffect(() => {
     const fetchGroups = async () => {
@@ -57,37 +58,8 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
     fetchGroups()
   }, [organizationId])
 
-  const handleCreateGroup = async () => {
-    const groupName = prompt('Enter group name:')
-    if (!groupName?.trim()) return
-
-    const role = prompt('Enter role for this group (optional):') || 'member'
-
-    setIsCreatingGroup(true)
-    setError(null)
-
-    try {
-      await authorizationCreateOrganizationGroup({
-        body: {
-          organizationId,
-          groupName,
-          role
-        }
-      })
-
-      // Refresh groups list
-      const response = await authorizationListOrganizationGroups({
-        query: { organizationId }
-      })
-      if (response.data?.groups) {
-        setGroups(response.data.groups)
-      }
-    } catch (err) {
-      console.error('Error creating group:', err)
-      setError('Failed to create group')
-    } finally {
-      setIsCreatingGroup(false)
-    }
+  const handleCreateGroup = () => {
+    navigate(`/organization/${organizationId}/settings/create-group`)
   }
 
   return (
@@ -113,10 +85,9 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
             color="blue" 
             className='flex items-center'
             onClick={handleCreateGroup}
-            disabled={isCreatingGroup}
           >
             <MaterialSymbol name="add" />
-            {isCreatingGroup ? 'Creating...' : 'Create New Group'}
+            Create New Group
           </Button>
         </div>
         <div className="px-6 pb-6">
