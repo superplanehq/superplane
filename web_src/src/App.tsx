@@ -5,6 +5,7 @@ import './App.css'
 import HomePage from './pages/home'
 import { Canvas } from './pages/canvas'
 import OrganizationPage from './pages/organization'
+import { OrganizationSettings } from './pages/organization/settings'
 import Navigation from './components/Navigation'
 
 // Get the base URL from environment or default to '/app' for production
@@ -20,6 +21,8 @@ function App() {
           <Route path="" element={<HomePage />} />
           <Route path="organization/:id" element={<OrganizationPage />} />
           <Route path="organization/:orgId/canvas/:canvasId" element={<Canvas />} />
+          <Route path="settings" element={<OrganizationSettings />} />
+          <Route path="settings/:section" element={<OrganizationSettings />} />
         </Routes>
       </BrowserRouter>
     </>

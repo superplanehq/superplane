@@ -36,7 +36,7 @@ const HomePage = () => {
   }, [])
 
   return (
-    <div className="flex justify-center w-full text-center">
+    <div className="flex justify-center w-full text-center" style={{ marginTop: "3rem" }}>
       <div className="w-full max-w-6xl px-4 py-8">
         <h1 className="text-3xl font-bold mb-6">My Canvases</h1>
       
