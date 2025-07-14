@@ -59,15 +59,15 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAuth.Authorization_GetCanvasGroup_FullMethodName:                  {Resource: "group", Action: "read", DomainType: "canvas"},
 
 		// Organization rules
-		pbAuth.Authorization_ListUserPermissions_FullMethodName:             {Resource: "user", Action: "read", DomainType: "org"},
-		pbAuth.Authorization_AssignRole_FullMethodName:                      {Resource: "role", Action: "assign", DomainType: "org"},
-		pbAuth.Authorization_RemoveRole_FullMethodName:                      {Resource: "role", Action: "remove", DomainType: "org"},
-		pbAuth.Authorization_ListRoles_FullMethodName:                       {Resource: "role", Action: "read", DomainType: "org"},
-		pbAuth.Authorization_DescribeRole_FullMethodName:                    {Resource: "role", Action: "read", DomainType: "org"},
-		pbAuth.Authorization_GetUserRoles_FullMethodName:                    {Resource: "user", Action: "read", DomainType: "org"},
-		pbAuth.Authorization_CreateRole_FullMethodName:                      {Resource: "role", Action: "create", DomainType: "org"},
-		pbAuth.Authorization_UpdateRole_FullMethodName:                      {Resource: "role", Action: "update", DomainType: "org"},
-		pbAuth.Authorization_DeleteRole_FullMethodName:                      {Resource: "role", Action: "delete", DomainType: "org"},
+		pbAuth.Authorization_ListUserPermissions_FullMethodName:             {Resource: "user", Action: "read", DomainType: "mixed"},
+		pbAuth.Authorization_AssignRole_FullMethodName:                      {Resource: "role", Action: "assign", DomainType: "mixed"},
+		pbAuth.Authorization_RemoveRole_FullMethodName:                      {Resource: "role", Action: "remove", DomainType: "mixed"},
+		pbAuth.Authorization_ListRoles_FullMethodName:                       {Resource: "role", Action: "read", DomainType: "mixed"},
+		pbAuth.Authorization_DescribeRole_FullMethodName:                    {Resource: "role", Action: "read", DomainType: "mixed"},
+		pbAuth.Authorization_GetUserRoles_FullMethodName:                    {Resource: "user", Action: "read", DomainType: "mixed"},
+		pbAuth.Authorization_CreateRole_FullMethodName:                      {Resource: "role", Action: "create", DomainType: "mixed"},
+		pbAuth.Authorization_UpdateRole_FullMethodName:                      {Resource: "role", Action: "update", DomainType: "mixed"},
+		pbAuth.Authorization_DeleteRole_FullMethodName:                      {Resource: "role", Action: "delete", DomainType: "mixed"},
 		pbAuth.Authorization_CreateOrganizationGroup_FullMethodName:         {Resource: "group", Action: "create", DomainType: "org"},
 		pbAuth.Authorization_AddUserToOrganizationGroup_FullMethodName:      {Resource: "group", Action: "update", DomainType: "org"},
 		pbAuth.Authorization_RemoveUserFromOrganizationGroup_FullMethodName: {Resource: "group", Action: "update", DomainType: "org"},
@@ -106,19 +106,31 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		userID := userMeta[0]
 
-		domainID, err := a.extractDomainID(req, rule.DomainType)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid %s ID", rule.DomainType))
+		var domainID string
+		var actualDomainType string
+		var err error
+
+		if rule.DomainType == "mixed" {
+			actualDomainType, domainID, err = a.extractMixedDomainID(req)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, "invalid domain information")
+			}
+		} else {
+			domainID, err = a.extractDomainID(req, rule.DomainType)
+			if err != nil {
+				return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("invalid %s ID", rule.DomainType))
+			}
+			actualDomainType = rule.DomainType
 		}
 
 		var allowed bool
-		if rule.DomainType == "org" {
+		if actualDomainType == "org" {
 			allowed, err = a.authService.CheckOrganizationPermission(userID, domainID, rule.Resource, rule.Action)
 			if err != nil {
 				return nil, err
 			}
 		}
-		if rule.DomainType == "canvas" {
+		if actualDomainType == "canvas" {
 			allowed, err = a.authService.CheckCanvasPermission(userID, domainID, rule.Resource, rule.Action)
 			if err != nil {
 				return nil, err
@@ -126,7 +138,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 		}
 
 		if !allowed {
-			log.Warnf("User %s tried to %s %s in %s %s", userID, rule.Action, rule.Resource, rule.DomainType, domainID)
+			log.Warnf("User %s tried to %s %s in %s %s", userID, rule.Action, rule.Resource, actualDomainType, domainID)
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
@@ -182,5 +194,47 @@ func extractCanvasID(req interface{}) (string, error) {
 		return canvasIDOrName, nil
 	default:
 		return "", nil
+	}
+}
+
+func (a *AuthorizationInterceptor) extractMixedDomainID(req interface{}) (string, string, error) {
+	// Extract both domain_type and domain_id from requests that support both org and canvas domains
+	switch r := req.(type) {
+	case interface {
+		GetDomainType() pbAuth.DomainType
+		GetDomainId() string
+	}:
+		domainType := r.GetDomainType()
+		domainID := r.GetDomainId()
+
+		var resolvedDomainType string
+		switch domainType {
+		case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
+			resolvedDomainType = "org"
+			// Resolve organization ID if it's a name
+			if _, err := uuid.Parse(domainID); err != nil {
+				org, err := models.FindOrganizationByName(domainID)
+				if err != nil {
+					return "", "", fmt.Errorf("organization not found: %s", domainID)
+				}
+				domainID = org.ID.String()
+			}
+		case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
+			resolvedDomainType = "canvas"
+			// Resolve canvas ID if it's a name
+			if _, err := uuid.Parse(domainID); err != nil {
+				canvas, err := models.FindCanvasByName(domainID)
+				if err != nil {
+					return "", "", fmt.Errorf("canvas not found: %s", domainID)
+				}
+				domainID = canvas.ID.String()
+			}
+		default:
+			return "", "", fmt.Errorf("unsupported domain type: %v", domainType)
+		}
+
+		return resolvedDomainType, domainID, nil
+	default:
+		return "", "", fmt.Errorf("unable to extract domain information from request")
 	}
 }
