@@ -1,3 +1,4 @@
+import React from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './App.css'
 
@@ -11,18 +12,24 @@ import Navigation from './components/Navigation'
 // Get the base URL from environment or default to '/app' for production
 const BASE_PATH = import.meta.env.BASE_URL || '/app'
 
+// Helper function to wrap components with Navigation
+const withNavigation = (Component: React.ComponentType) => (
+  <>
+    <Navigation />
+    <Component />
+  </>
+)
+
 // Main App component with router
 function App() {
   return (
     <>
       <BrowserRouter basename={BASE_PATH}>
-        <Navigation />
         <Routes>
-          <Route path="" element={<HomePage />} />
-          <Route path="organization/:id" element={<OrganizationPage />} />
-          <Route path="organization/:orgId/canvas/:canvasId" element={<Canvas />} />
-          <Route path="settings" element={<OrganizationSettings />} />
-          <Route path="settings/:section" element={<OrganizationSettings />} />
+          <Route path="" element={withNavigation(HomePage)} />
+          <Route path="organization/:orgId" element={withNavigation(OrganizationPage)} />
+          <Route path="organization/:orgId/canvas/:canvasId" element={withNavigation(Canvas)} />
+          <Route path="organization/:orgId/settings/*" element={withNavigation(OrganizationSettings)} />
         </Routes>
       </BrowserRouter>
     </>

@@ -5,7 +5,7 @@ import { SuperplaneCanvas } from '../../api-client'
 
 // Home page component - displays list of canvases
 const HomePage = () => {
-  const { id: organizationId } = useParams<{ id: string }>()
+  const { orgId: organizationId } = useParams<{ orgId: string }>()
   const [canvases, setCanvases] = useState<SuperplaneCanvas[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
