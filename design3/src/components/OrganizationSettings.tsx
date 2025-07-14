@@ -1415,6 +1415,13 @@ export function OrganizationSettings({
                           </TableCell>
                         </TableRow>
                       ))}
+                      {(teamMembers.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center h-[200px] py-6">
+                            No team members yet
+                          </TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
