@@ -3,9 +3,10 @@
 Integrations are a way to connect Superplane to external services.
 
 An integration:
-- Configures how Superplane should authenticate and make requests to the external service, so it can read/create resources in it
-- Configures how Superplane should receive requests from the external service, for example, execution outputs.
-- Once configured, can be used as an event source directly, or be used as the source for more specialized event sources.
+- Configures how Superplane should authenticate and make requests to an external service, so it can read and create resources in it.
+- Configures how Superplane should receive requests from the external service.
+- Once created, it is used to create stage executions.
+- It can be used to create event sources for specific resources in the external service.
 
 ## Management and usage
 
@@ -17,11 +18,7 @@ This is what an integration looks like in YAML:
 kind: Integration
 metadata:
   name: semaphore-integration
-
-  #
-  # If canvasId is specified, the integration will be scoped to that canvas.
-  #
-  # canvasId: canvas-123
+  canvasId: canvas-123
 spec:
 
   #
@@ -77,6 +74,8 @@ spec:
 
 ### Using an integration in a stage executor
 
+When creating stages, you must specify the stage executor, and in the executor, you should reference an integration. For example, this is how you run a Semaphore workflow during the stage execution, through the `semaphore-integration` integration:
+
 ```yaml
 executor:
   type: TYPE_SEMAPHORE
@@ -89,38 +88,36 @@ executor:
     parameters: {}
 ```
 
-### Using an integration as an event source
+NOTE: not all executor types require an integration, but most of them do. For example, the HTTP executor does not require an integration to be used.
 
-You can create a more specialized event source from it, filtering only the events you want to receive:
+### Creating an event source through an integration
+
+You can create an event source through the integration, and SuperPlane will take care of provisioning everything on the integration side. For example, here's how you can create an event source for a Semaphore project:
 
 ```yaml
 apiVersion: v1
 kind: EventSource
 metadata:
-  name: my-specific-project
+  name: my-project
   canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
 spec:
   integration:
     name: semaphore-integration
   semaphore:
     project: semaphore-demo-go
-  # github:
-  #   repository: semaphore-demo-go
 ```
 
-## GitHub
+And here's how you can create an event source for a GitHub repository:
 
-callback URL: ???
- - not using this one for now, because we are using the OAuth already
- - we probably should migrate to use just a GitHub app, instead of a GitHub app and a OAuth app
-
-setup URL:
-  http://localhost:8000/integrations/github/app_installation?state=<org-id>
-
-The setup URL receives a `installation_id` parameter, but since that can be spoofed, we shouldn't use that.
-
-Permissions
-  - Actions (read/write) -> needed to run GitHub Actions workflows
-  - Webhooks (read/write) -> needed to receive updates about specific repositories
-Events
-  - We only need events about app installations
+```yaml
+apiVersion: v1
+kind: EventSource
+metadata:
+  name: my-repository
+  canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
+spec:
+  integration:
+    name: github-integration
+  github:
+    repository: semaphore-demo-go
+```

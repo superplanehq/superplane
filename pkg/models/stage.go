@@ -1,15 +1,12 @@
 package models
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -346,37 +343,6 @@ func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[stri
 	}
 
 	return event.Inputs.Data(), nil
-}
-
-func (s *Stage) FindSecrets(encryptor crypto.Encryptor) (map[string]string, error) {
-	secretMap := map[string]string{}
-	for _, secretDef := range s.Secrets {
-		secretName := secretDef.ValueFrom.Secret.Name
-		secret, err := FindSecretByName(s.CanvasID.String(), secretName)
-		if err != nil {
-			return nil, fmt.Errorf("error finding secret %s: %v", secretName, err)
-		}
-
-		provider, err := secrets.NewProvider(secret.Provider, secrets.Options{
-			CanvasID:   s.CanvasID,
-			Encryptor:  encryptor,
-			SecretName: secret.Name,
-			SecretData: secret.Data,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
-		}
-
-		values, err := provider.Get(context.TODO())
-		if err != nil {
-			return nil, fmt.Errorf("error getting secret values for %s: %v", secretName, err)
-		}
-
-		secretMap[secretDef.Name] = values[secretDef.ValueFrom.Secret.Key]
-	}
-
-	return secretMap, nil
 }
 
 func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {

@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
 type PendingExecutionsWorker struct {
@@ -60,7 +62,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	secrets, err := stage.FindSecrets(w.Encryptor)
+	secrets, err := w.FindSecrets(stage, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
@@ -106,6 +108,32 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	}
 
 	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
+	secretMap := map[string]string{}
+	for _, secretDef := range stage.Secrets {
+		secretName := secretDef.ValueFrom.Secret.Name
+		provider, err := secrets.NewProvider(encryptor, secretName, stage.CanvasID.String())
+		if err != nil {
+			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
+		}
+
+		values, err := provider.Load(context.TODO())
+		if err != nil {
+			return nil, fmt.Errorf("error loading values for secret %s: %v", secretName, err)
+		}
+
+		key := secretDef.ValueFrom.Secret.Key
+		value, ok := values[key]
+		if !ok {
+			return nil, fmt.Errorf("key %s not found in secret %s", key, secretName)
+		}
+
+		secretMap[secretDef.Name] = value
+	}
+
+	return secretMap, nil
 }
 
 func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {

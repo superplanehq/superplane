@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
@@ -14,21 +15,25 @@ const (
 )
 
 type Provider interface {
-	Get(ctx context.Context) (map[string]string, error)
+	Load(ctx context.Context) (map[string]string, error)
 }
 
 type Options struct {
 	CanvasID   uuid.UUID
 	SecretName string
-	SecretData []byte
 	Encryptor  crypto.Encryptor
 }
 
-func NewProvider(provider string, options Options) (Provider, error) {
-	switch provider {
+func NewProvider(encryptor crypto.Encryptor, name string, canvasId string) (Provider, error) {
+	secret, err := models.FindSecretByName(canvasId, name)
+	if err != nil {
+		return nil, fmt.Errorf("error finding secret %s: %v", name, err)
+	}
+
+	switch secret.Provider {
 	case ProviderLocal:
-		return NewLocalProvider(database.Conn(), options), nil
+		return NewLocalProvider(database.Conn(), encryptor, secret), nil
 	default:
-		return nil, fmt.Errorf("provider not supported: %s", provider)
+		return nil, fmt.Errorf("provider not supported: %s", secret.Provider)
 	}
 }

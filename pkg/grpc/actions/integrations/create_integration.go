@@ -9,16 +9,18 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/datatypes"
 )
 
-func CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -43,7 +45,7 @@ func CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := buildIntegration(canvas, req.Integration)
+	integration, err := buildIntegration(encryptor, canvas, req.Integration)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -66,17 +68,17 @@ func CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*
 	return response, nil
 }
 
-func buildIntegration(canvas *models.Canvas, integration *pb.Integration) (*models.Integration, error) {
+func buildIntegration(encryptor crypto.Encryptor, canvas *models.Canvas, integration *pb.Integration) (*models.Integration, error) {
 	t, err := validateType(integration.Spec.Type)
 	if err != nil {
 		return nil, err
 	}
 
 	if integration.Spec.Auth == nil {
-		return nil, status.Error(codes.InvalidArgument, "auth is required")
+		return nil, fmt.Errorf("auth is required")
 	}
 
-	auth, authType, err := validateAuth(integration.Spec.Auth)
+	auth, authType, err := validateAuth(encryptor, canvas, integration.Spec.Auth)
 	if err != nil {
 		return nil, err
 	}
@@ -106,18 +108,33 @@ func validateType(t pb.Integration_Type) (string, error) {
 	case pb.Integration_TYPE_GITHUB:
 		return models.IntegrationTypeGithub, nil
 	default:
-		return "", status.Error(codes.InvalidArgument, "invalid integration type")
+		return "", fmt.Errorf("invalid integration type")
 	}
 }
 
-func validateAuth(auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(encryptor crypto.Encryptor, canvas *models.Canvas, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
-			return nil, "", fmt.Errorf("token is required")
+			return nil, "", fmt.Errorf("secret is required")
 		}
 
-		// TODO: validate secret existence
+		name := auth.Token.ValueFrom.Secret.Name
+		provider, err := secrets.NewProvider(encryptor, name, canvas.ID.String())
+		if err != nil {
+			return nil, "", err
+		}
+
+		values, err := provider.Load(context.TODO())
+		if err != nil {
+			return nil, "", fmt.Errorf("error loading values for secret %s: %v", name, err)
+		}
+
+		key := auth.Token.ValueFrom.Secret.Key
+		_, ok := values[key]
+		if !ok {
+			return nil, "", fmt.Errorf("key %s not found in secret %s", key, name)
+		}
 
 		return &models.IntegrationAuth{
 			Token: &models.IntegrationAuthToken{
@@ -134,7 +151,7 @@ func validateAuth(auth *pb.Integration_Auth) (*models.IntegrationAuth, string, e
 		return nil, models.IntegrationAuthTypeOIDC, nil
 
 	default:
-		return nil, "", status.Error(codes.InvalidArgument, "invalid auth type")
+		return nil, "", fmt.Errorf("invalid auth type")
 	}
 }
 
@@ -163,7 +180,7 @@ func serializeIntegrationAuth(authType string, auth models.IntegrationAuth) *pb.
 	switch authType {
 	case models.IntegrationAuthTypeToken:
 		return &pb.Integration_Auth{
-			Use: pb.Integration_AUTH_TYPE_TOKEN,
+			Use: integrationAuthTypeToProto(authType),
 			Token: &pb.Integration_Auth_Token{
 				ValueFrom: &pb.ValueFrom{
 					Secret: &pb.ValueFromSecret{

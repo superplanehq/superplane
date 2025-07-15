@@ -5,24 +5,28 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
 type LocalProvider struct {
-	tx      *gorm.DB
-	options Options
+	tx        *gorm.DB
+	encryptor crypto.Encryptor
+	record    *models.Secret
 }
 
-func NewLocalProvider(tx *gorm.DB, options Options) *LocalProvider {
+func NewLocalProvider(tx *gorm.DB, encryptor crypto.Encryptor, record *models.Secret) *LocalProvider {
 	return &LocalProvider{
-		tx:      tx,
-		options: options,
+		tx:        tx,
+		encryptor: encryptor,
+		record:    record,
 	}
 }
 
-func (p *LocalProvider) Get(ctx context.Context) (map[string]string, error) {
-	name := p.options.SecretName
-	decrypted, err := p.options.Encryptor.Decrypt(context.TODO(), p.options.SecretData, []byte(name))
+func (p *LocalProvider) Load(ctx context.Context) (map[string]string, error) {
+	name := p.record.Name
+	decrypted, err := p.encryptor.Decrypt(context.TODO(), p.record.Data, []byte(name))
 	if err != nil {
 		return nil, fmt.Errorf("error decrypting secret %s: %v", name, err)
 	}

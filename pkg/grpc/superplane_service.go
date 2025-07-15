@@ -123,7 +123,7 @@ func (s *SuperplaneService) ListConnectionGroupFieldSets(ctx context.Context, re
 }
 
 func (s *SuperplaneService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
-	return integrations.CreateIntegration(ctx, req)
+	return integrations.CreateIntegration(ctx, s.encryptor, req)
 }
 
 func (s *SuperplaneService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {

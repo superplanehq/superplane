@@ -2,11 +2,11 @@ package integrations
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
 const (
@@ -35,33 +35,20 @@ type Resource interface {
 func NewIntegration(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (Integration, error) {
 	switch integration.Type {
 	case models.IntegrationTypeSemaphore:
-		//
-		// TODO: if integration can be on organization level, and integration can use secret,
-		// then secret should also be on organization level as well.
-		//
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		secret, err := models.FindSecretByName(integration.DomainID.String(), secretInfo.Name)
+		provider, err := secrets.NewProvider(encryptor, secretInfo.Name, integration.DomainID.String())
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
 
-		//
-		// TODO: this handling should account for possibly other types of secrets
-		//
-		decrypted, err := encryptor.Decrypt(ctx, secret.Data, []byte(secretInfo.Name))
+		values, err := provider.Load(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error loading values for secret %s: %v", secretInfo.Name, err)
 		}
 
-		var keys map[string]string
-		err = json.Unmarshal(decrypted, &keys)
-		if err != nil {
-			return nil, err
-		}
-
-		token, ok := keys[secretInfo.Key]
+		token, ok := values[secretInfo.Key]
 		if !ok {
-			return nil, fmt.Errorf("secret %s does not contain key %s", secretInfo.Name, secretInfo.Key)
+			return nil, fmt.Errorf("key %s not found in secret %s: %v", secretInfo.Key, secretInfo.Name, err)
 		}
 
 		return NewSemaphoreIntegration(integration.URL, token)

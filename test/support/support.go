@@ -76,15 +76,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 
 	if options.Integration {
-		secretData := map[string]string{"key": "test"}
-		data, err := json.Marshal(secretData)
+		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
-
-		secret, err := models.CreateSecret(randomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
-		require.NoError(t, err)
-
 		integration, err := models.CreateIntegration(&models.Integration{
-			Name:       randomName("integration"),
+			Name:       RandomName("integration"),
 			CreatedBy:  r.User,
 			Type:       models.IntegrationTypeSemaphore,
 			DomainType: "canvas",
@@ -261,6 +256,14 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	}
 }
 
-func randomName(prefix string) string {
+func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	require.NoError(t, err)
+	return secret, nil
+}
+
+func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }
