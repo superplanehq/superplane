@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/crypto"
 
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
@@ -18,14 +17,14 @@ import (
 
 func Test__CreateIntegration(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
-	encryptor := &crypto.NoOpEncryptor{}
+	defer r.Close()
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	secret, err := support.CreateSecret(t, r, map[string]string{"key": "value"})
 	require.NoError(t, err)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CreateIntegration(context.Background(), encryptor, &protos.CreateIntegrationRequest{})
+		_, err := CreateIntegration(context.Background(), r.Encryptor, &protos.CreateIntegrationRequest{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -37,7 +36,7 @@ func Test__CreateIntegration(t *testing.T) {
 			CanvasIdOrName: uuid.New().String(),
 		}
 
-		_, err := CreateIntegration(ctx, encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -54,7 +53,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -72,7 +71,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -103,7 +102,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -134,7 +133,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err = CreateIntegration(ctx, encryptor, req)
+		_, err = CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -165,7 +164,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		integration, err := CreateIntegration(ctx, encryptor, req)
+		integration, err := CreateIntegration(ctx, r.Encryptor, req)
 		require.NoError(t, err)
 		assert.Equal(t, "test", integration.Integration.Metadata.Name)
 	})
@@ -194,7 +193,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

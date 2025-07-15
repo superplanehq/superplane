@@ -34,7 +34,7 @@ func DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest
 	}
 
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "integration not found")
+		return nil, status.Error(codes.NotFound, "integration not found")
 	}
 
 	response := &pb.DescribeIntegrationResponse{

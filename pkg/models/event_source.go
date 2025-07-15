@@ -56,6 +56,20 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	return &eventSource, nil
 }
 
+func FindEventSourceByResourceID(resourceID uuid.UUID) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("resource_id = ?", resourceID).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
 func (c *Canvas) ListEventSources() ([]EventSource, error) {
 	var sources []EventSource
 	err := database.Conn().

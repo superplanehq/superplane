@@ -1,11 +1,15 @@
 package workers
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -19,6 +23,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		Integration: true,
 	})
 
+	defer r.Close()
 	w := NewPendingEventsWorker(r.Encryptor)
 
 	eventData := []byte(`{"ref":"v1"}`)
@@ -360,5 +365,63 @@ func Test__PendingEventsWorker(t *testing.T) {
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
+	})
+
+	t.Run("execution resource is updated", func(t *testing.T) {
+		//
+		// Create pending execution resource
+		//
+		workflowID := uuid.New().String()
+		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-7", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
+			{
+				SourceID:   r.Source.ID,
+				SourceType: models.SourceTypeEventSource,
+			},
+		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		require.NoError(t, err)
+		execution := support.CreateExecution(t, r.Source, stage)
+		_, err = execution.AddResource(workflowID, resource.ID)
+		require.NoError(t, err)
+
+		//
+		// Create a Semaphore hook event for the source created for the execution,
+		// and trigger the worker.
+		//
+		hook := executors.SemaphoreHook{
+			Workflow: executors.SemaphoreHookWorkflow{
+				ID: workflowID,
+			},
+			Pipeline: executors.SemaphoreHookPipeline{
+				ID:     uuid.New().String(),
+				State:  integrations.SemaphorePipelineStateDone,
+				Result: integrations.SemaphorePipelineResultPassed,
+			},
+		}
+
+		eventData, err := json.Marshal(hook)
+		require.NoError(t, err)
+		source, err := models.FindEventSourceByResourceID(resource.ID)
+		require.NoError(t, err)
+		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
+		require.NoError(t, err)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Event is discarded, since the event source used by the executor cannot be used as a connection.
+		//
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateDiscarded, event.State)
+
+		//
+		// The execution resource has its state updated.
+		//
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		resource := resources[0]
+		assert.Equal(t, models.ExecutionFinished, resource.State)
+		assert.Equal(t, models.ResultPassed, resource.Result)
 	})
 }
