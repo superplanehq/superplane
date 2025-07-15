@@ -265,6 +265,38 @@
         ]
       }
     },
+    "/api/v1/authorization/canvases/{canvasIdOrName}/users": {
+      "get": {
+        "summary": "Get canvas users",
+        "description": "Returns all users that have roles within a canvas",
+        "operationId": "Authorization_GetCanvasUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetCanvasUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
     "/api/v1/authorization/groups": {
       "get": {
         "summary": "List organization groups",
@@ -479,6 +511,38 @@
             "name": "organizationId",
             "in": "query",
             "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/authorization/organizations/{organizationId}/users": {
+      "get": {
+        "summary": "Get organization users",
+        "description": "Returns all users that have roles within an organization",
+        "operationId": "Authorization_GetOrganizationUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetOrganizationUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "path",
+            "required": true,
             "type": "string"
           }
         ],
@@ -1958,6 +2022,37 @@
     }
   },
   "definitions": {
+    "AuthorizationAccountProvider": {
+      "type": "object",
+      "properties": {
+        "providerType": {
+          "type": "string",
+          "title": "e.g., \"google\", \"github\", \"email\""
+        },
+        "providerId": {
+          "type": "string",
+          "title": "unique ID from the provider"
+        },
+        "email": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isPrimary": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      }
+    },
     "AuthorizationAddUserToCanvasGroupBody": {
       "type": "object",
       "properties": {
@@ -2006,6 +2101,12 @@
         },
         "role": {
           "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       },
       "title": "Canvas group management messages"
@@ -2028,6 +2129,12 @@
           "type": "string"
         },
         "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         }
       },
@@ -2061,6 +2168,12 @@
           }
         },
         "inheritedRole": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         }
       },
@@ -2112,6 +2225,18 @@
         }
       }
     },
+    "AuthorizationGetCanvasUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationUser"
+          }
+        }
+      }
+    },
     "AuthorizationGetOrganizationGroupResponse": {
       "type": "object",
       "properties": {
@@ -2131,6 +2256,18 @@
         },
         "group": {
           "$ref": "#/definitions/AuthorizationGroup"
+        }
+      }
+    },
+    "AuthorizationGetOrganizationUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationUser"
+          }
         }
       }
     },
@@ -2168,6 +2305,12 @@
           "type": "string"
         },
         "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         }
       },
@@ -2282,6 +2425,12 @@
         },
         "inheritedRole": {
           "$ref": "#/definitions/AuthorizationRole"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
@@ -2317,11 +2466,91 @@
         },
         "inheritedRole": {
           "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
         }
       }
     },
     "AuthorizationUpdateRoleResponse": {
       "type": "object"
+    },
+    "AuthorizationUser": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        },
+        "lastLoginAt": {
+          "type": "string"
+        },
+        "roleAssignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationUserRoleAssignment"
+          }
+        },
+        "accountProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationAccountProvider"
+          }
+        }
+      }
+    },
+    "AuthorizationUserRoleAssignment": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string"
+        },
+        "roleDisplayName": {
+          "type": "string"
+        },
+        "roleDescription": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "domainName": {
+          "type": "string",
+          "title": "e.g., organization name or canvas name"
+        },
+        "assignedAt": {
+          "type": "string"
+        },
+        "assignedBy": {
+          "type": "string",
+          "title": "user ID of who assigned this role"
+        }
+      }
     },
     "ConnectionDataFilter": {
       "type": "object",

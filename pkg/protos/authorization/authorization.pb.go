@@ -775,6 +775,8 @@ type CreateOrganizationGroupRequest struct {
 	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
 	Role           string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -826,6 +828,20 @@ func (x *CreateOrganizationGroupRequest) GetGroupName() string {
 func (x *CreateOrganizationGroupRequest) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+func (x *CreateOrganizationGroupRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *CreateOrganizationGroupRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -1361,6 +1377,8 @@ type CreateCanvasGroupRequest struct {
 	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
 	Role           string                 `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
+	DisplayName    string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description    string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1412,6 +1430,20 @@ func (x *CreateCanvasGroupRequest) GetGroupName() string {
 func (x *CreateCanvasGroupRequest) GetRole() string {
 	if x != nil {
 		return x.Role
+	}
+	return ""
+}
+
+func (x *CreateCanvasGroupRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *CreateCanvasGroupRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -1940,6 +1972,184 @@ func (x *GetCanvasGroupResponse) GetGroup() *Group {
 	return nil
 }
 
+// Organization users messages
+type GetOrganizationUsersRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetOrganizationUsersRequest) Reset() {
+	*x = GetOrganizationUsersRequest{}
+	mi := &file_authorization_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOrganizationUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOrganizationUsersRequest) ProtoMessage() {}
+
+func (x *GetOrganizationUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOrganizationUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetOrganizationUsersRequest) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *GetOrganizationUsersRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
+type GetOrganizationUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetOrganizationUsersResponse) Reset() {
+	*x = GetOrganizationUsersResponse{}
+	mi := &file_authorization_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetOrganizationUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetOrganizationUsersResponse) ProtoMessage() {}
+
+func (x *GetOrganizationUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetOrganizationUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetOrganizationUsersResponse) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *GetOrganizationUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
+// Canvas users messages
+type GetCanvasUsersRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetCanvasUsersRequest) Reset() {
+	*x = GetCanvasUsersRequest{}
+	mi := &file_authorization_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCanvasUsersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCanvasUsersRequest) ProtoMessage() {}
+
+func (x *GetCanvasUsersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCanvasUsersRequest.ProtoReflect.Descriptor instead.
+func (*GetCanvasUsersRequest) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *GetCanvasUsersRequest) GetCanvasIdOrName() string {
+	if x != nil {
+		return x.CanvasIdOrName
+	}
+	return ""
+}
+
+type GetCanvasUsersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Users         []*User                `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCanvasUsersResponse) Reset() {
+	*x = GetCanvasUsersResponse{}
+	mi := &file_authorization_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCanvasUsersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCanvasUsersResponse) ProtoMessage() {}
+
+func (x *GetCanvasUsersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCanvasUsersResponse.ProtoReflect.Descriptor instead.
+func (*GetCanvasUsersResponse) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *GetCanvasUsersResponse) GetUsers() []*User {
+	if x != nil {
+		return x.Users
+	}
+	return nil
+}
+
 // Custom role management messages
 type CreateRoleRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1948,13 +2158,15 @@ type CreateRoleRequest struct {
 	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	Permissions   []*Permission          `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	InheritedRole string                 `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,6,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description   string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateRoleRequest) Reset() {
 	*x = CreateRoleRequest{}
-	mi := &file_authorization_proto_msgTypes[37]
+	mi := &file_authorization_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1966,7 +2178,7 @@ func (x *CreateRoleRequest) String() string {
 func (*CreateRoleRequest) ProtoMessage() {}
 
 func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[37]
+	mi := &file_authorization_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1979,7 +2191,7 @@ func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoleRequest.ProtoReflect.Descriptor instead.
 func (*CreateRoleRequest) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{37}
+	return file_authorization_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *CreateRoleRequest) GetName() string {
@@ -2017,6 +2229,20 @@ func (x *CreateRoleRequest) GetInheritedRole() string {
 	return ""
 }
 
+func (x *CreateRoleRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *CreateRoleRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type CreateRoleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2025,7 +2251,7 @@ type CreateRoleResponse struct {
 
 func (x *CreateRoleResponse) Reset() {
 	*x = CreateRoleResponse{}
-	mi := &file_authorization_proto_msgTypes[38]
+	mi := &file_authorization_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2037,7 +2263,7 @@ func (x *CreateRoleResponse) String() string {
 func (*CreateRoleResponse) ProtoMessage() {}
 
 func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[38]
+	mi := &file_authorization_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2050,7 +2276,7 @@ func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoleResponse.ProtoReflect.Descriptor instead.
 func (*CreateRoleResponse) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{38}
+	return file_authorization_proto_rawDescGZIP(), []int{42}
 }
 
 type UpdateRoleRequest struct {
@@ -2060,13 +2286,15 @@ type UpdateRoleRequest struct {
 	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	Permissions   []*Permission          `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	InheritedRole string                 `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,6,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description   string                 `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateRoleRequest) Reset() {
 	*x = UpdateRoleRequest{}
-	mi := &file_authorization_proto_msgTypes[39]
+	mi := &file_authorization_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2078,7 +2306,7 @@ func (x *UpdateRoleRequest) String() string {
 func (*UpdateRoleRequest) ProtoMessage() {}
 
 func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[39]
+	mi := &file_authorization_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2091,7 +2319,7 @@ func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRoleRequest) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{39}
+	return file_authorization_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *UpdateRoleRequest) GetRoleName() string {
@@ -2129,6 +2357,20 @@ func (x *UpdateRoleRequest) GetInheritedRole() string {
 	return ""
 }
 
+func (x *UpdateRoleRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UpdateRoleRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type UpdateRoleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -2137,7 +2379,7 @@ type UpdateRoleResponse struct {
 
 func (x *UpdateRoleResponse) Reset() {
 	*x = UpdateRoleResponse{}
-	mi := &file_authorization_proto_msgTypes[40]
+	mi := &file_authorization_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2149,7 +2391,7 @@ func (x *UpdateRoleResponse) String() string {
 func (*UpdateRoleResponse) ProtoMessage() {}
 
 func (x *UpdateRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[40]
+	mi := &file_authorization_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2162,7 +2404,7 @@ func (x *UpdateRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRoleResponse) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{40}
+	return file_authorization_proto_rawDescGZIP(), []int{44}
 }
 
 type DeleteRoleRequest struct {
@@ -2176,7 +2418,7 @@ type DeleteRoleRequest struct {
 
 func (x *DeleteRoleRequest) Reset() {
 	*x = DeleteRoleRequest{}
-	mi := &file_authorization_proto_msgTypes[41]
+	mi := &file_authorization_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2188,7 +2430,7 @@ func (x *DeleteRoleRequest) String() string {
 func (*DeleteRoleRequest) ProtoMessage() {}
 
 func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[41]
+	mi := &file_authorization_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2201,7 +2443,7 @@ func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRoleRequest) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{41}
+	return file_authorization_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *DeleteRoleRequest) GetRoleName() string {
@@ -2233,7 +2475,7 @@ type DeleteRoleResponse struct {
 
 func (x *DeleteRoleResponse) Reset() {
 	*x = DeleteRoleResponse{}
-	mi := &file_authorization_proto_msgTypes[42]
+	mi := &file_authorization_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2245,7 +2487,7 @@ func (x *DeleteRoleResponse) String() string {
 func (*DeleteRoleResponse) ProtoMessage() {}
 
 func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[42]
+	mi := &file_authorization_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2258,7 +2500,7 @@ func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{42}
+	return file_authorization_proto_rawDescGZIP(), []int{46}
 }
 
 // Core data structures
@@ -2268,13 +2510,15 @@ type Group struct {
 	DomainType    DomainType             `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                 `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Group) Reset() {
 	*x = Group{}
-	mi := &file_authorization_proto_msgTypes[43]
+	mi := &file_authorization_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2286,7 +2530,7 @@ func (x *Group) String() string {
 func (*Group) ProtoMessage() {}
 
 func (x *Group) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[43]
+	mi := &file_authorization_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2299,7 +2543,7 @@ func (x *Group) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Group.ProtoReflect.Descriptor instead.
 func (*Group) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{43}
+	return file_authorization_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *Group) GetName() string {
@@ -2330,19 +2574,351 @@ func (x *Group) GetRole() string {
 	return ""
 }
 
+func (x *Group) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *Group) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+type User struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	UserId           string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DisplayName      string                 `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Email            string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	AvatarUrl        string                 `protobuf:"bytes,4,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	IsActive         bool                   `protobuf:"varint,5,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
+	CreatedAt        string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt        string                 `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	LastLoginAt      string                 `protobuf:"bytes,8,opt,name=last_login_at,json=lastLoginAt,proto3" json:"last_login_at,omitempty"`
+	RoleAssignments  []*UserRoleAssignment  `protobuf:"bytes,9,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
+	AccountProviders []*AccountProvider     `protobuf:"bytes,10,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *User) Reset() {
+	*x = User{}
+	mi := &file_authorization_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *User) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*User) ProtoMessage() {}
+
+func (x *User) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use User.ProtoReflect.Descriptor instead.
+func (*User) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *User) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *User) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *User) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *User) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *User) GetIsActive() bool {
+	if x != nil {
+		return x.IsActive
+	}
+	return false
+}
+
+func (x *User) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *User) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
+func (x *User) GetLastLoginAt() string {
+	if x != nil {
+		return x.LastLoginAt
+	}
+	return ""
+}
+
+func (x *User) GetRoleAssignments() []*UserRoleAssignment {
+	if x != nil {
+		return x.RoleAssignments
+	}
+	return nil
+}
+
+func (x *User) GetAccountProviders() []*AccountProvider {
+	if x != nil {
+		return x.AccountProviders
+	}
+	return nil
+}
+
+type UserRoleAssignment struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoleName        string                 `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	RoleDisplayName string                 `protobuf:"bytes,2,opt,name=role_display_name,json=roleDisplayName,proto3" json:"role_display_name,omitempty"`
+	RoleDescription string                 `protobuf:"bytes,3,opt,name=role_description,json=roleDescription,proto3" json:"role_description,omitempty"`
+	DomainType      DomainType             `protobuf:"varint,4,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId        string                 `protobuf:"bytes,5,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	DomainName      string                 `protobuf:"bytes,6,opt,name=domain_name,json=domainName,proto3" json:"domain_name,omitempty"` // e.g., organization name or canvas name
+	AssignedAt      string                 `protobuf:"bytes,7,opt,name=assigned_at,json=assignedAt,proto3" json:"assigned_at,omitempty"`
+	AssignedBy      string                 `protobuf:"bytes,8,opt,name=assigned_by,json=assignedBy,proto3" json:"assigned_by,omitempty"` // user ID of who assigned this role
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UserRoleAssignment) Reset() {
+	*x = UserRoleAssignment{}
+	mi := &file_authorization_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserRoleAssignment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserRoleAssignment) ProtoMessage() {}
+
+func (x *UserRoleAssignment) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserRoleAssignment.ProtoReflect.Descriptor instead.
+func (*UserRoleAssignment) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *UserRoleAssignment) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetRoleDisplayName() string {
+	if x != nil {
+		return x.RoleDisplayName
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetRoleDescription() string {
+	if x != nil {
+		return x.RoleDescription
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetDomainType() DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return DomainType_DOMAIN_TYPE_UNSPECIFIED
+}
+
+func (x *UserRoleAssignment) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetDomainName() string {
+	if x != nil {
+		return x.DomainName
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetAssignedAt() string {
+	if x != nil {
+		return x.AssignedAt
+	}
+	return ""
+}
+
+func (x *UserRoleAssignment) GetAssignedBy() string {
+	if x != nil {
+		return x.AssignedBy
+	}
+	return ""
+}
+
+type AccountProvider struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProviderType  string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"` // e.g., "google", "github", "email"
+	ProviderId    string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`       // unique ID from the provider
+	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	AvatarUrl     string                 `protobuf:"bytes,5,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
+	IsPrimary     bool                   `protobuf:"varint,6,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountProvider) Reset() {
+	*x = AccountProvider{}
+	mi := &file_authorization_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountProvider) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountProvider) ProtoMessage() {}
+
+func (x *AccountProvider) ProtoReflect() protoreflect.Message {
+	mi := &file_authorization_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountProvider.ProtoReflect.Descriptor instead.
+func (*AccountProvider) Descriptor() ([]byte, []int) {
+	return file_authorization_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *AccountProvider) GetProviderType() string {
+	if x != nil {
+		return x.ProviderType
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetAvatarUrl() string {
+	if x != nil {
+		return x.AvatarUrl
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetIsPrimary() bool {
+	if x != nil {
+		return x.IsPrimary
+	}
+	return false
+}
+
+func (x *AccountProvider) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *AccountProvider) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return ""
+}
+
 type Role struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	DomainType    DomainType             `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	Permissions   []*Permission          `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
 	InheritedRole *Role                  `protobuf:"bytes,4,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	DisplayName   string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_authorization_proto_msgTypes[44]
+	mi := &file_authorization_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2354,7 +2930,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[44]
+	mi := &file_authorization_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2367,7 +2943,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{44}
+	return file_authorization_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *Role) GetName() string {
@@ -2398,6 +2974,20 @@ func (x *Role) GetInheritedRole() *Role {
 	return nil
 }
 
+func (x *Role) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *Role) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
 type Permission struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
@@ -2409,7 +2999,7 @@ type Permission struct {
 
 func (x *Permission) Reset() {
 	*x = Permission{}
-	mi := &file_authorization_proto_msgTypes[45]
+	mi := &file_authorization_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2421,7 +3011,7 @@ func (x *Permission) String() string {
 func (*Permission) ProtoMessage() {}
 
 func (x *Permission) ProtoReflect() protoreflect.Message {
-	mi := &file_authorization_proto_msgTypes[45]
+	mi := &file_authorization_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2434,7 +3024,7 @@ func (x *Permission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Permission.ProtoReflect.Descriptor instead.
 func (*Permission) Descriptor() ([]byte, []int) {
-	return file_authorization_proto_rawDescGZIP(), []int{45}
+	return file_authorization_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *Permission) GetResource() string {
@@ -2510,12 +3100,14 @@ const file_authorization_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x124\n" +
-	"\x05roles\x18\x04 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"|\n" +
+	"\x05roles\x18\x04 \x03(\v2\x1e.Superplane.Authorization.RoleR\x05roles\"\xc1\x01\n" +
 	"\x1eCreateOrganizationGroupRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"X\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12!\n" +
+	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\"X\n" +
 	"\x1fCreateOrganizationGroupResponse\x125\n" +
 	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x84\x01\n" +
 	"!AddUserToOrganizationGroupRequest\x12'\n" +
@@ -2546,12 +3138,14 @@ const file_authorization_proto_rawDesc = "" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"U\n" +
 	"\x1cGetOrganizationGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"x\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\xbd\x01\n" +
 	"\x18CreateCanvasGroupRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"R\n" +
+	"\x04role\x18\x03 \x01(\tR\x04role\x12!\n" +
+	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\"R\n" +
 	"\x19CreateCanvasGroupResponse\x125\n" +
 	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x80\x01\n" +
 	"\x1bAddUserToCanvasGroupRequest\x12)\n" +
@@ -2582,41 +3176,99 @@ const file_authorization_proto_rawDesc = "" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"O\n" +
 	"\x16GetCanvasGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\xfa\x01\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"F\n" +
+	"\x1bGetOrganizationUsersRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"T\n" +
+	"\x1cGetOrganizationUsersResponse\x124\n" +
+	"\x05users\x18\x01 \x03(\v2\x1e.Superplane.Authorization.UserR\x05users\"B\n" +
+	"\x15GetCanvasUsersRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"N\n" +
+	"\x16GetCanvasUsersResponse\x124\n" +
+	"\x05users\x18\x01 \x03(\v2\x1e.Superplane.Authorization.UserR\x05users\"\xbf\x02\n" +
 	"\x11CreateRoleRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
 	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
-	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\"\x14\n" +
-	"\x12CreateRoleResponse\"\x83\x02\n" +
+	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\x12!\n" +
+	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\"\x14\n" +
+	"\x12CreateRoleResponse\"\xc8\x02\n" +
 	"\x11UpdateRoleRequest\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
 	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
-	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\"\x14\n" +
+	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\x12!\n" +
+	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\a \x01(\tR\vdescription\"\x14\n" +
 	"\x12UpdateRoleResponse\"\x94\x01\n" +
 	"\x11DeleteRoleRequest\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\x14\n" +
-	"\x12DeleteRoleResponse\"\x93\x01\n" +
+	"\x12DeleteRoleResponse\"\xd8\x01\n" +
 	"\x05Group\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12\x12\n" +
-	"\x04role\x18\x04 \x01(\tR\x04role\"\xf0\x01\n" +
+	"\x04role\x18\x04 \x01(\tR\x04role\x12!\n" +
+	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\"\xa7\x03\n" +
+	"\x04User\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x04 \x01(\tR\tavatarUrl\x12\x1b\n" +
+	"\tis_active\x18\x05 \x01(\bR\bisActive\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\a \x01(\tR\tupdatedAt\x12\"\n" +
+	"\rlast_login_at\x18\b \x01(\tR\vlastLoginAt\x12W\n" +
+	"\x10role_assignments\x18\t \x03(\v2,.Superplane.Authorization.UserRoleAssignmentR\x0froleAssignments\x12V\n" +
+	"\x11account_providers\x18\n" +
+	" \x03(\v2).Superplane.Authorization.AccountProviderR\x10accountProviders\"\xcf\x02\n" +
+	"\x12UserRoleAssignment\x12\x1b\n" +
+	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +
+	"\x11role_display_name\x18\x02 \x01(\tR\x0froleDisplayName\x12)\n" +
+	"\x10role_description\x18\x03 \x01(\tR\x0froleDescription\x12E\n" +
+	"\vdomain_type\x18\x04 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x05 \x01(\tR\bdomainId\x12\x1f\n" +
+	"\vdomain_name\x18\x06 \x01(\tR\n" +
+	"domainName\x12\x1f\n" +
+	"\vassigned_at\x18\a \x01(\tR\n" +
+	"assignedAt\x12\x1f\n" +
+	"\vassigned_by\x18\b \x01(\tR\n" +
+	"assignedBy\"\x8c\x02\n" +
+	"\x0fAccountProvider\x12#\n" +
+	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x1f\n" +
+	"\vprovider_id\x18\x02 \x01(\tR\n" +
+	"providerId\x12\x14\n" +
+	"\x05email\x18\x03 \x01(\tR\x05email\x12!\n" +
+	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1d\n" +
+	"\n" +
+	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\x12\x1d\n" +
+	"\n" +
+	"is_primary\x18\x06 \x01(\bR\tisPrimary\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\a \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\b \x01(\tR\tupdatedAt\"\xb5\x02\n" +
 	"\x04Role\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12F\n" +
 	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12E\n" +
-	"\x0einherited_role\x18\x04 \x01(\v2\x1e.Superplane.Authorization.RoleR\rinheritedRole\"\x87\x01\n" +
+	"\x0einherited_role\x18\x04 \x01(\v2\x1e.Superplane.Authorization.RoleR\rinheritedRole\x12!\n" +
+	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\"\x87\x01\n" +
 	"\n" +
 	"Permission\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x16\n" +
@@ -2627,7 +3279,7 @@ const file_authorization_proto_rawDesc = "" +
 	"DomainType\x12\x1b\n" +
 	"\x17DOMAIN_TYPE_UNSPECIFIED\x10\x00\x12\x1c\n" +
 	"\x18DOMAIN_TYPE_ORGANIZATION\x10\x01\x12\x16\n" +
-	"\x12DOMAIN_TYPE_CANVAS\x10\x022\xc4.\n" +
+	"\x12DOMAIN_TYPE_CANVAS\x10\x022\x863\n" +
 	"\rAuthorization\x12\xa4\x02\n" +
 	"\x13ListUserPermissions\x124.Superplane.Authorization.ListUserPermissionsRequest\x1a5.Superplane.Authorization.ListUserPermissionsResponse\"\x9f\x01\x92Ac\n" +
 	"\rAuthorization\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x023\x121/api/v1/authorization/users/{user_id}/permissions\x12\xf1\x01\n" +
@@ -2667,7 +3319,11 @@ const file_authorization_proto_rawDesc = "" +
 	"\x14GetOrganizationGroup\x125.Superplane.Authorization.GetOrganizationGroupRequest\x1a6.Superplane.Authorization.GetOrganizationGroupResponse\"\x97\x01\x92Ac\n" +
 	"\rAuthorization\x12\x16Get organization group\x1a:Returns details of a specific group within an organization\x82\xd3\xe4\x93\x02+\x12)/api/v1/authorization/groups/{group_name}\x12\x9d\x02\n" +
 	"\x0eGetCanvasGroup\x12/.Superplane.Authorization.GetCanvasGroupRequest\x1a0.Superplane.Authorization.GetCanvasGroupResponse\"\xa7\x01\x92AV\n" +
-	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}\x12\xe4\x01\n" +
+	"\rAuthorization\x12\x10Get canvas group\x1a3Returns details of a specific group within a canvas\x82\xd3\xe4\x93\x02H\x12F/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}\x12\xaf\x02\n" +
+	"\x14GetOrganizationUsers\x125.Superplane.Authorization.GetOrganizationUsersRequest\x1a6.Superplane.Authorization.GetOrganizationUsersResponse\"\xa7\x01\x92Aa\n" +
+	"\rAuthorization\x12\x16Get organization users\x1a8Returns all users that have roles within an organization\x82\xd3\xe4\x93\x02=\x12;/api/v1/authorization/organizations/{organization_id}/users\x12\x8d\x02\n" +
+	"\x0eGetCanvasUsers\x12/.Superplane.Authorization.GetCanvasUsersRequest\x1a0.Superplane.Authorization.GetCanvasUsersResponse\"\x97\x01\x92AT\n" +
+	"\rAuthorization\x12\x10Get canvas users\x1a1Returns all users that have roles within a canvas\x82\xd3\xe4\x93\x02:\x128/api/v1/authorization/canvases/{canvas_id_or_name}/users\x12\xe4\x01\n" +
 	"\n" +
 	"CreateRole\x12+.Superplane.Authorization.CreateRoleRequest\x1a,.Superplane.Authorization.CreateRoleResponse\"{\x92AR\n" +
 	"\rAuthorization\x12\vCreate role\x1a4Creates a new custom role with specified permissions\x82\xd3\xe4\x93\x02 :\x01*\"\x1b/api/v1/authorization/roles\x12\xf1\x01\n" +
@@ -2693,7 +3349,7 @@ func file_authorization_proto_rawDescGZIP() []byte {
 }
 
 var file_authorization_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_authorization_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
+var file_authorization_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_authorization_proto_goTypes = []any{
 	(DomainType)(0),                                 // 0: Superplane.Authorization.DomainType
 	(*ListUserPermissionsRequest)(nil),              // 1: Superplane.Authorization.ListUserPermissionsRequest
@@ -2733,95 +3389,111 @@ var file_authorization_proto_goTypes = []any{
 	(*GetCanvasGroupUsersResponse)(nil),             // 35: Superplane.Authorization.GetCanvasGroupUsersResponse
 	(*GetCanvasGroupRequest)(nil),                   // 36: Superplane.Authorization.GetCanvasGroupRequest
 	(*GetCanvasGroupResponse)(nil),                  // 37: Superplane.Authorization.GetCanvasGroupResponse
-	(*CreateRoleRequest)(nil),                       // 38: Superplane.Authorization.CreateRoleRequest
-	(*CreateRoleResponse)(nil),                      // 39: Superplane.Authorization.CreateRoleResponse
-	(*UpdateRoleRequest)(nil),                       // 40: Superplane.Authorization.UpdateRoleRequest
-	(*UpdateRoleResponse)(nil),                      // 41: Superplane.Authorization.UpdateRoleResponse
-	(*DeleteRoleRequest)(nil),                       // 42: Superplane.Authorization.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),                      // 43: Superplane.Authorization.DeleteRoleResponse
-	(*Group)(nil),                                   // 44: Superplane.Authorization.Group
-	(*Role)(nil),                                    // 45: Superplane.Authorization.Role
-	(*Permission)(nil),                              // 46: Superplane.Authorization.Permission
+	(*GetOrganizationUsersRequest)(nil),             // 38: Superplane.Authorization.GetOrganizationUsersRequest
+	(*GetOrganizationUsersResponse)(nil),            // 39: Superplane.Authorization.GetOrganizationUsersResponse
+	(*GetCanvasUsersRequest)(nil),                   // 40: Superplane.Authorization.GetCanvasUsersRequest
+	(*GetCanvasUsersResponse)(nil),                  // 41: Superplane.Authorization.GetCanvasUsersResponse
+	(*CreateRoleRequest)(nil),                       // 42: Superplane.Authorization.CreateRoleRequest
+	(*CreateRoleResponse)(nil),                      // 43: Superplane.Authorization.CreateRoleResponse
+	(*UpdateRoleRequest)(nil),                       // 44: Superplane.Authorization.UpdateRoleRequest
+	(*UpdateRoleResponse)(nil),                      // 45: Superplane.Authorization.UpdateRoleResponse
+	(*DeleteRoleRequest)(nil),                       // 46: Superplane.Authorization.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),                      // 47: Superplane.Authorization.DeleteRoleResponse
+	(*Group)(nil),                                   // 48: Superplane.Authorization.Group
+	(*User)(nil),                                    // 49: Superplane.Authorization.User
+	(*UserRoleAssignment)(nil),                      // 50: Superplane.Authorization.UserRoleAssignment
+	(*AccountProvider)(nil),                         // 51: Superplane.Authorization.AccountProvider
+	(*Role)(nil),                                    // 52: Superplane.Authorization.Role
+	(*Permission)(nil),                              // 53: Superplane.Authorization.Permission
 }
 var file_authorization_proto_depIdxs = []int32{
 	0,  // 0: Superplane.Authorization.ListUserPermissionsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 1: Superplane.Authorization.ListUserPermissionsResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	46, // 2: Superplane.Authorization.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
+	53, // 2: Superplane.Authorization.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
 	7,  // 3: Superplane.Authorization.AssignRoleRequest.role_assignment:type_name -> Superplane.Authorization.RoleAssignment
 	7,  // 4: Superplane.Authorization.RemoveRoleRequest.role_assignment:type_name -> Superplane.Authorization.RoleAssignment
 	0,  // 5: Superplane.Authorization.RoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 6: Superplane.Authorization.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	45, // 7: Superplane.Authorization.ListRolesResponse.roles:type_name -> Superplane.Authorization.Role
+	52, // 7: Superplane.Authorization.ListRolesResponse.roles:type_name -> Superplane.Authorization.Role
 	0,  // 8: Superplane.Authorization.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	45, // 9: Superplane.Authorization.DescribeRoleResponse.role:type_name -> Superplane.Authorization.Role
+	52, // 9: Superplane.Authorization.DescribeRoleResponse.role:type_name -> Superplane.Authorization.Role
 	0,  // 10: Superplane.Authorization.GetUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	0,  // 11: Superplane.Authorization.GetUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	45, // 12: Superplane.Authorization.GetUserRolesResponse.roles:type_name -> Superplane.Authorization.Role
-	44, // 13: Superplane.Authorization.CreateOrganizationGroupResponse.group:type_name -> Superplane.Authorization.Group
-	44, // 14: Superplane.Authorization.ListOrganizationGroupsResponse.groups:type_name -> Superplane.Authorization.Group
-	44, // 15: Superplane.Authorization.GetOrganizationGroupUsersResponse.group:type_name -> Superplane.Authorization.Group
-	44, // 16: Superplane.Authorization.GetOrganizationGroupResponse.group:type_name -> Superplane.Authorization.Group
-	44, // 17: Superplane.Authorization.CreateCanvasGroupResponse.group:type_name -> Superplane.Authorization.Group
-	44, // 18: Superplane.Authorization.ListCanvasGroupsResponse.groups:type_name -> Superplane.Authorization.Group
-	44, // 19: Superplane.Authorization.GetCanvasGroupUsersResponse.group:type_name -> Superplane.Authorization.Group
-	44, // 20: Superplane.Authorization.GetCanvasGroupResponse.group:type_name -> Superplane.Authorization.Group
-	0,  // 21: Superplane.Authorization.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	46, // 22: Superplane.Authorization.CreateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
-	0,  // 23: Superplane.Authorization.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	46, // 24: Superplane.Authorization.UpdateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
-	0,  // 25: Superplane.Authorization.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	0,  // 26: Superplane.Authorization.Group.domain_type:type_name -> Superplane.Authorization.DomainType
-	0,  // 27: Superplane.Authorization.Role.domain_type:type_name -> Superplane.Authorization.DomainType
-	46, // 28: Superplane.Authorization.Role.permissions:type_name -> Superplane.Authorization.Permission
-	45, // 29: Superplane.Authorization.Role.inherited_role:type_name -> Superplane.Authorization.Role
-	0,  // 30: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
-	1,  // 31: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
-	3,  // 32: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
-	5,  // 33: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
-	8,  // 34: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
-	10, // 35: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
-	12, // 36: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
-	14, // 37: Superplane.Authorization.Authorization.CreateOrganizationGroup:input_type -> Superplane.Authorization.CreateOrganizationGroupRequest
-	26, // 38: Superplane.Authorization.Authorization.CreateCanvasGroup:input_type -> Superplane.Authorization.CreateCanvasGroupRequest
-	16, // 39: Superplane.Authorization.Authorization.AddUserToOrganizationGroup:input_type -> Superplane.Authorization.AddUserToOrganizationGroupRequest
-	28, // 40: Superplane.Authorization.Authorization.AddUserToCanvasGroup:input_type -> Superplane.Authorization.AddUserToCanvasGroupRequest
-	18, // 41: Superplane.Authorization.Authorization.RemoveUserFromOrganizationGroup:input_type -> Superplane.Authorization.RemoveUserFromOrganizationGroupRequest
-	30, // 42: Superplane.Authorization.Authorization.RemoveUserFromCanvasGroup:input_type -> Superplane.Authorization.RemoveUserFromCanvasGroupRequest
-	20, // 43: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
-	32, // 44: Superplane.Authorization.Authorization.ListCanvasGroups:input_type -> Superplane.Authorization.ListCanvasGroupsRequest
-	22, // 45: Superplane.Authorization.Authorization.GetOrganizationGroupUsers:input_type -> Superplane.Authorization.GetOrganizationGroupUsersRequest
-	34, // 46: Superplane.Authorization.Authorization.GetCanvasGroupUsers:input_type -> Superplane.Authorization.GetCanvasGroupUsersRequest
-	24, // 47: Superplane.Authorization.Authorization.GetOrganizationGroup:input_type -> Superplane.Authorization.GetOrganizationGroupRequest
-	36, // 48: Superplane.Authorization.Authorization.GetCanvasGroup:input_type -> Superplane.Authorization.GetCanvasGroupRequest
-	38, // 49: Superplane.Authorization.Authorization.CreateRole:input_type -> Superplane.Authorization.CreateRoleRequest
-	40, // 50: Superplane.Authorization.Authorization.UpdateRole:input_type -> Superplane.Authorization.UpdateRoleRequest
-	42, // 51: Superplane.Authorization.Authorization.DeleteRole:input_type -> Superplane.Authorization.DeleteRoleRequest
-	2,  // 52: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
-	4,  // 53: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
-	6,  // 54: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
-	9,  // 55: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
-	11, // 56: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
-	13, // 57: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
-	15, // 58: Superplane.Authorization.Authorization.CreateOrganizationGroup:output_type -> Superplane.Authorization.CreateOrganizationGroupResponse
-	27, // 59: Superplane.Authorization.Authorization.CreateCanvasGroup:output_type -> Superplane.Authorization.CreateCanvasGroupResponse
-	17, // 60: Superplane.Authorization.Authorization.AddUserToOrganizationGroup:output_type -> Superplane.Authorization.AddUserToOrganizationGroupResponse
-	29, // 61: Superplane.Authorization.Authorization.AddUserToCanvasGroup:output_type -> Superplane.Authorization.AddUserToCanvasGroupResponse
-	19, // 62: Superplane.Authorization.Authorization.RemoveUserFromOrganizationGroup:output_type -> Superplane.Authorization.RemoveUserFromOrganizationGroupResponse
-	31, // 63: Superplane.Authorization.Authorization.RemoveUserFromCanvasGroup:output_type -> Superplane.Authorization.RemoveUserFromCanvasGroupResponse
-	21, // 64: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
-	33, // 65: Superplane.Authorization.Authorization.ListCanvasGroups:output_type -> Superplane.Authorization.ListCanvasGroupsResponse
-	23, // 66: Superplane.Authorization.Authorization.GetOrganizationGroupUsers:output_type -> Superplane.Authorization.GetOrganizationGroupUsersResponse
-	35, // 67: Superplane.Authorization.Authorization.GetCanvasGroupUsers:output_type -> Superplane.Authorization.GetCanvasGroupUsersResponse
-	25, // 68: Superplane.Authorization.Authorization.GetOrganizationGroup:output_type -> Superplane.Authorization.GetOrganizationGroupResponse
-	37, // 69: Superplane.Authorization.Authorization.GetCanvasGroup:output_type -> Superplane.Authorization.GetCanvasGroupResponse
-	39, // 70: Superplane.Authorization.Authorization.CreateRole:output_type -> Superplane.Authorization.CreateRoleResponse
-	41, // 71: Superplane.Authorization.Authorization.UpdateRole:output_type -> Superplane.Authorization.UpdateRoleResponse
-	43, // 72: Superplane.Authorization.Authorization.DeleteRole:output_type -> Superplane.Authorization.DeleteRoleResponse
-	52, // [52:73] is the sub-list for method output_type
-	31, // [31:52] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	52, // 12: Superplane.Authorization.GetUserRolesResponse.roles:type_name -> Superplane.Authorization.Role
+	48, // 13: Superplane.Authorization.CreateOrganizationGroupResponse.group:type_name -> Superplane.Authorization.Group
+	48, // 14: Superplane.Authorization.ListOrganizationGroupsResponse.groups:type_name -> Superplane.Authorization.Group
+	48, // 15: Superplane.Authorization.GetOrganizationGroupUsersResponse.group:type_name -> Superplane.Authorization.Group
+	48, // 16: Superplane.Authorization.GetOrganizationGroupResponse.group:type_name -> Superplane.Authorization.Group
+	48, // 17: Superplane.Authorization.CreateCanvasGroupResponse.group:type_name -> Superplane.Authorization.Group
+	48, // 18: Superplane.Authorization.ListCanvasGroupsResponse.groups:type_name -> Superplane.Authorization.Group
+	48, // 19: Superplane.Authorization.GetCanvasGroupUsersResponse.group:type_name -> Superplane.Authorization.Group
+	48, // 20: Superplane.Authorization.GetCanvasGroupResponse.group:type_name -> Superplane.Authorization.Group
+	49, // 21: Superplane.Authorization.GetOrganizationUsersResponse.users:type_name -> Superplane.Authorization.User
+	49, // 22: Superplane.Authorization.GetCanvasUsersResponse.users:type_name -> Superplane.Authorization.User
+	0,  // 23: Superplane.Authorization.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	53, // 24: Superplane.Authorization.CreateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
+	0,  // 25: Superplane.Authorization.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	53, // 26: Superplane.Authorization.UpdateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
+	0,  // 27: Superplane.Authorization.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	0,  // 28: Superplane.Authorization.Group.domain_type:type_name -> Superplane.Authorization.DomainType
+	50, // 29: Superplane.Authorization.User.role_assignments:type_name -> Superplane.Authorization.UserRoleAssignment
+	51, // 30: Superplane.Authorization.User.account_providers:type_name -> Superplane.Authorization.AccountProvider
+	0,  // 31: Superplane.Authorization.UserRoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
+	0,  // 32: Superplane.Authorization.Role.domain_type:type_name -> Superplane.Authorization.DomainType
+	53, // 33: Superplane.Authorization.Role.permissions:type_name -> Superplane.Authorization.Permission
+	52, // 34: Superplane.Authorization.Role.inherited_role:type_name -> Superplane.Authorization.Role
+	0,  // 35: Superplane.Authorization.Permission.domain_type:type_name -> Superplane.Authorization.DomainType
+	1,  // 36: Superplane.Authorization.Authorization.ListUserPermissions:input_type -> Superplane.Authorization.ListUserPermissionsRequest
+	3,  // 37: Superplane.Authorization.Authorization.AssignRole:input_type -> Superplane.Authorization.AssignRoleRequest
+	5,  // 38: Superplane.Authorization.Authorization.RemoveRole:input_type -> Superplane.Authorization.RemoveRoleRequest
+	8,  // 39: Superplane.Authorization.Authorization.ListRoles:input_type -> Superplane.Authorization.ListRolesRequest
+	10, // 40: Superplane.Authorization.Authorization.DescribeRole:input_type -> Superplane.Authorization.DescribeRoleRequest
+	12, // 41: Superplane.Authorization.Authorization.GetUserRoles:input_type -> Superplane.Authorization.GetUserRolesRequest
+	14, // 42: Superplane.Authorization.Authorization.CreateOrganizationGroup:input_type -> Superplane.Authorization.CreateOrganizationGroupRequest
+	26, // 43: Superplane.Authorization.Authorization.CreateCanvasGroup:input_type -> Superplane.Authorization.CreateCanvasGroupRequest
+	16, // 44: Superplane.Authorization.Authorization.AddUserToOrganizationGroup:input_type -> Superplane.Authorization.AddUserToOrganizationGroupRequest
+	28, // 45: Superplane.Authorization.Authorization.AddUserToCanvasGroup:input_type -> Superplane.Authorization.AddUserToCanvasGroupRequest
+	18, // 46: Superplane.Authorization.Authorization.RemoveUserFromOrganizationGroup:input_type -> Superplane.Authorization.RemoveUserFromOrganizationGroupRequest
+	30, // 47: Superplane.Authorization.Authorization.RemoveUserFromCanvasGroup:input_type -> Superplane.Authorization.RemoveUserFromCanvasGroupRequest
+	20, // 48: Superplane.Authorization.Authorization.ListOrganizationGroups:input_type -> Superplane.Authorization.ListOrganizationGroupsRequest
+	32, // 49: Superplane.Authorization.Authorization.ListCanvasGroups:input_type -> Superplane.Authorization.ListCanvasGroupsRequest
+	22, // 50: Superplane.Authorization.Authorization.GetOrganizationGroupUsers:input_type -> Superplane.Authorization.GetOrganizationGroupUsersRequest
+	34, // 51: Superplane.Authorization.Authorization.GetCanvasGroupUsers:input_type -> Superplane.Authorization.GetCanvasGroupUsersRequest
+	24, // 52: Superplane.Authorization.Authorization.GetOrganizationGroup:input_type -> Superplane.Authorization.GetOrganizationGroupRequest
+	36, // 53: Superplane.Authorization.Authorization.GetCanvasGroup:input_type -> Superplane.Authorization.GetCanvasGroupRequest
+	38, // 54: Superplane.Authorization.Authorization.GetOrganizationUsers:input_type -> Superplane.Authorization.GetOrganizationUsersRequest
+	40, // 55: Superplane.Authorization.Authorization.GetCanvasUsers:input_type -> Superplane.Authorization.GetCanvasUsersRequest
+	42, // 56: Superplane.Authorization.Authorization.CreateRole:input_type -> Superplane.Authorization.CreateRoleRequest
+	44, // 57: Superplane.Authorization.Authorization.UpdateRole:input_type -> Superplane.Authorization.UpdateRoleRequest
+	46, // 58: Superplane.Authorization.Authorization.DeleteRole:input_type -> Superplane.Authorization.DeleteRoleRequest
+	2,  // 59: Superplane.Authorization.Authorization.ListUserPermissions:output_type -> Superplane.Authorization.ListUserPermissionsResponse
+	4,  // 60: Superplane.Authorization.Authorization.AssignRole:output_type -> Superplane.Authorization.AssignRoleResponse
+	6,  // 61: Superplane.Authorization.Authorization.RemoveRole:output_type -> Superplane.Authorization.RemoveRoleResponse
+	9,  // 62: Superplane.Authorization.Authorization.ListRoles:output_type -> Superplane.Authorization.ListRolesResponse
+	11, // 63: Superplane.Authorization.Authorization.DescribeRole:output_type -> Superplane.Authorization.DescribeRoleResponse
+	13, // 64: Superplane.Authorization.Authorization.GetUserRoles:output_type -> Superplane.Authorization.GetUserRolesResponse
+	15, // 65: Superplane.Authorization.Authorization.CreateOrganizationGroup:output_type -> Superplane.Authorization.CreateOrganizationGroupResponse
+	27, // 66: Superplane.Authorization.Authorization.CreateCanvasGroup:output_type -> Superplane.Authorization.CreateCanvasGroupResponse
+	17, // 67: Superplane.Authorization.Authorization.AddUserToOrganizationGroup:output_type -> Superplane.Authorization.AddUserToOrganizationGroupResponse
+	29, // 68: Superplane.Authorization.Authorization.AddUserToCanvasGroup:output_type -> Superplane.Authorization.AddUserToCanvasGroupResponse
+	19, // 69: Superplane.Authorization.Authorization.RemoveUserFromOrganizationGroup:output_type -> Superplane.Authorization.RemoveUserFromOrganizationGroupResponse
+	31, // 70: Superplane.Authorization.Authorization.RemoveUserFromCanvasGroup:output_type -> Superplane.Authorization.RemoveUserFromCanvasGroupResponse
+	21, // 71: Superplane.Authorization.Authorization.ListOrganizationGroups:output_type -> Superplane.Authorization.ListOrganizationGroupsResponse
+	33, // 72: Superplane.Authorization.Authorization.ListCanvasGroups:output_type -> Superplane.Authorization.ListCanvasGroupsResponse
+	23, // 73: Superplane.Authorization.Authorization.GetOrganizationGroupUsers:output_type -> Superplane.Authorization.GetOrganizationGroupUsersResponse
+	35, // 74: Superplane.Authorization.Authorization.GetCanvasGroupUsers:output_type -> Superplane.Authorization.GetCanvasGroupUsersResponse
+	25, // 75: Superplane.Authorization.Authorization.GetOrganizationGroup:output_type -> Superplane.Authorization.GetOrganizationGroupResponse
+	37, // 76: Superplane.Authorization.Authorization.GetCanvasGroup:output_type -> Superplane.Authorization.GetCanvasGroupResponse
+	39, // 77: Superplane.Authorization.Authorization.GetOrganizationUsers:output_type -> Superplane.Authorization.GetOrganizationUsersResponse
+	41, // 78: Superplane.Authorization.Authorization.GetCanvasUsers:output_type -> Superplane.Authorization.GetCanvasUsersResponse
+	43, // 79: Superplane.Authorization.Authorization.CreateRole:output_type -> Superplane.Authorization.CreateRoleResponse
+	45, // 80: Superplane.Authorization.Authorization.UpdateRole:output_type -> Superplane.Authorization.UpdateRoleResponse
+	47, // 81: Superplane.Authorization.Authorization.DeleteRole:output_type -> Superplane.Authorization.DeleteRoleResponse
+	59, // [59:82] is the sub-list for method output_type
+	36, // [36:59] is the sub-list for method input_type
+	36, // [36:36] is the sub-list for extension type_name
+	36, // [36:36] is the sub-list for extension extendee
+	0,  // [0:36] is the sub-list for field type_name
 }
 
 func init() { file_authorization_proto_init() }
@@ -2835,7 +3507,7 @@ func file_authorization_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_authorization_proto_rawDesc), len(file_authorization_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   46,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
