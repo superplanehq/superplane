@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,6 +57,21 @@ func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService auth
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", req.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// Create or update role metadata if display name or description is provided
+	if req.DisplayName != "" || req.Description != "" {
+		displayName := req.DisplayName
+
+		if displayName == "" {
+			displayName = req.Name // Fallback to role name
+		}
+
+		err = models.UpsertRoleMetadata(req.Name, domainType, req.DomainId, displayName, req.Description)
+		if err != nil {
+			log.Errorf("failed to create role metadata for %s: %v", req.Name, err)
+			// Don't fail the entire operation for metadata errors
+		}
 	}
 
 	log.Infof("created custom role %s in domain %s (%s)", req.Name, req.DomainId, domainType)

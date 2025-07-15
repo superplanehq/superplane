@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -26,6 +27,8 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authSer
 		Name:        roleDef.Name,
 		DomainType:  convertDomainTypeToProto(roleDef.DomainType),
 		Permissions: permissions,
+		DisplayName: models.GetRoleDisplayName(roleDef.Name, roleDef.DomainType, domainID),
+		Description: models.GetRoleDescription(roleDef.Name, roleDef.DomainType, domainID),
 	}
 
 	if roleDef.InheritsFrom != nil {
@@ -33,6 +36,8 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authSer
 			Name:        roleDef.InheritsFrom.Name,
 			DomainType:  convertDomainTypeToProto(roleDef.InheritsFrom.DomainType),
 			Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
+			DisplayName: models.GetRoleDisplayName(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID),
+			Description: models.GetRoleDescription(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID),
 		}
 	}
 
@@ -71,4 +76,22 @@ func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	require.NoError(t, err)
 	authService.EnableCache(false)
 	return authService
+}
+
+func CreateGroupWithMetadata(domainID, domainType, groupName, role, displayName, description string, authService authorization.Authorization) error {
+	err := authService.CreateGroup(domainID, domainType, groupName, role)
+	if err != nil {
+		return err
+	}
+
+	return models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
+}
+
+func CreateRoleWithMetadata(domainID string, roleDef *authorization.RoleDefinition, displayName, description string, authService authorization.Authorization) error {
+	err := authService.CreateCustomRole(domainID, roleDef)
+	if err != nil {
+		return err
+	}
+
+	return models.UpsertRoleMetadata(roleDef.Name, roleDef.DomainType, domainID, displayName, description)
 }

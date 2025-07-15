@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,14 +34,27 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
+	if req.DisplayName != "" || req.Description != "" {
+		displayName := req.DisplayName
+		if displayName == "" {
+			displayName = req.GroupName
+		}
+
+		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, req.Description)
+		if err != nil {
+			log.Errorf("failed to create group metadata for %s: %v", req.GroupName, err)
+		}
+	}
+
 	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainID, req.DomainType.String())
 
-	// Create the group object for response
 	group := &pb.Group{
-		Name:       req.GroupName,
-		DomainType: req.DomainType,
-		DomainId:   req.DomainID,
-		Role:       req.Role,
+		Name:        req.GroupName,
+		DomainType:  req.DomainType,
+		DomainId:    req.DomainID,
+		Role:        req.Role,
+		DisplayName: models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID),
+		Description: models.GetGroupDescription(req.GroupName, domainType, req.DomainID),
 	}
 
 	return &CreateGroupResponse{

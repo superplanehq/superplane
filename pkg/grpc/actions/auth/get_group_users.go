@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -43,10 +44,12 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 	}
 
 	group := &pb.Group{
-		Name:       req.GroupName,
-		DomainType: req.DomainType,
-		DomainId:   req.DomainID,
-		Role:       role,
+		Name:        req.GroupName,
+		DomainType:  req.DomainType,
+		DomainId:    req.DomainID,
+		Role:        role,
+		DisplayName: models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID),
+		Description: models.GetGroupDescription(req.GroupName, domainType, req.DomainID),
 	}
 
 	return &GetGroupUsersResponse{

@@ -23,10 +23,12 @@ type GroupUserRequest struct {
 }
 
 type CreateGroupRequest struct {
-	DomainID   string
-	GroupName  string
-	DomainType pb.DomainType
-	Role       string
+	DomainID    string
+	GroupName   string
+	DomainType  pb.DomainType
+	Role        string
+	DisplayName string
+	Description string
 }
 
 type CreateGroupResponse struct {
@@ -113,10 +115,12 @@ func ConvertDomainType(domainType pb.DomainType) (string, error) {
 // Organization group adapters
 func ConvertCreateOrganizationGroupRequest(req *pb.CreateOrganizationGroupRequest) *CreateGroupRequest {
 	return &CreateGroupRequest{
-		DomainID:   "", // Organization ID will be set by server
-		GroupName:  req.GroupName,
-		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-		Role:       req.Role,
+		DomainID:    "", // Organization ID will be set by server
+		GroupName:   req.GroupName,
+		DomainType:  pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		Role:        req.Role,
+		DisplayName: req.DisplayName,
+		Description: req.Description,
 	}
 }
 
@@ -180,10 +184,12 @@ func ConvertCreateCanvasGroupRequest(req *pb.CreateCanvasGroupRequest) (*CreateG
 		return nil, err
 	}
 	return &CreateGroupRequest{
-		DomainID:   canvasID,
-		GroupName:  req.GroupName,
-		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-		Role:       req.Role,
+		DomainID:    canvasID,
+		GroupName:   req.GroupName,
+		DomainType:  pb.DomainType_DOMAIN_TYPE_CANVAS,
+		Role:        req.Role,
+		DisplayName: req.DisplayName,
+		Description: req.Description,
 	}, nil
 }
 

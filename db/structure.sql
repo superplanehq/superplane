@@ -31,6 +31,20 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
+--
+-- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -201,6 +215,22 @@ CREATE TABLE public.events (
 
 
 --
+-- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.group_metadata (
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
+    group_name character varying(255) NOT NULL,
+    domain_type character varying(50) NOT NULL,
+    domain_id character varying(255) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
 -- Name: organizations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -212,6 +242,22 @@ CREATE TABLE public.organizations (
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     deleted_at timestamp without time zone
+);
+
+
+--
+-- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.role_metadata (
+    id uuid DEFAULT uuid_generate_v4() NOT NULL,
+    role_name character varying(255) NOT NULL,
+    domain_type character varying(50) NOT NULL,
+    domain_id character varying(255) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -451,6 +497,14 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.group_metadata
+    ADD CONSTRAINT group_metadata_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -464,6 +518,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_metadata
+    ADD CONSTRAINT role_metadata_pkey PRIMARY KEY (id);
 
 
 --
@@ -539,6 +601,22 @@ ALTER TABLE ONLY public.stages
 
 
 --
+-- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.group_metadata
+    ADD CONSTRAINT uq_group_metadata_key UNIQUE (group_name, domain_type, domain_id);
+
+
+--
+-- Name: role_metadata uq_role_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_metadata
+    ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -558,6 +636,13 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+
+
+--
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
@@ -589,10 +674,24 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
+
+
+--
+-- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
 
 
 --
@@ -649,6 +748,20 @@ CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (
 --
 
 CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
+
+
+--
+-- Name: group_metadata update_group_metadata_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_group_metadata_updated_at BEFORE UPDATE ON public.group_metadata FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+
+--
+-- Name: role_metadata update_role_metadata_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER update_role_metadata_updated_at BEFORE UPDATE ON public.role_metadata FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
@@ -775,7 +888,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250627174249	f
+20250715123537	f
 \.
 
 
