@@ -11,29 +11,39 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.OrgId)
+func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService authorization.Authorization) (*CreateGroupResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	if req.GroupName == "" {
-		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
-	}
-
-	if req.Role == "" {
-		return nil, status.Error(codes.InvalidArgument, "role must be specified")
-	}
-
-	// TODO: once orgs are implemented, check if the org exists
-
-	err = authService.CreateGroup(req.OrgId, req.GroupName, req.Role)
+	err = ValidateCreateGroupRequest(req)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s: %v", req.GroupName, req.Role, err)
+		return nil, err
+	}
+
+	domainType, err := ConvertDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
+	}
+
+	err = authService.CreateGroup(req.DomainID, domainType, req.GroupName, req.Role)
+	if err != nil {
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainID, err)
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
-	log.Infof("created group %s with role %s in organization %s", req.GroupName, req.Role, req.OrgId)
+	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainID, req.DomainType.String())
 
-	return &pb.CreateGroupResponse{}, nil
+	// Create the group object for response
+	group := &pb.Group{
+		Name:       req.GroupName,
+		DomainType: req.DomainType,
+		DomainId:   req.DomainID,
+		Role:       req.Role,
+	}
+
+	return &CreateGroupResponse{
+		Group: group,
+	}, nil
 }

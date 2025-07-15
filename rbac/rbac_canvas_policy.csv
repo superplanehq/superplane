@@ -18,4 +18,7 @@ p,role:canvas_admin,canvas:{CANVAS_ID},secret,create
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,update
 p,role:canvas_admin,canvas:{CANVAS_ID},secret,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},member,invite
+p,role:canvas_admin,canvas:{CANVAS_ID},group,create
+p,role:canvas_admin,canvas:{CANVAS_ID},group,read
+p,role:canvas_admin,canvas:{CANVAS_ID},group,update
 p,role:canvas_owner,canvas:{CANVAS_ID},member,remove

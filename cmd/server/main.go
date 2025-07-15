@@ -192,6 +192,12 @@ func main() {
 		panic("BASE_URL must be set")
 	}
 
+	// Sync missing default roles on startup
+	log.Info("Syncing default permissions for all organizations and canvases...")
+	if err := authService.CheckAndSyncMissingPermissions(); err != nil {
+		log.Warnf("Failed to sync missing permissions on startup: %v", err)
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		panic("JWT_SECRET must be set")

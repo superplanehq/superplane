@@ -12,6 +12,7 @@ import (
 	gormadapter "github.com/casbin/gorm-adapter/v3"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
 
@@ -105,13 +106,21 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
-func (a *AuthService) CreateGroup(orgID string, groupName string, role string) error {
-	validRoles := []string{RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner}
-	if !contains(validRoles, role) {
-		return fmt.Errorf("invalid role %s for organization", role)
+func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string) error {
+	validRoles := map[string][]string{
+		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
+		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
 	}
 
-	domain := fmt.Sprintf("org:%s", orgID)
+	if roles, exists := validRoles[domainType]; exists {
+		if !contains(roles, role) {
+			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+		}
+	} else {
+		return fmt.Errorf("invalid domain type %s", domainType)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
 	prefixedRole := fmt.Sprintf("role:%s", role)
 
@@ -121,15 +130,15 @@ func (a *AuthService) CreateGroup(orgID string, groupName string, role string) e
 	}
 
 	if !ruleAdded {
-		return fmt.Errorf("group %s already exists with role %s in organization %s", groupName, role, orgID)
+		return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
 	}
 
-	log.Infof("Created group %s with role %s in organization %s", groupName, role, orgID)
+	log.Infof("Created group %s with role %s in %s %s", groupName, role, domainType, domainID)
 	return nil
 }
 
-func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) error {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
@@ -147,7 +156,7 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 	}
 
 	if !groupExists {
-		return fmt.Errorf("group %s does not exist in organization %s", group, orgID)
+		return fmt.Errorf("group %s does not exist in %s %s", group, domainType, domainID)
 	}
 
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
@@ -162,8 +171,8 @@ func (a *AuthService) AddUserToGroup(orgID string, userID string, group string) 
 	return nil
 }
 
-func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group string) error {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
 
@@ -179,8 +188,8 @@ func (a *AuthService) RemoveUserFromGroup(orgID string, userID string, group str
 	return nil
 }
 
-func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
@@ -197,8 +206,8 @@ func (a *AuthService) GetGroupUsers(orgID string, group string) ([]string, error
 	return users, nil
 }
 
-func (a *AuthService) GetGroups(orgID string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups: %w", err)
@@ -221,8 +230,8 @@ func (a *AuthService) GetGroups(orgID string) ([]string, error) {
 	return groups, nil
 }
 
-func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error) {
-	domain := fmt.Sprintf("org:%s", orgID)
+func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
 	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
 	unprefixedRoles := []string{}
@@ -231,24 +240,34 @@ func (a *AuthService) GetGroupRoles(orgID string, group string) ([]string, error
 			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "role:"))
 		}
 	}
-	return unprefixedRoles, nil
+	return unprefixedRoles[0], nil
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedRole := fmt.Sprintf("role:%s", role)
+
+	// Check if it's a default role
 	validRoles := map[string][]string{
 		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
 		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
 	}
 
+	isValidDefaultRole := false
 	if roles, exists := validRoles[domainType]; exists {
-		if !contains(roles, role) {
+		isValidDefaultRole = contains(roles, role)
+	}
+
+	// If not a default role, check if it's a custom role that exists
+	if !isValidDefaultRole {
+		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRole, domain)
+		if len(policies) == 0 {
 			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
 		}
 	}
 
-	prefixedRole := fmt.Sprintf("role:%s", role)
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, fmt.Sprintf("%s:%s", domainType, domainID))
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add role: %w", err)
 	}
@@ -481,17 +500,43 @@ func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
 }
 
 func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	// Validate domain type
+	if domainType != DomainOrg && domainType != DomainCanvas {
+		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	}
 
-	if !a.roleExistsInDomain(roleName, domain) {
-		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+
+	// For default roles, check if the domain exists by looking for any policies in that domain
+	if a.IsDefaultRole(roleName, domainType) {
+		allPolicies, _ := a.enforcer.GetFilteredPolicy(1, domain)
+		if len(allPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
+	} else {
+		// For custom roles, check if role exists by looking for policies
+		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if len(policies) == 0 && len(groupingPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
+	}
+
+	// For default roles, show all permissions (including inherited)
+	// For custom roles, show only direct permissions
+	var permissions []*Permission
+	if a.IsDefaultRole(roleName, domainType) {
+		permissions = a.getRolePermissions(roleName, domain, domainType)
+	} else {
+		permissions = a.getDirectRolePermissions(roleName, domain, domainType)
 	}
 
 	roleDefinition := &RoleDefinition{
 		Name:        roleName,
 		DomainType:  domainType,
 		Description: a.getRoleDescription(roleName),
-		Permissions: a.getRolePermissions(roleName, domain, domainType),
+		Permissions: permissions,
 		Readonly:    true,
 	}
 
@@ -524,20 +569,54 @@ func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) 
 }
 
 func (a *AuthService) GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	// Validate domain type
+	if domainType != DomainOrg && domainType != DomainCanvas {
+		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	}
 
-	if !a.roleExistsInDomain(roleName, domain) {
-		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+
+	// For default roles, check if the domain exists by looking for any policies in that domain
+	if a.IsDefaultRole(roleName, domainType) {
+		allPolicies, _ := a.enforcer.GetFilteredPolicy(1, domain)
+		if len(allPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
+	} else {
+		// For custom roles, check if role exists by looking for policies
+		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if len(policies) == 0 && len(groupingPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
 	}
 
 	return a.getRolePermissions(roleName, domain, domainType), nil
 }
 
 func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	// Validate domain type
+	if domainType != DomainOrg && domainType != DomainCanvas {
+		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	}
 
-	if !a.roleExistsInDomain(roleName, domain) {
-		return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+
+	// For default roles, check if the domain exists by looking for any policies in that domain
+	if a.IsDefaultRole(roleName, domainType) {
+		allPolicies, _ := a.enforcer.GetFilteredPolicy(1, domain)
+		if len(allPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
+	} else {
+		// For custom roles, check if role exists by looking for policies
+		policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+		groupingPolicies, _ := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+		if len(policies) == 0 && len(groupingPolicies) == 0 {
+			return nil, fmt.Errorf("role %s not found in domain %s", roleName, domain)
+		}
 	}
 
 	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(roleName, domain)
@@ -559,8 +638,486 @@ func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
 	return a.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
 }
 
+func (a *AuthService) SyncDefaultRoles() error {
+	if err := a.syncOrganizationDefaultRoles(); err != nil {
+		return fmt.Errorf("failed to sync organization default roles: %w", err)
+	}
+
+	if err := a.syncCanvasDefaultRoles(); err != nil {
+		return fmt.Errorf("failed to sync canvas default roles: %w", err)
+	}
+
+	log.Info("Successfully synced default roles for all organizations and canvases")
+	return nil
+}
+
+func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
+	missingOrgPerms, err := a.detectMissingOrganizationPermissions()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect missing organization permissions: %w", err)
+	}
+
+	missingCanvasPerms, err := a.detectMissingCanvasPermissions()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to detect missing canvas permissions: %w", err)
+	}
+
+	return missingOrgPerms, missingCanvasPerms, nil
+}
+
+func (a *AuthService) detectMissingOrganizationPermissions() ([]string, error) {
+	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organizations with missing permissions: %w", err)
+	}
+
+	var missingPerms []string
+	for _, orgID := range orgIDs {
+		domain := fmt.Sprintf("org:%s", orgID)
+
+		missingInOrg, err := a.findMissingPermissionsInDomain(domain, a.orgPolicyTemplates)
+		if err != nil {
+			log.Errorf("Error checking permissions for org %s: %v", orgID, err)
+			continue
+		}
+
+		if len(missingInOrg) > 0 {
+			missingPerms = append(missingPerms, fmt.Sprintf("Organization %s: %d missing permissions", orgID, len(missingInOrg)))
+		}
+	}
+
+	return missingPerms, nil
+}
+
+func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
+	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get canvases with missing permissions: %w", err)
+	}
+
+	var missingPerms []string
+	for _, canvasID := range canvasIDs {
+		domain := fmt.Sprintf("canvas:%s", canvasID)
+
+		missingInCanvas, err := a.findMissingPermissionsInDomain(domain, a.canvasPolicyTemplates)
+		if err != nil {
+			log.Errorf("Error checking permissions for canvas %s: %v", canvasID, err)
+			continue
+		}
+
+		if len(missingInCanvas) > 0 {
+			missingPerms = append(missingPerms, fmt.Sprintf("Canvas %s: %d missing permissions", canvasID, len(missingInCanvas)))
+		}
+	}
+
+	return missingPerms, nil
+}
+
+func (a *AuthService) getAllOrganizations() ([]models.Organization, error) {
+	return models.ListOrganizations()
+}
+
+func (a *AuthService) getAllCanvases() ([]models.Canvas, error) {
+	return models.ListCanvases()
+}
+
+// Optimized function to get only organization IDs that have missing permissions
+func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
+	// Get all organization IDs first (lightweight query)
+	orgs, err := models.GetOrganizationIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get organization IDs: %w", err)
+	}
+
+	var missingOrgIDs []string
+	for _, orgID := range orgs {
+		domain := fmt.Sprintf("org:%s", orgID)
+		hasMissing, err := a.domainHasMissingPermissions(domain, a.orgPolicyTemplates)
+		if err != nil {
+			log.Warnf("Error checking permissions for org %s: %v", orgID, err)
+			continue
+		}
+		if hasMissing {
+			missingOrgIDs = append(missingOrgIDs, orgID)
+		}
+	}
+
+	return missingOrgIDs, nil
+}
+
+// Optimized function to get only canvas IDs that have missing permissions
+func (a *AuthService) getCanvasesWithMissingPermissions() ([]string, error) {
+	// Get all canvas IDs first (lightweight query)
+	canvases, err := models.GetCanvasIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get canvas IDs: %w", err)
+	}
+
+	var missingCanvasIDs []string
+	for _, canvasID := range canvases {
+		domain := fmt.Sprintf("canvas:%s", canvasID)
+		hasMissing, err := a.domainHasMissingPermissions(domain, a.canvasPolicyTemplates)
+		if err != nil {
+			log.Warnf("Error checking permissions for canvas %s: %v", canvasID, err)
+			continue
+		}
+		if hasMissing {
+			missingCanvasIDs = append(missingCanvasIDs, canvasID)
+		}
+	}
+
+	return missingCanvasIDs, nil
+}
+
+// Helper function to check if a domain has missing permissions
+func (a *AuthService) domainHasMissingPermissions(domain string, policyTemplates [][5]string) (bool, error) {
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Check grouping policy
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return false, err
+			}
+			if !exists {
+				return true, nil // Found at least one missing permission
+			}
+		} else if policy[0] == "p" {
+			// Check permission policy
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return false, err
+			}
+			if !exists {
+				return true, nil // Found at least one missing permission
+			}
+		}
+	}
+	return false, nil // No missing permissions found
+}
+
+func (a *AuthService) findMissingPermissionsInDomain(domain string, policyTemplates [][5]string) ([]string, error) {
+	var missingPolicies []string
+
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Check grouping policy: g,lower_role,higher_role,domain
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check grouping policy: %w", err)
+			}
+			if !exists {
+				missingPolicies = append(missingPolicies, fmt.Sprintf("Grouping: %s -> %s in %s", policy[1], policy[2], domain))
+			}
+		} else if policy[0] == "p" {
+			// Check permission policy: p,role,domain,resource,action
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return nil, fmt.Errorf("failed to check policy: %w", err)
+			}
+			if !exists {
+				missingPolicies = append(missingPolicies, fmt.Sprintf("Policy: %s on %s.%s in %s", policy[1], policy[3], policy[4], domain))
+			}
+		}
+	}
+
+	return missingPolicies, nil
+}
+
+func (a *AuthService) syncOrganizationDefaultRoles() error {
+	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to get organizations with missing permissions: %w", err)
+	}
+
+	if len(orgIDs) == 0 {
+		log.Debug("No organizations with missing permissions found")
+		return nil
+	}
+
+	log.Infof("Found %d organizations with missing permissions", len(orgIDs))
+
+	for _, orgID := range orgIDs {
+		if err := a.syncOrganizationRoles(orgID); err != nil {
+			log.Errorf("Failed to sync roles for organization %s: %v", orgID, err)
+			continue
+		}
+		log.Infof("Synced default roles for organization %s", orgID)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncCanvasDefaultRoles() error {
+	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to get canvases with missing permissions: %w", err)
+	}
+
+	if len(canvasIDs) == 0 {
+		log.Debug("No canvases with missing permissions found")
+		return nil
+	}
+
+	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
+
+	for _, canvasID := range canvasIDs {
+		if err := a.syncCanvasRoles(canvasID); err != nil {
+			log.Errorf("Failed to sync roles for canvas %s: %v", canvasID, err)
+			continue
+		}
+		log.Infof("Synced default roles for canvas %s", canvasID)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncOrganizationRoles(orgID string) error {
+	domain := fmt.Sprintf("org:%s", orgID)
+
+	// First, apply default permissions from CSV templates
+	err := a.applyDefaultPolicies(domain, a.orgPolicyTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to apply default org policies: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AuthService) syncCanvasRoles(canvasID string) error {
+	domain := fmt.Sprintf("canvas:%s", canvasID)
+
+	// First, apply default permissions from CSV templates
+	err := a.applyDefaultPolicies(domain, a.canvasPolicyTemplates)
+	if err != nil {
+		return fmt.Errorf("failed to apply default canvas policies: %w", err)
+	}
+
+	return nil
+}
+
 func (a *AuthService) EnableCache(enable bool) {
 	a.enforcer.EnableCache(enable)
+}
+
+// Helper function to apply default policies from templates
+func (a *AuthService) applyDefaultPolicies(domain string, policyTemplates [][5]string) error {
+	for _, policy := range policyTemplates {
+		if policy[0] == "g" {
+			// Add grouping policy only if it doesn't exist
+			exists, err := a.enforcer.HasGroupingPolicy(policy[1], policy[2], domain)
+			if err != nil {
+				return fmt.Errorf("failed to check grouping policy: %w", err)
+			}
+			if !exists {
+				_, err := a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
+				if err != nil {
+					return fmt.Errorf("failed to add grouping policy: %w", err)
+				}
+			}
+		} else if policy[0] == "p" {
+			// Add permission policy only if it doesn't exist
+			exists, err := a.enforcer.HasPolicy(policy[1], domain, policy[3], policy[4])
+			if err != nil {
+				return fmt.Errorf("failed to check policy: %w", err)
+			}
+			if !exists {
+				_, err := a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
+				if err != nil {
+					return fmt.Errorf("failed to add policy: %w", err)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Example usage function for checking and syncing missing permissions
+func (a *AuthService) CheckAndSyncMissingPermissions() error {
+	// First, detect missing permissions
+	missingOrgs, missingCanvases, err := a.DetectMissingPermissions()
+	if err != nil {
+		return fmt.Errorf("failed to detect missing permissions: %w", err)
+	}
+
+	if len(missingOrgs) > 0 {
+		log.Infof("Found %d organizations with missing permissions:", len(missingOrgs))
+		for _, org := range missingOrgs {
+			log.Info(org)
+		}
+	}
+
+	if len(missingCanvases) > 0 {
+		log.Infof("Found %d canvases with missing permissions:", len(missingCanvases))
+		for _, canvas := range missingCanvases {
+			log.Info(canvas)
+		}
+	}
+
+	// If there are missing permissions, sync them
+	if len(missingOrgs) > 0 || len(missingCanvases) > 0 {
+		log.Info("Syncing missing default roles...")
+		if err := a.SyncDefaultRoles(); err != nil {
+			return fmt.Errorf("failed to sync default roles: %w", err)
+		}
+		log.Info("Successfully synced all missing permissions")
+	} else {
+		log.Info("No missing permissions found - all organizations and canvases are up to date")
+	}
+
+	return nil
+}
+
+// CreateCustomRole creates a new custom role for a domain
+func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
+		return fmt.Errorf("cannot create custom role with default role name: %s", roleDefinition.Name)
+	}
+
+	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
+
+	// Validate inherited role exists if specified
+	if roleDefinition.InheritsFrom != nil {
+		// For inherited roles, check if it's a default role or if it has policies
+		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
+			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			if len(policies) == 0 {
+				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
+			}
+		}
+	}
+
+	// Add policies for each permission
+	for _, permission := range roleDefinition.Permissions {
+		_, err := a.enforcer.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+		if err != nil {
+			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	// Add inheritance if specified
+	if roleDefinition.InheritsFrom != nil {
+		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+		if err != nil {
+			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// UpdateCustomRole updates an existing custom role
+func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
+		return fmt.Errorf("cannot update default role: %s", roleDefinition.Name)
+	}
+
+	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
+
+	// Check if role exists by looking for existing policies
+	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	if len(existingPolicies) == 0 {
+		return fmt.Errorf("role %s not found in domain %s", roleDefinition.Name, domain)
+	}
+
+	// Validate inherited role exists if specified
+	if roleDefinition.InheritsFrom != nil {
+		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
+			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
+			if len(policies) == 0 {
+				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
+			}
+		}
+	}
+
+	// Remove existing policies for this role in this domain
+	_, err := a.enforcer.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
+	}
+
+	// Remove existing role inheritance
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
+	}
+
+	// Add new policies
+	for _, permission := range roleDefinition.Permissions {
+		_, err := a.enforcer.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+		if err != nil {
+			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	// Add inheritance if specified
+	if roleDefinition.InheritsFrom != nil {
+		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+		if err != nil {
+			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// DeleteCustomRole deletes a custom role
+func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleName string) error {
+	// Validate that the role name is not a default role
+	if a.IsDefaultRole(roleName, domainType) {
+		return fmt.Errorf("cannot delete default role: %s", roleName)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+
+	// Check if role exists by looking for existing policies
+	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	if len(existingPolicies) == 0 {
+		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
+	}
+
+	// Remove all policies for this role in this domain
+	_, err := a.enforcer.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove policies for role %s: %w", roleName, err)
+	}
+
+	// Remove role inheritance for this domain
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
+	}
+
+	// Remove users from this role in this domain
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(1, prefixedRoleName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
+	}
+
+	return nil
+}
+
+// IsDefaultRole checks if a role is a default system role
+func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
+	defaultRoles := map[string][]string{
+		DomainOrg:    {RoleOrgOwner, RoleOrgAdmin, RoleOrgViewer},
+		DomainCanvas: {RoleCanvasOwner, RoleCanvasAdmin, RoleCanvasViewer},
+	}
+
+	roles, exists := defaultRoles[domainType]
+	if !exists {
+		return false
+	}
+
+	return contains(roles, roleName)
 }
 
 func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
@@ -587,30 +1144,57 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
 
-	// Check both sides of grouping policy due to inheritance definition
-	leftRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+	// Check if role has any policies in this domain
+	policies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
+	if err == nil && len(policies) > 0 {
+		return true
+	}
 
-	if err != nil {
-		return false
+	// Check if role exists in grouping policies (inheritance)
+	leftRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+	if err == nil && len(leftRoles) > 0 {
+		return true
 	}
 
 	rightRoles, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedRoleName, domain)
-
-	if err != nil {
-		return false
+	if err == nil && len(rightRoles) > 0 {
+		return true
 	}
 
-	for _, role := range append(leftRoles, rightRoles...) {
-		if role[0] == prefixedRoleName || role[1] == prefixedRoleName {
-			return true
-		}
+	// Check if it's a default role (always exists)
+	if a.IsDefaultRole(roleName, a.getDomainTypeFromDomain(domain)) {
+		return true
 	}
+
 	return false
 }
 
 func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
 	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	// Get all permissions including inherited ones
 	permissions, err := a.enforcer.GetImplicitPermissionsForUser(prefixedRoleName, domain)
+	if err != nil {
+		return []*Permission{}
+	}
+
+	rolePermissions := make([]*Permission, 0, len(permissions))
+	for _, permission := range permissions {
+		if len(permission) >= 4 {
+			rolePermissions = append(rolePermissions, &Permission{
+				Resource:   permission[2],
+				Action:     permission[3],
+				DomainType: domainType,
+			})
+		}
+	}
+
+	return rolePermissions
+}
+
+func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType string) []*Permission {
+	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	// Get only direct permissions for this role, not inherited ones
+	permissions, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
 		return []*Permission{}
 	}
@@ -716,4 +1300,13 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+func (a *AuthService) getDomainTypeFromDomain(domain string) string {
+	if strings.HasPrefix(domain, "org:") {
+		return DomainOrg
+	} else if strings.HasPrefix(domain, "canvas:") {
+		return DomainCanvas
+	}
+	return ""
 }

@@ -480,3 +480,17 @@ func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name 
 
 	return plainKey, encrypted, nil
 }
+
+// GetCanvasIDs returns only the IDs of all canvases
+func GetCanvasIDs() ([]string, error) {
+	var canvasIDs []string
+	err := database.Conn().Model(&Canvas{}).
+		Select("id").
+		Pluck("id", &canvasIDs).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasIDs, nil
+}
