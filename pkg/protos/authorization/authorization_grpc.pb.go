@@ -42,6 +42,8 @@ const (
 	Authorization_CreateRole_FullMethodName                      = "/Superplane.Authorization.Authorization/CreateRole"
 	Authorization_UpdateRole_FullMethodName                      = "/Superplane.Authorization.Authorization/UpdateRole"
 	Authorization_DeleteRole_FullMethodName                      = "/Superplane.Authorization.Authorization/DeleteRole"
+	Authorization_DeleteOrganizationGroup_FullMethodName         = "/Superplane.Authorization.Authorization/DeleteOrganizationGroup"
+	Authorization_DeleteCanvasGroup_FullMethodName               = "/Superplane.Authorization.Authorization/DeleteCanvasGroup"
 )
 
 // AuthorizationClient is the client API for Authorization service.
@@ -117,6 +119,12 @@ type AuthorizationClient interface {
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(ctx context.Context, in *DeleteRoleRequest, opts ...grpc.CallOption) (*DeleteRoleResponse, error)
+	// Endpoint for deleting an organization group
+	// Operation is synchronous and idempotent.
+	DeleteOrganizationGroup(ctx context.Context, in *DeleteOrganizationGroupRequest, opts ...grpc.CallOption) (*DeleteOrganizationGroupResponse, error)
+	// Endpoint for deleting a canvas group
+	// Operation is synchronous and idempotent.
+	DeleteCanvasGroup(ctx context.Context, in *DeleteCanvasGroupRequest, opts ...grpc.CallOption) (*DeleteCanvasGroupResponse, error)
 }
 
 type authorizationClient struct {
@@ -357,6 +365,26 @@ func (c *authorizationClient) DeleteRole(ctx context.Context, in *DeleteRoleRequ
 	return out, nil
 }
 
+func (c *authorizationClient) DeleteOrganizationGroup(ctx context.Context, in *DeleteOrganizationGroupRequest, opts ...grpc.CallOption) (*DeleteOrganizationGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteOrganizationGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_DeleteOrganizationGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authorizationClient) DeleteCanvasGroup(ctx context.Context, in *DeleteCanvasGroupRequest, opts ...grpc.CallOption) (*DeleteCanvasGroupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteCanvasGroupResponse)
+	err := c.cc.Invoke(ctx, Authorization_DeleteCanvasGroup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthorizationServer is the server API for Authorization service.
 // All implementations should embed UnimplementedAuthorizationServer
 // for forward compatibility.
@@ -430,6 +458,12 @@ type AuthorizationServer interface {
 	// Endpoint for deleting a custom role
 	// Operation is synchronous and idempotent.
 	DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error)
+	// Endpoint for deleting an organization group
+	// Operation is synchronous and idempotent.
+	DeleteOrganizationGroup(context.Context, *DeleteOrganizationGroupRequest) (*DeleteOrganizationGroupResponse, error)
+	// Endpoint for deleting a canvas group
+	// Operation is synchronous and idempotent.
+	DeleteCanvasGroup(context.Context, *DeleteCanvasGroupRequest) (*DeleteCanvasGroupResponse, error)
 }
 
 // UnimplementedAuthorizationServer should be embedded to have
@@ -507,6 +541,12 @@ func (UnimplementedAuthorizationServer) UpdateRole(context.Context, *UpdateRoleR
 }
 func (UnimplementedAuthorizationServer) DeleteRole(context.Context, *DeleteRoleRequest) (*DeleteRoleResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteRole not implemented")
+}
+func (UnimplementedAuthorizationServer) DeleteOrganizationGroup(context.Context, *DeleteOrganizationGroupRequest) (*DeleteOrganizationGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteOrganizationGroup not implemented")
+}
+func (UnimplementedAuthorizationServer) DeleteCanvasGroup(context.Context, *DeleteCanvasGroupRequest) (*DeleteCanvasGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteCanvasGroup not implemented")
 }
 func (UnimplementedAuthorizationServer) testEmbeddedByValue() {}
 
@@ -942,6 +982,42 @@ func _Authorization_DeleteRole_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Authorization_DeleteOrganizationGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteOrganizationGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).DeleteOrganizationGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_DeleteOrganizationGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).DeleteOrganizationGroup(ctx, req.(*DeleteOrganizationGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Authorization_DeleteCanvasGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCanvasGroupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthorizationServer).DeleteCanvasGroup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Authorization_DeleteCanvasGroup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthorizationServer).DeleteCanvasGroup(ctx, req.(*DeleteCanvasGroupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Authorization_ServiceDesc is the grpc.ServiceDesc for Authorization service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1040,6 +1116,14 @@ var Authorization_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteRole",
 			Handler:    _Authorization_DeleteRole_Handler,
+		},
+		{
+			MethodName: "DeleteOrganizationGroup",
+			Handler:    _Authorization_DeleteOrganizationGroup_Handler,
+		},
+		{
+			MethodName: "DeleteCanvasGroup",
+			Handler:    _Authorization_DeleteCanvasGroup_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

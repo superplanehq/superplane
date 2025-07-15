@@ -376,6 +376,36 @@ service Authorization {
       tags: "Authorization";
     };
   }
+
+  //
+  // Endpoint for deleting an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteOrganizationGroup(DeleteOrganizationGroupRequest) returns (DeleteOrganizationGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/authorization/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete organization group";
+      description: "Deletes an existing group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for deleting a canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteCanvasGroup(DeleteCanvasGroupRequest) returns (DeleteCanvasGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete canvas group";
+      description: "Deletes an existing group within a canvas";
+      tags: "Authorization";
+    };
+  }
 }
 
 // User permissions listing messages
@@ -610,6 +640,20 @@ message DeleteRoleRequest {
 }
 
 message DeleteRoleResponse {}
+
+message DeleteOrganizationGroupRequest {
+  string organization_id = 1;
+  string group_name = 2;
+}
+
+message DeleteOrganizationGroupResponse {}
+
+message DeleteCanvasGroupRequest {
+  string canvas_id_or_name = 1;
+  string group_name = 2;
+}
+
+message DeleteCanvasGroupResponse {}
 
 // Core data structures
 message Group {

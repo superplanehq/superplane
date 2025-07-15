@@ -137,6 +137,42 @@
         "tags": [
           "Authorization"
         ]
+      },
+      "delete": {
+        "summary": "Delete canvas group",
+        "description": "Deletes an existing group within a canvas",
+        "operationId": "Authorization_DeleteCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationDeleteCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
       }
     },
     "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users": {
@@ -371,6 +407,42 @@
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "delete": {
+        "summary": "Delete organization group",
+        "description": "Deletes an existing group within an organization",
+        "operationId": "Authorization_DeleteOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationDeleteOrganizationGroupResponse"
             }
           },
           "default": {
@@ -2180,6 +2252,12 @@
       "title": "Custom role management messages"
     },
     "AuthorizationCreateRoleResponse": {
+      "type": "object"
+    },
+    "AuthorizationDeleteCanvasGroupResponse": {
+      "type": "object"
+    },
+    "AuthorizationDeleteOrganizationGroupResponse": {
       "type": "object"
     },
     "AuthorizationDeleteRoleResponse": {

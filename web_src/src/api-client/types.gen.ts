@@ -74,6 +74,14 @@ export type AuthorizationCreateRoleResponse = {
     [key: string]: unknown;
 };
 
+export type AuthorizationDeleteCanvasGroupResponse = {
+    [key: string]: unknown;
+};
+
+export type AuthorizationDeleteOrganizationGroupResponse = {
+    [key: string]: unknown;
+};
+
 export type AuthorizationDeleteRoleResponse = {
     [key: string]: unknown;
 };
@@ -770,6 +778,34 @@ export type AuthorizationCreateCanvasGroupResponses = {
 
 export type AuthorizationCreateCanvasGroupResponse2 = AuthorizationCreateCanvasGroupResponses[keyof AuthorizationCreateCanvasGroupResponses];
 
+export type AuthorizationDeleteCanvasGroupData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        groupName: string;
+    };
+    query?: never;
+    url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}';
+};
+
+export type AuthorizationDeleteCanvasGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationDeleteCanvasGroupError = AuthorizationDeleteCanvasGroupErrors[keyof AuthorizationDeleteCanvasGroupErrors];
+
+export type AuthorizationDeleteCanvasGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationDeleteCanvasGroupResponse;
+};
+
+export type AuthorizationDeleteCanvasGroupResponse2 = AuthorizationDeleteCanvasGroupResponses[keyof AuthorizationDeleteCanvasGroupResponses];
+
 export type AuthorizationGetCanvasGroupData = {
     body?: never;
     path: {
@@ -961,6 +997,35 @@ export type AuthorizationCreateOrganizationGroupResponses = {
 };
 
 export type AuthorizationCreateOrganizationGroupResponse2 = AuthorizationCreateOrganizationGroupResponses[keyof AuthorizationCreateOrganizationGroupResponses];
+
+export type AuthorizationDeleteOrganizationGroupData = {
+    body?: never;
+    path: {
+        groupName: string;
+    };
+    query?: {
+        organizationId?: string;
+    };
+    url: '/api/v1/authorization/groups/{groupName}';
+};
+
+export type AuthorizationDeleteOrganizationGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationDeleteOrganizationGroupError = AuthorizationDeleteOrganizationGroupErrors[keyof AuthorizationDeleteOrganizationGroupErrors];
+
+export type AuthorizationDeleteOrganizationGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationDeleteOrganizationGroupResponse;
+};
+
+export type AuthorizationDeleteOrganizationGroupResponse2 = AuthorizationDeleteOrganizationGroupResponses[keyof AuthorizationDeleteOrganizationGroupResponses];
 
 export type AuthorizationGetOrganizationGroupData = {
     body?: never;
