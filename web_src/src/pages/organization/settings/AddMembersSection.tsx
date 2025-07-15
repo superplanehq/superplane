@@ -1,215 +1,402 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '../../../components/Button/button'
-import { Input } from '../../../components/Input/input'
-import { 
-  Dropdown, 
-  DropdownButton, 
-  DropdownMenu, 
-  DropdownItem, 
-  DropdownLabel, 
-  DropdownDescription 
+import { Textarea } from '../../../components/Textarea/textarea'
+import {
+  Dropdown,
+  DropdownButton,
+  DropdownMenu,
+  DropdownItem,
+  DropdownLabel,
+  DropdownDescription
 } from '../../../components/Dropdown/dropdown'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
-import { 
+import { Heading } from '../../../components/Heading/heading'
+import { Field, Label } from '../../../components/Fieldset/fieldset'
+import { Tabs, type Tab } from '../../../components/Tabs/tabs'
+import { Link } from '../../../components/Link/link'
+import {
+  authorizationAssignRole,
+  authorizationListRoles,
   authorizationListOrganizationGroups,
-  authorizationAddUserToOrganizationGroup 
+  authorizationGetOrganizationGroupUsers
 } from '../../../api-client/sdk.gen'
-import { AuthorizationGroup } from '../../../api-client/types.gen'
+import { AuthorizationRole } from '../../../api-client/types.gen'
+import { capitalizeFirstLetter } from '../../../utils/text'
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean
   organizationId: string
   onMemberAdded?: () => void
+  className?: string
 }
 
-export function AddMembersSection({ showRoleSelection = true, organizationId, onMemberAdded }: AddMembersSectionProps) {
-  const [newMemberEmail, setNewMemberEmail] = useState('')
-  const [selectedRole, setSelectedRole] = useState('Member')
-  const [selectedGroup, setSelectedGroup] = useState('')
-  const [groups, setGroups] = useState<AuthorizationGroup[]>([])
+export function AddMembersSection({ showRoleSelection = true, organizationId, onMemberAdded, className }: AddMembersSectionProps) {
+  const [addMembersTab, setAddMembersTab] = useState<'emails' | 'upload'>('emails')
+  const [emailsInput, setEmailsInput] = useState('')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [bulkUserRole, setBulkUserRole] = useState('')
+  const [emailRole, setEmailRole] = useState('')
   const [isInviting, setIsInviting] = useState(false)
-  const [loadingGroups, setLoadingGroups] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [roles, setRoles] = useState<AuthorizationRole[]>([])
+  const [loadingRoles, setLoadingRoles] = useState(true)
+  const [organizationMembers, setOrganizationMembers] = useState<string[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
 
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        setLoadingGroups(true)
-        setError(null)
-        const response = await authorizationListOrganizationGroups({
-          query: { organizationId }
-        })
-        if (response.data?.groups) {
-          setGroups(response.data.groups)
-          if (response.data.groups.length > 0) {
-            setSelectedGroup(response.data.groups[0].name || '')
-          }
-        }
-      } catch (err) {
-        console.error('Error fetching groups:', err)
-        setError('Failed to fetch groups')
-      } finally {
-        setLoadingGroups(false)
-      }
-    }
+  const addMembersTabs: Tab[] = [
+    { id: 'emails', label: 'By emails' },
+    { id: 'upload', label: 'By file' }
+  ]
 
-    fetchGroups()
-  }, [organizationId])
-
-  const handleSendInvitation = async () => {
-    if (!newMemberEmail.trim() || !selectedGroup) return
-    
-    setIsInviting(true)
-    setError(null)
-    
+  const fetchRoles = useCallback(async () => {
     try {
-      // Note: In a real implementation, you would typically:
-      // 1. First create/invite the user to get their user ID
-      // 2. Then add them to the group
-      // For now, we'll simulate with a placeholder user ID
-      const userId = newMemberEmail // This would be replaced with actual user ID from user creation/invitation
-      
-      await authorizationAddUserToOrganizationGroup({
-        path: { groupName: selectedGroup },
-        body: {
-          organizationId,
-          userId
+      setLoadingRoles(true)
+      setError(null)
+      const response = await authorizationListRoles({
+        query: {
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         }
       })
       
-      console.log('Successfully added user to group:', newMemberEmail, 'to', selectedGroup, 'with role', selectedRole)
-      setNewMemberEmail('')
+      if (response.data?.roles) {
+        setRoles(response.data.roles)
+        // Set default role to the first org member role found, or first role if none
+        const orgMemberRole = response.data.roles.find(role => role.name?.includes('member'))
+        const defaultRole = orgMemberRole?.name || response.data.roles[0]?.name || ''
+        setBulkUserRole(defaultRole)
+        setEmailRole(defaultRole)
+      }
+    } catch (err) {
+      console.error('Error fetching roles:', err)
+      setError('Failed to fetch roles')
+    } finally {
+      setLoadingRoles(false)
+    }
+  }, [organizationId])
+
+  const fetchOrganizationMembers = useCallback(async () => {
+    try {
+      setLoadingMembers(true)
+      setError(null)
+      
+      // First, get all organization groups
+      const groupsResponse = await authorizationListOrganizationGroups({
+        query: { organizationId }
+      })
+      
+      if (groupsResponse.data?.groups) {
+        // Get users from each group
+        const allUserIds = new Set<string>()
+        
+        for (const group of groupsResponse.data.groups) {
+          if (group.name) {
+            try {
+              const usersResponse = await authorizationGetOrganizationGroupUsers({
+                path: { groupName: group.name }
+              })
+              
+              if (usersResponse.data?.userIds) {
+                usersResponse.data.userIds.forEach(userId => {
+                  if (userId) allUserIds.add(userId)
+                })
+              }
+            } catch (err) {
+              console.warn(`Failed to fetch users for group ${group.name}:`, err)
+              // Continue with other groups
+            }
+          }
+        }
+        
+        setOrganizationMembers(Array.from(allUserIds))
+      }
+    } catch (err) {
+      console.error('Error fetching organization members:', err)
+      setError('Failed to fetch organization members')
+    } finally {
+      setLoadingMembers(false)
+    }
+  }, [organizationId])
+
+  useEffect(() => {
+    fetchRoles()
+    fetchOrganizationMembers()
+  }, [fetchRoles, fetchOrganizationMembers])
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      setUploadFile(file)
+    }
+  }
+
+  const handleBulkAddSubmit = async () => {
+    if (!uploadFile) return
+
+    setIsInviting(true)
+    setError(null)
+
+    try {
+      // In a real implementation, you would parse the CSV/Excel file here
+      // For now, we'll simulate processing
+      const emailsToAdd = ['example1@company.com', 'example2@company.com', 'example3@company.com']
+      const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
+      
+      // Process each email (in real implementation, this would be done server-side)
+      for (const email of emailsToAdd) {
+        const userId = email // This would be replaced with actual user ID from user creation/invitation
+        
+        await authorizationAssignRole({
+          body: {
+            userId,
+            roleAssignment: {
+              domainType: 'DOMAIN_TYPE_ORGANIZATION',
+              domainId: organizationId,
+              role: roleToAssign
+            }
+          }
+        })
+      }
+
+      console.log('Successfully processed bulk upload:', {
+        fileName: uploadFile.name,
+        emails: emailsToAdd,
+        role: roleToAssign,
+        count: emailsToAdd.length
+      })
+
+      setUploadFile(null)
+      const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
+      setBulkUserRole(defaultRole)
+      setAddMembersTab('emails')
+      
+      // Refresh organization members after successful addition
+      fetchOrganizationMembers()
       onMemberAdded?.()
     } catch (err) {
-      console.error('Error adding member:', err)
-      setError('Failed to add member. Please try again.')
+      console.error('Error processing bulk upload:', err)
+      setError('Failed to process bulk upload. Please try again.')
     } finally {
       setIsInviting(false)
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSendInvitation()
+  const handleEmailsSubmit = async () => {
+    if (!emailsInput.trim()) return
+
+    setIsInviting(true)
+    setError(null)
+
+    try {
+      const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0)
+      const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
+
+      // Check for existing members
+      const existingMembers = emails.filter(email => organizationMembers.includes(email))
+      if (existingMembers.length > 0) {
+        setError(`The following users are already members: ${existingMembers.join(', ')}`)
+        return
+      }
+
+      // Process each email
+      for (const email of emails) {
+        const userId = email // This would be replaced with actual user ID from user creation/invitation
+        
+        await authorizationAssignRole({
+          body: {
+            userId,
+            roleAssignment: {
+              domainType: 'DOMAIN_TYPE_ORGANIZATION',
+              domainId: organizationId,
+              role: roleToAssign
+            }
+          }
+        })
+      }
+
+      console.log('Successfully added members by email:', {
+        emails,
+        role: roleToAssign,
+        count: emails.length
+      })
+
+      setEmailsInput('')
+      const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
+      setEmailRole(defaultRole)
+      
+      // Refresh organization members after successful addition
+      fetchOrganizationMembers()
+      onMemberAdded?.()
+    } catch (err) {
+      console.error('Error adding members by email:', err)
+      setError('Failed to add members. Please try again.')
+    } finally {
+      setIsInviting(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleEmailsSubmit()
     }
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+    <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Text className="font-medium text-zinc-900 dark:text-white">
-            Invite new members
-          </Text>
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            Add people to your organization by assigning them to a group
-          </Text>
+          <Heading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+            Add members
+          </Heading>
+          {!loadingMembers && (
+            <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+              {organizationMembers.length} current member{organizationMembers.length !== 1 ? 's' : ''}
+            </Text>
+          )}
         </div>
       </div>
-      
+
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
           <p className="text-sm">{error}</p>
         </div>
       )}
-      
-      {loadingGroups ? (
+
+      {(loadingRoles || loadingMembers) && (
         <div className="flex justify-center items-center h-20">
-          <p className="text-zinc-500 dark:text-zinc-400">Loading groups...</p>
+          <p className="text-zinc-500 dark:text-zinc-400">
+            {loadingRoles && loadingMembers ? 'Loading roles and members...' : 
+             loadingRoles ? 'Loading roles...' : 'Loading members...'}
+          </p>
         </div>
-      ) : groups.length === 0 ? (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <div className="flex">
-            <MaterialSymbol name="warning" className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mr-3 mt-0.5" />
-            <div className="text-sm">
-              <p className="text-yellow-800 dark:text-yellow-200 font-medium">
-                No groups available
-              </p>
-              <p className="text-yellow-700 dark:text-yellow-300 mt-1">
-                Create a group first to add members to your organization.
-              </p>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={newMemberEmail}
-                onChange={(e) => setNewMemberEmail(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="w-full"
-              />
-            </div>
+      )}
+      
+      {/* Add Members Tabs */}
+      <div className="mb-6">
+        <Tabs
+          tabs={addMembersTabs}
+          defaultTab={addMembersTab}
+          variant='underline'
+          onTabChange={(tabId) => setAddMembersTab(tabId as 'emails' | 'upload')}
+        />
+      </div>
+      
+      {/* Tab Content */}
+      {!loadingRoles && !loadingMembers && addMembersTab === 'emails' ? (
+        // Enter emails tab content
+        <div className="space-y-4">
+          <div className="flex items-start gap-3">
+            <Textarea
+              rows={1}
+              placeholder="Email addresses, separated by commas"
+              className="flex-1"
+              value={emailsInput}
+              onChange={(e) => setEmailsInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+            />
             
-            <div className="min-w-[140px]">
+            {showRoleSelection && (
               <Dropdown>
-                <DropdownButton outline className="flex items-center gap-2 text-sm w-full justify-between">
-                  {selectedGroup || 'Select Group'}
+                <DropdownButton outline className="flex items-center gap-2 text-sm">
+                  {emailRole ? capitalizeFirstLetter(emailRole.split('_').at(-1) || '') : 'Select Role'}
                   <MaterialSymbol name="keyboard_arrow_down" />
                 </DropdownButton>
                 <DropdownMenu>
-                  {groups.map((group, index) => (
-                    <DropdownItem key={index} onClick={() => setSelectedGroup(group.name || '')}>
-                      <DropdownLabel>{group.name}</DropdownLabel>
-                      <DropdownDescription>Role: {group.role || 'No role assigned'}</DropdownDescription>
+                  {roles.map((role) => (
+                    <DropdownItem key={role.name} onClick={() => setEmailRole(role.name || '')}>
+                      <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
+                      <DropdownDescription>{role.permissions?.length || 0} permissions</DropdownDescription>
                     </DropdownItem>
                   ))}
                 </DropdownMenu>
               </Dropdown>
-            </div>
-            
-            {showRoleSelection && (
-              <div className="min-w-[140px]">
-                <Dropdown>
-                  <DropdownButton outline className="flex items-center gap-2 text-sm w-full justify-between">
-                    {selectedRole}
-                    <MaterialSymbol name="keyboard_arrow_down" />
-                  </DropdownButton>
-                  <DropdownMenu>
-                    <DropdownItem onClick={() => setSelectedRole('Owner')}>
-                      <DropdownLabel>Owner</DropdownLabel>
-                      <DropdownDescription>Full access to organization settings</DropdownDescription>
-                    </DropdownItem>
-                    <DropdownItem onClick={() => setSelectedRole('Admin')}>
-                      <DropdownLabel>Admin</DropdownLabel>
-                      <DropdownDescription>Can manage members and organization settings</DropdownDescription>
-                    </DropdownItem>
-                    <DropdownItem onClick={() => setSelectedRole('Member')}>
-                      <DropdownLabel>Member</DropdownLabel>
-                      <DropdownDescription>Standard member access</DropdownDescription>
-                    </DropdownItem>
-                  </DropdownMenu>
-                </Dropdown>
-              </div>
             )}
             
             <Button 
               color="blue" 
-              onClick={handleSendInvitation}
-              disabled={!newMemberEmail.trim() || !selectedGroup || isInviting}
-              className="flex items-center gap-2"
+              className='flex items-center text-sm gap-2' 
+              onClick={handleEmailsSubmit}
+              disabled={!emailsInput.trim() || isInviting || !emailRole}
             >
-              <MaterialSymbol name="send" size="sm" />
-              {isInviting ? 'Adding...' : 'Add to Group'}
+              <MaterialSymbol name="add" size="sm" />
+              {isInviting ? 'Adding...' : 'Invite'}
             </Button>
           </div>
-          
-          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-            <div className="flex">
-              <MaterialSymbol name="info" className="h-4 w-4 text-blue-600 dark:text-blue-400 mr-2 mt-0.5" />
-              <p className="text-xs text-blue-800 dark:text-blue-200">
-                <strong>Note:</strong> This is a simplified implementation. In a production system, 
-                you would first invite the user via email, then add them to the selected group once they accept.
-              </p>
+        </div>
+      ) : !loadingRoles && !loadingMembers ? (
+        // Upload file tab content
+        <div className="space-y-6">
+          {/* File Upload */}
+          <Field>
+            <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+              CSV/Excel Spreadsheet *
+            </Label>
+            <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg p-6 text-center">
+              <MaterialSymbol name="cloud_upload" size="4xl" className="text-zinc-400 mb-2" />
+              <div className="space-y-2">
+                <Text className="!text-lg text-zinc-600 dark:text-zinc-400">
+                  {uploadFile ? uploadFile.name : 'Drag and drop .csv or'}
+                </Text>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="add-members-upload"
+                />
+                
+                <label htmlFor="add-members-upload">
+                  <Button outline className='flex items-center text-sm gap-2' type="button">
+                    <MaterialSymbol name="folder_open" size="sm" />
+                    Browse
+                  </Button>
+                </label>
+              </div>
             </div>
+            <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+              <Link href="#" className="text-blue-600 hover:text-blue-700 ml-1">Check .csv file format requirements</Link>
+            </Text>
+          </Field>
+
+          {/* Role Selection */}
+          {showRoleSelection && (
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Role
+              </Label>
+              <Dropdown>
+                <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
+                  {bulkUserRole ? capitalizeFirstLetter(bulkUserRole.split('_').at(-1) || '') : 'Select Role'}
+                  <MaterialSymbol name="keyboard_arrow_down" />
+                </DropdownButton>
+                <DropdownMenu>
+                  {roles.map((role) => (
+                    <DropdownItem key={role.name} onClick={() => setBulkUserRole(role.name || '')}>
+                      <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
+                      <DropdownDescription>{role.permissions?.length || 0} permissions</DropdownDescription>
+                    </DropdownItem>
+                  ))}
+                </DropdownMenu>
+              </Dropdown>
+            </Field>
+          )}
+          
+          {/* Upload Button */}
+          <div className="flex justify-end">
+            <Button 
+              color="blue" 
+              onClick={handleBulkAddSubmit} 
+              disabled={!uploadFile || isInviting || !bulkUserRole}
+              className="flex items-center gap-2"
+            >
+              <MaterialSymbol name="add" size="sm" />
+              {isInviting ? 'Processing...' : 'Invite'}
+            </Button>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   )
 }

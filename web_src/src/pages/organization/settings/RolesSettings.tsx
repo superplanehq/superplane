@@ -23,7 +23,6 @@ import {
   authorizationListRoles,
 } from '../../../api-client/sdk.gen'
 import { AuthorizationRole } from '../../../api-client/types.gen'
-import { Tabs } from '@/components/Tabs/tabs'
 import { capitalizeFirstLetter } from '@/utils/text'
 
 interface RolesSettingsProps {
@@ -37,20 +36,6 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
   const [loadingRoles, setLoadingRoles] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [roleTabs, setRoleTabs] = useState([
-    {
-      id: 'organization',
-      label: 'Organization Roles',
-      count: 0
-    },
-    {
-      id: 'canvas',
-      label: 'Canvas Roles',
-      count: 0
-    }
-  ])
-
-  const [activeRoleTab, setActiveRoleTab] = useState<'organization' | 'canvas'>('organization')
 
   const fetchDomainRoles = useCallback(async (domainType: 'organization' | 'canvas') => {
     const response = await authorizationListRoles({
@@ -70,16 +55,6 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
       setLoadingRoles(true)
       setError(null)
       const organizationRoles = await fetchDomainRoles('organization')
-
-      setRoleTabs(prev => prev.map((tab) => {
-        if (tab.id === 'organization') {
-          return {
-            ...tab,
-            count: organizationRoles.length
-          }
-        }
-        return tab
-      }))
 
       setRoles([...organizationRoles])
     } catch (err) {
@@ -101,16 +76,11 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
 
 
   const filteredRoles = useMemo(() => roles.filter((role) => {
-    if (activeRoleTab === 'organization') {
-      return role.domainType === 'DOMAIN_TYPE_ORGANIZATION'
-    }
-    return role.domainType === 'DOMAIN_TYPE_CANVAS'
-  }).filter((role) => {
     if (search === '') {
       return true
     }
     return role.name?.toLowerCase().includes(search.toLowerCase())
-  }), [roles, search, activeRoleTab])
+  }), [roles, search])
 
   return (
     <div className="space-y-6 pt-6">
@@ -121,13 +91,6 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
           </Heading>
         </div>
       </div>
-      <Tabs
-        tabs={roleTabs}
-        defaultTab={activeRoleTab}
-        onTabChange={(tabId) => setActiveRoleTab(tabId as 'organization' | 'canvas')}
-        variant="underline"
-      />
-
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p>{error}</p>
@@ -145,7 +108,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
             onClick={handleCreateRole}
           >
             <MaterialSymbol name="add" />
-            New {capitalizeFirstLetter(activeRoleTab)} role
+            New Organization Role
           </Button>
         </div>
         <div className="px-6 pb-6">
