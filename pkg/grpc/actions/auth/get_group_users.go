@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -43,6 +44,25 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		return nil, status.Error(codes.Internal, "failed to get group roles")
 	}
 
+	// Convert user IDs to User objects with role assignments
+	var users []*pb.User
+	for _, userID := range userIDs {
+		roleAssignment := &pb.UserRoleAssignment{
+			RoleName:        role,
+			RoleDisplayName: models.GetRoleDisplayName(role, domainType, req.DomainID),
+			RoleDescription: models.GetRoleDescription(role, domainType, req.DomainID),
+			DomainType:      req.DomainType,
+			DomainId:        req.DomainID,
+			AssignedAt:      time.Now().Format(time.RFC3339),
+		}
+
+		user, err := convertUserToProto(userID, []*pb.UserRoleAssignment{roleAssignment})
+		if err != nil {
+			continue // Skip users that can't be converted
+		}
+		users = append(users, user)
+	}
+
 	group := &pb.Group{
 		Name:        req.GroupName,
 		DomainType:  req.DomainType,
@@ -53,7 +73,7 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 	}
 
 	return &GetGroupUsersResponse{
-		UserIDs: userIDs,
-		Group:   group,
+		Users: users,
+		Group: group,
 	}, nil
 }

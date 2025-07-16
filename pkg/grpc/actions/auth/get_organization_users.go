@@ -87,7 +87,6 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 			IsActive:         true,
 			CreatedAt:        time.Now().Format(time.RFC3339),
 			UpdatedAt:        time.Now().Format(time.RFC3339),
-			LastLoginAt:      "",
 			RoleAssignments:  roleAssignments,
 			AccountProviders: []*pb.AccountProvider{},
 		}, nil

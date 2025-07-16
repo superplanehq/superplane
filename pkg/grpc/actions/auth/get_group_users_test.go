@@ -39,8 +39,11 @@ func Test_GetGroupUsers(t *testing.T) {
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Len(t, resp.UserIDs, 1)
-		assert.Contains(t, resp.UserIDs, r.User.String())
+		assert.Len(t, resp.Users, 1)
+		assert.Equal(t, r.User.String(), resp.Users[0].UserId)
+		assert.NotEmpty(t, resp.Users[0].DisplayName)
+		assert.NotEmpty(t, resp.Users[0].Email)
+		assert.NotEmpty(t, resp.Users[0].RoleAssignments)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
@@ -94,8 +97,8 @@ func Test_GetGroupUsers(t *testing.T) {
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Len(t, resp.UserIDs, 1)
-		assert.Contains(t, resp.UserIDs, r.User.String())
+		assert.Len(t, resp.Users, 1)
+		assert.Equal(t, r.User.String(), resp.Users[0].UserId)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
@@ -118,7 +121,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		resp, err := GetGroupUsers(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Empty(t, resp.UserIDs)
+		assert.Empty(t, resp.Users)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)

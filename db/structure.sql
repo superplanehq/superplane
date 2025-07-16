@@ -227,7 +227,8 @@ CREATE TABLE public.organizations (
     created_by uuid NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    description text DEFAULT ''::text
 );
 
 
@@ -625,6 +626,13 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
+
+
+--
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -853,7 +861,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250715123537	f
+20250716172940	f
 \.
 
 

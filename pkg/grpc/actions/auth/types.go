@@ -46,8 +46,8 @@ type GetGroupUsersRequest struct {
 }
 
 type GetGroupUsersResponse struct {
-	UserIDs []string
-	Group   *pb.Group
+	Users []*pb.User
+	Group *pb.Group
 }
 
 func ValidateGroupRequest(req *GroupRequest) error {
@@ -166,8 +166,8 @@ func ConvertGetOrganizationGroupUsersRequest(req *pb.GetOrganizationGroupUsersRe
 
 func ConvertToGetOrganizationGroupUsersResponse(resp *GetGroupUsersResponse) *pb.GetOrganizationGroupUsersResponse {
 	return &pb.GetOrganizationGroupUsersResponse{
-		UserIds: resp.UserIDs,
-		Group:   resp.Group,
+		Users: resp.Users,
+		Group: resp.Group,
 	}
 }
 
@@ -251,8 +251,8 @@ func ConvertGetCanvasGroupUsersRequest(req *pb.GetCanvasGroupUsersRequest) (*Get
 
 func ConvertToGetCanvasGroupUsersResponse(resp *GetGroupUsersResponse) *pb.GetCanvasGroupUsersResponse {
 	return &pb.GetCanvasGroupUsersResponse{
-		UserIds: resp.UserIDs,
-		Group:   resp.Group,
+		Users: resp.Users,
+		Group: resp.Group,
 	}
 }
 
