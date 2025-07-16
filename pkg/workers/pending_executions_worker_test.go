@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
@@ -13,7 +14,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
-	"gorm.io/datatypes"
 )
 
 const ExecutionStartedRoutingKey = "execution-started"
@@ -39,13 +39,23 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executor, resource := support.Executor(r)
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		executorType, executorSpec, resource := support.Executor(r)
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -86,50 +96,57 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executor, resource := support.Executor(r)
-		semaphoreSpec := executor.Spec.Data().Semaphore
-		semaphoreSpec.Parameters = map[string]string{
+		executorType, executorSpec, resource := support.Executor(r)
+		executorSpec.Semaphore.Parameters = map[string]string{
 			"REF":      "${{ inputs.REF }}",
 			"REF_TYPE": "${{ inputs.REF_TYPE }}",
 		}
 
-		executor.Spec = datatypes.NewJSONType(models.ExecutorSpec{
-			Semaphore: semaphoreSpec,
-		})
-
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceName: r.Source.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{Name: "REF"},
-			{Name: "REF_TYPE"},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "REF",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs([]models.InputDefinition{
+				{Name: "REF"},
+				{Name: "REF_TYPE"},
+			}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "REF",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref",
+								},
 							},
 						},
-					},
-					{
-						Name: "REF_TYPE",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref_type",
+						{
+							Name: "REF_TYPE",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref_type",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//

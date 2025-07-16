@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -29,13 +30,24 @@ func Test__TimeWindowWorker(t *testing.T) {
 		},
 	}
 
-	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), conditions, *executor, resource, []models.Connection{
-		{
-			SourceID:   r.Source.ID,
-			SourceType: models.SourceTypeEventSource,
-		},
-	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+	executorType, executorSpec, resource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections([]models.Connection{
+			{
+				SourceID:   r.Source.ID,
+				SourceType: models.SourceTypeEventSource,
+			},
+		}).
+		WithConditions(conditions).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		WithExecutorResource(resource).
+		Create()
+
 	require.NoError(t, err)
 
 	t.Run("event is not in time window -> does nothing", func(t *testing.T) {

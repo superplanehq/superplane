@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -94,6 +95,35 @@ func Test__CreateStage(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "invalid connection: event source source-does-not-exist not found", s.Message())
+	})
+
+	t.Run("connection for internal event source -> error", func(t *testing.T) {
+		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
+		_, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.Name,
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{
+					Name: "test",
+				},
+				Spec: &pb.Stage_Spec{
+					Executor: executor,
+					Connections: []*pb.Connection{
+						{
+							Name: internalSource.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid connection: event source internal not found", s.Message())
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -26,18 +27,29 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 	})
 
 	amqpURL, _ := config.RabbitMQURL()
-	executor, resource := support.Executor(r)
+	executorType, executorSpec, resource := support.Executor(r)
 
 	t.Run("stage does not require approval -> creates execution", func(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-no-approval-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
@@ -76,12 +88,24 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-1", r.User.String(), conditions, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-approval-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -108,12 +132,24 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-approval-2", r.User.String(), conditions, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-approval-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
@@ -160,12 +196,24 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window", r.User.String(), conditions, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-time-window").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -208,12 +256,24 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-time-window-2", r.User.String(), conditions, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-time-window-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -249,12 +309,23 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-no-approval-3", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-no-approval-3").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 
 		//

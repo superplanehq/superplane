@@ -182,7 +182,8 @@ CREATE TABLE public.event_sources (
     updated_at timestamp without time zone NOT NULL,
     key bytea NOT NULL,
     resource_id uuid,
-    state character varying(64) NOT NULL
+    state character varying(64) NOT NULL,
+    scope character varying(64) NOT NULL
 );
 
 

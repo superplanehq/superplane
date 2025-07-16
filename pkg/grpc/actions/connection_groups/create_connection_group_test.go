@@ -85,6 +85,32 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		assert.Equal(t, "connections must not be empty", s.Message())
 	})
 
+	t.Run("cannot use internal event source in connection -> error", func(t *testing.T) {
+		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		require.NoError(t, err)
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
+		req := &protos.CreateConnectionGroupRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			ConnectionGroup: &protos.ConnectionGroup{
+				Metadata: &protos.ConnectionGroup_Metadata{
+					Name: "test",
+				},
+				Spec: &protos.ConnectionGroup_Spec{
+					Connections: []*protos.Connection{
+						{Name: internalSource.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+					},
+				},
+			},
+		}
+
+		_, err = CreateConnectionGroup(ctx, req)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid connection: event source internal not found", s.Message())
+	})
+
 	t.Run("connection group with no group by fields -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 		req := &protos.CreateConnectionGroupRequest{

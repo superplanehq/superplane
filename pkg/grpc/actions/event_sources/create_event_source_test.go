@@ -24,7 +24,6 @@ func Test__CreateEventSource(t *testing.T) {
 	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		// Create EventSource with nested metadata structure
 		eventSource := &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",
@@ -49,7 +48,6 @@ func Test__CreateEventSource(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		// Create EventSource with nested metadata structure
 		eventSource := &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",
@@ -73,7 +71,6 @@ func Test__CreateEventSource(t *testing.T) {
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
-		// Create EventSource with nested metadata structure
 		eventSource := &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",

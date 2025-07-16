@@ -60,7 +60,7 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error finding integration resource: %v", err)
 	}
 
-	integration, err := models.FindIntegrationByID("canvas", eventSource.CanvasID, resource.IntegrationID)
+	integration, err := models.FindIntegrationByID(resource.IntegrationID)
 	if err != nil {
 		return fmt.Errorf("error finding integration: %v", err)
 	}

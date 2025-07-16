@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -76,24 +78,27 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	executor, resource, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
+	specValidationResponse, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	stage, err := canvas.CreateStage(
-		encryptor,
-		req.Stage.Metadata.Name,
-		userID,
-		conditions,
-		*executor,
-		resource,
-		connections,
-		inputValidator.SerializeInputs(),
-		inputValidator.SerializeInputMappings(),
-		inputValidator.SerializeOutputs(),
-		secrets,
-	)
+	stage, err := builders.NewStageBuilder().
+		WithContext(ctx).
+		WithEncryptor(encryptor).
+		InCanvas(canvas).
+		WithName(req.Stage.Metadata.Name).
+		WithRequester(uuid.MustParse(userID)).
+		WithConditions(conditions).
+		WithConnections(connections).
+		WithInputs(inputValidator.SerializeInputs()).
+		WithInputMappings(inputValidator.SerializeInputMappings()).
+		WithOutputs(inputValidator.SerializeOutputs()).
+		WithSecrets(secrets).
+		WithExecutorType(specValidationResponse.ExecutorType).
+		WithExecutorSpec(specValidationResponse.ExecutorSpec).
+		WithExecutorResource(specValidationResponse.ExecutorResource).
+		Create()
 
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {

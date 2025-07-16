@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -52,7 +53,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"), nil)
+	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"), models.EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	validEvent := []byte(`{"action": "created"}`)
@@ -184,7 +185,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	canvas, err := models.CreateCanvas(userID, org.ID, "test")
 	require.NoError(t, err)
 
-	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"), nil)
+	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"), models.EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	// No need to include organization ID in the payload anymore
@@ -322,18 +323,28 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		Integration: true,
 	})
 
-	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-		{
-			SourceID:   r.Source.ID,
-			SourceType: models.SourceTypeEventSource,
-		},
-	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
-		{Name: "version", Required: true},
-		{Name: "sha", Required: true},
-	}, []models.ValueDefinition{})
-	require.NoError(t, err)
+	executorType, executorSpec, resource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections([]models.Connection{
+			{
+				SourceID:   r.Source.ID,
+				SourceType: models.SourceTypeEventSource,
+			},
+		}).
+		WithOutputs([]models.OutputDefinition{
+			{Name: "version", Required: true},
+			{Name: "sha", Required: true},
+		}).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		WithExecutorResource(resource).
+		Create()
 
+	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)

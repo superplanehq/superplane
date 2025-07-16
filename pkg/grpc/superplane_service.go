@@ -59,7 +59,7 @@ func (s *SuperplaneService) DescribeStage(ctx context.Context, req *pb.DescribeS
 }
 
 func (s *SuperplaneService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return stages.UpdateStage(ctx, s.specValidator, req)
+	return stages.UpdateStage(ctx, s.encryptor, s.specValidator, req)
 }
 
 func (s *SuperplaneService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {

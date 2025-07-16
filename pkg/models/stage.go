@@ -221,6 +221,12 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	return &stage, nil
 }
 
+func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
+	connection.TargetID = s.ID
+	connection.TargetType = ConnectionTargetTypeStage
+	return tx.Create(&connection).Error
+}
+
 func (s *Stage) ApprovalsRequired() int {
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {

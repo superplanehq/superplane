@@ -34,6 +34,7 @@ CREATE TABLE resources (
 ALTER TABLE event_sources
   ADD COLUMN resource_id uuid,
   ADD COLUMN state CHARACTER VARYING(64) NOT NULL,
+  ADD COLUMN scope CHARACTER VARYING(64) NOT NULL,
   ADD FOREIGN KEY (resource_id) REFERENCES resources(id);
 
 ALTER TABLE stages DROP COLUMN executor_spec;

@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	EventSourceStatePending = "pending"
-	EventSourceStateReady   = "ready"
+	EventSourceStatePending  = "pending"
+	EventSourceStateReady    = "ready"
+	EventSourceScopeExternal = "external"
+	EventSourceScopeInternal = "internal"
 )
 
 type EventSource struct {
@@ -20,6 +22,7 @@ type EventSource struct {
 	Name       string
 	Key        []byte
 	State      string
+	Scope      string
 	CreatedAt  *time.Time
 	UpdatedAt  *time.Time
 }
@@ -56,9 +59,13 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	return &eventSource, nil
 }
 
-func FindEventSourceByResourceID(resourceID uuid.UUID) (*EventSource, error) {
+func FindEventSourceForResource(resourceID uuid.UUID) (*EventSource, error) {
+	return FindEventSourceForResourceInTransaction(database.Conn(), resourceID)
+}
+
+func FindEventSourceForResourceInTransaction(tx *gorm.DB, resourceID uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource
-	err := database.Conn().
+	err := tx.
 		Where("resource_id = ?", resourceID).
 		First(&eventSource).
 		Error
@@ -74,6 +81,7 @@ func (c *Canvas) ListEventSources() ([]EventSource, error) {
 	var sources []EventSource
 	err := database.Conn().
 		Where("canvas_id = ?", c.ID).
+		Where("scope = ?", EventSourceScopeExternal).
 		Find(&sources).
 		Error
 
@@ -99,15 +107,14 @@ func ListPendingEventSources() ([]EventSource, error) {
 	return eventSources, nil
 }
 
-func FindExecutorFromSource(sourceID uuid.UUID) (*StageExecutor, error) {
+func FindExecutorForResource(resourceID uuid.UUID) (*StageExecutor, error) {
 	var executor StageExecutor
 
 	err := database.Conn().
-		Table("event_sources").
+		Table("resources").
 		Select("stage_executors.*").
-		Joins("INNER JOIN resources ON resources.id = event_sources.resource_id").
 		Joins("INNER JOIN stage_executors ON stage_executors.resource_id = resources.id").
-		Where("event_sources.id = ?", sourceID).
+		Where("resources.id = ?", resourceID).
 		First(&executor).
 		Error
 

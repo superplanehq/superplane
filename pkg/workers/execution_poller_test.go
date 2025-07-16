@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -29,10 +30,19 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
-	require.NoError(t, err)
+	executorType, executorSpec, resource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections(connections).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		WithExecutorResource(resource).
+		Create()
 
+	require.NoError(t, err)
 	resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)
 	require.NoError(t, err)
 
@@ -99,16 +109,24 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		executor, resource := support.Executor(r)
-		stageWithOutput, err := r.Canvas.CreateStage(r.Encryptor, "stage-with-output", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceName: r.Source.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
-			{Name: "MY_OUTPUT", Required: true},
-		}, []models.ValueDefinition{})
+		executorType, executorSpec, resource := support.Executor(r)
+		stageWithOutput, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-output").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithOutputs([]models.OutputDefinition{{Name: "MY_OUTPUT", Required: true}}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 		resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)

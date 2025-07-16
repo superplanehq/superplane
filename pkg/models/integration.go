@@ -111,12 +111,10 @@ func FindIntegrationByName(domainType string, domainID uuid.UUID, name string) (
 	return &integration, nil
 }
 
-func FindIntegrationByID(domainType string, domainID uuid.UUID, id uuid.UUID) (*Integration, error) {
+func FindIntegrationByID(id uuid.UUID) (*Integration, error) {
 	integration := Integration{}
 
 	err := database.Conn().
-		Where("domain_type = ?", domainType).
-		Where("domain_id = ?", domainID).
 		Where("id = ?", id).
 		First(&integration).
 		Error
@@ -128,7 +126,7 @@ func FindIntegrationByID(domainType string, domainID uuid.UUID, id uuid.UUID) (*
 	return &integration, nil
 }
 
-func FindDomainIntegrationByID(domainType string, domainID, id uuid.UUID) (*Integration, error) {
+func FindDomainIntegration(domainType string, domainID uuid.UUID, id uuid.UUID) (*Integration, error) {
 	integration := Integration{}
 
 	err := database.Conn().

@@ -1,14 +1,11 @@
 package models
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -32,12 +29,12 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
-func (c *Canvas) CreateEventSource(name string, key []byte, resourceId *uuid.UUID) (*EventSource, error) {
-	return c.CreateEventSourceInTransaction(database.Conn(), name, key, resourceId)
+func (c *Canvas) CreateEventSource(name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
+	return c.CreateEventSourceInTransaction(database.Conn(), name, key, scope, resourceId)
 }
 
 // NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []byte, resourceId *uuid.UUID) (*EventSource, error) {
+func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
 	now := time.Now()
 
 	eventSource := EventSource{
@@ -48,6 +45,7 @@ func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []
 		Key:        key,
 		ResourceID: resourceId,
 		State:      EventSourceStatePending,
+		Scope:      scope,
 	}
 
 	err := tx.
@@ -71,6 +69,7 @@ func (c *Canvas) FindEventSourceByName(name string) (*EventSource, error) {
 	err := database.Conn().
 		Where("canvas_id = ?", c.ID).
 		Where("name = ?", name).
+		Where("scope = ?", EventSourceScopeExternal).
 		First(&eventSource).
 		Error
 
@@ -135,6 +134,7 @@ func (c *Canvas) FindEventSourceByID(id uuid.UUID) (*EventSource, error) {
 	err := database.Conn().
 		Where("id = ?", id).
 		Where("canvas_id = ?", c.ID).
+		Where("scope = ?", EventSourceScopeExternal).
 		First(&eventSource).
 		Error
 
@@ -194,12 +194,29 @@ func (c *Canvas) ListConnectionGroups() ([]ConnectionGroup, error) {
 }
 
 func (c *Canvas) CreateStage(
-	encryptor crypto.Encryptor,
 	name, createdBy string,
 	conditions []StageCondition,
-	executor StageExecutor,
-	resource *Resource,
-	connections []Connection,
+	inputs []InputDefinition,
+	inputMappings []InputMapping,
+	outputs []OutputDefinition,
+	secrets []ValueDefinition,
+) (*Stage, error) {
+	return c.CreateStageInTransaction(
+		database.Conn(),
+		name,
+		createdBy,
+		conditions,
+		inputs,
+		inputMappings,
+		outputs,
+		secrets,
+	)
+}
+
+func (c *Canvas) CreateStageInTransaction(
+	tx *gorm.DB,
+	name, createdBy string,
+	conditions []StageCondition,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
 	outputs []OutputDefinition,
@@ -219,154 +236,16 @@ func (c *Canvas) CreateStage(
 		Secrets:       datatypes.NewJSONSlice(secrets),
 	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		err := tx.Clauses(clause.Returning{}).Create(&stage).Error
-		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-				return ErrNameAlreadyUsed
-			}
-
-			return err
-		}
-
-		err = c.createStageExecutor(tx, encryptor, stage, executor, resource)
-		if err != nil {
-			return err
-		}
-
-		for _, i := range connections {
-			c := i
-			c.TargetID = stage.ID
-			c.TargetType = ConnectionTargetTypeStage
-			err := tx.Create(&c).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
+	err := tx.Clauses(clause.Returning{}).Create(&stage).Error
 	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
+		}
+
 		return nil, err
 	}
 
 	return stage, nil
-}
-
-func (c *Canvas) createStageExecutor(tx *gorm.DB, encryptor crypto.Encryptor, stage *Stage, executor StageExecutor, resource *Resource) error {
-	now := time.Now()
-
-	//
-	// If the executor is not associated with an integration/resource,
-	// we just associate it with the stage, and return.
-	//
-	if resource == nil {
-		executor.StageID = stage.ID
-		return tx.Create(&executor).Error
-	}
-
-	//
-	// Check if there is already a resource created for this.
-	// If not, create one and attach it to a new event source.
-	//
-	r, err := FindResourceInTransaction(tx, resource.IntegrationID, resource.ResourceType, resource.ResourceName)
-	if err != nil {
-		if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
-		}
-
-		r = resource
-		r.CreatedAt = &now
-		err := tx.Clauses(clause.Returning{}).Create(&r).Error
-		if err != nil {
-			return fmt.Errorf("error creating executor resource: %v", err)
-		}
-
-		_, key, err := genNewEventSourceKey(context.Background(), encryptor, resource.ResourceName)
-		if err != nil {
-			return err
-		}
-
-		_, err = c.CreateEventSourceInTransaction(tx, r.ResourceName, key, &r.ID)
-		if err != nil {
-			return fmt.Errorf("error creating event source for resource: %v", err)
-		}
-	}
-
-	executor.ResourceID = r.ID
-
-	//
-	// Create stage executor
-	//
-	executor.StageID = stage.ID
-	return tx.Create(&executor).Error
-}
-
-func (c *Canvas) UpdateStage(
-	id, requesterID string,
-	conditions []StageCondition,
-	executor StageExecutor,
-	resource *Resource,
-	connections []Connection,
-	inputs []InputDefinition,
-	inputMappings []InputMapping,
-	outputs []OutputDefinition,
-	secrets []ValueDefinition,
-) error {
-	now := time.Now()
-
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("target_id = ?", id).Delete(&Connection{}).Error; err != nil {
-			return fmt.Errorf("failed to delete existing connections: %v", err)
-		}
-
-		if err := tx.Where("stage_id = ?", id).Delete(&StageExecutor{}).Error; err != nil {
-			return fmt.Errorf("failed to delete existing executor: %v", err)
-		}
-
-		for _, connection := range connections {
-			connection.TargetID = uuid.Must(uuid.Parse(id))
-			connection.TargetType = ConnectionTargetTypeStage
-			if err := tx.Create(&connection).Error; err != nil {
-				return fmt.Errorf("failed to create connection: %v", err)
-			}
-		}
-
-		if resource != nil {
-			resource.CreatedAt = &now
-			err := tx.Clauses(clause.Returning{}).Create(&resource).Error
-			if err != nil {
-				return fmt.Errorf("error creating executor resource: %v", err)
-			}
-
-			executor.ResourceID = resource.ID
-		}
-
-		executor.StageID = uuid.MustParse(id)
-		err := tx.Create(&executor).Error
-		if err != nil {
-			return err
-		}
-
-		now := time.Now()
-		err = tx.Model(&Stage{}).
-			Where("id = ?", id).
-			Update("updated_at", now).
-			Update("updated_by", requesterID).
-			Update("conditions", datatypes.NewJSONSlice(conditions)).
-			Update("inputs", datatypes.NewJSONSlice(inputs)).
-			Update("input_mappings", datatypes.NewJSONSlice(inputMappings)).
-			Update("outputs", datatypes.NewJSONSlice(outputs)).
-			Update("secrets", datatypes.NewJSONSlice(secrets)).
-			Error
-
-		if err != nil {
-			return fmt.Errorf("failed to update stage: %v", err)
-		}
-
-		return nil
-	})
 }
 
 func ListCanvases() ([]Canvas, error) {
@@ -469,16 +348,6 @@ func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string) (*Canvas,
 	}
 
 	return nil, err
-}
-
-func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name string) (string, []byte, error) {
-	plainKey, _ := crypto.Base64String(32)
-	encrypted, err := encryptor.Encrypt(ctx, []byte(plainKey), []byte(name))
-	if err != nil {
-		return "", nil, err
-	}
-
-	return plainKey, encrypted, nil
 }
 
 // GetCanvasIDs returns only the IDs of all canvases

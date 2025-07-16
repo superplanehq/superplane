@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -28,7 +29,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
-	executor, resource := support.Executor(r)
+
+	executorType, executorSpec, resource := support.Executor(r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
 		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
@@ -47,16 +49,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		stage1, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
+		inputs := []models.InputDefinition{{Name: "VERSION"}}
+		inputMappings := []models.InputMapping{
 			{
 				Values: []models.ValueDefinition{
 					{
@@ -70,38 +64,48 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		}
+
+		stage1, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs(inputs).
+			WithInputMappings(inputMappings).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 
-		stage2, err := r.Canvas.CreateStage(r.Encryptor, "stage-2", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
-							},
-						},
-					},
+		stage2, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithInputs(inputs).
+			WithInputMappings(inputMappings).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
-
 		testconsumer := testconsumer.New(amqpURL, EventCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -139,7 +143,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), nil)
+		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 
 		//
@@ -209,62 +213,77 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-3", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
+		firstStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-3").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs([]models.InputDefinition{{Name: "VERSION"}}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{
-			{
-				Name:     "VERSION",
-				Required: true,
-			},
-		}, []models.ValueDefinition{})
+			}).
+			WithOutputs([]models.OutputDefinition{
+				{
+					Name:     "VERSION",
+					Required: true,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 
-		_, err = r.Canvas.CreateStage(r.Encryptor, "stage-4", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   firstStage.ID,
-				SourceType: models.SourceTypeStage,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: firstStage.Name,
-								Expression: "outputs.VERSION",
+		secondStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-4").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   firstStage.ID,
+					SourceType: models.SourceTypeStage,
+				},
+			}).
+			WithInputs([]models.InputDefinition{{Name: "VERSION"}}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: firstStage.Name,
+									Expression: "outputs.VERSION",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 
@@ -289,7 +308,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 		events, err := firstStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
-		secondStage, _ := r.Canvas.FindStageByName("stage-4")
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 1)
@@ -303,39 +321,57 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		firstStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-5", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:       r.Source.ID,
-				SourceType:     models.SourceTypeEventSource,
-				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.Filter{
-					{
-						Type: models.FilterTypeData,
-						Data: &models.DataFilter{
-							Expression: "ref == 'v1'",
+		firstStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-5").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:       r.Source.ID,
+					SourceType:     models.SourceTypeEventSource,
+					FilterOperator: models.FilterOperatorAnd,
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "ref == 'v1'",
+							},
 						},
 					},
 				},
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 
-		secondStage, err := r.Canvas.CreateStage(r.Encryptor, "stage-6", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:       r.Source.ID,
-				SourceType:     models.SourceTypeEventSource,
-				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.Filter{
-					{
-						Type: models.FilterTypeData,
-						Data: &models.DataFilter{
-							Expression: "ref == 'v2'",
+		secondStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-6").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:       r.Source.ID,
+					SourceType:     models.SourceTypeEventSource,
+					FilterOperator: models.FilterOperatorAnd,
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "ref == 'v2'",
+							},
 						},
 					},
 				},
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 
@@ -372,12 +408,22 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// Create pending execution resource
 		//
 		workflowID := uuid.New().String()
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-7", r.User.String(), []models.StageCondition{}, *executor, resource, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-7").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
+
 		require.NoError(t, err)
 		execution := support.CreateExecution(t, r.Source, stage)
 		_, err = execution.AddResource(workflowID, resource.ID)
@@ -400,7 +446,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		eventData, err := json.Marshal(hook)
 		require.NoError(t, err)
-		source, err := models.FindEventSourceByResourceID(resource.ID)
+		source, err := models.FindEventSourceForResource(resource.ID)
 		require.NoError(t, err)
 		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
 		require.NoError(t, err)

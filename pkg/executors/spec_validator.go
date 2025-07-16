@@ -12,16 +12,22 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
-	"gorm.io/datatypes"
 )
 
 type SpecValidator struct {
 	Encryptor crypto.Encryptor
 }
 
-func (v *SpecValidator) Validate(ctx context.Context, canvas *models.Canvas, in *pb.ExecutorSpec) (*models.StageExecutor, *models.Resource, error) {
+type SpecValidationResponse struct {
+	Integration      *models.Integration
+	ExecutorType     string
+	ExecutorSpec     *models.ExecutorSpec
+	ExecutorResource *models.Resource
+}
+
+func (v *SpecValidator) Validate(ctx context.Context, canvas *models.Canvas, in *pb.ExecutorSpec) (*SpecValidationResponse, error) {
 	if in == nil {
-		return nil, nil, fmt.Errorf("missing executor spec")
+		return nil, fmt.Errorf("missing executor spec")
 	}
 
 	switch in.Type {
@@ -30,17 +36,17 @@ func (v *SpecValidator) Validate(ctx context.Context, canvas *models.Canvas, in 
 	case pb.ExecutorSpec_TYPE_HTTP:
 		return v.validateHTTPExecutorSpec(in)
 	default:
-		return nil, nil, errors.New("invalid executor spec type")
+		return nil, errors.New("invalid executor spec type")
 	}
 }
 
-func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*models.StageExecutor, *models.Resource, error) {
+func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*SpecValidationResponse, error) {
 	if in.Http == nil {
-		return nil, nil, fmt.Errorf("invalid HTTP executor spec: missing HTTP executor spec")
+		return nil, fmt.Errorf("invalid HTTP executor spec: missing HTTP executor spec")
 	}
 
 	if in.Http.Url == "" {
-		return nil, nil, fmt.Errorf("invalid HTTP executor spec: missing URL")
+		return nil, fmt.Errorf("invalid HTTP executor spec: missing URL")
 	}
 
 	headers := in.Http.Headers
@@ -61,7 +67,7 @@ func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*models.S
 	} else {
 		for _, code := range in.Http.ResponsePolicy.StatusCodes {
 			if code < http.StatusOK || code > http.StatusNetworkAuthenticationRequired {
-				return nil, nil, fmt.Errorf("invalid HTTP executor spec: invalid status code: %d", code)
+				return nil, fmt.Errorf("invalid HTTP executor spec: invalid status code: %d", code)
 			}
 		}
 
@@ -70,69 +76,71 @@ func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec) (*models.S
 		}
 	}
 
-	return &models.StageExecutor{
-		Type: models.ExecutorSpecTypeHTTP,
-		Spec: datatypes.NewJSONType(models.ExecutorSpec{
+	return &SpecValidationResponse{
+		ExecutorType: models.ExecutorSpecTypeHTTP,
+		ExecutorSpec: &models.ExecutorSpec{
 			HTTP: &models.HTTPExecutorSpec{
 				URL:            in.Http.Url,
 				Headers:        headers,
 				Payload:        payload,
 				ResponsePolicy: responsePolicy,
 			},
-		}),
-	}, nil, nil
+		},
+	}, nil
 }
 
-func (v *SpecValidator) validateSemaphoreExecutorSpec(ctx context.Context, canvas *models.Canvas, in *pb.ExecutorSpec) (*models.StageExecutor, *models.Resource, error) {
+func (v *SpecValidator) validateSemaphoreExecutorSpec(ctx context.Context, canvas *models.Canvas, in *pb.ExecutorSpec) (*SpecValidationResponse, error) {
 	if in.Semaphore == nil {
-		return nil, nil, fmt.Errorf("invalid semaphore executor spec: missing semaphore executor spec")
+		return nil, fmt.Errorf("invalid semaphore executor spec: missing semaphore executor spec")
 	}
 
 	if in.Integration == nil {
-		return nil, nil, fmt.Errorf("invalid semaphore executor spec: missing integration")
+		return nil, fmt.Errorf("invalid semaphore executor spec: missing integration")
 	}
 
 	// TODO: support for organization level canvas
 	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, in.Integration.Name)
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid semaphore executor spec: integration not found")
+		return nil, fmt.Errorf("invalid semaphore executor spec: integration not found")
 	}
 
 	if integration.Type != models.IntegrationTypeSemaphore {
-		return nil, nil, fmt.Errorf("invalid semaphore executor spec: integration is not of type semaphore")
+		return nil, fmt.Errorf("invalid semaphore executor spec: integration is not of type semaphore")
 	}
 
 	i, err := integrations.NewIntegration(ctx, integration, v.Encryptor)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error building integration: %v", err)
+		return nil, fmt.Errorf("error building integration: %v", err)
 	}
 
 	project, err := i.Get(integrations.ResourceTypeProject, in.Semaphore.Project)
 	if err != nil {
-		return nil, nil, fmt.Errorf("project %s not found: %v", in.Semaphore.Project, err)
+		return nil, fmt.Errorf("project %s not found: %v", in.Semaphore.Project, err)
 	}
 
 	taskId, err := v.findSemaphoreTaskId(i, project, in.Semaphore)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return &models.StageExecutor{
-			Type: models.ExecutorSpecTypeSemaphore,
-			Spec: datatypes.NewJSONType(models.ExecutorSpec{
-				Semaphore: &models.SemaphoreExecutorSpec{
-					TaskId:       taskId,
-					Branch:       in.Semaphore.Branch,
-					PipelineFile: in.Semaphore.PipelineFile,
-					Parameters:   in.Semaphore.Parameters,
-				},
-			}),
-		}, &models.Resource{
+	return &SpecValidationResponse{
+		Integration:  integration,
+		ExecutorType: models.ExecutorSpecTypeSemaphore,
+		ExecutorSpec: &models.ExecutorSpec{
+			Semaphore: &models.SemaphoreExecutorSpec{
+				TaskId:       taskId,
+				Branch:       in.Semaphore.Branch,
+				PipelineFile: in.Semaphore.PipelineFile,
+				Parameters:   in.Semaphore.Parameters,
+			},
+		},
+		ExecutorResource: &models.Resource{
 			ExternalID:    project.Id(),
 			ResourceName:  project.Name(),
 			IntegrationID: integration.ID,
 			ResourceType:  integrations.ResourceTypeProject,
-		}, nil
+		},
+	}, nil
 }
 
 func (v *SpecValidator) findSemaphoreTaskId(i integrations.Integration, project integrations.Resource, spec *pb.ExecutorSpec_Semaphore) (*string, error) {

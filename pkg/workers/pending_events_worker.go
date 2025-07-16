@@ -88,7 +88,14 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	e, err := models.FindExecutorFromSource(event.SourceID)
+	//
+	// If this event source is not tied to a resource, there's nothing to do here.
+	//
+	if eventSource.ResourceID == nil {
+		return nil
+	}
+
+	e, err := models.FindExecutorForResource(*eventSource.ResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logger.Infof("No executor found for event source %s - skipping execution updates", event.SourceID)

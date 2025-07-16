@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/builders"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -17,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -55,7 +58,7 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	executor, resource, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
+	specValidationResponse, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -87,18 +90,22 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateStage(
-		stage.ID.String(),
-		userID,
-		conditions,
-		*executor,
-		resource,
-		connections,
-		inputValidator.SerializeInputs(),
-		inputValidator.SerializeInputMappings(),
-		inputValidator.SerializeOutputs(),
-		secrets,
-	)
+	stage, err = builders.NewStageBuilder().
+		WithContext(ctx).
+		WithExistingStage(stage).
+		WithEncryptor(encryptor).
+		InCanvas(canvas).
+		WithRequester(uuid.MustParse(userID)).
+		WithConditions(conditions).
+		WithConnections(connections).
+		WithInputs(inputValidator.SerializeInputs()).
+		WithInputMappings(inputValidator.SerializeInputMappings()).
+		WithOutputs(inputValidator.SerializeOutputs()).
+		WithSecrets(secrets).
+		WithExecutorType(specValidationResponse.ExecutorType).
+		WithExecutorSpec(specValidationResponse.ExecutorSpec).
+		WithExecutorResource(specValidationResponse.ExecutorResource).
+		Update()
 
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {

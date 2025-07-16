@@ -72,7 +72,7 @@ func Test__UpdateStage(t *testing.T) {
 	stageID := stage.Stage.Metadata.Id
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       "invalid-uuid",
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -84,7 +84,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       uuid.NewString(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -96,7 +96,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -108,7 +108,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -131,7 +131,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -162,7 +162,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -195,7 +195,7 @@ func Test__UpdateStage(t *testing.T) {
 			Parameters:   map[string]string{},
 		}
 
-		res, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		res, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{

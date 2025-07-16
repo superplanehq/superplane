@@ -46,7 +46,7 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, req *p
 		return nil, err
 	}
 
-	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, source.Name)
+	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, source.Name)
 	if err != nil {
 		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
 		return nil, status.Error(codes.Internal, "error generating key")
@@ -58,8 +58,13 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, req *p
 		return nil, status.Error(codes.Internal, "error updating key")
 	}
 
+	protoSource, err := serializeEventSource(*source)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &pb.ResetEventSourceKeyResponse{
-		EventSource: serializeEventSource(*source),
+		EventSource: protoSource,
 		Key:         string(plainKey),
 	}
 

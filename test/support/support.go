@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -67,7 +68,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), nil)
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 	}
 
@@ -110,23 +111,24 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		executor, resource := Executor(&r)
-		stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1",
-			r.User.String(),
-			conditions,
-			*executor,
-			resource,
-			[]models.Connection{
+		executorType, executorSpec, resource := Executor(&r)
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConditions(conditions).
+			WithConnections([]models.Connection{
 				{
 					SourceType: models.SourceTypeEventSource,
 					SourceID:   r.Source.ID,
 					SourceName: r.Source.Name,
 				},
-			},
-			[]models.InputDefinition{
+			}).
+			WithInputs([]models.InputDefinition{
 				{Name: "VERSION"},
-			},
-			[]models.InputMapping{
+			}).
+			WithInputMappings([]models.InputMapping{
 				{
 					Values: []models.ValueDefinition{
 						{Name: "VERSION", ValueFrom: &models.ValueDefinitionFrom{
@@ -137,10 +139,11 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 						}},
 					},
 				},
-			},
-			[]models.OutputDefinition{},
-			[]models.ValueDefinition{},
-		)
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			WithExecutorResource(resource).
+			Create()
 
 		require.NoError(t, err)
 		r.Stage = stage
@@ -219,19 +222,16 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (*models.StageExecutor, *models.Resource) {
-	return &models.StageExecutor{
-			Type: models.ExecutorSpecTypeSemaphore,
-			Spec: datatypes.NewJSONType(models.ExecutorSpec{
-				Semaphore: &models.SemaphoreExecutorSpec{
-					Branch:       "main",
-					PipelineFile: ".semaphore/run.yml",
-					Parameters: map[string]string{
-						"PARAM_1": "VALUE_1",
-						"PARAM_2": "VALUE_2",
-					},
+func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, *models.Resource) {
+	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
+			Semaphore: &models.SemaphoreExecutorSpec{
+				Branch:       "main",
+				PipelineFile: ".semaphore/run.yml",
+				Parameters: map[string]string{
+					"PARAM_1": "VALUE_1",
+					"PARAM_2": "VALUE_2",
 				},
-			}),
+			},
 		}, &models.Resource{
 			ResourceType:  integrations.ResourceTypeProject,
 			ExternalID:    uuid.NewString(),

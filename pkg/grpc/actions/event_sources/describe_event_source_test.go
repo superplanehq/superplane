@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -90,5 +91,20 @@ func Test__DescribeEventSource(t *testing.T) {
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, *r.Source.CreatedAt, response.EventSource.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, r.Source.Name, response.EventSource.Metadata.Name)
+	})
+
+	t.Run("internal event source cannot be described", func(t *testing.T) {
+		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		require.NoError(t, err)
+
+		_, err = DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Name:           internalSource.Name,
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, "event source not found", s.Message())
 	})
 }

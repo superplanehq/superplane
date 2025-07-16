@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -30,8 +31,18 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		},
 	}
 
-	executor, resource := support.Executor(r)
-	stage, err := r.Canvas.CreateStage(r.Encryptor, "stage-1", r.User.String(), []models.StageCondition{}, *executor, resource, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+	executorType, executorSpec, resource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections(connections).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		WithExecutorResource(resource).
+		Create()
+
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"

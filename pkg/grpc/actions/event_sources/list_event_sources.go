@@ -29,18 +29,28 @@ func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb
 		return nil, err
 	}
 
+	protoSources, err := serializeEventSources(sources)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &pb.ListEventSourcesResponse{
-		EventSources: serializeEventSources(sources),
+		EventSources: protoSources,
 	}
 
 	return response, nil
 }
 
-func serializeEventSources(eventSources []models.EventSource) []*pb.EventSource {
+func serializeEventSources(eventSources []models.EventSource) ([]*pb.EventSource, error) {
 	sources := []*pb.EventSource{}
 	for _, source := range eventSources {
-		sources = append(sources, serializeEventSource(source))
+		protoSource, err := serializeEventSource(source)
+		if err != nil {
+			return nil, err
+		}
+
+		sources = append(sources, protoSource)
 	}
 
-	return sources
+	return sources, nil
 }

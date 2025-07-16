@@ -45,7 +45,7 @@ func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := buildIntegration(encryptor, canvas, req.Integration)
+	integration, err := buildIntegration(ctx, encryptor, canvas, req.Integration)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -68,7 +68,7 @@ func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	return response, nil
 }
 
-func buildIntegration(encryptor crypto.Encryptor, canvas *models.Canvas, integration *pb.Integration) (*models.Integration, error) {
+func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, integration *pb.Integration) (*models.Integration, error) {
 	t, err := validateType(integration.Spec.Type)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func buildIntegration(encryptor crypto.Encryptor, canvas *models.Canvas, integra
 		return nil, fmt.Errorf("auth is required")
 	}
 
-	auth, authType, err := validateAuth(encryptor, canvas, integration.Spec.Auth)
+	auth, authType, err := validateAuth(ctx, encryptor, canvas, integration.Spec.Auth)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func validateType(t pb.Integration_Type) (string, error) {
 	}
 }
 
-func validateAuth(encryptor crypto.Encryptor, canvas *models.Canvas, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
@@ -125,7 +125,7 @@ func validateAuth(encryptor crypto.Encryptor, canvas *models.Canvas, auth *pb.In
 			return nil, "", err
 		}
 
-		values, err := provider.Load(context.TODO())
+		values, err := provider.Load(ctx)
 		if err != nil {
 			return nil, "", fmt.Errorf("error loading values for secret %s: %v", name, err)
 		}

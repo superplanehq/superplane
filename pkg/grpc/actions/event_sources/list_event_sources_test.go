@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -33,8 +34,11 @@ func Test__ListEventSources(t *testing.T) {
 		assert.Empty(t, res.EventSources)
 	})
 
-	t.Run("with event source -> list", func(t *testing.T) {
-		source, err := r.Canvas.CreateEventSource("event-source-1", []byte("key"), nil)
+	t.Run("lists only external event sources", func(t *testing.T) {
+		external, err := r.Canvas.CreateEventSource("external", []byte("key"), models.EventSourceScopeExternal, nil)
+		require.NoError(t, err)
+
+		_, err = r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
 		require.NoError(t, err)
 
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
@@ -44,8 +48,8 @@ func Test__ListEventSources(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)
-		assert.Equal(t, source.ID.String(), res.EventSources[0].Metadata.Id)
-		assert.Equal(t, "event-source-1", res.EventSources[0].Metadata.Name)
+		assert.Equal(t, external.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, external.Name, res.EventSources[0].Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), res.EventSources[0].Metadata.CanvasId)
 		assert.NotEmpty(t, res.EventSources[0].Metadata.CreatedAt)
 	})

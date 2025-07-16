@@ -52,7 +52,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	//
 	// Create new source
 	//
-	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.EventSource.Metadata.Name)
+	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, req.EventSource.Metadata.Name)
 	if err != nil {
 		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
 		return nil, status.Error(codes.Internal, "error generating key")
@@ -73,7 +73,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 			resourceID = &r.ID
 		}
 
-		eventSource, err = canvas.CreateEventSourceInTransaction(tx, req.EventSource.Metadata.Name, encryptedKey, resourceID)
+		eventSource, err = canvas.CreateEventSourceInTransaction(tx, req.EventSource.Metadata.Name, encryptedKey, models.EventSourceScopeExternal, resourceID)
 		if err != nil {
 			return err
 		}
@@ -90,8 +90,13 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 		return nil, err
 	}
 
+	protoSource, err := serializeEventSource(*eventSource)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &pb.CreateEventSourceResponse{
-		EventSource: serializeEventSource(*eventSource),
+		EventSource: protoSource,
 		Key:         string(plainKey),
 	}
 
@@ -169,7 +174,29 @@ func getResourceTypeAndName(integrationRecord *models.Integration, spec *pb.Even
 	}
 }
 
-func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
+func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, error) {
+	spec := &pb.EventSource_Spec{}
+	if eventSource.ResourceID != nil {
+		resource, err := models.FindResourceByID(*eventSource.ResourceID)
+		if err != nil {
+			return nil, fmt.Errorf("resource not found: %v", err)
+		}
+
+		integration, err := models.FindIntegrationByID(resource.IntegrationID)
+		if err != nil {
+			return nil, fmt.Errorf("integration not found: %v", err)
+		}
+
+		spec.Integration = &pb.IntegrationRef{Name: integration.Name}
+
+		switch integration.Type {
+		case models.IntegrationTypeSemaphore:
+			spec.Semaphore = &pb.EventSource_Spec_Semaphore{
+				Project: resource.ResourceName,
+			}
+		}
+	}
+
 	return &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
 			Id:        eventSource.ID.String(),
@@ -178,16 +205,6 @@ func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 			CreatedAt: timestamppb.New(*eventSource.CreatedAt),
 			UpdatedAt: timestamppb.New(*eventSource.UpdatedAt),
 		},
-		Spec: &pb.EventSource_Spec{},
-	}
-}
-
-func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name string) (string, []byte, error) {
-	plainKey, _ := crypto.Base64String(32)
-	encrypted, err := encryptor.Encrypt(ctx, []byte(plainKey), []byte(name))
-	if err != nil {
-		return "", nil, err
-	}
-
-	return plainKey, encrypted, nil
+		Spec: spec,
+	}, nil
 }
