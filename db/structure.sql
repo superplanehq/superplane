@@ -31,20 +31,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
---
--- Name: update_updated_at_column(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.update_updated_at_column() RETURNS trigger
-    LANGUAGE plpgsql
-    AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$;
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -219,7 +205,7 @@ CREATE TABLE public.events (
 --
 
 CREATE TABLE public.group_metadata (
-    id uuid DEFAULT uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     group_name character varying(255) NOT NULL,
     domain_type character varying(50) NOT NULL,
     domain_id character varying(255) NOT NULL,
@@ -250,7 +236,7 @@ CREATE TABLE public.organizations (
 --
 
 CREATE TABLE public.role_metadata (
-    id uuid DEFAULT uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     role_name character varying(255) NOT NULL,
     domain_type character varying(50) NOT NULL,
     domain_id character varying(255) NOT NULL,
@@ -639,13 +625,6 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -748,20 +727,6 @@ CREATE INDEX uix_stage_executions_stage ON public.stage_executions USING btree (
 --
 
 CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
-
-
---
--- Name: group_metadata update_group_metadata_updated_at; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER update_group_metadata_updated_at BEFORE UPDATE ON public.group_metadata FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
-
---
--- Name: role_metadata update_role_metadata_updated_at; Type: TRIGGER; Schema: public; Owner: -
---
-
-CREATE TRIGGER update_role_metadata_updated_at BEFORE UPDATE ON public.role_metadata FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 
 --
