@@ -52,7 +52,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	}
 
 	var err error
-	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test")
+	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
 
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")
