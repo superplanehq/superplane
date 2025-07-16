@@ -36,7 +36,7 @@ func FindResourceByID(id uuid.UUID) (*Resource, error) {
 func FindResourceByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Resource, error) {
 	var resource Resource
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		First(&resource).
 		Error

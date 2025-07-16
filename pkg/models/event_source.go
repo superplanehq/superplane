@@ -45,10 +45,10 @@ func (s *EventSource) UpdateScopeAndName(name, scope string) error {
 }
 
 func (s *EventSource) GetDecryptedKey(ctx context.Context, encryptor crypto.Encryptor) ([]byte, error) {
-	return s.GetDecryptedKeyInTransaction(database.Conn(), ctx, encryptor)
+	return s.GetDecryptedKeyInTransaction(ctx, database.Conn(), encryptor)
 }
 
-func (s *EventSource) GetDecryptedKeyInTransaction(tx *gorm.DB, ctx context.Context, encryptor crypto.Encryptor) ([]byte, error) {
+func (s *EventSource) GetDecryptedKeyInTransaction(ctx context.Context, tx *gorm.DB, encryptor crypto.Encryptor) ([]byte, error) {
 	if s.ResourceID == nil {
 		return encryptor.Decrypt(ctx, s.Key, []byte(s.Name))
 	}

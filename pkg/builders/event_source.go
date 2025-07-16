@@ -193,7 +193,7 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 		return nil, "", err
 	}
 
-	plainKey, err := eventSource.GetDecryptedKeyInTransaction(tx, b.ctx, b.encryptor)
+	plainKey, err := eventSource.GetDecryptedKeyInTransaction(b.ctx, tx, b.encryptor)
 	if err != nil {
 		return nil, "", err
 	}
