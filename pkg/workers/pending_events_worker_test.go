@@ -30,7 +30,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
 
-	executorType, executorSpec, resource := support.Executor(r)
+	executorType, executorSpec, integrationResource := support.Executor(r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
 		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
@@ -81,7 +81,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			WithInputMappings(inputMappings).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -101,7 +102,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			WithInputMappings(inputMappings).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -248,7 +250,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -282,7 +285,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -343,7 +347,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -370,7 +375,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -421,11 +427,14 @@ func Test__PendingEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
 		execution := support.CreateExecution(t, r.Source, stage)
+		resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
+		require.NoError(t, err)
 		_, err = execution.AddResource(workflowID, resource.ID)
 		require.NoError(t, err)
 
@@ -466,8 +475,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 		resources, err := execution.Resources()
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
-		resource := resources[0]
-		assert.Equal(t, models.ExecutionFinished, resource.State)
-		assert.Equal(t, models.ResultPassed, resource.Result)
+		executionResource := resources[0]
+		assert.Equal(t, models.ExecutionFinished, executionResource.State)
+		assert.Equal(t, models.ResultPassed, executionResource.Result)
 	})
 }

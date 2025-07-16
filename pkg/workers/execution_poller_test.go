@@ -30,7 +30,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, resource := support.Executor(r)
+	executorType, executorSpec, integrationResource := support.Executor(r)
 	stage, err := builders.NewStageBuilder().
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
@@ -39,11 +39,12 @@ func Test__ExecutionPoller(t *testing.T) {
 		WithConnections(connections).
 		WithExecutorType(executorType).
 		WithExecutorSpec(executorSpec).
-		WithExecutorResource(resource).
+		ForResource(integrationResource).
+		ForIntegration(r.Integration).
 		Create()
 
 	require.NoError(t, err)
-	resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)
+	resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
@@ -109,7 +110,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		executorType, executorSpec, resource := support.Executor(r)
+		executorType, executorSpec, integrationResource := support.Executor(r)
 		stageWithOutput, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
@@ -125,11 +126,12 @@ func Test__ExecutionPoller(t *testing.T) {
 			WithOutputs([]models.OutputDefinition{{Name: "MY_OUTPUT", Required: true}}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
-		resource, err = models.FindResource(r.Integration.ID, resource.ResourceType, resource.ResourceName)
+		resource, err = models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
 
 		//

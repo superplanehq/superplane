@@ -2,7 +2,6 @@ package builders
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -17,16 +17,17 @@ import (
 )
 
 type StageBuilder struct {
-	ctx              context.Context
-	encryptor        crypto.Encryptor
-	canvas           *models.Canvas
-	requesterID      uuid.UUID
-	existingStage    *models.Stage
-	newStage         *models.Stage
-	executorResource *models.Resource
-	executorType     string
-	executorSpec     *models.ExecutorSpec
-	connections      []models.Connection
+	ctx           context.Context
+	encryptor     crypto.Encryptor
+	canvas        *models.Canvas
+	requesterID   uuid.UUID
+	existingStage *models.Stage
+	newStage      *models.Stage
+	resource      integrations.Resource
+	integration   *models.Integration
+	executorType  string
+	executorSpec  *models.ExecutorSpec
+	connections   []models.Connection
 }
 
 func NewStageBuilder() *StageBuilder {
@@ -107,8 +108,13 @@ func (b *StageBuilder) WithExecutorType(executorType string) *StageBuilder {
 	return b
 }
 
-func (b *StageBuilder) WithExecutorResource(resource *models.Resource) *StageBuilder {
-	b.executorResource = resource
+func (b *StageBuilder) ForIntegration(integration *models.Integration) *StageBuilder {
+	b.integration = integration
+	return b
+}
+
+func (b *StageBuilder) ForResource(resource integrations.Resource) *StageBuilder {
+	b.resource = resource
 	return b
 }
 
@@ -158,7 +164,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		//
 		// Create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSource(tx)
+		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}
@@ -180,44 +186,28 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 	return stage, nil
 }
 
-func (b *StageBuilder) findOrCreateEventSource(tx *gorm.DB) (*models.EventSource, error) {
+func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.EventSource, error) {
 	//
 	// If this stage is not using an integration, it does not need an event source.
 	//
-	if b.executorResource == nil {
+	if b.resource == nil {
 		return nil, nil
 	}
 
 	//
-	// Check if the resource already exists.
-	// If it does, return the event source for it.
+	// The event source builder will ensure an event source for this resource
+	// will be re-used if already exists, or a new one will be created.
 	//
-	r, err := models.FindResourceInTransaction(tx, b.executorResource.IntegrationID, b.executorResource.ResourceType, b.executorResource.ResourceName)
-	if err == nil {
-		return models.FindEventSourceForResourceInTransaction(tx, r.ID)
-	}
+	eventSource, _, err := NewEventSourceBuilder(b.encryptor).
+		WithTransaction(tx).
+		WithContext(b.ctx).
+		InCanvas(b.canvas).
+		WithName(b.resource.Name()).
+		WithScope(models.EventSourceScopeInternal).
+		ForIntegration(b.integration).
+		ForResource(b.resource).
+		Create()
 
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	//
-	// If it doesn't, create it and attach it to a new event source.
-	//
-	now := time.Now()
-	r = b.executorResource
-	r.CreatedAt = &now
-	err = tx.Clauses(clause.Returning{}).Create(&r).Error
-	if err != nil {
-		return nil, err
-	}
-
-	_, key, err := crypto.NewRandomKey(b.ctx, b.encryptor, b.executorResource.ResourceName)
-	if err != nil {
-		return nil, err
-	}
-
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, r.ResourceName, key, models.EventSourceScopeInternal, &r.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +264,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		// Re-create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSource(tx)
+		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}

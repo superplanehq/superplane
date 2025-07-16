@@ -45,7 +45,8 @@ func Test__TimeWindowWorker(t *testing.T) {
 		WithConditions(conditions).
 		WithExecutorType(executorType).
 		WithExecutorSpec(executorSpec).
-		WithExecutorResource(resource).
+		ForResource(resource).
+		ForIntegration(r.Integration).
 		Create()
 
 	require.NoError(t, err)

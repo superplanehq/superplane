@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -19,7 +17,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"gorm.io/gorm"
 )
 
 func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
@@ -44,42 +41,43 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
-	integration, resource, err := validateIntegrationResource(ctx, encryptor, canvas, req.EventSource.Spec)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+	//
+	// It is OK to create an event source without an integration.
+	//
+	var integration *models.Integration
+	if req.EventSource.Spec != nil && req.EventSource.Spec.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, req.EventSource.Spec.Integration.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//
-	// Create new source
+	// If integration is defined, find the integration resource we are interested in.
 	//
-	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, req.EventSource.Metadata.Name)
-	if err != nil {
-		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
-		return nil, status.Error(codes.Internal, "error generating key")
+	var resource integrations.Resource
+	if integration != nil {
+		resourceName, err := resourceName(req.EventSource.Spec, integration)
+		if err != nil {
+			return nil, err
+		}
+
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	//
 	// Create the event source
 	//
-	var eventSource *models.EventSource
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		var resourceID *uuid.UUID
-		if integration != nil && resource != nil {
-			r, err := integration.CreateResourceInTransaction(tx, resource.Type(), resource.Id(), resource.Name())
-			if err != nil {
-				return err
-			}
-
-			resourceID = &r.ID
-		}
-
-		eventSource, err = canvas.CreateEventSourceInTransaction(tx, req.EventSource.Metadata.Name, encryptedKey, models.EventSourceScopeExternal, resourceID)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
+	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
+		InCanvas(canvas).
+		WithName(req.EventSource.Metadata.Name).
+		WithScope(models.EventSourceScopeExternal).
+		ForIntegration(integration).
+		ForResource(resource).
+		Create()
 
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
@@ -109,69 +107,6 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	}
 
 	return response, nil
-}
-
-func validateIntegrationResource(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, spec *pb.EventSource_Spec) (*models.Integration, integrations.Resource, error) {
-	//
-	// It is OK to have an event source without an integration
-	//
-	if spec == nil {
-		return nil, nil, nil
-	}
-
-	integrationRecord, err := validateIntegration(canvas, spec.Integration)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	resourceType, resourceName, err := getResourceTypeAndName(integrationRecord, spec)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	integration, err := integrations.NewIntegration(ctx, integrationRecord, encryptor)
-	if err != nil {
-		return nil, nil, fmt.Errorf("error building integration: %v", err)
-	}
-
-	resource, err := integration.Get(resourceType, resourceName)
-	if err != nil {
-		return nil, nil, fmt.Errorf("%s %s not found: %v", resourceType, resourceName, err)
-	}
-
-	return integrationRecord, resource, nil
-}
-
-func validateIntegration(canvas *models.Canvas, integrationRef *pb.IntegrationRef) (*models.Integration, error) {
-	if integrationRef == nil {
-		return nil, nil
-	}
-
-	if integrationRef.Name == "" {
-		return nil, status.Error(codes.InvalidArgument, "integration name is required")
-	}
-
-	// TODO: support for organization level integration
-	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationRef.Name)
-	if err != nil {
-		return nil, fmt.Errorf("integration not found: %v", err)
-	}
-
-	return integration, nil
-}
-
-func getResourceTypeAndName(integrationRecord *models.Integration, spec *pb.EventSource_Spec) (string, string, error) {
-	switch integrationRecord.Type {
-	case models.IntegrationTypeSemaphore:
-		if spec.Semaphore == nil {
-			return "", "", status.Error(codes.InvalidArgument, "missing semaphore resource")
-		}
-
-		return integrations.ResourceTypeProject, spec.Semaphore.Project, nil
-
-	default:
-		return "", "", status.Error(codes.InvalidArgument, "unsupported integration type")
-	}
 }
 
 func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, error) {
@@ -207,4 +142,17 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 		},
 		Spec: spec,
 	}, nil
+}
+
+func resourceName(spec *pb.EventSource_Spec, integration *models.Integration) (string, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		if spec.Semaphore == nil || spec.Semaphore.Project == "" {
+			return "", fmt.Errorf("semaphore project is required")
+		}
+
+		return spec.Semaphore.Project, nil
+	default:
+		return "", fmt.Errorf("integration type %s is not supported", integration.Type)
+	}
 }

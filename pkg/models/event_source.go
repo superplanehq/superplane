@@ -1,9 +1,11 @@
 package models
 
 import (
+	"context"
 	"time"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 )
@@ -32,6 +34,31 @@ func (s *EventSource) UpdateKey(key []byte) error {
 	s.Key = key
 	s.UpdatedAt = &now
 	return database.Conn().Save(s).Error
+}
+
+func (s *EventSource) UpdateScopeAndName(name, scope string) error {
+	now := time.Now()
+	s.Name = name
+	s.Scope = scope
+	s.UpdatedAt = &now
+	return database.Conn().Save(s).Error
+}
+
+func (s *EventSource) GetDecryptedKey(ctx context.Context, encryptor crypto.Encryptor) ([]byte, error) {
+	return s.GetDecryptedKeyInTransaction(database.Conn(), ctx, encryptor)
+}
+
+func (s *EventSource) GetDecryptedKeyInTransaction(tx *gorm.DB, ctx context.Context, encryptor crypto.Encryptor) ([]byte, error) {
+	if s.ResourceID == nil {
+		return encryptor.Decrypt(ctx, s.Key, []byte(s.Name))
+	}
+
+	resource, err := FindResourceByIDInTransaction(tx, *s.ResourceID)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptor.Decrypt(ctx, s.Key, []byte(resource.Id()))
 }
 
 func (s *EventSource) UpdateState(state string) error {

@@ -1,12 +1,15 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -271,5 +274,51 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
+	}
+}
+
+func ValidateIntegration(canvas *models.Canvas, integrationName string) (*models.Integration, error) {
+	if integrationName == "" {
+		return nil, status.Error(codes.InvalidArgument, "integration name is required")
+	}
+
+	// TODO: support for organization level integration
+	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationName)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
+	}
+
+	return integration, nil
+}
+
+func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integration *models.Integration, name string) (integrations.Resource, error) {
+	resourceType, err := GetResourceType(integration)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// If resource record does not exist yet, we need to go to the integration to find it.
+	//
+	integrationImpl, err := integrations.NewIntegration(ctx, integration, encryptor)
+	if err != nil {
+		return nil, fmt.Errorf("error starting integration implementation: %v", err)
+	}
+
+	resource, err := integrationImpl.Get(resourceType, name)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%s %s not found: %v", resourceType, name, err)
+	}
+
+	return resource, nil
+}
+
+func GetResourceType(integration *models.Integration) (string, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		return integrations.ResourceTypeProject, nil
+
+	default:
+		return "", status.Error(codes.InvalidArgument, "unsupported integration type")
 	}
 }

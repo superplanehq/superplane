@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -78,7 +79,34 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	specValidationResponse, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
+	//
+	// It is OK to create a stage without an integration.
+	//
+	var integration *models.Integration
+	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	//
+	// If integration is defined, find the integration resource we are interested in.
+	//
+	var resource integrations.Resource
+	if integration != nil {
+		resourceName, err := resourceName(req.Stage.Spec.Executor, integration)
+		if err != nil {
+			return nil, err
+		}
+
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	executorType, executorSpec, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor, integration, resource)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -95,9 +123,10 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		WithInputMappings(inputValidator.SerializeInputMappings()).
 		WithOutputs(inputValidator.SerializeOutputs()).
 		WithSecrets(secrets).
-		WithExecutorType(specValidationResponse.ExecutorType).
-		WithExecutorSpec(specValidationResponse.ExecutorSpec).
-		WithExecutorResource(specValidationResponse.ExecutorResource).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		ForIntegration(integration).
+		ForResource(resource).
 		Create()
 
 	if err != nil {
@@ -476,4 +505,21 @@ func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
 	}
 
 	return s, nil
+}
+
+func resourceName(spec *pb.ExecutorSpec, integration *models.Integration) (string, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		if spec.Type != pb.ExecutorSpec_TYPE_SEMAPHORE {
+			return "", fmt.Errorf("invalid semaphore executor spec: integration is not of type semaphore")
+		}
+
+		if spec.Semaphore == nil || spec.Semaphore.Project == "" {
+			return "", fmt.Errorf("semaphore project is required")
+		}
+
+		return spec.Semaphore.Project, nil
+	default:
+		return "", fmt.Errorf("integration type %s is not supported", integration.Type)
+	}
 }

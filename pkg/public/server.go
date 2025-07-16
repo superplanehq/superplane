@@ -478,7 +478,7 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.handleWebhook(w, r, source.ID.String(), source.Name, source.Key, signature)
+	s.handleWebhook(w, r, source, signature)
 }
 
 func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
@@ -502,10 +502,10 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.handleWebhook(w, r, source.ID.String(), source.Name, source.Key, signature)
+	s.handleWebhook(w, r, source, signature)
 }
 
-func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, sourceID, sourceName string, encryptedKey []byte, signature string) {
+func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, source *models.EventSource, signature string) {
 	//
 	// Only read up to the maximum event size we allow,
 	// and only proceed if payload is below that.
@@ -535,7 +535,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, sourceID,
 		return
 	}
 
-	key, err := s.encryptor.Decrypt(r.Context(), encryptedKey, []byte(sourceName))
+	key, err := source.GetDecryptedKey(r.Context(), s.encryptor)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -553,7 +553,7 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, sourceID,
 	// Here, we know the event is for a valid organization/source,
 	// and comes from Semaphore, so we just want to save it and give a response back.
 	//
-	if _, err := models.CreateEvent(uuid.MustParse(sourceID), sourceName, models.SourceTypeEventSource, body, headers); err != nil {
+	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
 		http.Error(w, "Error receiving event", http.StatusInternalServerError)
 		return
 	}

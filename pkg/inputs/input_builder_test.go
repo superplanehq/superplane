@@ -166,7 +166,8 @@ func Test__InputBuilder(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)

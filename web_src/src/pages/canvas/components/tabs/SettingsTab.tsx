@@ -156,7 +156,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                     <>
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Project ID</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.projectId || '—'}</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.project || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Branch</div>

@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -58,7 +59,34 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	specValidationResponse, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor)
+	//
+	// It is OK to create a stage without an integration.
+	//
+	var integration *models.Integration
+	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	//
+	// If integration is defined, find the integration resource we are interested in.
+	//
+	var resource integrations.Resource
+	if integration != nil {
+		resourceName, err := resourceName(req.Stage.Spec.Executor, integration)
+		if err != nil {
+			return nil, err
+		}
+
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	executorType, executorSpec, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor, integration, resource)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -102,9 +130,10 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		WithInputMappings(inputValidator.SerializeInputMappings()).
 		WithOutputs(inputValidator.SerializeOutputs()).
 		WithSecrets(secrets).
-		WithExecutorType(specValidationResponse.ExecutorType).
-		WithExecutorSpec(specValidationResponse.ExecutorSpec).
-		WithExecutorResource(specValidationResponse.ExecutorResource).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		ForResource(resource).
+		ForIntegration(integration).
 		Update()
 
 	if err != nil {

@@ -30,6 +30,10 @@ func (r *Resource) Type() string {
 }
 
 func FindResourceByID(id uuid.UUID) (*Resource, error) {
+	return FindResourceByIDInTransaction(database.Conn(), id)
+}
+
+func FindResourceByIDInTransaction(tx *gorm.DB, id uuid.UUID) (*Resource, error) {
 	var resource Resource
 
 	err := database.Conn().

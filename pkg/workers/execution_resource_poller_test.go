@@ -40,7 +40,8 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		WithConnections(connections).
 		WithExecutorType(executorType).
 		WithExecutorSpec(executorSpec).
-		WithExecutorResource(resource).
+		ForResource(resource).
+		ForIntegration(r.Integration).
 		Create()
 
 	require.NoError(t, err)
@@ -61,7 +62,9 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		_, err := execution.AddResource(workflowID, resource.ID)
+		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
+		require.NoError(t, err)
+		_, err = execution.AddResource(workflowID, resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -102,7 +105,9 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		_, err := execution.AddResource(workflowID, resource.ID)
+		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
+		require.NoError(t, err)
+		_, err = execution.AddResource(workflowID, resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)

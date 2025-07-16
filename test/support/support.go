@@ -142,7 +142,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForIntegration(r.Integration).
+			ForResource(resource).
 			Create()
 
 		require.NoError(t, err)
@@ -222,7 +223,7 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, *models.Resource) {
+func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.Resource) {
 	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
 			Semaphore: &models.SemaphoreExecutorSpec{
 				Branch:       "main",

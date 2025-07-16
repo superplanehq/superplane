@@ -15,9 +15,9 @@ func Test__SpecValidator(t *testing.T) {
 	}
 
 	t.Run("missing executor spec -> error", func(t *testing.T) {
-		_, err := validator.Validate(context.Background(), nil, &pb.ExecutorSpec{
+		_, _, err := validator.Validate(context.Background(), nil, &pb.ExecutorSpec{
 			Type: pb.ExecutorSpec_TYPE_HTTP,
-		})
+		}, nil, nil)
 		require.ErrorContains(t, err, "missing HTTP executor spec")
 	})
 
@@ -26,7 +26,7 @@ func Test__SpecValidator(t *testing.T) {
 			Type: pb.ExecutorSpec_TYPE_HTTP,
 			Http: &pb.ExecutorSpec_HTTP{},
 		}
-		_, err := validator.Validate(context.Background(), nil, in)
+		_, _, err := validator.Validate(context.Background(), nil, in, nil, nil)
 		require.ErrorContains(t, err, "missing URL")
 	})
 
@@ -40,7 +40,7 @@ func Test__SpecValidator(t *testing.T) {
 				},
 			},
 		}
-		_, err := validator.Validate(context.Background(), nil, in)
+		_, _, err := validator.Validate(context.Background(), nil, in, nil, nil)
 		require.ErrorContains(t, err, "invalid status code: 1000")
 	})
 
@@ -60,7 +60,7 @@ func Test__SpecValidator(t *testing.T) {
 			},
 		}
 
-		_, err := validator.validateHTTPExecutorSpec(in)
+		_, _, err := validator.validateHTTPExecutorSpec(in)
 		require.NoError(t, err)
 	})
 }

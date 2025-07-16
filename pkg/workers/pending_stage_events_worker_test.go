@@ -47,7 +47,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -103,7 +104,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			WithConditions(conditions).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -147,7 +149,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			WithConditions(conditions).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -211,7 +214,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			WithConditions(conditions).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -271,7 +275,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			WithConditions(conditions).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
@@ -323,7 +328,8 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			}).
 			WithExecutorType(executorType).
 			WithExecutorSpec(executorSpec).
-			WithExecutorResource(resource).
+			ForResource(resource).
+			ForIntegration(r.Integration).
 			Create()
 
 		require.NoError(t, err)
