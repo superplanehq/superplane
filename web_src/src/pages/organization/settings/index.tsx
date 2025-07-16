@@ -104,6 +104,7 @@ export function OrganizationSettings() {
               <Route path="add-members" element={<AddMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
+              <Route path="create-role/:roleName" element={<CreateRolePage />} />
               <Route path="profile" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Profile Settings</h1><p>Profile settings coming soon...</p></div>} />
               <Route path="api_token" element={<div className="pt-6"><h1 className="text-2xl font-semibold">API Token</h1><p>API token management coming soon...</p></div>} />
               <Route path="billing" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Billing & Plans</h1><p>Billing management coming soon...</p></div>} />

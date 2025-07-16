@@ -1,140 +1,238 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../../components/Button/button'
 import { Input } from '../../../components/Input/input'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
-import { authorizationCreateRole } from '../../../api-client/sdk.gen'
+import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
+import { Label, Description } from '../../../components/Fieldset/fieldset'
+import { 
+  authorizationCreateRole, 
+  authorizationUpdateRole,
+  authorizationDescribeRole 
+} from '../../../api-client/sdk.gen'
+import { Heading } from '@/components/Heading/heading'
 
 interface Permission {
   id: string
   name: string
   description: string
   category: string
+  resource: string
+  action: string
 }
 
-const AVAILABLE_PERMISSIONS: Permission[] = [
-  // Organization Management
-  { id: 'org.read', name: 'View Organization', description: 'View organization details and settings', category: 'Organization' },
-  { id: 'org.update', name: 'Manage Organization', description: 'Update organization settings and configuration', category: 'Organization' },
-  { id: 'org.delete', name: 'Delete Organization', description: 'Delete the organization (dangerous)', category: 'Organization' },
-  
-  // Member Management
-  { id: 'members.read', name: 'View Members', description: 'View organization members and their details', category: 'Members' },
-  { id: 'members.invite', name: 'Invite Members', description: 'Invite new members to the organization', category: 'Members' },
-  { id: 'members.remove', name: 'Remove Members', description: 'Remove members from the organization', category: 'Members' },
-  { id: 'members.update', name: 'Manage Members', description: 'Update member roles and permissions', category: 'Members' },
-  
-  // Group Management
-  { id: 'groups.read', name: 'View Groups', description: 'View organization groups and their members', category: 'Groups' },
-  { id: 'groups.create', name: 'Create Groups', description: 'Create new groups within the organization', category: 'Groups' },
-  { id: 'groups.update', name: 'Manage Groups', description: 'Update group settings and membership', category: 'Groups' },
-  { id: 'groups.delete', name: 'Delete Groups', description: 'Delete groups from the organization', category: 'Groups' },
-  
-  // Role Management
-  { id: 'roles.read', name: 'View Roles', description: 'View organization roles and their permissions', category: 'Roles' },
-  { id: 'roles.create', name: 'Create Roles', description: 'Create new roles within the organization', category: 'Roles' },
-  { id: 'roles.update', name: 'Manage Roles', description: 'Update role permissions and settings', category: 'Roles' },
-  { id: 'roles.delete', name: 'Delete Roles', description: 'Delete roles from the organization', category: 'Roles' },
-  
-  // Project Management
-  { id: 'projects.read', name: 'View Projects', description: 'View organization projects', category: 'Projects' },
-  { id: 'projects.create', name: 'Create Projects', description: 'Create new projects within the organization', category: 'Projects' },
-  { id: 'projects.update', name: 'Manage Projects', description: 'Update project settings and configuration', category: 'Projects' },
-  { id: 'projects.delete', name: 'Delete Projects', description: 'Delete projects from the organization', category: 'Projects' },
-  
-  // Billing
-  { id: 'billing.read', name: 'View Billing', description: 'View billing information and usage', category: 'Billing' },
-  { id: 'billing.update', name: 'Manage Billing', description: 'Update billing information and payment methods', category: 'Billing' },
+interface PermissionCategory {
+  category: string
+  icon: string
+  permissions: Permission[]
+}
+
+// Organization permissions based on RBAC policy
+const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
+  {
+    category: 'General',
+    icon: 'business',
+    permissions: [
+      { id: 'org.read', name: 'View Organization', description: 'View organization details and settings', category: 'General', resource: 'org', action: 'read' },
+      { id: 'org.update', name: 'Manage Organization', description: 'Update organization settings and configuration', category: 'General', resource: 'org', action: 'update' },
+      { id: 'org.delete', name: 'Delete Organization', description: 'Delete the organization (dangerous)', category: 'General', resource: 'org', action: 'delete' }
+    ]
+  },
+  {
+    category: 'People & Groups',
+    icon: 'group',
+    permissions: [
+      { id: 'user.read', name: 'View Members', description: 'View organization members and their details', category: 'People & Groups', resource: 'user', action: 'read' },
+      { id: 'user.invite', name: 'Invite Members', description: 'Invite new members to the organization', category: 'People & Groups', resource: 'user', action: 'invite' },
+      { id: 'user.remove', name: 'Remove Members', description: 'Remove members from the organization', category: 'People & Groups', resource: 'user', action: 'remove' },
+      { id: 'group.read', name: 'View Groups', description: 'View organization groups and their members', category: 'People & Groups', resource: 'group', action: 'read' },
+      { id: 'group.create', name: 'Create Groups', description: 'Create new groups within the organization', category: 'People & Groups', resource: 'group', action: 'create' },
+      { id: 'group.update', name: 'Manage Groups', description: 'Update group settings and membership', category: 'People & Groups', resource: 'group', action: 'update' }
+    ]
+  },
+  {
+    category: 'Roles & Permissions',
+    icon: 'admin_panel_settings',
+    permissions: [
+      { id: 'role.read', name: 'View Roles', description: 'View organization roles and their permissions', category: 'Roles & Permissions', resource: 'role', action: 'read' },
+      { id: 'role.create', name: 'Create Roles', description: 'Create new roles within the organization', category: 'Roles & Permissions', resource: 'role', action: 'create' },
+      { id: 'role.update', name: 'Manage Roles', description: 'Update role permissions and settings', category: 'Roles & Permissions', resource: 'role', action: 'update' },
+      { id: 'role.delete', name: 'Delete Roles', description: 'Delete roles from the organization', category: 'Roles & Permissions', resource: 'role', action: 'delete' },
+      { id: 'role.assign', name: 'Assign Roles', description: 'Assign roles to users and groups', category: 'Roles & Permissions', resource: 'role', action: 'assign' },
+      { id: 'role.remove', name: 'Remove Roles', description: 'Remove roles from users and groups', category: 'Roles & Permissions', resource: 'role', action: 'remove' }
+    ]
+  },
+  {
+    category: 'Projects & Resources',
+    icon: 'folder',
+    permissions: [
+      { id: 'canvas.read', name: 'View Canvases', description: 'View organization canvases', category: 'Projects & Resources', resource: 'canvas', action: 'read' },
+      { id: 'canvas.create', name: 'Create Canvases', description: 'Create new canvases within the organization', category: 'Projects & Resources', resource: 'canvas', action: 'create' },
+      { id: 'canvas.update', name: 'Manage Canvases', description: 'Update canvas settings and configuration', category: 'Projects & Resources', resource: 'canvas', action: 'update' },
+      { id: 'canvas.delete', name: 'Delete Canvases', description: 'Delete canvases from the organization', category: 'Projects & Resources', resource: 'canvas', action: 'delete' }
+    ]
+  }
 ]
 
 export function CreateRolePage() {
-  const { orgId } = useParams<{ orgId: string }>()
+  const { orgId, roleName: roleNameParam } = useParams<{ orgId: string; roleName?: string }>()
   const navigate = useNavigate()
-  
+  const isEditMode = !!roleNameParam
+
   const [roleName, setRoleName] = useState('')
   const [roleDescription, setRoleDescription] = useState('')
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([])
-  const [isCreating, setIsCreating] = useState(false)
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handlePermissionToggle = (permissionId: string) => {
-    setSelectedPermissions(prev => 
-      prev.includes(permissionId) 
-        ? prev.filter(id => id !== permissionId)
-        : [...prev, permissionId]
-    )
+  const handleCategoryToggle = (permissions: Permission[]) => {
+    const permissionIds = permissions.map(p => p.id)
+    const allSelected = permissionIds.every(id => selectedPermissions.has(id))
+
+    setSelectedPermissions(prev => {
+      const newSet = new Set(prev)
+      if (allSelected) {
+        // Deselect all in category
+        permissionIds.forEach(id => newSet.delete(id))
+      } else {
+        // Select all in category
+        permissionIds.forEach(id => newSet.add(id))
+      }
+      return newSet
+    })
   }
 
-  const handleSelectAllInCategory = (category: string) => {
-    const categoryPermissions = AVAILABLE_PERMISSIONS
-      .filter(p => p.category === category)
-      .map(p => p.id)
-    
-    const allSelected = categoryPermissions.every(id => selectedPermissions.includes(id))
-    
-    if (allSelected) {
-      // Deselect all in category
-      setSelectedPermissions(prev => prev.filter(id => !categoryPermissions.includes(id)))
-    } else {
-      // Select all in category
-      setSelectedPermissions(prev => [...new Set([...prev, ...categoryPermissions])])
+  const isCategorySelected = (permissions: Permission[]) => {
+    const permissionIds = permissions.map(p => p.id)
+    return permissionIds.every(id => selectedPermissions.has(id))
+  }
+
+  // Load role data when in edit mode
+  useEffect(() => {
+    const loadData = async () => {
+      if (!roleNameParam || !orgId) return
+      
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        const response = await authorizationDescribeRole({
+          query: {
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: orgId,
+            role: roleNameParam
+          }
+        })
+        
+        const role = response.data?.role
+        if (role) {
+          setRoleName(role.displayName || role.name || '')
+          setRoleDescription(role.description || '')
+          
+          // Convert permissions back to selected format
+          const permissionIds = new Set<string>()
+          role.permissions?.forEach(perm => {
+            const matchingPerm = ORGANIZATION_PERMISSIONS
+              .flatMap(cat => cat.permissions)
+              .find(p => p.resource === perm.resource && p.action === perm.action)
+            
+            if (matchingPerm) {
+              permissionIds.add(matchingPerm.id)
+            }
+          })
+          setSelectedPermissions(permissionIds)
+        }
+      } catch (err) {
+        console.error('Error loading role:', err)
+        setError('Failed to load role data.')
+      } finally {
+        setIsLoading(false)
+      }
     }
-  }
 
-  const handleCreateRole = async () => {
-    if (!roleName.trim() || selectedPermissions.length === 0 || !orgId) return
+    if (isEditMode && roleNameParam && orgId) {
+      loadData()
+    }
+  }, [isEditMode, roleNameParam, orgId])
+
+
+  const handleSubmitRole = async () => {
+    if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return
     
-    setIsCreating(true)
+    setIsSubmitting(true)
     setError(null)
     
     try {
-      await authorizationCreateRole({
-        body: {
-          domainType: 'organization',
-          domainId: orgId,
-          name: roleName.trim(),
-          description: roleDescription.trim(),
-          permissions: selectedPermissions
+      // Convert selected permissions to the protobuf format
+      const permissions = Array.from(selectedPermissions).map(permId => {
+        const permission = ORGANIZATION_PERMISSIONS
+          .flatMap(cat => cat.permissions)
+          .find(p => p.id === permId)
+        
+        if (!permission) {
+          throw new Error(`Permission ${permId} not found`)
+        }
+        
+        return {
+          resource: permission.resource,
+          action: permission.action,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION' as const
         }
       })
       
-      console.log('Successfully created role:', roleName)
+      if (isEditMode && roleNameParam) {
+        // Update existing role
+        await authorizationUpdateRole({
+          path: {
+            roleName: roleNameParam
+          },
+          body: {
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: orgId,
+            permissions: permissions,
+            displayName: roleName.trim(),
+            description: roleDescription.trim() || undefined
+          }
+        })
+        console.log('Successfully updated role:', roleName)
+      } else {
+        // Create new role
+        await authorizationCreateRole({
+          body: {
+            name: roleName.trim().toLowerCase().replace(/\s+/g, '_'),
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: orgId,
+            permissions: permissions,
+            displayName: roleName.trim(),
+            description: roleDescription.trim() || undefined
+          }
+        })
+        console.log('Successfully created role:', roleName)
+      }
+      
       navigate(`/organization/${orgId}/settings/roles`)
     } catch (err) {
-      console.error('Error creating role:', err)
-      setError('Failed to create role. Please try again.')
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} role:`, err)
+      setError(`Failed to ${isEditMode ? 'update' : 'create'} role. Please try again.`)
     } finally {
-      setIsCreating(false)
+      setIsSubmitting(false)
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleCreateRole()
-    }
-  }
 
   if (!orgId) {
     return <div>Error: Organization ID not found</div>
   }
 
-  const groupedPermissions = AVAILABLE_PERMISSIONS.reduce((acc, permission) => {
-    if (!acc[permission.category]) {
-      acc[permission.category] = []
-    }
-    acc[permission.category].push(permission)
-    return acc
-  }, {} as Record<string, Permission[]>)
-
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20">
-      <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
+      <div className="max-w-8xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Link 
+            <Link
               to={`/organization/${orgId}/settings/roles`}
               className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
             >
@@ -142,180 +240,169 @@ export function CreateRolePage() {
               <span className="text-sm">Back to Roles</span>
             </Link>
           </div>
-          
-          <div className="flex items-center justify-between">
+
+          <div className="flex items-center text-left">
             <div>
-              <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">
-                Create New Role
-              </h1>
+              <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">
+                {isEditMode ? 'Edit Organization Role' : 'Create New Organization Role'}
+              </Heading>
               <Text className="text-zinc-600 dark:text-zinc-400">
-                Define a role with specific permissions for organization members
+                {isEditMode 
+                  ? 'Update the role with specific organization permissions.' 
+                  : 'Define a custom role with specific organization permissions.'
+                }
               </Text>
             </div>
           </div>
         </div>
 
-        {/* Create Role Form */}
+        {/* Role Form */}
         <div className="space-y-6">
-          <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-                <p className="text-sm">{error}</p>
+          {isLoading ? (
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+              <div className="flex justify-center items-center h-32">
+                <p className="text-zinc-500 dark:text-zinc-400">Loading role data...</p>
               </div>
-            )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
+              {error && (
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
+                  <p className="text-sm">{error}</p>
+                </div>
+              )}
 
             <div className="space-y-6">
               {/* Role Name */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Role Name *
                 </label>
                 <Input
                   type="text"
-                  placeholder="Enter role name (e.g., Admin, Editor, Viewer)"
+                  placeholder="Enter role name"
                   value={roleName}
                   onChange={(e) => setRoleName(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      handleSubmitRole()
+                    }
+                  }}
+                  className="max-w-lg"
+                  disabled={isEditMode}
                 />
-                <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Choose a descriptive name that clearly identifies the role's purpose
-                </Text>
+                {isEditMode && (
+                  <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                    Role name cannot be changed when editing
+                  </Text>
+                )}
               </div>
 
               {/* Role Description */}
               <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-2">
+                <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                   Description
                 </label>
                 <textarea
-                  placeholder="Describe the role's purpose and responsibilities..."
+                  placeholder="Describe what this role can do"
                   value={roleDescription}
                   onChange={(e) => setRoleDescription(e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white resize-none"
+                  className="max-w-lg w-full px-3 py-2 border border-zinc-300 dark:border-zinc-700 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-zinc-800 dark:text-white resize-none"
                   rows={3}
                 />
-                <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Optional: Provide context about what this role is for
-                </Text>
               </div>
 
               {/* Permissions */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-900 dark:text-white mb-4">
-                  Permissions * ({selectedPermissions.length} selected)
-                </label>
-                
-                <div className="space-y-6">
-                  {Object.entries(groupedPermissions).map(([category, permissions]) => {
-                    const categoryPermissionIds = permissions.map(p => p.id)
-                    const allSelected = categoryPermissionIds.every(id => selectedPermissions.includes(id))
-                    const someSelected = categoryPermissionIds.some(id => selectedPermissions.includes(id))
-                    
-                    return (
-                      <div key={category} className="border border-zinc-200 dark:border-zinc-700 rounded-lg">
-                        <div className="bg-zinc-50 dark:bg-zinc-800 px-4 py-3 border-b border-zinc-200 dark:border-zinc-700 rounded-t-lg">
-                          <div className="flex items-center justify-between">
-                            <Text className="font-medium text-zinc-900 dark:text-white">
-                              {category}
-                            </Text>
-                            <Button
-                              size="sm"
-                              outline
-                              onClick={() => handleSelectAllInCategory(category)}
-                              className="text-xs"
-                            >
-                              {allSelected ? 'Deselect All' : 'Select All'}
-                            </Button>
-                          </div>
-                          {someSelected && !allSelected && (
-                            <Text className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                              {categoryPermissionIds.filter(id => selectedPermissions.includes(id)).length} of {categoryPermissionIds.length} selected
-                            </Text>
-                          )}
-                        </div>
-                        <div className="p-4 space-y-3">
-                          {permissions.map((permission) => (
-                            <label key={permission.id} className="flex items-start gap-3 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedPermissions.includes(permission.id)}
-                                onChange={() => handlePermissionToggle(permission.id)}
-                                className="mt-1 h-4 w-4 text-blue-600 border-zinc-300 rounded focus:ring-blue-500"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <Text className="font-medium text-zinc-900 dark:text-white">
-                                    {permission.name}
-                                  </Text>
-                                  <code className="text-xs bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded text-zinc-600 dark:text-zinc-400">
-                                    {permission.id}
-                                  </code>
-                                </div>
-                                <Text className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                                  {permission.description}
-                                </Text>
-                              </div>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-                
-                {selectedPermissions.length === 0 && (
-                  <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
-                    Please select at least one permission for this role
-                  </Text>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Help Section */}
-          <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-            <div className="flex items-start gap-4">
-              <div className="bg-blue-100 dark:bg-blue-900/20 rounded-lg p-2">
-                <MaterialSymbol name="help" className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <Text className="font-medium text-zinc-900 dark:text-white mb-2">
-                  About Roles and Permissions
+              <div className="pt-4 mb-4">
+                <h2 className="text-xl font-semibold text-zinc-900 dark:text-white mb-2">
+                  Organization Permissions
+                </h2>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                  Select the permissions this role should have within the organization.
                 </Text>
-                <div className="space-y-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  <p>• Roles define what actions members can perform within the organization</p>
-                  <p>• Each role consists of a collection of permissions that grant specific capabilities</p>
-                  <p>• Members inherit permissions from all roles assigned to their groups</p>
-                  <p>• Start with essential permissions and add more as needed</p>
-                </div>
-                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>Tip:</strong> Consider creating roles like "Admin" (full access), 
-                    "Editor" (read/write access), and "Viewer" (read-only access) to cover common use cases.
-                  </p>
-                </div>
               </div>
+
+              <div className="space-y-6">
+                {ORGANIZATION_PERMISSIONS.map((category) => (
+                  <div key={category.category} className="space-y-4">
+                    <div className="flex items-center mb-3">
+                      <h3 className="text-md font-semibold text-zinc-900 dark:text-white">{category.category}</h3>
+                      <button
+                        type="button"
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 ml-3 bg-transparent border-none cursor-pointer"
+                        onClick={() => handleCategoryToggle(category.permissions)}
+                      >
+                        {isCategorySelected(category.permissions) ? 'Deselect all' : 'Select all'}
+                      </button>
+                    </div>
+                    <div className="space-y-3">
+                      {category.permissions.map((permission) => (
+                        <CheckboxField
+                          key={permission.id}
+                          onClick={() => {
+                            setSelectedPermissions(prev => {
+                              const newSet = new Set(prev)
+                              if (newSet.has(permission.id)) {
+                                newSet.delete(permission.id)
+                              } else {
+                                newSet.add(permission.id)
+                              }
+                              return newSet
+                            })
+                          }}
+                        >
+                          <Checkbox
+                            name={permission.id}
+                            checked={selectedPermissions.has(permission.id)}
+                            onChange={(checked) => {
+                              setSelectedPermissions(prev => {
+                                const newSet = new Set(prev)
+                                if (checked) {
+                                  newSet.add(permission.id)
+                                } else {
+                                  newSet.delete(permission.id)
+                                }
+                                console.log('Checkbox onChange triggered, updated set:', newSet)
+                                return newSet
+                              })
+                            }}
+                          />
+                          <Label className='cursor-pointer'>{permission.name}</Label>
+                          <Description>{permission.description}</Description>
+                        </CheckboxField>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedPermissions.size === 0 && (
+                <Text className="text-sm text-red-600 dark:text-red-400 mt-2">
+                  Please select at least one permission for this role
+                </Text>
+              )}
             </div>
           </div>
+          )}
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-3">
-            <Button 
-              color="blue"
-              onClick={handleCreateRole}
-              disabled={!roleName.trim() || selectedPermissions.length === 0 || isCreating}
-              className="flex items-center gap-2"
-            >
-              <MaterialSymbol name="shield" size="sm" />
-              {isCreating ? 'Creating...' : 'Create Role'}
-            </Button>
-            
+          <div className="flex justify-end gap-3">
             <Link to={`/organization/${orgId}/settings/roles`}>
               <Button outline>
                 Cancel
               </Button>
             </Link>
+            <Button
+              color="blue"
+              onClick={handleSubmitRole}
+              disabled={!roleName.trim() || selectedPermissions.size === 0 || isSubmitting || isLoading}
+            >
+              {isSubmitting 
+                ? (isEditMode ? 'Updating...' : 'Creating...') 
+                : (isEditMode ? 'Update Role' : 'Create Role')
+              }
+            </Button>
           </div>
         </div>
       </div>

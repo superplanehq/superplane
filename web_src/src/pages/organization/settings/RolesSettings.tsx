@@ -21,6 +21,7 @@ import {
 } from '../../../components/Table/table'
 import {
   authorizationListRoles,
+  authorizationDeleteRole,
 } from '../../../api-client/sdk.gen'
 import { AuthorizationRole } from '../../../api-client/types.gen'
 import { capitalizeFirstLetter } from '@/utils/text'
@@ -36,6 +37,14 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
   const [loadingRoles, setLoadingRoles] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null
+    direction: 'asc' | 'desc'
+  }>({
+    key: null,
+    direction: 'asc'
+  })
+  const [deletingRole, setDeletingRole] = useState<string | null>(null)
 
   const fetchDomainRoles = useCallback(async (domainType: 'organization' | 'canvas') => {
     const response = await authorizationListRoles({
@@ -73,14 +82,104 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     navigate(`/organization/${organizationId}/settings/create-role`)
   }
 
+  const handleEditRole = (role: AuthorizationRole) => {
+    navigate(`/organization/${organizationId}/settings/create-role/${role.name}`)
+  }
 
-
-  const filteredRoles = useMemo(() => roles.filter((role) => {
-    if (search === '') {
-      return true
+  const handleDeleteRole = async (role: AuthorizationRole) => {
+    if (!role.name) return
+    
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`
+    )
+    
+    if (!confirmed) return
+    
+    try {
+      setDeletingRole(role.name)
+      await authorizationDeleteRole({
+        path: {
+          roleName: role.name
+        },
+        query: {
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
+        }
+      })
+      
+      // Refresh roles list
+      await setupRoles()
+    } catch (err) {
+      console.error('Error deleting role:', err)
+      setError('Failed to delete role. Please try again.')
+    } finally {
+      setDeletingRole(null)
     }
-    return role.name?.toLowerCase().includes(search.toLowerCase())
-  }), [roles, search])
+  }
+
+  const handleSort = (key: string) => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const getSortedData = (data: AuthorizationRole[]) => {
+    if (!sortConfig.key) return data
+
+    return [...data].sort((a, b) => {
+      let aValue: any
+      let bValue: any
+      
+      switch (sortConfig.key) {
+        case 'name':
+          aValue = (a.displayName || a.name || '').toLowerCase()
+          bValue = (b.displayName || b.name || '').toLowerCase()
+          break
+        case 'permissions':
+          aValue = a.permissions?.length || 0
+          bValue = b.permissions?.length || 0
+          break
+        default:
+          return 0
+      }
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }
+
+  const isDefaultRole = (roleName: string | undefined) => {
+    if (!roleName) return false
+    const defaultRoles = ['org_viewer', 'org_admin', 'org_owner']
+    return defaultRoles.includes(roleName)
+  }
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig.key !== columnKey) {
+      return 'unfold_more'
+    }
+    return sortConfig.direction === 'asc' ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
+  }
+
+
+
+  const filteredAndSortedRoles = useMemo(() => {
+    const filtered = roles.filter((role) => {
+      if (search === '') {
+        return true
+      }
+      // Search by display name if available, otherwise by name
+      const searchText = role.displayName || role.name || ''
+      return searchText.toLowerCase().includes(search.toLowerCase())
+    })
+    return getSortedData(filtered)
+  }, [roles, search, sortConfig])
 
   return (
     <div className="space-y-6 pt-6">
@@ -120,44 +219,74 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
             <Table dense>
               <TableHead>
                 <TableRow>
-                  <TableHeader>Role name</TableHeader>
-                  <TableHeader>Permissions</TableHeader>
+                  <TableHeader 
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role name
+                      <MaterialSymbol name={getSortIcon('name')} size="sm" className="text-zinc-400" />
+                    </div>
+                  </TableHeader>
+                  <TableHeader 
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    onClick={() => handleSort('permissions')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Permissions
+                      <MaterialSymbol name={getSortIcon('permissions')} size="sm" className="text-zinc-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredRoles.length === 0 ? (
+                {filteredAndSortedRoles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-zinc-500 dark:text-zinc-400">
+                    <TableCell colSpan={3} className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                       No roles found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredRoles.map((role, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="font-medium">{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</TableCell>
-                      <TableCell>{role.permissions?.length || 0}</TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <Dropdown>
-                            <DropdownButton plain>
-                              <MaterialSymbol name="more_vert" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem>
-                                <MaterialSymbol name="edit" />
-                                Edit
-                              </DropdownItem>
-                              <DropdownItem>
-                                <MaterialSymbol name="delete" />
-                                Delete
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredAndSortedRoles.map((role, index) => {
+                    const isDefault = isDefaultRole(role.name)
+                    return (
+                      <TableRow key={role.name || index}>
+                        <TableCell className="font-medium">
+                          {role.displayName || capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}
+                        </TableCell>
+                        <TableCell>{role.permissions?.length || 0}</TableCell>
+                        <TableCell>
+                          <div className="flex justify-end">
+                            {isDefault ? (
+                              <span className="text-xs text-zinc-500 dark:text-zinc-400 px-2 py-1 bg-zinc-100 dark:bg-zinc-800 rounded">
+                                Default Role
+                              </span>
+                            ) : (
+                              <Dropdown>
+                                <DropdownButton plain disabled={deletingRole === role.name}>
+                                  <MaterialSymbol name="more_vert" size="sm" />
+                                </DropdownButton>
+                                <DropdownMenu>
+                                  <DropdownItem onClick={() => handleEditRole(role)}>
+                                    <MaterialSymbol name="edit" />
+                                    Edit
+                                  </DropdownItem>
+                                  <DropdownItem 
+                                    onClick={() => handleDeleteRole(role)}
+                                    className="text-red-600 dark:text-red-400"
+                                  >
+                                    <MaterialSymbol name="delete" />
+                                    {deletingRole === role.name ? 'Deleting...' : 'Delete'}
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              </Dropdown>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })
                 )}
               </TableBody>
             </Table>
