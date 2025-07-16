@@ -204,9 +204,13 @@ func (x *ListUserPermissionsResponse) GetPermissions() []*Permission {
 
 // Role assignment messages
 type AssignRoleRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	RoleAssignment *RoleAssignment        `protobuf:"bytes,2,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*AssignRoleRequest_UserId
+	//	*AssignRoleRequest_UserEmail
+	UserIdentifier isAssignRoleRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
+	RoleAssignment *RoleAssignment                    `protobuf:"bytes,2,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -241,9 +245,27 @@ func (*AssignRoleRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *AssignRoleRequest) GetUserIdentifier() isAssignRoleRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *AssignRoleRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*AssignRoleRequest_UserId); ok {
+			return x.UserId
+		}
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*AssignRoleRequest_UserEmail); ok {
+			return x.UserEmail
+		}
 	}
 	return ""
 }
@@ -254,6 +276,22 @@ func (x *AssignRoleRequest) GetRoleAssignment() *RoleAssignment {
 	}
 	return nil
 }
+
+type isAssignRoleRequest_UserIdentifier interface {
+	isAssignRoleRequest_UserIdentifier()
+}
+
+type AssignRoleRequest_UserId struct {
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type AssignRoleRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,3,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*AssignRoleRequest_UserId) isAssignRoleRequest_UserIdentifier() {}
+
+func (*AssignRoleRequest_UserEmail) isAssignRoleRequest_UserIdentifier() {}
 
 type AssignRoleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -292,9 +330,13 @@ func (*AssignRoleResponse) Descriptor() ([]byte, []int) {
 }
 
 type RemoveRoleRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	RoleAssignment *RoleAssignment        `protobuf:"bytes,2,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*RemoveRoleRequest_UserId
+	//	*RemoveRoleRequest_UserEmail
+	UserIdentifier isRemoveRoleRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
+	RoleAssignment *RoleAssignment                    `protobuf:"bytes,2,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -329,9 +371,27 @@ func (*RemoveRoleRequest) Descriptor() ([]byte, []int) {
 	return file_authorization_proto_rawDescGZIP(), []int{4}
 }
 
+func (x *RemoveRoleRequest) GetUserIdentifier() isRemoveRoleRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *RemoveRoleRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*RemoveRoleRequest_UserId); ok {
+			return x.UserId
+		}
+	}
+	return ""
+}
+
+func (x *RemoveRoleRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*RemoveRoleRequest_UserEmail); ok {
+			return x.UserEmail
+		}
 	}
 	return ""
 }
@@ -342,6 +402,22 @@ func (x *RemoveRoleRequest) GetRoleAssignment() *RoleAssignment {
 	}
 	return nil
 }
+
+type isRemoveRoleRequest_UserIdentifier interface {
+	isRemoveRoleRequest_UserIdentifier()
+}
+
+type RemoveRoleRequest_UserId struct {
+	UserId string `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type RemoveRoleRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,3,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*RemoveRoleRequest_UserId) isRemoveRoleRequest_UserIdentifier() {}
+
+func (*RemoveRoleRequest_UserEmail) isRemoveRoleRequest_UserIdentifier() {}
 
 type RemoveRoleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -894,7 +970,11 @@ type AddUserToOrganizationGroupRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*AddUserToOrganizationGroupRequest_UserId
+	//	*AddUserToOrganizationGroupRequest_UserEmail
+	UserIdentifier isAddUserToOrganizationGroupRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -943,11 +1023,47 @@ func (x *AddUserToOrganizationGroupRequest) GetGroupName() string {
 	return ""
 }
 
+func (x *AddUserToOrganizationGroupRequest) GetUserIdentifier() isAddUserToOrganizationGroupRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *AddUserToOrganizationGroupRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*AddUserToOrganizationGroupRequest_UserId); ok {
+			return x.UserId
+		}
 	}
 	return ""
+}
+
+func (x *AddUserToOrganizationGroupRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*AddUserToOrganizationGroupRequest_UserEmail); ok {
+			return x.UserEmail
+		}
+	}
+	return ""
+}
+
+type isAddUserToOrganizationGroupRequest_UserIdentifier interface {
+	isAddUserToOrganizationGroupRequest_UserIdentifier()
+}
+
+type AddUserToOrganizationGroupRequest_UserId struct {
+	UserId string `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type AddUserToOrganizationGroupRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,4,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*AddUserToOrganizationGroupRequest_UserId) isAddUserToOrganizationGroupRequest_UserIdentifier() {
+}
+
+func (*AddUserToOrganizationGroupRequest_UserEmail) isAddUserToOrganizationGroupRequest_UserIdentifier() {
 }
 
 type AddUserToOrganizationGroupResponse struct {
@@ -990,7 +1106,11 @@ type RemoveUserFromOrganizationGroupRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*RemoveUserFromOrganizationGroupRequest_UserId
+	//	*RemoveUserFromOrganizationGroupRequest_UserEmail
+	UserIdentifier isRemoveUserFromOrganizationGroupRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1039,11 +1159,47 @@ func (x *RemoveUserFromOrganizationGroupRequest) GetGroupName() string {
 	return ""
 }
 
+func (x *RemoveUserFromOrganizationGroupRequest) GetUserIdentifier() isRemoveUserFromOrganizationGroupRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *RemoveUserFromOrganizationGroupRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*RemoveUserFromOrganizationGroupRequest_UserId); ok {
+			return x.UserId
+		}
 	}
 	return ""
+}
+
+func (x *RemoveUserFromOrganizationGroupRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*RemoveUserFromOrganizationGroupRequest_UserEmail); ok {
+			return x.UserEmail
+		}
+	}
+	return ""
+}
+
+type isRemoveUserFromOrganizationGroupRequest_UserIdentifier interface {
+	isRemoveUserFromOrganizationGroupRequest_UserIdentifier()
+}
+
+type RemoveUserFromOrganizationGroupRequest_UserId struct {
+	UserId string `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type RemoveUserFromOrganizationGroupRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,4,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*RemoveUserFromOrganizationGroupRequest_UserId) isRemoveUserFromOrganizationGroupRequest_UserIdentifier() {
+}
+
+func (*RemoveUserFromOrganizationGroupRequest_UserEmail) isRemoveUserFromOrganizationGroupRequest_UserIdentifier() {
 }
 
 type RemoveUserFromOrganizationGroupResponse struct {
@@ -1496,7 +1652,11 @@ type AddUserToCanvasGroupRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*AddUserToCanvasGroupRequest_UserId
+	//	*AddUserToCanvasGroupRequest_UserEmail
+	UserIdentifier isAddUserToCanvasGroupRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1545,12 +1705,46 @@ func (x *AddUserToCanvasGroupRequest) GetGroupName() string {
 	return ""
 }
 
+func (x *AddUserToCanvasGroupRequest) GetUserIdentifier() isAddUserToCanvasGroupRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *AddUserToCanvasGroupRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*AddUserToCanvasGroupRequest_UserId); ok {
+			return x.UserId
+		}
 	}
 	return ""
 }
+
+func (x *AddUserToCanvasGroupRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*AddUserToCanvasGroupRequest_UserEmail); ok {
+			return x.UserEmail
+		}
+	}
+	return ""
+}
+
+type isAddUserToCanvasGroupRequest_UserIdentifier interface {
+	isAddUserToCanvasGroupRequest_UserIdentifier()
+}
+
+type AddUserToCanvasGroupRequest_UserId struct {
+	UserId string `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type AddUserToCanvasGroupRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,4,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*AddUserToCanvasGroupRequest_UserId) isAddUserToCanvasGroupRequest_UserIdentifier() {}
+
+func (*AddUserToCanvasGroupRequest_UserEmail) isAddUserToCanvasGroupRequest_UserIdentifier() {}
 
 type AddUserToCanvasGroupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1592,7 +1786,11 @@ type RemoveUserFromCanvasGroupRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	GroupName      string                 `protobuf:"bytes,2,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	UserId         string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	// Types that are valid to be assigned to UserIdentifier:
+	//
+	//	*RemoveUserFromCanvasGroupRequest_UserId
+	//	*RemoveUserFromCanvasGroupRequest_UserEmail
+	UserIdentifier isRemoveUserFromCanvasGroupRequest_UserIdentifier `protobuf_oneof:"user_identifier"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1641,11 +1839,46 @@ func (x *RemoveUserFromCanvasGroupRequest) GetGroupName() string {
 	return ""
 }
 
+func (x *RemoveUserFromCanvasGroupRequest) GetUserIdentifier() isRemoveUserFromCanvasGroupRequest_UserIdentifier {
+	if x != nil {
+		return x.UserIdentifier
+	}
+	return nil
+}
+
 func (x *RemoveUserFromCanvasGroupRequest) GetUserId() string {
 	if x != nil {
-		return x.UserId
+		if x, ok := x.UserIdentifier.(*RemoveUserFromCanvasGroupRequest_UserId); ok {
+			return x.UserId
+		}
 	}
 	return ""
+}
+
+func (x *RemoveUserFromCanvasGroupRequest) GetUserEmail() string {
+	if x != nil {
+		if x, ok := x.UserIdentifier.(*RemoveUserFromCanvasGroupRequest_UserEmail); ok {
+			return x.UserEmail
+		}
+	}
+	return ""
+}
+
+type isRemoveUserFromCanvasGroupRequest_UserIdentifier interface {
+	isRemoveUserFromCanvasGroupRequest_UserIdentifier()
+}
+
+type RemoveUserFromCanvasGroupRequest_UserId struct {
+	UserId string `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3,oneof"`
+}
+
+type RemoveUserFromCanvasGroupRequest_UserEmail struct {
+	UserEmail string `protobuf:"bytes,4,opt,name=user_email,json=userEmail,proto3,oneof"`
+}
+
+func (*RemoveUserFromCanvasGroupRequest_UserId) isRemoveUserFromCanvasGroupRequest_UserIdentifier() {}
+
+func (*RemoveUserFromCanvasGroupRequest_UserEmail) isRemoveUserFromCanvasGroupRequest_UserIdentifier() {
 }
 
 type RemoveUserFromCanvasGroupResponse struct {
@@ -3215,14 +3448,20 @@ const file_authorization_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
-	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\"\x7f\n" +
-	"\x11AssignRoleRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12Q\n" +
-	"\x0frole_assignment\x18\x02 \x01(\v2(.Superplane.Authorization.RoleAssignmentR\x0eroleAssignment\"\x14\n" +
-	"\x12AssignRoleResponse\"\x7f\n" +
-	"\x11RemoveRoleRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12Q\n" +
-	"\x0frole_assignment\x18\x02 \x01(\v2(.Superplane.Authorization.RoleAssignmentR\x0eroleAssignment\"\x14\n" +
+	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\"\xb5\x01\n" +
+	"\x11AssignRoleRequest\x12\x19\n" +
+	"\auser_id\x18\x01 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x03 \x01(\tH\x00R\tuserEmail\x12Q\n" +
+	"\x0frole_assignment\x18\x02 \x01(\v2(.Superplane.Authorization.RoleAssignmentR\x0eroleAssignmentB\x11\n" +
+	"\x0fuser_identifier\"\x14\n" +
+	"\x12AssignRoleResponse\"\xb5\x01\n" +
+	"\x11RemoveRoleRequest\x12\x19\n" +
+	"\auser_id\x18\x01 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x03 \x01(\tH\x00R\tuserEmail\x12Q\n" +
+	"\x0frole_assignment\x18\x02 \x01(\v2(.Superplane.Authorization.RoleAssignmentR\x0eroleAssignmentB\x11\n" +
+	"\x0fuser_identifier\"\x14\n" +
 	"\x12RemoveRoleResponse\"\x88\x01\n" +
 	"\x0eRoleAssignment\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
@@ -3261,18 +3500,24 @@ const file_authorization_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\"X\n" +
 	"\x1fCreateOrganizationGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x84\x01\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\xba\x01\n" +
 	"!AddUserToOrganizationGroupRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"$\n" +
-	"\"AddUserToOrganizationGroupResponse\"\x89\x01\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x19\n" +
+	"\auser_id\x18\x03 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x04 \x01(\tH\x00R\tuserEmailB\x11\n" +
+	"\x0fuser_identifier\"$\n" +
+	"\"AddUserToOrganizationGroupResponse\"\xbf\x01\n" +
 	"&RemoveUserFromOrganizationGroupRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\")\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x19\n" +
+	"\auser_id\x18\x03 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x04 \x01(\tH\x00R\tuserEmailB\x11\n" +
+	"\x0fuser_identifier\")\n" +
 	"'RemoveUserFromOrganizationGroupResponse\"H\n" +
 	"\x1dListOrganizationGroupsRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"Y\n" +
@@ -3299,18 +3544,24 @@ const file_authorization_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x05 \x01(\tR\vdescription\"R\n" +
 	"\x19CreateCanvasGroupResponse\x125\n" +
-	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\x80\x01\n" +
+	"\x05group\x18\x01 \x01(\v2\x1f.Superplane.Authorization.GroupR\x05group\"\xb6\x01\n" +
 	"\x1bAddUserToCanvasGroupRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"\x1e\n" +
-	"\x1cAddUserToCanvasGroupResponse\"\x85\x01\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x19\n" +
+	"\auser_id\x18\x03 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x04 \x01(\tH\x00R\tuserEmailB\x11\n" +
+	"\x0fuser_identifier\"\x1e\n" +
+	"\x1cAddUserToCanvasGroupResponse\"\xbb\x01\n" +
 	" RemoveUserFromCanvasGroupRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x17\n" +
-	"\auser_id\x18\x03 \x01(\tR\x06userId\"#\n" +
+	"group_name\x18\x02 \x01(\tR\tgroupName\x12\x19\n" +
+	"\auser_id\x18\x03 \x01(\tH\x00R\x06userId\x12\x1f\n" +
+	"\n" +
+	"user_email\x18\x04 \x01(\tH\x00R\tuserEmailB\x11\n" +
+	"\x0fuser_identifier\"#\n" +
 	"!RemoveUserFromCanvasGroupResponse\"D\n" +
 	"\x17ListCanvasGroupsRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"S\n" +
@@ -3461,9 +3712,9 @@ const file_authorization_proto_rawDesc = "" +
 	"\x14AddUserToCanvasGroup\x125.Superplane.Authorization.AddUserToCanvasGroupRequest\x1a6.Superplane.Authorization.AddUserToCanvasGroupResponse\"\xab\x01\x92AQ\n" +
 	"\rAuthorization\x12\x18Add user to canvas group\x1a&Adds a user to a group within a canvas\x82\xd3\xe4\x93\x02Q:\x01*\"L/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users\x12\xd5\x02\n" +
 	"\x1fRemoveUserFromOrganizationGroup\x12@.Superplane.Authorization.RemoveUserFromOrganizationGroupRequest\x1aA.Superplane.Authorization.RemoveUserFromOrganizationGroupResponse\"\xac\x01\x92Ah\n" +
-	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02;*9/api/v1/authorization/groups/{group_name}/users/{user_id}\x12\xd3\x02\n" +
+	"\rAuthorization\x12#Remove user from organization group\x1a2Removes a user from a group within an organization\x82\xd3\xe4\x93\x02;:\x01*26/api/v1/authorization/groups/{group_name}/users/remove\x12\xd3\x02\n" +
 	"\x19RemoveUserFromCanvasGroup\x12:.Superplane.Authorization.RemoveUserFromCanvasGroupRequest\x1a;.Superplane.Authorization.RemoveUserFromCanvasGroupResponse\"\xbc\x01\x92A[\n" +
-	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02X*V/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}\x12\x8f\x02\n" +
+	"\rAuthorization\x12\x1dRemove user from canvas group\x1a+Removes a user from a group within a canvas\x82\xd3\xe4\x93\x02X:\x01*2S/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/remove\x12\x8f\x02\n" +
 	"\x16ListOrganizationGroups\x127.Superplane.Authorization.ListOrganizationGroupsRequest\x1a8.Superplane.Authorization.ListOrganizationGroupsResponse\"\x81\x01\x92AZ\n" +
 	"\rAuthorization\x12\x18List organization groups\x1a/Returns a list of groups within an organization\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/authorization/groups\x12\x8d\x02\n" +
 	"\x10ListCanvasGroups\x121.Superplane.Authorization.ListCanvasGroupsRequest\x1a2.Superplane.Authorization.ListCanvasGroupsResponse\"\x91\x01\x92AM\n" +
@@ -3670,6 +3921,30 @@ func init() { file_authorization_proto_init() }
 func file_authorization_proto_init() {
 	if File_authorization_proto != nil {
 		return
+	}
+	file_authorization_proto_msgTypes[2].OneofWrappers = []any{
+		(*AssignRoleRequest_UserId)(nil),
+		(*AssignRoleRequest_UserEmail)(nil),
+	}
+	file_authorization_proto_msgTypes[4].OneofWrappers = []any{
+		(*RemoveRoleRequest_UserId)(nil),
+		(*RemoveRoleRequest_UserEmail)(nil),
+	}
+	file_authorization_proto_msgTypes[15].OneofWrappers = []any{
+		(*AddUserToOrganizationGroupRequest_UserId)(nil),
+		(*AddUserToOrganizationGroupRequest_UserEmail)(nil),
+	}
+	file_authorization_proto_msgTypes[17].OneofWrappers = []any{
+		(*RemoveUserFromOrganizationGroupRequest_UserId)(nil),
+		(*RemoveUserFromOrganizationGroupRequest_UserEmail)(nil),
+	}
+	file_authorization_proto_msgTypes[27].OneofWrappers = []any{
+		(*AddUserToCanvasGroupRequest_UserId)(nil),
+		(*AddUserToCanvasGroupRequest_UserEmail)(nil),
+	}
+	file_authorization_proto_msgTypes[29].OneofWrappers = []any{
+		(*RemoveUserFromCanvasGroupRequest_UserId)(nil),
+		(*RemoveUserFromCanvasGroupRequest_UserEmail)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

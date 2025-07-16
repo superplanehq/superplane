@@ -2686,7 +2686,12 @@ type ApiAuthorizationRemoveUserFromCanvasGroupRequest struct {
 	ApiService *AuthorizationAPIService
 	canvasIdOrName string
 	groupName string
-	userId string
+	body *AuthorizationRemoveUserFromCanvasGroupBody
+}
+
+func (r ApiAuthorizationRemoveUserFromCanvasGroupRequest) Body(body AuthorizationRemoveUserFromCanvasGroupBody) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
+	r.body = &body
+	return r
 }
 
 func (r ApiAuthorizationRemoveUserFromCanvasGroupRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -2701,16 +2706,14 @@ Removes a user from a group within a canvas
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
  @param groupName
- @param userId
  @return ApiAuthorizationRemoveUserFromCanvasGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string, userId string) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx context.Context, canvasIdOrName string, groupName string) ApiAuthorizationRemoveUserFromCanvasGroupRequest {
 	return ApiAuthorizationRemoveUserFromCanvasGroupRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
 		groupName: groupName,
-		userId: userId,
 	}
 }
 
@@ -2718,7 +2721,7 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroup(ctx con
 //  @return map[string]interface{}
 func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(r ApiAuthorizationRemoveUserFromCanvasGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
+		localVarHTTPMethod   = http.MethodPatch
 		localVarPostBody     interface{}
 		formFiles            []formFile
 		localVarReturnValue  map[string]interface{}
@@ -2729,17 +2732,19 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}"
+	localVarPath := localBasePath + "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/remove"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
+	}
 
 	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
+	localVarHTTPContentTypes := []string{"application/json"}
 
 	// set Content-Type header
 	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
@@ -2755,6 +2760,8 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromCanvasGroupExecute(
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	// body params
+	localVarPostBody = r.body
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err
@@ -2804,12 +2811,11 @@ type ApiAuthorizationRemoveUserFromOrganizationGroupRequest struct {
 	ctx context.Context
 	ApiService *AuthorizationAPIService
 	groupName string
-	userId string
-	organizationId *string
+	body *AuthorizationRemoveUserFromOrganizationGroupBody
 }
 
-func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) OrganizationId(organizationId string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
-	r.organizationId = &organizationId
+func (r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) Body(body AuthorizationRemoveUserFromOrganizationGroupBody) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
+	r.body = &body
 	return r
 }
 
@@ -2824,15 +2830,13 @@ Removes a user from a group within an organization
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param groupName
- @param userId
  @return ApiAuthorizationRemoveUserFromOrganizationGroupRequest
 */
-func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroup(ctx context.Context, groupName string, userId string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
+func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroup(ctx context.Context, groupName string) ApiAuthorizationRemoveUserFromOrganizationGroupRequest {
 	return ApiAuthorizationRemoveUserFromOrganizationGroupRequest{
 		ApiService: a,
 		ctx: ctx,
 		groupName: groupName,
-		userId: userId,
 	}
 }
 
@@ -2840,7 +2844,7 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroup(c
 //  @return map[string]interface{}
 func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupExecute(r ApiAuthorizationRemoveUserFromOrganizationGroupRequest) (map[string]interface{}, *http.Response, error) {
 	var (
-		localVarHTTPMethod   = http.MethodDelete
+		localVarHTTPMethod   = http.MethodPatch
 		localVarPostBody     interface{}
 		formFiles            []formFile
 		localVarReturnValue  map[string]interface{}
@@ -2851,19 +2855,18 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupEx
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users/{userId}"
+	localVarPath := localBasePath + "/api/v1/authorization/groups/{groupName}/users/remove"
 	localVarPath = strings.Replace(localVarPath, "{"+"groupName"+"}", url.PathEscape(parameterValueToString(r.groupName, "groupName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
-
-	if r.organizationId != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "organizationId", r.organizationId, "", "")
+	if r.body == nil {
+		return localVarReturnValue, nil, reportError("body is required and must be specified")
 	}
+
 	// to determine the Content-Type header
-	localVarHTTPContentTypes := []string{}
+	localVarHTTPContentTypes := []string{"application/json"}
 
 	// set Content-Type header
 	localVarHTTPContentType := selectHeaderContentType(localVarHTTPContentTypes)
@@ -2879,6 +2882,8 @@ func (a *AuthorizationAPIService) AuthorizationRemoveUserFromOrganizationGroupEx
 	if localVarHTTPHeaderAccept != "" {
 		localVarHeaderParams["Accept"] = localVarHTTPHeaderAccept
 	}
+	// body params
+	localVarPostBody = r.body
 	req, err := a.client.prepareRequest(r.ctx, localVarPath, localVarHTTPMethod, localVarPostBody, localVarHeaderParams, localVarQueryParams, localVarFormParams, formFiles)
 	if err != nil {
 		return localVarReturnValue, nil, err

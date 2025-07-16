@@ -257,8 +257,8 @@
         ]
       }
     },
-    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}": {
-      "delete": {
+    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/remove": {
+      "patch": {
         "summary": "Remove user from canvas group",
         "description": "Removes a user from a group within a canvas",
         "operationId": "Authorization_RemoveUserFromCanvasGroup",
@@ -290,10 +290,12 @@
             "type": "string"
           },
           {
-            "name": "userId",
-            "in": "path",
+            "name": "body",
+            "in": "body",
             "required": true,
-            "type": "string"
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupBody"
+            }
           }
         ],
         "tags": [
@@ -547,8 +549,8 @@
         ]
       }
     },
-    "/api/v1/authorization/groups/{groupName}/users/{userId}": {
-      "delete": {
+    "/api/v1/authorization/groups/{groupName}/users/remove": {
+      "patch": {
         "summary": "Remove user from organization group",
         "description": "Removes a user from a group within an organization",
         "operationId": "Authorization_RemoveUserFromOrganizationGroup",
@@ -574,16 +576,12 @@
             "type": "string"
           },
           {
-            "name": "userId",
-            "in": "path",
+            "name": "body",
+            "in": "body",
             "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupBody"
+            }
           }
         ],
         "tags": [
@@ -2130,6 +2128,9 @@
       "properties": {
         "userId": {
           "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
         }
       }
     },
@@ -2144,6 +2145,9 @@
         },
         "userId": {
           "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
         }
       }
     },
@@ -2154,6 +2158,9 @@
       "type": "object",
       "properties": {
         "userId": {
+          "type": "string"
+        },
+        "userEmail": {
           "type": "string"
         },
         "roleAssignment": {
@@ -2473,6 +2480,9 @@
         "userId": {
           "type": "string"
         },
+        "userEmail": {
+          "type": "string"
+        },
         "roleAssignment": {
           "$ref": "#/definitions/AuthorizationRoleAssignment"
         }
@@ -2481,8 +2491,33 @@
     "AuthorizationRemoveRoleResponse": {
       "type": "object"
     },
+    "AuthorizationRemoveUserFromCanvasGroupBody": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        }
+      }
+    },
     "AuthorizationRemoveUserFromCanvasGroupResponse": {
       "type": "object"
+    },
+    "AuthorizationRemoveUserFromOrganizationGroupBody": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        }
+      }
     },
     "AuthorizationRemoveUserFromOrganizationGroupResponse": {
       "type": "object"

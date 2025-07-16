@@ -97,9 +97,13 @@ export const authorizationAddUserToCanvasGroup = <ThrowOnError extends boolean =
  * Removes a user from a group within a canvas
  */
 export const authorizationRemoveUserFromCanvasGroup = <ThrowOnError extends boolean = false>(options: Options<AuthorizationRemoveUserFromCanvasGroupData, ThrowOnError>) => {
-    return (options.client ?? _heyApiClient).delete<AuthorizationRemoveUserFromCanvasGroupResponse2, AuthorizationRemoveUserFromCanvasGroupError, ThrowOnError>({
-        url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}',
-        ...options
+    return (options.client ?? _heyApiClient).patch<AuthorizationRemoveUserFromCanvasGroupResponse2, AuthorizationRemoveUserFromCanvasGroupError, ThrowOnError>({
+        url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/remove',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers
+        }
     });
 };
 
@@ -193,9 +197,13 @@ export const authorizationAddUserToOrganizationGroup = <ThrowOnError extends boo
  * Removes a user from a group within an organization
  */
 export const authorizationRemoveUserFromOrganizationGroup = <ThrowOnError extends boolean = false>(options: Options<AuthorizationRemoveUserFromOrganizationGroupData, ThrowOnError>) => {
-    return (options.client ?? _heyApiClient).delete<AuthorizationRemoveUserFromOrganizationGroupResponse2, AuthorizationRemoveUserFromOrganizationGroupError, ThrowOnError>({
-        url: '/api/v1/authorization/groups/{groupName}/users/{userId}',
-        ...options
+    return (options.client ?? _heyApiClient).patch<AuthorizationRemoveUserFromOrganizationGroupResponse2, AuthorizationRemoveUserFromOrganizationGroupError, ThrowOnError>({
+        url: '/api/v1/authorization/groups/{groupName}/users/remove',
+        ...options,
+        headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers
+        }
     });
 };
 

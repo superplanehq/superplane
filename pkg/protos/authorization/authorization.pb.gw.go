@@ -417,15 +417,15 @@ func local_request_Authorization_AddUserToCanvasGroup_0(ctx context.Context, mar
 	return msg, metadata, err
 }
 
-var filter_Authorization_RemoveUserFromOrganizationGroup_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0, "user_id": 1}, Base: []int{1, 1, 2, 0, 0}, Check: []int{0, 1, 1, 2, 3}}
-
 func request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.Context, marshaler runtime.Marshaler, client AuthorizationClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq RemoveUserFromOrganizationGroupRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	io.Copy(io.Discard, req.Body)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	val, ok := pathParams["group_name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "group_name")
@@ -433,20 +433,6 @@ func request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.Context
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
-	}
-	val, ok = pathParams["user_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
-	}
-	protoReq.UserId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_RemoveUserFromOrganizationGroup_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := client.RemoveUserFromOrganizationGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -458,6 +444,9 @@ func local_request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.C
 		metadata runtime.ServerMetadata
 		err      error
 	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	val, ok := pathParams["group_name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "group_name")
@@ -465,20 +454,6 @@ func local_request_Authorization_RemoveUserFromOrganizationGroup_0(ctx context.C
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
-	}
-	val, ok = pathParams["user_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
-	}
-	protoReq.UserId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
-	}
-	if err := req.ParseForm(); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Authorization_RemoveUserFromOrganizationGroup_0); err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 	msg, err := server.RemoveUserFromOrganizationGroup(ctx, &protoReq)
 	return msg, metadata, err
@@ -490,7 +465,9 @@ func request_Authorization_RemoveUserFromCanvasGroup_0(ctx context.Context, mars
 		metadata runtime.ServerMetadata
 		err      error
 	)
-	io.Copy(io.Discard, req.Body)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	val, ok := pathParams["canvas_id_or_name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
@@ -506,14 +483,6 @@ func request_Authorization_RemoveUserFromCanvasGroup_0(ctx context.Context, mars
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
-	}
-	val, ok = pathParams["user_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
-	}
-	protoReq.UserId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
 	}
 	msg, err := client.RemoveUserFromCanvasGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
@@ -525,6 +494,9 @@ func local_request_Authorization_RemoveUserFromCanvasGroup_0(ctx context.Context
 		metadata runtime.ServerMetadata
 		err      error
 	)
+	if err := marshaler.NewDecoder(req.Body).Decode(&protoReq); err != nil && !errors.Is(err, io.EOF) {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
 	val, ok := pathParams["canvas_id_or_name"]
 	if !ok {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "canvas_id_or_name")
@@ -540,14 +512,6 @@ func local_request_Authorization_RemoveUserFromCanvasGroup_0(ctx context.Context
 	protoReq.GroupName, err = runtime.String(val)
 	if err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "group_name", err)
-	}
-	val, ok = pathParams["user_id"]
-	if !ok {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "user_id")
-	}
-	protoReq.UserId, err = runtime.String(val)
-	if err != nil {
-		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "user_id", err)
 	}
 	msg, err := server.RemoveUserFromCanvasGroup(ctx, &protoReq)
 	return msg, metadata, err
@@ -1332,13 +1296,13 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Authorization_AddUserToCanvasGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Authorization_RemoveUserFromOrganizationGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Authorization_RemoveUserFromOrganizationGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/remove"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1352,13 +1316,13 @@ func RegisterAuthorizationHandlerServer(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Authorization_RemoveUserFromOrganizationGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Authorization_RemoveUserFromCanvasGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Authorization_RemoveUserFromCanvasGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/remove"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1842,11 +1806,11 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Authorization_AddUserToCanvasGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Authorization_RemoveUserFromOrganizationGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Authorization_RemoveUserFromOrganizationGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromOrganizationGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/groups/{group_name}/users/remove"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -1859,11 +1823,11 @@ func RegisterAuthorizationHandlerClient(ctx context.Context, mux *runtime.ServeM
 		}
 		forward_Authorization_RemoveUserFromOrganizationGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodDelete, pattern_Authorization_RemoveUserFromCanvasGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodPatch, pattern_Authorization_RemoveUserFromCanvasGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Authorization.Authorization/RemoveUserFromCanvasGroup", runtime.WithHTTPPathPattern("/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/remove"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -2111,8 +2075,8 @@ var (
 	pattern_Authorization_CreateCanvasGroup_0               = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups"}, ""))
 	pattern_Authorization_AddUserToOrganizationGroup_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "group_name", "users"}, ""))
 	pattern_Authorization_AddUserToCanvasGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users"}, ""))
-	pattern_Authorization_RemoveUserFromOrganizationGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6}, []string{"api", "v1", "authorization", "groups", "group_name", "users", "user_id"}, ""))
-	pattern_Authorization_RemoveUserFromCanvasGroup_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7, 1, 0, 4, 1, 5, 8}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users", "user_id"}, ""))
+	pattern_Authorization_RemoveUserFromOrganizationGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 2, 6}, []string{"api", "v1", "authorization", "groups", "group_name", "users", "remove"}, ""))
+	pattern_Authorization_RemoveUserFromCanvasGroup_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5, 1, 0, 4, 1, 5, 6, 2, 7, 2, 8}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups", "group_name", "users", "remove"}, ""))
 	pattern_Authorization_ListOrganizationGroups_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3}, []string{"api", "v1", "authorization", "groups"}, ""))
 	pattern_Authorization_ListCanvasGroups_0                = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "canvases", "canvas_id_or_name", "groups"}, ""))
 	pattern_Authorization_GetOrganizationGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 2, 3, 1, 0, 4, 1, 5, 4, 2, 5}, []string{"api", "v1", "authorization", "groups", "group_name", "users"}, ""))

@@ -13,6 +13,7 @@ export type AuthorizationAccountProvider = {
 
 export type AuthorizationAddUserToCanvasGroupBody = {
     userId?: string;
+    userEmail?: string;
 };
 
 export type AuthorizationAddUserToCanvasGroupResponse = {
@@ -22,6 +23,7 @@ export type AuthorizationAddUserToCanvasGroupResponse = {
 export type AuthorizationAddUserToOrganizationGroupBody = {
     organizationId?: string;
     userId?: string;
+    userEmail?: string;
 };
 
 export type AuthorizationAddUserToOrganizationGroupResponse = {
@@ -30,6 +32,7 @@ export type AuthorizationAddUserToOrganizationGroupResponse = {
 
 export type AuthorizationAssignRoleRequest = {
     userId?: string;
+    userEmail?: string;
     roleAssignment?: AuthorizationRoleAssignment;
 };
 
@@ -161,6 +164,7 @@ export type AuthorizationPermission = {
 
 export type AuthorizationRemoveRoleRequest = {
     userId?: string;
+    userEmail?: string;
     roleAssignment?: AuthorizationRoleAssignment;
 };
 
@@ -168,8 +172,19 @@ export type AuthorizationRemoveRoleResponse = {
     [key: string]: unknown;
 };
 
+export type AuthorizationRemoveUserFromCanvasGroupBody = {
+    userId?: string;
+    userEmail?: string;
+};
+
 export type AuthorizationRemoveUserFromCanvasGroupResponse = {
     [key: string]: unknown;
+};
+
+export type AuthorizationRemoveUserFromOrganizationGroupBody = {
+    organizationId?: string;
+    userId?: string;
+    userEmail?: string;
 };
 
 export type AuthorizationRemoveUserFromOrganizationGroupResponse = {
@@ -889,14 +904,13 @@ export type AuthorizationAddUserToCanvasGroupResponses = {
 export type AuthorizationAddUserToCanvasGroupResponse2 = AuthorizationAddUserToCanvasGroupResponses[keyof AuthorizationAddUserToCanvasGroupResponses];
 
 export type AuthorizationRemoveUserFromCanvasGroupData = {
-    body?: never;
+    body: AuthorizationRemoveUserFromCanvasGroupBody;
     path: {
         canvasIdOrName: string;
         groupName: string;
-        userId: string;
     };
     query?: never;
-    url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}';
+    url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/remove';
 };
 
 export type AuthorizationRemoveUserFromCanvasGroupErrors = {
@@ -1111,15 +1125,12 @@ export type AuthorizationAddUserToOrganizationGroupResponses = {
 export type AuthorizationAddUserToOrganizationGroupResponse2 = AuthorizationAddUserToOrganizationGroupResponses[keyof AuthorizationAddUserToOrganizationGroupResponses];
 
 export type AuthorizationRemoveUserFromOrganizationGroupData = {
-    body?: never;
+    body: AuthorizationRemoveUserFromOrganizationGroupBody;
     path: {
         groupName: string;
-        userId: string;
     };
-    query?: {
-        organizationId?: string;
-    };
-    url: '/api/v1/authorization/groups/{groupName}/users/{userId}';
+    query?: never;
+    url: '/api/v1/authorization/groups/{groupName}/users/remove';
 };
 
 export type AuthorizationRemoveUserFromOrganizationGroupErrors = {

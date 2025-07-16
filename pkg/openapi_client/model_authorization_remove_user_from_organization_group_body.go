@@ -15,35 +15,35 @@ import (
 	"encoding/json"
 )
 
-// checks if the AuthorizationAddUserToOrganizationGroupBody type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &AuthorizationAddUserToOrganizationGroupBody{}
+// checks if the AuthorizationRemoveUserFromOrganizationGroupBody type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &AuthorizationRemoveUserFromOrganizationGroupBody{}
 
-// AuthorizationAddUserToOrganizationGroupBody struct for AuthorizationAddUserToOrganizationGroupBody
-type AuthorizationAddUserToOrganizationGroupBody struct {
+// AuthorizationRemoveUserFromOrganizationGroupBody struct for AuthorizationRemoveUserFromOrganizationGroupBody
+type AuthorizationRemoveUserFromOrganizationGroupBody struct {
 	OrganizationId *string `json:"organizationId,omitempty"`
 	UserId *string `json:"userId,omitempty"`
 	UserEmail *string `json:"userEmail,omitempty"`
 }
 
-// NewAuthorizationAddUserToOrganizationGroupBody instantiates a new AuthorizationAddUserToOrganizationGroupBody object
+// NewAuthorizationRemoveUserFromOrganizationGroupBody instantiates a new AuthorizationRemoveUserFromOrganizationGroupBody object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewAuthorizationAddUserToOrganizationGroupBody() *AuthorizationAddUserToOrganizationGroupBody {
-	this := AuthorizationAddUserToOrganizationGroupBody{}
+func NewAuthorizationRemoveUserFromOrganizationGroupBody() *AuthorizationRemoveUserFromOrganizationGroupBody {
+	this := AuthorizationRemoveUserFromOrganizationGroupBody{}
 	return &this
 }
 
-// NewAuthorizationAddUserToOrganizationGroupBodyWithDefaults instantiates a new AuthorizationAddUserToOrganizationGroupBody object
+// NewAuthorizationRemoveUserFromOrganizationGroupBodyWithDefaults instantiates a new AuthorizationRemoveUserFromOrganizationGroupBody object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewAuthorizationAddUserToOrganizationGroupBodyWithDefaults() *AuthorizationAddUserToOrganizationGroupBody {
-	this := AuthorizationAddUserToOrganizationGroupBody{}
+func NewAuthorizationRemoveUserFromOrganizationGroupBodyWithDefaults() *AuthorizationRemoveUserFromOrganizationGroupBody {
+	this := AuthorizationRemoveUserFromOrganizationGroupBody{}
 	return &this
 }
 
 // GetOrganizationId returns the OrganizationId field value if set, zero value otherwise.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationId() string {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetOrganizationId() string {
 	if o == nil || IsNil(o.OrganizationId) {
 		var ret string
 		return ret
@@ -53,7 +53,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationId() string
 
 // GetOrganizationIdOk returns a tuple with the OrganizationId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationIdOk() (*string, bool) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetOrganizationIdOk() (*string, bool) {
 	if o == nil || IsNil(o.OrganizationId) {
 		return nil, false
 	}
@@ -61,7 +61,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetOrganizationIdOk() (*st
 }
 
 // HasOrganizationId returns a boolean if a field has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) HasOrganizationId() bool {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) HasOrganizationId() bool {
 	if o != nil && !IsNil(o.OrganizationId) {
 		return true
 	}
@@ -70,12 +70,12 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) HasOrganizationId() bool {
 }
 
 // SetOrganizationId gets a reference to the given string and assigns it to the OrganizationId field.
-func (o *AuthorizationAddUserToOrganizationGroupBody) SetOrganizationId(v string) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) SetOrganizationId(v string) {
 	o.OrganizationId = &v
 }
 
 // GetUserId returns the UserId field value if set, zero value otherwise.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserId() string {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetUserId() string {
 	if o == nil || IsNil(o.UserId) {
 		var ret string
 		return ret
@@ -85,7 +85,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserId() string {
 
 // GetUserIdOk returns a tuple with the UserId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserIdOk() (*string, bool) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetUserIdOk() (*string, bool) {
 	if o == nil || IsNil(o.UserId) {
 		return nil, false
 	}
@@ -93,7 +93,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserIdOk() (*string, bo
 }
 
 // HasUserId returns a boolean if a field has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) HasUserId() bool {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) HasUserId() bool {
 	if o != nil && !IsNil(o.UserId) {
 		return true
 	}
@@ -102,12 +102,12 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) HasUserId() bool {
 }
 
 // SetUserId gets a reference to the given string and assigns it to the UserId field.
-func (o *AuthorizationAddUserToOrganizationGroupBody) SetUserId(v string) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) SetUserId(v string) {
 	o.UserId = &v
 }
 
 // GetUserEmail returns the UserEmail field value if set, zero value otherwise.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmail() string {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetUserEmail() string {
 	if o == nil || IsNil(o.UserEmail) {
 		var ret string
 		return ret
@@ -117,7 +117,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmail() string {
 
 // GetUserEmailOk returns a tuple with the UserEmail field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmailOk() (*string, bool) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) GetUserEmailOk() (*string, bool) {
 	if o == nil || IsNil(o.UserEmail) {
 		return nil, false
 	}
@@ -125,7 +125,7 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmailOk() (*string,
 }
 
 // HasUserEmail returns a boolean if a field has been set.
-func (o *AuthorizationAddUserToOrganizationGroupBody) HasUserEmail() bool {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) HasUserEmail() bool {
 	if o != nil && !IsNil(o.UserEmail) {
 		return true
 	}
@@ -134,11 +134,11 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) HasUserEmail() bool {
 }
 
 // SetUserEmail gets a reference to the given string and assigns it to the UserEmail field.
-func (o *AuthorizationAddUserToOrganizationGroupBody) SetUserEmail(v string) {
+func (o *AuthorizationRemoveUserFromOrganizationGroupBody) SetUserEmail(v string) {
 	o.UserEmail = &v
 }
 
-func (o AuthorizationAddUserToOrganizationGroupBody) MarshalJSON() ([]byte, error) {
+func (o AuthorizationRemoveUserFromOrganizationGroupBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -146,7 +146,7 @@ func (o AuthorizationAddUserToOrganizationGroupBody) MarshalJSON() ([]byte, erro
 	return json.Marshal(toSerialize)
 }
 
-func (o AuthorizationAddUserToOrganizationGroupBody) ToMap() (map[string]interface{}, error) {
+func (o AuthorizationRemoveUserFromOrganizationGroupBody) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.OrganizationId) {
 		toSerialize["organizationId"] = o.OrganizationId
@@ -160,38 +160,38 @@ func (o AuthorizationAddUserToOrganizationGroupBody) ToMap() (map[string]interfa
 	return toSerialize, nil
 }
 
-type NullableAuthorizationAddUserToOrganizationGroupBody struct {
-	value *AuthorizationAddUserToOrganizationGroupBody
+type NullableAuthorizationRemoveUserFromOrganizationGroupBody struct {
+	value *AuthorizationRemoveUserFromOrganizationGroupBody
 	isSet bool
 }
 
-func (v NullableAuthorizationAddUserToOrganizationGroupBody) Get() *AuthorizationAddUserToOrganizationGroupBody {
+func (v NullableAuthorizationRemoveUserFromOrganizationGroupBody) Get() *AuthorizationRemoveUserFromOrganizationGroupBody {
 	return v.value
 }
 
-func (v *NullableAuthorizationAddUserToOrganizationGroupBody) Set(val *AuthorizationAddUserToOrganizationGroupBody) {
+func (v *NullableAuthorizationRemoveUserFromOrganizationGroupBody) Set(val *AuthorizationRemoveUserFromOrganizationGroupBody) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableAuthorizationAddUserToOrganizationGroupBody) IsSet() bool {
+func (v NullableAuthorizationRemoveUserFromOrganizationGroupBody) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableAuthorizationAddUserToOrganizationGroupBody) Unset() {
+func (v *NullableAuthorizationRemoveUserFromOrganizationGroupBody) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableAuthorizationAddUserToOrganizationGroupBody(val *AuthorizationAddUserToOrganizationGroupBody) *NullableAuthorizationAddUserToOrganizationGroupBody {
-	return &NullableAuthorizationAddUserToOrganizationGroupBody{value: val, isSet: true}
+func NewNullableAuthorizationRemoveUserFromOrganizationGroupBody(val *AuthorizationRemoveUserFromOrganizationGroupBody) *NullableAuthorizationRemoveUserFromOrganizationGroupBody {
+	return &NullableAuthorizationRemoveUserFromOrganizationGroupBody{value: val, isSet: true}
 }
 
-func (v NullableAuthorizationAddUserToOrganizationGroupBody) MarshalJSON() ([]byte, error) {
+func (v NullableAuthorizationRemoveUserFromOrganizationGroupBody) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableAuthorizationAddUserToOrganizationGroupBody) UnmarshalJSON(src []byte) error {
+func (v *NullableAuthorizationRemoveUserFromOrganizationGroupBody) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

@@ -186,7 +186,8 @@ service Authorization {
   //
   rpc RemoveUserFromOrganizationGroup(RemoveUserFromOrganizationGroupRequest) returns (RemoveUserFromOrganizationGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/authorization/groups/{group_name}/users/{user_id}"
+      patch: "/api/v1/authorization/groups/{group_name}/users/remove"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from organization group";
@@ -201,7 +202,8 @@ service Authorization {
   //
   rpc RemoveUserFromCanvasGroup(RemoveUserFromCanvasGroupRequest) returns (RemoveUserFromCanvasGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"
+      patch: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/remove"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from canvas group";
@@ -424,14 +426,20 @@ message ListUserPermissionsResponse {
 
 // Role assignment messages
 message AssignRoleRequest {
-  string user_id = 1;
+  oneof user_identifier {
+    string user_id = 1;
+    string user_email = 3;
+  }
   RoleAssignment role_assignment = 2;
 }
 
 message AssignRoleResponse {}
 
 message RemoveRoleRequest {
-  string user_id = 1;
+  oneof user_identifier {
+    string user_id = 1;
+    string user_email = 3;
+  }
   RoleAssignment role_assignment = 2;
 }
 
@@ -493,7 +501,10 @@ message CreateOrganizationGroupResponse {
 message AddUserToOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message AddUserToOrganizationGroupResponse {}
@@ -501,7 +512,10 @@ message AddUserToOrganizationGroupResponse {}
 message RemoveUserFromOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message RemoveUserFromOrganizationGroupResponse {}
@@ -550,7 +564,10 @@ message CreateCanvasGroupResponse {
 message AddUserToCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message AddUserToCanvasGroupResponse {}
@@ -558,7 +575,10 @@ message AddUserToCanvasGroupResponse {}
 message RemoveUserFromCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message RemoveUserFromCanvasGroupResponse {}

@@ -38,6 +38,8 @@ docs/AuthorizationListRolesResponse.md
 docs/AuthorizationListUserPermissionsResponse.md
 docs/AuthorizationPermission.md
 docs/AuthorizationRemoveRoleRequest.md
+docs/AuthorizationRemoveUserFromCanvasGroupBody.md
+docs/AuthorizationRemoveUserFromOrganizationGroupBody.md
 docs/AuthorizationRole.md
 docs/AuthorizationRoleAssignment.md
 docs/AuthorizationUpdateRoleBody.md
@@ -172,6 +174,8 @@ model_authorization_list_roles_response.go
 model_authorization_list_user_permissions_response.go
 model_authorization_permission.go
 model_authorization_remove_role_request.go
+model_authorization_remove_user_from_canvas_group_body.go
+model_authorization_remove_user_from_organization_group_body.go
 model_authorization_role.go
 model_authorization_role_assignment.go
 model_authorization_update_role_body.go
