@@ -2292,10 +2292,11 @@
     "AuthorizationGetCanvasGroupUsersResponse": {
       "type": "object",
       "properties": {
-        "userIds": {
+        "users": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationUser"
           }
         },
         "group": {
@@ -2326,10 +2327,11 @@
     "AuthorizationGetOrganizationGroupUsersResponse": {
       "type": "object",
       "properties": {
-        "userIds": {
+        "users": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationUser"
           }
         },
         "group": {
@@ -2835,6 +2837,9 @@
           "type": "string"
         },
         "displayName": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         },
         "createdBy": {

@@ -97,7 +97,7 @@ export type AuthorizationGetCanvasGroupResponse = {
 };
 
 export type AuthorizationGetCanvasGroupUsersResponse = {
-    userIds?: Array<string>;
+    users?: Array<AuthorizationUser>;
     group?: AuthorizationGroup;
 };
 
@@ -110,7 +110,7 @@ export type AuthorizationGetOrganizationGroupResponse = {
 };
 
 export type AuthorizationGetOrganizationGroupUsersResponse = {
-    userIds?: Array<string>;
+    users?: Array<AuthorizationUser>;
     group?: AuthorizationGroup;
 };
 
@@ -316,6 +316,7 @@ export type OrganizationsOrganizationMetadata = {
     id?: string;
     name?: string;
     displayName?: string;
+    description?: string;
     createdBy?: string;
     createdAt?: string;
     updatedAt?: string;
