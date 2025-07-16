@@ -27,7 +27,6 @@ type AuthorizationUser struct {
 	IsActive *bool `json:"isActive,omitempty"`
 	CreatedAt *string `json:"createdAt,omitempty"`
 	UpdatedAt *string `json:"updatedAt,omitempty"`
-	LastLoginAt *string `json:"lastLoginAt,omitempty"`
 	RoleAssignments []AuthorizationUserRoleAssignment `json:"roleAssignments,omitempty"`
 	AccountProviders []AuthorizationAccountProvider `json:"accountProviders,omitempty"`
 }
@@ -273,38 +272,6 @@ func (o *AuthorizationUser) SetUpdatedAt(v string) {
 	o.UpdatedAt = &v
 }
 
-// GetLastLoginAt returns the LastLoginAt field value if set, zero value otherwise.
-func (o *AuthorizationUser) GetLastLoginAt() string {
-	if o == nil || IsNil(o.LastLoginAt) {
-		var ret string
-		return ret
-	}
-	return *o.LastLoginAt
-}
-
-// GetLastLoginAtOk returns a tuple with the LastLoginAt field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *AuthorizationUser) GetLastLoginAtOk() (*string, bool) {
-	if o == nil || IsNil(o.LastLoginAt) {
-		return nil, false
-	}
-	return o.LastLoginAt, true
-}
-
-// HasLastLoginAt returns a boolean if a field has been set.
-func (o *AuthorizationUser) HasLastLoginAt() bool {
-	if o != nil && !IsNil(o.LastLoginAt) {
-		return true
-	}
-
-	return false
-}
-
-// SetLastLoginAt gets a reference to the given string and assigns it to the LastLoginAt field.
-func (o *AuthorizationUser) SetLastLoginAt(v string) {
-	o.LastLoginAt = &v
-}
-
 // GetRoleAssignments returns the RoleAssignments field value if set, zero value otherwise.
 func (o *AuthorizationUser) GetRoleAssignments() []AuthorizationUserRoleAssignment {
 	if o == nil || IsNil(o.RoleAssignments) {
@@ -399,9 +366,6 @@ func (o AuthorizationUser) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.UpdatedAt) {
 		toSerialize["updatedAt"] = o.UpdatedAt
-	}
-	if !IsNil(o.LastLoginAt) {
-		toSerialize["lastLoginAt"] = o.LastLoginAt
 	}
 	if !IsNil(o.RoleAssignments) {
 		toSerialize["roleAssignments"] = o.RoleAssignments

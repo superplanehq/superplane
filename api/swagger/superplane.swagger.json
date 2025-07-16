@@ -2582,9 +2582,6 @@
         "updatedAt": {
           "type": "string"
         },
-        "lastLoginAt": {
-          "type": "string"
-        },
         "roleAssignments": {
           "type": "array",
           "items": {
@@ -2619,16 +2616,8 @@
         "domainId": {
           "type": "string"
         },
-        "domainName": {
-          "type": "string",
-          "title": "e.g., organization name or canvas name"
-        },
         "assignedAt": {
           "type": "string"
-        },
-        "assignedBy": {
-          "type": "string",
-          "title": "user ID of who assigned this role"
         }
       }
     },

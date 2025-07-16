@@ -673,9 +673,8 @@ message User {
   bool is_active = 5;
   string created_at = 6;
   string updated_at = 7;
-  string last_login_at = 8;
-  repeated UserRoleAssignment role_assignments = 9;
-  repeated AccountProvider account_providers = 10;
+  repeated UserRoleAssignment role_assignments = 8;
+  repeated AccountProvider account_providers = 9;
 }
 
 message UserRoleAssignment {
@@ -684,9 +683,7 @@ message UserRoleAssignment {
   string role_description = 3;
   DomainType domain_type = 4;
   string domain_id = 5;
-  string domain_name = 6; // e.g., organization name or canvas name
-  string assigned_at = 7;
-  string assigned_by = 8; // user ID of who assigned this role
+  string assigned_at = 6;
 }
 
 message AccountProvider {

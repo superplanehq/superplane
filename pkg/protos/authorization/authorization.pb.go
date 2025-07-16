@@ -2773,9 +2773,8 @@ type User struct {
 	IsActive         bool                   `protobuf:"varint,5,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
 	CreatedAt        string                 `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt        string                 `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	LastLoginAt      string                 `protobuf:"bytes,8,opt,name=last_login_at,json=lastLoginAt,proto3" json:"last_login_at,omitempty"`
-	RoleAssignments  []*UserRoleAssignment  `protobuf:"bytes,9,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
-	AccountProviders []*AccountProvider     `protobuf:"bytes,10,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
+	RoleAssignments  []*UserRoleAssignment  `protobuf:"bytes,8,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
+	AccountProviders []*AccountProvider     `protobuf:"bytes,9,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -2859,13 +2858,6 @@ func (x *User) GetUpdatedAt() string {
 	return ""
 }
 
-func (x *User) GetLastLoginAt() string {
-	if x != nil {
-		return x.LastLoginAt
-	}
-	return ""
-}
-
 func (x *User) GetRoleAssignments() []*UserRoleAssignment {
 	if x != nil {
 		return x.RoleAssignments
@@ -2887,9 +2879,7 @@ type UserRoleAssignment struct {
 	RoleDescription string                 `protobuf:"bytes,3,opt,name=role_description,json=roleDescription,proto3" json:"role_description,omitempty"`
 	DomainType      DomainType             `protobuf:"varint,4,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId        string                 `protobuf:"bytes,5,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	DomainName      string                 `protobuf:"bytes,6,opt,name=domain_name,json=domainName,proto3" json:"domain_name,omitempty"` // e.g., organization name or canvas name
-	AssignedAt      string                 `protobuf:"bytes,7,opt,name=assigned_at,json=assignedAt,proto3" json:"assigned_at,omitempty"`
-	AssignedBy      string                 `protobuf:"bytes,8,opt,name=assigned_by,json=assignedBy,proto3" json:"assigned_by,omitempty"` // user ID of who assigned this role
+	AssignedAt      string                 `protobuf:"bytes,6,opt,name=assigned_at,json=assignedAt,proto3" json:"assigned_at,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -2959,23 +2949,9 @@ func (x *UserRoleAssignment) GetDomainId() string {
 	return ""
 }
 
-func (x *UserRoleAssignment) GetDomainName() string {
-	if x != nil {
-		return x.DomainName
-	}
-	return ""
-}
-
 func (x *UserRoleAssignment) GetAssignedAt() string {
 	if x != nil {
 		return x.AssignedAt
-	}
-	return ""
-}
-
-func (x *UserRoleAssignment) GetAssignedBy() string {
-	if x != nil {
-		return x.AssignedBy
 	}
 	return ""
 }
@@ -3404,7 +3380,7 @@ const file_authorization_proto_rawDesc = "" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12\x12\n" +
 	"\x04role\x18\x04 \x01(\tR\x04role\x12!\n" +
 	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\x06 \x01(\tR\vdescription\"\xa7\x03\n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\"\x83\x03\n" +
 	"\x04User\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +
@@ -3415,11 +3391,9 @@ const file_authorization_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\tR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\tR\tupdatedAt\x12\"\n" +
-	"\rlast_login_at\x18\b \x01(\tR\vlastLoginAt\x12W\n" +
-	"\x10role_assignments\x18\t \x03(\v2,.Superplane.Authorization.UserRoleAssignmentR\x0froleAssignments\x12V\n" +
-	"\x11account_providers\x18\n" +
-	" \x03(\v2).Superplane.Authorization.AccountProviderR\x10accountProviders\"\xcf\x02\n" +
+	"updated_at\x18\a \x01(\tR\tupdatedAt\x12W\n" +
+	"\x10role_assignments\x18\b \x03(\v2,.Superplane.Authorization.UserRoleAssignmentR\x0froleAssignments\x12V\n" +
+	"\x11account_providers\x18\t \x03(\v2).Superplane.Authorization.AccountProviderR\x10accountProviders\"\x8d\x02\n" +
 	"\x12UserRoleAssignment\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +
 	"\x11role_display_name\x18\x02 \x01(\tR\x0froleDisplayName\x12)\n" +
@@ -3427,12 +3401,8 @@ const file_authorization_proto_rawDesc = "" +
 	"\vdomain_type\x18\x04 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x05 \x01(\tR\bdomainId\x12\x1f\n" +
-	"\vdomain_name\x18\x06 \x01(\tR\n" +
-	"domainName\x12\x1f\n" +
-	"\vassigned_at\x18\a \x01(\tR\n" +
-	"assignedAt\x12\x1f\n" +
-	"\vassigned_by\x18\b \x01(\tR\n" +
-	"assignedBy\"\x8c\x02\n" +
+	"\vassigned_at\x18\x06 \x01(\tR\n" +
+	"assignedAt\"\x8c\x02\n" +
 	"\x0fAccountProvider\x12#\n" +
 	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x1f\n" +
 	"\vprovider_id\x18\x02 \x01(\tR\n" +

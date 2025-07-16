@@ -25,9 +25,7 @@ type AuthorizationUserRoleAssignment struct {
 	RoleDescription *string `json:"roleDescription,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	DomainName *string `json:"domainName,omitempty"`
 	AssignedAt *string `json:"assignedAt,omitempty"`
-	AssignedBy *string `json:"assignedBy,omitempty"`
 }
 
 // NewAuthorizationUserRoleAssignment instantiates a new AuthorizationUserRoleAssignment object
@@ -211,38 +209,6 @@ func (o *AuthorizationUserRoleAssignment) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetDomainName returns the DomainName field value if set, zero value otherwise.
-func (o *AuthorizationUserRoleAssignment) GetDomainName() string {
-	if o == nil || IsNil(o.DomainName) {
-		var ret string
-		return ret
-	}
-	return *o.DomainName
-}
-
-// GetDomainNameOk returns a tuple with the DomainName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *AuthorizationUserRoleAssignment) GetDomainNameOk() (*string, bool) {
-	if o == nil || IsNil(o.DomainName) {
-		return nil, false
-	}
-	return o.DomainName, true
-}
-
-// HasDomainName returns a boolean if a field has been set.
-func (o *AuthorizationUserRoleAssignment) HasDomainName() bool {
-	if o != nil && !IsNil(o.DomainName) {
-		return true
-	}
-
-	return false
-}
-
-// SetDomainName gets a reference to the given string and assigns it to the DomainName field.
-func (o *AuthorizationUserRoleAssignment) SetDomainName(v string) {
-	o.DomainName = &v
-}
-
 // GetAssignedAt returns the AssignedAt field value if set, zero value otherwise.
 func (o *AuthorizationUserRoleAssignment) GetAssignedAt() string {
 	if o == nil || IsNil(o.AssignedAt) {
@@ -275,38 +241,6 @@ func (o *AuthorizationUserRoleAssignment) SetAssignedAt(v string) {
 	o.AssignedAt = &v
 }
 
-// GetAssignedBy returns the AssignedBy field value if set, zero value otherwise.
-func (o *AuthorizationUserRoleAssignment) GetAssignedBy() string {
-	if o == nil || IsNil(o.AssignedBy) {
-		var ret string
-		return ret
-	}
-	return *o.AssignedBy
-}
-
-// GetAssignedByOk returns a tuple with the AssignedBy field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *AuthorizationUserRoleAssignment) GetAssignedByOk() (*string, bool) {
-	if o == nil || IsNil(o.AssignedBy) {
-		return nil, false
-	}
-	return o.AssignedBy, true
-}
-
-// HasAssignedBy returns a boolean if a field has been set.
-func (o *AuthorizationUserRoleAssignment) HasAssignedBy() bool {
-	if o != nil && !IsNil(o.AssignedBy) {
-		return true
-	}
-
-	return false
-}
-
-// SetAssignedBy gets a reference to the given string and assigns it to the AssignedBy field.
-func (o *AuthorizationUserRoleAssignment) SetAssignedBy(v string) {
-	o.AssignedBy = &v
-}
-
 func (o AuthorizationUserRoleAssignment) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -332,14 +266,8 @@ func (o AuthorizationUserRoleAssignment) ToMap() (map[string]interface{}, error)
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
 	}
-	if !IsNil(o.DomainName) {
-		toSerialize["domainName"] = o.DomainName
-	}
 	if !IsNil(o.AssignedAt) {
 		toSerialize["assignedAt"] = o.AssignedAt
-	}
-	if !IsNil(o.AssignedBy) {
-		toSerialize["assignedBy"] = o.AssignedBy
 	}
 	return toSerialize, nil
 }

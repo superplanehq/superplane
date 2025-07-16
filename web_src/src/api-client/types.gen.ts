@@ -212,7 +212,6 @@ export type AuthorizationUser = {
     isActive?: boolean;
     createdAt?: string;
     updatedAt?: string;
-    lastLoginAt?: string;
     roleAssignments?: Array<AuthorizationUserRoleAssignment>;
     accountProviders?: Array<AuthorizationAccountProvider>;
 };
@@ -223,9 +222,7 @@ export type AuthorizationUserRoleAssignment = {
     roleDescription?: string;
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    domainName?: string;
     assignedAt?: string;
-    assignedBy?: string;
 };
 
 export type ConnectionDataFilter = {
