@@ -192,9 +192,20 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accountProviders, _ := dbUser.GetAccountProviders()
+	
+	// Extract primary email and avatar from account providers
+	primaryEmail := ""
+	primaryAvatar := ""
+	if len(accountProviders) > 0 {
+		primaryEmail = accountProviders[0].Email
+		primaryAvatar = accountProviders[0].AvatarURL
+	}
+	
 	authUser := User{
 		ID:               dbUser.ID.String(),
 		Name:             dbUser.Name,
+		Email:            primaryEmail,
+		AvatarURL:        primaryAvatar,
 		CreatedAt:        dbUser.CreatedAt,
 		AccountProviders: accountProviders,
 	}
@@ -281,9 +292,20 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 
 	if r.Header.Get("Accept") == "application/json" {
 		accountProviders, _ := dbUser.GetAccountProviders()
+		
+		// Extract primary email and avatar from account providers
+		primaryEmail := ""
+		primaryAvatar := ""
+		if len(accountProviders) > 0 {
+			primaryEmail = accountProviders[0].Email
+			primaryAvatar = accountProviders[0].AvatarURL
+		}
+		
 		authUser := User{
 			ID:               dbUser.ID.String(),
 			Name:             dbUser.Name,
+			Email:            primaryEmail,
+			AvatarURL:        primaryAvatar,
 			AccessToken:      token,
 			CreatedAt:        dbUser.CreatedAt,
 			AccountProviders: accountProviders,
@@ -361,9 +383,19 @@ func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 		accountProviders = []models.AccountProvider{}
 	}
 
+	// Extract primary email and avatar from account providers
+	primaryEmail := ""
+	primaryAvatar := ""
+	if len(accountProviders) > 0 {
+		primaryEmail = accountProviders[0].Email
+		primaryAvatar = accountProviders[0].AvatarURL
+	}
+
 	authUser := User{
 		ID:               user.ID.String(),
 		Name:             user.Name,
+		Email:            primaryEmail,
+		AvatarURL:        primaryAvatar,
 		CreatedAt:        user.CreatedAt,
 		AccountProviders: accountProviders,
 	}
