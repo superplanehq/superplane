@@ -165,6 +165,8 @@ func extractOrganizationID(req interface{}) (string, error) {
 	switch r := req.(type) {
 	case interface{ GetOrganizationId() string }:
 		domainID = r.GetOrganizationId()
+	case interface{ GetIdOrName() string }:
+		domainID = r.GetIdOrName()
 	default:
 		return "", nil
 	}

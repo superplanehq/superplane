@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
 import { GeneralSettings } from './GeneralSettings'
@@ -8,27 +9,62 @@ import { RolesSettings } from './RolesSettings'
 import { AddMembersPage } from './AddMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
+import { organizationsDescribeOrganization } from '../../../api-client/sdk.gen'
+import type { OrganizationsOrganization } from '../../../api-client/types.gen'
 
 export function OrganizationSettings() {
   const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
+  const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
   
-  // Use orgId from route params. Later this could come from an API call to get organization details
-  const currentOrganization = {
-    id: orgId,
-    name: 'Confluent', // This should be fetched from API based on orgId
-    avatar: 'https://confluent.io/favicon.ico',
-    initials: 'C'
-  }
+  // Fetch organization details
+  useEffect(() => {
+    if (!orgId) return
+    
+    const fetchOrganization = async () => {
+      try {
+        setLoading(true)
+        const response = await organizationsDescribeOrganization({
+          path: { idOrName: orgId }
+        })
+        setOrganization(response.data?.organization || null)
+      } catch (err) {
+        setError('Failed to load organization')
+        console.error('Error fetching organization:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchOrganization()
+  }, [orgId])
 
   if (!orgId) {
     return (
       <div className="flex justify-center items-center h-screen">
         <p className="text-zinc-500 dark:text-zinc-400">Organization ID not found</p>
+      </div>
+    )
+  }
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-zinc-500 dark:text-zinc-400">Loading organization...</p>
+      </div>
+    )
+  }
+  
+  if (error || !organization) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-zinc-500 dark:text-zinc-400">{error || 'Organization not found'}</p>
       </div>
     )
   }
@@ -73,10 +109,10 @@ export function OrganizationSettings() {
                 <Avatar 
                   className='w-6 h-6'
                   slot="icon"
-                  src="https://www.confluent.io/favicon.ico"
-                  alt="Confluent"
+                  initials={(organization.metadata?.displayName || organization.metadata?.name || orgId).charAt(0).toUpperCase()}
+                  alt={organization.metadata?.displayName || organization.metadata?.name || orgId}
                 />
-                <SidebarLabel className='text-zinc-900 dark:text-white'>Confluent</SidebarLabel>
+                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization.metadata?.displayName || organization.metadata?.name || orgId}</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem 
@@ -97,7 +133,7 @@ export function OrganizationSettings() {
           <div className="px-8 pb-8">
             <Routes>
               <Route path="" element={<Navigate to="general" replace />} />
-              <Route path="general" element={<GeneralSettings organizationName={currentOrganization.name} />} />
+              <Route path="general" element={<GeneralSettings organization={organization} />} />
               <Route path="members" element={<MembersSettings organizationId={orgId} />} />
               <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
               <Route path="roles" element={<RolesSettings organizationId={orgId} />} />

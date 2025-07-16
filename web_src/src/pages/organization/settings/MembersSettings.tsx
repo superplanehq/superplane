@@ -21,8 +21,10 @@ import {
 } from '../../../components/Table/table'
 import { AddMembersSection } from './AddMembersSection'
 import {
-  authorizationListOrganizationGroups
+  authorizationListOrganizationGroups,
+  authorizationGetOrganizationUsers
 } from '../../../api-client/sdk.gen'
+import { AuthorizationUser } from '../../../api-client/types.gen'
 
 interface Member {
   id: string
@@ -56,55 +58,37 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
         setLoadingMembers(true)
         setError(null)
 
-        // Fetch groups (future implementation)
-        await authorizationListOrganizationGroups({
-          query: { organizationId }
+        // Fetch organization users
+        const response = await authorizationGetOrganizationUsers({
+          path: { organizationId }
         })
 
-        // Mock data for demonstration - in real app, this would come from API
-        const mockMembers: Member[] = [
-          {
-            id: '1',
-            name: 'John Doe',
-            email: 'john@company.com',
-            role: 'Owner',
-            status: 'Active',
-            lastActive: '2 hours ago',
-            initials: 'JD',
-            avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face'
-          },
-          {
-            id: '2',
-            name: 'Jane Smith',
-            email: 'jane@company.com',
-            role: 'Admin',
-            status: 'Active',
-            lastActive: '1 day ago',
-            initials: 'JS'
-          },
-          {
-            id: '3',
-            name: 'Bob Wilson',
-            email: 'bob@company.com',
-            role: 'Member',
-            status: 'Pending',
-            lastActive: 'Never',
-            initials: 'BW'
-          },
-          {
-            id: '4',
-            name: 'Alice Johnson',
-            email: 'alice@company.com',
-            role: 'Member',
-            status: 'Active',
-            lastActive: '3 days ago',
-            initials: 'AJ'
+        // Convert AuthorizationUser to Member interface format
+        const members: Member[] = response.data?.users?.map((user: AuthorizationUser) => {
+          // Generate initials from displayName or userId
+          const name = user.displayName || user.userId || 'Unknown User'
+          const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+          
+          // Get primary role name from role assignments
+          const primaryRole = user.roleAssignments?.[0]?.roleDisplayName || user.roleAssignments?.[0]?.roleName || 'Member'
+          
+          // Calculate last active time
+          const lastLoginAt = user.lastLoginAt
+          const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
+          
+          return {
+            id: user.userId || '',
+            name: name,
+            email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
+            role: primaryRole,
+            status: user.isActive ? 'Active' : 'Inactive',
+            lastActive: lastActive,
+            initials: initials,
+            avatar: user.avatarUrl
           }
-        ]
+        }) || []
 
-        // For now, use mock data for members
-        // In a real implementation, you would fetch members from the API
-        setMembers(mockMembers)
+        setMembers(members)
 
       } catch (err) {
         console.error('Error fetching data:', err)

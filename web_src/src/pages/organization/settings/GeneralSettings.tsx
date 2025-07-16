@@ -1,13 +1,50 @@
 import { Heading } from '../../../components/Heading/heading'
 import { Input } from '../../../components/Input/input'
 import { Field, Fieldset, Label } from '../../../components/Fieldset/fieldset'
-import { Textarea } from '../../../components/Textarea/textarea'
+import { Button } from '../../../components/Button/button'
+import { useState } from 'react'
+import { organizationsUpdateOrganization } from '../../../api-client/sdk.gen'
+import type { OrganizationsOrganization } from '../../../api-client/types.gen'
+import { useParams } from 'react-router-dom'
 
 interface GeneralSettingsProps {
-  organizationName: string
+  organization: OrganizationsOrganization
 }
 
-export function GeneralSettings({ organizationName }: GeneralSettingsProps) {
+export function GeneralSettings({ organization }: GeneralSettingsProps) {
+  const { orgId } = useParams<{ orgId: string }>()
+  const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  const handleSave = async () => {
+    if (!orgId) return
+
+    try {
+      setSaving(true)
+      setSaveMessage(null)
+
+      await organizationsUpdateOrganization({
+        path: { idOrName: orgId },
+        body: {
+          organization: {
+            metadata: {
+              displayName: displayName,
+            }
+          }
+        }
+      })
+
+      setSaveMessage('Organization updated successfully')
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (err) {
+      setSaveMessage('Failed to update organization')
+      console.error('Error updating organization:', err)
+      setTimeout(() => setSaveMessage(null), 3000)
+    } finally {
+      setSaving(false)
+    }
+  }
   return (
     <div className="space-y-6 pt-6 text-left">
       <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
@@ -20,19 +57,27 @@ export function GeneralSettings({ organizationName }: GeneralSettingsProps) {
           </Label>
           <Input
             type="text"
-            defaultValue={organizationName}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
             className="max-w-lg"
           />
         </Field>
-        <Field>
-          <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-            Description
-          </Label>
-          <Textarea
-            placeholder="Enter organization description"
-            className="max-w-lg"
-          />
-        </Field>
+
+        <div className="flex items-center gap-4">
+          <Button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+          {saveMessage && (
+            <span className={`text-sm ${saveMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>
+              {saveMessage}
+            </span>
+          )}
+        </div>
       </Fieldset>
     </div>
   )

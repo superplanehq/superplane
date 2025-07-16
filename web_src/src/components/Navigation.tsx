@@ -1,13 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Avatar } from './Avatar/avatar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from './Dropdown/dropdown';
 import { Text } from './Text/text';
 import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
+import { organizationsDescribeOrganization } from '../api-client/sdk.gen';
+import type { OrganizationsOrganization } from '../api-client/types.gen';
 
 const Navigation: React.FC = () => {
   const { orgId } = useParams<{ orgId?: string }>();
+  const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null);
+  
+  useEffect(() => {
+    if (!orgId) return;
+    
+    const fetchOrganization = async () => {
+      try {
+        const response = await organizationsDescribeOrganization({
+          path: { idOrName: orgId }
+        });
+        setOrganization(response.data?.organization || null);
+      } catch (err) {
+        console.error('Error fetching organization:', err);
+      }
+    };
+    
+    fetchOrganization();
+  }, [orgId]);
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
       <div className="flex items-center justify-between px-2 py-[8px]">
@@ -24,14 +44,13 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left">TestOrg</Text>
+              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
-                src="https://api.dicebear.com/9.x/initials/svg?seed=Test"
-                initials="Test"
-                alt="Test"
-                className="w-7 h-7 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
+                initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
+                className="w-7 h-7"
               />
             </DropdownButton>
 
@@ -77,13 +96,12 @@ const Navigation: React.FC = () => {
                   <DropdownHeader>
                     <div className="flex items-center space-x-3">
                       <Avatar
-                        src="https://api.dicebear.com/9.x/initials/svg?seed=Test"
-                        initials="Test"
-                        alt="Test"
+                        initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                        alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
                         className="size-8"
                       />
                       <div className="flex-1 min-w-0">
-                        <Text className="font-medium truncate">Test</Text>
+                        <Text className="font-medium truncate">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
                       </div>
                     </div>
                   </DropdownHeader>
