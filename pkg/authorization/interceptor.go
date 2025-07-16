@@ -57,6 +57,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAuth.Authorization_ListCanvasGroups_FullMethodName:                {Resource: "group", Action: "read", DomainType: "canvas"},
 		pbAuth.Authorization_GetCanvasGroupUsers_FullMethodName:             {Resource: "group", Action: "read", DomainType: "canvas"},
 		pbAuth.Authorization_GetCanvasGroup_FullMethodName:                  {Resource: "group", Action: "read", DomainType: "canvas"},
+		pbAuth.Authorization_DeleteCanvasGroup_FullMethodName:               {Resource: "group", Action: "delete", DomainType: "canvas"},
 
 		// Organization rules
 		pbAuth.Authorization_ListUserPermissions_FullMethodName:             {Resource: "user", Action: "read", DomainType: "mixed"},
@@ -74,6 +75,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbAuth.Authorization_ListOrganizationGroups_FullMethodName:          {Resource: "group", Action: "read", DomainType: "org"},
 		pbAuth.Authorization_GetOrganizationGroupUsers_FullMethodName:       {Resource: "group", Action: "read", DomainType: "org"},
 		pbAuth.Authorization_GetOrganizationGroup_FullMethodName:            {Resource: "group", Action: "read", DomainType: "org"},
+		pbAuth.Authorization_DeleteOrganizationGroup_FullMethodName:         {Resource: "group", Action: "delete", DomainType: "org"},
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName:    {Resource: "org", Action: "read", DomainType: "org"},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:      {Resource: "org", Action: "update", DomainType: "org"},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:      {Resource: "org", Action: "delete", DomainType: "org"},
