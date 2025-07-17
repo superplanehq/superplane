@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"github.com/superplanehq/superplane/test/support"
@@ -326,18 +327,19 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "invalid condition: invalid time window condition: invalid day DoesNotExist", s.Message())
 	})
 
-	t.Run("stage is created", func(t *testing.T) {
+	t.Run("stage with integration", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
 		testconsumer := testconsumer.New(amqpURL, StageCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
+		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
-					Name: "test",
+					Name: name,
 				},
 				Spec: &pb.Stage_Spec{
 					Executor: executor,
@@ -385,11 +387,13 @@ func Test__CreateStage(t *testing.T) {
 		assert.NotNil(t, res.Stage.Metadata.Id)
 		assert.NotNil(t, res.Stage.Metadata.CreatedAt)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.Metadata.CanvasId)
-		assert.Equal(t, "test", res.Stage.Metadata.Name)
+		assert.Equal(t, name, res.Stage.Metadata.Name)
 
 		// Assert executor is correct
 		require.NotNil(t, res.Stage.Spec)
 		assert.Equal(t, executor.Type, res.Stage.Spec.Executor.Type)
+		assert.Equal(t, executor.Integration.Name, res.Stage.Spec.Executor.Integration.Name)
+		assert.Equal(t, executor.Semaphore.Project, res.Stage.Spec.Executor.Semaphore.Project)
 		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Spec.Executor.Semaphore.Branch)
 		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Spec.Executor.Semaphore.PipelineFile)
 		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Spec.Executor.Semaphore.Parameters)
@@ -410,15 +414,119 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "17:00", res.Stage.Spec.Conditions[1].TimeWindow.End)
 		assert.Equal(t, []string{"Monday", "Tuesday"}, res.Stage.Spec.Conditions[1].TimeWindow.WeekDays)
 		assert.True(t, testconsumer.HasReceivedMessage())
+
+		// Assert internally scoped event source was created
+		resource, err := models.FindResource(r.Integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		require.NoError(t, err)
+		require.NotNil(t, resource)
+		eventSource, err := resource.FindEventSource()
+		require.NoError(t, err)
+		require.NotNil(t, eventSource)
+		require.Equal(t, eventSource.Name, executor.Semaphore.Project)
+		require.Equal(t, eventSource.Scope, models.EventSourceScopeInternal)
+	})
+
+	t.Run("stage with same integration resource re-uses internally scoped event source", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+
+		//
+		// Create first stage using the demo-project Semaphore project integration resource.
+		//
+		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{
+					Name: support.RandomName("test"),
+				},
+				Spec: &pb.Stage_Spec{
+					Executor:   executor,
+					Conditions: []*pb.Condition{},
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, res.Stage)
+
+		//
+		// Create second stage using the demo-project Semaphore project integration resource.
+		//
+		res, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{
+					Name: support.RandomName("test"),
+				},
+				Spec: &pb.Stage_Spec{
+					Executor:   executor,
+					Conditions: []*pb.Condition{},
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, res.Stage)
+
+		// Assert the same integration resource record and
+		// internally scoped event source are re-used by both stages.
+		resources, err := r.Integration.ListResources(integrations.ResourceTypeProject)
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		sources, err := resources[0].ListEventSources()
+		require.NoError(t, err)
+		assert.Len(t, sources, 1)
+		assert.Equal(t, sources[0].Name, executor.Semaphore.Project)
+		assert.Equal(t, sources[0].Scope, models.EventSourceScopeInternal)
 	})
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+
+		//
+		// First stage works
+		//
+		name := support.RandomName("test")
+		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
-					Name: "test",
+					Name: name,
+				},
+				Spec: &pb.Stage_Spec{
+					Executor: executor,
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, res.Stage)
+
+		//
+		// Second stage with the same name fails
+		//
+		_, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{
+					Name: name,
 				},
 				Spec: &pb.Stage_Spec{
 					Executor: executor,

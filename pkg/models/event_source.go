@@ -78,14 +78,14 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	return &eventSource, nil
 }
 
-func FindEventSourceForResource(resourceID uuid.UUID) (*EventSource, error) {
-	return FindEventSourceForResourceInTransaction(database.Conn(), resourceID)
+func FindEventSourceByName(name string) (*EventSource, error) {
+	return FindEventSourceByNameInTransaction(database.Conn(), name)
 }
 
-func FindEventSourceForResourceInTransaction(tx *gorm.DB, resourceID uuid.UUID) (*EventSource, error) {
+func FindEventSourceByNameInTransaction(tx *gorm.DB, name string) (*EventSource, error) {
 	var eventSource EventSource
 	err := tx.
-		Where("resource_id = ?", resourceID).
+		Where("name = ?", name).
 		First(&eventSource).
 		Error
 

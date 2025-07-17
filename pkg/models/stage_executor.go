@@ -56,6 +56,24 @@ func (e *StageExecutor) GetResource() (*Resource, error) {
 	return &resource, nil
 }
 
+func (e *StageExecutor) GetIntegrationResource() (*IntegrationResource, error) {
+	var r IntegrationResource
+
+	err := database.Conn().
+		Table("resources").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Select("resources.name as name, integrations.name as integration_name").
+		Where("resources.id = ?", e.ResourceID).
+		First(&r).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
 func (e *StageExecutor) FindIntegration() (*Integration, error) {
 	var integration Integration
 

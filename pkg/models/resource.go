@@ -29,6 +29,38 @@ func (r *Resource) Type() string {
 	return r.ResourceType
 }
 
+func (r *Resource) ListEventSources() ([]EventSource, error) {
+	var eventSources []EventSource
+	err := database.Conn().
+		Where("resource_id = ?", r.ID).
+		Find(&eventSources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return eventSources, nil
+}
+
+func (r *Resource) FindEventSource() (*EventSource, error) {
+	return r.FindEventSourceInTransaction(database.Conn())
+}
+
+func (r *Resource) FindEventSourceInTransaction(tx *gorm.DB) (*EventSource, error) {
+	var eventSource EventSource
+	err := tx.
+		Where("resource_id = ?", r.ID).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
 func FindResourceByID(id uuid.UUID) (*Resource, error) {
 	return FindResourceByIDInTransaction(database.Conn(), id)
 }

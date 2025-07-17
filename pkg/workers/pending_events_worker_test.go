@@ -455,7 +455,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		eventData, err := json.Marshal(hook)
 		require.NoError(t, err)
-		source, err := models.FindEventSourceForResource(resource.ID)
+		source, err := resource.FindEventSource()
 		require.NoError(t, err)
 		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
 		require.NoError(t, err)

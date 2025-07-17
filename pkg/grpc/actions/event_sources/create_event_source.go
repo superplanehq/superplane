@@ -84,6 +84,10 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
+		if errors.Is(err, builders.ErrResourceAlreadyUsed) {
+			return nil, status.Errorf(codes.InvalidArgument, "event source for %s %s already exists", resource.Type(), resource.Name())
+		}
+
 		log.Errorf("Error creating event source. Request: %v. Error: %v", req, err)
 		return nil, err
 	}

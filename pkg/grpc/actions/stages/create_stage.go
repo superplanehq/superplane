@@ -450,13 +450,13 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 			},
 		}, nil
 	case models.ExecutorSpecTypeSemaphore:
-		resource, err := executor.GetResource()
+		resource, err := executor.GetIntegrationResource()
 		if err != nil {
 			return nil, err
 		}
 
 		spec := &pb.ExecutorSpec_Semaphore{
-			Project:      resource.ResourceName,
+			Project:      resource.Name,
 			Branch:       executorSpec.Semaphore.Branch,
 			PipelineFile: executorSpec.Semaphore.PipelineFile,
 			Parameters:   executorSpec.Semaphore.Parameters,
@@ -469,6 +469,9 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 		return &pb.ExecutorSpec{
 			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: spec,
+			Integration: &pb.IntegrationRef{
+				Name: resource.IntegrationName,
+			},
 		}, nil
 
 	default:

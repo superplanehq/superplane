@@ -67,6 +67,22 @@ func CreateIntegration(integration *Integration) (*Integration, error) {
 	return nil, err
 }
 
+func (i *Integration) ListResources(resourceType string) ([]*Resource, error) {
+	resources := []*Resource{}
+
+	err := database.Conn().
+		Where("integration_id = ?", i.ID).
+		Where("type = ?", resourceType).
+		Find(&resources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
+}
+
 func (i *Integration) CreateResource(resourceType, externalID, name string) (*Resource, error) {
 	return i.CreateResourceInTransaction(database.Conn(), resourceType, externalID, name)
 }
@@ -157,4 +173,9 @@ func ListIntegrations(domainType string, domainID uuid.UUID) ([]*Integration, er
 	}
 
 	return integrations, nil
+}
+
+type IntegrationResource struct {
+	Name            string
+	IntegrationName string
 }

@@ -13,6 +13,8 @@ import (
 	"gorm.io/gorm"
 )
 
+var ErrResourceAlreadyUsed = fmt.Errorf("resource already used")
+
 type EventSourceBuilder struct {
 	tx          *gorm.DB
 	ctx         context.Context
@@ -125,7 +127,7 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 	// Check if event source exists.
 	// If it does, we might either update it or fail the creation.
 	//
-	existingSource, err := models.FindEventSourceForResourceInTransaction(tx, resource.ID)
+	existingSource, err := resource.FindEventSourceInTransaction(tx)
 	if err == nil {
 		return b.createForExistingSource(tx, existingSource)
 	}
@@ -177,7 +179,7 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	// and there's already an existing external one, fail the creation, to avoid a duplicate.
 	//
 	if eventSource.Scope == models.EventSourceScopeExternal {
-		return nil, "", fmt.Errorf("event source for %s %s already exists", b.resource.Type(), b.resource.Name())
+		return nil, "", ErrResourceAlreadyUsed
 	}
 
 	//
