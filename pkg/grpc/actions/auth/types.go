@@ -210,6 +210,23 @@ func ConvertToGetOrganizationGroupResponse(resp *GetGroupResponse) *pb.GetOrgani
 	}
 }
 
+func ConvertUpdateOrganizationGroupRequest(req *pb.UpdateOrganizationGroupRequest) *UpdateGroupRequest {
+	return &UpdateGroupRequest{
+		DomainID:    "", // Organization ID will be set by server
+		GroupName:   req.GroupName,
+		DomainType:  pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		Role:        req.Role,
+		DisplayName: req.DisplayName,
+		Description: req.Description,
+	}
+}
+
+func ConvertToUpdateOrganizationGroupResponse(resp *UpdateGroupResponse) *pb.UpdateOrganizationGroupResponse {
+	return &pb.UpdateOrganizationGroupResponse{
+		Group: resp.Group,
+	}
+}
+
 // Canvas group adapters
 func ConvertCreateCanvasGroupRequest(req *pb.CreateCanvasGroupRequest) (*CreateGroupRequest, error) {
 	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
@@ -329,6 +346,27 @@ func ConvertGetCanvasGroupRequest(req *pb.GetCanvasGroupRequest) (*GetGroupReque
 
 func ConvertToGetCanvasGroupResponse(resp *GetGroupResponse) *pb.GetCanvasGroupResponse {
 	return &pb.GetCanvasGroupResponse{
+		Group: resp.Group,
+	}
+}
+
+func ConvertUpdateCanvasGroupRequest(req *pb.UpdateCanvasGroupRequest) (*UpdateGroupRequest, error) {
+	canvasID, err := ConvertCanvasIdOrNameToId(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+	return &UpdateGroupRequest{
+		DomainID:    canvasID,
+		GroupName:   req.GroupName,
+		DomainType:  pb.DomainType_DOMAIN_TYPE_CANVAS,
+		Role:        req.Role,
+		DisplayName: req.DisplayName,
+		Description: req.Description,
+	}, nil
+}
+
+func ConvertToUpdateCanvasGroupResponse(resp *UpdateGroupResponse) *pb.UpdateCanvasGroupResponse {
+	return &pb.UpdateCanvasGroupResponse{
 		Group: resp.Group,
 	}
 }

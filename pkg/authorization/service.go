@@ -137,6 +137,52 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 	return nil
 }
 
+func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupName string, newRole string) error {
+	validRoles := map[string][]string{
+		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
+		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
+	}
+	if roles, exists := validRoles[domainType]; exists {
+		if !contains(roles, newRole) {
+			return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
+		}
+	} else {
+		return fmt.Errorf("invalid domain type %s", domainType)
+	}
+
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	
+	// Get current role
+	currentRole, err := a.GetGroupRole(domainID, domainType, groupName)
+	if err != nil {
+		return fmt.Errorf("failed to get current group role: %w", err)
+	}
+
+	// Remove old role assignment
+	prefixedOldRole := fmt.Sprintf("role:%s", currentRole)
+	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove old group role: %w", err)
+	}
+	if !ruleRemoved {
+		return fmt.Errorf("old group role assignment not found")
+	}
+
+	// Add new role assignment
+	prefixedNewRole := fmt.Sprintf("role:%s", newRole)
+	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
+	if err != nil {
+		return fmt.Errorf("failed to add new group role: %w", err)
+	}
+	if !ruleAdded {
+		return fmt.Errorf("failed to add new group role assignment")
+	}
+
+	log.Infof("Updated group %s role from %s to %s in %s %s", groupName, currentRole, newRole, domainType, domainID)
+	return nil
+}
+
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	prefixedGroupName := fmt.Sprintf("group:%s", group)
@@ -239,6 +285,9 @@ func (a *AuthService) GetGroupRole(domainID string, domainType string, group str
 		if strings.HasPrefix(role, "role:") {
 			unprefixedRoles = append(unprefixedRoles, strings.TrimPrefix(role, "role:"))
 		}
+	}
+	if len(unprefixedRoles) == 0 {
+		return "", fmt.Errorf("group %s not found in domain %s", group, domainID)
 	}
 	return unprefixedRoles[0], nil
 }

@@ -173,6 +173,50 @@
         "tags": [
           "Authorization"
         ]
+      },
+      "put": {
+        "summary": "Update canvas group",
+        "description": "Updates an existing group within a canvas",
+        "operationId": "Authorization_UpdateCanvasGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateCanvasGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateCanvasGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
       }
     },
     "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users": {
@@ -466,6 +510,44 @@
             "in": "query",
             "required": false,
             "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "put": {
+        "summary": "Update organization group",
+        "description": "Updates an existing group within an organization",
+        "operationId": "Authorization_UpdateOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationUpdateOrganizationGroupBody"
+            }
           }
         ],
         "tags": [
@@ -2560,6 +2642,53 @@
         },
         "role": {
           "type": "string"
+        }
+      }
+    },
+    "AuthorizationUpdateCanvasGroupBody": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "AuthorizationUpdateCanvasGroupResponse": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/AuthorizationGroup"
+        }
+      }
+    },
+    "AuthorizationUpdateOrganizationGroupBody": {
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "AuthorizationUpdateOrganizationGroupResponse": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/AuthorizationGroup"
         }
       }
     },

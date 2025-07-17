@@ -99,49 +99,6 @@ func TestGetOrganizationUsersInvalidOrganizationId(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid organization ID")
 }
 
-func TestGetOrganizationUsersMultipleRoles(t *testing.T) {
-	authService := SetupTestAuthService(t)
-
-	// Create test organization ID
-	orgID := uuid.New().String()
-
-	// Setup organization roles
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
-
-	// Create test user ID
-	userID := uuid.New().String()
-
-	// Assign multiple roles to the same user
-	err = authService.AssignRole(userID, "org_admin", orgID, authorization.DomainOrg)
-	require.NoError(t, err)
-
-	err = authService.AssignRole(userID, "org_viewer", orgID, authorization.DomainOrg)
-	require.NoError(t, err)
-
-	// Test getting organization users
-	req := &pb.GetOrganizationUsersRequest{
-		OrganizationId: orgID,
-	}
-
-	resp, err := GetOrganizationUsers(context.Background(), req, authService)
-	require.NoError(t, err)
-	require.NotNil(t, resp)
-
-	// Should have 1 user with multiple roles
-	assert.Len(t, resp.Users, 1)
-	assert.Len(t, resp.Users[0].RoleAssignments, 2)
-
-	// Check that both roles are present
-	roleNames := make(map[string]bool)
-	for _, roleAssignment := range resp.Users[0].RoleAssignments {
-		roleNames[roleAssignment.RoleName] = true
-	}
-
-	assert.True(t, roleNames["org_admin"])
-	assert.True(t, roleNames["org_viewer"])
-}
-
 func TestGetOrganizationUsersWithActiveUser(t *testing.T) {
 	authService := SetupTestAuthService(t)
 

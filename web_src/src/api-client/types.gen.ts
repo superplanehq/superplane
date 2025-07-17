@@ -206,6 +206,27 @@ export type AuthorizationRoleAssignment = {
     role?: string;
 };
 
+export type AuthorizationUpdateCanvasGroupBody = {
+    role?: string;
+    displayName?: string;
+    description?: string;
+};
+
+export type AuthorizationUpdateCanvasGroupResponse = {
+    group?: AuthorizationGroup;
+};
+
+export type AuthorizationUpdateOrganizationGroupBody = {
+    organizationId?: string;
+    role?: string;
+    displayName?: string;
+    description?: string;
+};
+
+export type AuthorizationUpdateOrganizationGroupResponse = {
+    group?: AuthorizationGroup;
+};
+
 export type AuthorizationUpdateRoleBody = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
@@ -847,6 +868,34 @@ export type AuthorizationGetCanvasGroupResponses = {
 
 export type AuthorizationGetCanvasGroupResponse2 = AuthorizationGetCanvasGroupResponses[keyof AuthorizationGetCanvasGroupResponses];
 
+export type AuthorizationUpdateCanvasGroupData = {
+    body: AuthorizationUpdateCanvasGroupBody;
+    path: {
+        canvasIdOrName: string;
+        groupName: string;
+    };
+    query?: never;
+    url: '/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}';
+};
+
+export type AuthorizationUpdateCanvasGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationUpdateCanvasGroupError = AuthorizationUpdateCanvasGroupErrors[keyof AuthorizationUpdateCanvasGroupErrors];
+
+export type AuthorizationUpdateCanvasGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationUpdateCanvasGroupResponse;
+};
+
+export type AuthorizationUpdateCanvasGroupResponse2 = AuthorizationUpdateCanvasGroupResponses[keyof AuthorizationUpdateCanvasGroupResponses];
+
 export type AuthorizationGetCanvasGroupUsersData = {
     body?: never;
     path: {
@@ -1067,6 +1116,33 @@ export type AuthorizationGetOrganizationGroupResponses = {
 };
 
 export type AuthorizationGetOrganizationGroupResponse2 = AuthorizationGetOrganizationGroupResponses[keyof AuthorizationGetOrganizationGroupResponses];
+
+export type AuthorizationUpdateOrganizationGroupData = {
+    body: AuthorizationUpdateOrganizationGroupBody;
+    path: {
+        groupName: string;
+    };
+    query?: never;
+    url: '/api/v1/authorization/groups/{groupName}';
+};
+
+export type AuthorizationUpdateOrganizationGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: RpcStatus;
+};
+
+export type AuthorizationUpdateOrganizationGroupError = AuthorizationUpdateOrganizationGroupErrors[keyof AuthorizationUpdateOrganizationGroupErrors];
+
+export type AuthorizationUpdateOrganizationGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: AuthorizationUpdateOrganizationGroupResponse;
+};
+
+export type AuthorizationUpdateOrganizationGroupResponse2 = AuthorizationUpdateOrganizationGroupResponses[keyof AuthorizationUpdateOrganizationGroupResponses];
 
 export type AuthorizationGetOrganizationGroupUsersData = {
     body?: never;

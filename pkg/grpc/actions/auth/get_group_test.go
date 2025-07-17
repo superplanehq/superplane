@@ -22,8 +22,8 @@ func Test_GetGroup(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	// Create a group first
-	err = authService.CreateGroup(orgID, "org", "test-group", authorization.RoleOrgAdmin)
+	// Create a group with metadata
+	err = CreateGroupWithMetadata(orgID, "org", "test-group", authorization.RoleOrgAdmin, "Test Group", "Test group description", authService)
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
@@ -48,10 +48,10 @@ func Test_GetGroup(t *testing.T) {
 	t.Run("successful get canvas group", func(t *testing.T) {
 		canvasID := uuid.New().String()
 
-		// Setup canvas roles and create canvas group
+		// Setup canvas roles and create canvas group with metadata
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin)
+		err = CreateGroupWithMetadata(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
 		require.NoError(t, err)
 
 		req := &GetGroupRequest{

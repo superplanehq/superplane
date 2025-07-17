@@ -214,3 +214,37 @@ func (s *AuthorizationServer) UpdateRole(ctx context.Context, req *pb.UpdateRole
 func (s *AuthorizationServer) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
 	return auth.DeleteRole(ctx, req, s.authService)
 }
+
+func (s *AuthorizationServer) UpdateOrganizationGroup(ctx context.Context, req *pb.UpdateOrganizationGroupRequest) (*pb.UpdateOrganizationGroupResponse, error) {
+	genericReq := auth.ConvertUpdateOrganizationGroupRequest(req)
+	genericReq.DomainID = req.OrganizationId
+
+	genericResp, err := auth.UpdateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToUpdateOrganizationGroupResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) UpdateCanvasGroup(ctx context.Context, req *pb.UpdateCanvasGroupRequest) (*pb.UpdateCanvasGroupResponse, error) {
+	genericReq, err := auth.ConvertUpdateCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	genericResp, err := auth.UpdateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToUpdateCanvasGroupResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) DeleteOrganizationGroup(ctx context.Context, req *pb.DeleteOrganizationGroupRequest) (*pb.DeleteOrganizationGroupResponse, error) {
+	return auth.DeleteOrganizationGroup(ctx, req, s.authService)
+}
+
+func (s *AuthorizationServer) DeleteCanvasGroup(ctx context.Context, req *pb.DeleteCanvasGroupRequest) (*pb.DeleteCanvasGroupResponse, error) {
+	return auth.DeleteCanvasGroup(ctx, req, s.authService)
+}

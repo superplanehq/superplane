@@ -380,6 +380,22 @@ service Authorization {
   }
 
   //
+  // Endpoint for updating an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateOrganizationGroup(UpdateOrganizationGroupRequest) returns (UpdateOrganizationGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/authorization/groups/{group_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update organization group";
+      description: "Updates an existing group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
   // Endpoint for deleting an organization group
   // Operation is synchronous and idempotent.
   //
@@ -390,6 +406,22 @@ service Authorization {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete organization group";
       description: "Deletes an existing group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for updating a canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateCanvasGroup(UpdateCanvasGroupRequest) returns (UpdateCanvasGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas group";
+      description: "Updates an existing group within a canvas";
       tags: "Authorization";
     };
   }
@@ -661,12 +693,36 @@ message DeleteRoleRequest {
 
 message DeleteRoleResponse {}
 
+message UpdateOrganizationGroupRequest {
+  string organization_id = 1;
+  string group_name = 2;
+  string role = 3;
+  string display_name = 4;
+  string description = 5;
+}
+
+message UpdateOrganizationGroupResponse {
+  Group group = 1;
+}
+
 message DeleteOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
 }
 
 message DeleteOrganizationGroupResponse {}
+
+message UpdateCanvasGroupRequest {
+  string canvas_id_or_name = 1;
+  string group_name = 2;
+  string role = 3;
+  string display_name = 4;
+  string description = 5;
+}
+
+message UpdateCanvasGroupResponse {
+  Group group = 1;
+}
 
 message DeleteCanvasGroupRequest {
   string canvas_id_or_name = 1;

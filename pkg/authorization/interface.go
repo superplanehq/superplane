@@ -9,6 +9,7 @@ type PermissionChecker interface {
 // Group management interface
 type GroupManager interface {
 	CreateGroup(domainID string, domainType string, groupName string, role string) error
+	UpdateGroupRole(domainID string, domainType string, groupName string, newRole string) error
 	AddUserToGroup(domainID string, domainType string, userID string, group string) error
 	RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error
 	GetGroupUsers(domainID string, domainType string, group string) ([]string, error)
