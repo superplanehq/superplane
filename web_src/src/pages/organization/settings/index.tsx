@@ -7,6 +7,7 @@ import { MembersSettings } from './MembersSettings'
 import { GroupsSettings } from './GroupsSettings'
 import { RolesSettings } from './RolesSettings'
 import { AddMembersPage } from './AddMembersPage'
+import { GroupMembersPage } from './GroupMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
 import { ProfileSettings } from './ProfileSettings'
@@ -147,6 +148,7 @@ export function OrganizationSettings() {
               <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
               <Route path="roles" element={<RolesSettings organizationId={orgId} />} />
               <Route path="add-members" element={<AddMembersPage />} />
+              <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
               <Route path="create-role/:roleName" element={<CreateRolePage />} />

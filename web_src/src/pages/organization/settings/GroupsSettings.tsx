@@ -156,7 +156,10 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                             initials={group.name?.charAt(0).toUpperCase() || 'G'}
                           />
                           <div>
-                            <Link href="#" className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400">
+                            <Link 
+                              href={`/organization/${organizationId}/settings/groups/${group.name}/members`}
+                              className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400"
+                            >
                               {group.name}
                             </Link>
                             <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.description || 'No description available'}</p>

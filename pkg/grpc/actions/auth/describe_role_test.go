@@ -34,6 +34,33 @@ func Test_DescribeRole(t *testing.T) {
 		assert.Equal(t, authorization.RoleOrgViewer, resp.Role.InheritedRole.Name)
 		assert.Len(t, resp.Role.Permissions, 17)
 		assert.Len(t, resp.Role.InheritedRole.Permissions, 2)
+
+		// Test beautiful display names and descriptions
+		assert.Equal(t, "Admin", resp.Role.DisplayName)
+		assert.Equal(t, "Viewer", resp.Role.InheritedRole.DisplayName)
+		assert.Contains(t, resp.Role.Description, "Can manage canvases, users, groups, and roles")
+		assert.Contains(t, resp.Role.InheritedRole.Description, "Read-only access to organization resources")
+	})
+
+	t.Run("successful canvas role description", func(t *testing.T) {
+		canvasID := uuid.New().String()
+		err := authService.SetupCanvasRoles(canvasID)
+		require.NoError(t, err)
+
+		req := &pb.DescribeRoleRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
+			Role:       authorization.RoleCanvasAdmin,
+		}
+
+		resp, err := DescribeRole(ctx, req, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp.Role)
+		assert.Equal(t, authorization.RoleCanvasAdmin, resp.Role.Name)
+
+		// Test beautiful display names and descriptions for canvas roles
+		assert.Equal(t, "Admin", resp.Role.DisplayName)
+		assert.Contains(t, resp.Role.Description, "Can manage stages, events, connections, and secrets")
 	})
 
 	t.Run("invalid request - missing domain ID", func(t *testing.T) {

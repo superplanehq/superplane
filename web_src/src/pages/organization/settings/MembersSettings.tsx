@@ -21,15 +21,19 @@ import {
 } from '../../../components/Table/table'
 import { AddMembersSection } from './AddMembersSection'
 import {
-  authorizationGetOrganizationUsers
+  authorizationGetOrganizationUsers,
+  authorizationAssignRole,
+  authorizationRemoveRole,
+  authorizationListRoles
 } from '../../../api-client/sdk.gen'
-import { AuthorizationUser } from '../../../api-client/types.gen'
+import { AuthorizationUser, AuthorizationRole } from '../../../api-client/types.gen'
 
 interface Member {
   id: string
   name: string
   email: string
   role: string
+  roleName: string
   status: 'Active' | 'Pending' | 'Inactive'
   lastActive: string
   initials: string
@@ -43,6 +47,8 @@ interface MembersSettingsProps {
 export function MembersSettings({ organizationId }: MembersSettingsProps) {
   const [members, setMembers] = useState<Member[]>([])
   const [loadingMembers, setLoadingMembers] = useState(true)
+  const [organizationRoles, setOrganizationRoles] = useState<AuthorizationRole[]>([])
+  const [loadingRoles, setLoadingRoles] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{
@@ -54,21 +60,31 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
   const fetchData = useCallback(async () => {
     try {
       setLoadingMembers(true)
+      setLoadingRoles(true)
       setError(null)
 
-      // Fetch organization users
-      const response = await authorizationGetOrganizationUsers({
-        path: { organizationId }
-      })
+      // Fetch organization users and roles in parallel
+      const [usersResponse, rolesResponse] = await Promise.all([
+        authorizationGetOrganizationUsers({
+          path: { organizationId }
+        }),
+        authorizationListRoles({
+          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
+        })
+      ])
+
+      // Set organization roles
+      setOrganizationRoles(rolesResponse.data?.roles || [])
 
       // Convert AuthorizationUser to Member interface format
-      const members: Member[] = response.data?.users?.map((user: AuthorizationUser) => {
+      const members: Member[] = usersResponse.data?.users?.map((user: AuthorizationUser) => {
         // Generate initials from displayName or userId
         const name = user.displayName || user.userId || 'Unknown User'
         const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-        // Get primary role name from role assignments
-        const primaryRole = user.roleAssignments?.[0]?.roleDisplayName || user.roleAssignments?.[0]?.roleName || 'Member'
+        // Get primary role name and display name from role assignments
+        const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
+        const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
 
         // Calculate last active time
         const lastLoginAt = user.isActive ? Date.now() : null
@@ -78,7 +94,8 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
           id: user.userId || '',
           name: name,
           email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
-          role: primaryRole,
+          role: primaryRoleDisplayName,
+          roleName: primaryRoleName,
           status: user.isActive ? 'Active' : 'Inactive',
           lastActive: lastActive,
           initials: initials,
@@ -93,6 +110,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
       setError('Failed to fetch members')
     } finally {
       setLoadingMembers(false)
+      setLoadingRoles(false)
     }
   }, [organizationId])
 
@@ -146,40 +164,55 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
     )
   }
 
-  const handleRoleChange = async (memberId: string, newRole: string) => {
+  const handleRoleChange = async (memberId: string, newRoleName: string) => {
     try {
-      // In a real implementation, you would call the API to update the role
-      // const response = await authorizationAssignRole({
-      //   body: { userId: memberId, roleAssignment: { role: newRole, domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId } }
-      // })
+      setError(null)
 
-      setMembers(prev => prev.map(member =>
-        member.id === memberId ? { ...member, role: newRole } : member
-      ))
+      await authorizationAssignRole({
+        body: {
+          userId: memberId,
+          roleAssignment: {
+            role: newRoleName,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: organizationId
+          }
+        }
+      })
+
+      // Refresh the data to get updated role information from the API
+      await fetchData()
     } catch (err) {
       console.error('Error updating role:', err)
       setError('Failed to update member role')
     }
   }
 
-  const handleMemberAction = async (memberId: string, action: 'edit' | 'suspend' | 'remove') => {
+  const handleMemberRemove = async (memberId: string) => {
     try {
-      switch (action) {
-        case 'edit':
-          console.log('Edit member:', memberId)
-          break
-        case 'suspend':
-          setMembers(prev => prev.map(member =>
-            member.id === memberId ? { ...member, status: 'Inactive' as const } : member
-          ))
-          break
-        case 'remove':
-          setMembers(prev => prev.filter(member => member.id !== memberId))
-          break
+      setError(null)
+
+      // Find the member to get their current role
+      const member = members.find(m => m.id === memberId)
+      if (!member) {
+        setError('Member not found')
+        return
       }
+
+      await authorizationRemoveRole({
+        body: {
+          userId: memberId,
+          roleAssignment: {
+            role: member.roleName,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: organizationId
+          }
+        }
+      })
+
+      setMembers(prev => prev.filter(member => member.id !== memberId))
     } catch (err) {
-      console.error('Error performing member action:', err)
-      setError('Failed to perform action')
+      console.error('Error removing member:', err)
+      setError('Failed to remove member')
     }
   }
 
@@ -301,18 +334,23 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                           <MaterialSymbol name="keyboard_arrow_down" />
                         </DropdownButton>
                         <DropdownMenu>
-                          <DropdownItem onClick={() => handleRoleChange(member.id, 'Owner')}>
-                            <DropdownLabel>Owner</DropdownLabel>
-                            <DropdownDescription>Full access to organization settings</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleRoleChange(member.id, 'Admin')}>
-                            <DropdownLabel>Admin</DropdownLabel>
-                            <DropdownDescription>Can manage members and organization settings</DropdownDescription>
-                          </DropdownItem>
-                          <DropdownItem onClick={() => handleRoleChange(member.id, 'Member')}>
-                            <DropdownLabel>Member</DropdownLabel>
-                            <DropdownDescription>Standard member access</DropdownDescription>
-                          </DropdownItem>
+                          {organizationRoles.map((role) => (
+                            <DropdownItem
+                              key={role.name}
+                              onClick={() => handleRoleChange(member.id, role.name || '')}
+                              disabled={loadingRoles}
+                            >
+                              <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
+                              {role.description && (
+                                <DropdownDescription>{role.description}</DropdownDescription>
+                              )}
+                            </DropdownItem>
+                          ))}
+                          {loadingRoles && (
+                            <DropdownItem disabled>
+                              <DropdownLabel>Loading roles...</DropdownLabel>
+                            </DropdownItem>
+                          )}
                         </DropdownMenu>
                       </Dropdown>
                     </TableCell>
@@ -333,15 +371,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                             <MaterialSymbol name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
-                            <DropdownItem onClick={() => handleMemberAction(member.id, 'edit')}>
-                              <MaterialSymbol name="edit" />
-                              Edit
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleMemberAction(member.id, 'suspend')}>
-                              <MaterialSymbol name="block" />
-                              Suspend
-                            </DropdownItem>
-                            <DropdownItem onClick={() => handleMemberAction(member.id, 'remove')}>
+                            <DropdownItem onClick={() => handleMemberRemove(member.id)}>
                               <MaterialSymbol name="delete" />
                               Remove
                             </DropdownItem>

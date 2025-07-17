@@ -144,11 +144,18 @@ func DeleteGroupMetadata(groupName, domainType, domainID string) error {
 
 // GetRoleDisplayName gets the display name for a role, fallback to role name if not found
 func GetRoleDisplayName(roleName, domainType, domainID string) string {
+	// First check if we have stored metadata
 	metadata, err := FindRoleMetadata(roleName, domainType, domainID)
-	if err != nil {
-		return roleName // Fallback to role name
+	if err == nil {
+		return metadata.DisplayName
 	}
-	return metadata.DisplayName
+	
+	// For default roles, provide beautiful display names
+	if displayName := getDefaultRoleDisplayName(roleName, domainType); displayName != "" {
+		return displayName
+	}
+	
+	return roleName // Fallback to role name
 }
 
 // GetGroupDisplayName gets the display name for a group, fallback to group name if not found
@@ -162,11 +169,18 @@ func GetGroupDisplayName(groupName, domainType, domainID string) string {
 
 // GetRoleDescription gets the description for a role
 func GetRoleDescription(roleName, domainType, domainID string) string {
+	// First check if we have stored metadata
 	metadata, err := FindRoleMetadata(roleName, domainType, domainID)
-	if err != nil {
-		return "" // No description available
+	if err == nil {
+		return metadata.Description
 	}
-	return metadata.Description
+	
+	// For default roles, provide beautiful descriptions
+	if description := getDefaultRoleDescription(roleName, domainType); description != "" {
+		return description
+	}
+	
+	return "" // No description available
 }
 
 // GetGroupDescription gets the description for a group
@@ -176,4 +190,62 @@ func GetGroupDescription(groupName, domainType, domainID string) string {
 		return "" // No description available
 	}
 	return metadata.Description
+}
+
+// getDefaultRoleDisplayName returns beautiful display names for default roles
+func getDefaultRoleDisplayName(roleName, domainType string) string {
+	// Organization roles
+	if domainType == "org" {
+		switch roleName {
+		case "org_owner":
+			return "Owner"
+		case "org_admin":
+			return "Admin"
+		case "org_viewer":
+			return "Viewer"
+		}
+	}
+	
+	// Canvas roles
+	if domainType == "canvas" {
+		switch roleName {
+		case "canvas_owner":
+			return "Owner"
+		case "canvas_admin":
+			return "Admin"
+		case "canvas_viewer":
+			return "Viewer"
+		}
+	}
+	
+	return ""
+}
+
+// getDefaultRoleDescription returns beautiful descriptions for default roles
+func getDefaultRoleDescription(roleName, domainType string) string {
+	// Organization roles
+	if domainType == "org" {
+		switch roleName {
+		case "org_owner":
+			return "Full control over organization settings, billing, and member management."
+		case "org_admin":
+			return "Can manage canvases, users, groups, and roles within the organization."
+		case "org_viewer":
+			return "Read-only access to organization resources and information."
+		}
+	}
+	
+	// Canvas roles
+	if domainType == "canvas" {
+		switch roleName {
+		case "canvas_owner":
+			return "Full control over canvas settings, members, and deletion."
+		case "canvas_admin":
+			return "Can manage stages, events, connections, and secrets within the canvas."
+		case "canvas_viewer":
+			return "Read-only access to canvas resources and execution information."
+		}
+	}
+	
+	return ""
 }

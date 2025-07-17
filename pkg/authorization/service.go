@@ -267,6 +267,21 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 	}
 
 	prefixedUserID := fmt.Sprintf("user:%s", userID)
+
+	existingRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
+	if err != nil {
+		return fmt.Errorf("failed to get existing roles for user: %w", err)
+	}
+
+	for _, existingRole := range existingRoles {
+		if strings.HasPrefix(existingRole[1], "role:") {
+			_, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, existingRole[1], domain)
+			if err != nil {
+				log.Warnf("failed to remove existing role %s for user %s: %v", existingRole[1], userID, err)
+			}
+		}
+	}
+
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add role: %w", err)
@@ -340,6 +355,10 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 		} else {
 			return fmt.Errorf("unknown policy type: %s", policy[0])
 		}
+	}
+
+	if err := a.setupDefaultOrganizationRoleMetadata(orgID); err != nil {
+		log.Errorf("Error setting up default organization role metadata: %v", err)
 	}
 
 	return nil
@@ -472,6 +491,12 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 				return fmt.Errorf("failed to add policy: %w", err)
 			}
 		}
+	}
+
+	// Set up metadata for default canvas roles
+	if err := a.setupDefaultCanvasRoleMetadata(canvasID); err != nil {
+		log.Errorf("Error setting up default canvas role metadata: %v", err)
+		// Don't fail the entire setup if metadata fails
 	}
 
 	return nil
@@ -1309,4 +1334,70 @@ func (a *AuthService) getDomainTypeFromDomain(domain string) string {
 		return DomainCanvas
 	}
 	return ""
+}
+
+// setupDefaultOrganizationRoleMetadata creates metadata for default organization roles
+func (a *AuthService) setupDefaultOrganizationRoleMetadata(orgID string) error {
+	defaultRoles := []struct {
+		name        string
+		displayName string
+		description string
+	}{
+		{
+			name:        RoleOrgOwner,
+			displayName: "Owner",
+			description: "Full control over organization settings, billing, and member management.",
+		},
+		{
+			name:        RoleOrgAdmin,
+			displayName: "Admin",
+			description: "Can manage canvases, users, groups, and roles within the organization.",
+		},
+		{
+			name:        RoleOrgViewer,
+			displayName: "Viewer",
+			description: "Read-only access to organization resources and information.",
+		},
+	}
+
+	for _, role := range defaultRoles {
+		if err := models.UpsertRoleMetadata(role.name, DomainOrg, orgID, role.displayName, role.description); err != nil {
+			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
+		}
+	}
+
+	return nil
+}
+
+// setupDefaultCanvasRoleMetadata creates metadata for default canvas roles
+func (a *AuthService) setupDefaultCanvasRoleMetadata(canvasID string) error {
+	defaultRoles := []struct {
+		name        string
+		displayName string
+		description string
+	}{
+		{
+			name:        RoleCanvasOwner,
+			displayName: "Owner",
+			description: "Full control over canvas settings, members, and deletion.",
+		},
+		{
+			name:        RoleCanvasAdmin,
+			displayName: "Admin",
+			description: "Can manage stages, events, connections, and secrets within the canvas.",
+		},
+		{
+			name:        RoleCanvasViewer,
+			displayName: "Viewer",
+			description: "Read-only access to canvas resources and execution information.",
+		},
+	}
+
+	for _, role := range defaultRoles {
+		if err := models.UpsertRoleMetadata(role.name, DomainCanvas, canvasID, role.displayName, role.description); err != nil {
+			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
+		}
+	}
+
+	return nil
 }

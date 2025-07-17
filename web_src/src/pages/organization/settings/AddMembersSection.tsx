@@ -17,18 +17,21 @@ import { Link } from '../../../components/Link/link'
 import {
   authorizationAssignRole,
   authorizationListRoles,
+  authorizationAddUserToOrganizationGroup,
 } from '../../../api-client/sdk.gen'
 import { AuthorizationRole } from '../../../api-client/types.gen'
 import { capitalizeFirstLetter } from '../../../utils/text'
+import Papa from 'papaparse'
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean
   organizationId: string
+  groupName?: string
   onMemberAdded?: () => void
   className?: string
 }
 
-export function AddMembersSection({ showRoleSelection = true, organizationId, onMemberAdded, className }: AddMembersSectionProps) {
+export function AddMembersSection({ showRoleSelection = true, organizationId, groupName, onMemberAdded, className }: AddMembersSectionProps) {
   const [addMembersTab, setAddMembersTab] = useState<'emails' | 'upload'>('emails')
   const [emailsInput, setEmailsInput] = useState('')
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -89,23 +92,58 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
     setError(null)
 
     try {
-      // In a real implementation, you would parse the CSV/Excel file here
-      // For now, we'll simulate processing
-      const emailsToAdd = ['example1@company.com', 'example2@company.com', 'example3@company.com']
+      // Parse CSV file
+      const fileContent = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.onerror = reject
+        reader.readAsText(uploadFile)
+      })
+
+      // Parse CSV content
+      const parseResult = Papa.parse(fileContent, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header) => header.toLowerCase().trim()
+      })
+
+      if (parseResult.errors.length > 0) {
+        throw new Error(`CSV parsing errors: ${parseResult.errors.map(e => e.message).join(', ')}`)
+      }
+
+      // Extract emails from CSV data
+      const csvData = parseResult.data as Array<{ email?: string;[key: string]: string | undefined }>
+      const emailsToAdd = csvData
+        .map(row => row.email || row['email address'] || '')
+        .filter(email => email && isEmailValid(email))
+
+      if (emailsToAdd.length === 0) {
+        throw new Error('No valid email addresses found in the CSV file. Please ensure the CSV has an "email" column.')
+      }
+
       const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
 
-      // Process each email (in real implementation, this would be done server-side)
+      // Process each email
       for (const email of emailsToAdd) {
-        await authorizationAssignRole({
-          body: {
-            userEmail: email,
-            roleAssignment: {
-              domainType: 'DOMAIN_TYPE_ORGANIZATION',
-              domainId: organizationId,
-              role: roleToAssign
+        if (groupName) {
+          // Add user to specific group
+          await authorizationAddUserToOrganizationGroup({
+            path: { groupName },
+            body: { userEmail: email, organizationId: organizationId }
+          })
+        } else {
+          // Add user to organization with role
+          await authorizationAssignRole({
+            body: {
+              userEmail: email,
+              roleAssignment: {
+                domainType: 'DOMAIN_TYPE_ORGANIZATION',
+                domainId: organizationId,
+                role: roleToAssign
+              }
             }
-          }
-        })
+          })
+        }
       }
 
       console.log('Successfully processed bulk upload:', {
@@ -123,7 +161,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
       onMemberAdded?.()
     } catch (err) {
       console.error('Error processing bulk upload:', err)
-      setError('Failed to process bulk upload. Please try again.')
+      setError(err instanceof Error ? err.message : 'Failed to process bulk upload. Please try again.')
     } finally {
       setIsInviting(false)
     }
@@ -146,16 +184,25 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
 
       // Process each email
       for (const email of emails) {
-        await authorizationAssignRole({
-          body: {
-            userEmail: email,
-            roleAssignment: {
-              domainType: 'DOMAIN_TYPE_ORGANIZATION',
-              domainId: organizationId,
-              role: roleToAssign
+        if (groupName) {
+          // Add user to specific group
+          await authorizationAddUserToOrganizationGroup({
+            path: { groupName },
+            body: { userEmail: email, organizationId: organizationId }
+          })
+        } else {
+          // Add user to organization with role
+          await authorizationAssignRole({
+            body: {
+              userEmail: email,
+              roleAssignment: {
+                domainType: 'DOMAIN_TYPE_ORGANIZATION',
+                domainId: organizationId,
+                role: roleToAssign
+              }
             }
-          }
-        })
+          })
+        }
       }
 
       console.log('Successfully added members by email:', {
@@ -193,6 +240,11 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
           </Text>
 
         </div>
+        {groupName && (
+          <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+            Adding members to group: <strong>{groupName}</strong>
+          </Text>
+        )}
       </div>
 
       {error && (
@@ -233,7 +285,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
               onKeyDown={handleKeyDown}
             />
 
-            {showRoleSelection && (
+            {showRoleSelection && !groupName && (
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm">
                   {emailRole ? capitalizeFirstLetter(emailRole.split('_').at(-1) || '') : 'Select Role'}
@@ -254,10 +306,10 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
               color="blue"
               className='flex items-center text-sm gap-2'
               onClick={handleEmailsSubmit}
-              disabled={!emailsInput.trim() || isInviting || !emailRole}
+              disabled={!emailsInput.trim() || isInviting || (!groupName && showRoleSelection && !emailRole)}
             >
               <MaterialSymbol name="add" size="sm" />
-              {isInviting ? 'Adding...' : 'Invite'}
+              {isInviting ? 'Adding...' : (groupName ? 'Add to Group' : 'Invite')}
             </Button>
           </div>
         </div>
@@ -292,12 +344,13 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
               </div>
             </div>
             <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+              The CSV file should have an "email" column with email addresses.
               <Link href="#" className="text-blue-600 hover:text-blue-700 ml-1">Check .csv file format requirements</Link>
             </Text>
           </Field>
 
           {/* Role Selection */}
-          {showRoleSelection && (
+          {showRoleSelection && !groupName && (
             <Field>
               <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                 Role
@@ -324,11 +377,11 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
             <Button
               color="blue"
               onClick={handleBulkAddSubmit}
-              disabled={!uploadFile || isInviting || !bulkUserRole}
+              disabled={!uploadFile || isInviting || (!groupName && showRoleSelection && !bulkUserRole)}
               className="flex items-center gap-2"
             >
               <MaterialSymbol name="add" size="sm" />
-              {isInviting ? 'Processing...' : 'Invite'}
+              {isInviting ? 'Processing...' : (groupName ? 'Add to Group' : 'Invite')}
             </Button>
           </div>
         </div>
