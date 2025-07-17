@@ -9,8 +9,10 @@ import { RolesSettings } from './RolesSettings'
 import { AddMembersPage } from './AddMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
+import { ProfileSettings } from './ProfileSettings'
 import { organizationsDescribeOrganization } from '../../../api-client/sdk.gen'
 import type { OrganizationsOrganization } from '../../../api-client/types.gen'
+import { useUserStore } from '../../../stores/userStore'
 
 export function OrganizationSettings() {
   const { orgId } = useParams<{ orgId: string }>()
@@ -19,6 +21,12 @@ export function OrganizationSettings() {
   const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user, fetchUser } = useUserStore()
+  
+  // Fetch user data when component mounts
+  useEffect(() => {
+    fetchUser()
+  }, [fetchUser])
   
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
@@ -87,10 +95,11 @@ export function OrganizationSettings() {
               <div className='flex items-center gap-3 text-sm font-bold py-3'>
                 <Avatar 
                   className='w-6 h-6'
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=64&h=64&fit=crop&crop=face"
-                  alt="My Account"
+                  src={user?.avatar_url}
+                  initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
+                  alt={user?.name || 'My Account'}
                 />
-                <SidebarLabel className='text-zinc-900 dark:text-white'>My Account</SidebarLabel>
+                <SidebarLabel className='text-zinc-900 dark:text-white'>{user?.name || 'My Account'}</SidebarLabel>
               </div>
               <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/organization/${orgId}/settings/profile`)}>
                 <span className='px-7'>
@@ -141,7 +150,7 @@ export function OrganizationSettings() {
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
               <Route path="create-role/:roleName" element={<CreateRolePage />} />
-              <Route path="profile" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Profile Settings</h1><p>Profile settings coming soon...</p></div>} />
+              <Route path="profile" element={<ProfileSettings />} />
               <Route path="api_token" element={<div className="pt-6"><h1 className="text-2xl font-semibold">API Token</h1><p>API token management coming soon...</p></div>} />
               <Route path="billing" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Billing & Plans</h1><p>Billing management coming soon...</p></div>} />
             </Routes>

@@ -300,8 +300,39 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountProviders, err := user.GetAccountProviders()
+	if err != nil {
+		log.Errorf("Error getting account providers: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var email, avatarURL string
+	if len(accountProviders) > 0 {
+		email = accountProviders[0].Email
+		avatarURL = accountProviders[0].AvatarURL
+
+		// Fallback to user name if no email from provider
+		if email == "" && user.Name != "" {
+			email = user.Name
+		}
+	} else {
+		if user.Name != "" {
+			email = user.Name
+		}
+	}
+
+	safeUser := UserProfileResponse{
+		ID:               user.ID.String(),
+		Email:            email,
+		Name:             user.Name,
+		AvatarURL:        avatarURL,
+		CreatedAt:        user.CreatedAt,
+		AccountProviders: accountProviders,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(safeUser)
 }
 
 func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
@@ -353,6 +384,15 @@ func (s *Server) Close() {
 type OutputsRequest struct {
 	ExecutionID string         `json:"execution_id"`
 	Outputs     map[string]any `json:"outputs"`
+}
+
+type UserProfileResponse struct {
+	ID               string                   `json:"id"`
+	Email            string                   `json:"email"`
+	Name             string                   `json:"name"`
+	AvatarURL        string                   `json:"avatar_url"`
+	CreatedAt        time.Time                `json:"created_at"`
+	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
 }
 
 func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {

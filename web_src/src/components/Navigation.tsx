@@ -7,14 +7,23 @@ import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
 import { organizationsDescribeOrganization } from '../api-client/sdk.gen';
 import type { OrganizationsOrganization } from '../api-client/types.gen';
+import { useUserStore } from '../stores/userStore';
 
 const Navigation: React.FC = () => {
   const { orgId } = useParams<{ orgId?: string }>();
   const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null);
-  
+  const { user, fetchUser } = useUserStore();
+
   useEffect(() => {
-    if (!orgId) return;
-    
+    fetchUser();
+  }, [fetchUser]);
+
+  useEffect(() => {
+    if (!orgId) {
+      setOrganization(null);
+      return;
+    }
+
     const fetchOrganization = async () => {
       try {
         const response = await organizationsDescribeOrganization({
@@ -25,7 +34,7 @@ const Navigation: React.FC = () => {
         console.error('Error fetching organization:', err);
       }
     };
-    
+
     fetchOrganization();
   }, [orgId]);
   return (
@@ -44,12 +53,13 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
+              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || user?.name}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
-                initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
-                alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
+                src={user?.avatar_url}
+                initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                alt={user?.name || 'User'}
                 className="w-7 h-7"
               />
             </DropdownButton>
@@ -59,14 +69,14 @@ const Navigation: React.FC = () => {
               <DropdownHeader>
                 <div className="flex items-center space-x-3">
                   <Avatar
-                    src="https://api.dicebear.com/9.x/initials/svg?seed=Test"
-                    initials="Test"
-                    alt="Test"
+                    src={user?.avatar_url}
+                    initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                    alt={user?.name || 'User'}
                     className="size-8"
                   />
                   <div className="flex-1 min-w-0">
-                    <Text className="font-medium truncate">Test</Text>
-                    <Text className="text-sm text-zinc-500 truncate">TestUsername</Text>
+                    <Text className="font-medium truncate">{user?.name || 'Loading...'}</Text>
+                    <Text className="text-sm text-zinc-500 truncate">{user?.email || 'Loading...'}</Text>
                   </div>
                 </div>
               </DropdownHeader>
