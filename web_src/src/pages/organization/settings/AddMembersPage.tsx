@@ -1,4 +1,3 @@
-import React from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Button } from '../../../components/Button/button'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
@@ -18,7 +17,7 @@ export function AddMembersPage() {
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Link 
+            <Link
               to={`/organization/${orgId}/settings/members`}
               className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
             >
@@ -26,7 +25,7 @@ export function AddMembersPage() {
               <span className="text-sm">Back to Members</span>
             </Link>
           </div>
-          
+
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-2">
@@ -41,7 +40,7 @@ export function AddMembersPage() {
 
         {/* Add Members Section */}
         <div className="space-y-6">
-          <AddMembersSection 
+          <AddMembersSection
             organizationId={orgId}
             onMemberAdded={() => {
               // Optionally navigate back or show success message
@@ -67,7 +66,7 @@ export function AddMembersPage() {
                 </div>
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    <strong>Note:</strong> Members must be assigned to at least one group to access the organization. 
+                    <strong>Note:</strong> Members must be assigned to at least one group to access the organization.
                     Make sure you have created groups before adding members.
                   </p>
                 </div>

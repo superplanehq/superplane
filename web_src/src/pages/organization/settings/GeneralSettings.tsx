@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { organizationsUpdateOrganization } from '../../../api-client/sdk.gen'
 import type { OrganizationsOrganization } from '../../../api-client/types.gen'
 import { useParams } from 'react-router-dom'
+import { Textarea } from '@/components/Textarea/textarea'
 
 interface GeneralSettingsProps {
   organization: OrganizationsOrganization
@@ -16,6 +17,7 @@ export function GeneralSettings({ organization }: GeneralSettingsProps) {
   const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [organizationDescription, setOrganizationDescription] = useState(organization.metadata?.description || '')
 
   const handleSave = async () => {
     if (!orgId) return
@@ -30,6 +32,7 @@ export function GeneralSettings({ organization }: GeneralSettingsProps) {
           organization: {
             metadata: {
               displayName: displayName,
+              description: organizationDescription,
             }
           }
         }
@@ -60,6 +63,17 @@ export function GeneralSettings({ organization }: GeneralSettingsProps) {
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             className="max-w-lg"
+          />
+        </Field>
+        <Field>
+          <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+            Description
+          </Label>
+          <Textarea
+            className='bg-white dark:bg-zinc-950 rounded-lg dark:border-zinc-800 max-w-xl'
+            placeholder='Enter organization description'
+            value={organizationDescription}
+            onChange={(e) => setOrganizationDescription(e.target.value)}
           />
         </Field>
 

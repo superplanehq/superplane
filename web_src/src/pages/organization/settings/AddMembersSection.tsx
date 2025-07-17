@@ -11,15 +11,12 @@ import {
 } from '../../../components/Dropdown/dropdown'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
-import { Heading } from '../../../components/Heading/heading'
 import { Field, Label } from '../../../components/Fieldset/fieldset'
 import { Tabs, type Tab } from '../../../components/Tabs/tabs'
 import { Link } from '../../../components/Link/link'
 import {
   authorizationAssignRole,
   authorizationListRoles,
-  authorizationListOrganizationGroups,
-  authorizationGetOrganizationGroupUsers
 } from '../../../api-client/sdk.gen'
 import { AuthorizationRole } from '../../../api-client/types.gen'
 import { capitalizeFirstLetter } from '../../../utils/text'
@@ -41,8 +38,6 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
   const [error, setError] = useState<string | null>(null)
   const [roles, setRoles] = useState<AuthorizationRole[]>([])
   const [loadingRoles, setLoadingRoles] = useState(true)
-  const [organizationMembers, setOrganizationMembers] = useState<string[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(false)
 
   const addMembersTabs: Tab[] = [
     { id: 'emails', label: 'By emails' },
@@ -59,7 +54,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
           domainId: organizationId
         }
       })
-      
+
       if (response.data?.roles) {
         setRoles(response.data.roles)
         // Set default role to the first org member role found, or first role if none
@@ -76,53 +71,9 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
     }
   }, [organizationId])
 
-  const fetchOrganizationMembers = useCallback(async () => {
-    try {
-      setLoadingMembers(true)
-      setError(null)
-      
-      // First, get all organization groups
-      const groupsResponse = await authorizationListOrganizationGroups({
-        query: { organizationId }
-      })
-      
-      if (groupsResponse.data?.groups) {
-        // Get users from each group
-        const allUserIds = new Set<string>()
-        
-        for (const group of groupsResponse.data.groups) {
-          if (group.name) {
-            try {
-              const usersResponse = await authorizationGetOrganizationGroupUsers({
-                path: { groupName: group.name }
-              })
-              
-              if (usersResponse.data?.userIds) {
-                usersResponse.data.userIds.forEach(userId => {
-                  if (userId) allUserIds.add(userId)
-                })
-              }
-            } catch (err) {
-              console.warn(`Failed to fetch users for group ${group.name}:`, err)
-              // Continue with other groups
-            }
-          }
-        }
-        
-        setOrganizationMembers(Array.from(allUserIds))
-      }
-    } catch (err) {
-      console.error('Error fetching organization members:', err)
-      setError('Failed to fetch organization members')
-    } finally {
-      setLoadingMembers(false)
-    }
-  }, [organizationId])
-
   useEffect(() => {
     fetchRoles()
-    fetchOrganizationMembers()
-  }, [fetchRoles, fetchOrganizationMembers])
+  }, [fetchRoles])
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -142,14 +93,12 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
       // For now, we'll simulate processing
       const emailsToAdd = ['example1@company.com', 'example2@company.com', 'example3@company.com']
       const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
-      
+
       // Process each email (in real implementation, this would be done server-side)
       for (const email of emailsToAdd) {
-        const userId = email // This would be replaced with actual user ID from user creation/invitation
-        
         await authorizationAssignRole({
           body: {
-            userId,
+            userEmail: email,
             roleAssignment: {
               domainType: 'DOMAIN_TYPE_ORGANIZATION',
               domainId: organizationId,
@@ -170,9 +119,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
       const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
       setBulkUserRole(defaultRole)
       setAddMembersTab('emails')
-      
-      // Refresh organization members after successful addition
-      fetchOrganizationMembers()
+
       onMemberAdded?.()
     } catch (err) {
       console.error('Error processing bulk upload:', err)
@@ -182,6 +129,11 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
     }
   }
 
+  const isEmailValid = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
   const handleEmailsSubmit = async () => {
     if (!emailsInput.trim()) return
 
@@ -189,23 +141,14 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
     setError(null)
 
     try {
-      const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0)
+      const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
       const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
-
-      // Check for existing members
-      const existingMembers = emails.filter(email => organizationMembers.includes(email))
-      if (existingMembers.length > 0) {
-        setError(`The following users are already members: ${existingMembers.join(', ')}`)
-        return
-      }
 
       // Process each email
       for (const email of emails) {
-        const userId = email // This would be replaced with actual user ID from user creation/invitation
-        
         await authorizationAssignRole({
           body: {
-            userId,
+            userEmail: email,
             roleAssignment: {
               domainType: 'DOMAIN_TYPE_ORGANIZATION',
               domainId: organizationId,
@@ -224,9 +167,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
       setEmailsInput('')
       const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
       setEmailRole(defaultRole)
-      
-      // Refresh organization members after successful addition
-      fetchOrganizationMembers()
+
       onMemberAdded?.()
     } catch (err) {
       console.error('Error adding members by email:', err)
@@ -247,14 +188,10 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
     <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <Heading level={3} className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+          <Text className="font-semibold text-zinc-900 dark:text-white mb-1">
             Add members
-          </Heading>
-          {!loadingMembers && (
-            <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-              {organizationMembers.length} current member{organizationMembers.length !== 1 ? 's' : ''}
-            </Text>
-          )}
+          </Text>
+
         </div>
       </div>
 
@@ -264,15 +201,14 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
         </div>
       )}
 
-      {(loadingRoles || loadingMembers) && (
+      {(loadingRoles) && (
         <div className="flex justify-center items-center h-20">
           <p className="text-zinc-500 dark:text-zinc-400">
-            {loadingRoles && loadingMembers ? 'Loading roles and members...' : 
-             loadingRoles ? 'Loading roles...' : 'Loading members...'}
+            {loadingRoles && 'Loading roles...'}
           </p>
         </div>
       )}
-      
+
       {/* Add Members Tabs */}
       <div className="mb-6">
         <Tabs
@@ -282,9 +218,9 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
           onTabChange={(tabId) => setAddMembersTab(tabId as 'emails' | 'upload')}
         />
       </div>
-      
+
       {/* Tab Content */}
-      {!loadingRoles && !loadingMembers && addMembersTab === 'emails' ? (
+      {!loadingRoles && addMembersTab === 'emails' ? (
         // Enter emails tab content
         <div className="space-y-4">
           <div className="flex items-start gap-3">
@@ -296,7 +232,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
               onChange={(e) => setEmailsInput(e.target.value)}
               onKeyDown={handleKeyDown}
             />
-            
+
             {showRoleSelection && (
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm">
@@ -313,10 +249,10 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
                 </DropdownMenu>
               </Dropdown>
             )}
-            
-            <Button 
-              color="blue" 
-              className='flex items-center text-sm gap-2' 
+
+            <Button
+              color="blue"
+              className='flex items-center text-sm gap-2'
               onClick={handleEmailsSubmit}
               disabled={!emailsInput.trim() || isInviting || !emailRole}
             >
@@ -325,9 +261,9 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
             </Button>
           </div>
         </div>
-      ) : !loadingRoles && !loadingMembers ? (
+      ) : !loadingRoles ? (
         // Upload file tab content
-        <div className="space-y-6">
+        <div className="space-y-6 text-left">
           {/* File Upload */}
           <Field>
             <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
@@ -346,7 +282,7 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
                   className="hidden"
                   id="add-members-upload"
                 />
-                
+
                 <label htmlFor="add-members-upload">
                   <Button outline className='flex items-center text-sm gap-2' type="button">
                     <MaterialSymbol name="folder_open" size="sm" />
@@ -382,12 +318,12 @@ export function AddMembersSection({ showRoleSelection = true, organizationId, on
               </Dropdown>
             </Field>
           )}
-          
+
           {/* Upload Button */}
           <div className="flex justify-end">
-            <Button 
-              color="blue" 
-              onClick={handleBulkAddSubmit} 
+            <Button
+              color="blue"
+              onClick={handleBulkAddSubmit}
               disabled={!uploadFile || isInviting || !bulkUserRole}
               className="flex items-center gap-2"
             >

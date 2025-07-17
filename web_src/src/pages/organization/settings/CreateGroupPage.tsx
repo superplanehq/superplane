@@ -70,7 +70,9 @@ export function CreateGroupPage() {
         body: {
           organizationId: orgId,
           groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, '_'),
-          role: selectedRole
+          role: selectedRole,
+          displayName: groupName,
+          description: groupDescription
         }
       })
 

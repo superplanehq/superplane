@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Heading } from '../../../components/Heading/heading'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Avatar } from '../../../components/Avatar/avatar'
@@ -21,7 +21,6 @@ import {
 } from '../../../components/Table/table'
 import { AddMembersSection } from './AddMembersSection'
 import {
-  authorizationListOrganizationGroups,
   authorizationGetOrganizationUsers
 } from '../../../api-client/sdk.gen'
 import { AuthorizationUser } from '../../../api-client/types.gen'
@@ -52,54 +51,54 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
   }>({ key: null, direction: 'asc' })
 
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoadingMembers(true)
-        setError(null)
+  const fetchData = useCallback(async () => {
+    try {
+      setLoadingMembers(true)
+      setError(null)
 
-        // Fetch organization users
-        const response = await authorizationGetOrganizationUsers({
-          path: { organizationId }
-        })
+      // Fetch organization users
+      const response = await authorizationGetOrganizationUsers({
+        path: { organizationId }
+      })
 
-        // Convert AuthorizationUser to Member interface format
-        const members: Member[] = response.data?.users?.map((user: AuthorizationUser) => {
-          // Generate initials from displayName or userId
-          const name = user.displayName || user.userId || 'Unknown User'
-          const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-          
-          // Get primary role name from role assignments
-          const primaryRole = user.roleAssignments?.[0]?.roleDisplayName || user.roleAssignments?.[0]?.roleName || 'Member'
-          
-          // Calculate last active time
-          const lastLoginAt = user.lastLoginAt
-          const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
-          
-          return {
-            id: user.userId || '',
-            name: name,
-            email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
-            role: primaryRole,
-            status: user.isActive ? 'Active' : 'Inactive',
-            lastActive: lastActive,
-            initials: initials,
-            avatar: user.avatarUrl
-          }
-        }) || []
+      // Convert AuthorizationUser to Member interface format
+      const members: Member[] = response.data?.users?.map((user: AuthorizationUser) => {
+        // Generate initials from displayName or userId
+        const name = user.displayName || user.userId || 'Unknown User'
+        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-        setMembers(members)
+        // Get primary role name from role assignments
+        const primaryRole = user.roleAssignments?.[0]?.roleDisplayName || user.roleAssignments?.[0]?.roleName || 'Member'
 
-      } catch (err) {
-        console.error('Error fetching data:', err)
-        setError('Failed to fetch members')
-      } finally {
-        setLoadingMembers(false)
-      }
+        // Calculate last active time
+        const lastLoginAt = user.isActive ? Date.now() : null
+        const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
+
+        return {
+          id: user.userId || '',
+          name: name,
+          email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
+          role: primaryRole,
+          status: user.isActive ? 'Active' : 'Inactive',
+          lastActive: lastActive,
+          initials: initials,
+          avatar: user.avatarUrl
+        }
+      }) || []
+
+      setMembers(members)
+
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError('Failed to fetch members')
+    } finally {
+      setLoadingMembers(false)
     }
-
-    fetchData()
   }, [organizationId])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const handleSort = (key: keyof Member) => {
     setSortConfig(prevConfig => ({
@@ -185,9 +184,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
   }
 
   const handleMemberAdded = () => {
-    // Refresh members data when a new member is added
-    console.log('Member added, refreshing data...')
-    // In a real app, you would refetch the members list
+    fetchData()
   }
 
   return (
@@ -321,10 +318,10 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status === 'Active'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                          : member.status === 'Pending'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
+                        : member.status === 'Pending'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
+                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
                         }`}>
                         {member.status}
                       </span>

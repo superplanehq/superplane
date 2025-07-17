@@ -159,7 +159,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                             <Link href="#" className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400">
                               {group.name}
                             </Link>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{"No description avaiable"}</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.description || 'No description available'}</p>
                           </div>
                         </div>
                       </TableCell>
