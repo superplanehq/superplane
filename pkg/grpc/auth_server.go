@@ -103,6 +103,10 @@ func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req
 	return auth.ConvertToGetOrganizationGroupUsersResponse(genericResp), nil
 }
 
+func (s *AuthorizationServer) GetOrganizationUsers(ctx context.Context, req *pb.GetOrganizationUsersRequest) (*pb.GetOrganizationUsersResponse, error) {
+	return auth.GetOrganizationUsers(ctx, req, s.authService)
+}
+
 func (s *AuthorizationServer) CreateCanvasGroup(ctx context.Context, req *pb.CreateCanvasGroupRequest) (*pb.CreateCanvasGroupResponse, error) {
 	genericReq, err := auth.ConvertCreateCanvasGroupRequest(req)
 	if err != nil {

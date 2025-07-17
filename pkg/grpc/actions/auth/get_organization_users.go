@@ -116,7 +116,9 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 	primaryAvatar := ""
 	primaryDisplayName := dbUser.Name
 
-	if len(accountProviders) > 0 {
+	if !dbUser.IsActive {
+		primaryEmail = dbUser.Name
+	} else if len(accountProviders) > 0 {
 		primaryEmail = accountProviders[0].Email
 		primaryAvatar = accountProviders[0].AvatarURL
 		if primaryDisplayName == "" {

@@ -79,6 +79,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_DescribeOrganization_FullMethodName:    {Resource: "org", Action: "read", DomainType: "org"},
 		pbOrganization.Organizations_UpdateOrganization_FullMethodName:      {Resource: "org", Action: "update", DomainType: "org"},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:      {Resource: "org", Action: "delete", DomainType: "org"},
+		pbAuth.Authorization_GetOrganizationUsers_FullMethodName:            {Resource: "org", Action: "read", DomainType: "org"},
 	}
 
 	return &AuthorizationInterceptor{
@@ -210,35 +211,44 @@ func (a *AuthorizationInterceptor) extractMixedDomainID(req interface{}) (string
 	}:
 		domainType := r.GetDomainType()
 		domainID := r.GetDomainId()
+		return resolveDomainAndItsType(domainID, domainType)
 
-		var resolvedDomainType string
-		switch domainType {
-		case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-			resolvedDomainType = "org"
-			// Resolve organization ID if it's a name
-			if _, err := uuid.Parse(domainID); err != nil {
-				org, err := models.FindOrganizationByName(domainID)
-				if err != nil {
-					return "", "", fmt.Errorf("organization not found: %s", domainID)
-				}
-				domainID = org.ID.String()
-			}
-		case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-			resolvedDomainType = "canvas"
-			// Resolve canvas ID if it's a name
-			if _, err := uuid.Parse(domainID); err != nil {
-				canvas, err := models.FindCanvasByName(domainID)
-				if err != nil {
-					return "", "", fmt.Errorf("canvas not found: %s", domainID)
-				}
-				domainID = canvas.ID.String()
-			}
-		default:
-			return "", "", fmt.Errorf("unsupported domain type: %v", domainType)
-		}
-
-		return resolvedDomainType, domainID, nil
+	case interface {
+		GetRoleAssignment() *pbAuth.RoleAssignment
+	}:
+		roleAssignment := r.GetRoleAssignment()
+		return resolveDomainAndItsType(roleAssignment.DomainId, roleAssignment.DomainType)
 	default:
 		return "", "", fmt.Errorf("unable to extract domain information from request")
 	}
+}
+
+func resolveDomainAndItsType(domainID string, domainType pbAuth.DomainType) (string, string, error) {
+	var resolvedDomainType string
+	switch domainType {
+	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		resolvedDomainType = "org"
+		// Resolve organization ID if it's a name
+		if _, err := uuid.Parse(domainID); err != nil {
+			org, err := models.FindOrganizationByName(domainID)
+			if err != nil {
+				return "", "", fmt.Errorf("organization not found: %s", domainID)
+			}
+			domainID = org.ID.String()
+		}
+	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
+		resolvedDomainType = "canvas"
+		// Resolve canvas ID if it's a name
+		if _, err := uuid.Parse(domainID); err != nil {
+			canvas, err := models.FindCanvasByName(domainID)
+			if err != nil {
+				return "", "", fmt.Errorf("canvas not found: %s", domainID)
+			}
+			domainID = canvas.ID.String()
+		}
+	default:
+		return "", "", fmt.Errorf("unsupported domain type: %v", domainType)
+	}
+
+	return resolvedDomainType, domainID, nil
 }
