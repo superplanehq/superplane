@@ -8,15 +8,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
 func TestGetOrganizationUsers(t *testing.T) {
 	authService := SetupTestAuthService(t)
-	
+
 	// Create test organization ID
 	orgID := uuid.New().String()
-	
+
 	// Setup organization roles
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
@@ -28,7 +29,7 @@ func TestGetOrganizationUsers(t *testing.T) {
 	// Assign roles to users
 	err = authService.AssignRole(userID1, "org_admin", orgID, authorization.DomainOrg)
 	require.NoError(t, err)
-	
+
 	err = authService.AssignRole(userID2, "org_viewer", orgID, authorization.DomainOrg)
 	require.NoError(t, err)
 
@@ -40,7 +41,7 @@ func TestGetOrganizationUsers(t *testing.T) {
 	resp, err := GetOrganizationUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	
+
 	// Should have 2 users
 	assert.Len(t, resp.Users, 2)
 
@@ -48,7 +49,11 @@ func TestGetOrganizationUsers(t *testing.T) {
 	for _, user := range resp.Users {
 		assert.NotEmpty(t, user.UserId)
 		assert.NotEmpty(t, user.RoleAssignments)
-		
+
+		// Check that is_active field is properly set
+		// For test fallback users, should be false
+		assert.False(t, user.IsActive)
+
 		// Check role assignment details
 		for _, roleAssignment := range user.RoleAssignments {
 			assert.NotEmpty(t, roleAssignment.RoleName)
@@ -60,10 +65,10 @@ func TestGetOrganizationUsers(t *testing.T) {
 
 func TestGetOrganizationUsersEmptyOrganization(t *testing.T) {
 	authService := SetupTestAuthService(t)
-	
+
 	// Create test organization ID
 	orgID := uuid.New().String()
-	
+
 	// Setup organization roles (but don't assign any users)
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
@@ -76,7 +81,7 @@ func TestGetOrganizationUsersEmptyOrganization(t *testing.T) {
 	resp, err := GetOrganizationUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	
+
 	// Should have 0 users
 	assert.Len(t, resp.Users, 0)
 }
@@ -96,10 +101,10 @@ func TestGetOrganizationUsersInvalidOrganizationId(t *testing.T) {
 
 func TestGetOrganizationUsersMultipleRoles(t *testing.T) {
 	authService := SetupTestAuthService(t)
-	
+
 	// Create test organization ID
 	orgID := uuid.New().String()
-	
+
 	// Setup organization roles
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
@@ -110,7 +115,7 @@ func TestGetOrganizationUsersMultipleRoles(t *testing.T) {
 	// Assign multiple roles to the same user
 	err = authService.AssignRole(userID, "org_admin", orgID, authorization.DomainOrg)
 	require.NoError(t, err)
-	
+
 	err = authService.AssignRole(userID, "org_viewer", orgID, authorization.DomainOrg)
 	require.NoError(t, err)
 
@@ -122,17 +127,55 @@ func TestGetOrganizationUsersMultipleRoles(t *testing.T) {
 	resp, err := GetOrganizationUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	
+
 	// Should have 1 user with multiple roles
 	assert.Len(t, resp.Users, 1)
 	assert.Len(t, resp.Users[0].RoleAssignments, 2)
-	
+
 	// Check that both roles are present
 	roleNames := make(map[string]bool)
 	for _, roleAssignment := range resp.Users[0].RoleAssignments {
 		roleNames[roleAssignment.RoleName] = true
 	}
-	
+
 	assert.True(t, roleNames["org_admin"])
 	assert.True(t, roleNames["org_viewer"])
+}
+
+func TestGetOrganizationUsersWithActiveUser(t *testing.T) {
+	authService := SetupTestAuthService(t)
+
+	orgID := uuid.New().String()
+	err := authService.SetupOrganizationRoles(orgID)
+	require.NoError(t, err)
+
+	user := &models.User{
+		Name:     "Active User",
+		IsActive: true,
+	}
+	err = user.Create()
+	require.NoError(t, err)
+
+	err = authService.AssignRole(user.ID.String(), "org_admin", orgID, authorization.DomainOrg)
+	require.NoError(t, err)
+
+	req := &pb.GetOrganizationUsersRequest{
+		OrganizationId: orgID,
+	}
+
+	resp, err := GetOrganizationUsers(context.Background(), req, authService)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	assert.Len(t, resp.Users, 1)
+
+	activeUser := resp.Users[0]
+	assert.Equal(t, user.ID.String(), activeUser.UserId)
+	assert.True(t, activeUser.IsActive)
+	assert.Equal(t, "Active User", activeUser.DisplayName)
+	assert.NotEmpty(t, activeUser.RoleAssignments)
+
+	assert.Equal(t, "org_admin", activeUser.RoleAssignments[0].RoleName)
+	assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, activeUser.RoleAssignments[0].DomainType)
+	assert.Equal(t, orgID, activeUser.RoleAssignments[0].DomainId)
 }

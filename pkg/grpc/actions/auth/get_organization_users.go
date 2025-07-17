@@ -84,7 +84,7 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 			DisplayName:      "Test User",
 			Email:            "test@example.com",
 			AvatarUrl:        "",
-			IsActive:         true,
+			IsActive:         false,
 			CreatedAt:        time.Now().Format(time.RFC3339),
 			UpdatedAt:        time.Now().Format(time.RFC3339),
 			RoleAssignments:  roleAssignments,
@@ -129,7 +129,7 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 		DisplayName:      primaryDisplayName,
 		Email:            primaryEmail,
 		AvatarUrl:        primaryAvatar,
-		IsActive:         true, // TODO: Add active status to user model
+		IsActive:         dbUser.IsActive,
 		CreatedAt:        dbUser.CreatedAt.Format(time.RFC3339),
 		UpdatedAt:        dbUser.UpdatedAt.Format(time.RFC3339),
 		RoleAssignments:  roleAssignments,
