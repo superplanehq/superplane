@@ -456,8 +456,8 @@ export function GroupMembersPage() {
                             Active
                           </span>
                           :
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400">
-                            Inactive
+                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
+                            Pending
                           </span>
                       }
                     </TableCell>

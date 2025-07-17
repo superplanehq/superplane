@@ -96,7 +96,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
           email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
           role: primaryRoleDisplayName,
           roleName: primaryRoleName,
-          status: user.isActive ? 'Active' : 'Inactive',
+          status: user.isActive ? 'Active' : 'Pending',
           lastActive: lastActive,
           initials: initials,
           avatar: user.avatarUrl
