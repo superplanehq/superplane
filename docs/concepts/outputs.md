@@ -44,9 +44,10 @@ spec:
               expression: outputs.VERSION
   executor:
     type: TYPE_SEMAPHORE
+    integration:
+      name: semaphore
     semaphore:
-      projectId: 093f9ecd-ba40-420d-a085-77f2fbf953c1
-      taskId: d76b6eb6-b1cc-40dd-bbf5-0b09980e184e
+      project: my-semaphore-project
       branch: main
       pipelineFile: .semaphore/stage-2.yml
       parameters:

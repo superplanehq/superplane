@@ -36,14 +36,6 @@ func (s *EventSource) UpdateKey(key []byte) error {
 	return database.Conn().Save(s).Error
 }
 
-func (s *EventSource) UpdateScopeAndName(name, scope string) error {
-	now := time.Now()
-	s.Name = name
-	s.Scope = scope
-	s.UpdatedAt = &now
-	return database.Conn().Save(s).Error
-}
-
 func (s *EventSource) GetDecryptedKey(ctx context.Context, encryptor crypto.Encryptor) ([]byte, error) {
 	return s.GetDecryptedKeyInTransaction(ctx, database.Conn(), encryptor)
 }

@@ -33,6 +33,7 @@ services:
       START_EXECUTIONS_POLLER: "yes"
       START_PENDING_EXECUTIONS_WORKER: "yes"
       START_PENDING_FIELD_SETS_WORKER: "yes"
+      START_PENDING_EVENT_SOURCES_WORKER: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_GRPC_GATEWAY: "yes"
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
@@ -40,7 +41,7 @@ services:
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
-      BASE_URL: "http://localhost:8000"
+      BASE_URL: ${BASE_URL}
 
     ports:
       - 80:8000

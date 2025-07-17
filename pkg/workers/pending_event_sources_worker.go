@@ -65,7 +65,6 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error finding integration: %v", err)
 	}
 
-	// TODO: having this as part integrations.Integration.Init() could be the better
 	switch integration.Type {
 	case models.IntegrationTypeSemaphore:
 		return w.processSemaphoreSource(eventSource, integration, resource)

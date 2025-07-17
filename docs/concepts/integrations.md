@@ -106,18 +106,3 @@ spec:
   semaphore:
     project: semaphore-demo-go
 ```
-
-And here's how you can create an event source for a GitHub repository:
-
-```yaml
-apiVersion: v1
-kind: EventSource
-metadata:
-  name: my-repository
-  canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
-spec:
-  integration:
-    name: github-integration
-  github:
-    repository: semaphore-demo-go
-```

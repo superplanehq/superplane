@@ -26,7 +26,7 @@ func (w *ExecutionResourcePoller) Start() error {
 			log.Errorf("Error processing started executions: %v", err)
 		}
 
-		time.Sleep(15 * time.Second)
+		time.Sleep(15 * time.Minute)
 	}
 }
 
