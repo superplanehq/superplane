@@ -1,11 +1,13 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../../components/Button/button'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
+import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { AddMembersSection } from './AddMembersSection'
 
 export function AddMembersPage() {
   const { orgId } = useParams<{ orgId: string }>()
+  const navigate = useNavigate()
 
   if (!orgId) {
     return <div>Error: Organization ID not found</div>
@@ -16,14 +18,20 @@ export function AddMembersPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Link
-              to={`/organization/${orgId}/settings/members`}
-              className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-            >
-              <MaterialSymbol name="arrow_back" size="sm" />
-              <span className="text-sm">Back to Members</span>
-            </Link>
+          <div className="mb-4">
+            <Breadcrumbs
+              items={[
+                { 
+                  label: 'Members', 
+                  onClick: () => navigate(`/organization/${orgId}/settings/members`)
+                },
+                { 
+                  label: 'Add members', 
+                  current: true 
+                }
+              ]}
+              showDivider={false}
+            />
           </div>
 
           <div className="flex items-center justify-between">

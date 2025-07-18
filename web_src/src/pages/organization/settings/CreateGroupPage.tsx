@@ -12,6 +12,7 @@ import {
 } from '../../../components/Dropdown/dropdown'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
+import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import {
   authorizationCreateOrganizationGroup,
   authorizationListRoles
@@ -102,14 +103,20 @@ export function CreateGroupPage() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-2 mb-4">
-            <Link
-              to={`/organization/${orgId}/settings/groups`}
-              className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-            >
-              <MaterialSymbol name="arrow_back" size="sm" />
-              <span className="text-sm">Back to Groups</span>
-            </Link>
+          <div className="mb-4">
+            <Breadcrumbs
+              items={[
+                { 
+                  label: 'Groups', 
+                  onClick: () => navigate(`/organization/${orgId}/settings/groups`)
+                },
+                { 
+                  label: 'Create new group', 
+                  current: true 
+                }
+              ]}
+              showDivider={false}
+            />
           </div>
 
           <div className="text-left">

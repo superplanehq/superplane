@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUserStore } from '../../../stores/userStore';
 import { Avatar } from '../../../components/Avatar/avatar';
 import { Text } from '../../../components/Text/text';
@@ -52,7 +51,7 @@ export function ProfileSettings() {
       <Heading level={1} className="text-2xl font-semibold text-zinc-900 dark:text-white mb-6">
         Profile Settings
       </Heading>
-      
+
       <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-sm border border-zinc-200 dark:border-zinc-700 p-6">
         <div className="space-y-6">
           {/* User Avatar and Basic Info */}
@@ -83,7 +82,7 @@ export function ProfileSettings() {
                 {user.id}
               </Text>
             </div>
-            
+
             <div>
               <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
                 Member Since
@@ -122,27 +121,6 @@ export function ProfileSettings() {
                 </Text>
               </div>
             )}
-          </div>
-
-          {/* Security Info */}
-          <div className="border-t border-zinc-200 dark:border-zinc-700 pt-6">
-            <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-              Security
-            </Text>
-            <div className="space-y-2">
-              <div className="flex items-center space-x-3">
-                <MaterialSymbol name="verified" className="text-green-500" />
-                <Text className="text-sm text-zinc-900 dark:text-white">
-                  Account verified
-                </Text>
-              </div>
-              <div className="flex items-center space-x-3">
-                <MaterialSymbol name="lock" className="text-zinc-500 dark:text-zinc-400" />
-                <Text className="text-sm text-zinc-900 dark:text-white">
-                  Two-factor authentication not enabled
-                </Text>
-              </div>
-            </div>
           </div>
         </div>
       </div>

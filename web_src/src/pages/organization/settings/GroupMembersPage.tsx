@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Heading, Subheading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
 import { Input, InputGroup } from '../../../components/Input/input'
+import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import {
   Dropdown,
   DropdownButton,
@@ -35,6 +36,7 @@ import { AuthorizationGroup, AuthorizationUser, AuthorizationRole } from '../../
 export function GroupMembersPage() {
   const { orgId, groupName: encodedGroupName } = useParams<{ orgId: string; groupName: string }>()
   const groupName = encodedGroupName ? decodeURIComponent(encodedGroupName) : undefined
+  const navigate = useNavigate()
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null)
   const [group, setGroup] = useState<AuthorizationGroup | null>(null)
   const [members, setMembers] = useState<AuthorizationUser[]>([])
@@ -137,7 +139,7 @@ export function GroupMembersPage() {
   }, [orgId, groupName])
 
   const handleBackToGroups = () => {
-    window.history.back()
+    navigate(`/organization/${orgId}/settings/groups`)
   }
 
   const handleEditGroupName = () => {
@@ -348,14 +350,20 @@ export function GroupMembersPage() {
   if (error && !group) {
     return (
       <div className="space-y-6 pt-6">
-        <div className="flex items-center gap-2 mb-4">
-          <button
-            onClick={handleBackToGroups}
-            className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-          >
-            <MaterialSymbol name="arrow_back" size="sm" />
-            <span className="text-sm">Back to Groups</span>
-          </button>
+        <div className="mb-4">
+          <Breadcrumbs
+            items={[
+              { 
+                label: 'Groups', 
+                onClick: handleBackToGroups
+              },
+              { 
+                label: 'Group', 
+                current: true 
+              }
+            ]}
+            showDivider={false}
+          />
         </div>
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
           <p>{error}</p>
@@ -366,15 +374,21 @@ export function GroupMembersPage() {
 
   return (
     <div className="space-y-6 pt-6">
-      {/* Back navigation */}
-      <div className="flex items-center gap-2 mb-4">
-        <button
-          onClick={handleBackToGroups}
-          className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors"
-        >
-          <MaterialSymbol name="arrow_back" size="sm" />
-          <span className="text-sm">Back to Groups</span>
-        </button>
+      {/* Breadcrumbs navigation */}
+      <div className="mb-4">
+        <Breadcrumbs
+          items={[
+            { 
+              label: 'Groups', 
+              onClick: handleBackToGroups
+            },
+            { 
+              label: group?.displayName || groupName || 'Group', 
+              current: true 
+            }
+          ]}
+          showDivider={false}
+        />
       </div>
 
       <div className="bg-zinc-100 dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 space-y-6">
