@@ -58,9 +58,7 @@ func (s *EventSource) UpdateState(state string) error {
 }
 
 func (s *EventSource) UpdateStateInTransaction(tx *gorm.DB, state string) error {
-	now := time.Now()
 	s.State = state
-	s.UpdatedAt = &now
 	return tx.Save(s).Error
 }
 

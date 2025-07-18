@@ -47,10 +47,6 @@ type IntegrationOIDC struct {
 }
 
 func CreateIntegration(integration *Integration) (*Integration, error) {
-	now := time.Now()
-	integration.CreatedAt = &now
-	integration.UpdatedAt = &now
-
 	err := database.Conn().
 		Clauses(clause.Returning{}).
 		Create(&integration).
