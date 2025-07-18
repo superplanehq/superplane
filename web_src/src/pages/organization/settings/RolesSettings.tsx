@@ -21,7 +21,6 @@ import {
 } from '../../../components/Table/table'
 import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
 import { AuthorizationRole } from '../../../api-client/types.gen'
-import { capitalizeFirstLetter } from '@/utils/text'
 
 interface RolesSettingsProps {
   organizationId: string
@@ -211,7 +210,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                     return (
                       <TableRow key={role.name || index}>
                         <TableCell className="font-semibold">
-                          {role.displayName || capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}
+                          {role.displayName || role.name}
                         </TableCell>
                         <TableCell>{role.permissions?.length || 0}</TableCell>
                         <TableCell>

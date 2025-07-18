@@ -23,7 +23,6 @@ import {
   useAssignRole,
   useAddUserToGroup
 } from '../../../hooks/useOrganizationData'
-import { capitalizeFirstLetter } from '../../../utils/text'
 import Papa from 'papaparse'
 
 interface AddMembersSectionProps {
@@ -332,14 +331,14 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               {showRoleSelection && !groupName && (
                 <Dropdown>
                   <DropdownButton outline className="flex items-center gap-2 text-sm">
-                    {emailRole ? capitalizeFirstLetter(emailRole.split('_').at(-1) || '') : 'Select Role'}
+                    {emailRole ? roles.find(r => r.name === emailRole)?.displayName || emailRole : 'Select Role'}
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
                     {roles.map((role) => (
                       <DropdownItem key={role.name} onClick={() => setEmailRole(role.name || '')}>
-                        <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
-                        <DropdownDescription>{role.permissions?.length || 0} permissions</DropdownDescription>
+                        <DropdownLabel>{role.displayName}</DropdownLabel>
+                        <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
                       </DropdownItem>
                     ))}
                   </DropdownMenu>
@@ -494,14 +493,14 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 </Label>
                 <Dropdown>
                   <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                    {bulkUserRole ? capitalizeFirstLetter(bulkUserRole.split('_').at(-1) || '') : 'Select Role'}
+                    {bulkUserRole ? roles.find(r => r.name === bulkUserRole)?.displayName || bulkUserRole : 'Select Role'}
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
                     {roles.map((role) => (
                       <DropdownItem key={role.name} onClick={() => setBulkUserRole(role.name || '')}>
-                        <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
-                        <DropdownDescription>{role.permissions?.length || 0} permissions</DropdownDescription>
+                        <DropdownLabel>{role.displayName}</DropdownLabel>
+                        <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
                       </DropdownItem>
                     ))}
                   </DropdownMenu>

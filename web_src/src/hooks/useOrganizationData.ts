@@ -7,6 +7,7 @@ import {
   authorizationGetOrganizationGroupUsers,
   authorizationAssignRole,
   authorizationRemoveRole,
+  authorizationCreateOrganizationGroup,
   authorizationUpdateOrganizationGroup,
   authorizationDeleteOrganizationGroup,
   authorizationAddUserToOrganizationGroup,
@@ -184,6 +185,34 @@ export const useRemoveRole = (organizationId: string) => {
     onSuccess: () => {
       // Invalidate and refetch organization users
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
+    }
+  })
+}
+
+export const useCreateGroup = (organizationId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: { 
+      organizationId: string, 
+      groupName: string, 
+      displayName?: string,
+      description?: string,
+      role?: string 
+    }) => {
+      return await authorizationCreateOrganizationGroup({
+        body: {
+          organizationId: params.organizationId,
+          groupName: params.groupName,
+          displayName: params.displayName,
+          description: params.description,
+          role: params.role
+        }
+      })
+    },
+    onSuccess: () => {
+      // Invalidate and refetch groups
+      queryClient.invalidateQueries({ queryKey: organizationKeys.groups(organizationId) })
     }
   })
 }

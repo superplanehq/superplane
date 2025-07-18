@@ -13,13 +13,8 @@ import {
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Text } from '../../../components/Text/text'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
-import {
-  authorizationCreateOrganizationGroup,
-  authorizationListRoles
-} from '../../../api-client/sdk.gen'
-import { AuthorizationRole } from '../../../api-client/types.gen'
+import { useCreateGroup, useOrganizationRoles } from '../../../hooks/useOrganizationData'
 import { Heading } from '@/components/Heading/heading'
-import { capitalizeFirstLetter } from '@/utils/text'
 
 export function CreateGroupPage() {
   const { orgId } = useParams<{ orgId: string }>()
@@ -28,36 +23,17 @@ export function CreateGroupPage() {
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
-  const [roles, setRoles] = useState<AuthorizationRole[]>([])
   const [isCreating, setIsCreating] = useState(false)
-  const [loadingRoles, setLoadingRoles] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(orgId || '')
+  const createGroupMutation = useCreateGroup(orgId || '')
+
   useEffect(() => {
-    const fetchRoles = async () => {
-      if (!orgId) return
-
-      try {
-        setLoadingRoles(true)
-        setError(null)
-        const response = await authorizationListRoles({
-          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: orgId }
-        })
-        if (response.data?.roles) {
-          setRoles(response.data.roles)
-          if (response.data.roles.length > 0) {
-            setSelectedRole(response.data.roles[0].name || '')
-          }
-        }
-      } catch (err) {
-        setError('Failed to fetch roles')
-      } finally {
-        setLoadingRoles(false)
-      }
+    if (roles.length > 0 && !selectedRole) {
+      setSelectedRole(roles[0].name || '')
     }
-
-    fetchRoles()
-  }, [orgId])
+  }, [roles, selectedRole])
 
   const handleCreateGroup = async () => {
     if (!groupName.trim() || !selectedRole || !orgId) return
@@ -66,18 +42,16 @@ export function CreateGroupPage() {
     setError(null)
 
     try {
-      await authorizationCreateOrganizationGroup({
-        body: {
-          organizationId: orgId,
-          groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, '_'),
-          role: selectedRole,
-          displayName: groupName,
-          description: groupDescription
-        }
+      await createGroupMutation.mutateAsync({
+        organizationId: orgId,
+        groupName: groupName.trim().toLocaleLowerCase().replace(/\s+/g, '_'),
+        role: selectedRole,
+        displayName: groupName,
+        description: groupDescription
       })
 
       navigate(`/organization/${orgId}/settings/groups`)
-    } catch (err) {
+    } catch {
       setError('Failed to create group. Please try again.')
     } finally {
       setIsCreating(false)
@@ -103,13 +77,13 @@ export function CreateGroupPage() {
           <div className="mb-4">
             <Breadcrumbs
               items={[
-                { 
-                  label: 'Groups', 
+                {
+                  label: 'Groups',
                   onClick: () => navigate(`/organization/${orgId}/settings/groups`)
                 },
-                { 
-                  label: 'Create new group', 
-                  current: true 
+                {
+                  label: 'Create new group',
+                  current: true
                 }
               ]}
               showDivider={false}
@@ -198,15 +172,15 @@ export function CreateGroupPage() {
                 ) : (
                   <Dropdown>
                     <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                      {capitalizeFirstLetter(selectedRole.split('_').at(-1) || '') || 'Select Role'}
+                      {roles.find(r => r.name === selectedRole)?.displayName || 'Select Role'}
                       <MaterialSymbol name="keyboard_arrow_down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (
                         <DropdownItem key={role.name} onClick={() => setSelectedRole(role.name || '')}>
-                          <DropdownLabel >{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
+                          <DropdownLabel >{role.displayName}</DropdownLabel>
                           <DropdownDescription>
-                            {'No description available'}
+                            {role.description || 'No description available'}
                           </DropdownDescription>
                         </DropdownItem>
                       ))}

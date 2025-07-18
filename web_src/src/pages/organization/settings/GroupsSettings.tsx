@@ -23,7 +23,6 @@ import {
   TableCell
 } from '../../../components/Table/table'
 import { useOrganizationGroups, useOrganizationRoles, useUpdateGroup, useDeleteGroup } from '../../../hooks/useOrganizationData'
-import { capitalizeFirstLetter } from '@/utils/text'
 import debounce from 'lodash.debounce'
 
 // Utility function to format relative time
@@ -298,7 +297,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                             {updateGroupMutation.isPending ? (
                               'Updating...'
                             ) : (
-                              capitalizeFirstLetter(group.role?.split('_').at(-1) || '') || 'Select Role'
+                              roles.find(r => r.name === group.role)?.displayName || 'Select Role'
                             )}
                             <MaterialSymbol name="keyboard_arrow_down" />
                           </DropdownButton>
@@ -308,7 +307,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                                 key={role.name}
                                 onClick={() => handleRoleUpdate(group.name!, role.name!)}
                               >
-                                <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
+                                <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
                                 <DropdownDescription>
                                   {role.description || 'No description available'}
                                 </DropdownDescription>
