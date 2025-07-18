@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Button } from '../Button/button'
 import { Input } from '../Input/input'
@@ -105,18 +105,34 @@ export function WorkflowNodeAccordion({
   }, [data.title, data.description])
 
   // Helper function to mark a section as modified
-  const markSectionModified = (sectionId: string) => {
+  const markSectionModified = useCallback((sectionId: string) => {
     setModifiedSections(prev => new Set([...prev, sectionId]));
-  }
+  }, []);
 
   // Helper function to clear modified status for a section
-  const clearSectionModified = (sectionId: string) => {
+  const clearSectionModified = useCallback((sectionId: string) => {
     setModifiedSections(prev => {
       const newSet = new Set(prev);
       newSet.delete(sectionId);
       return newSet;
     });
-  }
+  }, []);
+
+  // Track connections changes from external sources (like modal saves)
+  const prevConnectionsRef = useRef<number>(data.yamlConfig?.spec?.connections?.length || 0);
+  
+  useEffect(() => {
+    const currentConnectionsCount = data.yamlConfig?.spec?.connections?.length || 0;
+    const prevConnectionsCount = prevConnectionsRef.current;
+    
+    // If connections were added externally, mark section as modified
+    if (currentConnectionsCount > prevConnectionsCount) {
+      markSectionModified('connections');
+    }
+    
+    // Update the reference
+    prevConnectionsRef.current = currentConnectionsCount;
+  }, [data.yamlConfig?.spec?.connections, markSectionModified])
 
   // Component to render the orange modification indicator
   const ModificationIndicator = ({ sectionId }: { sectionId: string }) => {
