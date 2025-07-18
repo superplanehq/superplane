@@ -157,12 +157,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           }
         }
 
-        console.log('Successfully processed bulk upload:', {
-          fileName: uploadFile.name,
-          emails: emailsToAdd,
-          role: roleToAssign,
-          count: emailsToAdd.length
-        })
 
         setUploadFile(null)
         const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
@@ -170,8 +164,8 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         setAddMembersTab('emails')
 
         onMemberAdded?.()
-      } catch (err) {
-        console.error('Error processing bulk upload:', err)
+      } catch {
+        console.error('Failed to add members by file')
       }
     }
 
@@ -209,19 +203,14 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           }
         }
 
-        console.log('Successfully added members by email:', {
-          emails,
-          role: roleToAssign,
-          count: emails.length
-        })
 
         setEmailsInput('')
         const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
         setEmailRole(defaultRole)
 
         onMemberAdded?.()
-      } catch (err) {
-        console.error('Error adding members by email:', err)
+      } catch {
+        console.error('Failed to add members by email')
       }
     }
 
@@ -256,17 +245,13 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           }
         }
 
-        console.log('Successfully added existing members:', {
-          members: selectedUsers.map(m => ({ userId: m.userId, email: m.email })),
-          count: selectedUsers.length
-        })
 
         setSelectedMembers(new Set())
         setMemberSearchTerm('')
 
         onMemberAdded?.()
-      } catch (err) {
-        console.error('Error adding existing members:', err)
+      } catch {
+        console.error('Failed to add existing members')
       }
     }
 

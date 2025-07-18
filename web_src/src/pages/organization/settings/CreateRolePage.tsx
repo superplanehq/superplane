@@ -162,7 +162,6 @@ export function CreateRolePage() {
           displayName: roleName.trim(),
           description: roleDescription.trim() || undefined
         })
-        console.log('Successfully updated role:', roleName)
       } else {
         // Create new role
         await createRoleMutation.mutateAsync({
@@ -173,12 +172,11 @@ export function CreateRolePage() {
           displayName: roleName.trim(),
           description: roleDescription.trim() || undefined
         })
-        console.log('Successfully created role:', roleName)
       }
 
       navigate(`/organization/${orgId}/settings/roles`)
-    } catch (err) {
-      console.error(`Error ${isEditMode ? 'updating' : 'creating'} role:`, err)
+    } catch {
+      console.error('Failed to create role')
     }
   }
 
@@ -330,7 +328,6 @@ export function CreateRolePage() {
                                   } else {
                                     newSet.delete(permission.id)
                                   }
-                                  console.log('Checkbox onChange triggered, updated set:', newSet)
                                   return newSet
                                 })
                               }}

@@ -72,7 +72,6 @@ export function Checkbox({
           ]
         ])}
         onClick={() => {
-          console.log('Span clicked, current checked:', checked)
           onChange?.(!checked)
         }}
       >
@@ -81,7 +80,6 @@ export function Checkbox({
           type="checkbox"
           checked={checked}
           onChange={(e) => {
-            console.log('Checkbox input onChange triggered:', e.target.checked)
             onChange?.(e.target.checked)
           }}
           className="absolute inset-0 opacity-0 cursor-pointer z-10"

@@ -63,14 +63,14 @@ const Navigation: React.FC = () => {
 
               {/* User Actions */}
               <DropdownSection>
-                <DropdownItem onClick={() => console.log('Profile')}>
+                <DropdownItem onClick={() => {}}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="person" data-slot="icon" size='sm' />
                     <DropdownLabel>Your Profile</DropdownLabel>
                   </span>
                 </DropdownItem>
 
-                <DropdownItem onClick={() => console.log('Settings')}>
+                <DropdownItem onClick={() => {}}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="settings" data-slot="icon" size='sm' />
                     <DropdownLabel>Account Settings</DropdownLabel>
@@ -138,7 +138,7 @@ const Navigation: React.FC = () => {
 
               {/* Sign Out Section */}
               <DropdownSection>
-                <DropdownItem onClick={() => console.log('Sign out')}>
+                <DropdownItem onClick={() => {}}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="logout" data-slot="icon" size='sm' />
                     <DropdownLabel>Sign Out</DropdownLabel>

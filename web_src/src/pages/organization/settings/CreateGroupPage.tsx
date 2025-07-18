@@ -50,7 +50,6 @@ export function CreateGroupPage() {
           }
         }
       } catch (err) {
-        console.error('Error fetching roles:', err)
         setError('Failed to fetch roles')
       } finally {
         setLoadingRoles(false)
@@ -77,10 +76,8 @@ export function CreateGroupPage() {
         }
       })
 
-      console.log('Successfully created group:', groupName)
       navigate(`/organization/${orgId}/settings/groups`)
     } catch (err) {
-      console.error('Error creating group:', err)
       setError('Failed to create group. Please try again.')
     } finally {
       setIsCreating(false)
