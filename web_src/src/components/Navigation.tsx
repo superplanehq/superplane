@@ -38,10 +38,10 @@ const Navigation: React.FC = () => {
     fetchOrganization();
   }, [orgId]);
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-white shadow-sm">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-950 dark:border-zinc-200 shadow-sm">
       <div className="flex items-center justify-between px-2 py-[8px]">
         <Link href="/" className="flex items-center flex-shrink-0 text-decoration-none">
-          <strong className="ml-2 text-xl text-gray-900">SuperPlane</strong>
+          <strong className="ml-2 text-xl text-gray-900 dark:text-white">SuperPlane</strong>
         </Link>
         <div className="flex items-center flex-shrink-0">
 

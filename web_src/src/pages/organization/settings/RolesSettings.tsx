@@ -88,13 +88,13 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
 
   const handleDeleteRole = async (role: AuthorizationRole) => {
     if (!role.name) return
-    
+
     const confirmed = window.confirm(
       `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`
     )
-    
+
     if (!confirmed) return
-    
+
     try {
       setDeletingRole(role.name)
       await authorizationDeleteRole({
@@ -106,7 +106,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
           domainId: organizationId
         }
       })
-      
+
       // Refresh roles list
       await setupRoles()
     } catch (err) {
@@ -128,9 +128,9 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     if (!sortConfig.key) return data
 
     return [...data].sort((a, b) => {
-      let aValue: any
-      let bValue: any
-      
+      let aValue: string | number
+      let bValue: string | number
+
       switch (sortConfig.key) {
         case 'name':
           aValue = (a.displayName || a.name || '').toLowerCase()
@@ -143,7 +143,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
         default:
           return 0
       }
-      
+
       if (aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
       }
@@ -219,7 +219,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
             <Table dense>
               <TableHead>
                 <TableRow>
-                  <TableHeader 
+                  <TableHeader
                     className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                     onClick={() => handleSort('name')}
                   >
@@ -228,7 +228,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                       <MaterialSymbol name={getSortIcon('name')} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader 
+                  <TableHeader
                     className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                     onClick={() => handleSort('permissions')}
                   >
@@ -252,7 +252,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                     const isDefault = isDefaultRole(role.name)
                     return (
                       <TableRow key={role.name || index}>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-semibold">
                           {role.displayName || capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}
                         </TableCell>
                         <TableCell>{role.permissions?.length || 0}</TableCell>
@@ -272,7 +272,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                                     <MaterialSymbol name="edit" />
                                     Edit
                                   </DropdownItem>
-                                  <DropdownItem 
+                                  <DropdownItem
                                     onClick={() => handleDeleteRole(role)}
                                     className="text-red-600 dark:text-red-400"
                                   >

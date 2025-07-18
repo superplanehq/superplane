@@ -117,7 +117,7 @@ export function OrganizationSettings() {
             <SidebarSection>
               <div className='flex items-center gap-3 text-sm font-bold py-3'>
                 <Avatar 
-                  className='w-6 h-6'
+                  className='w-6 h-6 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-white'
                   slot="icon"
                   initials={(organization.metadata?.displayName || organization.metadata?.name || orgId).charAt(0).toUpperCase()}
                   alt={organization.metadata?.displayName || organization.metadata?.name || orgId}
