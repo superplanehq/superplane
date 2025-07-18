@@ -43,12 +43,17 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			return nil, status.Error(codes.Internal, "failed to get group members count")
 		}
 
-		// Get group metadata for timestamps
 		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, req.DomainID)
-		var createdAt, updatedAt string
+		var createdAt, updatedAt, displayName, description string
 		if err == nil {
 			createdAt = groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z")
 			updatedAt = groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z")
+			displayName = groupMetadata.DisplayName
+			description = groupMetadata.Description
+		} else {
+			// Use fallback values when metadata is not found
+			displayName = groupName
+			description = ""
 		}
 
 		groups[i] = &pb.Group{
@@ -56,8 +61,8 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			DomainType:   req.DomainType,
 			DomainId:     req.DomainID,
 			Role:         role,
-			DisplayName:  groupMetadata.DisplayName,
-			Description:  groupMetadata.Description,
+			DisplayName:  displayName,
+			Description:  description,
 			MembersCount: int32(membersCount),
 			CreatedAt:    createdAt,
 			UpdatedAt:    updatedAt,

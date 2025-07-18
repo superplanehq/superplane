@@ -50,8 +50,16 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 	}
 
 	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainID)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get group metadata")
+	var displayName, description, createdAt, updatedAt string
+	if err == nil {
+		displayName = groupMetadata.DisplayName
+		description = groupMetadata.Description
+		createdAt = groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z")
+		updatedAt = groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z")
+	} else {
+		// Use fallback values when metadata is not found
+		displayName = req.GroupName
+		description = ""
 	}
 
 	membersCount, err := authService.GetGroupMembersCount(req.DomainID, domainType, req.GroupName)
@@ -64,11 +72,11 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 		DomainType:   req.DomainType,
 		DomainId:     req.DomainID,
 		Role:         role,
-		DisplayName:  groupMetadata.DisplayName,
-		Description:  groupMetadata.Description,
+		DisplayName:  displayName,
+		Description:  description,
 		MembersCount: int32(membersCount),
-		CreatedAt:    groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:    groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
 	}
 
 	return &GetGroupResponse{

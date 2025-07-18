@@ -204,6 +204,23 @@ CREATE TABLE public.events (
 
 
 --
+-- Name: execution_resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.execution_resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    external_id character varying(128) NOT NULL,
+    stage_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    parent_resource_id uuid NOT NULL,
+    state character varying(64) NOT NULL,
+    result character varying(64) NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -216,6 +233,26 @@ CREATE TABLE public.group_metadata (
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: integrations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.integrations (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(128) NOT NULL,
+    domain_type character varying(64) NOT NULL,
+    domain_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    created_by uuid NOT NULL,
+    updated_at timestamp without time zone,
+    type character varying(64) NOT NULL,
+    url character varying(256) NOT NULL,
+    auth_type character varying(64) NOT NULL,
+    auth jsonb DEFAULT '{}'::jsonb NOT NULL,
+    oidc jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -236,6 +273,21 @@ CREATE TABLE public.organizations (
 
 
 --
+-- Name: resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    external_id character varying(128) NOT NULL,
+    type character varying(64) NOT NULL,
+    name character varying(128) NOT NULL,
+    integration_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone
+);
+
+
+--
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -248,21 +300,6 @@ CREATE TABLE public.role_metadata (
     description text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
-);
-
-
---
--- Name: resources; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.resources (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    external_id character varying(128) NOT NULL,
-    type character varying(64) NOT NULL,
-    name character varying(128) NOT NULL,
-    integration_id uuid NOT NULL,
-    created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone
 );
 
 
@@ -514,11 +551,35 @@ ALTER TABLE ONLY public.events
 
 
 --
+-- Name: execution_resources execution_resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.group_metadata
     ADD CONSTRAINT group_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: integrations integrations_domain_type_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integrations
+    ADD CONSTRAINT integrations_domain_type_domain_id_name_key UNIQUE (domain_type, domain_id, name);
+
+
+--
+-- Name: integrations integrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.integrations
+    ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
 
 
 --
@@ -535,6 +596,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.organizations
     ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resources
+    ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
 
 
 --
