@@ -33,8 +33,6 @@ export interface WorkflowNodeAccordionProps extends Omit<WorkflowNodeProps, 'tab
   multiple?: boolean
   partialSave?: boolean
   saveGranular?: boolean
-  modalEdit?: boolean
-  onConnectionModalOpen?: () => void
   onSelect?: () => void
   nodes?: any[]
   totalNodesCount?: number
@@ -49,8 +47,6 @@ export function WorkflowNodeAccordion({
   multiple = true,
   partialSave = false,
   saveGranular = false,
-  modalEdit = false,
-  onConnectionModalOpen,
   onUpdate,
   onDelete,
   onEdit,
@@ -996,13 +992,8 @@ export function WorkflowNodeAccordion({
               <Link
                 href='#'
                 onClick={() => {
-                  if (modalEdit && onConnectionModalOpen) {
-                    // Show modal for editing connection
-                    onConnectionModalOpen();
-                  } else {
-                    // Use existing inline behavior
-                    handleAddConnection();
-                  }
+                  // Use inline behavior to add connection
+                  handleAddConnection();
                 }}
                 className="text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 flex items-center !text-xs"
               >

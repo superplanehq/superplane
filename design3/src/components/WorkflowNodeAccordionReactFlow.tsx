@@ -11,8 +11,6 @@ export interface WorkflowNodeAccordionReactFlowData {
   multiple?: boolean
   partialSave?: boolean
   saveGranular?: boolean
-  modalEdit?: boolean
-  onConnectionModalOpen?: () => void
   onUpdate?: (data: Partial<WorkflowNodeData>) => void
   onDelete?: () => void
   onEdit?: () => void
@@ -36,8 +34,6 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
     multiple = true,
     partialSave = false,
     saveGranular = false,
-    modalEdit = false,
-    onConnectionModalOpen,
     onUpdate,
     onDelete,
     onEdit,
@@ -48,12 +44,6 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
     totalNodesCount = 0,
     savedConnectionIndices = []
   } = data as unknown as WorkflowNodeAccordionReactFlowData
-  
-  console.log('WorkflowNodeAccordionReactFlow received nodes:', nodes);
-  console.log('WorkflowNodeAccordionReactFlow received totalNodesCount:', totalNodesCount);
-  console.log('WorkflowNodeAccordionReactFlow received modalEdit:', modalEdit);
-  console.log('WorkflowNodeAccordionReactFlow full data:', data);
-  console.log('Data keys:', Object.keys(data));
 
   const handleUpdate = (updates: Partial<WorkflowNodeData>) => {
     onUpdate?.(updates)
@@ -96,8 +86,6 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
         multiple={multiple}
         partialSave={partialSave}
         saveGranular={saveGranular}
-        modalEdit={modalEdit}
-        onConnectionModalOpen={onConnectionModalOpen}
         className={selected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
