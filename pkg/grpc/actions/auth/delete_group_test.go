@@ -48,6 +48,11 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		users, err = authService.GetGroupUsers(orgID, authorization.DomainOrg, "test-group")
 		require.NoError(t, err)
 		assert.Empty(t, users)
+
+		// Verify the group no longer exists in the groups list
+		groups, err = authService.GetGroups(orgID, authorization.DomainOrg)
+		require.NoError(t, err)
+		assert.NotContains(t, groups, "test-group")
 	})
 
 	t.Run("delete non-existent group", func(t *testing.T) {
@@ -121,6 +126,11 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 		users, err = authService.GetGroupUsers(canvasID, authorization.DomainCanvas, "canvas-group")
 		require.NoError(t, err)
 		assert.Empty(t, users)
+
+		// Verify the group no longer exists in the groups list
+		groups, err = authService.GetGroups(canvasID, authorization.DomainCanvas)
+		require.NoError(t, err)
+		assert.NotContains(t, groups, "canvas-group")
 	})
 
 	t.Run("delete non-existent canvas group", func(t *testing.T) {

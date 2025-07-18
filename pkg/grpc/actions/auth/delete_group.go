@@ -55,6 +55,13 @@ func DeleteOrganizationGroup(ctx context.Context, req *pb.DeleteOrganizationGrou
 			return nil, status.Error(codes.Internal, "failed to remove users from group")
 		}
 	}
+
+	err = authService.DeleteGroup(req.OrganizationId, domainType, req.GroupName)
+	if err != nil {
+		log.Errorf("failed to delete group %s: %v", req.GroupName, err)
+		return nil, status.Error(codes.Internal, "failed to delete group")
+	}
+
 	err = models.DeleteGroupMetadata(req.GroupName, domainType, req.OrganizationId)
 	if err != nil {
 		log.Errorf("failed to delete group metadata for %s: %v", req.GroupName, err)
@@ -113,6 +120,13 @@ func DeleteCanvasGroup(ctx context.Context, req *pb.DeleteCanvasGroupRequest, au
 			return nil, status.Error(codes.Internal, "failed to remove users from group")
 		}
 	}
+
+	err = authService.DeleteGroup(canvasID, domainType, req.GroupName)
+	if err != nil {
+		log.Errorf("failed to delete group %s: %v", req.GroupName, err)
+		return nil, status.Error(codes.Internal, "failed to delete group")
+	}
+
 	err = models.DeleteGroupMetadata(req.GroupName, domainType, canvasID)
 	if err != nil {
 		log.Errorf("failed to delete group metadata for %s: %v", req.GroupName, err)

@@ -137,6 +137,27 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 	return nil
 }
 
+// DeleteGroup removes a group from the authorization system
+func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName string) error {
+	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+
+	// Remove group-to-role assignment (the group itself)
+	_, err := a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove group role assignment: %w", err)
+	}
+
+	// Remove all user-to-group assignments for this group
+	_, err = a.enforcer.RemoveFilteredGroupingPolicy(1, prefixedGroupName, domain)
+	if err != nil {
+		return fmt.Errorf("failed to remove users from group: %w", err)
+	}
+
+	log.Infof("Deleted group %s from %s %s", groupName, domainType, domainID)
+	return nil
+}
+
 func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupName string, newRole string) error {
 	validRoles := map[string][]string{
 		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},

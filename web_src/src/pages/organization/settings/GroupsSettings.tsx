@@ -24,7 +24,9 @@ import {
 } from '../../../components/Table/table'
 import {
   authorizationListOrganizationGroups,
-  authorizationListRoles
+  authorizationListRoles,
+  authorizationUpdateOrganizationGroup,
+  authorizationDeleteOrganizationGroup
 } from '../../../api-client/sdk.gen'
 import { AuthorizationGroup, AuthorizationRole } from '../../../api-client/types.gen'
 import { capitalizeFirstLetter } from '@/utils/text'
@@ -41,6 +43,15 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
   const [loadingGroups, setLoadingGroups] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [updatingGroupRoles, setUpdatingGroupRoles] = useState<Set<string>>(new Set())
+  const [deletingGroups, setDeletingGroups] = useState<Set<string>>(new Set())
+  const [sortConfig, setSortConfig] = useState<{
+    key: string | null
+    direction: 'asc' | 'desc'
+  }>({
+    key: null,
+    direction: 'asc'
+  })
 
   const setDebouncedSearch = debounce(setSearch, 300)
 
@@ -89,12 +100,120 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
     navigate(`/organization/${organizationId}/settings/create-group`)
   }
 
-  const filteredGroups = useMemo(() => groups.filter((group) => {
-    if (search === '') {
-      return true
+  const handleViewMembers = (groupName: string) => {
+    navigate(`/organization/${organizationId}/settings/groups/${groupName}/members`)
+  }
+
+  const handleDeleteGroup = async (groupName: string) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the group "${groupName}"? This action cannot be undone.`
+    )
+    
+    if (!confirmed) return
+    
+    try {
+      setError(null)
+      setDeletingGroups(prev => new Set(prev).add(groupName))
+      
+      await authorizationDeleteOrganizationGroup({
+        path: { groupName },
+        query: { organizationId }
+      })
+      
+      // Remove the group from local state
+      setGroups(prev => prev.filter(group => group.name !== groupName))
+    } catch (err) {
+      console.error('Error deleting group:', err)
+      setError(`Failed to delete group "${groupName}": ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setDeletingGroups(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(groupName)
+        return newSet
+      })
     }
-    return group.name?.toLowerCase().includes(search.toLowerCase())
-  }), [groups, search])
+  }
+
+  const handleRoleUpdate = async (groupName: string, newRoleName: string) => {
+    try {
+      setError(null)
+      setUpdatingGroupRoles(prev => new Set(prev).add(groupName))
+      
+      await authorizationUpdateOrganizationGroup({
+        path: { groupName },
+        body: {
+          organizationId,
+          role: newRoleName
+        }
+      })
+
+      // Update the group's role in the local state
+      setGroups(prev => prev.map(group => 
+        group.name === groupName ? { ...group, role: newRoleName } : group
+      ))
+    } catch (err) {
+      console.error('Error updating group role:', err)
+      setError(`Failed to update role for group "${groupName}": ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      setUpdatingGroupRoles(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(groupName)
+        return newSet
+      })
+    }
+  }
+
+  const handleSort = (key: string) => {
+    setSortConfig(prevConfig => ({
+      key,
+      direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+
+  const getSortIcon = (columnKey: string) => {
+    if (sortConfig.key !== columnKey) {
+      return 'unfold_more'
+    }
+    return sortConfig.direction === 'asc' ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
+  }
+
+  const filteredAndSortedGroups = useMemo(() => {
+    const filtered = groups.filter((group) => {
+      if (search === '') {
+        return true
+      }
+      return group.name?.toLowerCase().includes(search.toLowerCase())
+    })
+    
+    if (!sortConfig.key) return filtered
+
+    return [...filtered].sort((a, b) => {
+      let aValue: any
+      let bValue: any
+      
+      switch (sortConfig.key) {
+        case 'name':
+          aValue = (a.name || '').toLowerCase()
+          bValue = (b.name || '').toLowerCase()
+          break
+        case 'role':
+          aValue = (a.role || '').toLowerCase()
+          bValue = (b.role || '').toLowerCase()
+          break
+        default:
+          return 0
+      }
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === 'asc' ? -1 : 1
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === 'asc' ? 1 : -1
+      }
+      return 0
+    })
+  }, [groups, search, sortConfig])
 
   return (
     <div className="space-y-6 pt-6">
@@ -133,20 +252,36 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
             <Table dense>
               <TableHead>
                 <TableRow>
-                  <TableHeader>Team name</TableHeader>
-                  <TableHeader>Role</TableHeader>
+                  <TableHeader 
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Team name
+                      <MaterialSymbol name={getSortIcon('name')} size="sm" className="text-zinc-400" />
+                    </div>
+                  </TableHeader>
+                  <TableHeader 
+                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
+                    onClick={() => handleSort('role')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Role
+                      <MaterialSymbol name={getSortIcon('role')} size="sm" className="text-zinc-400" />
+                    </div>
+                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredGroups.length === 0 ? (
+                {filteredAndSortedGroups.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-zinc-500 dark:text-zinc-400">
                       No groups found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredGroups.map((group, index) => (
+                  filteredAndSortedGroups.map((group, index) => (
                     <TableRow key={index}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -168,16 +303,27 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                       </TableCell>
                       <TableCell>
                         <Dropdown>
-                          <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                            {capitalizeFirstLetter(group.role?.split('_').at(-1) || '') || 'Select Role'}
+                          <DropdownButton 
+                            outline 
+                            className="flex items-center gap-2 text-sm justify-between"
+                            disabled={updatingGroupRoles.has(group.name!)}
+                          >
+                            {updatingGroupRoles.has(group.name!) ? (
+                              'Updating...'
+                            ) : (
+                              capitalizeFirstLetter(group.role?.split('_').at(-1) || '') || 'Select Role'
+                            )}
                             <MaterialSymbol name="keyboard_arrow_down" />
                           </DropdownButton>
                           <DropdownMenu>
                             {roles.map((role) => (
-                              <DropdownItem key={role.name} onClick={() => { }}>
+                              <DropdownItem 
+                                key={role.name} 
+                                onClick={() => handleRoleUpdate(group.name!, role.name!)}
+                              >
                                 <DropdownLabel>{capitalizeFirstLetter(role.name?.split('_').at(-1) || '')}</DropdownLabel>
                                 <DropdownDescription>
-                                  {'No description available'}
+                                  {role.description || 'No description available'}
                                 </DropdownDescription>
                               </DropdownItem>
                             ))}
@@ -187,21 +333,23 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                       <TableCell>
                         <div className="flex justify-end">
                           <Dropdown>
-                            <DropdownButton plain>
+                            <DropdownButton 
+                              plain
+                              disabled={deletingGroups.has(group.name!)}
+                            >
                               <MaterialSymbol name="more_vert" size="sm" />
                             </DropdownButton>
                             <DropdownMenu>
-                              <DropdownItem>
+                              <DropdownItem onClick={() => handleViewMembers(group.name!)}>
                                 <MaterialSymbol name="group" />
                                 View Members
                               </DropdownItem>
-                              <DropdownItem>
-                                <MaterialSymbol name="edit" />
-                                Edit Group
-                              </DropdownItem>
-                              <DropdownItem>
+                              <DropdownItem 
+                                onClick={() => handleDeleteGroup(group.name!)}
+                                className="text-red-600 dark:text-red-400"
+                              >
                                 <MaterialSymbol name="delete" />
-                                Delete Group
+                                {deletingGroups.has(group.name!) ? 'Deleting...' : 'Delete Group'}
                               </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>

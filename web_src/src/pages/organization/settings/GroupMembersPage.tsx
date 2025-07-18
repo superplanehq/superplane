@@ -25,9 +25,11 @@ import {
 import {
   authorizationGetOrganizationGroup,
   authorizationGetOrganizationGroupUsers,
-  authorizationRemoveUserFromOrganizationGroup
+  authorizationRemoveUserFromOrganizationGroup,
+  authorizationListRoles,
+  authorizationUpdateOrganizationGroup
 } from '../../../api-client/sdk.gen'
-import { AuthorizationGroup, AuthorizationUser } from '../../../api-client/types.gen'
+import { AuthorizationGroup, AuthorizationUser, AuthorizationRole } from '../../../api-client/types.gen'
 
 export function GroupMembersPage() {
   const { orgId, groupName: encodedGroupName } = useParams<{ orgId: string; groupName: string }>()
@@ -36,6 +38,8 @@ export function GroupMembersPage() {
   const [members, setMembers] = useState<AuthorizationUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [roles, setRoles] = useState<AuthorizationRole[]>([])
+  const [loadingRoles, setLoadingRoles] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [isEditingGroupName, setIsEditingGroupName] = useState(false)
   const [isEditingGroupDescription, setIsEditingGroupDescription] = useState(false)
@@ -59,13 +63,20 @@ export function GroupMembersPage() {
 
         console.log('Fetching group data for:', { orgId, groupName })
 
-        // Fetch group details
-        const groupResponse = await authorizationGetOrganizationGroup({
-          path: { groupName },
-          query: { organizationId: orgId }
-        })
-
-        console.log('Group response:', groupResponse)
+        // Fetch group details, members, and roles in parallel
+        const [groupResponse, membersResponse, rolesResponse] = await Promise.all([
+          authorizationGetOrganizationGroup({
+            path: { groupName },
+            query: { organizationId: orgId }
+          }),
+          authorizationGetOrganizationGroupUsers({
+            path: { groupName },
+            query: { organizationId: orgId }
+          }),
+          authorizationListRoles({
+            query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: orgId }
+          })
+        ])
 
         if (groupResponse.data?.group) {
           setGroup(groupResponse.data.group)
@@ -79,29 +90,23 @@ export function GroupMembersPage() {
           })
         }
 
-        // Fetch group members
-        try {
-          const membersResponse = await authorizationGetOrganizationGroupUsers({
-            path: { groupName },
-            query: { organizationId: orgId }
-          })
-
-          console.log('Members response:', membersResponse)
-
-          if (membersResponse.data?.users) {
-            setMembers(membersResponse.data.users)
-          } else {
-            setMembers([])
-          }
-        } catch (membersErr) {
-          console.error('Error fetching group members:', membersErr)
+        if (membersResponse.data?.users) {
+          setMembers(membersResponse.data.users)
+        } else {
           setMembers([])
+        }
+
+        if (rolesResponse.data?.roles) {
+          setRoles(rolesResponse.data.roles)
+        } else {
+          setRoles([])
         }
       } catch (err) {
         console.error('Error fetching group data:', err)
         setError(`Failed to load group data: ${err instanceof Error ? err.message : 'Unknown error'}`)
       } finally {
         setLoading(false)
+        setLoadingRoles(false)
       }
     }
 
@@ -204,6 +209,27 @@ export function GroupMembersPage() {
   const handleMemberAdded = () => {
     // Refresh the members list after adding a new member
     window.location.reload()
+  }
+
+  const handleRoleUpdate = async (newRoleName: string) => {
+    if (!orgId || !group || !groupName) return
+
+    try {
+      setError(null)
+      await authorizationUpdateOrganizationGroup({
+        path: { groupName },
+        body: {
+          organizationId: orgId,
+          role: newRoleName
+        }
+      })
+
+      // Update the group's role in the local state
+      setGroup(prev => prev ? { ...prev, role: newRoleName } : null)
+    } catch (err) {
+      console.error('Error updating group role:', err)
+      setError(`Failed to update group role: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    }
   }
 
   const filteredMembers = members.filter(member =>
@@ -342,19 +368,21 @@ export function GroupMembersPage() {
             <Dropdown>
               <DropdownButton color='white'
                 className="flex items-center gap-2 text-sm"
+                disabled={loadingRoles}
               >
-                {group?.role?.split('_').slice(-1)[0] || 'Member'}
+                {loadingRoles ? 'Loading...' : roles.find(role => role.name === group?.role)?.displayName || 'Member'}
                 <MaterialSymbol name="keyboard_arrow_down" />
               </DropdownButton>
               <DropdownMenu>
-                <DropdownItem>
-                  <DropdownLabel>Admin</DropdownLabel>
-                  <DropdownDescription>Admin role description.</DropdownDescription>
-                </DropdownItem>
-                <DropdownItem>
-                  <DropdownLabel>Member</DropdownLabel>
-                  <DropdownDescription>Member role description.</DropdownDescription>
-                </DropdownItem>
+                {roles.map((role) => (
+                  <DropdownItem
+                    key={role.name}
+                    onClick={() => handleRoleUpdate(role.name!)}
+                  >
+                    <DropdownLabel>{role.displayName}</DropdownLabel>
+                    <DropdownDescription>{role.description}</DropdownDescription>
+                  </DropdownItem>
+                ))}
               </DropdownMenu>
             </Dropdown>
             <Dropdown>
