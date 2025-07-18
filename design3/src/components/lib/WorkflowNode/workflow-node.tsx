@@ -67,6 +67,7 @@ export interface WorkflowNodeData {
 export interface WorkflowNodeProps {
   data: WorkflowNodeData
   variant?: 'read' | 'edit'
+  selected: boolean
   className?: string
   tabs?: Tab[]
   onUpdate?: (data: Partial<WorkflowNodeData>) => void

@@ -82,6 +82,7 @@ export const WorkflowNodeAccordionReactFlow = memo(({ data, selected }: NodeProp
       <WorkflowNodeAccordion
         data={workflowNodeData}
         variant={variant}
+        selected={selected}
         sections={sections}
         multiple={multiple}
         partialSave={partialSave}
