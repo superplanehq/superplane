@@ -1,5 +1,7 @@
 An executor is what the stage calls when the event passes all the conditions and exits the queue. When defining your executor specification, you can use the syntax `${{ inputs.* }}` and `${{ secrets.* }}` to access the inputs and secrets defined in the stage.
 
+Most executors are intended for use with integrations. See [integrations](integrations.md) for more information.
+
 The available executor types are:
 - [HTTP Executor](#http-executor)
 - [Semaphore Executor](#semaphore-executor)
@@ -38,11 +40,11 @@ The Semaphore Executor allows you to trigger Semaphore pipelines when a stage is
 ```yaml
 executor:
   type: TYPE_SEMAPHORE
+  integration:
+    name: semaphore
   semaphore:
-    organizationUrl: https://myorg.semaphoreci.com
-    apiToken: ${{ secrets.API_TOKEN }}
-    projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
-    taskId: fd67cfb1-e06c-4896-a517-c648f878330a
+    project: my-semaphore-project
+    task: my-task
     branch: sxmoon
     pipelineFile: .semaphore/pipeline_3.yml
     parameters:
@@ -50,4 +52,4 @@ executor:
       VERSION_B: ${{ inputs.VERSION_B }}
 ```
 
-If the `taskId` is not specified, the executor will use the [workflows API](https://docs.semaphoreci.com/reference/api#run-workflow) to run a workflow. If the `taskId` is specified, the executor will use the [tasks API](https://docs.semaphoreci.com/reference/api#run-task) to run the task.
+If the `task` is not specified, the executor will use the [workflows API](https://docs.semaphoreci.com/reference/api#run-workflow) to run a workflow. If the `task` is specified, the executor will use the [tasks API](https://docs.semaphoreci.com/reference/api#run-task) to run the task.

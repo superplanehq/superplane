@@ -1,15 +1,12 @@
 package models
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/secrets"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -23,7 +20,7 @@ const (
 )
 
 type Stage struct {
-	ID        uuid.UUID `gorm:"type:uuid;primary_key;"`
+	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	CanvasID  uuid.UUID
 	Name      string
 	CreatedAt *time.Time
@@ -32,7 +29,6 @@ type Stage struct {
 	UpdatedBy uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]
-	ExecutorSpec  datatypes.JSONType[ExecutorSpec]
 	Inputs        datatypes.JSONSlice[InputDefinition]
 	InputMappings datatypes.JSONSlice[InputMapping]
 	Outputs       datatypes.JSONSlice[OutputDefinition]
@@ -70,9 +66,9 @@ type ValueDefinition struct {
 }
 
 type ValueDefinitionFrom struct {
-	EventData     *ValueDefinitionFromEventData     `json:"event_data"`
-	LastExecution *ValueDefinitionFromLastExecution `json:"last_execution"`
-	Secret        *ValueDefinitionFromSecret        `json:"secret"`
+	EventData     *ValueDefinitionFromEventData     `json:"event_data,omitempty"`
+	LastExecution *ValueDefinitionFromLastExecution `json:"last_execution,omitempty"`
+	Secret        *ValueDefinitionFromSecret        `json:"secret,omitempty"`
 }
 
 type ValueDefinitionFromEventData struct {
@@ -190,33 +186,6 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-type ExecutorSpec struct {
-	Type      string                 `json:"type"`
-	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
-	HTTP      *HTTPExecutorSpec      `json:"http,omitempty"`
-}
-
-type SemaphoreExecutorSpec struct {
-	APIToken        string            `json:"api_token"`
-	OrganizationURL string            `json:"organization_url"`
-	ProjectID       string            `json:"project_id"`
-	Branch          string            `json:"branch"`
-	PipelineFile    string            `json:"pipeline_file"`
-	Parameters      map[string]string `json:"parameters"`
-	TaskID          string            `json:"task_id"`
-}
-
-type HTTPExecutorSpec struct {
-	URL            string              `json:"url"`
-	Payload        map[string]string   `json:"payload"`
-	Headers        map[string]string   `json:"headers"`
-	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
-}
-
-type HTTPResponsePolicy struct {
-	StatusCodes []uint32 `json:"status_codes"`
-}
-
 func FindStageByID(id string) (*Stage, error) {
 	return FindStageByIDInTransaction(database.Conn(), id)
 }
@@ -252,6 +221,12 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	return &stage, nil
 }
 
+func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
+	connection.TargetID = s.ID
+	connection.TargetType = ConnectionTargetTypeStage
+	return tx.Create(&connection).Error
+}
+
 func (s *Stage) ApprovalsRequired() int {
 	for _, condition := range s.Conditions {
 		if condition.Type == StageConditionTypeApproval {
@@ -270,6 +245,21 @@ func (s *Stage) HasApprovalCondition() bool {
 	}
 
 	return false
+}
+
+func (s *Stage) GetExecutor() (*StageExecutor, error) {
+	var executor StageExecutor
+
+	err := database.Conn().
+		Where("stage_id = ?", s.ID).
+		First(&executor).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &executor, nil
 }
 
 func (s *Stage) MissingRequiredOutputs(outputs map[string]any) []string {
@@ -347,7 +337,7 @@ func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[stri
 		Select("e.*").
 		Joins("INNER JOIN stage_executions AS ex ON ex.stage_event_id = e.id").
 		Where("e.stage_id = ?", s.ID).
-		Where("ex.state = ?", StageExecutionFinished).
+		Where("ex.state = ?", ExecutionFinished).
 		Where("ex.result IN ?", results).
 		Order("ex.finished_at DESC").
 		Limit(1).
@@ -359,37 +349,6 @@ func (s *Stage) FindLastExecutionInputs(tx *gorm.DB, results []string) (map[stri
 	}
 
 	return event.Inputs.Data(), nil
-}
-
-func (s *Stage) FindSecrets(encryptor crypto.Encryptor) (map[string]string, error) {
-	secretMap := map[string]string{}
-	for _, secretDef := range s.Secrets {
-		secretName := secretDef.ValueFrom.Secret.Name
-		secret, err := FindSecretByName(s.CanvasID.String(), secretName)
-		if err != nil {
-			return nil, fmt.Errorf("error finding secret %s: %v", secretName, err)
-		}
-
-		provider, err := secrets.NewProvider(secret.Provider, secrets.Options{
-			CanvasID:   s.CanvasID,
-			Encryptor:  encryptor,
-			SecretName: secret.Name,
-			SecretData: secret.Data,
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
-		}
-
-		values, err := provider.Get(context.TODO())
-		if err != nil {
-			return nil, fmt.Errorf("error getting secret values for %s: %v", secretName, err)
-		}
-
-		secretMap[secretDef.Name] = values[secretDef.ValueFrom.Secret.Key]
-	}
-
-	return secretMap, nil
 }
 
 func ListStagesByIDs(ids []uuid.UUID) ([]Stage, error) {

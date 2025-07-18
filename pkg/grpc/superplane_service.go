@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/integrations"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/secrets"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
@@ -24,7 +25,7 @@ type SuperplaneService struct {
 func NewSuperplaneService(encryptor crypto.Encryptor, authService authorization.Authorization) *SuperplaneService {
 	return &SuperplaneService{
 		encryptor:            encryptor,
-		specValidator:        executors.SpecValidator{},
+		specValidator:        executors.SpecValidator{Encryptor: encryptor},
 		authorizationService: authService,
 	}
 }
@@ -50,7 +51,7 @@ func (s *SuperplaneService) ResetEventSourceKey(ctx context.Context, req *pb.Res
 }
 
 func (s *SuperplaneService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return stages.CreateStage(ctx, s.specValidator, req)
+	return stages.CreateStage(ctx, s.encryptor, s.specValidator, req)
 }
 
 func (s *SuperplaneService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -58,7 +59,7 @@ func (s *SuperplaneService) DescribeStage(ctx context.Context, req *pb.DescribeS
 }
 
 func (s *SuperplaneService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return stages.UpdateStage(ctx, s.specValidator, req)
+	return stages.UpdateStage(ctx, s.encryptor, s.specValidator, req)
 }
 
 func (s *SuperplaneService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
@@ -119,4 +120,16 @@ func (s *SuperplaneService) ListConnectionGroups(ctx context.Context, req *pb.Li
 
 func (s *SuperplaneService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
 	return groups.ListConnectionGroupFieldSets(ctx, req)
+}
+
+func (s *SuperplaneService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+	return integrations.CreateIntegration(ctx, s.encryptor, req)
+}
+
+func (s *SuperplaneService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
+	return integrations.DescribeIntegration(ctx, req)
+}
+
+func (s *SuperplaneService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
+	return integrations.ListIntegrations(ctx, req)
 }

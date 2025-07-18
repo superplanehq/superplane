@@ -5,12 +5,16 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test__TimeWindowWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
 
 	//
 	// Stage's time window is on week days, 08:00-17:00
@@ -26,14 +30,25 @@ func Test__TimeWindowWorker(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, r.Canvas.CreateStage("stage-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
-		{
-			SourceID:   r.Source.ID,
-			SourceType: models.SourceTypeEventSource,
-		},
-	}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
+	executorType, executorSpec, resource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections([]models.Connection{
+			{
+				SourceID:   r.Source.ID,
+				SourceType: models.SourceTypeEventSource,
+			},
+		}).
+		WithConditions(conditions).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		ForResource(resource).
+		ForIntegration(r.Integration).
+		Create()
 
-	stage, err := r.Canvas.FindStageByName("stage-1")
 	require.NoError(t, err)
 
 	t.Run("event is not in time window -> does nothing", func(t *testing.T) {

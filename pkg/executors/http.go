@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -15,7 +16,7 @@ import (
 const MaxHTTPResponseSize = 8 * 1024
 
 type HTTPExecutor struct {
-	execution models.StageExecution
+	execution *models.StageExecution
 	jwtSigner *jwt.Signer
 }
 
@@ -53,7 +54,7 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	return nil
 }
 
-func NewHTTPExecutor(execution models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
+func NewHTTPExecutor(execution *models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
 	return &HTTPExecutor{
 		execution: execution,
 		jwtSigner: jwtSigner,
@@ -64,7 +65,11 @@ func (e *HTTPExecutor) Name() string {
 	return models.ExecutorSpecTypeHTTP
 }
 
-func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
+func (e *HTTPExecutor) HandleWebhook(data []byte) (Response, error) {
+	return nil, nil
+}
+
+func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, _ integrations.Resource) (Response, error) {
 	payload, err := e.buildPayload(spec.HTTP)
 	if err != nil {
 		return nil, fmt.Errorf("error building parameters: %v", err)
@@ -105,7 +110,7 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec) (Response, error) {
 	}, nil
 }
 
-func (e *HTTPExecutor) Check(spec models.ExecutorSpec, id string) (Response, error) {
+func (e *HTTPExecutor) Check(id string) (Response, error) {
 	return nil, nil
 }
 

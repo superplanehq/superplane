@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -16,26 +17,42 @@ import (
 const ExecutionCreatedRoutingKey = "execution-created"
 
 func Test__PendingStageEventsWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
+
 	w, _ := NewPendingStageEventsWorker(func() time.Time {
 		return time.Now()
 	})
 
 	amqpURL, _ := config.RabbitMQURL()
+	executorType, executorSpec, resource := support.Executor(r)
 
 	t.Run("stage does not require approval -> creates execution", func(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-no-approval-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
-		stage, err := r.Canvas.FindStageByName("stage-no-approval-1")
 		require.NoError(t, err)
+
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -54,13 +71,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -72,14 +89,25 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-1", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-approval-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
-		stage, err := r.Canvas.FindStageByName("stage-with-approval-1")
 		require.NoError(t, err)
 
 		//
@@ -105,14 +133,26 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		conditions := []models.StageCondition{
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-approval-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
-		stage, err := r.Canvas.FindStageByName("stage-with-approval-2")
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-approval-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionCreatedRoutingKey)
@@ -134,13 +174,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -158,14 +198,26 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
-		stage, err := r.Canvas.FindStageByName("stage-with-time-window")
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-time-window").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -207,14 +259,26 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 				},
 			},
 		}
-		require.NoError(t, r.Canvas.CreateStage("stage-with-time-window-2", r.User.String(), conditions, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
 
-		stage, err := r.Canvas.FindStageByName("stage-with-time-window-2")
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-time-window-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithConditions(conditions).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
+
 		require.NoError(t, err)
 
 		//
@@ -236,13 +300,13 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, models.StageEventStateWaiting, event.State)
 		require.Equal(t, models.StageEventStateReasonExecution, event.StateReason)
-		execution, err := models.FindExecutionInState(stage.ID, []string{models.StageExecutionPending})
+		execution, err := models.FindExecutionInState(stage.ID, []string{models.ExecutionPending})
 		require.NoError(t, err)
 		assert.NotEmpty(t, execution.ID)
 		assert.NotEmpty(t, execution.CreatedAt)
 		assert.Equal(t, execution.StageID, stage.ID)
 		assert.Equal(t, execution.StageEventID, event.ID)
-		assert.Equal(t, execution.State, models.StageExecutionPending)
+		assert.Equal(t, execution.State, models.ExecutionPending)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -250,14 +314,24 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		require.NoError(t, r.Canvas.CreateStage("stage-no-approval-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-no-approval-3").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
-		stage, err := r.Canvas.FindStageByName("stage-no-approval-3")
 		require.NoError(t, err)
 
 		//

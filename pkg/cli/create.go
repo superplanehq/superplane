@@ -172,11 +172,6 @@ var createCmd = &cobra.Command{
 				Fail("Invalid EventSource YAML: metadata section missing")
 			}
 
-			name, ok := metadata["name"].(string)
-			if !ok {
-				Fail("Invalid EventSource YAML: name field missing")
-			}
-
 			canvasIDOrName, ok := metadata["canvasId"].(string)
 			if !ok {
 				canvasIDOrName, ok = metadata["canvasName"].(string)
@@ -186,22 +181,20 @@ var createCmd = &cobra.Command{
 			}
 
 			// Create the event source request
-			request := openapi_client.NewSuperplaneCreateEventSourceBody()
-
-			// Create EventSource with metadata and spec
-			eventSource := openapi_client.NewSuperplaneEventSource()
-			esMeta := openapi_client.NewSuperplaneEventSourceMetadata()
-			esMeta.SetName(name)
-			esMeta.SetCanvasId(canvasIDOrName)
-			eventSource.SetMetadata(*esMeta)
-
-			// Create an empty spec for the EventSource
-			emptySpec := make(map[string]interface{})
-			eventSource.SetSpec(emptySpec)
-
-			request.SetEventSource(*eventSource)
-			response, _, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasIDOrName).Body(*request).Execute()
+			var eventSource openapi_client.SuperplaneEventSource
+			err = yaml.Unmarshal(data, &eventSource)
 			Check(err)
+
+			body := openapi_client.SuperplaneCreateEventSourceBody{
+				EventSource: &eventSource,
+			}
+
+			response, httpResponse, err := c.EventSourceAPI.SuperplaneCreateEventSource(context.Background(), canvasIDOrName).Body(body).Execute()
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
 
 			// Access the event source from response
 			es := response.GetEventSource()
@@ -246,6 +239,45 @@ var createCmd = &cobra.Command{
 			}
 
 			out, err := yaml.Marshal(response.ConnectionGroup)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
+		case "Integration":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the metadata from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]interface{})
+			if !ok {
+				Fail("Invalid Integration YAML: metadata section missing")
+			}
+
+			canvasID, ok := metadata["canvasId"].(string)
+			if !ok {
+				Fail("Invalid Integration YAML: canvasId or canvasName field missing")
+			}
+
+			var integration openapi_client.SuperplaneIntegration
+			err = yaml.Unmarshal(data, &integration)
+			Check(err)
+
+			body := openapi_client.SuperplaneCreateIntegrationBody{
+				Integration: &integration,
+			}
+
+			response, httpResponse, err := c.IntegrationAPI.SuperplaneCreateIntegration(context.Background(), canvasID).
+				Body(body).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.Integration)
 			Check(err)
 			fmt.Printf("%s", string(out))
 

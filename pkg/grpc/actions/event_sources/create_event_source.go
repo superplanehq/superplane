@@ -3,11 +3,14 @@ package eventsources
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -30,33 +33,72 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	}
 
 	logger := logging.ForCanvas(canvas)
-	// Extract name from EventSource metadata
+
+	//
+	// Validate request
+	//
 	if req.EventSource == nil || req.EventSource.Metadata == nil || req.EventSource.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
-	plainKey, encryptedKey, err := genNewEventSourceKey(ctx, encryptor, req.EventSource.Metadata.Name)
-	if err != nil {
-		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
-		return nil, status.Error(codes.Internal, "error generating key")
+	//
+	// It is OK to create an event source without an integration.
+	//
+	var integration *models.Integration
+	if req.EventSource.Spec != nil && req.EventSource.Spec.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, req.EventSource.Spec.Integration.Name)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	// TODO: Store key in secrethub secret and create a webhook notification
-	// using Notifications API for semaphore event sources. This webhook should point
-	// to the created secret, as designed in the API.
+	//
+	// If integration is defined, find the integration resource we are interested in.
+	//
+	var resource integrations.Resource
+	if integration != nil {
+		resourceName, err := resourceName(req.EventSource.Spec, integration)
+		if err != nil {
+			return nil, err
+		}
 
-	eventSource, err := canvas.CreateEventSource(req.EventSource.Metadata.Name, encryptedKey)
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	//
+	// Create the event source
+	//
+	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
+		InCanvas(canvas).
+		WithName(req.EventSource.Metadata.Name).
+		WithScope(models.EventSourceScopeExternal).
+		ForIntegration(integration).
+		ForResource(resource).
+		Create()
+
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+
+		if errors.Is(err, builders.ErrResourceAlreadyUsed) {
+			return nil, status.Errorf(codes.InvalidArgument, "event source for %s %s already exists", resource.Type(), resource.Name())
 		}
 
 		log.Errorf("Error creating event source. Request: %v. Error: %v", req, err)
 		return nil, err
 	}
 
+	protoSource, err := serializeEventSource(*eventSource)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &pb.CreateEventSourceResponse{
-		EventSource: serializeEventSource(*eventSource),
+		EventSource: protoSource,
 		Key:         string(plainKey),
 	}
 
@@ -71,7 +113,29 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	return response, nil
 }
 
-func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
+func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, error) {
+	spec := &pb.EventSource_Spec{}
+	if eventSource.ResourceID != nil {
+		resource, err := models.FindResourceByID(*eventSource.ResourceID)
+		if err != nil {
+			return nil, fmt.Errorf("resource not found: %v", err)
+		}
+
+		integration, err := models.FindIntegrationByID(resource.IntegrationID)
+		if err != nil {
+			return nil, fmt.Errorf("integration not found: %v", err)
+		}
+
+		spec.Integration = &pb.IntegrationRef{Name: integration.Name}
+
+		switch integration.Type {
+		case models.IntegrationTypeSemaphore:
+			spec.Semaphore = &pb.EventSource_Spec_Semaphore{
+				Project: resource.ResourceName,
+			}
+		}
+	}
+
 	return &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
 			Id:        eventSource.ID.String(),
@@ -80,16 +144,19 @@ func serializeEventSource(eventSource models.EventSource) *pb.EventSource {
 			CreatedAt: timestamppb.New(*eventSource.CreatedAt),
 			UpdatedAt: timestamppb.New(*eventSource.UpdatedAt),
 		},
-		Spec: &pb.EventSource_Spec{},
-	}
+		Spec: spec,
+	}, nil
 }
 
-func genNewEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, name string) (string, []byte, error) {
-	plainKey, _ := crypto.Base64String(32)
-	encrypted, err := encryptor.Encrypt(ctx, []byte(plainKey), []byte(name))
-	if err != nil {
-		return "", nil, err
-	}
+func resourceName(spec *pb.EventSource_Spec, integration *models.Integration) (string, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		if spec.Semaphore == nil || spec.Semaphore.Project == "" {
+			return "", fmt.Errorf("semaphore project is required")
+		}
 
-	return plainKey, encrypted, nil
+		return spec.Semaphore.Project, nil
+	default:
+		return "", fmt.Errorf("integration type %s is not supported", integration.Type)
+	}
 }

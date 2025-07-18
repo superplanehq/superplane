@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,7 +14,7 @@ import (
 )
 
 func Test__ListEventSources(t *testing.T) {
-	r := support.Setup(t)
+	r := support.SetupWithOptions(t, support.SetupOptions{})
 
 	t.Run("no canvas ID -> error", func(t *testing.T) {
 		_, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{})
@@ -26,14 +25,8 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("no event sources -> empty list", func(t *testing.T) {
-		org, err := models.CreateOrganization(uuid.New(), "test", "test")
-		require.NoError(t, err)
-
-		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas")
-		require.NoError(t, err)
-
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
-			CanvasIdOrName: canvas.ID.String(),
+			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -41,7 +34,13 @@ func Test__ListEventSources(t *testing.T) {
 		assert.Empty(t, res.EventSources)
 	})
 
-	t.Run("with event source -> list", func(t *testing.T) {
+	t.Run("lists only external event sources", func(t *testing.T) {
+		external, err := r.Canvas.CreateEventSource("external", []byte("key"), models.EventSourceScopeExternal, nil)
+		require.NoError(t, err)
+
+		_, err = r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		require.NoError(t, err)
+
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -49,7 +48,8 @@ func Test__ListEventSources(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)
-		assert.Equal(t, r.Source.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, external.ID.String(), res.EventSources[0].Metadata.Id)
+		assert.Equal(t, external.Name, res.EventSources[0].Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), res.EventSources[0].Metadata.CanvasId)
 		assert.NotEmpty(t, res.EventSources[0].Metadata.CreatedAt)
 	})

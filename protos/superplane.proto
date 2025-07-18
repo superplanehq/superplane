@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane;
 
+import "authorization.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -69,6 +70,40 @@ service Superplane {
       summary: "Create a new canvas connection group";
       description: "Creates a new canvas connection group";
       tags: "ConnectionGroup";
+    };
+  }
+
+  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/integrations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integrations for a canvas";
+      description: "List integrations for a canvas";
+      tags: "Integration";
+    };
+  }
+
+  rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an integration for a canvas";
+      description: "Describe an integration for a canvas";
+      tags: "Integration";
+    };
+  }
+
+  rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id_or_name}/integrations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas integration";
+      description: "Creates a new canvas integration";
+      tags: "Integration";
     };
   }
 
@@ -289,6 +324,78 @@ service Superplane {
   }
 }
 
+message CreateIntegrationRequest {
+  string canvas_id_or_name = 1;
+  Integration integration = 2;
+}
+
+message CreateIntegrationResponse {
+  Integration integration = 1;
+}
+
+message ListIntegrationsRequest {
+  string canvas_id_or_name = 1;
+}
+
+message ListIntegrationsResponse {
+  repeated Integration integrations = 1;
+}
+
+message DescribeIntegrationRequest {
+  string canvas_id_or_name = 1;
+  string id_or_name = 2;
+}
+
+message DescribeIntegrationResponse {
+  Integration integration = 1;
+}
+
+message Integration {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string created_by = 3;
+    google.protobuf.Timestamp created_at = 4;
+    Authorization.DomainType domain_type = 5;
+    string domain_id = 6;
+  }
+
+  enum Type {
+    TYPE_NONE = 0;
+    TYPE_SEMAPHORE = 1;
+    TYPE_GITHUB = 2;
+  }
+
+  message Auth {
+    message Token {
+      ValueFrom value_from = 1;
+    }
+
+    AuthType use = 1;
+    Token token = 2;
+  }
+
+  enum AuthType {
+    AUTH_TYPE_NONE = 0;
+    AUTH_TYPE_TOKEN = 1;
+    AUTH_TYPE_OIDC = 2;
+  }
+
+  message OIDC {
+    bool enabled = 1;
+  }
+
+  message Spec {
+    Type type = 1;
+    string url = 2;
+    Auth auth = 3;
+    OIDC oidc = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}
+
 message ListCanvasesRequest {
   string organization_id = 1;
 }
@@ -338,7 +445,12 @@ message EventSource {
   }
 
   message Spec {
-    // No additional configuration needed as per the YAML example
+    message Semaphore {
+      string project = 1;
+    }
+
+    IntegrationRef integration = 1;
+    Semaphore semaphore = 2;
   }
 
   Metadata metadata = 1;
@@ -530,42 +642,42 @@ message ConnectionGroup {
   Spec spec = 2;
 }
 
+enum FilterType {
+  FILTER_TYPE_UNKNOWN = 0;
+  FILTER_TYPE_DATA = 1;
+  FILTER_TYPE_HEADER = 2;
+}
+
+message Filter {
+  FilterType type = 1;
+  DataFilter data = 2;
+  HeaderFilter header = 3;
+}
+
+message DataFilter {
+  string expression = 1;
+}
+
+message HeaderFilter {
+  string expression = 1;
+}
+
+//
+// Filters can be combined in two ways:
+//   - FILTER_OPERATOR_AND: all filters must be true (default)
+//   - FILTER_OPERATOR_OR: at least one filter must be true
+//
+enum FilterOperator {
+  FILTER_OPERATOR_AND = 0;
+  FILTER_OPERATOR_OR = 1;
+}
+
 message Connection {
   enum Type {
     TYPE_UNKNOWN = 0;
     TYPE_EVENT_SOURCE = 1;
     TYPE_STAGE = 2;
     TYPE_CONNECTION_GROUP = 3;
-  }
-
-  enum FilterType {
-    FILTER_TYPE_UNKNOWN = 0;
-    FILTER_TYPE_DATA = 1;
-    FILTER_TYPE_HEADER = 2;
-  }
-
-  message Filter {
-    FilterType type = 1;
-    DataFilter data = 2;
-    HeaderFilter header = 3;
-  }
-
-  message DataFilter {
-    string expression = 1;
-  }
-
-  message HeaderFilter {
-    string expression = 1;
-  }
-
-  //
-  // Filters can be combined in two ways:
-  //   - FILTER_OPERATOR_AND: all filters must be true (default)
-  //   - FILTER_OPERATOR_OR: at least one filter must be true
-  //
-  enum FilterOperator {
-    FILTER_OPERATOR_AND = 0;
-    FILTER_OPERATOR_OR = 1;
   }
 
   Type type = 1;
@@ -673,6 +785,11 @@ message CreateStageRequest {
   string canvas_id_or_name = 2;
 }
 
+message IntegrationRef {
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+}
+
 message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
@@ -681,13 +798,11 @@ message ExecutorSpec {
   }
 
   message Semaphore {
-    string project_id = 1;
-    string branch = 2;
-    string pipeline_file = 3;
-    string task_id = 4;
+    string project = 1;
+    string task = 2;
+    string branch = 3;
+    string pipeline_file = 4;
     map<string, string> parameters = 5;
-    string api_token = 6;
-    string organization_url = 7;
   }
 
   message HTTP {
@@ -702,8 +817,9 @@ message ExecutorSpec {
   }
 
   Type type = 1;
-  Semaphore semaphore = 2;
-  HTTP http = 3;
+  IntegrationRef integration = 2;
+  Semaphore semaphore = 3;
+  HTTP http = 4;
 }
 
 message CreateStageResponse {
@@ -841,13 +957,17 @@ message Execution {
   }
 
   string id = 1;
-  string reference_id = 2;
-  State state = 3;
-  Result result = 4;
-  google.protobuf.Timestamp created_at = 5;
-  google.protobuf.Timestamp started_at = 6;
-  google.protobuf.Timestamp finished_at = 7;
-  repeated OutputValue outputs = 8;
+  State state = 2;
+  Result result = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp finished_at = 6;
+  repeated OutputValue outputs = 7;
+  repeated ExecutionResource resources = 8;
+}
+
+message ExecutionResource {
+  string id = 1;
 }
 
 message StageEventApproval {

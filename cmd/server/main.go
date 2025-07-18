@@ -15,7 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL string) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -25,7 +25,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 
 	if os.Getenv("START_PENDING_EVENTS_WORKER") == "yes" {
 		log.Println("Starting Pending Events Worker")
-		w := workers.PendingEventsWorker{}
+		w := workers.NewPendingEventsWorker(encryptor)
 		go w.Start()
 	}
 
@@ -78,6 +78,17 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor) {
 		log.Println("Starting Pending Field Sets Worker")
 
 		w, err := workers.NewPendingFieldSetsWorker(time.Now)
+		if err != nil {
+			panic(err)
+		}
+
+		go w.Start()
+	}
+
+	if os.Getenv("START_PENDING_EVENT_SOURCES_WORKER") == "yes" {
+		log.Println("Starting Pending Event Sources Worker")
+
+		w, err := workers.NewPendingEventSourcesWorker(encryptor, baseURL)
 		if err != nil {
 			panic(err)
 		}
@@ -176,6 +187,11 @@ func main() {
 		log.Fatalf("failed to create auth service: %v", err)
 	}
 
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		panic("BASE_URL must be set")
+	}
+
 	// Sync missing default roles on startup
 	log.Info("Syncing default permissions for all organizations and canvases...")
 	if err := authService.CheckAndSyncMissingPermissions(); err != nil {
@@ -197,7 +213,7 @@ func main() {
 		go startInternalAPI(encryptorInstance, authService)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance)
+	startWorkers(jwtSigner, encryptorInstance, baseURL)
 
 	log.Println("Superplane is UP.")
 

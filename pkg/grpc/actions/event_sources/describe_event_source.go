@@ -39,8 +39,13 @@ func DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest
 		return nil, err
 	}
 
+	protoSource, err := serializeEventSource(*source)
+	if err != nil {
+		return nil, err
+	}
+
 	response := &pb.DescribeEventSourceResponse{
-		EventSource: serializeEventSource(*source),
+		EventSource: protoSource,
 	}
 
 	return response, nil

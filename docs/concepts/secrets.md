@@ -3,11 +3,11 @@ Secrets allow you to store sensitive values and share them in your canvas. You c
 ```yaml
 kind: Secret
 metadata:
-  name: semaphore-access
+  name: my-secret
 spec:
   provider: local
   local:
-    api-token: XXX
+    key: XXX
 ```
 
 And then, to use it in your stage:
@@ -16,22 +16,22 @@ And then, to use it in your stage:
 kind: Stage
 spec:
   secrets:
-    - name: API_TOKEN
+    - name: MY_SECRET_KEY
       valueFrom:
         secret:
-          name: semaphore-access
-          key: api-token
+          name: my-secret
+          key: key
 
   executor:
     type: TYPE_SEMAPHORE
+    integration:
+      name: semaphore
     semaphore:
-      organizationUrl: https://myorg.semaphoreci.com
-      apiToken: ${{ secrets.API_TOKEN }}
-      projectId: dfafcfe4-cf55-4cb9-abde-c073733c9b83
-      taskId: fd67cfb1-e06c-4896-a517-c648f878330a
+      project: my-semaphore-project
       branch: main
       pipelineFile: .semaphore/pipeline_3.yml
-      parameters: {}
+      parameters:
+        MY_SECRET_KEY: ${{ secrets.MY_SECRET_KEY }}
 ```
 
 ### Other secret providers

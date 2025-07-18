@@ -32,6 +32,7 @@ services:
       START_WEB_SERVER: "yes"
       START_EVENT_DISTRIBUTER: "yes"
       START_PENDING_FIELD_SETS_WORKER: "yes"
+      START_PENDING_EVENT_SOURCES_WORKER: "yes"
       WEB_BASE_PATH: "/app"
       PUBLIC_API_BASE_PATH: /api/v1
       ENCRYPTION_KEY: 1234567890abcdefghijklmnopqrstuv
@@ -39,7 +40,7 @@ services:
       SESSION_SECRET: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
-      BASE_URL: "http://localhost:8000"
+      BASE_URL: ${BASE_URL:-http://localhost:8000}
 
     ports:
       - 8000:8000

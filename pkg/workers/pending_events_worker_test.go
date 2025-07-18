@@ -1,11 +1,16 @@
 package workers
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
+	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -14,11 +19,18 @@ import (
 const EventCreatedRoutingKey = "stage-event-created"
 
 func Test__PendingEventsWorker(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	w := PendingEventsWorker{}
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
+
+	defer r.Close()
+	w := NewPendingEventsWorker(r.Encryptor)
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
+
+	executorType, executorSpec, integrationResource := support.Executor(r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
 		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
@@ -37,16 +49,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create two stages, connecting event source to them.
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
+		inputs := []models.InputDefinition{{Name: "VERSION"}}
+		inputMappings := []models.InputMapping{
 			{
 				Values: []models.ValueDefinition{
 					{
@@ -60,38 +64,50 @@ func Test__PendingEventsWorker(t *testing.T) {
 					},
 				},
 			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+		}
+
+		stage1, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs(inputs).
+			WithInputMappings(inputMappings).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-2", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
-							},
-						},
-					},
+		stage2, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithInputs(inputs).
+			WithInputMappings(inputMappings).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 		amqpURL, _ := config.RabbitMQURL()
-
 		testconsumer := testconsumer.New(amqpURL, EventCreatedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
@@ -114,9 +130,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Two pending stage events are created: one for each stage.
 		//
-		stage1, _ := r.Canvas.FindStageByName("stage-1")
-		stage2, _ := r.Canvas.FindStageByName("stage-2")
-
 		stage1Events, err := stage1.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, stage1Events, 1)
@@ -132,7 +145,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`))
+		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 
 		//
@@ -202,64 +215,79 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		err := r.Canvas.CreateStage("stage-3", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
+		firstStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-3").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs([]models.InputDefinition{{Name: "VERSION"}}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{
-			{
-				Name:     "VERSION",
-				Required: true,
-			},
-		}, []models.ValueDefinition{})
+			}).
+			WithOutputs([]models.OutputDefinition{
+				{
+					Name:     "VERSION",
+					Required: true,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
-		firstStage, err := r.Canvas.FindStageByName("stage-3")
-		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-4", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   firstStage.ID,
-				SourceType: models.SourceTypeStage,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: firstStage.Name,
-								Expression: "outputs.VERSION",
+		secondStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-4").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   firstStage.ID,
+					SourceType: models.SourceTypeStage,
+				},
+			}).
+			WithInputs([]models.InputDefinition{{Name: "VERSION"}}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: firstStage.Name,
+									Expression: "outputs.VERSION",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 
@@ -284,7 +312,6 @@ func Test__PendingEventsWorker(t *testing.T) {
 		events, err := firstStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
-		secondStage, _ := r.Canvas.FindStageByName("stage-4")
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 1)
@@ -298,39 +325,59 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		err := r.Canvas.CreateStage("stage-5", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:       r.Source.ID,
-				SourceType:     models.SourceTypeEventSource,
-				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.ConnectionFilter{
-					{
-						Type: models.FilterTypeData,
-						Data: &models.DataFilter{
-							Expression: "ref == 'v1'",
+		firstStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-5").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:       r.Source.ID,
+					SourceType:     models.SourceTypeEventSource,
+					FilterOperator: models.FilterOperatorAnd,
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "ref == 'v1'",
+							},
 						},
 					},
 				},
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 
-		err = r.Canvas.CreateStage("stage-6", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:       r.Source.ID,
-				SourceType:     models.SourceTypeEventSource,
-				FilterOperator: models.FilterOperatorAnd,
-				Filters: []models.ConnectionFilter{
-					{
-						Type: models.FilterTypeData,
-						Data: &models.DataFilter{
-							Expression: "ref == 'v2'",
+		secondStage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-6").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:       r.Source.ID,
+					SourceType:     models.SourceTypeEventSource,
+					FilterOperator: models.FilterOperatorAnd,
+					Filters: []models.Filter{
+						{
+							Type: models.FilterTypeData,
+							Data: &models.DataFilter{
+								Expression: "ref == 'v2'",
+							},
 						},
 					},
 				},
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 
@@ -352,16 +399,84 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// A pending stage event should be created only for the first stage
 		//
-
-		firstStage, _ := r.Canvas.FindStageByName("stage-5")
 		events, err := firstStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 1)
 		assert.Equal(t, r.Source.ID, events[0].SourceID)
 
-		secondStage, _ := r.Canvas.FindStageByName("stage-6")
 		events, err = secondStage.ListPendingEvents()
 		require.NoError(t, err)
 		require.Len(t, events, 0)
+	})
+
+	t.Run("execution resource is updated", func(t *testing.T) {
+		//
+		// Create pending execution resource
+		//
+		workflowID := uuid.New().String()
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-7").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
+
+		require.NoError(t, err)
+		execution := support.CreateExecution(t, r.Source, stage)
+		resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
+		require.NoError(t, err)
+		_, err = execution.AddResource(workflowID, resource.ID)
+		require.NoError(t, err)
+
+		//
+		// Create a Semaphore hook event for the source created for the execution,
+		// and trigger the worker.
+		//
+		hook := executors.SemaphoreHook{
+			Workflow: executors.SemaphoreHookWorkflow{
+				ID: workflowID,
+			},
+			Pipeline: executors.SemaphoreHookPipeline{
+				ID:     uuid.New().String(),
+				State:  integrations.SemaphorePipelineStateDone,
+				Result: integrations.SemaphorePipelineResultPassed,
+			},
+		}
+
+		eventData, err := json.Marshal(hook)
+		require.NoError(t, err)
+		source, err := resource.FindEventSource()
+		require.NoError(t, err)
+		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
+		require.NoError(t, err)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Event is discarded, since the event source used by the executor cannot be used as a connection.
+		//
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateDiscarded, event.State)
+
+		//
+		// The execution resource has its state updated.
+		//
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		executionResource := resources[0]
+		assert.Equal(t, models.ExecutionFinished, executionResource.State)
+		assert.Equal(t, models.ResultPassed, executionResource.Result)
 	})
 }

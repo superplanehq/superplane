@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
 type PendingExecutionsWorker struct {
@@ -31,7 +33,7 @@ func (w *PendingExecutionsWorker) Start() {
 }
 
 func (w *PendingExecutionsWorker) Tick() error {
-	executions, err := models.ListStageExecutionsInState(models.StageExecutionPending)
+	executions, err := models.ListExecutionsInState(models.ExecutionPending)
 	if err != nil {
 		return fmt.Errorf("error listing pending stage executions: %v", err)
 	}
@@ -60,33 +62,39 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	secrets, err := stage.FindSecrets(w.Encryptor)
+	secrets, err := w.FindSecrets(stage, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec.Data(), inputMap, secrets)
+	stageExecutor, err := stage.GetExecutor()
+	if err != nil {
+		return fmt.Errorf("error getting executor for stage: %v", err)
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return fmt.Errorf("error getting resource for stage executor: %v", err)
+	}
+
+	executorSpec := stageExecutor.Spec.Data()
+	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(spec.Type, execution, w.JwtSigner)
+	executor, err := executors.NewExecutor(stageExecutor, &execution, w.JwtSigner, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
-	}
-
-	err = execution.Start()
-	if err != nil {
-		return fmt.Errorf("error moving execution to started state: %v", err)
 	}
 
 	//
 	// If we get an error calling the executor, we fail the execution.
 	//
-	response, err := executor.Execute(*spec)
+	response, err := executor.Execute(*spec, resource)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		err := execution.Finish(stage, models.StageExecutionResultFailed)
+		err := execution.Finish(stage, models.ResultFailed)
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
 		}
@@ -99,7 +107,33 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return w.handleSyncResource(logger, response, execution, stage)
 	}
 
-	return w.handleAsyncResource(logger, response, stage, execution)
+	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
+	secretMap := map[string]string{}
+	for _, secretDef := range stage.Secrets {
+		secretName := secretDef.ValueFrom.Secret.Name
+		provider, err := secrets.NewProvider(encryptor, secretName, stage.CanvasID.String())
+		if err != nil {
+			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
+		}
+
+		values, err := provider.Load(context.TODO())
+		if err != nil {
+			return nil, fmt.Errorf("error loading values for secret %s: %v", secretName, err)
+		}
+
+		key := secretDef.ValueFrom.Secret.Key
+		value, ok := values[key]
+		if !ok {
+			return nil, fmt.Errorf("key %s not found in secret %s", key, secretName)
+		}
+
+		secretMap[secretDef.Name] = value
+	}
+
+	return secretMap, nil
 }
 
 func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
@@ -110,9 +144,9 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 		}
 	}
 
-	result := models.StageExecutionResultFailed
+	result := models.ResultFailed
 	if response.Successful() {
-		result = models.StageExecutionResultPassed
+		result = models.ResultPassed
 	}
 
 	//
@@ -121,7 +155,7 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 	missingOutputs := stage.MissingRequiredOutputs(outputs)
 	if len(missingOutputs) > 0 {
 		logger.Infof("Execution has missing outputs %v - marking the execution as failed", missingOutputs)
-		result = models.StageExecutionResultFailed
+		result = models.ResultFailed
 	}
 
 	err := execution.Finish(stage, result)
@@ -134,8 +168,13 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
-func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, stage *models.Stage, execution models.StageExecution) error {
-	err := execution.StartWithReferenceID(response.Id())
+func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, executor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
+	_, err := execution.AddResource(response.Id(), executor.ResourceID)
+	if err != nil {
+		return fmt.Errorf("error adding resource to execution: %v", err)
+	}
+
+	err = execution.Start()
 	if err != nil {
 		return fmt.Errorf("error moving execution to started state: %v", err)
 	}

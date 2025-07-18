@@ -14,7 +14,12 @@ import (
 )
 
 func Test__DescribeStage(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true, Stage: true, Approvals: 1})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+		Stage:       true,
+		Approvals:   1,
+	})
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{

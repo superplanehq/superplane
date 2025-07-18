@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/builders"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -17,7 +21,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -55,7 +59,34 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	executor, err := specValidator.Validate(req.Stage.Spec.Executor)
+	//
+	// It is OK to create a stage without an integration.
+	//
+	var integration *models.Integration
+	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	//
+	// If integration is defined, find the integration resource we are interested in.
+	//
+	var resource integrations.Resource
+	if integration != nil {
+		resourceName, err := resourceName(req.Stage.Spec.Executor, integration)
+		if err != nil {
+			return nil, err
+		}
+
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	executorType, executorSpec, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor, integration, resource)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -87,17 +118,23 @@ func UpdateStage(ctx context.Context, specValidator executors.SpecValidator, req
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateStage(
-		stage.ID.String(),
-		userID,
-		conditions,
-		*executor,
-		connections,
-		inputValidator.SerializeInputs(),
-		inputValidator.SerializeInputMappings(),
-		inputValidator.SerializeOutputs(),
-		secrets,
-	)
+	stage, err = builders.NewStageBuilder().
+		WithContext(ctx).
+		WithExistingStage(stage).
+		WithEncryptor(encryptor).
+		InCanvas(canvas).
+		WithRequester(uuid.MustParse(userID)).
+		WithConditions(conditions).
+		WithConnections(connections).
+		WithInputs(inputValidator.SerializeInputs()).
+		WithInputMappings(inputValidator.SerializeInputMappings()).
+		WithOutputs(inputValidator.SerializeOutputs()).
+		WithSecrets(secrets).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		ForResource(resource).
+		ForIntegration(integration).
+		Update()
 
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {

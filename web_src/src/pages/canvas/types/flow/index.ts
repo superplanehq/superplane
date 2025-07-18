@@ -5,7 +5,7 @@ import {
   SuperplaneExecutorSpec,
   SuperplaneExecutorSpecType,
   SuperplaneConnection,
-  ConnectionFilterOperator,
+  SuperplaneFilterOperator,
   SuperplaneCondition,
   SuperplaneConditionType,
   SuperplaneInputDefinition,
@@ -63,7 +63,7 @@ export type HandleProps = {
 
 export {
   SuperplaneStageEventState as QueueState,
-  ConnectionFilterOperator,
+  SuperplaneFilterOperator,
   SuperplaneConditionType as ConditionType,
   SuperplaneExecutorSpecType as ExecutorSpecType
 };

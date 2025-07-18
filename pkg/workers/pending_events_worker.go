@@ -6,7 +6,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -14,7 +16,15 @@ import (
 	"gorm.io/gorm"
 )
 
-type PendingEventsWorker struct{}
+type PendingEventsWorker struct {
+	Encryptor crypto.Encryptor
+}
+
+func NewPendingEventsWorker(encryptor crypto.Encryptor) *PendingEventsWorker {
+	return &PendingEventsWorker{
+		Encryptor: encryptor,
+	}
+}
 
 func (w *PendingEventsWorker) Start() {
 	for {
@@ -49,6 +59,92 @@ func (w *PendingEventsWorker) Tick() error {
 func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Event) error {
 	logger.Info("Processing")
 
+	//
+	// First, we check if there's an execution resource
+	// to update for this event
+	//
+	err := w.UpdateExecutionResource(logger, event)
+	if err != nil {
+		return err
+	}
+
+	//
+	// Lastly, we process all the connections for the source of this event.
+	//
+	return w.ProcessConnections(logger, event)
+}
+
+func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *models.Event) error {
+	//
+	// If this is an event from a stage or connection group,
+	// there's nothing to do here.
+	//
+	if event.SourceType != models.SourceTypeEventSource {
+		return nil
+	}
+
+	eventSource, err := models.FindEventSource(event.SourceID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// If this event source is not tied to a resource, there's nothing to do here.
+	//
+	if eventSource.ResourceID == nil {
+		return nil
+	}
+
+	e, err := models.FindExecutorForResource(*eventSource.ResourceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Infof("No executor found for event source %s - skipping execution updates", event.SourceID)
+			return nil
+		}
+
+		return err
+	}
+
+	executor, err := executors.NewExecutor(e, nil, nil, w.Encryptor)
+	if err != nil {
+		return err
+	}
+
+	status, err := executor.HandleWebhook([]byte(event.Raw))
+	if err != nil {
+		return err
+	}
+
+	if !status.Finished() {
+		return nil
+	}
+
+	result := models.ResultPassed
+	if !status.Successful() {
+		result = models.ResultFailed
+	}
+
+	executionResource, err := models.FindExecutionResource(status.Id(), *eventSource.ResourceID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			logger.Infof("No execution resource %s found for source %s - skipping execution update", status.Id(), eventSource.ID)
+			return nil
+		}
+
+		return err
+	}
+
+	err = executionResource.Finish(result)
+	if err != nil {
+		return err
+	}
+
+	logger.Infof("Execution resource %s finished with result %s", executionResource.ExternalID, executionResource.Result)
+
+	return nil
+}
+
+func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *models.Event) error {
 	connections, err := models.ListConnectionsForSource(
 		event.SourceID,
 		event.SourceType,

@@ -16,7 +16,10 @@ import (
 
 func Test__StageEventApprovedConsumer(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Stage: true, Approvals: 2,
+		Source:      true,
+		Integration: true,
+		Stage:       true,
+		Approvals:   2,
 	})
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
