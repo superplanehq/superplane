@@ -34,13 +34,16 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
+	var displayName string
+	var description string
 	if req.DisplayName != "" || req.Description != "" {
-		displayName := req.DisplayName
+		displayName = req.DisplayName
 		if displayName == "" {
 			displayName = req.GroupName
 		}
+		description = req.Description
 
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, req.Description)
+		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, description)
 		if err != nil {
 			log.Errorf("failed to create group metadata for %s: %v", req.GroupName, err)
 		}
@@ -53,8 +56,8 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		DomainType:  req.DomainType,
 		DomainId:    req.DomainID,
 		Role:        req.Role,
-		DisplayName: models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID),
-		Description: models.GetGroupDescription(req.GroupName, domainType, req.DomainID),
+		DisplayName: displayName,
+		Description: description,
 	}
 
 	return &CreateGroupResponse{

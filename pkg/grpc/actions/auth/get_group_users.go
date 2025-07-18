@@ -44,13 +44,22 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		return nil, status.Error(codes.Internal, "failed to get group roles")
 	}
 
+	// Batch fetch role metadata for the single role
+	roleMetadataMap, err := models.FindRoleMetadataByNames([]string{role}, domainType, req.DomainID)
+	if err != nil {
+		// Log error but continue with fallback behavior
+		roleMetadataMap = make(map[string]*models.RoleMetadata)
+	}
+
+	roleMetadata := roleMetadataMap[role]
+
 	// Convert user IDs to User objects with role assignments
 	var users []*pb.User
 	for _, userID := range userIDs {
 		roleAssignment := &pb.UserRoleAssignment{
 			RoleName:        role,
-			RoleDisplayName: models.GetRoleDisplayName(role, domainType, req.DomainID),
-			RoleDescription: models.GetRoleDescription(role, domainType, req.DomainID),
+			RoleDisplayName: models.GetRoleDisplayNameWithFallback(role, domainType, req.DomainID, roleMetadata),
+			RoleDescription: models.GetRoleDescriptionWithFallback(role, domainType, req.DomainID, roleMetadata),
 			DomainType:      req.DomainType,
 			DomainId:        req.DomainID,
 			AssignedAt:      time.Now().Format(time.RFC3339),
@@ -63,13 +72,21 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		users = append(users, user)
 	}
 
+	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get group metadata")
+	}
+
 	group := &pb.Group{
-		Name:        req.GroupName,
-		DomainType:  req.DomainType,
-		DomainId:    req.DomainID,
-		Role:        role,
-		DisplayName: models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID),
-		Description: models.GetGroupDescription(req.GroupName, domainType, req.DomainID),
+		Name:         req.GroupName,
+		DomainType:   req.DomainType,
+		DomainId:     req.DomainID,
+		Role:         role,
+		DisplayName:  groupMetadata.DisplayName,
+		Description:  groupMetadata.Description,
+		MembersCount: int32(len(userIDs)),
+		CreatedAt:    groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:    groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	return &GetGroupUsersResponse{

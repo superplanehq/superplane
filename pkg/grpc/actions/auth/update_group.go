@@ -58,16 +58,22 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, req.DomainID, domainType)
 	}
 
-	// Update metadata if provided
+	var displayName string
+	var description string
+	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainID)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get group metadata")
+	}
+
 	if req.DisplayName != "" || req.Description != "" {
-		displayName := req.DisplayName
+		displayName = req.DisplayName
 		if displayName == "" {
-			displayName = models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID)
+			displayName = groupMetadata.DisplayName
 		}
 
-		description := req.Description
+		description = req.Description
 		if description == "" {
-			description = models.GetGroupDescription(req.GroupName, domainType, req.DomainID)
+			description = groupMetadata.Description
 		}
 
 		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, description)
@@ -83,13 +89,21 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 		updatedRole = currentRole
 	}
 
+	membersCount, err := authService.GetGroupMembersCount(groupMetadata.DomainID, domainType, req.GroupName)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get group members count")
+	}
+
 	group := &pb.Group{
-		Name:        req.GroupName,
-		DomainType:  req.DomainType,
-		DomainId:    req.DomainID,
-		Role:        updatedRole,
-		DisplayName: models.GetGroupDisplayName(req.GroupName, domainType, req.DomainID),
-		Description: models.GetGroupDescription(req.GroupName, domainType, req.DomainID),
+		Name:         req.GroupName,
+		DomainType:   req.DomainType,
+		DomainId:     req.DomainID,
+		Role:         updatedRole,
+		DisplayName:  displayName,
+		Description:  description,
+		MembersCount: int32(membersCount),
+		CreatedAt:    groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		UpdatedAt:    groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}
 
 	return &UpdateGroupResponse{

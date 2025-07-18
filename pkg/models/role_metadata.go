@@ -86,7 +86,7 @@ func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, 
 func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description string) error {
 	var metadata RoleMetadata
 	err := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
-	
+
 	if err == gorm.ErrRecordNotFound {
 		// Create new metadata
 		metadata = RoleMetadata{
@@ -100,7 +100,7 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 	} else if err != nil {
 		return err
 	}
-	
+
 	// Update existing metadata
 	metadata.DisplayName = displayName
 	metadata.Description = description
@@ -111,7 +111,7 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 func UpsertGroupMetadata(groupName, domainType, domainID, displayName, description string) error {
 	var metadata GroupMetadata
 	err := database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
-	
+
 	if err == gorm.ErrRecordNotFound {
 		// Create new metadata
 		metadata = GroupMetadata{
@@ -125,7 +125,7 @@ func UpsertGroupMetadata(groupName, domainType, domainID, displayName, descripti
 	} else if err != nil {
 		return err
 	}
-	
+
 	// Update existing metadata
 	metadata.DisplayName = displayName
 	metadata.Description = description
@@ -142,11 +142,24 @@ func DeleteGroupMetadata(groupName, domainType, domainID string) error {
 	return database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).Delete(&GroupMetadata{}).Error
 }
 
-// GetRoleDisplayName gets the display name for a role, fallback to role name if not found
-func GetRoleDisplayName(roleName, domainType, domainID string) string {
-	// First check if we have stored metadata
-	metadata, err := FindRoleMetadata(roleName, domainType, domainID)
-	if err == nil {
+// FindRoleMetadataByNames finds multiple role metadata records by role names, domain type, and domain ID
+func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (map[string]*RoleMetadata, error) {
+	var metadata []RoleMetadata
+	err := database.Conn().Where("role_name IN ? AND domain_type = ? AND domain_id = ?", roleNames, domainType, domainID).Find(&metadata).Error
+	if err != nil {
+		return nil, err
+	}
+	
+	result := make(map[string]*RoleMetadata)
+	for i := range metadata {
+		result[metadata[i].RoleName] = &metadata[i]
+	}
+	return result, nil
+}
+
+// GetRoleDisplayNameWithFallback gets the display name for a role, with fallback to default names
+func GetRoleDisplayNameWithFallback(roleName, domainType, domainID string, metadata *RoleMetadata) string {
+	if metadata != nil {
 		return metadata.DisplayName
 	}
 	
@@ -158,20 +171,9 @@ func GetRoleDisplayName(roleName, domainType, domainID string) string {
 	return roleName // Fallback to role name
 }
 
-// GetGroupDisplayName gets the display name for a group, fallback to group name if not found
-func GetGroupDisplayName(groupName, domainType, domainID string) string {
-	metadata, err := FindGroupMetadata(groupName, domainType, domainID)
-	if err != nil {
-		return groupName // Fallback to group name
-	}
-	return metadata.DisplayName
-}
-
-// GetRoleDescription gets the description for a role
-func GetRoleDescription(roleName, domainType, domainID string) string {
-	// First check if we have stored metadata
-	metadata, err := FindRoleMetadata(roleName, domainType, domainID)
-	if err == nil {
+// GetRoleDescriptionWithFallback gets the description for a role, with fallback to default descriptions
+func GetRoleDescriptionWithFallback(roleName, domainType, domainID string, metadata *RoleMetadata) string {
+	if metadata != nil {
 		return metadata.Description
 	}
 	
@@ -181,15 +183,6 @@ func GetRoleDescription(roleName, domainType, domainID string) string {
 	}
 	
 	return "" // No description available
-}
-
-// GetGroupDescription gets the description for a group
-func GetGroupDescription(groupName, domainType, domainID string) string {
-	metadata, err := FindGroupMetadata(groupName, domainType, domainID)
-	if err != nil {
-		return "" // No description available
-	}
-	return metadata.Description
 }
 
 // getDefaultRoleDisplayName returns beautiful display names for default roles
@@ -205,7 +198,7 @@ func getDefaultRoleDisplayName(roleName, domainType string) string {
 			return "Viewer"
 		}
 	}
-	
+
 	// Canvas roles
 	if domainType == "canvas" {
 		switch roleName {
@@ -217,7 +210,7 @@ func getDefaultRoleDisplayName(roleName, domainType string) string {
 			return "Viewer"
 		}
 	}
-	
+
 	return ""
 }
 
@@ -234,7 +227,7 @@ func getDefaultRoleDescription(roleName, domainType string) string {
 			return "Read-only access to organization resources and information."
 		}
 	}
-	
+
 	// Canvas roles
 	if domainType == "canvas" {
 		switch roleName {
@@ -246,6 +239,6 @@ func getDefaultRoleDescription(roleName, domainType string) string {
 			return "Read-only access to canvas resources and execution information."
 		}
 	}
-	
+
 	return ""
 }

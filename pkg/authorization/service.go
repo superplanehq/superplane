@@ -273,6 +273,14 @@ func (a *AuthService) GetGroupUsers(domainID string, domainType string, group st
 	return users, nil
 }
 
+func (a *AuthService) GetGroupMembersCount(domainID string, domainType string, group string) (int, error) {
+	users, err := a.GetGroupUsers(domainID, domainType, group)
+	if err != nil {
+		return 0, err
+	}
+	return len(users), nil
+}
+
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)

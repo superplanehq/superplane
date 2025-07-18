@@ -135,6 +135,9 @@ export type AuthorizationGroup = {
     role?: string;
     displayName?: string;
     description?: string;
+    membersCount?: number;
+    createdAt?: string;
+    updatedAt?: string;
 };
 
 export type AuthorizationListCanvasGroupsResponse = {

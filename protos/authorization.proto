@@ -739,6 +739,9 @@ message Group {
   string role = 4;
   string display_name = 5;
   string description = 6;
+  int32  members_count = 7;
+  string created_at = 8;
+  string updated_at = 9;
 }
 
 message User {

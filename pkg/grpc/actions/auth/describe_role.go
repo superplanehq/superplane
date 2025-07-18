@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,7 +33,17 @@ func DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest, authService 
 		return nil, status.Error(codes.NotFound, "role not found")
 	}
 
-	role, err := convertRoleDefinitionToProto(roleDefinition, authService, req.DomainId)
+	roleNames := []string{roleDefinition.Name}
+	if roleDefinition.InheritsFrom != nil {
+		roleNames = append(roleNames, roleDefinition.InheritsFrom.Name)
+	}
+
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, req.DomainId)
+	if err != nil {
+		roleMetadataMap = make(map[string]*models.RoleMetadata)
+	}
+
+	role, err := convertRoleDefinitionToProto(roleDefinition, authService, req.DomainId, roleMetadataMap)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to convert role definition")
 	}

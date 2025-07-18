@@ -3161,6 +3161,9 @@ type Group struct {
 	Role          string                 `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	MembersCount  int32                  `protobuf:"varint,7,opt,name=members_count,json=membersCount,proto3" json:"members_count,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     string                 `protobuf:"bytes,9,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3233,6 +3236,27 @@ func (x *Group) GetDisplayName() string {
 func (x *Group) GetDescription() string {
 	if x != nil {
 		return x.Description
+	}
+	return ""
+}
+
+func (x *Group) GetMembersCount() int32 {
+	if x != nil {
+		return x.MembersCount
+	}
+	return 0
+}
+
+func (x *Group) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+func (x *Group) GetUpdatedAt() string {
+	if x != nil {
+		return x.UpdatedAt
 	}
 	return ""
 }
@@ -3881,7 +3905,7 @@ const file_authorization_proto_rawDesc = "" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x02 \x01(\tR\tgroupName\"\x1b\n" +
-	"\x19DeleteCanvasGroupResponse\"\xd8\x01\n" +
+	"\x19DeleteCanvasGroupResponse\"\xbb\x02\n" +
 	"\x05Group\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
@@ -3889,7 +3913,12 @@ const file_authorization_proto_rawDesc = "" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12\x12\n" +
 	"\x04role\x18\x04 \x01(\tR\x04role\x12!\n" +
 	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\x06 \x01(\tR\vdescription\"\x83\x03\n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12#\n" +
+	"\rmembers_count\x18\a \x01(\x05R\fmembersCount\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\b \x01(\tR\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\t \x01(\tR\tupdatedAt\"\x83\x03\n" +
 	"\x04User\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12\x14\n" +

@@ -38,13 +38,29 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			return nil, status.Error(codes.Internal, "failed to get group roles")
 		}
 
+		membersCount, err := authService.GetGroupMembersCount(req.DomainID, domainType, groupName)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to get group members count")
+		}
+
+		// Get group metadata for timestamps
+		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, req.DomainID)
+		var createdAt, updatedAt string
+		if err == nil {
+			createdAt = groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z")
+			updatedAt = groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		}
+
 		groups[i] = &pb.Group{
-			Name:        groupName,
-			DomainType:  req.DomainType,
-			DomainId:    req.DomainID,
-			Role:        role,
-			DisplayName: models.GetGroupDisplayName(groupName, domainType, req.DomainID),
-			Description: models.GetGroupDescription(groupName, domainType, req.DomainID),
+			Name:         groupName,
+			DomainType:   req.DomainType,
+			DomainId:     req.DomainID,
+			Role:         role,
+			DisplayName:  groupMetadata.DisplayName,
+			Description:  groupMetadata.Description,
+			MembersCount: int32(membersCount),
+			CreatedAt:    createdAt,
+			UpdatedAt:    updatedAt,
 		}
 	}
 

@@ -35,6 +35,19 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		return nil, err
 	}
 
+	// Extract all role names for batch metadata lookup
+	roleNames := make([]string, len(roleDefinitions))
+	for i, roleDef := range roleDefinitions {
+		roleNames[i] = roleDef.Name
+	}
+
+	// Batch fetch role metadata
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	if err != nil {
+		// Log error but continue with fallback behavior
+		roleMetadataMap = make(map[string]*models.RoleMetadata)
+	}
+
 	userRoleMap := make(map[string][]*pb.UserRoleAssignment)
 
 	for _, roleDef := range roleDefinitions {
@@ -50,10 +63,11 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 			continue
 		}
 
+		roleMetadata := roleMetadataMap[roleDef.Name]
 		roleAssignment := &pb.UserRoleAssignment{
 			RoleName:        roleDef.Name,
-			RoleDisplayName: models.GetRoleDisplayName(roleDef.Name, domainType, domainID),
-			RoleDescription: models.GetRoleDescription(roleDef.Name, domainType, domainID),
+			RoleDisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
+			RoleDescription: models.GetRoleDescriptionWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
 			DomainType:      convertDomainTypeToProto(domainType),
 			DomainId:        domainID,
 			AssignedAt:      time.Now().Format(time.RFC3339),
