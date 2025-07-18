@@ -54,6 +54,8 @@ import {
 } from './lib/Table/table';
 import { Link } from './lib/Link/link';
 import { Field, Label } from './lib/Fieldset/fieldset';
+import { SettingsPage } from './SettingsPage';
+import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 
 
 // Node types for React Flow
@@ -92,6 +94,19 @@ export function CanvasEditorPage({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showMiniMap, setShowMiniMap] = useState(true)
+  const [activeView, setActiveView] = useState<'editor' | 'settings'>('editor')
+  
+  // Define tabs for navigation
+  const navigationTabs: Tab[] = [
+    {
+      id: 'editor',
+      label: 'Editor',
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+    }
+  ]
 
   // Mock user and organization data
   const currentUser: User = {
@@ -559,22 +574,37 @@ export function CanvasEditorPage({
             </DropdownMenu>
           </Dropdown>
         </div>
+        
+        {/* Navigation Tabs */}
+        
+        <div className='border-r border-zinc-400 dark:border-zinc-600'>
         <Button plain>
           <MaterialSymbol size='lg' opticalSize={20} weight={400} name="star" />
         </Button>
         <Button plain onClick={handleMembers}>
           <MaterialSymbol size='lg' opticalSize={20} weight={400} name="person" />
         </Button>
-        <Dropdown>
-          <DropdownButton plain aria-label="More options">
-            <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
-          </DropdownButton>
-          <DropdownMenu className="min-w-(--button-width)">
-            <DropdownItem onClick={() => setShowSecretsModal(true)}>Secrets</DropdownItem>
+        </div>
+        <div className='hidden'>
+          <Dropdown> 
+            <DropdownButton plain aria-label="More options">
+              <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
+            </DropdownButton>
+            <DropdownMenu className="min-w-(--button-width)">
+              <DropdownItem onClick={() => setShowSecretsModal(true)}>Secrets</DropdownItem>
             <DropdownItem href="#">Integrations</DropdownItem>
             <DropdownItem href="#">Delete</DropdownItem>
           </DropdownMenu>
         </Dropdown>
+        </div>
+        <div className="flex items-center pl-4 h-full">
+          <ControlledTabs
+            tabs={navigationTabs}
+            activeTab={activeView}
+            variant='underline'
+            onTabChange={(tabId) => setActiveView(tabId as 'editor' | 'settings')}
+          />
+        </div>
       </nav>
     );
     
@@ -584,47 +614,55 @@ export function CanvasEditorPage({
     <div className="flex flex-col min-h-screen bg-gray-50">
       {renderNavigation()}
 
-      {/* React Flow Canvas */}
-      <div className="flex-1 flex">
-        {/* Component Sidebar */}
-        <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
-          <ComponentSidebar
-            isOpen={true}
-            onClose={() => setSidebarOpen(false)}
-            onNodeAdd={addNode}
-          />
+      {/* Conditional Content Based on Active View */}
+      {activeView === 'editor' ? (
+        /* React Flow Canvas */
+        <div className="flex-1 flex">
+          {/* Component Sidebar */}
+          <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
+            <ComponentSidebar
+              isOpen={true}
+              onClose={() => setSidebarOpen(false)}
+              onNodeAdd={addNode}
+            />
+          </div>
+          
+          {/* Canvas Area */}
+          <div className="flex-1" ref={reactFlowWrapper}>
+            <ReactFlowProvider>
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                onNodesChange={onNodesChange}
+                onEdgesChange={onEdgesChange}
+                onConnect={onConnect}
+                onNodeClick={onNodeClick}
+                nodeTypes={nodeTypes}
+                connectionLineType={ConnectionLineType.SmoothStep}
+                defaultViewport={ { x: 0, y: 0, zoom: 1 } }
+                attributionPosition="bottom-left"
+                className="bg-gray-50"
+              >
+                <Controls 
+                  className="bg-white border border-gray-300 rounded-lg shadow-sm"
+                  showInteractive={false}
+                />
+                <Background 
+                  variant={BackgroundVariant.Dots} 
+                  gap={20} 
+                  size={1}
+                  color="#e5e7eb"
+                />
+              </ReactFlow>
+            </ReactFlowProvider>
+          </div>
         </div>
-        
-        {/* Canvas Area */}
-        <div className="flex-1" ref={reactFlowWrapper}>
-          <ReactFlowProvider>
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              onNodesChange={onNodesChange}
-              onEdgesChange={onEdgesChange}
-              onConnect={onConnect}
-              onNodeClick={onNodeClick}
-              nodeTypes={nodeTypes}
-              connectionLineType={ConnectionLineType.SmoothStep}
-              defaultViewport={ { x: 0, y: 0, zoom: 1 } }
-              attributionPosition="bottom-left"
-              className="bg-gray-50"
-            >
-              <Controls 
-                className="bg-white border border-gray-300 rounded-lg shadow-sm"
-                showInteractive={false}
-              />
-              <Background 
-                variant={BackgroundVariant.Dots} 
-                gap={20} 
-                size={1}
-                color="#e5e7eb"
-              />
-            </ReactFlow>
-          </ReactFlowProvider>
+      ) : (
+        /* Settings Page */
+        <div className="flex-1">
+          <SettingsPage />
         </div>
-      </div>
+      )}
 
       {/* Canvas Members Modal */}
       <Dialog 

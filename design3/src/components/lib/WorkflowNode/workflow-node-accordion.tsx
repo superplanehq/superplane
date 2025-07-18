@@ -26,6 +26,7 @@ import { Divider } from '../Divider/divider'
 import { Text } from '../Text/text'
 import { Link } from '../Link/link'
 import Tippy from '@tippyjs/react'
+import { Badge } from '../Badge/badge'
 
 export type { WorkflowNodeData } from './workflow-node'
 
@@ -220,6 +221,9 @@ export function WorkflowNodeAccordion({
   // Track which inputs are in read-only mode
   const [savedInputs, setSavedInputs] = useState<Set<number>>(new Set())
   
+  // Track which executors are in read-only mode
+  const [savedExecutors, setSavedExecutors] = useState<Set<number>>(new Set())
+  
   
   // Filter state for connections
   const [connectionFilters, setConnectionFilters] = useState<Record<number, Array<{id: string, type: string, expression: string, operator?: string}>>>({})
@@ -317,6 +321,22 @@ export function WorkflowNodeAccordion({
     // Clear modification status when saving
     clearSectionModified('inputs');
     console.log('All inputs saved:', yamlConfig.spec.inputs);
+  }
+
+  const handleExecutorsSave = () => {
+    onUpdate?.({
+      yamlConfig: {
+        ...yamlConfig,
+        spec: {
+          ...yamlConfig.spec,
+          executor: yamlConfig.spec.executor || { type: 'default', config: {} }
+        }
+      }
+    })
+    
+    // Clear modification status when saving
+    clearSectionModified('executor');
+    console.log('Executor saved:', yamlConfig.spec.executor);
   }
 
   const handleOutputsSave = () => {
@@ -491,6 +511,33 @@ export function WorkflowNodeAccordion({
           inputs: [...currentInputs, newInput]
         }
       };
+    });
+  }
+
+  const handleAddExecutor = () => {
+    setYamlConfig(prev => {
+      const newExecutor = { 
+        type: 'semaphore', 
+        config: {} 
+      };
+      
+      // Mark as modified when adding/changing executor
+      markSectionModified('executor');
+      
+      return {
+        ...prev,
+        spec: {
+          ...prev.spec,
+          executor: newExecutor
+        }
+      };
+    });
+    
+    // Ensure the executor starts in editable mode
+    setSavedExecutors(prev => {
+      const newSaved = new Set(prev);
+      newSaved.delete(0); // Remove from saved to make it editable
+      return newSaved;
     });
   }
 
@@ -903,7 +950,7 @@ export function WorkflowNodeAccordion({
                             Select connection
                             <MaterialSymbol name="expand_more" size="md" />
                           </DropdownButton>
-                          <DropdownMenu>
+                          <DropdownMenu anchor="bottom start">
                             <DropdownItem className='flex items-center gap-2' onClick={() => {
                               const newConnections = [...(yamlConfig.spec.connections || [])]
                               newConnections[index] = { ...connection, type: 'stage' }
@@ -959,7 +1006,7 @@ export function WorkflowNodeAccordion({
                                     {filter.type}
                                     <MaterialSymbol name="expand_more" size="sm" />
                                   </DropdownButton>
-                                  <DropdownMenu>
+                                  <DropdownMenu anchor="bottom start">
                                     <DropdownItem onClick={() => handleUpdateFilter(index, filter.id, 'type', 'data')}>
                                       <DropdownLabel>Data</DropdownLabel>
                                     </DropdownItem>
@@ -1263,7 +1310,7 @@ export function WorkflowNodeAccordion({
                                         {mapping.connection || 'Connection'}
                                         <MaterialSymbol name="expand_more" size="sm" />
                                       </DropdownButton>
-                                      <DropdownMenu>
+                                      <DropdownMenu anchor="bottom start">
                                         {yamlConfig.spec.connections?.map((connection, connIndex) => (
                                           <DropdownItem 
                                             key={connIndex}
@@ -1280,7 +1327,7 @@ export function WorkflowNodeAccordion({
                                         {mapping.value || 'Value'}
                                         <MaterialSymbol name="expand_more" size="sm" />
                                       </DropdownButton>
-                                      <DropdownMenu>
+                                      <DropdownMenu anchor="bottom start">
                                         {yamlConfig.spec.connections?.map((connection, connIndex) => (
                                           <DropdownItem 
                                             key={connIndex}
@@ -1606,108 +1653,268 @@ export function WorkflowNodeAccordion({
     },
     {
       id: 'executor',
-      title: 'Executor Configuration',
+      title: (
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center">
+            <span>Executor Configuration</span>
+            <ModificationIndicator sectionId="executor" />
+          </div>
+          {yamlConfig.spec.executor && yamlConfig.spec.executor.type !== 'default' && (
+            <span className="text-xs text-gray-600 dark:text-gray-400 text-code !font-normal pr-2">
+              {yamlConfig.spec.executor.type}
+            </span>
+          )}
+        </div>
+      ),
       content: (
         <div className="space-y-4">
-          <Field>
-            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Executor Type
-            </Label>
-            <Dropdown>
-              <DropdownButton outline className="w-full flex items-center justify-between">
-                <span>{yamlConfig.spec.executor?.type || 'Select executor type'}</span>
-                <MaterialSymbol name="expand_more" size="sm" />
-              </DropdownButton>
-              <DropdownMenu>
-                <DropdownItem onClick={() => handleExecutorTypeChange('semaphore')}>
-                  <DropdownLabel>Semaphore</DropdownLabel>
-                </DropdownItem>
-                <DropdownItem onClick={() => handleExecutorTypeChange('github')}>
-                  <DropdownLabel>GitHub</DropdownLabel>
-                </DropdownItem>
-              </DropdownMenu>
-            </Dropdown>
-          </Field>
-          
-          {yamlConfig.spec.executor?.type === 'github' && (
-            <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                GitHub Integration
-              </Label>
-              {!isGitHubConnected ? (
-                <div className="space-y-2">
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    Connect with GitHub to proceed
-                  </Text>
-                  <Button
-                    onClick={handleConnectGitHub}
-                    className="w-full flex items-center justify-center gap-2"
-                    color="blue"
-                  >
-                    <MaterialSymbol name="link" size="sm" />
-                    Connect with GitHub
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                    Select a GitHub project:
-                  </Text>
-                  <Dropdown>
-                    <DropdownButton outline className="w-full flex items-center justify-between">
-                      <span>
-                        {selectedGitHubProject ? 
-                          githubProjects.find(p => p.id === selectedGitHubProject)?.name : 
-                          'Select a project'
-                        }
-                      </span>
-                      <MaterialSymbol name="expand_more" size="sm" />
-                    </DropdownButton>
-                    <DropdownMenu>
-                      {githubProjects.map((project) => (
-                        <DropdownItem 
-                          key={project.id} 
-                          onClick={() => handleGitHubProjectSelect(project.id)}
-                        >
-                          <DropdownLabel>{project.name}</DropdownLabel>
-                        </DropdownItem>
-                      ))}
-                    </DropdownMenu>
-                  </Dropdown>
-                </div>
-              )}
-            </Field>
+          {/* Add Executor Button */}
+          {yamlConfig.spec.executor && yamlConfig.spec.executor.type == 'default' && (
+          <Link 
+            href="#"
+            onClick={handleAddExecutor}
+            className="flex items-center text-xs"
+          >
+            <MaterialSymbol name="add" size="sm" />
+            Add Executor
+          </Link>
           )}
-          
-          {yamlConfig.spec.executor?.type === 'semaphore' && (
-            <Field>
-              <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Configuration (JSON)
-              </Label>
-              <Textarea
-                value={JSON.stringify(yamlConfig.spec.executor?.config || {}, null, 2)}
-                onChange={(e) => {
-                  try {
-                    const config = JSON.parse(e.target.value)
-                    setYamlConfig(prev => ({ 
-                      ...prev, 
-                      spec: { 
-                        ...prev.spec, 
-                        executor: { 
-                          type: 'semaphore',
-                          config 
-                        }
-                      }
-                    }))
-                  } catch (err) {
-                    // Invalid JSON, don't update
-                  }
-                }}
-                placeholder="{}"
-                rows={6}
-                className="w-full font-mono text-sm"
-              />
-            </Field>
+          {/* Executor Display */}
+          {yamlConfig.spec.executor && yamlConfig.spec.executor.type !== 'default' && (
+            <div className="space-y-2">
+              <div className="flex">
+                {savedExecutors.has(0) ? (
+                  // Read-only mode - entire executor box is read-only
+                  <div className="flex-auto space-y-1 border border-zinc-50 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/20 p-2 rounded-sm">
+                    {/* Executor type and name with edit button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                          {yamlConfig.spec.executor.type === 'github' ? 'GitHub' : yamlConfig.spec.executor.type === 'semaphore' ? 'Semaphore' : yamlConfig.spec.executor.type}
+                        </h4>
+                      </div>
+                      <div className="flex items-center">
+                        <Button
+                          plain
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
+                          onClick={() => {
+                            // Remove from saved executors to make it editable again
+                            setSavedExecutors(prev => {
+                              const newSaved = new Set(prev);
+                              newSaved.delete(0);
+                              return newSaved;
+                            });
+                            console.log('Executor made editable:', yamlConfig.spec.executor);
+                          }}
+                        >
+                          <MaterialSymbol name="edit" size="sm" />
+                        </Button>
+                        <Button
+                          plain
+                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                          onClick={() => {
+                            // Remove executor
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { type: 'default', config: {} }
+                              } 
+                            }))
+                            
+                            markSectionModified('executor');
+                            
+                            // Also remove from saved executors
+                            setSavedExecutors(prev => {
+                              const newSaved = new Set(prev);
+                              newSaved.delete(0);
+                              return newSaved;
+                            });
+                            
+                            console.log('Executor deleted');
+                          }}
+                        >
+                          <MaterialSymbol name="delete" size="sm" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Editable mode - executor is editable inline
+                  <div className="flex-auto space-y-3 bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 rounded-sm">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 space-y-3">
+                        {/* Executor Type */}
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Executor Type
+                          </Label>
+                          <Dropdown>
+                            <DropdownButton color='white' className="w-full flex items-center !justify-between">
+                              <span>{yamlConfig.spec.executor?.type || 'Select executor type'}</span>
+                              <MaterialSymbol name="expand_more" size="sm" />
+                            </DropdownButton>
+                            <DropdownMenu anchor="bottom start">
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { type: 'semaphore', config: {} }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}>
+                                <DropdownLabel>Semaphore</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { type: 'github', config: {} }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }} className='flex items-center gap-2'>
+                             
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
+                                  </svg>
+                                  <DropdownLabel>GitHub</DropdownLabel>
+                                
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
+                        </Field>
+
+
+                        {/* GitHub specific fields */}
+                        {yamlConfig.spec.executor?.type === 'github' && (
+                          <Field>
+                            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                              GitHub Project
+                            </Label>
+                            {!isGitHubConnected ? (
+                              <div className="space-y-2">
+                                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                                  Connect with GitHub to proceed
+                                </Text>
+                                <Link
+                                  href='#'
+                                  onClick={handleConnectGitHub}
+                                  className="w-full flex items-center text-sm gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                                  
+                                >
+                                  <MaterialSymbol name="link" size="sm" />
+                                  Connect with GitHub
+                                </Link>
+                              </div>
+                            ) : (
+                              <Dropdown>
+                                <DropdownButton outline className="w-full flex items-center !justify-between">
+                                  <span>
+                                    {selectedGitHubProject ? 
+                                      githubProjects.find(p => p.id === selectedGitHubProject)?.name : 
+                                      'Select a project'
+                                    }
+                                  </span>
+                                  <MaterialSymbol name="expand_more" size="sm" />
+                                </DropdownButton>
+                                <DropdownMenu anchor="bottom start">
+                                  {githubProjects.map((project) => (
+                                    <DropdownItem 
+                                      key={project.id} 
+                                      onClick={() => handleGitHubProjectSelect(project.id)}
+                                    >
+                                      <DropdownLabel>{project.name}</DropdownLabel>
+                                    </DropdownItem>
+                                  ))}
+                                </DropdownMenu>
+                              </Dropdown>
+                            )}
+                          </Field>
+                        )}
+
+                        {/* Semaphore specific fields */}
+                        {yamlConfig.spec.executor?.type === 'semaphore' && (
+                          <Field>
+                            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                              Configuration (JSON)
+                            </Label>
+                            <Textarea
+                              value={JSON.stringify(yamlConfig.spec.executor?.config || {}, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const config = JSON.parse(e.target.value)
+                                  setYamlConfig(prev => ({ 
+                                    ...prev, 
+                                    spec: { 
+                                      ...prev.spec, 
+                                      executor: { 
+                                        type: prev.spec.executor?.type || 'semaphore',
+                                        config 
+                                      }
+                                    }
+                                  }))
+                                  markSectionModified('executor');
+                                } catch (err) {
+                                  // Invalid JSON, don't update
+                                }
+                              }}
+                              placeholder="{}"
+                              rows={6}
+                              className="w-full font-mono text-sm"
+                            />
+                          </Field>
+                        )}
+
+                        {/* Save Button - only show if saveGranular is true */}
+                        {saveGranular && (
+                          <div className='flex items-center justify-end w-full border-t border-zinc-200 dark:border-zinc-700 pt-2'>
+                            <Button
+                              plain
+                              className='flex items-center !text-xs'
+                              onClick={() => {
+                                setSavedExecutors(prev => new Set([...prev, 0]));
+                                console.log('Executor cancelled');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              color='blue'
+                              className='flex items-center !text-xs'
+                              onClick={() => {
+                                // Save executor
+                                onUpdate?.({
+                                  yamlConfig: {
+                                    ...yamlConfig,
+                                    spec: {
+                                      ...yamlConfig.spec,
+                                      executor: yamlConfig.spec.executor || { type: 'default', config: {} }
+                                    }
+                                  }
+                                });
+                                
+                                setSavedExecutors(prev => new Set([...prev, 0]));
+                                // Clear modification status when saving
+                                clearSectionModified('executor');
+                                console.log('Executor saved:', yamlConfig.spec.executor);
+                              }}
+                            >
+                              <MaterialSymbol name="save" size="sm" />
+                              Save
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
           
           {partialSave && (
@@ -1717,7 +1924,7 @@ export function WorkflowNodeAccordion({
                 <Button
                   color='blue'
                   className='flex items-center !text-xs'
-                  onClick={handleExecutorSave}
+                  onClick={handleExecutorsSave}
                 >
                   <MaterialSymbol name="save" size="sm" />
                   Save
@@ -1841,21 +2048,25 @@ export function WorkflowNodeAccordion({
               Run
             </Button>
           
-            <Button 
-              type="button"
-              plain
-              className="flex items-center gap-2"
-              onClick={handleSave}
-            >
-              <MaterialSymbol name="save" size="md"/>
-              Save
-            </Button>
+            
+            
+            <Dropdown>
+              <DropdownButton plain className='flex items-center gap-2'>
+                <MaterialSymbol name="save" size="md"/>
+                Save
+                <MaterialSymbol name="expand_more" size="md"/>
+              </DropdownButton>
+              <DropdownMenu anchor="bottom start">
+                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           <Tippy content="" placement="top">
             <Dropdown>
               <DropdownButton plain>
                 <MaterialSymbol name="more_vert" size="md"/>
               </DropdownButton>
-              <DropdownMenu>
+              <DropdownMenu anchor="bottom start">
                 <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
                 <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
               </DropdownMenu>
@@ -1865,7 +2076,7 @@ export function WorkflowNodeAccordion({
           
         </div>
       )}
-        <div className="node-header p-4 flex justify-between border-b border-gray-200 justify-between">
+        <div className="node-header p-4 flex justify-between border-b border-gray-200 align-start items-start">
           <div className="flex flex-col w-full">
             <div className="flex items-center">
               <span className="material-symbols-outlined mr-2 text-gray-600 p-2 bg-zinc-100 dark:bg-zinc-700 rounded-xl">
@@ -1933,7 +2144,7 @@ export function WorkflowNodeAccordion({
               </div>
             )}
           </div>
-    
+          <Badge color="zinc">Draft</Badge>
       </div>
         {/* Header */}
         <div className="hidden p-4 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-700">
@@ -1994,9 +2205,16 @@ export function WorkflowNodeAccordion({
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                 Connect your GitHub account to access your repositories and enable GitHub-based execution.
                 </p>
-                <Button onClick={handleGitHubLogin} color="blue" className="flex items-center gap-2">
-                  <MaterialSymbol name="login" size="sm" />
-                  Login with GitHub
+                <Button 
+                  type="button"
+                  outline
+                  onClick={handleGitHubLogin}
+                  className="flex items-center w-full text-lg px-6 py-3"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
+                  </svg>
+                  Continue with GitHub
                 </Button>
               </div>
             </div>

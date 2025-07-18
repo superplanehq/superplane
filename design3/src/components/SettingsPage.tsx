@@ -10,6 +10,7 @@ import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel, Dr
 import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from './lib/Dialog/dialog'
 import { Input, InputGroup } from './lib/Input/input'
 import { Checkbox } from './lib/Checkbox/checkbox'
+import { Sidebar, SidebarBody, SidebarItem, SidebarLabel, SidebarSection } from './lib/Sidebar/sidebar'
 
 interface SettingsPageProps {
   onSignOut?: () => void
@@ -24,7 +25,7 @@ export function SettingsPage({
   onLinkClick,
   onConfigurationClick 
 }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'groups' | 'roles'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'secrets' | 'integrations' | 'delete'>('users')
   const [searchUsers, setSearchUsers] = useState('')
   const [inviteRole, setInviteRole] = useState('Member')
   const [userRoles, setUserRoles] = useState<Record<string, string>>({
@@ -88,14 +89,19 @@ export function SettingsPage({
       icon: <MaterialSymbol name="person" size="sm" />,
     },
     {
-      id: 'groups',
-      label: 'Groups',
-      icon: <MaterialSymbol name="group" size="sm" />,
+      id: 'secrets',
+      label: 'Secrets',
+      icon: <MaterialSymbol name="key" size="sm" />,
     },
     {
-      id: 'roles',
-      label: 'Roles',
-      icon: <MaterialSymbol name="admin_panel_settings" size="sm" />,
+      id: 'integrations',
+      label: 'Integrations',
+      icon: <MaterialSymbol name="integration_instructions" size="sm" />,
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: <MaterialSymbol name="delete" size="sm" />,
     },
   ]
 
@@ -233,55 +239,35 @@ export function SettingsPage({
   return (
     <div className="flex min-h-screen h-full bg-gray-50">
       {/* Vertical Navigation */}
-      <NavigationVertical
-        user={currentUser}
-        organization={currentOrganization}
-        showOrganization={true}
-        links={navigationLinks}
-        onHelpClick={handleHelpClick}
-        onUserMenuAction={handleUserMenuAction}
-        onOrganizationMenuAction={handleOrganizationMenuAction}
-        onLinkClick={handleLinkClick}
-        onConfigurationClick={undefined}
-      />
-
+      
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <header className="bg-white dark:bg-zinc-800 border-b border-zinc-200 dark:border-zinc-700 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-700">
-                Settings
-              </div>
-            </div>
-            
-            
-          </div>
-        </header>
+      
 
         {/* Settings Content */}
         <main className="flex-1 flex">
           {/* Sidebar Navigation */}
-          <div className="w-64 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-700 p-6">
-            <nav className="space-y-2">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as 'users' | 'groups' | 'roles')}
-                  className={clsx(
-                    'w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors',
-                    activeTab === tab.id
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                      : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800'
-                  )}
-                >
-                  {tab.icon}
-                  <span className="text-sm font-medium">{tab.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
+          <Sidebar className='w-70 bg-white dark:bg-zinc-950 border-r bw-1 border-zinc-200 dark:border-zinc-800'>
+                    
+            <SidebarBody>
+              
+         
+                {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
+                  <SidebarItem 
+                    key={tab.id} onClick={() => setActiveTab(tab.id as any)} 
+                    className={`${activeTab === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
+                  >
+                    <span className={`px-7 ${activeTab === tab.id ? 'font-semibold' : 'font-normal'}`}>
+                      <SidebarLabel>{tab.label}</SidebarLabel>
+                    </span>
+                  </SidebarItem>
+                ))}
+                
+          
+            </SidebarBody>
+          </Sidebar>
+       
 
           {/* Main Content Area */}
           <div className="flex-1 p-6">
@@ -454,74 +440,198 @@ export function SettingsPage({
               </div>
             )}
 
-            {activeTab === 'groups' && (
+            {activeTab === 'secrets' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <Subheading level={2}>Groups</Subheading>
-                  <Button color="blue" onClick={handleCreateGroup}>
+                  <Subheading level={2}>Secrets</Subheading>
+                  <Button color="blue">
                     <MaterialSymbol name="add" />
-                    Create Group
+                    Add Secret
                   </Button>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {mockGroups.map((group) => (
-                    <div key={group.id} className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <Subheading level={3}>{group.name}</Subheading>
-                        <div className="flex space-x-2">
-                          <Button plain>
-                            <MaterialSymbol name="edit" />
-                          </Button>
-                          <Button plain>
-                            <MaterialSymbol name="delete" />
-                          </Button>
-                        </div>
+                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+                  <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
+                    Manage environment variables and secrets for your workflows. These values are encrypted and can be used in your stage configurations.
+                  </Text>
+                  
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">DATABASE_URL</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 days ago</div>
                       </div>
-                      <Text className="text-zinc-600 dark:text-zinc-400 mb-4">{group.description}</Text>
-                      <Text className="text-sm text-zinc-500 dark:text-zinc-400">{group.members} members</Text>
+                      <div className="flex space-x-2">
+                        <Button plain>
+                          <MaterialSymbol name="edit" />
+                        </Button>
+                        <Button plain>
+                          <MaterialSymbol name="delete" />
+                        </Button>
+                      </div>
                     </div>
-                  ))}
+                    
+                    <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">API_KEY</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 1 week ago</div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button plain>
+                          <MaterialSymbol name="edit" />
+                        </Button>
+                        <Button plain>
+                          <MaterialSymbol name="delete" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between py-3">
+                      <div>
+                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">WEBHOOK_SECRET</div>
+                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 weeks ago</div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button plain>
+                          <MaterialSymbol name="edit" />
+                        </Button>
+                        <Button plain>
+                          <MaterialSymbol name="delete" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            {activeTab === 'roles' && (
+            {activeTab === 'integrations' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <Subheading level={2}>Roles</Subheading>
-                  <Button color="blue" onClick={handleCreateRole}>
+                  <Subheading level={2}>Integrations</Subheading>
+                  <Button color="blue">
                     <MaterialSymbol name="add" />
-                    Create Role
+                    Add Integration
                   </Button>
                 </div>
                 
-                <div className="space-y-4">
-                  {mockRoles.map((role) => (
-                    <div key={role.id} className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <Subheading level={3}>{role.name}</Subheading>
-                          <Text className="text-zinc-600 dark:text-zinc-400">{role.description}</Text>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
+                          <MaterialSymbol name="code" className="text-white" size="sm" />
                         </div>
-                        <div className="flex space-x-2">
-                          <Button plain>
-                            <MaterialSymbol name="edit" />
-                            Edit
-                          </Button>
-                          <Button plain>
-                            <MaterialSymbol name="delete" />
-                            Delete
-                          </Button>
-                        </div>
+                        <Subheading level={3}>GitHub</Subheading>
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400">
-                          {role.permissions.length} permission{role.permissions.length !== 1 ? 's' : ''}
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-xs text-green-600 dark:text-green-400">Connected</span>
                       </div>
                     </div>
-                  ))}
+                    <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
+                      Connected to your GitHub account for repository access and webhook triggers.
+                    </Text>
+                    <div className="flex space-x-2">
+                      <Button plain>
+                        <MaterialSymbol name="settings" />
+                        Configure
+                      </Button>
+                      <Button plain>
+                        <MaterialSymbol name="link_off" />
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-blue-500 rounded flex items-center justify-center">
+                          <MaterialSymbol name="cloud" className="text-white" size="sm" />
+                        </div>
+                        <Subheading level={3}>Slack</Subheading>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-zinc-400 rounded-full"></div>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Not Connected</span>
+                      </div>
+                    </div>
+                    <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
+                      Get notifications about workflow runs and deployments in your Slack channels.
+                    </Text>
+                    <div className="flex space-x-2">
+                      <Button color="blue">
+                        <MaterialSymbol name="link" />
+                        Connect
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-orange-500 rounded flex items-center justify-center">
+                          <MaterialSymbol name="webhook" className="text-white" size="sm" />
+                        </div>
+                        <Subheading level={3}>Custom Webhook</Subheading>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-zinc-400 rounded-full"></div>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400">Not Connected</span>
+                      </div>
+                    </div>
+                    <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
+                      Send workflow events to your custom webhook endpoint.
+                    </Text>
+                    <div className="flex space-x-2">
+                      <Button color="blue">
+                        <MaterialSymbol name="link" />
+                        Connect
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'delete' && (
+              <div className="space-y-6">
+                <Subheading level={2}>Danger Zone</Subheading>
+                
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+                  <div className="flex items-start gap-4">
+                    <MaterialSymbol name="warning" className="text-red-600 dark:text-red-400 mt-1" />
+                    <div className="flex-1">
+                      <Subheading level={3} className="text-red-900 dark:text-red-100 mb-2">
+                        Delete Canvas
+                      </Subheading>
+                      <Text className="text-red-700 dark:text-red-300 mb-4">
+                        Once you delete this canvas, there is no going back. This action cannot be undone.
+                        All workflows, configurations, and associated data will be permanently removed.
+                      </Text>
+                      
+                      <div className="space-y-3">
+                        <Text className="text-sm text-red-600 dark:text-red-400">
+                          This will permanently delete:
+                        </Text>
+                        <ul className="text-sm text-red-600 dark:text-red-400 space-y-1 ml-4">
+                          <li>• All workflow stages and configurations</li>
+                          <li>• All secrets and environment variables</li>
+                          <li>• All integration connections</li>
+                          <li>• All execution history and logs</li>
+                          <li>• All team member access</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="mt-6">
+                        <Button color="red">
+                          <MaterialSymbol name="delete" />
+                          Delete Canvas
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
