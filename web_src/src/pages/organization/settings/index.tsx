@@ -6,7 +6,6 @@ import { GeneralSettings } from './GeneralSettings'
 import { MembersSettings } from './MembersSettings'
 import { GroupsSettings } from './GroupsSettings'
 import { RolesSettings } from './RolesSettings'
-import { AddMembersPage } from './AddMembersPage'
 import { GroupMembersPage } from './GroupMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
@@ -23,19 +22,19 @@ export function OrganizationSettings() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user, fetchUser } = useUserStore()
-  
+
   // Fetch user data when component mounts
   useEffect(() => {
     fetchUser()
   }, [fetchUser])
-  
+
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
-  
+
   // Fetch organization details
   useEffect(() => {
     if (!orgId) return
-    
+
     const fetchOrganization = async () => {
       try {
         setLoading(true)
@@ -50,7 +49,7 @@ export function OrganizationSettings() {
         setLoading(false)
       }
     }
-    
+
     fetchOrganization()
   }, [orgId])
 
@@ -61,7 +60,7 @@ export function OrganizationSettings() {
       </div>
     )
   }
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -69,7 +68,7 @@ export function OrganizationSettings() {
       </div>
     )
   }
-  
+
   if (error || !organization) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -94,7 +93,7 @@ export function OrganizationSettings() {
           <SidebarBody>
             <SidebarSection>
               <div className='flex items-center gap-3 text-sm font-bold py-3'>
-                <Avatar 
+                <Avatar
                   className='w-6 h-6'
                   src={user?.avatar_url}
                   initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : 'U'}
@@ -113,10 +112,10 @@ export function OrganizationSettings() {
                 </span>
               </SidebarItem>
             </SidebarSection>
-            <SidebarDivider className='dark:border-zinc-800'/>
+            <SidebarDivider className='dark:border-zinc-800' />
             <SidebarSection>
               <div className='flex items-center gap-3 text-sm font-bold py-3'>
-                <Avatar 
+                <Avatar
                   className='w-6 h-6 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-white'
                   slot="icon"
                   initials={(organization.metadata?.displayName || organization.metadata?.name || orgId).charAt(0).toUpperCase()}
@@ -125,9 +124,9 @@ export function OrganizationSettings() {
                 <SidebarLabel className='text-zinc-900 dark:text-white'>{organization.metadata?.displayName || organization.metadata?.name || orgId}</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
-                <SidebarItem 
-                  key={tab.id} 
-                  onClick={() => navigate(`/organization/${orgId}/settings/${tab.id}`)} 
+                <SidebarItem
+                  key={tab.id}
+                  onClick={() => navigate(`/organization/${orgId}/settings/${tab.id}`)}
                   className={`${currentSection === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
                 >
                   <span className={`px-7 ${currentSection === tab.id ? 'font-semibold' : 'font-normal'}`}>
@@ -138,7 +137,7 @@ export function OrganizationSettings() {
             </SidebarSection>
           </SidebarBody>
         </Sidebar>
-        
+
         <div className="flex-1 overflow-auto bg-zinc-50 dark:bg-zinc-900">
           <div className="px-8 pb-8">
             <Routes>
@@ -147,7 +146,6 @@ export function OrganizationSettings() {
               <Route path="members" element={<MembersSettings organizationId={orgId} />} />
               <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
               <Route path="roles" element={<RolesSettings organizationId={orgId} />} />
-              <Route path="add-members" element={<AddMembersPage />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
