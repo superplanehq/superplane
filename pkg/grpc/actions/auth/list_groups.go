@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,11 +38,34 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			return nil, status.Error(codes.Internal, "failed to get group roles")
 		}
 
+		membersCount, err := authService.GetGroupMembersCount(req.DomainID, domainType, groupName)
+		if err != nil {
+			return nil, status.Error(codes.Internal, "failed to get group members count")
+		}
+
+		groupMetadata, err := models.FindGroupMetadata(groupName, domainType, req.DomainID)
+		var createdAt, updatedAt, displayName, description string
+		if err == nil {
+			createdAt = groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z")
+			updatedAt = groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z")
+			displayName = groupMetadata.DisplayName
+			description = groupMetadata.Description
+		} else {
+			// Use fallback values when metadata is not found
+			displayName = groupName
+			description = ""
+		}
+
 		groups[i] = &pb.Group{
-			Name:       groupName,
-			DomainType: req.DomainType,
-			DomainId:   req.DomainID,
-			Role:       role,
+			Name:         groupName,
+			DomainType:   req.DomainType,
+			DomainId:     req.DomainID,
+			Role:         role,
+			DisplayName:  displayName,
+			Description:  description,
+			MembersCount: int32(membersCount),
+			CreatedAt:    createdAt,
+			UpdatedAt:    updatedAt,
 		}
 	}
 

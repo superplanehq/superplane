@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -19,25 +20,32 @@ func convertDomainType(domainType pbAuth.DomainType) string {
 	}
 }
 
-func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string) (*pbAuth.Role, error) {
+func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbAuth.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
+	roleMetadata := roleMetadataMap[roleDef.Name]
 	role := &pbAuth.Role{
 		Name:        roleDef.Name,
 		DomainType:  convertDomainTypeToProto(roleDef.DomainType),
 		Permissions: permissions,
+		DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+		Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
 	}
 
 	if roleDef.InheritsFrom != nil {
+		inheritedRoleMetadata := roleMetadataMap[roleDef.InheritsFrom.Name]
 		role.InheritedRole = &pbAuth.Role{
 			Name:        roleDef.InheritsFrom.Name,
 			DomainType:  convertDomainTypeToProto(roleDef.InheritsFrom.DomainType),
 			Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
+			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+			Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
 		}
 	}
 
 	return role, nil
 }
+
 
 func convertPermissionsToProto(permissions []*authorization.Permission) []*pbAuth.Permission {
 	permList := make([]*pbAuth.Permission, len(permissions))
@@ -71,4 +79,22 @@ func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	require.NoError(t, err)
 	authService.EnableCache(false)
 	return authService
+}
+
+func CreateGroupWithMetadata(domainID, domainType, groupName, role, displayName, description string, authService authorization.Authorization) error {
+	err := authService.CreateGroup(domainID, domainType, groupName, role)
+	if err != nil {
+		return err
+	}
+
+	return models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
+}
+
+func CreateRoleWithMetadata(domainID string, roleDef *authorization.RoleDefinition, displayName, description string, authService authorization.Authorization) error {
+	err := authService.CreateCustomRole(domainID, roleDef)
+	if err != nil {
+		return err
+	}
+
+	return models.UpsertRoleMetadata(roleDef.Name, roleDef.DomainType, domainID, displayName, description)
 }

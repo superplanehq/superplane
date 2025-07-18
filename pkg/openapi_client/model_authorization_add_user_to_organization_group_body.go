@@ -22,6 +22,7 @@ var _ MappedNullable = &AuthorizationAddUserToOrganizationGroupBody{}
 type AuthorizationAddUserToOrganizationGroupBody struct {
 	OrganizationId *string `json:"organizationId,omitempty"`
 	UserId *string `json:"userId,omitempty"`
+	UserEmail *string `json:"userEmail,omitempty"`
 }
 
 // NewAuthorizationAddUserToOrganizationGroupBody instantiates a new AuthorizationAddUserToOrganizationGroupBody object
@@ -105,6 +106,38 @@ func (o *AuthorizationAddUserToOrganizationGroupBody) SetUserId(v string) {
 	o.UserId = &v
 }
 
+// GetUserEmail returns the UserEmail field value if set, zero value otherwise.
+func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmail() string {
+	if o == nil || IsNil(o.UserEmail) {
+		var ret string
+		return ret
+	}
+	return *o.UserEmail
+}
+
+// GetUserEmailOk returns a tuple with the UserEmail field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationAddUserToOrganizationGroupBody) GetUserEmailOk() (*string, bool) {
+	if o == nil || IsNil(o.UserEmail) {
+		return nil, false
+	}
+	return o.UserEmail, true
+}
+
+// HasUserEmail returns a boolean if a field has been set.
+func (o *AuthorizationAddUserToOrganizationGroupBody) HasUserEmail() bool {
+	if o != nil && !IsNil(o.UserEmail) {
+		return true
+	}
+
+	return false
+}
+
+// SetUserEmail gets a reference to the given string and assigns it to the UserEmail field.
+func (o *AuthorizationAddUserToOrganizationGroupBody) SetUserEmail(v string) {
+	o.UserEmail = &v
+}
+
 func (o AuthorizationAddUserToOrganizationGroupBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o AuthorizationAddUserToOrganizationGroupBody) ToMap() (map[string]interfa
 	}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
+	}
+	if !IsNil(o.UserEmail) {
+		toSerialize["userEmail"] = o.UserEmail
 	}
 	return toSerialize, nil
 }

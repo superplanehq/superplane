@@ -20,7 +20,7 @@ var _ MappedNullable = &AuthorizationGetOrganizationGroupUsersResponse{}
 
 // AuthorizationGetOrganizationGroupUsersResponse struct for AuthorizationGetOrganizationGroupUsersResponse
 type AuthorizationGetOrganizationGroupUsersResponse struct {
-	UserIds []string `json:"userIds,omitempty"`
+	Users []AuthorizationUser `json:"users,omitempty"`
 	Group *AuthorizationGroup `json:"group,omitempty"`
 }
 
@@ -41,36 +41,36 @@ func NewAuthorizationGetOrganizationGroupUsersResponseWithDefaults() *Authorizat
 	return &this
 }
 
-// GetUserIds returns the UserIds field value if set, zero value otherwise.
-func (o *AuthorizationGetOrganizationGroupUsersResponse) GetUserIds() []string {
-	if o == nil || IsNil(o.UserIds) {
-		var ret []string
+// GetUsers returns the Users field value if set, zero value otherwise.
+func (o *AuthorizationGetOrganizationGroupUsersResponse) GetUsers() []AuthorizationUser {
+	if o == nil || IsNil(o.Users) {
+		var ret []AuthorizationUser
 		return ret
 	}
-	return o.UserIds
+	return o.Users
 }
 
-// GetUserIdsOk returns a tuple with the UserIds field value if set, nil otherwise
+// GetUsersOk returns a tuple with the Users field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthorizationGetOrganizationGroupUsersResponse) GetUserIdsOk() ([]string, bool) {
-	if o == nil || IsNil(o.UserIds) {
+func (o *AuthorizationGetOrganizationGroupUsersResponse) GetUsersOk() ([]AuthorizationUser, bool) {
+	if o == nil || IsNil(o.Users) {
 		return nil, false
 	}
-	return o.UserIds, true
+	return o.Users, true
 }
 
-// HasUserIds returns a boolean if a field has been set.
-func (o *AuthorizationGetOrganizationGroupUsersResponse) HasUserIds() bool {
-	if o != nil && !IsNil(o.UserIds) {
+// HasUsers returns a boolean if a field has been set.
+func (o *AuthorizationGetOrganizationGroupUsersResponse) HasUsers() bool {
+	if o != nil && !IsNil(o.Users) {
 		return true
 	}
 
 	return false
 }
 
-// SetUserIds gets a reference to the given []string and assigns it to the UserIds field.
-func (o *AuthorizationGetOrganizationGroupUsersResponse) SetUserIds(v []string) {
-	o.UserIds = v
+// SetUsers gets a reference to the given []AuthorizationUser and assigns it to the Users field.
+func (o *AuthorizationGetOrganizationGroupUsersResponse) SetUsers(v []AuthorizationUser) {
+	o.Users = v
 }
 
 // GetGroup returns the Group field value if set, zero value otherwise.
@@ -115,8 +115,8 @@ func (o AuthorizationGetOrganizationGroupUsersResponse) MarshalJSON() ([]byte, e
 
 func (o AuthorizationGetOrganizationGroupUsersResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.UserIds) {
-		toSerialize["userIds"] = o.UserIds
+	if !IsNil(o.Users) {
+		toSerialize["users"] = o.Users
 	}
 	if !IsNil(o.Group) {
 		toSerialize["group"] = o.Group

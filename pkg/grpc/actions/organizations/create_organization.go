@@ -35,7 +35,7 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, 
 		return nil, status.Error(codes.InvalidArgument, "organization display name is required")
 	}
 
-	organization, err := models.CreateOrganization(userIDUUID, req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName)
+	organization, err := models.CreateOrganization(userIDUUID, req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName, req.Organization.Metadata.Description)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -65,6 +65,7 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, 
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
 				DisplayName: organization.DisplayName,
+				Description: organization.Description,
 				CreatedBy:   organization.CreatedBy.String(),
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),

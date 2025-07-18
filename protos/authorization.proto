@@ -122,7 +122,7 @@ service Authorization {
   //
   rpc CreateOrganizationGroup(CreateOrganizationGroupRequest) returns (CreateOrganizationGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups"
+      post: "/api/v1/authorization/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -138,7 +138,7 @@ service Authorization {
   //
   rpc CreateCanvasGroup(CreateCanvasGroupRequest) returns (CreateCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/groups"
+      post: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -154,7 +154,7 @@ service Authorization {
   //
   rpc AddUserToOrganizationGroup(AddUserToOrganizationGroupRequest) returns (AddUserToOrganizationGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/groups/{group_name}/users"
+      post: "/api/v1/authorization/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -170,7 +170,7 @@ service Authorization {
   //
   rpc AddUserToCanvasGroup(AddUserToCanvasGroupRequest) returns (AddUserToCanvasGroupResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
+      post: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -186,7 +186,8 @@ service Authorization {
   //
   rpc RemoveUserFromOrganizationGroup(RemoveUserFromOrganizationGroupRequest) returns (RemoveUserFromOrganizationGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/groups/{group_name}/users/{user_id}"
+      patch: "/api/v1/authorization/groups/{group_name}/users/remove"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from organization group";
@@ -201,7 +202,8 @@ service Authorization {
   //
   rpc RemoveUserFromCanvasGroup(RemoveUserFromCanvasGroupRequest) returns (RemoveUserFromCanvasGroupResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users/{user_id}"
+      patch: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users/remove"
+      body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Remove user from canvas group";
@@ -216,7 +218,7 @@ service Authorization {
   //
   rpc ListOrganizationGroups(ListOrganizationGroupsRequest) returns (ListOrganizationGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups"
+      get: "/api/v1/authorization/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization groups";
@@ -231,7 +233,7 @@ service Authorization {
   //
   rpc ListCanvasGroups(ListCanvasGroupsRequest) returns (ListCanvasGroupsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List canvas groups";
@@ -246,7 +248,7 @@ service Authorization {
   //
   rpc GetOrganizationGroupUsers(GetOrganizationGroupUsersRequest) returns (GetOrganizationGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}/users"
+      get: "/api/v1/authorization/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization group users";
@@ -261,7 +263,7 @@ service Authorization {
   //
   rpc GetCanvasGroupUsers(GetCanvasGroupUsersRequest) returns (GetCanvasGroupUsersResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}/users"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}/users"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group users";
@@ -276,7 +278,7 @@ service Authorization {
   //
   rpc GetOrganizationGroup(GetOrganizationGroupRequest) returns (GetOrganizationGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/groups/{group_name}"
+      get: "/api/v1/authorization/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization group";
@@ -291,11 +293,41 @@ service Authorization {
   //
   rpc GetCanvasGroup(GetCanvasGroupRequest) returns (GetCanvasGroupResponse) {
     option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/groups/{group_name}"
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get canvas group";
       description: "Returns details of a specific group within a canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting all users in an organization
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetOrganizationUsers(GetOrganizationUsersRequest) returns (GetOrganizationUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/organizations/{organization_id}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization users";
+      description: "Returns all users that have roles within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for getting all users in a canvas
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetCanvasUsers(GetCanvasUsersRequest) returns (GetCanvasUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/authorization/canvases/{canvas_id_or_name}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas users";
+      description: "Returns all users that have roles within a canvas";
       tags: "Authorization";
     };
   }
@@ -346,6 +378,68 @@ service Authorization {
       tags: "Authorization";
     };
   }
+
+  //
+  // Endpoint for updating an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateOrganizationGroup(UpdateOrganizationGroupRequest) returns (UpdateOrganizationGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/authorization/groups/{group_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update organization group";
+      description: "Updates an existing group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for deleting an organization group
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteOrganizationGroup(DeleteOrganizationGroupRequest) returns (DeleteOrganizationGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/authorization/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete organization group";
+      description: "Deletes an existing group within an organization";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for updating a canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateCanvasGroup(UpdateCanvasGroupRequest) returns (UpdateCanvasGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas group";
+      description: "Updates an existing group within a canvas";
+      tags: "Authorization";
+    };
+  }
+
+  //
+  // Endpoint for deleting a canvas group
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteCanvasGroup(DeleteCanvasGroupRequest) returns (DeleteCanvasGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/authorization/canvases/{canvas_id_or_name}/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete canvas group";
+      description: "Deletes an existing group within a canvas";
+      tags: "Authorization";
+    };
+  }
 }
 
 // User permissions listing messages
@@ -364,14 +458,20 @@ message ListUserPermissionsResponse {
 
 // Role assignment messages
 message AssignRoleRequest {
-  string user_id = 1;
+  oneof user_identifier {
+    string user_id = 1;
+    string user_email = 3;
+  }
   RoleAssignment role_assignment = 2;
 }
 
 message AssignRoleResponse {}
 
 message RemoveRoleRequest {
-  string user_id = 1;
+  oneof user_identifier {
+    string user_id = 1;
+    string user_email = 3;
+  }
   RoleAssignment role_assignment = 2;
 }
 
@@ -422,6 +522,8 @@ message CreateOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
   string role = 3;
+  string display_name = 4;
+  string description = 5;
 }
 
 message CreateOrganizationGroupResponse {
@@ -431,7 +533,10 @@ message CreateOrganizationGroupResponse {
 message AddUserToOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message AddUserToOrganizationGroupResponse {}
@@ -439,7 +544,10 @@ message AddUserToOrganizationGroupResponse {}
 message RemoveUserFromOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message RemoveUserFromOrganizationGroupResponse {}
@@ -458,7 +566,7 @@ message GetOrganizationGroupUsersRequest {
 }
 
 message GetOrganizationGroupUsersResponse {
-  repeated string user_ids = 1;
+  repeated User users = 1;
   Group group = 2;
 }
 
@@ -477,6 +585,8 @@ message CreateCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
   string role = 3;
+  string display_name = 4;
+  string description = 5;
 }
 
 message CreateCanvasGroupResponse {
@@ -486,7 +596,10 @@ message CreateCanvasGroupResponse {
 message AddUserToCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message AddUserToCanvasGroupResponse {}
@@ -494,7 +607,10 @@ message AddUserToCanvasGroupResponse {}
 message RemoveUserFromCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  string user_id = 3;
+  oneof user_identifier {
+    string user_id = 3;
+    string user_email = 4;
+  }
 }
 
 message RemoveUserFromCanvasGroupResponse {}
@@ -513,7 +629,7 @@ message GetCanvasGroupUsersRequest {
 }
 
 message GetCanvasGroupUsersResponse {
-  repeated string user_ids = 1;
+  repeated User users = 1;
   Group group = 2;
 }
 
@@ -526,6 +642,24 @@ message GetCanvasGroupResponse {
   Group group = 1;
 }
 
+// Organization users messages
+message GetOrganizationUsersRequest {
+  string organization_id = 1;
+}
+
+message GetOrganizationUsersResponse {
+  repeated User users = 1;
+}
+
+// Canvas users messages
+message GetCanvasUsersRequest {
+  string canvas_id_or_name = 1;
+}
+
+message GetCanvasUsersResponse {
+  repeated User users = 1;
+}
+
 // Custom role management messages
 message CreateRoleRequest {
   string name = 1;
@@ -533,6 +667,8 @@ message CreateRoleRequest {
   string domain_id = 3;
   repeated Permission permissions = 4;
   string inherited_role = 5;
+  string display_name = 6;
+  string description = 7;
 }
 
 message CreateRoleResponse {}
@@ -543,6 +679,8 @@ message UpdateRoleRequest {
   string domain_id = 3;
   repeated Permission permissions = 4;
   string inherited_role = 5;
+  string display_name = 6;
+  string description = 7;
 }
 
 message UpdateRoleResponse {}
@@ -555,12 +693,87 @@ message DeleteRoleRequest {
 
 message DeleteRoleResponse {}
 
+message UpdateOrganizationGroupRequest {
+  string organization_id = 1;
+  string group_name = 2;
+  string role = 3;
+  string display_name = 4;
+  string description = 5;
+}
+
+message UpdateOrganizationGroupResponse {
+  Group group = 1;
+}
+
+message DeleteOrganizationGroupRequest {
+  string organization_id = 1;
+  string group_name = 2;
+}
+
+message DeleteOrganizationGroupResponse {}
+
+message UpdateCanvasGroupRequest {
+  string canvas_id_or_name = 1;
+  string group_name = 2;
+  string role = 3;
+  string display_name = 4;
+  string description = 5;
+}
+
+message UpdateCanvasGroupResponse {
+  Group group = 1;
+}
+
+message DeleteCanvasGroupRequest {
+  string canvas_id_or_name = 1;
+  string group_name = 2;
+}
+
+message DeleteCanvasGroupResponse {}
+
 // Core data structures
 message Group {
   string name = 1;
   DomainType domain_type = 2;
   string domain_id = 3;
   string role = 4;
+  string display_name = 5;
+  string description = 6;
+  int32  members_count = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+message User {
+  string user_id = 1;
+  string display_name = 2;
+  string email = 3;
+  string avatar_url = 4;
+  bool is_active = 5;
+  string created_at = 6;
+  string updated_at = 7;
+  repeated UserRoleAssignment role_assignments = 8;
+  repeated AccountProvider account_providers = 9;
+}
+
+message UserRoleAssignment {
+  string role_name = 1;
+  string role_display_name = 2;
+  string role_description = 3;
+  DomainType domain_type = 4;
+  string domain_id = 5;
+  string assigned_at = 6;
+}
+
+message AccountProvider {
+  string provider_type = 1; // e.g., "google", "github", "email"
+  string provider_id = 2;   // unique ID from the provider
+  string email = 3;
+  string display_name = 4;
+  string avatar_url = 5;
+  bool is_primary = 6;
+  string created_at = 7;
+  string updated_at = 8;
 }
 
 message Role {
@@ -568,6 +781,8 @@ message Role {
   DomainType domain_type = 2;
   repeated Permission permissions = 3;
   Role inherited_role = 4;
+  string display_name = 5;
+  string description = 6;
 }
 
 message Permission {

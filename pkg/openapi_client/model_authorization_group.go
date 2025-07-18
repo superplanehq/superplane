@@ -24,6 +24,11 @@ type AuthorizationGroup struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
 	Role *string `json:"role,omitempty"`
+	DisplayName *string `json:"displayName,omitempty"`
+	Description *string `json:"description,omitempty"`
+	MembersCount *int32 `json:"membersCount,omitempty"`
+	CreatedAt *string `json:"createdAt,omitempty"`
+	UpdatedAt *string `json:"updatedAt,omitempty"`
 }
 
 // NewAuthorizationGroup instantiates a new AuthorizationGroup object
@@ -175,6 +180,166 @@ func (o *AuthorizationGroup) SetRole(v string) {
 	o.Role = &v
 }
 
+// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
+func (o *AuthorizationGroup) GetDisplayName() string {
+	if o == nil || IsNil(o.DisplayName) {
+		var ret string
+		return ret
+	}
+	return *o.DisplayName
+}
+
+// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationGroup) GetDisplayNameOk() (*string, bool) {
+	if o == nil || IsNil(o.DisplayName) {
+		return nil, false
+	}
+	return o.DisplayName, true
+}
+
+// HasDisplayName returns a boolean if a field has been set.
+func (o *AuthorizationGroup) HasDisplayName() bool {
+	if o != nil && !IsNil(o.DisplayName) {
+		return true
+	}
+
+	return false
+}
+
+// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
+func (o *AuthorizationGroup) SetDisplayName(v string) {
+	o.DisplayName = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *AuthorizationGroup) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationGroup) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *AuthorizationGroup) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *AuthorizationGroup) SetDescription(v string) {
+	o.Description = &v
+}
+
+// GetMembersCount returns the MembersCount field value if set, zero value otherwise.
+func (o *AuthorizationGroup) GetMembersCount() int32 {
+	if o == nil || IsNil(o.MembersCount) {
+		var ret int32
+		return ret
+	}
+	return *o.MembersCount
+}
+
+// GetMembersCountOk returns a tuple with the MembersCount field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationGroup) GetMembersCountOk() (*int32, bool) {
+	if o == nil || IsNil(o.MembersCount) {
+		return nil, false
+	}
+	return o.MembersCount, true
+}
+
+// HasMembersCount returns a boolean if a field has been set.
+func (o *AuthorizationGroup) HasMembersCount() bool {
+	if o != nil && !IsNil(o.MembersCount) {
+		return true
+	}
+
+	return false
+}
+
+// SetMembersCount gets a reference to the given int32 and assigns it to the MembersCount field.
+func (o *AuthorizationGroup) SetMembersCount(v int32) {
+	o.MembersCount = &v
+}
+
+// GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
+func (o *AuthorizationGroup) GetCreatedAt() string {
+	if o == nil || IsNil(o.CreatedAt) {
+		var ret string
+		return ret
+	}
+	return *o.CreatedAt
+}
+
+// GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationGroup) GetCreatedAtOk() (*string, bool) {
+	if o == nil || IsNil(o.CreatedAt) {
+		return nil, false
+	}
+	return o.CreatedAt, true
+}
+
+// HasCreatedAt returns a boolean if a field has been set.
+func (o *AuthorizationGroup) HasCreatedAt() bool {
+	if o != nil && !IsNil(o.CreatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetCreatedAt gets a reference to the given string and assigns it to the CreatedAt field.
+func (o *AuthorizationGroup) SetCreatedAt(v string) {
+	o.CreatedAt = &v
+}
+
+// GetUpdatedAt returns the UpdatedAt field value if set, zero value otherwise.
+func (o *AuthorizationGroup) GetUpdatedAt() string {
+	if o == nil || IsNil(o.UpdatedAt) {
+		var ret string
+		return ret
+	}
+	return *o.UpdatedAt
+}
+
+// GetUpdatedAtOk returns a tuple with the UpdatedAt field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationGroup) GetUpdatedAtOk() (*string, bool) {
+	if o == nil || IsNil(o.UpdatedAt) {
+		return nil, false
+	}
+	return o.UpdatedAt, true
+}
+
+// HasUpdatedAt returns a boolean if a field has been set.
+func (o *AuthorizationGroup) HasUpdatedAt() bool {
+	if o != nil && !IsNil(o.UpdatedAt) {
+		return true
+	}
+
+	return false
+}
+
+// SetUpdatedAt gets a reference to the given string and assigns it to the UpdatedAt field.
+func (o *AuthorizationGroup) SetUpdatedAt(v string) {
+	o.UpdatedAt = &v
+}
+
 func (o AuthorizationGroup) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -196,6 +361,21 @@ func (o AuthorizationGroup) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Role) {
 		toSerialize["role"] = o.Role
+	}
+	if !IsNil(o.DisplayName) {
+		toSerialize["displayName"] = o.DisplayName
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
+	}
+	if !IsNil(o.MembersCount) {
+		toSerialize["membersCount"] = o.MembersCount
+	}
+	if !IsNil(o.CreatedAt) {
+		toSerialize["createdAt"] = o.CreatedAt
+	}
+	if !IsNil(o.UpdatedAt) {
+		toSerialize["updatedAt"] = o.UpdatedAt
 	}
 	return toSerialize, nil
 }

@@ -24,6 +24,8 @@ type AuthorizationRole struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	Permissions []AuthorizationPermission `json:"permissions,omitempty"`
 	InheritedRole *AuthorizationRole `json:"inheritedRole,omitempty"`
+	DisplayName *string `json:"displayName,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewAuthorizationRole instantiates a new AuthorizationRole object
@@ -175,6 +177,70 @@ func (o *AuthorizationRole) SetInheritedRole(v AuthorizationRole) {
 	o.InheritedRole = &v
 }
 
+// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
+func (o *AuthorizationRole) GetDisplayName() string {
+	if o == nil || IsNil(o.DisplayName) {
+		var ret string
+		return ret
+	}
+	return *o.DisplayName
+}
+
+// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationRole) GetDisplayNameOk() (*string, bool) {
+	if o == nil || IsNil(o.DisplayName) {
+		return nil, false
+	}
+	return o.DisplayName, true
+}
+
+// HasDisplayName returns a boolean if a field has been set.
+func (o *AuthorizationRole) HasDisplayName() bool {
+	if o != nil && !IsNil(o.DisplayName) {
+		return true
+	}
+
+	return false
+}
+
+// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
+func (o *AuthorizationRole) SetDisplayName(v string) {
+	o.DisplayName = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *AuthorizationRole) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationRole) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *AuthorizationRole) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *AuthorizationRole) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o AuthorizationRole) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -196,6 +262,12 @@ func (o AuthorizationRole) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.InheritedRole) {
 		toSerialize["inheritedRole"] = o.InheritedRole
+	}
+	if !IsNil(o.DisplayName) {
+		toSerialize["displayName"] = o.DisplayName
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

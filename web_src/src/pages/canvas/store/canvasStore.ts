@@ -27,7 +27,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // Actions (equivalent to the reducer actions in the context implementation)
   initialize: (data: CanvasData) => {
-    console.log("Initializing Canvas with data:", data);
     set({
       canvas: data.canvas || {},
       stages: data.stages || [],
@@ -36,11 +35,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       nodePositions: {},
     });
     get().syncToReactFlow({ autoLayout: true });
-    console.log("Canvas initialized with stages:", data.stages?.length || 0);
   },
 
   addStage: (stage: SuperplaneStage) => {
-    console.log("Adding stage:", stage);
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
@@ -51,7 +48,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateStage: (stage: SuperplaneStage) => {
-    console.log("Updating stage:", stage);
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stage.metadata!.id ? {
         ...stage, queue: s.queue
@@ -61,7 +57,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
-    console.log("Adding connection group:", connectionGroup);
     set((state) => ({
       connectionGroups: [...state.connectionGroups, connectionGroup]
     }));
@@ -76,7 +71,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateEventSource: (eventSource: EventSourceWithEvents) => {
-    console.log("Updating event source:", eventSource);
     set((state) => ({
       eventSources: state.eventSources.map(es =>
         es.metadata!.id === eventSource.metadata!.id ? eventSource : es
@@ -86,7 +80,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateCanvas: (newCanvas: Partial<SuperplaneCanvas>) => {
-    console.log("Updating canvas:", newCanvas);
     set((state) => ({
       canvas: { ...state.canvas, ...newCanvas }
     }));
@@ -103,7 +96,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   approveStageEvent: (stageEventId: string, stageId: string) => {
-    console.log("[client action] Approving stage event:", stageEventId);
 
     // use post request to approve stage event
     // defined in @/api-client/api
@@ -244,8 +236,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   // Initialization with default properties
-  fitViewNode: (nodeId: string) => {
+  fitViewNode: () => {
     // Will be replaced when setReactFlowInstance is called
-    console.warn('fitViewNode called before ReactFlow instance was set', nodeId);
   },
 }));

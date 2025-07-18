@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,9 +35,27 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		return nil, status.Error(codes.Internal, "failed to get user roles")
 	}
 
+	// Extract all role names for batch metadata lookup
+	domainType := convertDomainType(req.DomainType)
+	roleNames := make([]string, len(roles))
+	for i, role := range roles {
+		roleNames[i] = role.Name
+		// Also add inherited role names
+		if role.InheritsFrom != nil {
+			roleNames = append(roleNames, role.InheritsFrom.Name)
+		}
+	}
+
+	// Batch fetch role metadata
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, req.DomainId)
+	if err != nil {
+		// Log error but continue with fallback behavior
+		roleMetadataMap = make(map[string]*models.RoleMetadata)
+	}
+
 	var rolesProto []*pb.Role
 	for _, role := range roles {
-		roleProto, err := convertRoleDefinitionToProto(role, authService, req.DomainId)
+		roleProto, err := convertRoleDefinitionToProto(role, authService, req.DomainId, roleMetadataMap)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to convert role definition")
 		}

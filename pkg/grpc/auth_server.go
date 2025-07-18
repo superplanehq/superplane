@@ -91,6 +91,18 @@ func (s *AuthorizationServer) ListOrganizationGroups(ctx context.Context, req *p
 	return auth.ConvertToListOrganizationGroupsResponse(genericResp.Groups), nil
 }
 
+func (s *AuthorizationServer) GetOrganizationGroup(ctx context.Context, req *pb.GetOrganizationGroupRequest) (*pb.GetOrganizationGroupResponse, error) {
+	genericReq := auth.ConvertGetOrganizationGroupRequest(req)
+	genericReq.DomainID = req.OrganizationId
+
+	genericResp, err := auth.GetGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToGetOrganizationGroupResponse(genericResp), nil
+}
+
 func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req *pb.GetOrganizationGroupUsersRequest) (*pb.GetOrganizationGroupUsersResponse, error) {
 	genericReq := auth.ConvertGetOrganizationGroupUsersRequest(req)
 	genericReq.DomainID = req.OrganizationId
@@ -101,6 +113,10 @@ func (s *AuthorizationServer) GetOrganizationGroupUsers(ctx context.Context, req
 	}
 
 	return auth.ConvertToGetOrganizationGroupUsersResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) GetOrganizationUsers(ctx context.Context, req *pb.GetOrganizationUsersRequest) (*pb.GetOrganizationUsersResponse, error) {
+	return auth.GetOrganizationUsers(ctx, req, s.authService)
 }
 
 func (s *AuthorizationServer) CreateCanvasGroup(ctx context.Context, req *pb.CreateCanvasGroupRequest) (*pb.CreateCanvasGroupResponse, error) {
@@ -159,6 +175,20 @@ func (s *AuthorizationServer) ListCanvasGroups(ctx context.Context, req *pb.List
 	return auth.ConvertToListCanvasGroupsResponse(genericResp.Groups), nil
 }
 
+func (s *AuthorizationServer) GetCanvasGroup(ctx context.Context, req *pb.GetCanvasGroupRequest) (*pb.GetCanvasGroupResponse, error) {
+	genericReq, err := auth.ConvertGetCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	genericResp, err := auth.GetGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToGetCanvasGroupResponse(genericResp), nil
+}
+
 func (s *AuthorizationServer) GetCanvasGroupUsers(ctx context.Context, req *pb.GetCanvasGroupUsersRequest) (*pb.GetCanvasGroupUsersResponse, error) {
 	genericReq, err := auth.ConvertGetCanvasGroupUsersRequest(req)
 	if err != nil {
@@ -183,4 +213,38 @@ func (s *AuthorizationServer) UpdateRole(ctx context.Context, req *pb.UpdateRole
 
 func (s *AuthorizationServer) DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest) (*pb.DeleteRoleResponse, error) {
 	return auth.DeleteRole(ctx, req, s.authService)
+}
+
+func (s *AuthorizationServer) UpdateOrganizationGroup(ctx context.Context, req *pb.UpdateOrganizationGroupRequest) (*pb.UpdateOrganizationGroupResponse, error) {
+	genericReq := auth.ConvertUpdateOrganizationGroupRequest(req)
+	genericReq.DomainID = req.OrganizationId
+
+	genericResp, err := auth.UpdateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToUpdateOrganizationGroupResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) UpdateCanvasGroup(ctx context.Context, req *pb.UpdateCanvasGroupRequest) (*pb.UpdateCanvasGroupResponse, error) {
+	genericReq, err := auth.ConvertUpdateCanvasGroupRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
+	genericResp, err := auth.UpdateGroup(ctx, genericReq, s.authService)
+	if err != nil {
+		return nil, err
+	}
+
+	return auth.ConvertToUpdateCanvasGroupResponse(genericResp), nil
+}
+
+func (s *AuthorizationServer) DeleteOrganizationGroup(ctx context.Context, req *pb.DeleteOrganizationGroupRequest) (*pb.DeleteOrganizationGroupResponse, error) {
+	return auth.DeleteOrganizationGroup(ctx, req, s.authService)
+}
+
+func (s *AuthorizationServer) DeleteCanvasGroup(ctx context.Context, req *pb.DeleteCanvasGroupRequest) (*pb.DeleteCanvasGroupResponse, error) {
+	return auth.DeleteCanvasGroup(ctx, req, s.authService)
 }

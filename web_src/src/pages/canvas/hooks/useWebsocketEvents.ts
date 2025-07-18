@@ -31,9 +31,9 @@ export function useWebsocketEvents(canvasId: string): void {
       reconnectAttempts: 10,
       heartbeat: false,
       reconnectInterval: 3000,
-      onOpen: () => console.log('WebSocket connected'),
-      onError: (error) => console.error('WebSocket error:', error),
-      onClose: (event) => console.log('WebSocket closed:', event),
+      onOpen: () => {},
+      onError: () => {},
+      onClose: () => {},
       share: false, // Setting share to false to avoid issues with multiple connections
     }
   );
@@ -92,7 +92,6 @@ export function useWebsocketEvents(canvasId: string): void {
           updateEventSource(updatedEventSource);
 
         } else {
-          console.warn(`Event source not found for new event: ${newEventPayload.source_id}`);
         }
 
         break;
@@ -109,7 +108,6 @@ export function useWebsocketEvents(canvasId: string): void {
         syncStageEvents(canvasId, executionStartedPayload.stage_id);
         break;
       default:
-        console.warn('Unhandled event type:', event);
     }
 
 

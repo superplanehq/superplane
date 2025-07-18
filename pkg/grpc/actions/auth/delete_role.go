@@ -36,7 +36,7 @@ func DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest, authService auth
 	err = authService.DeleteCustomRole(req.DomainId, domainType, req.RoleName)
 	if err != nil {
 		log.Errorf("failed to delete role %s: %v", req.RoleName, err)
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	log.Infof("deleted custom role %s from domain %s (%s)", req.RoleName, req.DomainId, domainType)

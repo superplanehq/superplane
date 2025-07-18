@@ -7,7 +7,6 @@ import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSour
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
-import Navigation from "../../components/Navigation";
 
 // No props needed as we'll get the ID from the URL params
 
@@ -151,9 +150,7 @@ export function Canvas() {
   }
 
   return (
-    <StrictMode>
-      <Navigation />
-      
+    <StrictMode>      
       <div className="relative" style={{ height: "calc(100vh - 3rem)", marginTop: "3rem", overflow: "hidden" }}>
         <ComponentSidebar 
           isOpen={isComponentSidebarOpen} 

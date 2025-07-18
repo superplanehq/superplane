@@ -6,6 +6,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -63,6 +64,20 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", req.RoleName, err)
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// Update role metadata if display name or description is provided
+	if req.DisplayName != "" || req.Description != "" {
+		displayName := req.DisplayName
+		if displayName == "" {
+			displayName = req.RoleName // Fallback to role name
+		}
+
+		err = models.UpsertRoleMetadata(req.RoleName, domainType, req.DomainId, displayName, req.Description)
+		if err != nil {
+			log.Errorf("failed to update role metadata for %s: %v", req.RoleName, err)
+			// Don't fail the entire operation for metadata errors
+		}
 	}
 
 	log.Infof("updated custom role %s in domain %s (%s)", req.RoleName, req.DomainId, domainType)

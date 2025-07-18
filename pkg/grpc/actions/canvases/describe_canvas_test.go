@@ -30,7 +30,7 @@ func Test__DescribeCanvas(t *testing.T) {
 	})
 
 	t.Run("empty canvas", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization")
+		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "")
 		require.NoError(t, err)
 		canvas, err := models.CreateCanvas(userID, organization.ID, "test")
 		require.NoError(t, err)

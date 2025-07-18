@@ -17,5 +17,6 @@ p,role:org_admin,org:{ORG_ID},role,delete
 p,role:org_admin,org:{ORG_ID},group,create
 p,role:org_admin,org:{ORG_ID},group,read
 p,role:org_admin,org:{ORG_ID},group,update
+p,role:org_admin,org:{ORG_ID},group,delete
 p,role:org_owner,org:{ORG_ID},org,update
 p,role:org_owner,org:{ORG_ID},org,delete

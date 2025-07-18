@@ -24,6 +24,7 @@ type OrganizationsOrganizationMetadata struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 	DisplayName *string `json:"displayName,omitempty"`
+	Description *string `json:"description,omitempty"`
 	CreatedBy *string `json:"createdBy,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
@@ -142,6 +143,38 @@ func (o *OrganizationsOrganizationMetadata) SetDisplayName(v string) {
 	o.DisplayName = &v
 }
 
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *OrganizationsOrganizationMetadata) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *OrganizationsOrganizationMetadata) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *OrganizationsOrganizationMetadata) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *OrganizationsOrganizationMetadata) SetDescription(v string) {
+	o.Description = &v
+}
+
 // GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
 func (o *OrganizationsOrganizationMetadata) GetCreatedBy() string {
 	if o == nil || IsNil(o.CreatedBy) {
@@ -256,6 +289,9 @@ func (o OrganizationsOrganizationMetadata) ToMap() (map[string]interface{}, erro
 	}
 	if !IsNil(o.DisplayName) {
 		toSerialize["displayName"] = o.DisplayName
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	if !IsNil(o.CreatedBy) {
 		toSerialize["createdBy"] = o.CreatedBy

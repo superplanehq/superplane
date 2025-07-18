@@ -59,6 +59,9 @@ func UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) 
 	if req.Organization.Metadata.DisplayName != "" {
 		organization.DisplayName = req.Organization.Metadata.DisplayName
 	}
+	if req.Organization.Metadata.Description != "" {
+		organization.Description = req.Organization.Metadata.Description
+	}
 	organization.UpdatedAt = &now
 
 	err = database.Conn().Save(organization).Error
@@ -77,6 +80,7 @@ func UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) 
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
 				DisplayName: organization.DisplayName,
+				Description: organization.Description,
 				CreatedBy:   organization.CreatedBy.String(),
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),

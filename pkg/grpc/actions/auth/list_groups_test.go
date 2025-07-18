@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -42,6 +43,8 @@ func Test_ListGroups(t *testing.T) {
 			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, group.DomainType)
 			assert.Equal(t, orgID, group.DomainId)
 			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Role)
+			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
+			// CreatedAt and UpdatedAt may be empty if no metadata exists
 		}
 
 		// Check specific group names
@@ -90,6 +93,8 @@ func Test_ListGroups(t *testing.T) {
 			assert.NotEmpty(t, group.Name)
 			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, group.DomainType)
 			assert.Equal(t, canvasID, group.DomainId)
+			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
+			// CreatedAt and UpdatedAt may be empty if no metadata exists
 		}
 
 		// Check specific group names
@@ -99,5 +104,39 @@ func Test_ListGroups(t *testing.T) {
 		}
 		assert.Contains(t, groupNames, "canvas-group-1")
 		assert.Contains(t, groupNames, "canvas-group-2")
+	})
+
+	t.Run("groups with metadata have timestamps", func(t *testing.T) {
+		// Create group metadata for one of the groups
+		err := models.UpsertGroupMetadata("test-group-1", "org", orgID, "Test Group 1", "A test group")
+		require.NoError(t, err)
+
+		// Add a user to the group to test members count
+		err = authService.AddUserToGroup(orgID, "org", "test-user-1", "test-group-1")
+		require.NoError(t, err)
+
+		req := &GroupRequest{
+			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainID:   orgID,
+		}
+
+		resp, err := ListGroups(ctx, req, authService)
+		require.NoError(t, err)
+
+		// Find the group with metadata
+		var groupWithMetadata *pb.Group
+		for _, group := range resp.Groups {
+			if group.Name == "test-group-1" {
+				groupWithMetadata = group
+				break
+			}
+		}
+
+		require.NotNil(t, groupWithMetadata)
+		assert.NotEmpty(t, groupWithMetadata.CreatedAt)
+		assert.NotEmpty(t, groupWithMetadata.UpdatedAt)
+		assert.Equal(t, int32(1), groupWithMetadata.MembersCount)
+		assert.Equal(t, "Test Group 1", groupWithMetadata.DisplayName)
+		assert.Equal(t, "A test group", groupWithMetadata.Description)
 	})
 }

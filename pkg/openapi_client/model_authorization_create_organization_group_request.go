@@ -23,6 +23,8 @@ type AuthorizationCreateOrganizationGroupRequest struct {
 	OrganizationId *string `json:"organizationId,omitempty"`
 	GroupName *string `json:"groupName,omitempty"`
 	Role *string `json:"role,omitempty"`
+	DisplayName *string `json:"displayName,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 // NewAuthorizationCreateOrganizationGroupRequest instantiates a new AuthorizationCreateOrganizationGroupRequest object
@@ -138,6 +140,70 @@ func (o *AuthorizationCreateOrganizationGroupRequest) SetRole(v string) {
 	o.Role = &v
 }
 
+// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetDisplayName() string {
+	if o == nil || IsNil(o.DisplayName) {
+		var ret string
+		return ret
+	}
+	return *o.DisplayName
+}
+
+// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetDisplayNameOk() (*string, bool) {
+	if o == nil || IsNil(o.DisplayName) {
+		return nil, false
+	}
+	return o.DisplayName, true
+}
+
+// HasDisplayName returns a boolean if a field has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) HasDisplayName() bool {
+	if o != nil && !IsNil(o.DisplayName) {
+		return true
+	}
+
+	return false
+}
+
+// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
+func (o *AuthorizationCreateOrganizationGroupRequest) SetDisplayName(v string) {
+	o.DisplayName = &v
+}
+
+// GetDescription returns the Description field value if set, zero value otherwise.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetDescription() string {
+	if o == nil || IsNil(o.Description) {
+		var ret string
+		return ret
+	}
+	return *o.Description
+}
+
+// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) GetDescriptionOk() (*string, bool) {
+	if o == nil || IsNil(o.Description) {
+		return nil, false
+	}
+	return o.Description, true
+}
+
+// HasDescription returns a boolean if a field has been set.
+func (o *AuthorizationCreateOrganizationGroupRequest) HasDescription() bool {
+	if o != nil && !IsNil(o.Description) {
+		return true
+	}
+
+	return false
+}
+
+// SetDescription gets a reference to the given string and assigns it to the Description field.
+func (o *AuthorizationCreateOrganizationGroupRequest) SetDescription(v string) {
+	o.Description = &v
+}
+
 func (o AuthorizationCreateOrganizationGroupRequest) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -156,6 +222,12 @@ func (o AuthorizationCreateOrganizationGroupRequest) ToMap() (map[string]interfa
 	}
 	if !IsNil(o.Role) {
 		toSerialize["role"] = o.Role
+	}
+	if !IsNil(o.DisplayName) {
+		toSerialize["displayName"] = o.DisplayName
+	}
+	if !IsNil(o.Description) {
+		toSerialize["description"] = o.Description
 	}
 	return toSerialize, nil
 }

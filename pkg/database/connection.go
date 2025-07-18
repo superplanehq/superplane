@@ -96,6 +96,6 @@ func TruncateTables() error {
 		integrations, resources,
 		execution_resources,
 		secrets, account_providers, users, organizations,
-		casbin_rule;
+		casbin_rule, role_metadata, group_metadata;
 	`).Error
 }

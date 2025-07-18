@@ -34,6 +34,7 @@ func Test__CreateOrganization(t *testing.T) {
 			Metadata: &protos.Organization_Metadata{
 				Name:        "test-org",
 				DisplayName: "Test Organization",
+				Description: "This is a test organization",
 			},
 		}
 
@@ -49,6 +50,7 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.NotEmpty(t, response.Organization.Metadata.UpdatedAt)
 		assert.Equal(t, "test-org", response.Organization.Metadata.Name)
 		assert.Equal(t, "Test Organization", response.Organization.Metadata.DisplayName)
+		assert.Equal(t, "This is a test organization", response.Organization.Metadata.Description)
 		assert.Equal(t, user.ID.String(), response.Organization.Metadata.CreatedBy)
 	})
 

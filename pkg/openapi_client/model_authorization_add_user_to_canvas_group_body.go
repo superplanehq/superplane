@@ -21,6 +21,7 @@ var _ MappedNullable = &AuthorizationAddUserToCanvasGroupBody{}
 // AuthorizationAddUserToCanvasGroupBody struct for AuthorizationAddUserToCanvasGroupBody
 type AuthorizationAddUserToCanvasGroupBody struct {
 	UserId *string `json:"userId,omitempty"`
+	UserEmail *string `json:"userEmail,omitempty"`
 }
 
 // NewAuthorizationAddUserToCanvasGroupBody instantiates a new AuthorizationAddUserToCanvasGroupBody object
@@ -72,6 +73,38 @@ func (o *AuthorizationAddUserToCanvasGroupBody) SetUserId(v string) {
 	o.UserId = &v
 }
 
+// GetUserEmail returns the UserEmail field value if set, zero value otherwise.
+func (o *AuthorizationAddUserToCanvasGroupBody) GetUserEmail() string {
+	if o == nil || IsNil(o.UserEmail) {
+		var ret string
+		return ret
+	}
+	return *o.UserEmail
+}
+
+// GetUserEmailOk returns a tuple with the UserEmail field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *AuthorizationAddUserToCanvasGroupBody) GetUserEmailOk() (*string, bool) {
+	if o == nil || IsNil(o.UserEmail) {
+		return nil, false
+	}
+	return o.UserEmail, true
+}
+
+// HasUserEmail returns a boolean if a field has been set.
+func (o *AuthorizationAddUserToCanvasGroupBody) HasUserEmail() bool {
+	if o != nil && !IsNil(o.UserEmail) {
+		return true
+	}
+
+	return false
+}
+
+// SetUserEmail gets a reference to the given string and assigns it to the UserEmail field.
+func (o *AuthorizationAddUserToCanvasGroupBody) SetUserEmail(v string) {
+	o.UserEmail = &v
+}
+
 func (o AuthorizationAddUserToCanvasGroupBody) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -84,6 +117,9 @@ func (o AuthorizationAddUserToCanvasGroupBody) ToMap() (map[string]interface{}, 
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
+	}
+	if !IsNil(o.UserEmail) {
+		toSerialize["userEmail"] = o.UserEmail
 	}
 	return toSerialize, nil
 }
