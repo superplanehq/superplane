@@ -1499,6 +1499,114 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/integrations": {
+      "get": {
+        "summary": "List integrations for a canvas",
+        "description": "List integrations for a canvas",
+        "operationId": "Superplane_ListIntegrations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneListIntegrationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      },
+      "post": {
+        "summary": "Create a new canvas integration",
+        "description": "Creates a new canvas integration",
+        "operationId": "Superplane_CreateIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SuperplaneCreateIntegrationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
+    "/api/v1/canvases/{canvasIdOrName}/integrations/{idOrName}": {
+      "get": {
+        "summary": "Describe an integration for a canvas",
+        "description": "Describe an integration for a canvas",
+        "operationId": "Superplane_DescribeIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/secrets": {
       "get": {
         "summary": "List secrets",
@@ -2174,6 +2282,14 @@
     }
   },
   "definitions": {
+    "AuthToken": {
+      "type": "object",
+      "properties": {
+        "valueFrom": {
+          "$ref": "#/definitions/SuperplaneValueFrom"
+        }
+      }
+    },
     "AuthorizationAccountProvider": {
       "type": "object",
       "properties": {
@@ -2795,7 +2911,7 @@
         }
       }
     },
-    "ConnectionDataFilter": {
+    "EventSourceSpecSemaphore": {
       "type": "object",
       "properties": {
         "project": {

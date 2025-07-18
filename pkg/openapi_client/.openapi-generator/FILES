@@ -171,6 +171,7 @@ docs/SuperplaneValueFromEventData.md
 docs/SuperplaneValueFromLastExecution.md
 docs/SuperplaneValueFromSecret.md
 git_push.sh
+model_auth_token.go
 model_authorization_account_provider.go
 model_authorization_add_user_to_canvas_group_body.go
 model_authorization_add_user_to_organization_group_body.go
@@ -207,11 +208,7 @@ model_authorization_update_organization_group_response.go
 model_authorization_update_role_body.go
 model_authorization_user.go
 model_authorization_user_role_assignment.go
-model_connection_data_filter.go
-model_connection_filter.go
-model_connection_filter_operator.go
-model_connection_filter_type.go
-model_connection_header_filter.go
+model_event_source_spec_semaphore.go
 model_execution_result.go
 model_executor_spec_http.go
 model_executor_spec_http_response_policy.go
