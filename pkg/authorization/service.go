@@ -107,22 +107,20 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 }
 
 func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string) error {
-	validRoles := map[string][]string{
-		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
-		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
-	}
-
-	if roles, exists := validRoles[domainType]; exists {
-		if !contains(roles, role) {
-			return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
-		}
-	} else {
+	// Validate domain type
+	if domainType != DomainOrg && domainType != DomainCanvas {
 		return fmt.Errorf("invalid domain type %s", domainType)
 	}
 
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
 	prefixedRole := fmt.Sprintf("role:%s", role)
+
+	// Check if role exists in this domain using the enforcer
+	if !a.roleExistsInDomain(role, domain) {
+		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+	}
+
+	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
 
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
 	if err != nil {
@@ -159,21 +157,20 @@ func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName 
 }
 
 func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupName string, newRole string) error {
-	validRoles := map[string][]string{
-		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
-		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
-	}
-	if roles, exists := validRoles[domainType]; exists {
-		if !contains(roles, newRole) {
-			return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
-		}
-	} else {
+	// Validate domain type
+	if domainType != DomainOrg && domainType != DomainCanvas {
 		return fmt.Errorf("invalid domain type %s", domainType)
 	}
 
 	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+
+	// Check if role exists in this domain using the enforcer
+	if !a.roleExistsInDomain(newRole, domain) {
+		return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
+	}
+
 	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
-	
+
 	// Get current role
 	currentRole, err := a.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
