@@ -650,6 +650,10 @@ interface Canvas {
         </DialogBody>
         
         <DialogActions>
+          
+          <Button plain onClick={handleCreateCanvasCancel}>
+            Cancel
+          </Button>
           <Button 
             color="blue" 
             onClick={handleCreateCanvasSubmit}
@@ -658,9 +662,6 @@ interface Canvas {
           >
             <MaterialSymbol name="add" size="sm" />
             Create Canvas
-          </Button>
-          <Button plain onClick={handleCreateCanvasCancel}>
-            Cancel
           </Button>
         </DialogActions>
       </Dialog>
