@@ -8,6 +8,7 @@ import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
 import { CanvasEditorPage2 } from './components/CanvasEditorPage2'
 import { CanvasEditorPage3 } from './components/CanvasEditorPage3'
+import { CanvasEditorPage4 } from './components/CanvasEditorPage4'
 import { CanvasMembersPage } from './components/CanvasMembersPage'
 import { DashboardPage } from './components/DashboardPage'
 import { OrganizationPage } from './components/OrganizationPage'
@@ -245,6 +246,20 @@ function App() {
     const canvasId = currentPath.split('/canvas3/')[1]
     return (
       <CanvasEditorPage3 
+        canvasId={canvasId}
+        onBack={() => {
+          window.history.pushState(null, '', '/canvases')
+          setCurrentPath('/canvases')
+        }}
+      />
+    )
+  }
+  
+  // Canvas editor route 4
+  if (currentPath.startsWith('/canvas4/')) {
+    const canvasId = currentPath.split('/canvas4/')[1]
+    return (
+      <CanvasEditorPage4 
         canvasId={canvasId}
         onBack={() => {
           window.history.pushState(null, '', '/canvases')

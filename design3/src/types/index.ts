@@ -21,7 +21,7 @@ export interface WorkflowData extends Record<string, unknown> {
 }
 
 export interface WorkflowNode extends Node {
-  data: WorkflowData;
+  data: WorkflowData | Record<string, any>; // Allow for different node data types
 }
 
 export interface WorkflowEdge extends Edge {

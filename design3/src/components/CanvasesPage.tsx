@@ -8,9 +8,17 @@ import { Avatar } from './lib/Avatar/avatar'
 import { Dropdown, DropdownButton, DropdownItem, DropdownMenu } from './lib/Dropdown/dropdown'
 import { Checkbox, CheckboxField } from './lib/Checkbox/checkbox'
 import { Input, InputGroup } from './lib/Input/input'
-import { Label } from './lib/Fieldset/fieldset'
+import { Field, Label } from './lib/Fieldset/fieldset'
 import { Link } from './lib/Link/link'
 import { Divider } from './lib/Divider/divider'
+import { Textarea } from './lib/Textarea/textarea'
+import { 
+  Dialog, 
+  DialogTitle, 
+  DialogDescription, 
+  DialogBody, 
+  DialogActions 
+} from './lib/Dialog/dialog'
 import Tippy from '@tippyjs/react'
 
 interface CanvasesPageProps {
@@ -27,6 +35,11 @@ export function CanvasesPage({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const showIcons = false
   const [currentPage, setCurrentPage] = useState('home')
+  
+  // New canvas modal state
+  const [showCreateCanvasModal, setShowCreateCanvasModal] = useState(false)
+  const [newCanvasName, setNewCanvasName] = useState('')
+  const [newCanvasDescription, setNewCanvasDescription] = useState('')
 
 
 interface Canvas {
@@ -230,6 +243,39 @@ interface Canvas {
     const matchesStatus = filterStatus === 'all' || canvas.status === filterStatus
     return matchesSearch && matchesStatus
   })
+
+  // New canvas modal handlers
+  const handleCreateCanvasClick = () => {
+    setShowCreateCanvasModal(true)
+  }
+
+  const handleCreateCanvasCancel = () => {
+    setShowCreateCanvasModal(false)
+    setNewCanvasName('')
+    setNewCanvasDescription('')
+  }
+
+  const handleCreateCanvasSubmit = () => {
+    if (newCanvasName.trim()) {
+      // Generate new canvas ID
+      const newCanvasId = `canvas-${Date.now()}`
+      
+      // Reset form and close modal
+      setShowCreateCanvasModal(false)
+      setNewCanvasName('')
+      setNewCanvasDescription('')
+      
+      // Redirect to canvas editor
+      window.history.pushState(null, '', `/canvas/${newCanvasId}`)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+      
+      console.log('Creating new canvas:', {
+        id: newCanvasId,
+        name: newCanvasName.trim(),
+        description: newCanvasDescription.trim()
+      })
+    }
+  }
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900">
       {/* Navigation */}
@@ -295,7 +341,10 @@ interface Canvas {
                           <Text className="text-lg text-zinc-600 dark:text-zinc-400 hidden">
                             Create and manage your interactive canvases
                           </Text>
-                        <Button className='flex items-center bg-blue-700 text-white hover:bg-blue-600'>
+                        <Button 
+                          className='flex items-center bg-blue-700 text-white hover:bg-blue-600'
+                          onClick={handleCreateCanvasClick}
+                        >
                           <MaterialSymbol name="add" className="mr-2" />
                           New Canvas
                         </Button>
@@ -544,7 +593,11 @@ interface Canvas {
                               : 'Get started by creating your first canvas.'}
                           </Text>
                           {(!searchQuery && filterStatus === 'all') && (
-                            <Button color="blue" className='flex items-center gap-2'>
+                            <Button 
+                              color="blue" 
+                              className='flex items-center gap-2'
+                              onClick={handleCreateCanvasClick}
+                            >
                               <MaterialSymbol name="add" />
                               Create Canvas
                             </Button>
@@ -555,6 +608,62 @@ interface Canvas {
           </div>
         </div>
       </main>
+
+      {/* Create Canvas Modal */}
+      <Dialog open={showCreateCanvasModal} onClose={handleCreateCanvasCancel} size="lg">
+        <DialogTitle>Create New Canvas</DialogTitle>
+        <DialogDescription>
+          Create a new interactive canvas to build and manage your workflows.
+        </DialogDescription>
+        
+        <DialogBody>
+          <div className="space-y-6">
+            {/* Canvas Name */}
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Canvas name *
+              </Label>
+              <Input
+                type="text"
+                value={newCanvasName}
+                onChange={(e) => setNewCanvasName(e.target.value)}
+                placeholder="Enter canvas name"
+                className="w-full"
+                autoFocus
+              />
+            </Field>
+
+            {/* Canvas Description */}
+            <Field>
+              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                Description
+              </Label>
+              <Textarea
+                value={newCanvasDescription}
+                onChange={(e) => setNewCanvasDescription(e.target.value)}
+                placeholder="Describe what this canvas will be used for (optional)"
+                rows={3}
+                className="w-full"
+              />
+            </Field>
+          </div>
+        </DialogBody>
+        
+        <DialogActions>
+          <Button 
+            color="blue" 
+            onClick={handleCreateCanvasSubmit}
+            disabled={!newCanvasName.trim()}
+            className="flex items-center gap-2"
+          >
+            <MaterialSymbol name="add" size="sm" />
+            Create Canvas
+          </Button>
+          <Button plain onClick={handleCreateCanvasCancel}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }
