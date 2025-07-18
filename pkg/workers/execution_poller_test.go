@@ -8,20 +8,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
-	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
 
-const ExecutionFinishedRoutingKey = "execution-finished"
-
 func Test__ExecutionPoller(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source:       true,
-		SemaphoreAPI: true,
+		Source:      true,
+		Integration: true,
 	})
 
 	defer r.Close()
@@ -33,22 +30,31 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-	err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, spec, connections, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{})
-	require.NoError(t, err)
-	stage, err := r.Canvas.FindStageByName("stage-1")
-	require.NoError(t, err)
+	executorType, executorSpec, integrationResource := support.Executor(r)
+	stage, err := builders.NewStageBuilder().
+		WithEncryptor(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("stage-1").
+		WithRequester(r.User).
+		WithConnections(connections).
+		WithExecutorType(executorType).
+		WithExecutorSpec(executorSpec).
+		ForResource(integrationResource).
+		ForIntegration(r.Integration).
+		Create()
 
-	encryptor := &crypto.NoOpEncryptor{}
+	require.NoError(t, err)
+	resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
+	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionPoller(encryptor)
+	w := NewExecutionPoller(r.Encryptor)
 
-	t.Run("failed pipeline -> execution fails", func(t *testing.T) {
+	t.Run("failed resource -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
 		//
-		// Create execution
+		// Create failed resource
 		//
 		workflowID := uuid.New().String()
 		execution := support.CreateExecutionWithData(t, r.Source, stage,
@@ -57,30 +63,27 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.StartWithReferenceID(workflowID))
+		require.NoError(t, execution.Start())
+		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		require.NoError(t, err)
+		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
 		//
-		// Mock failed result and tick worker
+		// Trigger worker and verify execution goes to the finished state.
 		//
-		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultFailed)
 		err = w.Tick()
 		require.NoError(t, err)
-
-		//
-		// Verify execution eventually goes to the finished state, with result = failed.
-		//
 		require.Eventually(t, func() bool {
 			e, err := models.FindExecutionByID(execution.ID)
 			if err != nil {
 				return false
 			}
 
-			return e.State == models.StageExecutionFinished && e.Result == models.StageExecutionResultFailed
+			return e.State == models.ExecutionFinished && e.Result == models.ResultFailed
 		}, 5*time.Second, 200*time.Millisecond)
 
 		//
@@ -97,7 +100,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
-		assert.Equal(t, models.StageExecutionResultFailed, e.Execution.Result)
+		assert.Equal(t, models.ResultFailed, e.Execution.Result)
 		assert.NotEmpty(t, e.Execution.CreatedAt)
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)
@@ -107,19 +110,28 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		err = r.Canvas.CreateStage("stage-with-output", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceName: r.Source.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{
-			{Name: "MY_OUTPUT", Required: true},
-		}, []models.ValueDefinition{})
+		executorType, executorSpec, integrationResource := support.Executor(r)
+		stageWithOutput, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-with-output").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithOutputs([]models.OutputDefinition{{Name: "MY_OUTPUT", Required: true}}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
-		stageWithOutput, err := r.Canvas.FindStageByName("stage-with-output")
+		resource, err = models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
 
 		//
@@ -132,35 +144,32 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.StartWithReferenceID(workflowID))
+		require.NoError(t, execution.Start())
+		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		require.NoError(t, err)
+		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
 		//
-		// Mock passed result and tick worker
+		// Trigger worker and verify execution eventually goes to the finished state,
+		// with result = failed, even though the resource passed.
 		//
-		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
 		err = w.Tick()
 		require.NoError(t, err)
-
-		//
-		// Verify execution eventually goes to the finished state, with result = failed,
-		// even though the semaphore pipeline passed.
-		//
 		require.Eventually(t, func() bool {
 			e, err := models.FindExecutionByID(execution.ID)
 			if err != nil {
 				return false
 			}
 
-			return e.State == models.StageExecutionFinished && e.Result == models.StageExecutionResultFailed
+			return e.State == models.ExecutionFinished && e.Result == models.ResultFailed
 		}, 5*time.Second, 200*time.Millisecond)
 	})
 
-	t.Run("passed pipeline -> execution passes", func(t *testing.T) {
+	t.Run("passed resource -> execution passes", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
 		//
@@ -173,30 +182,28 @@ func Test__ExecutionPoller(t *testing.T) {
 			map[string]any{},
 		)
 
-		require.NoError(t, execution.StartWithReferenceID(workflowID))
+		require.NoError(t, execution.Start())
+		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		require.NoError(t, err)
+		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
 		//
-		// Mock passed result and tick worker
+		// Trigger the worker and erify execution eventually
+		// goes to the finished state, with result = failed.
 		//
-		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
 		err = w.Tick()
 		require.NoError(t, err)
-
-		//
-		// Verify execution eventually goes to the finished state, with result = failed.
-		//
 		require.Eventually(t, func() bool {
 			e, err := models.FindExecutionByID(execution.ID)
 			if err != nil {
 				return false
 			}
 
-			return e.State == models.StageExecutionFinished && e.Result == models.StageExecutionResultPassed
+			return e.State == models.ExecutionFinished && e.Result == models.ResultPassed
 		}, 5*time.Second, 200*time.Millisecond)
 
 		//
@@ -213,7 +220,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
-		assert.Equal(t, models.StageExecutionResultPassed, e.Execution.Result)
+		assert.Equal(t, models.ResultPassed, e.Execution.Result)
 		assert.NotEmpty(t, e.Execution.CreatedAt)
 		assert.NotEmpty(t, e.Execution.StartedAt)
 		assert.NotEmpty(t, e.Execution.FinishedAt)

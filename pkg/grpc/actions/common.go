@@ -1,12 +1,17 @@
 package actions
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,9 +30,9 @@ func ValidateUUIDs(ids ...string) error {
 
 func ExecutionResultToProto(result string) pb.Execution_Result {
 	switch result {
-	case models.StageExecutionResultFailed:
+	case models.ResultFailed:
 		return pb.Execution_RESULT_FAILED
-	case models.StageExecutionResultPassed:
+	case models.ResultPassed:
 		return pb.Execution_RESULT_PASSED
 	default:
 		return pb.Execution_RESULT_UNKNOWN
@@ -78,7 +83,7 @@ func ValidateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 			return nil, fmt.Errorf("invalid connection: %v", err)
 		}
 
-		filters, err := validateFilters(connection.Filters)
+		filters, err := ValidateFilters(connection.Filters)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +92,7 @@ func ValidateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 			SourceID:       *sourceID,
 			SourceName:     connection.Name,
 			SourceType:     protoToConnectionType(connection.Type),
-			FilterOperator: protoToFilterOperator(connection.FilterOperator),
+			FilterOperator: ProtoToFilterOperator(connection.FilterOperator),
 			Filters:        filters,
 		})
 	}
@@ -95,8 +100,8 @@ func ValidateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 	return cs, nil
 }
 
-func validateFilters(in []*pb.Connection_Filter) ([]models.ConnectionFilter, error) {
-	filters := []models.ConnectionFilter{}
+func ValidateFilters(in []*pb.Filter) ([]models.Filter, error) {
+	filters := []models.Filter{}
 	for i, f := range in {
 		filter, err := validateFilter(f)
 		if err != nil {
@@ -109,18 +114,18 @@ func validateFilters(in []*pb.Connection_Filter) ([]models.ConnectionFilter, err
 	return filters, nil
 }
 
-func validateFilter(filter *pb.Connection_Filter) (*models.ConnectionFilter, error) {
+func validateFilter(filter *pb.Filter) (*models.Filter, error) {
 	switch filter.Type {
-	case pb.Connection_FILTER_TYPE_DATA:
+	case pb.FilterType_FILTER_TYPE_DATA:
 		return validateDataFilter(filter.Data)
-	case pb.Connection_FILTER_TYPE_HEADER:
+	case pb.FilterType_FILTER_TYPE_HEADER:
 		return validateHeaderFilter(filter.Header)
 	default:
 		return nil, fmt.Errorf("invalid filter type: %s", filter.Type)
 	}
 }
 
-func validateDataFilter(filter *pb.Connection_DataFilter) (*models.ConnectionFilter, error) {
+func validateDataFilter(filter *pb.DataFilter) (*models.Filter, error) {
 	if filter == nil {
 		return nil, fmt.Errorf("no filter provided")
 	}
@@ -129,7 +134,7 @@ func validateDataFilter(filter *pb.Connection_DataFilter) (*models.ConnectionFil
 		return nil, fmt.Errorf("expression is empty")
 	}
 
-	return &models.ConnectionFilter{
+	return &models.Filter{
 		Type: models.FilterTypeData,
 		Data: &models.DataFilter{
 			Expression: filter.Expression,
@@ -137,7 +142,7 @@ func validateDataFilter(filter *pb.Connection_DataFilter) (*models.ConnectionFil
 	}, nil
 }
 
-func validateHeaderFilter(filter *pb.Connection_HeaderFilter) (*models.ConnectionFilter, error) {
+func validateHeaderFilter(filter *pb.HeaderFilter) (*models.Filter, error) {
 	if filter == nil {
 		return nil, fmt.Errorf("no filter provided")
 	}
@@ -146,7 +151,7 @@ func validateHeaderFilter(filter *pb.Connection_HeaderFilter) (*models.Connectio
 		return nil, fmt.Errorf("expression is empty")
 	}
 
-	return &models.ConnectionFilter{
+	return &models.Filter{
 		Type: models.FilterTypeHeader,
 		Header: &models.HeaderFilter{
 			Expression: filter.Expression,
@@ -167,21 +172,21 @@ func protoToConnectionType(t pb.Connection_Type) string {
 	}
 }
 
-func protoToFilterOperator(in pb.Connection_FilterOperator) string {
+func ProtoToFilterOperator(in pb.FilterOperator) string {
 	switch in {
-	case pb.Connection_FILTER_OPERATOR_OR:
+	case pb.FilterOperator_FILTER_OPERATOR_OR:
 		return models.FilterOperatorOr
 	default:
 		return models.FilterOperatorAnd
 	}
 }
 
-func filterOperatorToProto(in string) pb.Connection_FilterOperator {
+func filterOperatorToProto(in string) pb.FilterOperator {
 	switch in {
 	case models.FilterOperatorOr:
-		return pb.Connection_FILTER_OPERATOR_OR
+		return pb.FilterOperator_FILTER_OPERATOR_OR
 	default:
-		return pb.Connection_FILTER_OPERATOR_AND
+		return pb.FilterOperator_FILTER_OPERATOR_AND
 	}
 }
 
@@ -212,8 +217,8 @@ func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 	return connections, nil
 }
 
-func serializeFilters(in []models.ConnectionFilter) ([]*pb.Connection_Filter, error) {
-	filters := []*pb.Connection_Filter{}
+func serializeFilters(in []models.Filter) ([]*pb.Filter, error) {
+	filters := []*pb.Filter{}
 
 	for _, f := range in {
 		filter, err := serializeFilter(f)
@@ -227,19 +232,19 @@ func serializeFilters(in []models.ConnectionFilter) ([]*pb.Connection_Filter, er
 	return filters, nil
 }
 
-func serializeFilter(in models.ConnectionFilter) (*pb.Connection_Filter, error) {
+func serializeFilter(in models.Filter) (*pb.Filter, error) {
 	switch in.Type {
 	case models.FilterTypeData:
-		return &pb.Connection_Filter{
-			Type: pb.Connection_FILTER_TYPE_DATA,
-			Data: &pb.Connection_DataFilter{
+		return &pb.Filter{
+			Type: pb.FilterType_FILTER_TYPE_DATA,
+			Data: &pb.DataFilter{
 				Expression: in.Data.Expression,
 			},
 		}, nil
 	case models.FilterTypeHeader:
-		return &pb.Connection_Filter{
-			Type: pb.Connection_FILTER_TYPE_HEADER,
-			Header: &pb.Connection_HeaderFilter{
+		return &pb.Filter{
+			Type: pb.FilterType_FILTER_TYPE_HEADER,
+			Header: &pb.HeaderFilter{
 				Expression: in.Header.Expression,
 			},
 		}, nil
@@ -258,5 +263,62 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 		return pb.Connection_TYPE_CONNECTION_GROUP
 	default:
 		return pb.Connection_TYPE_UNKNOWN
+	}
+}
+
+func DomainTypeToProto(domainType string) pbAuth.DomainType {
+	switch domainType {
+	case authorization.DomainCanvas:
+		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
+	case authorization.DomainOrg:
+		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
+	default:
+		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
+	}
+}
+
+func ValidateIntegration(canvas *models.Canvas, integrationName string) (*models.Integration, error) {
+	if integrationName == "" {
+		return nil, status.Error(codes.InvalidArgument, "integration name is required")
+	}
+
+	// TODO: support for organization level integration
+	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationName)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
+	}
+
+	return integration, nil
+}
+
+func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integration *models.Integration, name string) (integrations.Resource, error) {
+	resourceType, err := GetResourceType(integration)
+	if err != nil {
+		return nil, err
+	}
+
+	//
+	// If resource record does not exist yet, we need to go to the integration to find it.
+	//
+	integrationImpl, err := integrations.NewIntegration(ctx, integration, encryptor)
+	if err != nil {
+		return nil, fmt.Errorf("error starting integration implementation: %v", err)
+	}
+
+	resource, err := integrationImpl.Get(resourceType, name)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "%s %s not found: %v", resourceType, name, err)
+	}
+
+	return resource, nil
+}
+
+func GetResourceType(integration *models.Integration) (string, error) {
+	switch integration.Type {
+	case models.IntegrationTypeSemaphore:
+		return integrations.ResourceTypeProject, nil
+
+	default:
+		return "", status.Error(codes.InvalidArgument, "unsupported integration type")
 	}
 }

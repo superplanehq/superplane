@@ -177,12 +177,12 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 	}
 
 	e := &pb.Execution{
-		Id:          execution.ID.String(),
-		ReferenceId: execution.ReferenceID,
-		State:       executionStateToProto(execution.State),
-		Result:      actions.ExecutionResultToProto(execution.Result),
-		CreatedAt:   timestamppb.New(*execution.CreatedAt),
-		Outputs:     []*pb.OutputValue{},
+		Id:        execution.ID.String(),
+		State:     executionStateToProto(execution.State),
+		Result:    actions.ExecutionResultToProto(execution.Result),
+		CreatedAt: timestamppb.New(*execution.CreatedAt),
+		Outputs:   []*pb.OutputValue{},
+		Resources: []*pb.ExecutionResource{},
 	}
 
 	if execution.StartedAt != nil {
@@ -197,16 +197,27 @@ func serializeStageEventExecution(event models.StageEvent) (*pb.Execution, error
 		e.Outputs = append(e.Outputs, &pb.OutputValue{Name: k, Value: v.(string)})
 	}
 
+	resources, err := execution.Resources()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, r := range resources {
+		e.Resources = append(e.Resources, &pb.ExecutionResource{
+			Id: r.ExternalID,
+		})
+	}
+
 	return e, nil
 }
 
 func executionStateToProto(state string) pb.Execution_State {
 	switch state {
-	case models.StageExecutionPending:
+	case models.ExecutionPending:
 		return pb.Execution_STATE_PENDING
-	case models.StageExecutionStarted:
+	case models.ExecutionStarted:
 		return pb.Execution_STATE_STARTED
-	case models.StageExecutionFinished:
+	case models.ExecutionFinished:
 		return pb.Execution_STATE_FINISHED
 	default:
 		return pb.Execution_STATE_UNKNOWN

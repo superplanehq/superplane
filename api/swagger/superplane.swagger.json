@@ -2798,47 +2798,7 @@
     "ConnectionDataFilter": {
       "type": "object",
       "properties": {
-        "expression": {
-          "type": "string"
-        }
-      }
-    },
-    "ConnectionFilter": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/ConnectionFilterType"
-        },
-        "data": {
-          "$ref": "#/definitions/ConnectionDataFilter"
-        },
-        "header": {
-          "$ref": "#/definitions/ConnectionHeaderFilter"
-        }
-      }
-    },
-    "ConnectionFilterOperator": {
-      "type": "string",
-      "enum": [
-        "FILTER_OPERATOR_AND",
-        "FILTER_OPERATOR_OR"
-      ],
-      "default": "FILTER_OPERATOR_AND",
-      "title": "Filters can be combined in two ways:\n  - FILTER_OPERATOR_AND: all filters must be true (default)\n  - FILTER_OPERATOR_OR: at least one filter must be true"
-    },
-    "ConnectionFilterType": {
-      "type": "string",
-      "enum": [
-        "FILTER_TYPE_UNKNOWN",
-        "FILTER_TYPE_DATA",
-        "FILTER_TYPE_HEADER"
-      ],
-      "default": "FILTER_TYPE_UNKNOWN"
-    },
-    "ConnectionHeaderFilter": {
-      "type": "object",
-      "properties": {
-        "expression": {
+        "project": {
           "type": "string"
         }
       }
@@ -2887,35 +2847,6 @@
         }
       }
     },
-    "ExecutorSpecSemaphore": {
-      "type": "object",
-      "properties": {
-        "projectId": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "taskId": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "apiToken": {
-          "type": "string"
-        },
-        "organizationUrl": {
-          "type": "string"
-        }
-      }
-    },
     "GroupByField": {
       "type": "object",
       "properties": {
@@ -2940,6 +2871,34 @@
       "properties": {
         "connection": {
           "type": "string"
+        }
+      }
+    },
+    "IntegrationAuth": {
+      "type": "object",
+      "properties": {
+        "use": {
+          "$ref": "#/definitions/IntegrationAuthType"
+        },
+        "token": {
+          "$ref": "#/definitions/AuthToken"
+        }
+      }
+    },
+    "IntegrationAuthType": {
+      "type": "string",
+      "enum": [
+        "AUTH_TYPE_NONE",
+        "AUTH_TYPE_TOKEN",
+        "AUTH_TYPE_OIDC"
+      ],
+      "default": "AUTH_TYPE_NONE"
+    },
+    "IntegrationOIDC": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
         }
       }
     },
@@ -3175,11 +3134,11 @@
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/ConnectionFilter"
+            "$ref": "#/definitions/SuperplaneFilter"
           }
         },
         "filterOperator": {
-          "$ref": "#/definitions/ConnectionFilterOperator"
+          "$ref": "#/definitions/SuperplaneFilterOperator"
         }
       }
     },
@@ -3383,6 +3342,22 @@
         }
       }
     },
+    "SuperplaneCreateIntegrationBody": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/SuperplaneIntegration"
+        }
+      }
+    },
+    "SuperplaneCreateIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/SuperplaneIntegration"
+        }
+      }
+    },
     "SuperplaneCreateSecretBody": {
       "type": "object",
       "properties": {
@@ -3415,6 +3390,14 @@
         }
       }
     },
+    "SuperplaneDataFilter": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string"
+        }
+      }
+    },
     "SuperplaneDeleteSecretResponse": {
       "type": "object"
     },
@@ -3439,6 +3422,14 @@
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
+        }
+      }
+    },
+    "SuperplaneDescribeIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/SuperplaneIntegration"
         }
       }
     },
@@ -3493,15 +3484,19 @@
     },
     "SuperplaneEventSourceSpec": {
       "type": "object",
-      "title": "No additional configuration needed as per the YAML example"
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/SuperplaneIntegrationRef"
+        },
+        "semaphore": {
+          "$ref": "#/definitions/EventSourceSpecSemaphore"
+        }
+      }
     },
     "SuperplaneExecution": {
       "type": "object",
       "properties": {
         "id": {
-          "type": "string"
-        },
-        "referenceId": {
           "type": "string"
         },
         "state": {
@@ -3528,6 +3523,21 @@
             "type": "object",
             "$ref": "#/definitions/SuperplaneOutputValue"
           }
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneExecutionResource"
+          }
+        }
+      }
+    },
+    "SuperplaneExecutionResource": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
         }
       }
     },
@@ -3547,11 +3557,37 @@
         "type": {
           "$ref": "#/definitions/SuperplaneExecutorSpecType"
         },
+        "integration": {
+          "$ref": "#/definitions/SuperplaneIntegrationRef"
+        },
         "semaphore": {
-          "$ref": "#/definitions/ExecutorSpecSemaphore"
+          "$ref": "#/definitions/SuperplaneExecutorSpecSemaphore"
         },
         "http": {
           "$ref": "#/definitions/ExecutorSpecHTTP"
+        }
+      }
+    },
+    "SuperplaneExecutorSpecSemaphore": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "task": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pipelineFile": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
       }
     },
@@ -3563,6 +3599,46 @@
         "TYPE_HTTP"
       ],
       "default": "TYPE_UNKNOWN"
+    },
+    "SuperplaneFilter": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneFilterType"
+        },
+        "data": {
+          "$ref": "#/definitions/SuperplaneDataFilter"
+        },
+        "header": {
+          "$ref": "#/definitions/SuperplaneHeaderFilter"
+        }
+      }
+    },
+    "SuperplaneFilterOperator": {
+      "type": "string",
+      "enum": [
+        "FILTER_OPERATOR_AND",
+        "FILTER_OPERATOR_OR"
+      ],
+      "default": "FILTER_OPERATOR_AND",
+      "title": "Filters can be combined in two ways:\n  - FILTER_OPERATOR_AND: all filters must be true (default)\n  - FILTER_OPERATOR_OR: at least one filter must be true"
+    },
+    "SuperplaneFilterType": {
+      "type": "string",
+      "enum": [
+        "FILTER_TYPE_UNKNOWN",
+        "FILTER_TYPE_DATA",
+        "FILTER_TYPE_HEADER"
+      ],
+      "default": "FILTER_TYPE_UNKNOWN"
+    },
+    "SuperplaneHeaderFilter": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string"
+        }
+      }
     },
     "SuperplaneInputDefinition": {
       "type": "object",
@@ -3589,6 +3665,78 @@
           "$ref": "#/definitions/InputMappingWhen"
         }
       }
+    },
+    "SuperplaneIntegration": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SuperplaneIntegrationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/SuperplaneIntegrationSpec"
+        }
+      }
+    },
+    "SuperplaneIntegrationMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneIntegrationRef": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "SuperplaneIntegrationSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/SuperplaneIntegrationType"
+        },
+        "url": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/definitions/IntegrationAuth"
+        },
+        "oidc": {
+          "$ref": "#/definitions/IntegrationOIDC"
+        }
+      }
+    },
+    "SuperplaneIntegrationType": {
+      "type": "string",
+      "enum": [
+        "TYPE_NONE",
+        "TYPE_SEMAPHORE",
+        "TYPE_GITHUB"
+      ],
+      "default": "TYPE_NONE"
     },
     "SuperplaneKeyValuePair": {
       "type": "object",
@@ -3645,6 +3793,18 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventSource"
+          }
+        }
+      }
+    },
+    "SuperplaneListIntegrationsResponse": {
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneIntegration"
           }
         }
       }

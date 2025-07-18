@@ -258,7 +258,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Health check
 	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
 
+	//
 	// Webhook endpoints (they have their own authentication)
+	//
+	// Any verification that happens here must be quick
+	// so we always respond with a 200 OK to the event origin.
+	// All the event processing happen on the workers.
+	//
+	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
 		Headers("Content-Type", "application/json").
@@ -488,12 +495,6 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 }
 
 func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
-	//
-	// Any verification that happens here must be quick
-	// so we always respond with a 200 OK to the event origin.
-	// All the event processing happen on the workers.
-	//
-
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)
@@ -517,67 +518,10 @@ func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//
-	// Only read up to the maximum event size we allow,
-	// and only proceed if payload is below that.
-	//
-	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
-	defer r.Body.Close()
-
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		if _, ok := err.(*http.MaxBytesError); ok {
-			http.Error(
-				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
-				http.StatusRequestEntityTooLarge,
-			)
-
-			return
-		}
-
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
-		return
-	}
-
-	headers, err := parseHeaders(&r.Header)
-	if err != nil {
-		http.Error(w, "Error parsing headers", http.StatusBadRequest)
-		return
-	}
-
-	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.Name))
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	signature = strings.Replace(signature, "sha256=", "", 1)
-	if err := crypto.VerifySignature(key, body, signature); err != nil {
-		log.Errorf("Invalid signature: %v", err)
-		http.Error(w, "Invalid signature", http.StatusForbidden)
-		return
-	}
-
-	//
-	// Here, we know the event is for a valid organization/source,
-	// and comes from GitHub, so we just want to save it and give a response back.
-	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
-		http.Error(w, "Error receiving event", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	s.handleWebhook(w, r, source, signature)
 }
 
 func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
-	//
-	// Any verification that happens here must be quick
-	// so we always respond with a 200 OK to the event origin.
-	// All the event processing happen on the workers.
-	//
-
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)
@@ -598,6 +542,10 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	s.handleWebhook(w, r, source, signature)
+}
+
+func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, source *models.EventSource, signature string) {
 	//
 	// Only read up to the maximum event size we allow,
 	// and only proceed if payload is below that.
@@ -627,7 +575,7 @@ func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.Name))
+	key, err := source.GetDecryptedKey(r.Context(), s.encryptor)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return

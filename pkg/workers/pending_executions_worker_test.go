@@ -1,15 +1,15 @@
 package workers
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -20,7 +20,9 @@ const ExecutionStartedRoutingKey = "execution-started"
 
 func Test__PendingExecutionsWorker(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{
-		Source: true, Stage: true, SemaphoreAPI: true, Approvals: 1,
+		Source:      true,
+		Integration: true,
+		Approvals:   1,
 	})
 
 	defer r.Close()
@@ -33,19 +35,27 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 	amqpURL, _ := config.RabbitMQURL()
 
-	t.Run("semaphore task is triggered with simple parameters", func(t *testing.T) {
+	t.Run("semaphore workflow is triggered with simple parameters", func(t *testing.T) {
 		//
-		// Create stage that trigger Semaphore task.
+		// Create stage that runs Semaphore workflow.
 		//
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		require.NoError(t, r.Canvas.CreateStage("stage-task", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{}, []models.InputMapping{}, []models.OutputDefinition{}, []models.ValueDefinition{}))
-
-		stage, err := r.Canvas.FindStageByName("stage-task")
+		executorType, executorSpec, resource := support.Executor(r)
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
 		require.NoError(t, err)
 
@@ -65,66 +75,80 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		require.NoError(t, err)
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionStarted, execution.State)
-		assert.NotEmpty(t, execution.ReferenceID)
+		assert.Equal(t, models.ExecutionStarted, execution.State)
 		assert.NotEmpty(t, execution.StartedAt)
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, models.ExecutionResourcePending, resources[0].State)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.SemaphoreAPIMock.LastTaskTrigger
+		req := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, req)
-		assert.Equal(t, "main", req.Spec.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
+		assert.Equal(t, "refs/heads/main", req.Reference)
+		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"PARAM_1": "VALUE_1",
 			"PARAM_2": "VALUE_2",
 		})
 	})
 
-	t.Run("semaphore task with resolved parameters is triggered", func(t *testing.T) {
+	t.Run("semaphore workflow with resolved parameters is triggered", func(t *testing.T) {
 		//
-		// Create stage that trigger Semaphore task.
+		// Create stage that runs Semaphore workflow.
 		//
-		spec := support.ExecutorSpecWithURL(r.SemaphoreAPIMock.Server.URL)
-		spec.Semaphore.Parameters = map[string]string{
+		executorType, executorSpec, resource := support.Executor(r)
+		executorSpec.Semaphore.Parameters = map[string]string{
 			"REF":      "${{ inputs.REF }}",
 			"REF_TYPE": "${{ inputs.REF_TYPE }}",
 		}
 
-		require.NoError(t, r.Canvas.CreateStage("stage-task-2", r.User.String(), []models.StageCondition{}, spec, []models.Connection{
-			{
-				SourceID:   r.Source.ID,
-				SourceName: r.Source.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{Name: "REF"},
-			{Name: "REF_TYPE"},
-		}, []models.InputMapping{
-			{
-				Values: []models.ValueDefinition{
-					{
-						Name: "REF",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref",
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-2").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceName: r.Source.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs([]models.InputDefinition{
+				{Name: "REF"},
+				{Name: "REF_TYPE"},
+			}).
+			WithInputMappings([]models.InputMapping{
+				{
+					Values: []models.ValueDefinition{
+						{
+							Name: "REF",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref",
+								},
 							},
 						},
-					},
-					{
-						Name: "REF_TYPE",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: r.Source.Name,
-								Expression: "ref_type",
+						{
+							Name: "REF_TYPE",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: r.Source.Name,
+									Expression: "ref_type",
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{}))
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
-		stage, err := r.Canvas.FindStageByName("stage-task-2")
 		require.NoError(t, err)
 
 		//
@@ -149,15 +173,18 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		require.NoError(t, err)
 		execution, err = stage.FindExecutionByID(execution.ID)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionStarted, execution.State)
-		assert.NotEmpty(t, execution.ReferenceID)
+		assert.Equal(t, models.ExecutionStarted, execution.State)
 		assert.NotEmpty(t, execution.StartedAt)
+		resources, err := execution.Resources()
+		require.NoError(t, err)
+		assert.Len(t, resources, 1)
+		assert.Equal(t, models.ExecutionResourcePending, resources[0].State)
 		assert.True(t, testconsumer.HasReceivedMessage())
 
-		req := r.SemaphoreAPIMock.LastTaskTrigger
+		req := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, req)
-		assert.Equal(t, "main", req.Spec.Branch)
-		assert.Equal(t, ".semaphore/run.yml", req.Spec.PipelineFile)
+		assert.Equal(t, "refs/heads/main", req.Reference)
+		assert.Equal(t, ".semaphore/run.yml", req.PipelineFile)
 		assertParameters(t, req, execution, map[string]string{
 			"REF":      "refs/heads/test",
 			"REF_TYPE": "branch",
@@ -165,7 +192,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
 		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
 		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
@@ -175,14 +202,14 @@ func assertParameters(t *testing.T, trigger *semaphore.TaskTrigger, execution *m
 		all[k] = v
 	}
 
-	assert.Len(t, trigger.Spec.Parameters, len(all)+1)
+	assert.Len(t, req.Parameters, len(all)+1)
 	for name, value := range all {
-		assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == name && p.Value == value
-		}))
+		v, ok := req.Parameters[name]
+		assert.True(t, ok)
+		assert.Equal(t, value, v)
 	}
 
-	assert.True(t, slices.ContainsFunc(trigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-		return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
-	}))
+	v, ok := req.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"]
+	assert.True(t, ok)
+	assert.NotEmpty(t, v)
 }

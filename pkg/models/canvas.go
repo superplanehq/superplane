@@ -29,19 +29,26 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
+func (c *Canvas) CreateEventSource(name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
+	return c.CreateEventSourceInTransaction(database.Conn(), name, key, scope, resourceId)
+}
+
 // NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSource(name string, key []byte) (*EventSource, error) {
+func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
 	now := time.Now()
 
 	eventSource := EventSource{
-		Name:      name,
-		CanvasID:  c.ID,
-		CreatedAt: &now,
-		UpdatedAt: &now,
-		Key:       key,
+		Name:       name,
+		CanvasID:   c.ID,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+		Key:        key,
+		ResourceID: resourceId,
+		State:      EventSourceStatePending,
+		Scope:      scope,
 	}
 
-	err := database.Conn().
+	err := tx.
 		Clauses(clause.Returning{}).
 		Create(&eventSource).
 		Error
@@ -62,6 +69,7 @@ func (c *Canvas) FindEventSourceByName(name string) (*EventSource, error) {
 	err := database.Conn().
 		Where("canvas_id = ?", c.ID).
 		Where("name = ?", name).
+		Where("scope = ?", EventSourceScopeExternal).
 		First(&eventSource).
 		Error
 
@@ -126,6 +134,7 @@ func (c *Canvas) FindEventSourceByID(id uuid.UUID) (*EventSource, error) {
 	err := database.Conn().
 		Where("id = ?", id).
 		Where("canvas_id = ?", c.ID).
+		Where("scope = ?", EventSourceScopeExternal).
 		First(&eventSource).
 		Error
 
@@ -187,96 +196,56 @@ func (c *Canvas) ListConnectionGroups() ([]ConnectionGroup, error) {
 func (c *Canvas) CreateStage(
 	name, createdBy string,
 	conditions []StageCondition,
-	executorSpec ExecutorSpec,
-	connections []Connection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
 	outputs []OutputDefinition,
 	secrets []ValueDefinition,
-) error {
-	now := time.Now()
-	ID := uuid.New()
-
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		stage := &Stage{
-			ID:            ID,
-			CanvasID:      c.ID,
-			Name:          name,
-			Conditions:    datatypes.NewJSONSlice(conditions),
-			CreatedAt:     &now,
-			CreatedBy:     uuid.Must(uuid.Parse(createdBy)),
-			ExecutorSpec:  datatypes.NewJSONType(executorSpec),
-			Inputs:        datatypes.NewJSONSlice(inputs),
-			InputMappings: datatypes.NewJSONSlice(inputMappings),
-			Outputs:       datatypes.NewJSONSlice(outputs),
-			Secrets:       datatypes.NewJSONSlice(secrets),
-		}
-
-		err := tx.Clauses(clause.Returning{}).Create(&stage).Error
-		if err != nil {
-			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-				return ErrNameAlreadyUsed
-			}
-
-			return err
-		}
-
-		for _, i := range connections {
-			c := i
-			c.TargetID = ID
-			c.TargetType = ConnectionTargetTypeStage
-			err := tx.Create(&c).Error
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
+) (*Stage, error) {
+	return c.CreateStageInTransaction(
+		database.Conn(),
+		name,
+		createdBy,
+		conditions,
+		inputs,
+		inputMappings,
+		outputs,
+		secrets,
+	)
 }
 
-func (c *Canvas) UpdateStage(
-	id, requesterID string,
+func (c *Canvas) CreateStageInTransaction(
+	tx *gorm.DB,
+	name, createdBy string,
 	conditions []StageCondition,
-	executorSpec ExecutorSpec,
-	connections []Connection,
 	inputs []InputDefinition,
 	inputMappings []InputMapping,
 	outputs []OutputDefinition,
 	secrets []ValueDefinition,
-) error {
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("target_id = ?", id).Delete(&Connection{}).Error; err != nil {
-			return fmt.Errorf("failed to delete existing connections: %v", err)
+) (*Stage, error) {
+	now := time.Now()
+
+	stage := &Stage{
+		CanvasID:      c.ID,
+		Name:          name,
+		Conditions:    datatypes.NewJSONSlice(conditions),
+		CreatedAt:     &now,
+		CreatedBy:     uuid.Must(uuid.Parse(createdBy)),
+		Inputs:        datatypes.NewJSONSlice(inputs),
+		InputMappings: datatypes.NewJSONSlice(inputMappings),
+		Outputs:       datatypes.NewJSONSlice(outputs),
+		Secrets:       datatypes.NewJSONSlice(secrets),
+	}
+
+	err := tx.Clauses(clause.Returning{}).Create(&stage).Error
+	if err != nil {
+		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+			return nil, ErrNameAlreadyUsed
 		}
 
-		for _, connection := range connections {
-			connection.TargetID = uuid.Must(uuid.Parse(id))
-			connection.TargetType = ConnectionTargetTypeStage
-			if err := tx.Create(&connection).Error; err != nil {
-				return fmt.Errorf("failed to create connection: %v", err)
-			}
-		}
+		return nil, err
+	}
 
-		now := time.Now()
-		err := tx.Model(&Stage{}).
-			Where("id = ?", id).
-			Update("updated_at", now).
-			Update("updated_by", requesterID).
-			Update("executor_spec", datatypes.NewJSONType(executorSpec)).
-			Update("conditions", datatypes.NewJSONSlice(conditions)).
-			Update("inputs", datatypes.NewJSONSlice(inputs)).
-			Update("input_mappings", datatypes.NewJSONSlice(inputMappings)).
-			Update("outputs", datatypes.NewJSONSlice(outputs)).
-			Update("secrets", datatypes.NewJSONSlice(secrets)).
-			Error
-
-		if err != nil {
-			return fmt.Errorf("failed to update stage timestamp: %v", err)
-		}
-
-		return nil
-	})
+	return stage, nil
 }
 
 func ListCanvases() ([]Canvas, error) {

@@ -15,41 +15,41 @@ import (
 	"encoding/json"
 )
 
-// checks if the ConnectionFilter type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &ConnectionFilter{}
+// checks if the SuperplaneFilter type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SuperplaneFilter{}
 
-// ConnectionFilter struct for ConnectionFilter
-type ConnectionFilter struct {
-	Type *ConnectionFilterType `json:"type,omitempty"`
-	Data *ConnectionDataFilter `json:"data,omitempty"`
-	Header *ConnectionHeaderFilter `json:"header,omitempty"`
+// SuperplaneFilter struct for SuperplaneFilter
+type SuperplaneFilter struct {
+	Type *SuperplaneFilterType `json:"type,omitempty"`
+	Data *SuperplaneDataFilter `json:"data,omitempty"`
+	Header *SuperplaneHeaderFilter `json:"header,omitempty"`
 }
 
-// NewConnectionFilter instantiates a new ConnectionFilter object
+// NewSuperplaneFilter instantiates a new SuperplaneFilter object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewConnectionFilter() *ConnectionFilter {
-	this := ConnectionFilter{}
-	var type_ ConnectionFilterType = CONNECTIONFILTERTYPE_FILTER_TYPE_UNKNOWN
+func NewSuperplaneFilter() *SuperplaneFilter {
+	this := SuperplaneFilter{}
+	var type_ SuperplaneFilterType = SUPERPLANEFILTERTYPE_FILTER_TYPE_UNKNOWN
 	this.Type = &type_
 	return &this
 }
 
-// NewConnectionFilterWithDefaults instantiates a new ConnectionFilter object
+// NewSuperplaneFilterWithDefaults instantiates a new SuperplaneFilter object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewConnectionFilterWithDefaults() *ConnectionFilter {
-	this := ConnectionFilter{}
-	var type_ ConnectionFilterType = CONNECTIONFILTERTYPE_FILTER_TYPE_UNKNOWN
+func NewSuperplaneFilterWithDefaults() *SuperplaneFilter {
+	this := SuperplaneFilter{}
+	var type_ SuperplaneFilterType = SUPERPLANEFILTERTYPE_FILTER_TYPE_UNKNOWN
 	this.Type = &type_
 	return &this
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *ConnectionFilter) GetType() ConnectionFilterType {
+func (o *SuperplaneFilter) GetType() SuperplaneFilterType {
 	if o == nil || IsNil(o.Type) {
-		var ret ConnectionFilterType
+		var ret SuperplaneFilterType
 		return ret
 	}
 	return *o.Type
@@ -57,7 +57,7 @@ func (o *ConnectionFilter) GetType() ConnectionFilterType {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConnectionFilter) GetTypeOk() (*ConnectionFilterType, bool) {
+func (o *SuperplaneFilter) GetTypeOk() (*SuperplaneFilterType, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -65,7 +65,7 @@ func (o *ConnectionFilter) GetTypeOk() (*ConnectionFilterType, bool) {
 }
 
 // HasType returns a boolean if a field has been set.
-func (o *ConnectionFilter) HasType() bool {
+func (o *SuperplaneFilter) HasType() bool {
 	if o != nil && !IsNil(o.Type) {
 		return true
 	}
@@ -73,15 +73,15 @@ func (o *ConnectionFilter) HasType() bool {
 	return false
 }
 
-// SetType gets a reference to the given ConnectionFilterType and assigns it to the Type field.
-func (o *ConnectionFilter) SetType(v ConnectionFilterType) {
+// SetType gets a reference to the given SuperplaneFilterType and assigns it to the Type field.
+func (o *SuperplaneFilter) SetType(v SuperplaneFilterType) {
 	o.Type = &v
 }
 
 // GetData returns the Data field value if set, zero value otherwise.
-func (o *ConnectionFilter) GetData() ConnectionDataFilter {
+func (o *SuperplaneFilter) GetData() SuperplaneDataFilter {
 	if o == nil || IsNil(o.Data) {
-		var ret ConnectionDataFilter
+		var ret SuperplaneDataFilter
 		return ret
 	}
 	return *o.Data
@@ -89,7 +89,7 @@ func (o *ConnectionFilter) GetData() ConnectionDataFilter {
 
 // GetDataOk returns a tuple with the Data field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConnectionFilter) GetDataOk() (*ConnectionDataFilter, bool) {
+func (o *SuperplaneFilter) GetDataOk() (*SuperplaneDataFilter, bool) {
 	if o == nil || IsNil(o.Data) {
 		return nil, false
 	}
@@ -97,7 +97,7 @@ func (o *ConnectionFilter) GetDataOk() (*ConnectionDataFilter, bool) {
 }
 
 // HasData returns a boolean if a field has been set.
-func (o *ConnectionFilter) HasData() bool {
+func (o *SuperplaneFilter) HasData() bool {
 	if o != nil && !IsNil(o.Data) {
 		return true
 	}
@@ -105,15 +105,15 @@ func (o *ConnectionFilter) HasData() bool {
 	return false
 }
 
-// SetData gets a reference to the given ConnectionDataFilter and assigns it to the Data field.
-func (o *ConnectionFilter) SetData(v ConnectionDataFilter) {
+// SetData gets a reference to the given SuperplaneDataFilter and assigns it to the Data field.
+func (o *SuperplaneFilter) SetData(v SuperplaneDataFilter) {
 	o.Data = &v
 }
 
 // GetHeader returns the Header field value if set, zero value otherwise.
-func (o *ConnectionFilter) GetHeader() ConnectionHeaderFilter {
+func (o *SuperplaneFilter) GetHeader() SuperplaneHeaderFilter {
 	if o == nil || IsNil(o.Header) {
-		var ret ConnectionHeaderFilter
+		var ret SuperplaneHeaderFilter
 		return ret
 	}
 	return *o.Header
@@ -121,7 +121,7 @@ func (o *ConnectionFilter) GetHeader() ConnectionHeaderFilter {
 
 // GetHeaderOk returns a tuple with the Header field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *ConnectionFilter) GetHeaderOk() (*ConnectionHeaderFilter, bool) {
+func (o *SuperplaneFilter) GetHeaderOk() (*SuperplaneHeaderFilter, bool) {
 	if o == nil || IsNil(o.Header) {
 		return nil, false
 	}
@@ -129,7 +129,7 @@ func (o *ConnectionFilter) GetHeaderOk() (*ConnectionHeaderFilter, bool) {
 }
 
 // HasHeader returns a boolean if a field has been set.
-func (o *ConnectionFilter) HasHeader() bool {
+func (o *SuperplaneFilter) HasHeader() bool {
 	if o != nil && !IsNil(o.Header) {
 		return true
 	}
@@ -137,12 +137,12 @@ func (o *ConnectionFilter) HasHeader() bool {
 	return false
 }
 
-// SetHeader gets a reference to the given ConnectionHeaderFilter and assigns it to the Header field.
-func (o *ConnectionFilter) SetHeader(v ConnectionHeaderFilter) {
+// SetHeader gets a reference to the given SuperplaneHeaderFilter and assigns it to the Header field.
+func (o *SuperplaneFilter) SetHeader(v SuperplaneHeaderFilter) {
 	o.Header = &v
 }
 
-func (o ConnectionFilter) MarshalJSON() ([]byte, error) {
+func (o SuperplaneFilter) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -150,7 +150,7 @@ func (o ConnectionFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o ConnectionFilter) ToMap() (map[string]interface{}, error) {
+func (o SuperplaneFilter) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
@@ -164,38 +164,38 @@ func (o ConnectionFilter) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableConnectionFilter struct {
-	value *ConnectionFilter
+type NullableSuperplaneFilter struct {
+	value *SuperplaneFilter
 	isSet bool
 }
 
-func (v NullableConnectionFilter) Get() *ConnectionFilter {
+func (v NullableSuperplaneFilter) Get() *SuperplaneFilter {
 	return v.value
 }
 
-func (v *NullableConnectionFilter) Set(val *ConnectionFilter) {
+func (v *NullableSuperplaneFilter) Set(val *SuperplaneFilter) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableConnectionFilter) IsSet() bool {
+func (v NullableSuperplaneFilter) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableConnectionFilter) Unset() {
+func (v *NullableSuperplaneFilter) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableConnectionFilter(val *ConnectionFilter) *NullableConnectionFilter {
-	return &NullableConnectionFilter{value: val, isSet: true}
+func NewNullableSuperplaneFilter(val *SuperplaneFilter) *NullableSuperplaneFilter {
+	return &NullableSuperplaneFilter{value: val, isSet: true}
 }
 
-func (v NullableConnectionFilter) MarshalJSON() ([]byte, error) {
+func (v NullableSuperplaneFilter) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableConnectionFilter) UnmarshalJSON(src []byte) error {
+func (v *NullableSuperplaneFilter) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

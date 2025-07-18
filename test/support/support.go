@@ -1,17 +1,22 @@
 package support
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
+	"gorm.io/datatypes"
 )
 
 type ResourceRegistry struct {
@@ -20,6 +25,8 @@ type ResourceRegistry struct {
 	Source           *models.EventSource
 	Stage            *models.Stage
 	Organization     *models.Organization
+	Integration      *models.Integration
+	Encryptor        crypto.Encryptor
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -30,17 +37,18 @@ func (r *ResourceRegistry) Close() {
 }
 
 type SetupOptions struct {
-	Source       bool
-	Stage        bool
-	SemaphoreAPI bool
-	Approvals    int
+	Source      bool
+	Stage       bool
+	Approvals   int
+	Integration bool
 }
 
 func Setup(t *testing.T) *ResourceRegistry {
 	return SetupWithOptions(t, SetupOptions{
-		Source:    true,
-		Stage:     true,
-		Approvals: 1,
+		Source:      true,
+		Stage:       true,
+		Integration: true,
+		Approvals:   1,
 	})
 }
 
@@ -48,7 +56,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
 	r := ResourceRegistry{
-		User: uuid.New(),
+		User:      uuid.New(),
+		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
 	var err error
@@ -59,8 +68,39 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"))
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
+	}
+
+	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
+	r.SemaphoreAPIMock.Init()
+	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+
+	if options.Integration {
+		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
+		require.NoError(t, err)
+		integration, err := models.CreateIntegration(&models.Integration{
+			Name:       RandomName("integration"),
+			CreatedBy:  r.User,
+			Type:       models.IntegrationTypeSemaphore,
+			DomainType: "canvas",
+			DomainID:   r.Canvas.ID,
+			URL:        r.SemaphoreAPIMock.Server.URL,
+			AuthType:   models.IntegrationAuthTypeToken,
+			Auth: datatypes.NewJSONType(models.IntegrationAuth{
+				Token: &models.IntegrationAuthToken{
+					ValueFrom: models.ValueDefinitionFrom{
+						Secret: &models.ValueDefinitionFromSecret{
+							Name: secret.Name,
+							Key:  "key",
+						},
+					},
+				},
+			}),
+		})
+
+		require.NoError(t, err)
+		r.Integration = integration
 	}
 
 	if options.Stage {
@@ -71,21 +111,24 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		err = r.Canvas.CreateStage("stage-1",
-			r.User.String(),
-			conditions,
-			ExecutorSpec(),
-			[]models.Connection{
+		executorType, executorSpec, resource := Executor(&r)
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConditions(conditions).
+			WithConnections([]models.Connection{
 				{
 					SourceType: models.SourceTypeEventSource,
 					SourceID:   r.Source.ID,
 					SourceName: r.Source.Name,
 				},
-			},
-			[]models.InputDefinition{
+			}).
+			WithInputs([]models.InputDefinition{
 				{Name: "VERSION"},
-			},
-			[]models.InputMapping{
+			}).
+			WithInputMappings([]models.InputMapping{
 				{
 					Values: []models.ValueDefinition{
 						{Name: "VERSION", ValueFrom: &models.ValueDefinitionFrom{
@@ -96,20 +139,15 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 						}},
 					},
 				},
-			},
-			[]models.OutputDefinition{},
-			[]models.ValueDefinition{},
-		)
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForIntegration(r.Integration).
+			ForResource(resource).
+			Create()
 
 		require.NoError(t, err)
-		r.Stage, err = r.Canvas.FindStageByName("stage-1")
-		require.NoError(t, err)
-	}
-
-	if options.SemaphoreAPI {
-		r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-		r.SemaphoreAPIMock.Init()
-		log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+		r.Stage = stage
 	}
 
 	return &r
@@ -185,39 +223,48 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func ExecutorSpec() models.ExecutorSpec {
-	return ExecutorSpecWithURL("http://localhost:8000")
-}
-
-func ExecutorSpecWithURL(URL string) models.ExecutorSpec {
-	return models.ExecutorSpec{
-		Type: models.ExecutorSpecTypeSemaphore,
-		Semaphore: &models.SemaphoreExecutorSpec{
-			OrganizationURL: URL,
-			APIToken:        base64.StdEncoding.EncodeToString([]byte("token")),
-			ProjectID:       "demo-project",
-			TaskID:          "demo-task",
-			Branch:          "main",
-			PipelineFile:    ".semaphore/run.yml",
-			Parameters: map[string]string{
-				"PARAM_1": "VALUE_1",
-				"PARAM_2": "VALUE_2",
+func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.Resource) {
+	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
+			Semaphore: &models.SemaphoreExecutorSpec{
+				Branch:       "main",
+				PipelineFile: ".semaphore/run.yml",
+				Parameters: map[string]string{
+					"PARAM_1": "VALUE_1",
+					"PARAM_2": "VALUE_2",
+				},
 			},
+		}, &models.Resource{
+			ResourceType:  integrations.ResourceTypeProject,
+			ExternalID:    uuid.NewString(),
+			IntegrationID: r.Integration.ID,
+			ResourceName:  "demo-project",
+		}
+}
+
+func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
+	return &pb.ExecutorSpec{
+		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+		Integration: &pb.IntegrationRef{
+			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
+			Name:       r.Integration.Name,
+		},
+		Semaphore: &pb.ExecutorSpec_Semaphore{
+			Project:      "demo-project",
+			Branch:       "main",
+			PipelineFile: ".semaphore/semaphore.yml",
+			Parameters:   map[string]string{},
 		},
 	}
 }
 
-func ProtoExecutor() *protos.ExecutorSpec {
-	return &protos.ExecutorSpec{
-		Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
-		Semaphore: &protos.ExecutorSpec_Semaphore{
-			OrganizationUrl: "http://localhost:8000",
-			ApiToken:        "test",
-			ProjectId:       "test",
-			TaskId:          "task",
-			Branch:          "main",
-			PipelineFile:    ".semaphore/semaphore.yml",
-			Parameters:      map[string]string{},
-		},
-	}
+func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	require.NoError(t, err)
+	return secret, nil
+}
+
+func RandomName(prefix string) string {
+	return prefix + "-" + uuid.New().String()
 }

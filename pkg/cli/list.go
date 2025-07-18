@@ -222,12 +222,19 @@ var listStageEventsCmd = &cobra.Command{
 			if event.Execution != nil {
 				fmt.Println("   Execution:")
 				fmt.Printf("      ID: %s\n", *event.Execution.Id)
-				fmt.Printf("      Reference ID: %s\n", *event.Execution.ReferenceId)
 				fmt.Printf("      State: %s\n", *event.Execution.State)
 				fmt.Printf("      Result: %s\n", *event.Execution.Result)
 				fmt.Printf("      Created at: %s\n", event.Execution.CreatedAt)
 				fmt.Printf("      Started at: %s\n", event.Execution.StartedAt)
 				fmt.Printf("      Finished at: %s\n", event.Execution.FinishedAt)
+
+				if len(event.Execution.Resources) > 0 {
+					fmt.Println("      Resources:")
+					for _, resource := range event.Execution.Resources {
+						fmt.Printf("        * ID: %s\n", *resource.Id)
+					}
+				}
+
 				if len(event.Execution.Outputs) > 0 {
 					fmt.Println("      Outputs:")
 					for _, output := range event.Execution.Outputs {

@@ -16,13 +16,18 @@ import (
 )
 
 func Test__UpdateStage(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	specValidator := executors.SpecValidator{}
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Source:      true,
+		Integration: true,
+	})
+	specValidator := executors.SpecValidator{
+		Encryptor: r.Encryptor,
+	}
 
 	// Create a stage first that we'll update in tests
-	executor := support.ProtoExecutor()
+	executor := support.ProtoExecutor(r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	stage, err := CreateStage(ctx, specValidator, &protos.CreateStageRequest{
+	stage, err := CreateStage(ctx, r.Encryptor, specValidator, &protos.CreateStageRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		Stage: &protos.Stage{
 			Metadata: &protos.Stage_Metadata{
@@ -48,10 +53,10 @@ func Test__UpdateStage(t *testing.T) {
 					{
 						Name: r.Source.Name,
 						Type: protos.Connection_TYPE_EVENT_SOURCE,
-						Filters: []*protos.Connection_Filter{
+						Filters: []*protos.Filter{
 							{
-								Type: protos.Connection_FILTER_TYPE_DATA,
-								Data: &protos.Connection_DataFilter{
+								Type: protos.FilterType_FILTER_TYPE_DATA,
+								Data: &protos.DataFilter{
 									Expression: "test == 1",
 								},
 							},
@@ -67,7 +72,7 @@ func Test__UpdateStage(t *testing.T) {
 	stageID := stage.Stage.Metadata.Id
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       "invalid-uuid",
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -79,7 +84,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       uuid.NewString(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -91,7 +96,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -103,12 +108,12 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: "source-does-not-exist",
@@ -126,20 +131,20 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: r.Source.Name,
 							Type: protos.Connection_TYPE_EVENT_SOURCE,
-							Filters: []*protos.Connection_Filter{
+							Filters: []*protos.Filter{
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "",
 									},
 								},
@@ -157,12 +162,12 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: support.ProtoExecutor(),
+					Executor: executor,
 					Connections: []*protos.Connection{
 						{
 							Name: r.Source.Name,
@@ -183,39 +188,35 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage is updated", func(t *testing.T) {
-		res, err := UpdateStage(ctx, specValidator, &protos.UpdateStageRequest{
+		executor.Semaphore = &protos.ExecutorSpec_Semaphore{
+			Project:      "demo-project-2",
+			Branch:       "other",
+			PipelineFile: ".semaphore/other.yml",
+			Parameters:   map[string]string{},
+		}
+
+		res, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor: &protos.ExecutorSpec{
-						Type: protos.ExecutorSpec_TYPE_SEMAPHORE,
-						Semaphore: &protos.ExecutorSpec_Semaphore{
-							OrganizationUrl: "http://localhost:8000",
-							ApiToken:        "test",
-							ProjectId:       "test-2",
-							TaskId:          "task-2",
-							Branch:          "other",
-							PipelineFile:    ".semaphore/other.yml",
-							Parameters:      map[string]string{},
-						},
-					},
+					Executor:   executor,
 					Conditions: []*protos.Condition{},
 					Connections: []*protos.Connection{
 						{
 							Name:           r.Source.Name,
 							Type:           protos.Connection_TYPE_EVENT_SOURCE,
-							FilterOperator: protos.Connection_FILTER_OPERATOR_OR,
-							Filters: []*protos.Connection_Filter{
+							FilterOperator: protos.FilterOperator_FILTER_OPERATOR_OR,
+							Filters: []*protos.Filter{
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "test == 42",
 									},
 								},
 								{
-									Type: protos.Connection_FILTER_TYPE_DATA,
-									Data: &protos.Connection_DataFilter{
+									Type: protos.FilterType_FILTER_TYPE_DATA,
+									Data: &protos.DataFilter{
 										Expression: "status == 'active'",
 									},
 								},
@@ -236,18 +237,16 @@ func Test__UpdateStage(t *testing.T) {
 		require.Len(t, res.Stage.Spec.Connections, 1)
 		assert.Equal(t, r.Source.Name, res.Stage.Spec.Connections[0].Name)
 		assert.Equal(t, protos.Connection_TYPE_EVENT_SOURCE, res.Stage.Spec.Connections[0].Type)
-		assert.Equal(t, protos.Connection_FILTER_OPERATOR_OR, res.Stage.Spec.Connections[0].FilterOperator)
+		assert.Equal(t, protos.FilterOperator_FILTER_OPERATOR_OR, res.Stage.Spec.Connections[0].FilterOperator)
 		require.Len(t, res.Stage.Spec.Connections[0].Filters, 2)
 		assert.Equal(t, "test == 42", res.Stage.Spec.Connections[0].Filters[0].Data.Expression)
 		assert.Equal(t, "status == 'active'", res.Stage.Spec.Connections[0].Filters[1].Data.Expression)
 
 		// Executor spec is updated
 		assert.Equal(t, protos.ExecutorSpec_TYPE_SEMAPHORE, res.Stage.Spec.Executor.Type)
-		assert.Equal(t, "task-2", res.Stage.Spec.Executor.Semaphore.TaskId)
-		assert.Equal(t, "test-2", res.Stage.Spec.Executor.Semaphore.ProjectId)
+		assert.Equal(t, "demo-project-2", res.Stage.Spec.Executor.Semaphore.Project)
 		assert.Equal(t, "other", res.Stage.Spec.Executor.Semaphore.Branch)
 		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Semaphore.PipelineFile)
-		assert.Equal(t, "http://localhost:8000", res.Stage.Spec.Executor.Semaphore.OrganizationUrl)
 
 		// Conditions are updated
 		require.Empty(t, res.Stage.Spec.Conditions)

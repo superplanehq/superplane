@@ -4,18 +4,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test__InputBuilder(t *testing.T) {
-	r := support.SetupWithOptions(t, support.SetupOptions{})
+	r := support.SetupWithOptions(t, support.SetupOptions{
+		Integration: true,
+	})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"))
+	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), models.EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"))
+	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"), models.EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {
@@ -81,81 +84,92 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Create stage, connected to our two sources
 		//
-		err := r.Canvas.CreateStage("stage-1", r.User.String(), []models.StageCondition{}, support.ExecutorSpec(), []models.Connection{
-			{
-				SourceID:   docsSource.ID,
-				SourceName: docsSource.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-			{
-				SourceID:   tfSource.ID,
-				SourceName: tfSource.Name,
-				SourceType: models.SourceTypeEventSource,
-			},
-		}, []models.InputDefinition{
-			{
-				Name: "DOCS_VERSION",
-			},
-			{
-				Name: "TF_VERSION",
-			},
-		}, []models.InputMapping{
-			{
-				When: &models.InputMappingWhen{
-					TriggeredBy: &models.WhenTriggeredBy{
-						Connection: docsSource.Name,
-					},
+		executorType, executorSpec, resource := support.Executor(r)
+		stage, err := builders.NewStageBuilder().
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName("stage-1").
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   docsSource.ID,
+					SourceName: docsSource.Name,
+					SourceType: models.SourceTypeEventSource,
 				},
-				Values: []models.ValueDefinition{
-					{
-						Name: "DOCS_VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: "docs",
-								Expression: "ref",
-							},
+				{
+					SourceID:   tfSource.ID,
+					SourceName: tfSource.Name,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs([]models.InputDefinition{
+				{
+					Name: "DOCS_VERSION",
+				},
+				{
+					Name: "TF_VERSION",
+				},
+			}).
+			WithInputMappings([]models.InputMapping{
+				{
+					When: &models.InputMappingWhen{
+						TriggeredBy: &models.WhenTriggeredBy{
+							Connection: docsSource.Name,
 						},
 					},
-					{
-						Name: "TF_VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							LastExecution: &models.ValueDefinitionFromLastExecution{
-								Results: []string{"passed"},
+					Values: []models.ValueDefinition{
+						{
+							Name: "DOCS_VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: "docs",
+									Expression: "ref",
+								},
 							},
 						},
-					},
-				},
-			},
-			{
-				When: &models.InputMappingWhen{
-					TriggeredBy: &models.WhenTriggeredBy{
-						Connection: tfSource.Name,
-					},
-				},
-				Values: []models.ValueDefinition{
-					{
-						Name: "DOCS_VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							LastExecution: &models.ValueDefinitionFromLastExecution{
-								Results: []string{"passed"},
-							},
-						},
-					},
-					{
-						Name: "TF_VERSION",
-						ValueFrom: &models.ValueDefinitionFrom{
-							EventData: &models.ValueDefinitionFromEventData{
-								Connection: "docs",
-								Expression: "ref",
+						{
+							Name: "TF_VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								LastExecution: &models.ValueDefinitionFromLastExecution{
+									Results: []string{"passed"},
+								},
 							},
 						},
 					},
 				},
-			},
-		}, []models.OutputDefinition{}, []models.ValueDefinition{})
+				{
+					When: &models.InputMappingWhen{
+						TriggeredBy: &models.WhenTriggeredBy{
+							Connection: tfSource.Name,
+						},
+					},
+					Values: []models.ValueDefinition{
+						{
+							Name: "DOCS_VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								LastExecution: &models.ValueDefinitionFromLastExecution{
+									Results: []string{"passed"},
+								},
+							},
+						},
+						{
+							Name: "TF_VERSION",
+							ValueFrom: &models.ValueDefinitionFrom{
+								EventData: &models.ValueDefinitionFromEventData{
+									Connection: "docs",
+									Expression: "ref",
+								},
+							},
+						},
+					},
+				},
+			}).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(resource).
+			ForIntegration(r.Integration).
+			Create()
 
-		require.NoError(t, err)
-		stage, err := r.Canvas.FindStageByName("stage-1")
 		require.NoError(t, err)
 
 		//
@@ -182,7 +196,7 @@ func Test__InputBuilder(t *testing.T) {
 		// Mock a completed previous execution of the stage
 		//
 		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
-		execution.Finish(stage, models.StageExecutionResultPassed)
+		execution.Finish(stage, models.ResultPassed)
 
 		//
 		// Build inputs from docs source event

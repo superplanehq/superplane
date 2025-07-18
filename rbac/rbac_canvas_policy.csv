@@ -6,6 +6,10 @@ p,role:canvas_viewer,canvas:{CANVAS_ID},stageevent,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroup,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},connectiongroupfieldset,read
 p,role:canvas_viewer,canvas:{CANVAS_ID},secret,read
+p,role:canvas_viewer,canvas:{CANVAS_ID},integration,read
+p,role:canvas_admin,canvas:{CANVAS_ID},integration,create
+p,role:canvas_admin,canvas:{CANVAS_ID},integration,update
+p,role:canvas_admin,canvas:{CANVAS_ID},integration,delete
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,create
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,update
 p,role:canvas_admin,canvas:{CANVAS_ID},eventsource,delete

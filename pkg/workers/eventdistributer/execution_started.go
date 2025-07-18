@@ -23,13 +23,13 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 			"event": "execution_started",
 		}
 	}
-	
+
 	// Get execution ID if available
 	executionIDStr, _ := rawMsg["execution_id"].(string)
 	if executionIDStr == "" {
 		executionIDStr, _ = rawMsg["id"].(string)
 	}
-	
+
 	// Get canvas ID if available
 	canvasID, _ := rawMsg["canvas_id"].(string)
 
@@ -50,16 +50,15 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 	if execution != nil {
 		// Use data from the database
 		payload = map[string]interface{}{
-			"id":            execution.ID.String(),
-			"stage_id":      execution.StageID.String(),
-			"canvas_id":     canvasID,
+			"id":             execution.ID.String(),
+			"stage_id":       execution.StageID.String(),
+			"canvas_id":      canvasID,
 			"stage_event_id": execution.StageEventID.String(),
-			"reference_id":  execution.ReferenceID,
-			"state":         execution.State,
-			"result":        execution.Result,
-			"created_at":    execution.CreatedAt,
-			"updated_at":    execution.UpdatedAt,
-			"started_at":    execution.StartedAt,
+			"state":          execution.State,
+			"result":         execution.Result,
+			"created_at":     execution.CreatedAt,
+			"updated_at":     execution.UpdatedAt,
+			"started_at":     execution.StartedAt,
 		}
 	} else {
 		// Use the raw message
@@ -68,7 +67,7 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 
 	// Create the websocket event
 	wsEvent := map[string]interface{}{
-		"event": "execution_started",
+		"event":   "execution_started",
 		"payload": payload,
 	}
 
@@ -88,6 +87,6 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 		wsHub.BroadcastAll(wsEventJSON)
 		log.Debugf("Broadcasted execution_started event to all clients")
 	}
-	
+
 	return nil
 }

@@ -299,18 +299,6 @@ export type ExecutorSpecHttpResponsePolicy = {
     statusCodes?: Array<number>;
 };
 
-export type ExecutorSpecSemaphore = {
-    projectId?: string;
-    branch?: string;
-    pipelineFile?: string;
-    taskId?: string;
-    parameters?: {
-        [key: string]: string;
-    };
-    apiToken?: string;
-    organizationUrl?: string;
-};
-
 export type GroupByField = {
     name?: string;
     expression?: string;
@@ -322,6 +310,17 @@ export type InputMappingWhen = {
 
 export type InputMappingWhenTriggeredBy = {
     connection?: string;
+};
+
+export type IntegrationAuth = {
+    use?: IntegrationAuthType;
+    token?: AuthToken;
+};
+
+export type IntegrationAuthType = 'AUTH_TYPE_NONE' | 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC';
+
+export type IntegrationOidc = {
+    enabled?: boolean;
 };
 
 export type OrganizationsCreateOrganizationRequest = {
@@ -423,8 +422,8 @@ export type SuperplaneConditionType = 'CONDITION_TYPE_UNKNOWN' | 'CONDITION_TYPE
 export type SuperplaneConnection = {
     type?: SuperplaneConnectionType;
     name?: string;
-    filters?: Array<ConnectionFilter>;
-    filterOperator?: ConnectionFilterOperator;
+    filters?: Array<SuperplaneFilter>;
+    filterOperator?: SuperplaneFilterOperator;
 };
 
 export type SuperplaneConnectionGroup = {
@@ -499,6 +498,14 @@ export type SuperplaneCreateEventSourceResponse = {
     key?: string;
 };
 
+export type SuperplaneCreateIntegrationBody = {
+    integration?: SuperplaneIntegration;
+};
+
+export type SuperplaneCreateIntegrationResponse = {
+    integration?: SuperplaneIntegration;
+};
+
 export type SuperplaneCreateSecretBody = {
     secret?: SuperplaneSecret;
 };
@@ -515,6 +522,10 @@ export type SuperplaneCreateStageResponse = {
     stage?: SuperplaneStage;
 };
 
+export type SuperplaneDataFilter = {
+    expression?: string;
+};
+
 export type SuperplaneDeleteSecretResponse = {
     [key: string]: unknown;
 };
@@ -529,6 +540,10 @@ export type SuperplaneDescribeConnectionGroupResponse = {
 
 export type SuperplaneDescribeEventSourceResponse = {
     eventSource?: SuperplaneEventSource;
+};
+
+export type SuperplaneDescribeIntegrationResponse = {
+    integration?: SuperplaneIntegration;
 };
 
 export type SuperplaneDescribeSecretResponse = {
@@ -553,29 +568,59 @@ export type SuperplaneEventSourceMetadata = {
 };
 
 export type SuperplaneEventSourceSpec = {
-    [key: string]: unknown;
+    integration?: SuperplaneIntegrationRef;
+    semaphore?: EventSourceSpecSemaphore;
 };
 
 export type SuperplaneExecution = {
     id?: string;
-    referenceId?: string;
     state?: SuperplaneExecutionState;
     result?: ExecutionResult;
     createdAt?: string;
     startedAt?: string;
     finishedAt?: string;
     outputs?: Array<SuperplaneOutputValue>;
+    resources?: Array<SuperplaneExecutionResource>;
+};
+
+export type SuperplaneExecutionResource = {
+    id?: string;
 };
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
 export type SuperplaneExecutorSpec = {
     type?: SuperplaneExecutorSpecType;
-    semaphore?: ExecutorSpecSemaphore;
+    integration?: SuperplaneIntegrationRef;
+    semaphore?: SuperplaneExecutorSpecSemaphore;
     http?: ExecutorSpecHttp;
 };
 
+export type SuperplaneExecutorSpecSemaphore = {
+    project?: string;
+    task?: string;
+    branch?: string;
+    pipelineFile?: string;
+    parameters?: {
+        [key: string]: string;
+    };
+};
+
 export type SuperplaneExecutorSpecType = 'TYPE_UNKNOWN' | 'TYPE_SEMAPHORE' | 'TYPE_HTTP';
+
+export type SuperplaneFilter = {
+    type?: SuperplaneFilterType;
+    data?: SuperplaneDataFilter;
+    header?: SuperplaneHeaderFilter;
+};
+
+export type SuperplaneFilterOperator = 'FILTER_OPERATOR_AND' | 'FILTER_OPERATOR_OR';
+
+export type SuperplaneFilterType = 'FILTER_TYPE_UNKNOWN' | 'FILTER_TYPE_DATA' | 'FILTER_TYPE_HEADER';
+
+export type SuperplaneHeaderFilter = {
+    expression?: string;
+};
 
 export type SuperplaneInputDefinition = {
     name?: string;
@@ -586,6 +631,34 @@ export type SuperplaneInputMapping = {
     values?: Array<SuperplaneValueDefinition>;
     when?: InputMappingWhen;
 };
+
+export type SuperplaneIntegration = {
+    metadata?: SuperplaneIntegrationMetadata;
+    spec?: SuperplaneIntegrationSpec;
+};
+
+export type SuperplaneIntegrationMetadata = {
+    id?: string;
+    name?: string;
+    createdBy?: string;
+    createdAt?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+};
+
+export type SuperplaneIntegrationRef = {
+    domainType?: AuthorizationDomainType;
+    name?: string;
+};
+
+export type SuperplaneIntegrationSpec = {
+    type?: SuperplaneIntegrationType;
+    url?: string;
+    auth?: IntegrationAuth;
+    oidc?: IntegrationOidc;
+};
+
+export type SuperplaneIntegrationType = 'TYPE_NONE' | 'TYPE_SEMAPHORE' | 'TYPE_GITHUB';
 
 export type SuperplaneKeyValuePair = {
     name?: string;
@@ -606,6 +679,10 @@ export type SuperplaneListConnectionGroupsResponse = {
 
 export type SuperplaneListEventSourcesResponse = {
     eventSources?: Array<SuperplaneEventSource>;
+};
+
+export type SuperplaneListIntegrationsResponse = {
+    integrations?: Array<SuperplaneIntegration>;
 };
 
 export type SuperplaneListSecretsResponse = {

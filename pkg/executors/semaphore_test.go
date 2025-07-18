@@ -1,13 +1,12 @@
 package executors
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/apis/semaphore"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	semaphoremock "github.com/superplanehq/superplane/test/semaphore"
@@ -24,23 +23,26 @@ func Test_Semaphore(t *testing.T) {
 	}
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
-		executor, err := NewSemaphoreExecutor(execution, signer)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
 		semaphoreMock.Init()
 		defer semaphoreMock.Close()
 
+		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
+		require.NoError(t, err)
+
+		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
+		require.NoError(t, err)
+		require.NotNil(t, executor)
+
 		_, err = executor.Execute(models.ExecutorSpec{
 			Semaphore: &models.SemaphoreExecutorSpec{
-				APIToken:        "test",
-				OrganizationURL: semaphoreMock.Server.URL,
-				ProjectID:       projectID,
-				PipelineFile:    ".semaphore/semaphore.yml",
-				Branch:          "main",
-				Parameters:      map[string]string{"a": "b", "c": "d"},
+				PipelineFile: ".semaphore/semaphore.yml",
+				Branch:       "main",
+				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
+		}, &models.Resource{
+			ResourceType: integrations.ResourceTypeProject,
+			ExternalID:   projectID,
 		})
 
 		require.NoError(t, err)
@@ -59,54 +61,43 @@ func Test_Semaphore(t *testing.T) {
 	})
 
 	t.Run("runs task if task ID is not empty", func(t *testing.T) {
-		executor, err := NewSemaphoreExecutor(execution, signer)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
 		semaphoreMock.Init()
 		defer semaphoreMock.Close()
 
+		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
+		require.NoError(t, err)
+
+		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
+		require.NoError(t, err)
+		require.NotNil(t, executor)
+
 		taskID := uuid.NewString()
 		_, err = executor.Execute(models.ExecutorSpec{
 			Semaphore: &models.SemaphoreExecutorSpec{
-				APIToken:        "test",
-				OrganizationURL: semaphoreMock.Server.URL,
-				ProjectID:       projectID,
-				PipelineFile:    ".semaphore/semaphore.yml",
-				Branch:          "main",
-				Parameters:      map[string]string{"a": "b", "c": "d"},
-				TaskID:          taskID,
+				TaskId:       &taskID,
+				PipelineFile: ".semaphore/semaphore.yml",
+				Branch:       "main",
+				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
+		}, &models.Resource{
+			ResourceType: integrations.ResourceTypeTask,
+			ExternalID:   projectID,
 		})
 
 		require.NoError(t, err)
 
-		taskTrigger := semaphoreMock.LastTaskTrigger
-		require.NotNil(t, taskTrigger)
-		assert.Equal(t, "main", taskTrigger.Spec.Branch)
-		assert.Equal(t, ".semaphore/semaphore.yml", taskTrigger.Spec.PipelineFile)
-		assert.Len(t, taskTrigger.Spec.Parameters, 5)
-		assert.Len(t, taskTrigger.Spec.Parameters, 5)
+		runTaskRequest := semaphoreMock.LastRunTask
+		require.NotNil(t, runTaskRequest)
+		assert.Equal(t, "main", runTaskRequest.Branch)
+		assert.Equal(t, ".semaphore/semaphore.yml", runTaskRequest.PipelineFile)
+		assert.Len(t, runTaskRequest.Parameters, 5)
+		assert.Len(t, runTaskRequest.Parameters, 5)
 
-		assert.True(t, slices.ContainsFunc(taskTrigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == "SEMAPHORE_STAGE_EXECUTION_TOKEN" && p.Value != ""
-		}))
-
-		assert.True(t, slices.ContainsFunc(taskTrigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == "SEMAPHORE_STAGE_ID" && p.Value == stageID.String()
-		}))
-
-		assert.True(t, slices.ContainsFunc(taskTrigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == "SEMAPHORE_STAGE_EXECUTION_ID" && p.Value == execution.ID.String()
-		}))
-
-		assert.True(t, slices.ContainsFunc(taskTrigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == "a" && p.Value == "b"
-		}))
-
-		assert.True(t, slices.ContainsFunc(taskTrigger.Spec.Parameters, func(p semaphore.TaskTriggerParameter) bool {
-			return p.Name == "c" && p.Value == "d"
-		}))
+		assert.NotEmpty(t, runTaskRequest.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"])
+		assert.Equal(t, stageID.String(), runTaskRequest.Parameters["SEMAPHORE_STAGE_ID"])
+		assert.Equal(t, executionID.String(), runTaskRequest.Parameters["SEMAPHORE_STAGE_EXECUTION_ID"])
+		assert.Equal(t, "b", runTaskRequest.Parameters["a"])
+		assert.Equal(t, "d", runTaskRequest.Parameters["c"])
 	})
 }

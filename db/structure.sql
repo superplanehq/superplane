@@ -180,7 +180,10 @@ CREATE TABLE public.event_sources (
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    key bytea NOT NULL
+    key bytea NOT NULL,
+    resource_id uuid,
+    state character varying(64) NOT NULL,
+    scope character varying(64) NOT NULL
 );
 
 
@@ -249,6 +252,21 @@ CREATE TABLE public.role_metadata (
 
 
 --
+-- Name: resources; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.resources (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    external_id character varying(128) NOT NULL,
+    type character varying(64) NOT NULL,
+    name character varying(128) NOT NULL,
+    integration_id uuid NOT NULL,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone
+);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -312,7 +330,6 @@ CREATE TABLE public.stage_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     stage_id uuid NOT NULL,
     stage_event_id uuid NOT NULL,
-    reference_id character varying(64) NOT NULL,
     state character varying(64) NOT NULL,
     result character varying(64) NOT NULL,
     outputs jsonb DEFAULT '{}'::jsonb NOT NULL,
@@ -320,6 +337,19 @@ CREATE TABLE public.stage_executions (
     updated_at timestamp without time zone NOT NULL,
     started_at timestamp without time zone,
     finished_at timestamp without time zone
+);
+
+
+--
+-- Name: stage_executors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.stage_executors (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    stage_id uuid NOT NULL,
+    resource_id uuid NOT NULL,
+    type character varying(64) NOT NULL,
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
@@ -335,7 +365,6 @@ CREATE TABLE public.stages (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone,
     updated_by uuid,
-    executor_spec jsonb NOT NULL,
     conditions jsonb,
     inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     outputs jsonb DEFAULT '[]'::jsonb NOT NULL,
@@ -573,6 +602,14 @@ ALTER TABLE ONLY public.stage_executions
 
 
 --
+-- Name: stage_executors stage_executors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_executors
+    ADD CONSTRAINT stage_executors_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: stages stages_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -780,6 +817,38 @@ ALTER TABLE ONLY public.event_sources
 
 
 --
+-- Name: event_sources event_sources_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.event_sources
+    ADD CONSTRAINT event_sources_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.resources(id);
+
+
+--
+-- Name: execution_resources execution_resources_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.stage_executions(id);
+
+
+--
+-- Name: execution_resources execution_resources_parent_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.execution_resources
+    ADD CONSTRAINT execution_resources_parent_resource_id_fkey FOREIGN KEY (parent_resource_id) REFERENCES public.resources(id);
+
+
+--
+-- Name: resources resources_integration_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.resources
+    ADD CONSTRAINT resources_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
+
+
+--
 -- Name: secrets secrets_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -817,6 +886,22 @@ ALTER TABLE ONLY public.stage_executions
 
 ALTER TABLE ONLY public.stage_executions
     ADD CONSTRAINT stage_executions_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
+
+
+--
+-- Name: stage_executors stage_executors_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_executors
+    ADD CONSTRAINT stage_executors_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.resources(id);
+
+
+--
+-- Name: stage_executors stage_executors_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_executors
+    ADD CONSTRAINT stage_executors_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
 
 
 --

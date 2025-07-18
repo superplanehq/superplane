@@ -439,9 +439,9 @@ func serializeValueFrom(in *pb.ValueFrom) *models.ValueDefinitionFrom {
 		for _, result := range in.LastExecution.Results {
 			switch result {
 			case pb.Execution_RESULT_PASSED:
-				results = append(results, models.StageExecutionResultPassed)
+				results = append(results, models.ResultPassed)
 			case pb.Execution_RESULT_FAILED:
-				results = append(results, models.StageExecutionResultFailed)
+				results = append(results, models.ResultFailed)
 			}
 		}
 
