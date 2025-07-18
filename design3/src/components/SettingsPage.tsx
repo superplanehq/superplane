@@ -11,6 +11,7 @@ import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } fro
 import { Input, InputGroup } from './lib/Input/input'
 import { Checkbox } from './lib/Checkbox/checkbox'
 import { Sidebar, SidebarBody, SidebarItem, SidebarLabel, SidebarSection } from './lib/Sidebar/sidebar'
+import { Textarea } from './lib/Textarea/textarea'
 
 interface SettingsPageProps {
   onSignOut?: () => void
@@ -26,6 +27,7 @@ export function SettingsPage({
   onConfigurationClick 
 }: SettingsPageProps) {
   const [activeTab, setActiveTab] = useState<'users' | 'secrets' | 'integrations' | 'delete'>('users')
+  const [secretsSection, setSecretsSection] = useState<'list' | 'new'>('list')
   const [searchUsers, setSearchUsers] = useState('')
   const [inviteRole, setInviteRole] = useState('Member')
   const [userRoles, setUserRoles] = useState<Record<string, string>>({
@@ -45,6 +47,16 @@ export function SettingsPage({
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
   const [newRolePermissions, setNewRolePermissions] = useState<string[]>([])
+
+  // Secret form state
+  const [secretName, setSecretName] = useState('')
+  const [secretDescription, setSecretDescription] = useState('')
+  const [environmentVariables, setEnvironmentVariables] = useState<Array<{id: string, name: string, value: string}>>([
+    { id: '1', name: '', value: '' }
+  ])
+  const [configurationFiles, setConfigurationFiles] = useState<Array<{id: string, path: string, file?: File}>>([
+    { id: '1', path: '', file: undefined }
+  ])
 
   // Available permissions
   const organizationPermissions = [
@@ -208,6 +220,68 @@ export function SettingsPage({
       })
       handleCloseGroupModal()
     }
+  }
+
+  // Secret section handlers
+  const handleCreateSecret = () => {
+    setSecretsSection('new')
+  }
+
+  const handleBackToSecrets = () => {
+    setSecretsSection('list')
+    setSecretName('')
+    setSecretDescription('')
+    setEnvironmentVariables([{ id: '1', name: '', value: '' }])
+    setConfigurationFiles([{ id: '1', path: '', file: undefined }])
+  }
+
+  const handleSaveSecret = () => {
+    if (secretName.trim()) {
+      // Here you would typically save the secret to your backend
+      console.log('Creating secret:', {
+        name: secretName,
+        description: secretDescription,
+        environmentVariables: environmentVariables.filter(env => env.name.trim() || env.value.trim()),
+        configurationFiles: configurationFiles.filter(file => file.path.trim() || file.file)
+      })
+      handleBackToSecrets()
+    }
+  }
+
+  const handleAddEnvironmentVariable = () => {
+    const newId = Date.now().toString()
+    setEnvironmentVariables(prev => [...prev, { id: newId, name: '', value: '' }])
+  }
+
+  const handleRemoveEnvironmentVariable = (id: string) => {
+    setEnvironmentVariables(prev => prev.filter(env => env.id !== id))
+  }
+
+  const handleUpdateEnvironmentVariable = (id: string, field: 'name' | 'value', value: string) => {
+    setEnvironmentVariables(prev => 
+      prev.map(env => env.id === id ? { ...env, [field]: value } : env)
+    )
+  }
+
+  const handleAddConfigurationFile = () => {
+    const newId = Date.now().toString()
+    setConfigurationFiles(prev => [...prev, { id: newId, path: '', file: undefined }])
+  }
+
+  const handleRemoveConfigurationFile = (id: string) => {
+    setConfigurationFiles(prev => prev.filter(file => file.id !== id))
+  }
+
+  const handleUpdateConfigurationFile = (id: string, field: 'path', value: string) => {
+    setConfigurationFiles(prev => 
+      prev.map(file => file.id === id ? { ...file, [field]: value } : file)
+    )
+  }
+
+  const handleFileUpload = (id: string, file: File) => {
+    setConfigurationFiles(prev => 
+      prev.map(configFile => configFile.id === id ? { ...configFile, file } : configFile)
+    )
   }
 
   // Mock data for demonstration
@@ -442,66 +516,241 @@ export function SettingsPage({
 
             {activeTab === 'secrets' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <Subheading level={2}>Secrets</Subheading>
-                  <Button color="blue">
-                    <MaterialSymbol name="add" />
-                    Add Secret
-                  </Button>
+                {/* Breadcrumbs */}
+                <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
+                  <button 
+                    className={secretsSection === 'list' ? 'font-medium text-zinc-900 dark:text-zinc-100' : 'hover:text-zinc-900 dark:hover:text-zinc-100'}
+                    onClick={() => setSecretsSection('list')}
+                  >
+                    Secrets
+                  </button>
+                  {secretsSection === 'new' && (
+                    <>
+                      <MaterialSymbol name="chevron_right" size="sm" />
+                      <span className="font-medium text-zinc-900 dark:text-zinc-100">New secret</span>
+                    </>
+                  )}
                 </div>
-                
-                <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-                  <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
-                    Manage environment variables and secrets for your workflows. These values are encrypted and can be used in your stage configurations.
-                  </Text>
-                  
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
-                      <div>
-                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">DATABASE_URL</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 days ago</div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button plain>
-                          <MaterialSymbol name="edit" />
-                        </Button>
-                        <Button plain>
-                          <MaterialSymbol name="delete" />
-                        </Button>
-                      </div>
+
+                {secretsSection === 'list' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <Subheading level={2}>Secrets</Subheading>
+                      <Button color="blue" onClick={handleCreateSecret}>
+                        <MaterialSymbol name="add" />
+                        Add Secret
+                      </Button>
                     </div>
                     
-                    <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
-                      <div>
-                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">API_KEY</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 1 week ago</div>
+                    <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+                      <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
+                        Manage environment variables and secrets for your workflows. These values are encrypted and can be used in your stage configurations.
+                      </Text>
+                      
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
+                          <div>
+                            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">DATABASE_URL</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 days ago</div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button plain>
+                              <MaterialSymbol name="edit" />
+                            </Button>
+                            <Button plain>
+                              <MaterialSymbol name="delete" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-3 border-b border-zinc-200 dark:border-zinc-700">
+                          <div>
+                            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">API_KEY</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 1 week ago</div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button plain>
+                              <MaterialSymbol name="edit" />
+                            </Button>
+                            <Button plain>
+                              <MaterialSymbol name="delete" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between py-3">
+                          <div>
+                            <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">WEBHOOK_SECRET</div>
+                            <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 weeks ago</div>
+                          </div>
+                          <div className="flex space-x-2">
+                            <Button plain>
+                              <MaterialSymbol name="edit" />
+                            </Button>
+                            <Button plain>
+                              <MaterialSymbol name="delete" />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <Button plain>
-                          <MaterialSymbol name="edit" />
-                        </Button>
-                        <Button plain>
-                          <MaterialSymbol name="delete" />
-                        </Button>
-                      </div>
+                    </div>
+                  </>
+                )}
+
+                {secretsSection === 'new' && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <Subheading level={2}>New secret</Subheading>
                     </div>
                     
-                    <div className="flex items-center justify-between py-3">
-                      <div>
-                        <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">WEBHOOK_SECRET</div>
-                        <div className="text-xs text-zinc-500 dark:text-zinc-400">Added 2 weeks ago</div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <Button plain>
-                          <MaterialSymbol name="edit" />
-                        </Button>
-                        <Button plain>
-                          <MaterialSymbol name="delete" />
-                        </Button>
+                    <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+                      <div className="space-y-6">
+                        {/* Name of the Secret */}
+                        <div>
+                          <label htmlFor="secretName" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                            Name of the Secret
+                          </label>
+                          <Input
+                            id="secretName"
+                            type="text"
+                            placeholder="Enter name..."
+                            value={secretName}
+                            onChange={(e) => setSecretName(e.target.value)}
+                            className="w-full"
+                          />
+                        </div>
+
+                        {/* Description of the Secret */}
+                        <div>
+                          <label htmlFor="secretDescription" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                            Description of the Secret
+                          </label>
+                          <Textarea
+                            id="secretDescription"
+                            placeholder="Describe secret contents..."
+                            value={secretDescription}
+                            onChange={(e) => setSecretDescription(e.target.value)}
+                            className="w-full"
+                            rows={3}
+                          />
+                        </div>
+
+                        {/* Content */}
+                        <div>
+                          <Subheading level={3} className="mb-4">Content</Subheading>
+                          
+                          {/* Environment Variables */}
+                          <div className="mb-6">
+                            <Subheading level={4} className="mb-3">Environment Variables</Subheading>
+                            <div className="space-y-3">
+                              {environmentVariables.map((env) => (
+                                <div key={env.id} className="flex gap-3 items-center">
+                                  <div className="flex-1">
+                                    <Input
+                                      placeholder="Variable Name"
+                                      value={env.name}
+                                      onChange={(e) => handleUpdateEnvironmentVariable(env.id, 'name', e.target.value)}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                  <div className="flex-1">
+                                    <Input
+                                      placeholder="Value"
+                                      value={env.value}
+                                      onChange={(e) => handleUpdateEnvironmentVariable(env.id, 'value', e.target.value)}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                  <Button
+                                    plain
+                                    onClick={() => handleRemoveEnvironmentVariable(env.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <MaterialSymbol name="delete" size="sm" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              plain
+                              onClick={handleAddEnvironmentVariable}
+                              className="mt-3 text-zinc-900 dark:text-zinc-100 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            >
+                              + Add Environment Variable
+                            </Button>
+                          </div>
+
+                          {/* Configuration Files */}
+                          <div>
+                            <Subheading level={4} className="mb-3">Configuration Files</Subheading>
+                            <div className="space-y-3">
+                              {configurationFiles.map((file) => (
+                                <div key={file.id} className="flex gap-3 items-center">
+                                  <div className="flex-1">
+                                    <Input
+                                      placeholder="/path/to/file"
+                                      value={file.path}
+                                      onChange={(e) => handleUpdateConfigurationFile(file.id, 'path', e.target.value)}
+                                      className="w-full"
+                                    />
+                                  </div>
+                                  <Button
+                                    color="zinc"
+                                    onClick={() => {
+                                      const input = document.createElement('input')
+                                      input.type = 'file'
+                                      input.onchange = (e) => {
+                                        const selectedFile = (e.target as HTMLInputElement).files?.[0]
+                                        if (selectedFile) {
+                                          handleFileUpload(file.id, selectedFile)
+                                        }
+                                      }
+                                      input.click()
+                                    }}
+                                  >
+                                    Upload File
+                                  </Button>
+                                  <Button
+                                    plain
+                                    onClick={() => handleRemoveConfigurationFile(file.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <MaterialSymbol name="delete" size="sm" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                            <Button
+                              plain
+                              onClick={handleAddConfigurationFile}
+                              className="mt-3 text-zinc-900 dark:text-zinc-100 hover:text-zinc-700 dark:hover:text-zinc-300"
+                            >
+                              + Add Configuration File
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                          <Button
+                            color="blue"
+                            onClick={handleSaveSecret}
+                            disabled={!secretName.trim()}
+                          >
+                            Save Secret
+                          </Button>
+                          <Button
+                            plain
+                            onClick={handleBackToSecrets}
+                            className="text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
               </div>
             )}
 
@@ -814,6 +1063,7 @@ export function SettingsPage({
           </Button>
         </DialogActions>
       </Dialog>
+
     </div>
   )
 }

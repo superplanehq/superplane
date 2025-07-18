@@ -597,11 +597,11 @@ export function CanvasEditorPage({
           </DropdownMenu>
         </Dropdown>
         </div>
-        <div className="flex items-center pl-4 h-full">
+        <div className="flex items-center h-full">
           <ControlledTabs
             tabs={navigationTabs}
             activeTab={activeView}
-            variant='underline'
+            variant='default'
             onTabChange={(tabId) => setActiveView(tabId as 'editor' | 'settings')}
           />
         </div>

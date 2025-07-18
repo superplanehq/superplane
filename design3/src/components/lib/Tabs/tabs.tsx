@@ -113,8 +113,8 @@ function TabItem({
     'relative flex items-center gap-2 font-medium text-sm transition-all duration-200 ease-in-out focus:outline-hidden',
     {
       // Default variant
-      'px-1 py-3 border-b-2 border-transparent': variant === 'default',
-      'text-blue-600 border-blue-500 dark:text-blue-400': variant === 'default' && isActive,
+      'px-4 py-3 border-b border-transparent': variant === 'default',
+      'bg-zinc-600/10 dark:bg-zinc-100/10 !border-blue-500 dark:border-blue-400 border-b-2 border-width-2': variant === 'default' && isActive,
       
       // Pills variant
       'px-3 py-2 rounded-md': variant === 'pills',
@@ -224,7 +224,7 @@ export function ControlledTabs({
     'flex',
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
-      'gap-6': variant === 'default',
+      'gap-0': variant === 'default',
       'gap-4': variant === 'underline',
     }
   )
