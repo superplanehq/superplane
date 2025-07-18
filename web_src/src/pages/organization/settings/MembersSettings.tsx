@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { Heading } from '../../../components/Heading/heading'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Avatar } from '../../../components/Avatar/avatar'
@@ -20,13 +20,7 @@ import {
   TableCell
 } from '../../../components/Table/table'
 import { AddMembersSection } from './AddMembersSection'
-import {
-  authorizationGetOrganizationUsers,
-  authorizationAssignRole,
-  authorizationRemoveRole,
-  authorizationListRoles
-} from '../../../api-client/sdk.gen'
-import { AuthorizationUser, AuthorizationRole } from '../../../api-client/types.gen'
+import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveRole } from '../../../hooks/useOrganizationData'
 
 interface Member {
   id: string
@@ -45,78 +39,50 @@ interface MembersSettingsProps {
 }
 
 export function MembersSettings({ organizationId }: MembersSettingsProps) {
-  const [members, setMembers] = useState<Member[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(true)
-  const [organizationRoles, setOrganizationRoles] = useState<AuthorizationRole[]>([])
-  const [loadingRoles, setLoadingRoles] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null
     direction: 'asc' | 'desc'
   }>({ key: null, direction: 'asc' })
 
+  // Use React Query hooks for data fetching
+  const { data: users = [], isLoading: loadingMembers, error: usersError } = useOrganizationUsers(organizationId)
+  const { data: organizationRoles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(organizationId)
 
-  const fetchData = useCallback(async () => {
-    try {
-      setLoadingMembers(true)
-      setLoadingRoles(true)
-      setError(null)
+  // Mutations for role assignment
+  const assignRoleMutation = useAssignRole(organizationId)
+  const removeRoleMutation = useRemoveRole(organizationId)
 
-      // Fetch organization users and roles in parallel
-      const [usersResponse, rolesResponse] = await Promise.all([
-        authorizationGetOrganizationUsers({
-          path: { organizationId }
-        }),
-        authorizationListRoles({
-          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
-        })
-      ])
+  const error = usersError || rolesError
 
-      // Set organization roles
-      setOrganizationRoles(rolesResponse.data?.roles || [])
+  // Transform users to Member interface format
+  const members = useMemo(() => {
+    return users.map((user) => {
+      // Generate initials from displayName or userId
+      const name = user.displayName || user.userId || 'Unknown User'
+      const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
-      // Convert AuthorizationUser to Member interface format
-      const members: Member[] = usersResponse.data?.users?.map((user: AuthorizationUser) => {
-        // Generate initials from displayName or userId
-        const name = user.displayName || user.userId || 'Unknown User'
-        const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+      // Get primary role name and display name from role assignments
+      const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
+      const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
 
-        // Get primary role name and display name from role assignments
-        const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
-        const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
+      // Calculate last active time
+      const lastLoginAt = user.isActive ? Date.now() : null
+      const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
 
-        // Calculate last active time
-        const lastLoginAt = user.isActive ? Date.now() : null
-        const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
-
-        return {
-          id: user.userId || '',
-          name: name,
-          email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
-          role: primaryRoleDisplayName,
-          roleName: primaryRoleName,
-          status: user.isActive ? 'Active' : 'Pending',
-          lastActive: lastActive,
-          initials: initials,
-          avatar: user.avatarUrl
-        }
-      }) || []
-
-      setMembers(members)
-
-    } catch (err) {
-      console.error('Error fetching data:', err)
-      setError('Failed to fetch members')
-    } finally {
-      setLoadingMembers(false)
-      setLoadingRoles(false)
-    }
-  }, [organizationId])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+      return {
+        id: user.userId || '',
+        name: name,
+        email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
+        role: primaryRoleDisplayName,
+        roleName: primaryRoleName,
+        status: user.isActive ? 'Active' : 'Pending',
+        lastActive: lastActive,
+        initials: initials,
+        avatar: user.avatarUrl
+      }
+    })
+  }, [users])
 
   const handleSort = (key: keyof Member) => {
     setSortConfig(prevConfig => ({
@@ -166,58 +132,42 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
 
   const handleRoleChange = async (memberId: string, newRoleName: string) => {
     try {
-      setError(null)
-
-      await authorizationAssignRole({
-        body: {
-          userId: memberId,
-          roleAssignment: {
-            role: newRoleName,
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: organizationId
-          }
+      await assignRoleMutation.mutateAsync({
+        userId: memberId,
+        roleAssignment: {
+          role: newRoleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         }
       })
-
-      // Refresh the data to get updated role information from the API
-      await fetchData()
     } catch (err) {
       console.error('Error updating role:', err)
-      setError('Failed to update member role')
     }
   }
 
   const handleMemberRemove = async (memberId: string) => {
     try {
-      setError(null)
-
       // Find the member to get their current role
       const member = members.find(m => m.id === memberId)
       if (!member) {
-        setError('Member not found')
         return
       }
 
-      await authorizationRemoveRole({
-        body: {
-          userId: memberId,
-          roleAssignment: {
-            role: member.roleName,
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: organizationId
-          }
+      await removeRoleMutation.mutateAsync({
+        userId: memberId,
+        roleAssignment: {
+          role: member.roleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         }
       })
-
-      setMembers(prev => prev.filter(member => member.id !== memberId))
     } catch (err) {
       console.error('Error removing member:', err)
-      setError('Failed to remove member')
     }
   }
 
   const handleMemberAdded = () => {
-    fetchData()
+    // No need to manually refresh - React Query will handle cache invalidation
   }
 
   return (
@@ -235,7 +185,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{error}</p>
+          <p>{error instanceof Error ? error.message : 'Failed to fetch data'}</p>
         </div>
       )}
 

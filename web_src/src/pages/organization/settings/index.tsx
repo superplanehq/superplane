@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
 import { GeneralSettings } from './GeneralSettings'
@@ -10,18 +10,17 @@ import { GroupMembersPage } from './GroupMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
 import { ProfileSettings } from './ProfileSettings'
-import { organizationsDescribeOrganization } from '../../../api-client/sdk.gen'
-import type { OrganizationsOrganization } from '../../../api-client/types.gen'
+import { useOrganization } from '../../../hooks/useOrganizationData'
 import { useUserStore } from '../../../stores/userStore'
 
 export function OrganizationSettings() {
   const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const { user, fetchUser } = useUserStore()
+
+  // Use React Query hook for organization data
+  const { data: organization, isLoading: loading, error } = useOrganization(orgId || '')
 
   // Fetch user data when component mounts
   useEffect(() => {
@@ -30,28 +29,6 @@ export function OrganizationSettings() {
 
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
-
-  // Fetch organization details
-  useEffect(() => {
-    if (!orgId) return
-
-    const fetchOrganization = async () => {
-      try {
-        setLoading(true)
-        const response = await organizationsDescribeOrganization({
-          path: { idOrName: orgId }
-        })
-        setOrganization(response.data?.organization || null)
-      } catch (err) {
-        setError('Failed to load organization')
-        console.error('Error fetching organization:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchOrganization()
-  }, [orgId])
 
   if (!orgId) {
     return (
@@ -69,10 +46,10 @@ export function OrganizationSettings() {
     )
   }
 
-  if (error || !organization) {
+  if (error || (!loading && !organization)) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">{error || 'Organization not found'}</p>
+        <p className="text-zinc-500 dark:text-zinc-400">{error instanceof Error ? error.message : 'Organization not found'}</p>
       </div>
     )
   }
@@ -118,10 +95,10 @@ export function OrganizationSettings() {
                 <Avatar
                   className='w-6 h-6 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-white'
                   slot="icon"
-                  initials={(organization.metadata?.displayName || organization.metadata?.name || orgId).charAt(0).toUpperCase()}
-                  alt={organization.metadata?.displayName || organization.metadata?.name || orgId}
+                  initials={(organization?.metadata?.displayName || organization?.metadata?.name || orgId).charAt(0).toUpperCase()}
+                  alt={organization?.metadata?.displayName || organization?.metadata?.name || orgId}
                 />
-                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization.metadata?.displayName || organization.metadata?.name || orgId}</SidebarLabel>
+                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization?.metadata?.displayName || organization?.metadata?.name || orgId}</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem
@@ -142,7 +119,15 @@ export function OrganizationSettings() {
           <div className="px-8 pb-8">
             <Routes>
               <Route path="" element={<Navigate to="general" replace />} />
-              <Route path="general" element={<GeneralSettings organization={organization} />} />
+              <Route path="general" element={
+                organization ? (
+                  <GeneralSettings organization={organization} />
+                ) : (
+                  <div className="flex justify-center items-center h-32">
+                    <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
+                  </div>
+                )
+              } />
               <Route path="members" element={<MembersSettings organizationId={orgId} />} />
               <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
               <Route path="roles" element={<RolesSettings organizationId={orgId} />} />

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { Button } from '../../../components/Button/button'
 import { Textarea } from '../../../components/Textarea/textarea'
 import { Input, InputGroup } from '../../../components/Input/input'
@@ -17,13 +17,12 @@ import { Text } from '../../../components/Text/text'
 import { Field, Label } from '../../../components/Fieldset/fieldset'
 import { Tabs, type Tab } from '../../../components/Tabs/tabs'
 import {
-  authorizationAssignRole,
-  authorizationListRoles,
-  authorizationAddUserToOrganizationGroup,
-  authorizationGetOrganizationUsers,
-  authorizationGetOrganizationGroupUsers,
-} from '../../../api-client/sdk.gen'
-import { AuthorizationRole, AuthorizationUser } from '../../../api-client/types.gen'
+  useOrganizationUsers,
+  useOrganizationRoles,
+  useOrganizationGroupUsers,
+  useAssignRole,
+  useAddUserToGroup
+} from '../../../hooks/useOrganizationData'
 import { capitalizeFirstLetter } from '../../../utils/text'
 import Papa from 'papaparse'
 
@@ -46,14 +45,20 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [bulkUserRole, setBulkUserRole] = useState('')
     const [emailRole, setEmailRole] = useState('')
-    const [isInviting, setIsInviting] = useState(false)
-    const [error, setError] = useState<string | null>(null)
-    const [roles, setRoles] = useState<AuthorizationRole[]>([])
-    const [loadingRoles, setLoadingRoles] = useState(true)
-    const [existingMembers, setExistingMembers] = useState<AuthorizationUser[]>([])
-    const [loadingMembers, setLoadingMembers] = useState(false)
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [memberSearchTerm, setMemberSearchTerm] = useState('')
+
+    // React Query hooks
+    const { data: roles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(organizationId)
+    const { data: orgUsers = [], isLoading: loadingOrgUsers, error: orgUsersError } = useOrganizationUsers(organizationId)
+    const { data: groupUsers = [], isLoading: loadingGroupUsers, error: groupUsersError } = useOrganizationGroupUsers(organizationId, groupName || '')
+
+    // Mutations
+    const assignRoleMutation = useAssignRole(organizationId)
+    const addUserToGroupMutation = useAddUserToGroup(organizationId)
+
+    const isInviting = assignRoleMutation.isPending || addUserToGroupMutation.isPending
+    const error = rolesError || orgUsersError || groupUsersError
 
     const addMembersTabs: Tab[] = [
       { id: 'emails', label: 'By emails' },
@@ -61,86 +66,32 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       { id: 'upload', label: 'By file' }
     ]
 
-    const fetchRoles = useCallback(async () => {
-      try {
-        setLoadingRoles(true)
-        setError(null)
-        const response = await authorizationListRoles({
-          query: {
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: organizationId
-          }
-        })
+    // Calculate available members (org users who aren't in the group)
+    const existingMembers = useMemo(() => {
+      if (!groupName) return []
 
-        if (response.data?.roles) {
-          setRoles(response.data.roles)
-          // Set default role to the first org member role found, or first role if none
-          const orgMemberRole = response.data.roles.find(role => role.name?.includes('member'))
-          const defaultRole = orgMemberRole?.name || response.data.roles[0]?.name || ''
-          setBulkUserRole(defaultRole)
-          setEmailRole(defaultRole)
-        }
-      } catch (err) {
-        console.error('Error fetching roles:', err)
-        setError('Failed to fetch roles')
-      } finally {
-        setLoadingRoles(false)
+      const existingMemberIds = new Set(groupUsers.map(user => user.userId))
+      return orgUsers.filter(user => !existingMemberIds.has(user.userId))
+    }, [orgUsers, groupUsers, groupName])
+
+    const loadingMembers = loadingOrgUsers || loadingGroupUsers
+
+    // Set default roles when roles are loaded
+    useEffect(() => {
+      if (roles.length > 0) {
+        const orgMemberRole = roles.find(role => role.name?.includes('member'))
+        const defaultRole = orgMemberRole?.name || roles[0]?.name || ''
+        setBulkUserRole(defaultRole)
+        setEmailRole(defaultRole)
       }
-    }, [organizationId])
-
-    const fetchExistingMembers = useCallback(async () => {
-      if (!groupName) return // Only fetch for group additions
-
-      try {
-        setLoadingMembers(true)
-        setError(null)
-
-        // Fetch both organization users and current group members
-        const [orgUsersResponse, groupMembersResponse] = await Promise.all([
-          authorizationGetOrganizationUsers({
-            path: { organizationId }
-          }),
-          authorizationGetOrganizationGroupUsers({
-            path: { groupName },
-            query: { organizationId }
-          })
-        ])
-
-        if (orgUsersResponse.data?.users) {
-          // Get existing group member IDs
-          const existingMemberIds = new Set(
-            groupMembersResponse.data?.users?.map(user => user.userId) || []
-          )
-
-          // Filter out users who are already in the group
-          const availableMembers = orgUsersResponse.data.users.filter(
-            user => !existingMemberIds.has(user.userId)
-          )
-
-          setExistingMembers(availableMembers)
-        }
-      } catch (err) {
-        console.error('Error fetching existing members:', err)
-        setError('Failed to fetch existing members')
-      } finally {
-        setLoadingMembers(false)
-      }
-    }, [organizationId, groupName])
+    }, [roles])
 
     // Expose refresh function to parent
     useImperativeHandle(ref, () => ({
-      refreshExistingMembers: fetchExistingMembers
-    }), [fetchExistingMembers])
-
-    useEffect(() => {
-      fetchRoles()
-    }, [fetchRoles])
-
-    useEffect(() => {
-      if (addMembersTab === 'existing') {
-        fetchExistingMembers()
+      refreshExistingMembers: () => {
+        // No need to manually refresh - React Query will handle it
       }
-    }, [addMembersTab, fetchExistingMembers])
+    }), [])
 
     const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0]
@@ -151,9 +102,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
     const handleBulkAddSubmit = async () => {
       if (!uploadFile) return
-
-      setIsInviting(true)
-      setError(null)
 
       try {
         // Parse CSV file
@@ -191,20 +139,19 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         for (const email of emailsToAdd) {
           if (groupName) {
             // Add user to specific group
-            await authorizationAddUserToOrganizationGroup({
-              path: { groupName },
-              body: { userEmail: email, organizationId: organizationId }
+            await addUserToGroupMutation.mutateAsync({
+              groupName,
+              userEmail: email,
+              organizationId
             })
           } else {
             // Add user to organization with role
-            await authorizationAssignRole({
-              body: {
-                userEmail: email,
-                roleAssignment: {
-                  domainType: 'DOMAIN_TYPE_ORGANIZATION',
-                  domainId: organizationId,
-                  role: roleToAssign
-                }
+            await assignRoleMutation.mutateAsync({
+              userEmail: email,
+              roleAssignment: {
+                domainType: 'DOMAIN_TYPE_ORGANIZATION',
+                domainId: organizationId,
+                role: roleToAssign
               }
             })
           }
@@ -225,9 +172,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         onMemberAdded?.()
       } catch (err) {
         console.error('Error processing bulk upload:', err)
-        setError(err instanceof Error ? err.message : 'Failed to process bulk upload. Please try again.')
-      } finally {
-        setIsInviting(false)
       }
     }
 
@@ -239,9 +183,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     const handleEmailsSubmit = async () => {
       if (!emailsInput.trim()) return
 
-      setIsInviting(true)
-      setError(null)
-
       try {
         const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
         const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
@@ -250,20 +191,19 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         for (const email of emails) {
           if (groupName) {
             // Add user to specific group
-            await authorizationAddUserToOrganizationGroup({
-              path: { groupName },
-              body: { userEmail: email, organizationId: organizationId }
+            await addUserToGroupMutation.mutateAsync({
+              groupName,
+              userEmail: email,
+              organizationId
             })
           } else {
             // Add user to organization with role
-            await authorizationAssignRole({
-              body: {
-                userEmail: email,
-                roleAssignment: {
-                  domainType: 'DOMAIN_TYPE_ORGANIZATION',
-                  domainId: organizationId,
-                  role: roleToAssign
-                }
+            await assignRoleMutation.mutateAsync({
+              userEmail: email,
+              roleAssignment: {
+                domainType: 'DOMAIN_TYPE_ORGANIZATION',
+                domainId: organizationId,
+                role: roleToAssign
               }
             })
           }
@@ -282,17 +222,11 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         onMemberAdded?.()
       } catch (err) {
         console.error('Error adding members by email:', err)
-        setError('Failed to add members. Please try again.')
-      } finally {
-        setIsInviting(false)
       }
     }
 
     const handleExistingMembersSubmit = async () => {
       if (selectedMembers.size === 0) return
-
-      setIsInviting(true)
-      setError(null)
 
       try {
         const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.userId!))
@@ -302,16 +236,18 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           if (groupName) {
             // Add user to specific group - try both userId and email
             try {
-              await authorizationAddUserToOrganizationGroup({
-                path: { groupName },
-                body: { userId: member.userId, organizationId: organizationId }
+              await addUserToGroupMutation.mutateAsync({
+                groupName,
+                userId: member.userId,
+                organizationId
               })
             } catch (err) {
               // If userId fails, try with email
               if (member.email) {
-                await authorizationAddUserToOrganizationGroup({
-                  path: { groupName },
-                  body: { userEmail: member.email, organizationId: organizationId }
+                await addUserToGroupMutation.mutateAsync({
+                  groupName,
+                  userEmail: member.email,
+                  organizationId
                 })
               } else {
                 throw err
@@ -328,15 +264,9 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         setSelectedMembers(new Set())
         setMemberSearchTerm('')
 
-        // Refresh the available members list to reflect the changes
-        fetchExistingMembers()
-
         onMemberAdded?.()
       } catch (err) {
         console.error('Error adding existing members:', err)
-        setError('Failed to add members. Please try again.')
-      } finally {
-        setIsInviting(false)
       }
     }
 
@@ -378,7 +308,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p className="text-sm">{error}</p>
+            <p className="text-sm">{error instanceof Error ? error.message : 'Failed to fetch data'}</p>
           </div>
         )}
 

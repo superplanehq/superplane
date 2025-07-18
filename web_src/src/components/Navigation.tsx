@@ -1,42 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Avatar } from './Avatar/avatar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from './Dropdown/dropdown';
 import { Text } from './Text/text';
 import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
-import { organizationsDescribeOrganization } from '../api-client/sdk.gen';
-import type { OrganizationsOrganization } from '../api-client/types.gen';
+import { useOrganization } from '../hooks/useOrganizationData';
 import { useUserStore } from '../stores/userStore';
 
 const Navigation: React.FC = () => {
   const { orgId } = useParams<{ orgId?: string }>();
-  const [organization, setOrganization] = useState<OrganizationsOrganization | null>(null);
   const { user, fetchUser } = useUserStore();
+
+  const { data: organization } = useOrganization(orgId || '');
 
   useEffect(() => {
     fetchUser();
   }, [fetchUser]);
-
-  useEffect(() => {
-    if (!orgId) {
-      setOrganization(null);
-      return;
-    }
-
-    const fetchOrganization = async () => {
-      try {
-        const response = await organizationsDescribeOrganization({
-          path: { idOrName: orgId }
-        });
-        setOrganization(response.data?.organization || null);
-      } catch (err) {
-        console.error('Error fetching organization:', err);
-      }
-    };
-
-    fetchOrganization();
-  }, [orgId]);
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white border-zinc-200 dark:border-zinc-800 border-b">
       <div className="flex items-center justify-between px-2 py-[8px]">

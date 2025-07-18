@@ -3,7 +3,7 @@ import { Input } from '../../../components/Input/input'
 import { Field, Fieldset, Label } from '../../../components/Fieldset/fieldset'
 import { Button } from '../../../components/Button/button'
 import { useState } from 'react'
-import { organizationsUpdateOrganization } from '../../../api-client/sdk.gen'
+import { useUpdateOrganization } from '../../../hooks/useOrganizationData'
 import type { OrganizationsOrganization } from '../../../api-client/types.gen'
 import { useParams } from 'react-router-dom'
 import { Textarea } from '@/components/Textarea/textarea'
@@ -15,27 +15,21 @@ interface GeneralSettingsProps {
 export function GeneralSettings({ organization }: GeneralSettingsProps) {
   const { orgId } = useParams<{ orgId: string }>()
   const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
-  const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [organizationDescription, setOrganizationDescription] = useState(organization.metadata?.description || '')
+
+  // Use React Query mutation hook
+  const updateOrganizationMutation = useUpdateOrganization(orgId || '')
 
   const handleSave = async () => {
     if (!orgId) return
 
     try {
-      setSaving(true)
       setSaveMessage(null)
 
-      await organizationsUpdateOrganization({
-        path: { idOrName: orgId },
-        body: {
-          organization: {
-            metadata: {
-              displayName: displayName,
-              description: organizationDescription,
-            }
-          }
-        }
+      await updateOrganizationMutation.mutateAsync({
+        displayName: displayName,
+        description: organizationDescription,
       })
 
       setSaveMessage('Organization updated successfully')
@@ -44,8 +38,6 @@ export function GeneralSettings({ organization }: GeneralSettingsProps) {
       setSaveMessage('Failed to update organization')
       console.error('Error updating organization:', err)
       setTimeout(() => setSaveMessage(null), 3000)
-    } finally {
-      setSaving(false)
     }
   }
   return (
@@ -81,10 +73,10 @@ export function GeneralSettings({ organization }: GeneralSettingsProps) {
           <Button
             type="button"
             onClick={handleSave}
-            disabled={saving}
+            disabled={updateOrganizationMutation.isPending}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            {saving ? 'Saving...' : 'Save Changes'}
+            {updateOrganizationMutation.isPending ? 'Saving...' : 'Save Changes'}
           </Button>
           {saveMessage && (
             <span className={`text-sm ${saveMessage.includes('successfully') ? 'text-green-600' : 'text-red-600'}`}>

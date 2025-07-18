@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
@@ -22,13 +22,7 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import {
-  authorizationListOrganizationGroups,
-  authorizationListRoles,
-  authorizationUpdateOrganizationGroup,
-  authorizationDeleteOrganizationGroup
-} from '../../../api-client/sdk.gen'
-import { AuthorizationGroup, AuthorizationRole } from '../../../api-client/types.gen'
+import { useOrganizationGroups, useOrganizationRoles, useUpdateGroup, useDeleteGroup } from '../../../hooks/useOrganizationData'
 import { capitalizeFirstLetter } from '@/utils/text'
 import debounce from 'lodash.debounce'
 
@@ -61,13 +55,7 @@ interface GroupsSettingsProps {
 
 export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
   const navigate = useNavigate()
-  const [groups, setGroups] = useState<AuthorizationGroup[]>([])
-  const [roles, setRoles] = useState<AuthorizationRole[]>([])
-  const [loadingGroups, setLoadingGroups] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const [updatingGroupRoles, setUpdatingGroupRoles] = useState<Set<string>>(new Set())
-  const [deletingGroups, setDeletingGroups] = useState<Set<string>>(new Set())
   const [sortConfig, setSortConfig] = useState<{
     key: string | null
     direction: 'asc' | 'desc'
@@ -78,46 +66,15 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
 
   const setDebouncedSearch = debounce(setSearch, 300)
 
-  useEffect(() => {
-    const fetchGroups = async () => {
-      try {
-        setLoadingGroups(true)
-        setError(null)
-        const response = await authorizationListOrganizationGroups({
-          query: { organizationId }
-        })
-        if (response.data?.groups) {
-          setGroups(response.data.groups)
-        }
-      } catch (err) {
-        console.error('Error fetching groups:', err)
-        setError('Failed to fetch groups')
-      } finally {
-        setLoadingGroups(false)
-      }
-    }
+  // Use React Query hooks for data fetching
+  const { data: groups = [], isLoading: loadingGroups, error: groupsError } = useOrganizationGroups(organizationId)
+  const { data: roles = [], error: rolesError } = useOrganizationRoles(organizationId)
 
-    const fetchRoles = async () => {
-      try {
-        setLoadingGroups(true)
-        setError(null)
-        const response = await authorizationListRoles({
-          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
-        })
-        if (response.data?.roles) {
-          setRoles(response.data.roles)
-        }
-      } catch (err) {
-        console.error('Error fetching roles:', err)
-        setError('Failed to fetch roles')
-      } finally {
-        setLoadingGroups(false)
-      }
-    }
+  // Mutations
+  const updateGroupMutation = useUpdateGroup(organizationId)
+  const deleteGroupMutation = useDeleteGroup(organizationId)
 
-    fetchGroups()
-    fetchRoles()
-  }, [organizationId])
+  const error = groupsError || rolesError
 
   const handleCreateGroup = () => {
     navigate(`/organization/${organizationId}/settings/create-group`)
@@ -135,54 +92,24 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
     if (!confirmed) return
 
     try {
-      setError(null)
-      setDeletingGroups(prev => new Set(prev).add(groupName))
-
-      await authorizationDeleteOrganizationGroup({
-        path: { groupName },
-        query: { organizationId }
+      await deleteGroupMutation.mutateAsync({
+        groupName,
+        organizationId
       })
-
-      // Remove the group from local state
-      setGroups(prev => prev.filter(group => group.name !== groupName))
     } catch (err) {
       console.error('Error deleting group:', err)
-      setError(`Failed to delete group "${groupName}": ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setDeletingGroups(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(groupName)
-        return newSet
-      })
     }
   }
 
   const handleRoleUpdate = async (groupName: string, newRoleName: string) => {
     try {
-      setError(null)
-      setUpdatingGroupRoles(prev => new Set(prev).add(groupName))
-
-      await authorizationUpdateOrganizationGroup({
-        path: { groupName },
-        body: {
-          organizationId,
-          role: newRoleName
-        }
+      await updateGroupMutation.mutateAsync({
+        groupName,
+        organizationId,
+        role: newRoleName
       })
-
-      // Update the group's role in the local state
-      setGroups(prev => prev.map(group =>
-        group.name === groupName ? { ...group, role: newRoleName } : group
-      ))
     } catch (err) {
       console.error('Error updating group role:', err)
-      setError(`Failed to update role for group "${groupName}": ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setUpdatingGroupRoles(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(groupName)
-        return newSet
-      })
     }
   }
 
@@ -256,7 +183,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{error}</p>
+          <p>{error instanceof Error ? error.message : 'Failed to fetch data'}</p>
         </div>
       )}
 
@@ -366,9 +293,9 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                           <DropdownButton
                             outline
                             className="flex items-center gap-2 text-sm justify-between"
-                            disabled={updatingGroupRoles.has(group.name!)}
+                            disabled={updateGroupMutation.isPending}
                           >
-                            {updatingGroupRoles.has(group.name!) ? (
+                            {updateGroupMutation.isPending ? (
                               'Updating...'
                             ) : (
                               capitalizeFirstLetter(group.role?.split('_').at(-1) || '') || 'Select Role'
@@ -395,7 +322,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                           <Dropdown>
                             <DropdownButton
                               plain
-                              disabled={deletingGroups.has(group.name!)}
+                              disabled={deleteGroupMutation.isPending}
                             >
                               <MaterialSymbol name="more_vert" size="sm" />
                             </DropdownButton>
@@ -409,7 +336,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                                 className="text-red-600 dark:text-red-400"
                               >
                                 <MaterialSymbol name="delete" />
-                                {deletingGroups.has(group.name!) ? 'Deleting...' : 'Delete Group'}
+                                {deleteGroupMutation.isPending ? 'Deleting...' : 'Delete Group'}
                               </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>

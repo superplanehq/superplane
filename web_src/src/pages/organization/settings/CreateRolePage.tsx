@@ -6,11 +6,7 @@ import { Text } from '../../../components/Text/text'
 import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
 import { Label, Description } from '../../../components/Fieldset/fieldset'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
-import {
-  authorizationCreateRole,
-  authorizationUpdateRole,
-  authorizationDescribeRole
-} from '../../../api-client/sdk.gen'
+import { useRole, useCreateRole, useUpdateRole } from '../../../hooks/useOrganizationData'
 import { Heading } from '@/components/Heading/heading'
 
 interface Permission {
@@ -83,9 +79,13 @@ export function CreateRolePage() {
   const [roleName, setRoleName] = useState('')
   const [roleDescription, setRoleDescription] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+
+  // React Query hooks
+  const { data: existingRole, isLoading, error } = useRole(orgId || '', roleNameParam || '')
+  const createRoleMutation = useCreateRole(orgId || '')
+  const updateRoleMutation = useUpdateRole(orgId || '')
+
+  const isSubmitting = createRoleMutation.isPending || updateRoleMutation.isPending
 
   const handleCategoryToggle = (permissions: Permission[]) => {
     const permissionIds = permissions.map(p => p.id)
@@ -111,58 +111,28 @@ export function CreateRolePage() {
 
   // Load role data when in edit mode
   useEffect(() => {
-    const loadData = async () => {
-      if (!roleNameParam || !orgId) return
+    if (isEditMode && existingRole) {
+      setRoleName(existingRole.displayName || existingRole.name || '')
+      setRoleDescription(existingRole.description || '')
 
-      try {
-        setIsLoading(true)
-        setError(null)
+      // Convert permissions back to selected format
+      const permissionIds = new Set<string>()
+      existingRole.permissions?.forEach(perm => {
+        const matchingPerm = ORGANIZATION_PERMISSIONS
+          .flatMap(cat => cat.permissions)
+          .find(p => p.resource === perm.resource && p.action === perm.action)
 
-        const response = await authorizationDescribeRole({
-          query: {
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: orgId,
-            role: roleNameParam
-          }
-        })
-
-        const role = response.data?.role
-        if (role) {
-          setRoleName(role.displayName || role.name || '')
-          setRoleDescription(role.description || '')
-
-          // Convert permissions back to selected format
-          const permissionIds = new Set<string>()
-          role.permissions?.forEach(perm => {
-            const matchingPerm = ORGANIZATION_PERMISSIONS
-              .flatMap(cat => cat.permissions)
-              .find(p => p.resource === perm.resource && p.action === perm.action)
-
-            if (matchingPerm) {
-              permissionIds.add(matchingPerm.id)
-            }
-          })
-          setSelectedPermissions(permissionIds)
+        if (matchingPerm) {
+          permissionIds.add(matchingPerm.id)
         }
-      } catch (err) {
-        console.error('Error loading role:', err)
-        setError('Failed to load role data.')
-      } finally {
-        setIsLoading(false)
-      }
+      })
+      setSelectedPermissions(permissionIds)
     }
-
-    if (isEditMode && roleNameParam && orgId) {
-      loadData()
-    }
-  }, [isEditMode, roleNameParam, orgId])
+  }, [isEditMode, existingRole])
 
 
   const handleSubmitRole = async () => {
     if (!roleName.trim() || selectedPermissions.size === 0 || !orgId) return
-
-    setIsSubmitting(true)
-    setError(null)
 
     try {
       // Convert selected permissions to the protobuf format
@@ -184,30 +154,24 @@ export function CreateRolePage() {
 
       if (isEditMode && roleNameParam) {
         // Update existing role
-        await authorizationUpdateRole({
-          path: {
-            roleName: roleNameParam
-          },
-          body: {
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: orgId,
-            permissions: permissions,
-            displayName: roleName.trim(),
-            description: roleDescription.trim() || undefined
-          }
+        await updateRoleMutation.mutateAsync({
+          roleName: roleNameParam,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: orgId,
+          permissions: permissions,
+          displayName: roleName.trim(),
+          description: roleDescription.trim() || undefined
         })
         console.log('Successfully updated role:', roleName)
       } else {
         // Create new role
-        await authorizationCreateRole({
-          body: {
-            name: roleName.trim().toLowerCase().replace(/\s+/g, '_'),
-            domainType: 'DOMAIN_TYPE_ORGANIZATION',
-            domainId: orgId,
-            permissions: permissions,
-            displayName: roleName.trim(),
-            description: roleDescription.trim() || undefined
-          }
+        await createRoleMutation.mutateAsync({
+          name: roleName.trim().toLowerCase().replace(/\s+/g, '_'),
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: orgId,
+          permissions: permissions,
+          displayName: roleName.trim(),
+          description: roleDescription.trim() || undefined
         })
         console.log('Successfully created role:', roleName)
       }
@@ -215,9 +179,6 @@ export function CreateRolePage() {
       navigate(`/organization/${orgId}/settings/roles`)
     } catch (err) {
       console.error(`Error ${isEditMode ? 'updating' : 'creating'} role:`, err)
-      setError(`Failed to ${isEditMode ? 'update' : 'create'} role. Please try again.`)
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
@@ -274,7 +235,7 @@ export function CreateRolePage() {
             <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
               {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-                  <p className="text-sm">{error}</p>
+                  <p className="text-sm">{error instanceof Error ? error.message : 'Failed to load role data'}</p>
                 </div>
               )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heading } from '../../../components/Heading/heading'
 import { Button } from '../../../components/Button/button'
@@ -19,10 +19,7 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import {
-  authorizationListRoles,
-  authorizationDeleteRole,
-} from '../../../api-client/sdk.gen'
+import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
 import { AuthorizationRole } from '../../../api-client/types.gen'
 import { capitalizeFirstLetter } from '@/utils/text'
 
@@ -33,9 +30,6 @@ interface RolesSettingsProps {
 
 export function RolesSettings({ organizationId }: RolesSettingsProps) {
   const navigate = useNavigate()
-  const [roles, setRoles] = useState<AuthorizationRole[]>([])
-  const [loadingRoles, setLoadingRoles] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{
     key: string | null
@@ -44,39 +38,14 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     key: null,
     direction: 'asc'
   })
-  const [deletingRole, setDeletingRole] = useState<string | null>(null)
-
-  const fetchDomainRoles = useCallback(async (domainType: 'organization' | 'canvas') => {
-    const response = await authorizationListRoles({
-      query: {
-        domainType: domainType === 'organization' ? 'DOMAIN_TYPE_ORGANIZATION' : 'DOMAIN_TYPE_CANVAS',
-        domainId: organizationId
-      }
-    })
-
-    return response.data?.roles || []
-  }, [organizationId])
 
   const setDebouncedSearch = debounce((search: string) => setSearch(search), 500)
 
-  const setupRoles = useCallback(async () => {
-    try {
-      setLoadingRoles(true)
-      setError(null)
-      const organizationRoles = await fetchDomainRoles('organization')
-
-      setRoles([...organizationRoles])
-    } catch (err) {
-      console.error('Error fetching roles:', err)
-      setError('Failed to fetch roles')
-    } finally {
-      setLoadingRoles(false)
-    }
-  }, [fetchDomainRoles, setRoles])
-
-  useEffect(() => {
-    setupRoles()
-  }, [setupRoles])
+  // Use React Query hooks for data fetching
+  const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId)
+  
+  // Mutation for role deletion
+  const deleteRoleMutation = useDeleteRole(organizationId)
 
   const handleCreateRole = () => {
     navigate(`/organization/${organizationId}/settings/create-role`)
@@ -96,24 +65,13 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     if (!confirmed) return
 
     try {
-      setDeletingRole(role.name)
-      await authorizationDeleteRole({
-        path: {
-          roleName: role.name
-        },
-        query: {
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        }
+      await deleteRoleMutation.mutateAsync({
+        roleName: role.name,
+        domainType: 'DOMAIN_TYPE_ORGANIZATION',
+        domainId: organizationId
       })
-
-      // Refresh roles list
-      await setupRoles()
     } catch (err) {
       console.error('Error deleting role:', err)
-      setError('Failed to delete role. Please try again.')
-    } finally {
-      setDeletingRole(null)
     }
   }
 
@@ -192,7 +150,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
       </div>
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{error}</p>
+          <p>{error instanceof Error ? error.message : 'Failed to fetch roles'}</p>
         </div>
       )}
 
@@ -264,7 +222,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                               </span>
                             ) : (
                               <Dropdown>
-                                <DropdownButton plain disabled={deletingRole === role.name}>
+                                <DropdownButton plain disabled={deleteRoleMutation.isPending}>
                                   <MaterialSymbol name="more_vert" size="sm" />
                                 </DropdownButton>
                                 <DropdownMenu>
@@ -277,7 +235,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                                     className="text-red-600 dark:text-red-400"
                                   >
                                     <MaterialSymbol name="delete" />
-                                    {deletingRole === role.name ? 'Deleting...' : 'Delete'}
+                                    {deleteRoleMutation.isPending ? 'Deleting...' : 'Delete'}
                                   </DropdownItem>
                                 </DropdownMenu>
                               </Dropdown>

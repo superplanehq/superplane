@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol'
 import { Avatar } from '../../../components/Avatar/avatar'
@@ -24,34 +24,25 @@ import {
   TableCell
 } from '../../../components/Table/table'
 import {
-  authorizationGetOrganizationGroup,
-  authorizationGetOrganizationGroupUsers,
-  authorizationRemoveUserFromOrganizationGroup,
-  authorizationListRoles,
-  authorizationUpdateOrganizationGroup,
-  authorizationDeleteOrganizationGroup
-} from '../../../api-client/sdk.gen'
-import { AuthorizationGroup, AuthorizationUser, AuthorizationRole } from '../../../api-client/types.gen'
+  useOrganizationGroup,
+  useOrganizationGroupUsers,
+  useOrganizationRoles,
+  useUpdateGroup,
+  useDeleteGroup,
+  useRemoveUserFromGroup
+} from '../../../hooks/useOrganizationData'
+import { AuthorizationUser } from '@/api-client'
 
 export function GroupMembersPage() {
   const { orgId, groupName: encodedGroupName } = useParams<{ orgId: string; groupName: string }>()
   const groupName = encodedGroupName ? decodeURIComponent(encodedGroupName) : undefined
   const navigate = useNavigate()
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null)
-  const [group, setGroup] = useState<AuthorizationGroup | null>(null)
-  const [members, setMembers] = useState<AuthorizationUser[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [roles, setRoles] = useState<AuthorizationRole[]>([])
-  const [loadingRoles, setLoadingRoles] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [isEditingGroupName, setIsEditingGroupName] = useState(false)
   const [isEditingGroupDescription, setIsEditingGroupDescription] = useState(false)
   const [editedGroupName, setEditedGroupName] = useState('')
   const [editedGroupDescription, setEditedGroupDescription] = useState('')
-  const [deletingGroup, setDeletingGroup] = useState(false)
-  const [updatingGroupName, setUpdatingGroupName] = useState(false)
-  const [updatingGroupDescription, setUpdatingGroupDescription] = useState(false)
   const [sortConfig, setSortConfig] = useState<{
     key: string | null
     direction: 'asc' | 'desc'
@@ -60,83 +51,19 @@ export function GroupMembersPage() {
     direction: 'asc'
   })
 
-  const fetchGroupData = async () => {
-    if (!orgId || !groupName) return
+  // React Query hooks
+  const { data: group, isLoading: loadingGroup, error: groupError, refetch: refetchGroup } = useOrganizationGroup(orgId || '', groupName || '')
+  const { data: members = [], isLoading: loadingMembers, error: membersError } = useOrganizationGroupUsers(orgId || '', groupName || '')
+  const { data: roles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(orgId || '')
 
-    try {
-      setLoading(true)
-      setError(null)
+  // Mutations
+  const updateGroupMutation = useUpdateGroup(orgId || '')
+  const deleteGroupMutation = useDeleteGroup(orgId || '')
+  const removeUserFromGroupMutation = useRemoveUserFromGroup(orgId || '')
 
-      console.log('Fetching group data for:', { orgId, groupName })
+  const loading = loadingGroup || loadingMembers
+  const error = groupError || membersError || rolesError
 
-      // Fetch group details, members, and roles in parallel
-      const [groupResponse, membersResponse, rolesResponse] = await Promise.all([
-        authorizationGetOrganizationGroup({
-          path: { groupName },
-          query: { organizationId: orgId }
-        }),
-        authorizationGetOrganizationGroupUsers({
-          path: { groupName },
-          query: { organizationId: orgId }
-        }),
-        authorizationListRoles({
-          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: orgId }
-        })
-      ])
-
-      if (groupResponse.data?.group) {
-        setGroup(groupResponse.data.group)
-      } else {
-        console.warn('No group data in response')
-        // Set a fallback group with the name from URL params
-        setGroup({
-          name: groupName,
-          description: 'Group details could not be loaded',
-          role: 'member'
-        })
-      }
-
-      if (membersResponse.data?.users) {
-        setMembers(membersResponse.data.users)
-      } else {
-        setMembers([])
-      }
-
-      if (rolesResponse.data?.roles) {
-        setRoles(rolesResponse.data.roles)
-      } else {
-        setRoles([])
-      }
-    } catch (err) {
-      console.error('Error fetching group data:', err)
-      setError(`Failed to load group data: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setLoading(false)
-      setLoadingRoles(false)
-    }
-  }
-
-  const refreshGroupData = async () => {
-    if (!orgId || !groupName) return
-
-    try {
-      const groupResponse = await authorizationGetOrganizationGroup({
-        path: { groupName },
-        query: { organizationId: orgId }
-      })
-
-      if (groupResponse.data?.group) {
-        setGroup(groupResponse.data.group)
-      }
-    } catch (err) {
-      console.error('Error refreshing group data:', err)
-      // Don't set error state here as it might interfere with the update success flow
-    }
-  }
-
-  useEffect(() => {
-    fetchGroupData()
-  }, [orgId, groupName])
 
   const handleBackToGroups = () => {
     navigate(`/organization/${orgId}/settings/groups`)
@@ -153,24 +80,17 @@ export function GroupMembersPage() {
     if (!group || !editedGroupName.trim() || !groupName || !orgId) return
 
     try {
-      setError(null)
-      setUpdatingGroupName(true)
-      await authorizationUpdateOrganizationGroup({
-        path: { groupName },
-        body: {
-          organizationId: orgId,
-          displayName: editedGroupName.trim()
-        }
+      await updateGroupMutation.mutateAsync({
+        groupName,
+        organizationId: orgId,
+        displayName: editedGroupName.trim()
       })
 
       // Refetch group data from server to ensure consistency
-      await refreshGroupData()
+      await refetchGroup()
       setIsEditingGroupName(false)
     } catch (err) {
       console.error('Error updating group name:', err)
-      setError(`Failed to update group name: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setUpdatingGroupName(false)
     }
   }
 
@@ -190,24 +110,17 @@ export function GroupMembersPage() {
     if (!group || !editedGroupDescription.trim() || !groupName || !orgId) return
 
     try {
-      setError(null)
-      setUpdatingGroupDescription(true)
-      await authorizationUpdateOrganizationGroup({
-        path: { groupName },
-        body: {
-          organizationId: orgId,
-          description: editedGroupDescription.trim()
-        }
+      await updateGroupMutation.mutateAsync({
+        groupName,
+        organizationId: orgId,
+        description: editedGroupDescription.trim()
       })
 
       // Refetch group data from server to ensure consistency
-      await refreshGroupData()
+      await refetchGroup()
       setIsEditingGroupDescription(false)
     } catch (err) {
       console.error('Error updating group description:', err)
-      setError(`Failed to update group description: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setUpdatingGroupDescription(false)
     }
   }
 
@@ -251,16 +164,11 @@ export function GroupMembersPage() {
     if (!groupName || !orgId) return
 
     try {
-      await authorizationRemoveUserFromOrganizationGroup({
-        path: { groupName },
-        body: {
-          userId,
-          organizationId: orgId
-        }
+      await removeUserFromGroupMutation.mutateAsync({
+        groupName,
+        userId,
+        organizationId: orgId
       })
-
-      // Remove member from local state
-      setMembers(prev => prev.filter(member => member.userId !== userId))
 
       // Trigger refresh of the AddMembersSection to update the "From organization" tab
       addMembersSectionRef.current?.refreshExistingMembers()
@@ -270,39 +178,20 @@ export function GroupMembersPage() {
   }
 
   const handleMemberAdded = () => {
-    // Refresh the members list after adding a new member
-    if (orgId && groupName) {
-      authorizationGetOrganizationGroupUsers({
-        path: { groupName },
-        query: { organizationId: orgId }
-      }).then(response => {
-        if (response.data?.users) {
-          setMembers(response.data.users)
-        }
-      }).catch(err => {
-        console.error('Error refreshing members:', err)
-      })
-    }
+    // No need to manually refresh - React Query will handle cache invalidation
   }
 
   const handleRoleUpdate = async (newRoleName: string) => {
     if (!orgId || !group || !groupName) return
 
     try {
-      setError(null)
-      await authorizationUpdateOrganizationGroup({
-        path: { groupName },
-        body: {
-          organizationId: orgId,
-          role: newRoleName
-        }
+      await updateGroupMutation.mutateAsync({
+        groupName,
+        organizationId: orgId,
+        role: newRoleName
       })
-
-      // Update the group's role in the local state
-      setGroup(prev => prev ? { ...prev, role: newRoleName } : null)
     } catch (err) {
       console.error('Error updating group role:', err)
-      setError(`Failed to update group role: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -316,21 +205,15 @@ export function GroupMembersPage() {
     if (!confirmed) return
 
     try {
-      setError(null)
-      setDeletingGroup(true)
-
-      await authorizationDeleteOrganizationGroup({
-        path: { groupName },
-        query: { organizationId: orgId }
+      await deleteGroupMutation.mutateAsync({
+        groupName,
+        organizationId: orgId
       })
 
       // Navigate back to groups list after successful deletion
       window.history.back()
     } catch (err) {
       console.error('Error deleting group:', err)
-      setError(`Failed to delete group "${groupName}": ${err instanceof Error ? err.message : 'Unknown error'}`)
-    } finally {
-      setDeletingGroup(false)
     }
   }
 
@@ -353,20 +236,20 @@ export function GroupMembersPage() {
         <div className="mb-4">
           <Breadcrumbs
             items={[
-              { 
-                label: 'Groups', 
+              {
+                label: 'Groups',
                 onClick: handleBackToGroups
               },
-              { 
-                label: 'Group', 
-                current: true 
+              {
+                label: 'Group',
+                current: true
               }
             ]}
             showDivider={false}
           />
         </div>
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-          <p>{error}</p>
+          <p>{error instanceof Error ? error.message : 'Failed to load group data'}</p>
         </div>
       </div>
     )
@@ -378,13 +261,13 @@ export function GroupMembersPage() {
       <div className="mb-4">
         <Breadcrumbs
           items={[
-            { 
-              label: 'Groups', 
+            {
+              label: 'Groups',
               onClick: handleBackToGroups
             },
-            { 
-              label: group?.displayName || groupName || 'Group', 
-              current: true 
+            {
+              label: group?.displayName || groupName || 'Group',
+              current: true
             }
           ]}
           showDivider={false}
@@ -416,10 +299,10 @@ export function GroupMembersPage() {
                       }}
                       autoFocus
                     />
-                    <Button plain onClick={handleSaveGroupName} disabled={updatingGroupName} className="text-green-600 hover:text-green-700">
-                      <MaterialSymbol name={updatingGroupName ? "hourglass_empty" : "check"} size="sm" />
+                    <Button plain onClick={handleSaveGroupName} disabled={updateGroupMutation.isPending} className="text-green-600 hover:text-green-700">
+                      <MaterialSymbol name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
-                    <Button plain onClick={handleCancelGroupName} disabled={updatingGroupName} className="text-red-600 hover:text-red-700">
+                    <Button plain onClick={handleCancelGroupName} disabled={updateGroupMutation.isPending} className="text-red-600 hover:text-red-700">
                       <MaterialSymbol name="close" size="sm" />
                     </Button>
                   </div>
@@ -454,10 +337,10 @@ export function GroupMembersPage() {
                       }}
                       autoFocus
                     />
-                    <Button plain onClick={handleSaveGroupDescription} disabled={updatingGroupDescription} className="text-green-600 hover:text-green-700">
-                      <MaterialSymbol name={updatingGroupDescription ? "hourglass_empty" : "check"} size="sm" />
+                    <Button plain onClick={handleSaveGroupDescription} disabled={updateGroupMutation.isPending} className="text-green-600 hover:text-green-700">
+                      <MaterialSymbol name={updateGroupMutation.isPending ? "hourglass_empty" : "check"} size="sm" />
                     </Button>
-                    <Button plain onClick={handleCancelGroupDescription} disabled={updatingGroupDescription} className="text-red-600 hover:text-red-700">
+                    <Button plain onClick={handleCancelGroupDescription} disabled={updateGroupMutation.isPending} className="text-red-600 hover:text-red-700">
                       <MaterialSymbol name="close" size="sm" />
                     </Button>
                   </div>
@@ -500,7 +383,7 @@ export function GroupMembersPage() {
               </DropdownMenu>
             </Dropdown>
             <Dropdown>
-              <DropdownButton plain aria-label="More options" disabled={deletingGroup}>
+              <DropdownButton plain aria-label="More options" disabled={deleteGroupMutation.isPending}>
                 <MaterialSymbol name="more_vert" size="sm" />
               </DropdownButton>
               <DropdownMenu>
@@ -509,7 +392,7 @@ export function GroupMembersPage() {
                   className="text-red-600 dark:text-red-400"
                 >
                   <MaterialSymbol name="delete" />
-                  {deletingGroup ? 'Deleting...' : 'Delete group'}
+                  {deleteGroupMutation.isPending ? 'Deleting...' : 'Delete group'}
                 </DropdownItem>
               </DropdownMenu>
             </Dropdown>
