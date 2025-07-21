@@ -17,7 +17,9 @@ import {
   authorizationDeleteRole,
   authorizationDescribeRole,
   organizationsDescribeOrganization,
-  organizationsUpdateOrganization
+  organizationsUpdateOrganization,
+  superplaneListCanvases,
+  superplaneCreateCanvas
 } from '../api-client/sdk.gen'
 import { AuthorizationCreateRoleRequest, AuthorizationDomainType, AuthorizationRoleAssignment } from '@/api-client'
 
@@ -31,6 +33,7 @@ export const organizationKeys = {
   group: (orgId: string, groupName: string) => [...organizationKeys.all, 'group', orgId, groupName] as const,
   groupUsers: (orgId: string, groupName: string) => [...organizationKeys.all, 'groupUsers', orgId, groupName] as const,
   role: (orgId: string, roleName: string) => [...organizationKeys.all, 'role', orgId, roleName] as const,
+  canvases: (orgId: string) => [...organizationKeys.all, 'canvases', orgId] as const,
 }
 
 // Hooks for fetching data
@@ -408,6 +411,43 @@ export const useUpdateOrganization = (organizationId: string) => {
     onSuccess: () => {
       // Invalidate and refetch organization details
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) })
+    }
+  })
+}
+
+export const useOrganizationCanvases = (organizationId: string) => {
+  return useQuery({
+    queryKey: organizationKeys.canvases(organizationId),
+    queryFn: async () => {
+      const response = await superplaneListCanvases({ query: { organizationId } })
+      return response.data?.canvases || []
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    enabled: !!organizationId,
+  })
+}
+
+export const useCreateCanvas = (organizationId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: {
+      canvas: {
+        metadata: {
+          name: string
+          description?: string
+        }
+      },
+      organizationId: string
+    }) => {
+      return await superplaneCreateCanvas({
+        body: params
+      })
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvases
+      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) })
     }
   })
 }
