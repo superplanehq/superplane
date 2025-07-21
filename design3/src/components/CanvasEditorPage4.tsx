@@ -838,12 +838,20 @@ export function CanvasEditorPage4({
                 </div>
               ))}
               {(!yamlConfig.spec.connections || yamlConfig.spec.connections?.length === 0) && (
-                <div className="flex justify-center items-center h-full">
-                  <Text className="text-zinc-500 dark:text-zinc-400">
-                    No connections added
-                  </Text>
-                </div>
-              )}
+  <div className="flex flex-col items-center justify-center h-full space-y-4">
+    <Text className="text-zinc-500 dark:text-zinc-400">
+      No connections added
+    </Text>
+    <Button
+      onClick={handleAddConnection}
+      className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
+      plain
+    >
+      <MaterialSymbol name="add" size="sm" />
+      Add Connection
+    </Button>
+  </div>
+)}
             </div>
           </div>
         );
