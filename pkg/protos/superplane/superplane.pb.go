@@ -5879,7 +5879,7 @@ func (x *Integration_Auth) GetToken() *Integration_Auth_Token {
 
 type Integration_OIDC struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Enabled       bool                   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Supported     bool                   `protobuf:"varint,1,opt,name=supported,proto3" json:"supported,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5914,9 +5914,9 @@ func (*Integration_OIDC) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{6, 2}
 }
 
-func (x *Integration_OIDC) GetEnabled() bool {
+func (x *Integration_OIDC) GetSupported() bool {
 	if x != nil {
-		return x.Enabled
+		return x.Supported
 	}
 	return false
 }
@@ -7150,7 +7150,7 @@ const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\"X\n" +
 	"\x1bDescribeIntegrationResponse\x129\n" +
-	"\vintegration\x18\x01 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"\xfa\x06\n" +
+	"\vintegration\x18\x01 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"\xfe\x06\n" +
 	"\vIntegration\x12<\n" +
 	"\bmetadata\x18\x01 \x01(\v2 .Superplane.Integration.MetadataR\bmetadata\x120\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.Integration.SpecR\x04spec\x1a\xec\x01\n" +
@@ -7169,9 +7169,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x05token\x18\x02 \x01(\v2\".Superplane.Integration.Auth.TokenR\x05token\x1a=\n" +
 	"\x05Token\x124\n" +
 	"\n" +
-	"value_from\x18\x01 \x01(\v2\x15.Superplane.ValueFromR\tvalueFrom\x1a \n" +
-	"\x04OIDC\x12\x18\n" +
-	"\aenabled\x18\x01 \x01(\bR\aenabled\x1a\xae\x01\n" +
+	"value_from\x18\x01 \x01(\v2\x15.Superplane.ValueFromR\tvalueFrom\x1a$\n" +
+	"\x04OIDC\x12\x1c\n" +
+	"\tsupported\x18\x01 \x01(\bR\tsupported\x1a\xae\x01\n" +
 	"\x04Spec\x120\n" +
 	"\x04type\x18\x01 \x01(\x0e2\x1c.Superplane.Integration.TypeR\x04type\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x120\n" +

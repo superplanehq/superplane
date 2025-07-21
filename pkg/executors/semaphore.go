@@ -166,6 +166,16 @@ func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string) (map[
 	parameters["SEMAPHORE_STAGE_ID"] = e.execution.StageID.String()
 	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = e.execution.ID.String()
 
+	//
+	// TODO: the fact that we have this check here means
+	// that all new implementations of Executor need to do it by themselves,
+	// which is clearly a code smell that indicates poor extensibility.
+	// We should move this check up.
+	//
+	if e.integration.HasOidcSupport() {
+		return parameters, nil
+	}
+
 	token, err := e.jwtSigner.Generate(e.execution.ID.String(), 24*time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("error generating tags token: %v", err)

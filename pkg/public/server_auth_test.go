@@ -27,7 +27,7 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	// Create test user

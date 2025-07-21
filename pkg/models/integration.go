@@ -43,7 +43,7 @@ type IntegrationAuthToken struct {
 }
 
 type IntegrationOIDC struct {
-	Enabled bool `json:"enabled"`
+	Supported bool `json:"supported"`
 }
 
 func CreateIntegration(integration *Integration) (*Integration, error) {

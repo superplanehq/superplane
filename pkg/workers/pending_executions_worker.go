@@ -55,7 +55,7 @@ func (w *PendingExecutionsWorker) Tick() error {
 
 // TODO
 // There is an issue here where, if we are having issues updating the state of the execution in the database,
-// we might end up creating more executions than we should.
+// we might end up creating more execution resources than we should.
 func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *models.Stage, execution models.StageExecution) error {
 	inputMap, err := execution.GetInputs()
 	if err != nil {
@@ -77,13 +77,18 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error getting resource for stage executor: %v", err)
 	}
 
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return fmt.Errorf("error finding integration: %v", err)
+	}
+
 	executorSpec := stageExecutor.Spec.Data()
 	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, &execution, w.JwtSigner, w.Encryptor)
+	executor, err := executors.NewExecutor(integration, stageExecutor, &execution, w.JwtSigner, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}

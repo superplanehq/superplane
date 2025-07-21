@@ -382,7 +382,7 @@ message Integration {
   }
 
   message OIDC {
-    bool enabled = 1;
+    bool supported = 1;
   }
 
   message Spec {

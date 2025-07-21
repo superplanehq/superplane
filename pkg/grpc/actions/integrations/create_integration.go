@@ -85,7 +85,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *m
 
 	if integration.Spec.Oidc == nil {
 		integration.Spec.Oidc = &pb.Integration_OIDC{
-			Enabled: false,
+			Supported: false,
 		}
 	}
 
@@ -97,7 +97,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *m
 		URL:        integration.Spec.Url,
 		AuthType:   authType,
 		Auth:       datatypes.NewJSONType(*auth),
-		OIDC:       datatypes.NewJSONType(models.IntegrationOIDC{Enabled: integration.Spec.Oidc.Enabled}),
+		OIDC:       datatypes.NewJSONType(models.IntegrationOIDC{Supported: integration.Spec.Oidc.Supported}),
 	}, nil
 }
 
@@ -170,7 +170,7 @@ func serializeIntegration(integration models.Integration) *pb.Integration {
 			Url:  integration.URL,
 			Auth: serializeIntegrationAuth(integration.AuthType, integration.Auth.Data()),
 			Oidc: &pb.Integration_OIDC{
-				Enabled: integration.OIDC.Data().Enabled,
+				Supported: integration.OIDC.Data().Supported,
 			},
 		},
 	}

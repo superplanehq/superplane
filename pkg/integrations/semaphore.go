@@ -26,6 +26,10 @@ func NewSemaphoreIntegration(URL, token string) (Integration, error) {
 	}, nil
 }
 
+func (s *SemaphoreIntegration) HasOidcSupport() bool {
+	return true
+}
+
 func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]Resource, error) {
 	switch resourceType {
 	case ResourceTypeTask:

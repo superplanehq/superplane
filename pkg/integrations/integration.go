@@ -24,6 +24,7 @@ type Integration interface {
 	Get(resourceType, id string, parentIDs ...string) (Resource, error)
 	Create(resourceType string, params any) (Resource, error)
 	List(resourceType string, parentIDs ...string) ([]Resource, error)
+	HasOidcSupport() bool
 }
 
 type Resource interface {

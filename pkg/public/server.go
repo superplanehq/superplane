@@ -45,6 +45,7 @@ type Server struct {
 	httpServer            *http.Server
 	encryptor             crypto.Encryptor
 	jwt                   *jwt.Signer
+	oidcVerifier          *crypto.OIDCVerifier
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
@@ -59,7 +60,7 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
+func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
 	wsHub := ws.NewHub()
 
 	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
@@ -72,6 +73,7 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, basePath strin
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		oidcVerifier:          oidcVerifier,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
@@ -265,7 +267,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// so we always respond with a 200 OK to the event origin.
 	// All the event processing happen on the workers.
 	//
-	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
 		Headers("Content-Type", "application/json").
@@ -357,24 +358,72 @@ func (s *Server) Close() {
 	}
 }
 
+func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request) *models.StageExecution {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	headerParts := strings.Split(authHeader, "Bearer ")
+	if len(headerParts) != 2 {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	token := headerParts[1]
+	vars := mux.Vars(r)
+	executionIDFromRequest := vars["executionID"]
+	executionID, err := uuid.Parse(executionIDFromRequest)
+	if err != nil {
+		http.Error(w, "Execution not found", http.StatusNotFound)
+		return nil
+	}
+
+	execution, err := models.FindExecutionByID(executionID)
+	if err != nil {
+		http.Error(w, "Execution not found", http.StatusNotFound)
+		return nil
+	}
+
+	integration, err := execution.GetIntegration()
+	if err != nil {
+		http.Error(w, "Integration not found", http.StatusNotFound)
+		return nil
+	}
+
+	//
+	// If OIDC is not supported by the integration,
+	// we expect the JWT token issued by SuperPlane itself.
+	//
+	if !integration.OIDC.Data().Supported {
+		err = s.jwt.Validate(token, executionID.String())
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return nil
+		}
+	}
+
+	//
+	// If OIDC is supported by the integration,
+	// we expect the JWT token issued by the integration.
+	// TODO: check claims
+	//
+	_, err = s.oidcVerifier.Verify(r.Context(), headerParts[1], integration.URL)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	return execution
+}
+
 type OutputsRequest struct {
 	ExecutionID string         `json:"execution_id"`
 	Outputs     map[string]any `json:"outputs"`
 }
 
 func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
-		return
-	}
-
-	headerParts := strings.Split(authHeader, "Bearer ")
-	if len(headerParts) != 2 {
-		http.Error(w, "Malformed Authorization header", http.StatusUnauthorized)
-		return
-	}
-
 	r.Body = http.MaxBytesReader(w, r.Body, MaxExecutionOutputsSize)
 	defer r.Body.Close()
 
@@ -401,22 +450,8 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	executionID, err := uuid.Parse(req.ExecutionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
-
-	token := headerParts[1]
-	err = s.jwt.Validate(token, req.ExecutionID)
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	execution, err := models.FindExecutionByID(executionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
+	execution := s.authenticateExecution(w, r)
+	if execution == nil {
 		return
 	}
 
