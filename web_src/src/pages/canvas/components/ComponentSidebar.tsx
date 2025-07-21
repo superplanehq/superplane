@@ -74,19 +74,18 @@ export const ComponentSidebar = ({ isOpen, onToggle }: ComponentSidebarProps) =>
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const filteredStages = stages.filter(stage => 
+  const filteredStages = stages.filter(stage =>
     stage.metadata?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredEventSources = eventSources.filter((eventSource: EventSourceWithEvents) => 
+  const filteredEventSources = eventSources.filter((eventSource: EventSourceWithEvents) =>
     eventSource.metadata?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div
-      className={`fixed top-12 left-0 bg-white transition-all duration-300 ease-linear z-20 ${
-        isOpen ? 'w-80' : 'w-0'
-      } overflow-hidden`}
+      className={`fixed top-[42px] left-0 bg-white transition-all duration-300 ease-linear z-20 ${isOpen ? 'w-80' : 'w-0'
+        } overflow-hidden`}
       style={{
         boxShadow: isOpen ? 'rgba(0,0,0,0.07) 2px 0 12px' : 'none',
         height: 'calc(100vh - 48px)'
