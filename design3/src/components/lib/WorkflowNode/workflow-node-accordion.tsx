@@ -1102,9 +1102,19 @@ export function WorkflowNodeAccordion({
           )}
             {yamlConfig.spec.connections?.length === 0 && totalNodesCount <= 1 ? (
               <div className="flex justify-center items-center h-full">
-                <Text className="text-zinc-500 dark:text-zinc-400">
-                  Add event source or stage to connect to
-                </Text>
+                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    No connections added
+                  </Text>
+                  <Button
+                    onClick={handleAddConnection}
+                    className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
+                    plain
+                  >
+                    <MaterialSymbol name="add" size="sm" />
+                    Add Connection
+                  </Button>
+                </div>
               </div>
             ) : (
               partialSave && (yamlConfig.spec.connections?.length !== undefined && yamlConfig.spec.connections?.length > 0) && (

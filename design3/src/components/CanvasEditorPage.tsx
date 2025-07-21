@@ -1126,15 +1126,21 @@ export function CanvasEditorPage({
                 </Field>
               )}      
 
-              {/* Add Filter Button - exact same as inline */}
-              <Link
-                href="#"
-                onClick={() => handleAddFilter()}
-                className="flex items-center !text-xs"
-              >
-                <MaterialSymbol name="add" size="sm" />
-                Add Filter
-              </Link>
+              {connectionFilters.length === 0 && (
+  <div className="flex flex-col items-center justify-center h-full space-y-4">
+    <Text className="text-zinc-500 dark:text-zinc-400">
+      DEBUG: This is the zero state for connections modal.
+    </Text>
+    <Button
+      onClick={handleAddFilter}
+      className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
+      plain
+    >
+      <MaterialSymbol name="add" size="sm" />
+      Add Connection
+    </Button>
+  </div>
+)}
             </div>
           </div>
         </DialogBody>
