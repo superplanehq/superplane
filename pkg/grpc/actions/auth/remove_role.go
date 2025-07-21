@@ -20,15 +20,9 @@ func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	var domainTypeStr string
-
-	switch req.RoleAssignment.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainTypeStr = authorization.DomainOrg
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainTypeStr = authorization.DomainCanvas
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	domainType, err := actions.ProtoToDomainType(req.RoleAssignment.DomainType)
+	if err != nil {
+		return nil, err
 	}
 
 	roleStr := req.RoleAssignment.Role
@@ -36,7 +30,7 @@ func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	err = authService.RemoveRole(req.UserId, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
+	err = authService.RemoveRole(req.UserId, roleStr, req.RoleAssignment.DomainId, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove role")
 	}

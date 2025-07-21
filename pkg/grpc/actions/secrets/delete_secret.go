@@ -3,6 +3,7 @@ package secrets
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -10,25 +11,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+func DeleteSecret(ctx context.Context, domainType string, domainID uuid.UUID, idOrName string) (*pb.DeleteSecretResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {
-		secret, err = models.FindSecretByName(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByName(domainType, domainID, idOrName)
 	} else {
-		secret, err = models.FindSecretByID(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByID(domainType, domainID, idOrName)
 	}
 
 	if err != nil {

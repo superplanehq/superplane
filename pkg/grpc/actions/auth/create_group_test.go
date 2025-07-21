@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -32,7 +33,7 @@ func Test_CreateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if group was created
-		groups, err := authService.GetGroups(orgID, "org")
+		groups, err := authService.GetGroups(orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)
@@ -42,7 +43,7 @@ func Test_CreateGroup(t *testing.T) {
 		canvasID := uuid.New().String()
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		
+
 		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,

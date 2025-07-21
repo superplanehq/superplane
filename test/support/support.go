@@ -83,7 +83,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			Name:       RandomName("integration"),
 			CreatedBy:  r.User,
 			Type:       models.IntegrationTypeSemaphore,
-			DomainType: "canvas",
+			DomainType: models.DomainTypeCanvas,
 			DomainID:   r.Canvas.ID,
 			URL:        r.SemaphoreAPIMock.Server.URL,
 			AuthType:   models.IntegrationAuthTypeToken,
@@ -260,7 +260,7 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
-	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }

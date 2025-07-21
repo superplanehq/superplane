@@ -7,7 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,23 +17,8 @@ func Test__DescribeIntegration(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 	defer r.Close()
 
-	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := DescribeIntegration(context.Background(), &protos.DescribeIntegrationRequest{
-			CanvasIdOrName: uuid.New().String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("integration that does not exist -> error", func(t *testing.T) {
-		_, err := DescribeIntegration(context.Background(), &protos.DescribeIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       uuid.New().String(),
-		})
-
+		_, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, uuid.New().String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -41,11 +26,7 @@ func Test__DescribeIntegration(t *testing.T) {
 	})
 
 	t.Run("using id", func(t *testing.T) {
-		response, err := DescribeIntegration(context.Background(), &protos.DescribeIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       r.Integration.ID.String(),
-		})
-
+		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, r.Integration.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)
@@ -56,11 +37,7 @@ func Test__DescribeIntegration(t *testing.T) {
 	})
 
 	t.Run("using name", func(t *testing.T) {
-		response, err := DescribeIntegration(context.Background(), &protos.DescribeIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       r.Integration.Name,
-		})
-
+		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, r.Integration.Name)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)

@@ -783,8 +783,9 @@ func (Execution_Result) EnumDescriptor() ([]byte, []int) {
 
 type CreateIntegrationRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	Integration    *Integration           `protobuf:"bytes,2,opt,name=integration,proto3" json:"integration,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	Integration    *Integration           `protobuf:"bytes,3,opt,name=integration,proto3" json:"integration,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -817,6 +818,13 @@ func (x *CreateIntegrationRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use CreateIntegrationRequest.ProtoReflect.Descriptor instead.
 func (*CreateIntegrationRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *CreateIntegrationRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *CreateIntegrationRequest) GetCanvasIdOrName() string {
@@ -879,7 +887,8 @@ func (x *CreateIntegrationResponse) GetIntegration() *Integration {
 
 type ListIntegrationsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -912,6 +921,13 @@ func (x *ListIntegrationsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListIntegrationsRequest.ProtoReflect.Descriptor instead.
 func (*ListIntegrationsRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListIntegrationsRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *ListIntegrationsRequest) GetCanvasIdOrName() string {
@@ -967,8 +983,9 @@ func (x *ListIntegrationsResponse) GetIntegrations() []*Integration {
 
 type DescribeIntegrationRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,3,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1001,6 +1018,13 @@ func (x *DescribeIntegrationRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DescribeIntegrationRequest.ProtoReflect.Descriptor instead.
 func (*DescribeIntegrationRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *DescribeIntegrationRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *DescribeIntegrationRequest) GetCanvasIdOrName() string {
@@ -1864,7 +1888,8 @@ func (x *Secret) GetSpec() *Secret_Spec {
 type CreateSecretRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Secret         *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1904,6 +1929,13 @@ func (x *CreateSecretRequest) GetSecret() *Secret {
 		return x.Secret
 	}
 	return nil
+}
+
+func (x *CreateSecretRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *CreateSecretRequest) GetCanvasIdOrName() string {
@@ -1962,6 +1994,7 @@ type UpdateSecretRequest struct {
 	Secret         *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
 	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,4,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2017,6 +2050,13 @@ func (x *UpdateSecretRequest) GetCanvasIdOrName() string {
 	return ""
 }
 
+func (x *UpdateSecretRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
+}
+
 type UpdateSecretResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Secret        *Secret                `protobuf:"bytes,1,opt,name=secret,proto3" json:"secret,omitempty"`
@@ -2063,8 +2103,9 @@ func (x *UpdateSecretResponse) GetSecret() *Secret {
 
 type DescribeSecretRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,3,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2097,6 +2138,13 @@ func (x *DescribeSecretRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DescribeSecretRequest.ProtoReflect.Descriptor instead.
 func (*DescribeSecretRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *DescribeSecretRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *DescribeSecretRequest) GetCanvasIdOrName() string {
@@ -2159,7 +2207,8 @@ func (x *DescribeSecretResponse) GetSecret() *Secret {
 
 type ListSecretsRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2192,6 +2241,13 @@ func (x *ListSecretsRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ListSecretsRequest.ProtoReflect.Descriptor instead.
 func (*ListSecretsRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *ListSecretsRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *ListSecretsRequest) GetCanvasIdOrName() string {
@@ -2247,8 +2303,9 @@ func (x *ListSecretsResponse) GetSecrets() []*Secret {
 
 type DeleteSecretRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
-	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,2,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,3,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -2281,6 +2338,13 @@ func (x *DeleteSecretRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteSecretRequest.ProtoReflect.Descriptor instead.
 func (*DeleteSecretRequest) Descriptor() ([]byte, []int) {
 	return file_superplane_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *DeleteSecretRequest) GetOrganizationId() string {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return ""
 }
 
 func (x *DeleteSecretRequest) GetCanvasIdOrName() string {
@@ -6319,11 +6383,12 @@ func (x *Secret_Local) GetData() map[string]string {
 }
 
 type Secret_Metadata struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasId      string                 `protobuf:"bytes,3,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Id            string                   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	DomainType    authorization.DomainType `protobuf:"varint,3,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,4,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	CreatedAt     *timestamp.Timestamp     `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -6372,9 +6437,16 @@ func (x *Secret_Metadata) GetName() string {
 	return ""
 }
 
-func (x *Secret_Metadata) GetCanvasId() string {
+func (x *Secret_Metadata) GetDomainType() authorization.DomainType {
 	if x != nil {
-		return x.CanvasId
+		return x.DomainType
+	}
+	return authorization.DomainType(0)
+}
+
+func (x *Secret_Metadata) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
 	}
 	return ""
 }
@@ -7135,20 +7207,23 @@ var File_superplane_proto protoreflect.FileDescriptor
 const file_superplane_proto_rawDesc = "" +
 	"\n" +
 	"\x10superplane.proto\x12\n" +
-	"Superplane\x1a\x13authorization.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x80\x01\n" +
-	"\x18CreateIntegrationRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x129\n" +
-	"\vintegration\x18\x02 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"V\n" +
+	"Superplane\x1a\x13authorization.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1cgoogle/api/annotations.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xa9\x01\n" +
+	"\x18CreateIntegrationRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x129\n" +
+	"\vintegration\x18\x03 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"V\n" +
 	"\x19CreateIntegrationResponse\x129\n" +
-	"\vintegration\x18\x01 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"D\n" +
-	"\x17ListIntegrationsRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"W\n" +
+	"\vintegration\x18\x01 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"m\n" +
+	"\x17ListIntegrationsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"W\n" +
 	"\x18ListIntegrationsResponse\x12;\n" +
-	"\fintegrations\x18\x01 \x03(\v2\x17.Superplane.IntegrationR\fintegrations\"e\n" +
-	"\x1aDescribeIntegrationRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
+	"\fintegrations\x18\x01 \x03(\v2\x17.Superplane.IntegrationR\fintegrations\"\x8e\x01\n" +
+	"\x1aDescribeIntegrationRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x02 \x01(\tR\bidOrName\"X\n" +
+	"id_or_name\x18\x03 \x01(\tR\bidOrName\"X\n" +
 	"\x1bDescribeIntegrationResponse\x129\n" +
 	"\vintegration\x18\x01 \x01(\v2\x17.Superplane.IntegrationR\vintegration\"\xfa\x06\n" +
 	"\vIntegration\x12<\n" +
@@ -7243,7 +7318,7 @@ const file_superplane_proto_rawDesc = "" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\"k\n" +
 	"\x1bResetEventSourceKeyResponse\x12:\n" +
 	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"\x98\x04\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"\xdf\x04\n" +
 	"\x06Secret\x127\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1b.Superplane.Secret.MetadataR\bmetadata\x12+\n" +
 	"\x04spec\x18\x02 \x01(\v2\x17.Superplane.Secret.SpecR\x04spec\x1ax\n" +
@@ -7251,45 +7326,52 @@ const file_superplane_proto_rawDesc = "" +
 	"\x04data\x18\x01 \x03(\v2\".Superplane.Secret.Local.DataEntryR\x04data\x1a7\n" +
 	"\tDataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\x86\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a\xcd\x01\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
-	"\tcanvas_id\x18\x03 \x01(\tR\bcanvasId\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12E\n" +
+	"\vdomain_type\x18\x03 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x04 \x01(\tR\bdomainId\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1ao\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1ao\n" +
 	"\x04Spec\x127\n" +
 	"\bprovider\x18\x01 \x01(\x0e2\x1b.Superplane.Secret.ProviderR\bprovider\x12.\n" +
 	"\x05local\x18\x02 \x01(\v2\x18.Superplane.Secret.LocalR\x05local\"4\n" +
 	"\bProvider\x12\x14\n" +
 	"\x10PROVIDER_UNKNOWN\x10\x00\x12\x12\n" +
-	"\x0ePROVIDER_LOCAL\x10\x01\"l\n" +
+	"\x0ePROVIDER_LOCAL\x10\x01\"\x95\x01\n" +
 	"\x13CreateSecretRequest\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12)\n" +
-	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"B\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"B\n" +
 	"\x14CreateSecretResponse\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"\x8a\x01\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"\xb3\x01\n" +
 	"\x13UpdateSecretRequest\x12*\n" +
 	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"B\n" +
+	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\x12'\n" +
+	"\x0forganization_id\x18\x04 \x01(\tR\x0eorganizationId\"B\n" +
 	"\x14UpdateSecretResponse\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"`\n" +
-	"\x15DescribeSecretRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"\x89\x01\n" +
+	"\x15DescribeSecretRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x02 \x01(\tR\bidOrName\"D\n" +
+	"id_or_name\x18\x03 \x01(\tR\bidOrName\"D\n" +
 	"\x16DescribeSecretResponse\x12*\n" +
-	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"?\n" +
-	"\x12ListSecretsRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"C\n" +
+	"\x06secret\x18\x01 \x01(\v2\x12.Superplane.SecretR\x06secret\"h\n" +
+	"\x12ListSecretsRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\"C\n" +
 	"\x13ListSecretsResponse\x12,\n" +
-	"\asecrets\x18\x01 \x03(\v2\x12.Superplane.SecretR\asecrets\"^\n" +
-	"\x13DeleteSecretRequest\x12)\n" +
-	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
+	"\asecrets\x18\x01 \x03(\v2\x12.Superplane.SecretR\asecrets\"\x87\x01\n" +
+	"\x13DeleteSecretRequest\x12'\n" +
+	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12)\n" +
+	"\x11canvas_id_or_name\x18\x02 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
 	"\n" +
-	"id_or_name\x18\x02 \x01(\tR\bidOrName\"\x16\n" +
+	"id_or_name\x18\x03 \x01(\tR\bidOrName\"\x16\n" +
 	"\x14DeleteSecretResponse\"k\n" +
 	"\x1aDescribeEventSourceRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
@@ -7664,21 +7746,29 @@ const file_superplane_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02*A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x012\xe66\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x012\xa6E\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
 	"\x06Canvas\x12\rList canvases\x1a\x1eReturns a list of all canvases\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/canvases\x12\xcc\x01\n" +
 	"\fCreateCanvas\x12\x1f.Superplane.CreateCanvasRequest\x1a .Superplane.CreateCanvasResponse\"y\x92A[\n" +
-	"\x06Canvas\x12\x13Create a new canvas\x1a<Creates a new canvas with the given name and organization ID\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/canvases\x12\xce\x01\n" +
+	"\x06Canvas\x12\x13Create a new canvas\x1a<Creates a new canvas with the given name and organization ID\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/canvases\x12\xc9\x01\n" +
+	"\x18CreateOrganizationSecret\x12\x1f.Superplane.CreateSecretRequest\x1a .Superplane.CreateSecretResponse\"j\x92AM\n" +
+	"\x06Secret\x12 Create a new organization secret\x1a!Creates a new organization secret\x82\xd3\xe4\x93\x02\x14:\x01*\"\x0f/api/v1/secrets\x12\xce\x01\n" +
 	"\fCreateSecret\x12\x1f.Superplane.CreateSecretRequest\x1a .Superplane.CreateSecretResponse\"{\x92AA\n" +
 	"\x06Secret\x12\x1aCreate a new canvas secret\x1a\x1bCreates a new canvas secret\x82\xd3\xe4\x93\x021:\x01*\",/api/v1/canvases/{canvas_id_or_name}/secrets\x12\x91\x02\n" +
 	"\x15CreateConnectionGroup\x12(.Superplane.CreateConnectionGroupRequest\x1a).Superplane.CreateConnectionGroupResponse\"\xa2\x01\x92A^\n" +
-	"\x0fConnectionGroup\x12$Create a new canvas connection group\x1a%Creates a new canvas connection group\x82\xd3\xe4\x93\x02;:\x01*\"6/api/v1/canvases/{canvas_id_or_name}/connection-groups\x12\xe9\x01\n" +
+	"\x0fConnectionGroup\x12$Create a new canvas connection group\x1a%Creates a new canvas connection group\x82\xd3\xe4\x93\x02;:\x01*\"6/api/v1/canvases/{canvas_id_or_name}/connection-groups\x12\xe5\x01\n" +
+	"\x1cListOrganizationIntegrations\x12#.Superplane.ListIntegrationsRequest\x1a$.Superplane.ListIntegrationsResponse\"z\x92A[\n" +
+	"\vIntegration\x12%List integrations for an organization\x1a%List integrations for an organization\x82\xd3\xe4\x93\x02\x16\x12\x14/api/v1/integrations\x12\xe9\x01\n" +
 	"\x10ListIntegrations\x12#.Superplane.ListIntegrationsRequest\x1a$.Superplane.ListIntegrationsResponse\"\x89\x01\x92AM\n" +
-	"\vIntegration\x12\x1eList integrations for a canvas\x1a\x1eList integrations for a canvas\x82\xd3\xe4\x93\x023\x121/api/v1/canvases/{canvas_id_or_name}/integrations\x12\x8b\x02\n" +
+	"\vIntegration\x12\x1eList integrations for a canvas\x1a\x1eList integrations for a canvas\x82\xd3\xe4\x93\x023\x121/api/v1/canvases/{canvas_id_or_name}/integrations\x12\x88\x02\n" +
+	"\x1fDescribeOrganizationIntegration\x12&.Superplane.DescribeIntegrationRequest\x1a'.Superplane.DescribeIntegrationResponse\"\x93\x01\x92Ag\n" +
+	"\vIntegration\x12+Describe an integration for an organization\x1a+Describe an integration for an organization\x82\xd3\xe4\x93\x02#\x12!/api/v1/integrations/{id_or_name}\x12\x8b\x02\n" +
 	"\x13DescribeIntegration\x12&.Superplane.DescribeIntegrationRequest\x1a'.Superplane.DescribeIntegrationResponse\"\xa2\x01\x92AY\n" +
-	"\vIntegration\x12$Describe an integration for a canvas\x1a$Describe an integration for a canvas\x82\xd3\xe4\x93\x02@\x12>/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}\x12\xf2\x01\n" +
+	"\vIntegration\x12$Describe an integration for a canvas\x1a$Describe an integration for a canvas\x82\xd3\xe4\x93\x02@\x12>/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}\x12\xec\x01\n" +
+	"\x1dCreateOrganizationIntegration\x12$.Superplane.CreateIntegrationRequest\x1a%.Superplane.CreateIntegrationResponse\"~\x92A\\\n" +
+	"\vIntegration\x12%Create a new organization integration\x1a&Creates a new organization integration\x82\xd3\xe4\x93\x02\x19:\x01*\"\x14/api/v1/integrations\x12\xf2\x01\n" +
 	"\x11CreateIntegration\x12$.Superplane.CreateIntegrationRequest\x1a%.Superplane.CreateIntegrationResponse\"\x8f\x01\x92AP\n" +
 	"\vIntegration\x12\x1fCreate a new canvas integration\x1a Creates a new canvas integration\x82\xd3\xe4\x93\x026:\x01*\"1/api/v1/canvases/{canvas_id_or_name}/integrations\x12\xa2\x02\n" +
 	"\x11CreateEventSource\x12$.Superplane.CreateEventSourceRequest\x1a%.Superplane.CreateEventSourceResponse\"\xbf\x01\x92A\x7f\n" +
@@ -7694,7 +7784,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x13DescribeEventSource\x12&.Superplane.DescribeEventSourceRequest\x1a'.Superplane.DescribeEventSourceResponse\"\xc3\x01\x92A\x80\x01\n" +
 	"\vEventSource\x12\x18Get event source details\x1aWReturns the details of a specific event source (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x029\x127/api/v1/canvases/{canvas_id_or_name}/event-sources/{id}\x12\xd0\x02\n" +
 	"\x17DescribeConnectionGroup\x12*.Superplane.DescribeConnectionGroupRequest\x1a+.Superplane.DescribeConnectionGroupResponse\"\xdb\x01\x92A\x8c\x01\n" +
-	"\x0fConnectionGroup\x12\x1cGet connection group details\x1a[Returns the details of a specific connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02E\x12C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\x8d\x02\n" +
+	"\x0fConnectionGroup\x12\x1cGet connection group details\x1a[Returns the details of a specific connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02E\x12C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xed\x01\n" +
+	"\x1aDescribeOrganizationSecret\x12!.Superplane.DescribeSecretRequest\x1a\".Superplane.DescribeSecretResponse\"\x87\x01\x92A`\n" +
+	"\x06Secret\x12\x1fGet organization secret details\x1a5Returns the details of a specific organization secret\x82\xd3\xe4\x93\x02\x1e\x12\x1c/api/v1/secrets/{id_or_name}\x12\x8d\x02\n" +
 	"\x0eDescribeSecret\x12!.Superplane.DescribeSecretRequest\x1a\".Superplane.DescribeSecretResponse\"\xb3\x01\x92Ao\n" +
 	"\x06Secret\x12\x12Get secret details\x1aQReturns the details of a specific secret (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02;\x129/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}\x12\xf1\x01\n" +
 	"\n" +
@@ -7703,7 +7795,9 @@ const file_superplane_proto_rawDesc = "" +
 	"\x10ListEventSources\x12#.Superplane.ListEventSourcesRequest\x1a$.Superplane.ListEventSourcesResponse\"\xbf\x01\x92A\x81\x01\n" +
 	"\vEventSource\x12\x12List event sources\x1a^Returns a list of all event sources for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x024\x122/api/v1/canvases/{canvas_id_or_name}/event-sources\x12\xbb\x02\n" +
 	"\x14ListConnectionGroups\x12'.Superplane.ListConnectionGroupsRequest\x1a(.Superplane.ListConnectionGroupsResponse\"\xcf\x01\x92A\x8d\x01\n" +
-	"\x0fConnectionGroup\x12\x16List connection groups\x1abReturns a list of all connection groups for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x028\x126/api/v1/canvases/{canvas_id_or_name}/connection-groups\x12\xf8\x01\n" +
+	"\x0fConnectionGroup\x12\x16List connection groups\x1abReturns a list of all connection groups for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x028\x126/api/v1/canvases/{canvas_id_or_name}/connection-groups\x12\xc1\x01\n" +
+	"\x17ListOrganizationSecrets\x12\x1e.Superplane.ListSecretsRequest\x1a\x1f.Superplane.ListSecretsResponse\"e\x92AK\n" +
+	"\x06Secret\x12\x19List organization secrets\x1a&Returns a list of organization secrets\x82\xd3\xe4\x93\x02\x11\x12\x0f/api/v1/secrets\x12\xf8\x01\n" +
 	"\vListSecrets\x12\x1e.Superplane.ListSecretsRequest\x1a\x1f.Superplane.ListSecretsResponse\"\xa7\x01\x92Ap\n" +
 	"\x06Secret\x12\fList secrets\x1aXReturns a list of all secrets for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x02.\x12,/api/v1/canvases/{canvas_id_or_name}/secrets\x12\xa2\x02\n" +
 	"\x0fListStageEvents\x12\".Superplane.ListStageEventsRequest\x1a#.Superplane.ListStageEventsResponse\"\xc5\x01\x92Au\n" +
@@ -7713,11 +7807,15 @@ const file_superplane_proto_rawDesc = "" +
 	"\vUpdateStage\x12\x1e.Superplane.UpdateStageRequest\x1a\x1f.Superplane.UpdateStageResponse\"\xa3\x01\x92A]\n" +
 	"\x05Stage\x12\x0eUpdate a stage\x1aDUpdates the specified stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02=:\x01*28/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}\x12\xbd\x02\n" +
 	"\x15UpdateConnectionGroup\x12(.Superplane.UpdateConnectionGroupRequest\x1a).Superplane.UpdateConnectionGroupResponse\"\xce\x01\x92A}\n" +
-	"\x0fConnectionGroup\x12\x19Update a connection group\x1aOUpdates the specified connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02H:\x01*2C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xf5\x01\n" +
+	"\x0fConnectionGroup\x12\x19Update a connection group\x1aOUpdates the specified connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02H:\x01*2C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xff\x01\n" +
+	"\x18UpdateOrganizationSecret\x12\x1f.Superplane.UpdateSecretRequest\x1a .Superplane.UpdateSecretResponse\"\x9f\x01\x92Au\n" +
+	"\x06Secret\x12\x1eUpdates an organization secret\x1aKUpdates the specified organization secret (can be referenced by ID or name)\x82\xd3\xe4\x93\x02!:\x01*2\x1c/api/v1/secrets/{id_or_name}\x12\xf5\x01\n" +
 	"\fUpdateSecret\x12\x1f.Superplane.UpdateSecretRequest\x1a .Superplane.UpdateSecretResponse\"\xa1\x01\x92AZ\n" +
 	"\x06Secret\x12\x10Updates a secret\x1a>Updates the specified secret (can be referenced by ID or name)\x82\xd3\xe4\x93\x02>:\x01*29/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}\x12\xb4\x02\n" +
 	"\x11ApproveStageEvent\x12$.Superplane.ApproveStageEventRequest\x1a%.Superplane.ApproveStageEventResponse\"\xd1\x01\x92Ak\n" +
-	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xde\x01\n" +
+	"\x05Stage\x12\x15Approve a stage event\x1aKApproves the specified stage event (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02]:\x01*\"X/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve\x12\xd9\x01\n" +
+	"\x18DeleteOrganizationSecret\x12\x1f.Superplane.DeleteSecretRequest\x1a .Superplane.DeleteSecretResponse\"z\x92AS\n" +
+	"\x06Secret\x12\x1eDeletes an organization secret\x1a)Deletes the specified organization secret\x82\xd3\xe4\x93\x02\x1e*\x1c/api/v1/secrets/{id_or_name}\x12\xde\x01\n" +
 	"\fDeleteSecret\x12\x1f.Superplane.DeleteSecretRequest\x1a .Superplane.DeleteSecretResponse\"\x8a\x01\x92AF\n" +
 	"\x06Secret\x12\x17Deletes a canvas secret\x1a#Deletes the specified canvas secret\x82\xd3\xe4\x93\x02;*9/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}B\xc4\x01\x92A\x86\x01\x12\\\n" +
 	"\x0eSuperplane API\x12\x1eAPI for the Superplane service\"%\n" +
@@ -7989,85 +8087,102 @@ var file_superplane_proto_depIdxs = []int32{
 	75,  // 110: Superplane.EventSource.Spec.integration:type_name -> Superplane.IntegrationRef
 	115, // 111: Superplane.EventSource.Spec.semaphore:type_name -> Superplane.EventSource.Spec.Semaphore
 	119, // 112: Superplane.Secret.Local.data:type_name -> Superplane.Secret.Local.DataEntry
-	135, // 113: Superplane.Secret.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	4,   // 114: Superplane.Secret.Spec.provider:type_name -> Superplane.Secret.Provider
-	116, // 115: Superplane.Secret.Spec.local:type_name -> Superplane.Secret.Local
-	135, // 116: Superplane.ConnectionGroup.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	135, // 117: Superplane.ConnectionGroup.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	61,  // 118: Superplane.ConnectionGroup.Spec.connections:type_name -> Superplane.Connection
-	122, // 119: Superplane.ConnectionGroup.Spec.group_by:type_name -> Superplane.ConnectionGroup.Spec.GroupBy
-	5,   // 120: Superplane.ConnectionGroup.Spec.timeout_behavior:type_name -> Superplane.ConnectionGroup.Spec.TimeoutBehavior
-	123, // 121: Superplane.ConnectionGroup.Spec.GroupBy.fields:type_name -> Superplane.ConnectionGroup.Spec.GroupBy.Field
-	135, // 122: Superplane.Stage.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	61,  // 123: Superplane.Stage.Spec.connections:type_name -> Superplane.Connection
-	71,  // 124: Superplane.Stage.Spec.conditions:type_name -> Superplane.Condition
-	76,  // 125: Superplane.Stage.Spec.executor:type_name -> Superplane.ExecutorSpec
-	64,  // 126: Superplane.Stage.Spec.inputs:type_name -> Superplane.InputDefinition
-	65,  // 127: Superplane.Stage.Spec.input_mappings:type_name -> Superplane.InputMapping
-	63,  // 128: Superplane.Stage.Spec.outputs:type_name -> Superplane.OutputDefinition
-	66,  // 129: Superplane.Stage.Spec.secrets:type_name -> Superplane.ValueDefinition
-	127, // 130: Superplane.InputMapping.When.triggered_by:type_name -> Superplane.InputMapping.WhenTriggeredBy
-	131, // 131: Superplane.ExecutorSpec.Semaphore.parameters:type_name -> Superplane.ExecutorSpec.Semaphore.ParametersEntry
-	132, // 132: Superplane.ExecutorSpec.HTTP.headers:type_name -> Superplane.ExecutorSpec.HTTP.HeadersEntry
-	133, // 133: Superplane.ExecutorSpec.HTTP.payload:type_name -> Superplane.ExecutorSpec.HTTP.PayloadEntry
-	130, // 134: Superplane.ExecutorSpec.HTTP.response_policy:type_name -> Superplane.ExecutorSpec.HTTPResponsePolicy
-	22,  // 135: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
-	25,  // 136: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
-	37,  // 137: Superplane.Superplane.CreateSecret:input_type -> Superplane.CreateSecretRequest
-	49,  // 138: Superplane.Superplane.CreateConnectionGroup:input_type -> Superplane.CreateConnectionGroupRequest
-	17,  // 139: Superplane.Superplane.ListIntegrations:input_type -> Superplane.ListIntegrationsRequest
-	19,  // 140: Superplane.Superplane.DescribeIntegration:input_type -> Superplane.DescribeIntegrationRequest
-	15,  // 141: Superplane.Superplane.CreateIntegration:input_type -> Superplane.CreateIntegrationRequest
-	32,  // 142: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
-	34,  // 143: Superplane.Superplane.ResetEventSourceKey:input_type -> Superplane.ResetEventSourceKeyRequest
-	74,  // 144: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
-	27,  // 145: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
-	30,  // 146: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
-	47,  // 147: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
-	53,  // 148: Superplane.Superplane.DescribeConnectionGroup:input_type -> Superplane.DescribeConnectionGroupRequest
-	41,  // 149: Superplane.Superplane.DescribeSecret:input_type -> Superplane.DescribeSecretRequest
-	80,  // 150: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
-	82,  // 151: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
-	55,  // 152: Superplane.Superplane.ListConnectionGroups:input_type -> Superplane.ListConnectionGroupsRequest
-	43,  // 153: Superplane.Superplane.ListSecrets:input_type -> Superplane.ListSecretsRequest
-	88,  // 154: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
-	84,  // 155: Superplane.Superplane.ListConnectionGroupFieldSets:input_type -> Superplane.ListConnectionGroupFieldSetsRequest
-	78,  // 156: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
-	51,  // 157: Superplane.Superplane.UpdateConnectionGroup:input_type -> Superplane.UpdateConnectionGroupRequest
-	39,  // 158: Superplane.Superplane.UpdateSecret:input_type -> Superplane.UpdateSecretRequest
-	96,  // 159: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
-	45,  // 160: Superplane.Superplane.DeleteSecret:input_type -> Superplane.DeleteSecretRequest
-	23,  // 161: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
-	26,  // 162: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
-	38,  // 163: Superplane.Superplane.CreateSecret:output_type -> Superplane.CreateSecretResponse
-	50,  // 164: Superplane.Superplane.CreateConnectionGroup:output_type -> Superplane.CreateConnectionGroupResponse
-	18,  // 165: Superplane.Superplane.ListIntegrations:output_type -> Superplane.ListIntegrationsResponse
-	20,  // 166: Superplane.Superplane.DescribeIntegration:output_type -> Superplane.DescribeIntegrationResponse
-	16,  // 167: Superplane.Superplane.CreateIntegration:output_type -> Superplane.CreateIntegrationResponse
-	33,  // 168: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
-	35,  // 169: Superplane.Superplane.ResetEventSourceKey:output_type -> Superplane.ResetEventSourceKeyResponse
-	77,  // 170: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
-	28,  // 171: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
-	31,  // 172: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
-	48,  // 173: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
-	54,  // 174: Superplane.Superplane.DescribeConnectionGroup:output_type -> Superplane.DescribeConnectionGroupResponse
-	42,  // 175: Superplane.Superplane.DescribeSecret:output_type -> Superplane.DescribeSecretResponse
-	81,  // 176: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
-	83,  // 177: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
-	56,  // 178: Superplane.Superplane.ListConnectionGroups:output_type -> Superplane.ListConnectionGroupsResponse
-	44,  // 179: Superplane.Superplane.ListSecrets:output_type -> Superplane.ListSecretsResponse
-	89,  // 180: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
-	85,  // 181: Superplane.Superplane.ListConnectionGroupFieldSets:output_type -> Superplane.ListConnectionGroupFieldSetsResponse
-	79,  // 182: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
-	52,  // 183: Superplane.Superplane.UpdateConnectionGroup:output_type -> Superplane.UpdateConnectionGroupResponse
-	40,  // 184: Superplane.Superplane.UpdateSecret:output_type -> Superplane.UpdateSecretResponse
-	97,  // 185: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
-	46,  // 186: Superplane.Superplane.DeleteSecret:output_type -> Superplane.DeleteSecretResponse
-	161, // [161:187] is the sub-list for method output_type
-	135, // [135:161] is the sub-list for method input_type
-	135, // [135:135] is the sub-list for extension type_name
-	135, // [135:135] is the sub-list for extension extendee
-	0,   // [0:135] is the sub-list for field type_name
+	134, // 113: Superplane.Secret.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	135, // 114: Superplane.Secret.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	4,   // 115: Superplane.Secret.Spec.provider:type_name -> Superplane.Secret.Provider
+	116, // 116: Superplane.Secret.Spec.local:type_name -> Superplane.Secret.Local
+	135, // 117: Superplane.ConnectionGroup.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	135, // 118: Superplane.ConnectionGroup.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	61,  // 119: Superplane.ConnectionGroup.Spec.connections:type_name -> Superplane.Connection
+	122, // 120: Superplane.ConnectionGroup.Spec.group_by:type_name -> Superplane.ConnectionGroup.Spec.GroupBy
+	5,   // 121: Superplane.ConnectionGroup.Spec.timeout_behavior:type_name -> Superplane.ConnectionGroup.Spec.TimeoutBehavior
+	123, // 122: Superplane.ConnectionGroup.Spec.GroupBy.fields:type_name -> Superplane.ConnectionGroup.Spec.GroupBy.Field
+	135, // 123: Superplane.Stage.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	61,  // 124: Superplane.Stage.Spec.connections:type_name -> Superplane.Connection
+	71,  // 125: Superplane.Stage.Spec.conditions:type_name -> Superplane.Condition
+	76,  // 126: Superplane.Stage.Spec.executor:type_name -> Superplane.ExecutorSpec
+	64,  // 127: Superplane.Stage.Spec.inputs:type_name -> Superplane.InputDefinition
+	65,  // 128: Superplane.Stage.Spec.input_mappings:type_name -> Superplane.InputMapping
+	63,  // 129: Superplane.Stage.Spec.outputs:type_name -> Superplane.OutputDefinition
+	66,  // 130: Superplane.Stage.Spec.secrets:type_name -> Superplane.ValueDefinition
+	127, // 131: Superplane.InputMapping.When.triggered_by:type_name -> Superplane.InputMapping.WhenTriggeredBy
+	131, // 132: Superplane.ExecutorSpec.Semaphore.parameters:type_name -> Superplane.ExecutorSpec.Semaphore.ParametersEntry
+	132, // 133: Superplane.ExecutorSpec.HTTP.headers:type_name -> Superplane.ExecutorSpec.HTTP.HeadersEntry
+	133, // 134: Superplane.ExecutorSpec.HTTP.payload:type_name -> Superplane.ExecutorSpec.HTTP.PayloadEntry
+	130, // 135: Superplane.ExecutorSpec.HTTP.response_policy:type_name -> Superplane.ExecutorSpec.HTTPResponsePolicy
+	22,  // 136: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
+	25,  // 137: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
+	37,  // 138: Superplane.Superplane.CreateOrganizationSecret:input_type -> Superplane.CreateSecretRequest
+	37,  // 139: Superplane.Superplane.CreateSecret:input_type -> Superplane.CreateSecretRequest
+	49,  // 140: Superplane.Superplane.CreateConnectionGroup:input_type -> Superplane.CreateConnectionGroupRequest
+	17,  // 141: Superplane.Superplane.ListOrganizationIntegrations:input_type -> Superplane.ListIntegrationsRequest
+	17,  // 142: Superplane.Superplane.ListIntegrations:input_type -> Superplane.ListIntegrationsRequest
+	19,  // 143: Superplane.Superplane.DescribeOrganizationIntegration:input_type -> Superplane.DescribeIntegrationRequest
+	19,  // 144: Superplane.Superplane.DescribeIntegration:input_type -> Superplane.DescribeIntegrationRequest
+	15,  // 145: Superplane.Superplane.CreateOrganizationIntegration:input_type -> Superplane.CreateIntegrationRequest
+	15,  // 146: Superplane.Superplane.CreateIntegration:input_type -> Superplane.CreateIntegrationRequest
+	32,  // 147: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
+	34,  // 148: Superplane.Superplane.ResetEventSourceKey:input_type -> Superplane.ResetEventSourceKeyRequest
+	74,  // 149: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
+	27,  // 150: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
+	30,  // 151: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
+	47,  // 152: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
+	53,  // 153: Superplane.Superplane.DescribeConnectionGroup:input_type -> Superplane.DescribeConnectionGroupRequest
+	41,  // 154: Superplane.Superplane.DescribeOrganizationSecret:input_type -> Superplane.DescribeSecretRequest
+	41,  // 155: Superplane.Superplane.DescribeSecret:input_type -> Superplane.DescribeSecretRequest
+	80,  // 156: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
+	82,  // 157: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
+	55,  // 158: Superplane.Superplane.ListConnectionGroups:input_type -> Superplane.ListConnectionGroupsRequest
+	43,  // 159: Superplane.Superplane.ListOrganizationSecrets:input_type -> Superplane.ListSecretsRequest
+	43,  // 160: Superplane.Superplane.ListSecrets:input_type -> Superplane.ListSecretsRequest
+	88,  // 161: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
+	84,  // 162: Superplane.Superplane.ListConnectionGroupFieldSets:input_type -> Superplane.ListConnectionGroupFieldSetsRequest
+	78,  // 163: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
+	51,  // 164: Superplane.Superplane.UpdateConnectionGroup:input_type -> Superplane.UpdateConnectionGroupRequest
+	39,  // 165: Superplane.Superplane.UpdateOrganizationSecret:input_type -> Superplane.UpdateSecretRequest
+	39,  // 166: Superplane.Superplane.UpdateSecret:input_type -> Superplane.UpdateSecretRequest
+	96,  // 167: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
+	45,  // 168: Superplane.Superplane.DeleteOrganizationSecret:input_type -> Superplane.DeleteSecretRequest
+	45,  // 169: Superplane.Superplane.DeleteSecret:input_type -> Superplane.DeleteSecretRequest
+	23,  // 170: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
+	26,  // 171: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
+	38,  // 172: Superplane.Superplane.CreateOrganizationSecret:output_type -> Superplane.CreateSecretResponse
+	38,  // 173: Superplane.Superplane.CreateSecret:output_type -> Superplane.CreateSecretResponse
+	50,  // 174: Superplane.Superplane.CreateConnectionGroup:output_type -> Superplane.CreateConnectionGroupResponse
+	18,  // 175: Superplane.Superplane.ListOrganizationIntegrations:output_type -> Superplane.ListIntegrationsResponse
+	18,  // 176: Superplane.Superplane.ListIntegrations:output_type -> Superplane.ListIntegrationsResponse
+	20,  // 177: Superplane.Superplane.DescribeOrganizationIntegration:output_type -> Superplane.DescribeIntegrationResponse
+	20,  // 178: Superplane.Superplane.DescribeIntegration:output_type -> Superplane.DescribeIntegrationResponse
+	16,  // 179: Superplane.Superplane.CreateOrganizationIntegration:output_type -> Superplane.CreateIntegrationResponse
+	16,  // 180: Superplane.Superplane.CreateIntegration:output_type -> Superplane.CreateIntegrationResponse
+	33,  // 181: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
+	35,  // 182: Superplane.Superplane.ResetEventSourceKey:output_type -> Superplane.ResetEventSourceKeyResponse
+	77,  // 183: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
+	28,  // 184: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
+	31,  // 185: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
+	48,  // 186: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
+	54,  // 187: Superplane.Superplane.DescribeConnectionGroup:output_type -> Superplane.DescribeConnectionGroupResponse
+	42,  // 188: Superplane.Superplane.DescribeOrganizationSecret:output_type -> Superplane.DescribeSecretResponse
+	42,  // 189: Superplane.Superplane.DescribeSecret:output_type -> Superplane.DescribeSecretResponse
+	81,  // 190: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
+	83,  // 191: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
+	56,  // 192: Superplane.Superplane.ListConnectionGroups:output_type -> Superplane.ListConnectionGroupsResponse
+	44,  // 193: Superplane.Superplane.ListOrganizationSecrets:output_type -> Superplane.ListSecretsResponse
+	44,  // 194: Superplane.Superplane.ListSecrets:output_type -> Superplane.ListSecretsResponse
+	89,  // 195: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
+	85,  // 196: Superplane.Superplane.ListConnectionGroupFieldSets:output_type -> Superplane.ListConnectionGroupFieldSetsResponse
+	79,  // 197: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
+	52,  // 198: Superplane.Superplane.UpdateConnectionGroup:output_type -> Superplane.UpdateConnectionGroupResponse
+	40,  // 199: Superplane.Superplane.UpdateOrganizationSecret:output_type -> Superplane.UpdateSecretResponse
+	40,  // 200: Superplane.Superplane.UpdateSecret:output_type -> Superplane.UpdateSecretResponse
+	97,  // 201: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
+	46,  // 202: Superplane.Superplane.DeleteOrganizationSecret:output_type -> Superplane.DeleteSecretResponse
+	46,  // 203: Superplane.Superplane.DeleteSecret:output_type -> Superplane.DeleteSecretResponse
+	170, // [170:204] is the sub-list for method output_type
+	136, // [136:170] is the sub-list for method input_type
+	136, // [136:136] is the sub-list for extension type_name
+	136, // [136:136] is the sub-list for extension extendee
+	0,   // [0:136] is the sub-list for field type_name
 }
 
 func init() { file_superplane_proto_init() }

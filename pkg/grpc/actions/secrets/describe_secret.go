@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,25 +14,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, idOrName string) (*pb.DescribeSecretResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {
-		secret, err = models.FindSecretByName(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByName(domainType, domainID, idOrName)
 	} else {
-		secret, err = models.FindSecretByID(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByID(domainType, domainID, idOrName)
 	}
 
 	if err != nil {
@@ -51,10 +40,11 @@ func DescribeSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.Des
 func serializeSecret(ctx context.Context, encryptor crypto.Encryptor, secret models.Secret) (*pb.Secret, error) {
 	s := &pb.Secret{
 		Metadata: &pb.Secret_Metadata{
-			Id:        secret.ID.String(),
-			Name:      secret.Name,
-			CanvasId:  secret.CanvasID.String(),
-			CreatedAt: timestamppb.New(*secret.CreatedAt),
+			Id:         secret.ID.String(),
+			Name:       secret.Name,
+			DomainType: actions.DomainTypeToProto(secret.DomainType),
+			DomainId:   secret.DomainID.String(),
+			CreatedAt:  timestamppb.New(*secret.CreatedAt),
 		},
 		Spec: &pb.Secret_Spec{
 			Provider: secretProviderToProto(secret.Provider),

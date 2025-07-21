@@ -22,7 +22,7 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		return nil, err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, err
 	}

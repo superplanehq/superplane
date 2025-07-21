@@ -49,6 +49,18 @@ service Superplane {
     };
   }
 
+  rpc CreateOrganizationSecret(CreateSecretRequest) returns (CreateSecretResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/secrets"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new organization secret";
+      description: "Creates a new organization secret";
+      tags: "Secret";
+    };
+  }
+
   rpc CreateSecret(CreateSecretRequest) returns (CreateSecretResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/secrets"
@@ -73,6 +85,17 @@ service Superplane {
     };
   }
 
+  rpc ListOrganizationIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integrations for an organization";
+      description: "List integrations for an organization";
+      tags: "Integration";
+    };
+  }
+
   rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/integrations"
@@ -84,6 +107,17 @@ service Superplane {
     };
   }
 
+  rpc DescribeOrganizationIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an integration for an organization";
+      description: "Describe an integration for an organization";
+      tags: "Integration";
+    };
+  }
+
   rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}"
@@ -91,6 +125,18 @@ service Superplane {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe an integration for a canvas";
       description: "Describe an integration for a canvas";
+      tags: "Integration";
+    };
+  }
+
+  rpc CreateOrganizationIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/integrations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new organization integration";
+      description: "Creates a new organization integration";
       tags: "Integration";
     };
   }
@@ -187,6 +233,18 @@ service Superplane {
     };
   }
 
+  rpc DescribeOrganizationSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/secrets/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get organization secret details";
+      description: "Returns the details of a specific organization secret";
+      tags: "Secret";
+    };
+  }
+
+
   rpc DescribeSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -228,6 +286,17 @@ service Superplane {
       summary: "List connection groups";
       description: "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)";
       tags: "ConnectionGroup";
+    };
+  }
+
+  rpc ListOrganizationSecrets(ListSecretsRequest) returns (ListSecretsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/secrets"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization secrets";
+      description: "Returns a list of organization secrets";
+      tags: "Secret";
     };
   }
 
@@ -288,6 +357,19 @@ service Superplane {
     };
   }
 
+  rpc UpdateOrganizationSecret(UpdateSecretRequest) returns (UpdateSecretResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/secrets/{id_or_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Updates an organization secret";
+      description: "Updates the specified organization secret (can be referenced by ID or name)";
+      tags: "Secret";
+    };
+  }
+
+
   rpc UpdateSecret(UpdateSecretRequest) returns (UpdateSecretResponse) {
     option (google.api.http) = {
       patch: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -312,6 +394,17 @@ service Superplane {
     };
   }
 
+  rpc DeleteOrganizationSecret(DeleteSecretRequest) returns (DeleteSecretResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/secrets/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Deletes an organization secret";
+      description: "Deletes the specified organization secret";
+      tags: "Secret";
+    };
+  }
+
   rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse) {
     option (google.api.http) = {
       delete: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
@@ -325,8 +418,9 @@ service Superplane {
 }
 
 message CreateIntegrationRequest {
-  string canvas_id_or_name = 1;
-  Integration integration = 2;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
+  Integration integration = 3;
 }
 
 message CreateIntegrationResponse {
@@ -334,7 +428,8 @@ message CreateIntegrationResponse {
 }
 
 message ListIntegrationsRequest {
-  string canvas_id_or_name = 1;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
 }
 
 message ListIntegrationsResponse {
@@ -342,8 +437,9 @@ message ListIntegrationsResponse {
 }
 
 message DescribeIntegrationRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
+  string id_or_name = 3;
 }
 
 message DescribeIntegrationResponse {
@@ -503,8 +599,9 @@ message Secret {
   message Metadata {
     string id = 1;
     string name = 2;
-    string canvas_id = 3;
-    google.protobuf.Timestamp created_at = 4;
+    Authorization.DomainType domain_type = 3;
+    string domain_id = 4;
+    google.protobuf.Timestamp created_at = 5;
   }
 
   message Spec {
@@ -518,7 +615,8 @@ message Secret {
 
 message CreateSecretRequest {
   Secret secret = 1;
-  string canvas_id_or_name = 2;
+  string organization_id = 2;
+  string canvas_id_or_name = 3;
 }
 
 message CreateSecretResponse {
@@ -529,6 +627,7 @@ message UpdateSecretRequest {
   Secret secret = 1;
   string id_or_name = 2;
   string canvas_id_or_name = 3;
+  string organization_id = 4;
 }
 
 message UpdateSecretResponse {
@@ -536,8 +635,9 @@ message UpdateSecretResponse {
 }
 
 message DescribeSecretRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
+  string id_or_name = 3;
 }
 
 message DescribeSecretResponse {
@@ -545,7 +645,8 @@ message DescribeSecretResponse {
 }
 
 message ListSecretsRequest {
-  string canvas_id_or_name = 1;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
 }
 
 message ListSecretsResponse {
@@ -553,8 +654,9 @@ message ListSecretsResponse {
 }
 
 message DeleteSecretRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
+  string organization_id = 1;
+  string canvas_id_or_name = 2;
+  string id_or_name = 3;
 }
 
 message DeleteSecretResponse {}

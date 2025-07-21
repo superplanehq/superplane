@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
@@ -13,7 +14,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/secrets"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type SuperplaneService struct {
@@ -82,24 +86,94 @@ func (s *SuperplaneService) ListStageEvents(ctx context.Context, req *pb.ListSta
 	return stageevents.ListStageEvents(ctx, req)
 }
 
+func (s *SuperplaneService) CreateOrganizationSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.CreateSecret(ctx, s.encryptor, models.DomainTypeOrganization, org.ID, req.Secret)
+}
+
 func (s *SuperplaneService) CreateSecret(ctx context.Context, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
-	return secrets.CreateSecret(ctx, s.encryptor, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.CreateSecret(ctx, s.encryptor, models.DomainTypeCanvas, canvas.ID, req.Secret)
+}
+
+func (s *SuperplaneService) UpdateOrganizationSecret(ctx context.Context, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.UpdateSecret(ctx, s.encryptor, models.DomainTypeOrganization, org.ID, req.IdOrName, req.Secret)
 }
 
 func (s *SuperplaneService) UpdateSecret(ctx context.Context, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
-	return secrets.UpdateSecret(ctx, s.encryptor, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.UpdateSecret(ctx, s.encryptor, models.DomainTypeCanvas, canvas.ID, req.IdOrName, req.Secret)
+}
+
+func (s *SuperplaneService) DescribeOrganizationSecret(ctx context.Context, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.DescribeSecret(ctx, s.encryptor, models.DomainTypeCanvas, org.ID, req.IdOrName)
 }
 
 func (s *SuperplaneService) DescribeSecret(ctx context.Context, req *pb.DescribeSecretRequest) (*pb.DescribeSecretResponse, error) {
-	return secrets.DescribeSecret(ctx, s.encryptor, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.DescribeSecret(ctx, s.encryptor, models.DomainTypeCanvas, canvas.ID, req.IdOrName)
+}
+
+func (s *SuperplaneService) ListOrganizationSecrets(ctx context.Context, req *pb.ListSecretsRequest) (*pb.ListSecretsResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.ListSecrets(ctx, s.encryptor, models.DomainTypeOrganization, org.ID)
 }
 
 func (s *SuperplaneService) ListSecrets(ctx context.Context, req *pb.ListSecretsRequest) (*pb.ListSecretsResponse, error) {
-	return secrets.ListSecrets(ctx, s.encryptor, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.ListSecrets(ctx, s.encryptor, models.DomainTypeCanvas, canvas.ID)
+}
+
+func (s *SuperplaneService) DeleteOrganizationSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.DeleteSecret(ctx, models.DomainTypeOrganization, org.ID, req.IdOrName)
 }
 
 func (s *SuperplaneService) DeleteSecret(ctx context.Context, req *pb.DeleteSecretRequest) (*pb.DeleteSecretResponse, error) {
-	return secrets.DeleteSecret(ctx, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return secrets.DeleteSecret(ctx, models.DomainTypeCanvas, canvas.ID, req.IdOrName)
 }
 
 func (s *SuperplaneService) CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
@@ -123,13 +197,85 @@ func (s *SuperplaneService) ListConnectionGroupFieldSets(ctx context.Context, re
 }
 
 func (s *SuperplaneService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
-	return integrations.CreateIntegration(ctx, s.encryptor, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.CreateIntegration(ctx, s.encryptor, models.DomainTypeCanvas, canvas.ID, req.Integration)
+}
+
+func (s *SuperplaneService) CreateOrganizationIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.CreateIntegration(ctx, s.encryptor, models.DomainTypeOrganization, org.ID, req.Integration)
 }
 
 func (s *SuperplaneService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
-	return integrations.DescribeIntegration(ctx, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.DescribeIntegration(ctx, models.DomainTypeCanvas, canvas.ID, req.IdOrName)
+}
+
+func (s *SuperplaneService) DescribeOrganizationIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.DescribeIntegration(ctx, models.DomainTypeOrganization, org.ID, req.IdOrName)
 }
 
 func (s *SuperplaneService) ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
-	return integrations.ListIntegrations(ctx, req)
+	canvas, err := s.validateCanvas(req.CanvasIdOrName)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.ListIntegrations(ctx, models.DomainTypeCanvas, canvas.ID)
+}
+
+func (s *SuperplaneService) ListOrganizationIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb.ListIntegrationsResponse, error) {
+	org, err := s.validateOrganization(req.OrganizationId)
+	if err != nil {
+		return nil, err
+	}
+
+	return integrations.ListIntegrations(ctx, models.DomainTypeOrganization, org.ID)
+}
+
+func (s *SuperplaneService) validateCanvas(canvasIDOrName string) (*models.Canvas, error) {
+	err := actions.ValidateUUIDs(canvasIDOrName)
+	var canvas *models.Canvas
+	if err != nil {
+		canvas, err = models.FindCanvasByName(canvasIDOrName)
+	} else {
+		canvas, err = models.FindCanvasByID(canvasIDOrName)
+	}
+
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
+	}
+
+	return canvas, nil
+}
+
+func (s *SuperplaneService) validateOrganization(organizationID string) (*models.Organization, error) {
+	err := actions.ValidateUUIDs(organizationID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+	}
+
+	org, err := models.FindOrganizationByID(organizationID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "organization not found")
+	}
+
+	return org, nil
 }

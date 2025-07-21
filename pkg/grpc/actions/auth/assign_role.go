@@ -5,6 +5,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,9 +25,9 @@ func AssignRole(ctx context.Context, req *pb.AssignRoleRequest, authService auth
 
 	switch req.RoleAssignment.DomainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainTypeStr = authorization.DomainOrg
+		domainTypeStr = models.DomainTypeOrganization
 	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainTypeStr = authorization.DomainCanvas
+		domainTypeStr = models.DomainTypeCanvas
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
