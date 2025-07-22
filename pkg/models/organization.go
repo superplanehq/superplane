@@ -10,11 +10,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const (
-	DomainTypeOrganization = "org"
-	DomainTypeCanvas       = "canvas"
-)
-
 type Organization struct {
 	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name        string    `gorm:"uniqueIndex"`
