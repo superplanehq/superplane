@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
 	"gorm.io/datatypes"
@@ -244,7 +245,7 @@ func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.R
 func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	return &pb.ExecutorSpec{
 		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
-		Integration: &pb.IntegrationRef{
+		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},

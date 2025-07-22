@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -37,7 +37,7 @@ func Test__CreateSecret(t *testing.T) {
 			},
 		}
 
-		_, err := CreateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID, secret)
+		_, err := CreateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -59,7 +59,7 @@ func Test__CreateSecret(t *testing.T) {
 			},
 		}
 
-		response, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID, secret)
+		response, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)
@@ -86,7 +86,7 @@ func Test__CreateSecret(t *testing.T) {
 			},
 		}
 
-		_, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID, secret)
+		_, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

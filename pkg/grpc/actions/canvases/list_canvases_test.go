@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 

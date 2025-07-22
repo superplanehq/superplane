@@ -18,7 +18,7 @@ func Test__DescribeIntegration(t *testing.T) {
 	defer r.Close()
 
 	t.Run("integration that does not exist -> error", func(t *testing.T) {
-		_, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, uuid.New().String())
+		_, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), uuid.New().String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -26,7 +26,7 @@ func Test__DescribeIntegration(t *testing.T) {
 	})
 
 	t.Run("using id", func(t *testing.T) {
-		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, r.Integration.ID.String())
+		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), r.Integration.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)
@@ -37,7 +37,7 @@ func Test__DescribeIntegration(t *testing.T) {
 	})
 
 	t.Run("using name", func(t *testing.T) {
-		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, r.Integration.Name)
+		response, err := DescribeIntegration(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), r.Integration.Name)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Integration)

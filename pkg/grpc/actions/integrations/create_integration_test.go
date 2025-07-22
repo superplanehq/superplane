@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/models"
 
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,7 +24,7 @@ func Test__CreateIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CreateIntegration(context.Background(), r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, &protos.Integration{})
+		_, err := CreateIntegration(context.Background(), r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), &protos.Integration{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -38,7 +38,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -53,7 +53,7 @@ func Test__CreateIntegration(t *testing.T) {
 			Spec: &protos.Integration_Spec{},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -81,7 +81,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -109,7 +109,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -137,7 +137,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		require.NoError(t, err)
 		assert.Equal(t, "test", response.Integration.Metadata.Name)
 	})
@@ -163,7 +163,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID, integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

@@ -26,7 +26,7 @@ func Test__DeleteSecret(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, "test2")
+		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), "test2")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -34,7 +34,7 @@ func Test__DeleteSecret(t *testing.T) {
 	})
 
 	t.Run("secret is deleted", func(t *testing.T) {
-		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID, "test")
+		_, err := DeleteSecret(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), "test")
 		require.NoError(t, err)
 
 		_, err = models.FindSecretByName(models.DomainTypeCanvas, r.Canvas.ID, "test")

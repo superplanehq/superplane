@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -28,7 +28,7 @@ func Test__UpdateSecret(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID, "test2", &protos.Secret{})
+		_, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test2", &protos.Secret{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -51,7 +51,7 @@ func Test__UpdateSecret(t *testing.T) {
 			},
 		}
 
-		response, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID, "test", secret)
+		response, err := UpdateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test", secret)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)

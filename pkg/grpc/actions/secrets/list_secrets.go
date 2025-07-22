@@ -6,11 +6,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 )
 
-func ListSecrets(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID) (*pb.ListSecretsResponse, error) {
-	secrets, err := models.ListSecrets(domainType, domainID)
+func ListSecrets(ctx context.Context, encryptor crypto.Encryptor, domainType, domainId string) (*pb.ListSecretsResponse, error) {
+	secrets, err := models.ListSecrets(domainType, uuid.MustParse(domainId))
 	if err != nil {
 		return nil, err
 	}

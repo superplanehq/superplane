@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -126,7 +127,7 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 			return nil, fmt.Errorf("integration not found: %v", err)
 		}
 
-		spec.Integration = &pb.IntegrationRef{Name: integration.Name}
+		spec.Integration = &integrationPb.IntegrationRef{Name: integration.Name}
 
 		switch integration.Type {
 		case models.IntegrationTypeSemaphore:

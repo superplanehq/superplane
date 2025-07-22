@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
@@ -22,7 +22,7 @@ func Test__DescribeSecret(t *testing.T) {
 	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("secret does not exist -> error", func(t *testing.T) {
-		_, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID, uuid.NewString())
+		_, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -36,7 +36,7 @@ func Test__DescribeSecret(t *testing.T) {
 		_, err := models.CreateSecret("test", secrets.ProviderLocal, uuid.NewString(), models.DomainTypeCanvas, r.Canvas.ID, data)
 		require.NoError(t, err)
 
-		response, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID, "test")
+		response, err := DescribeSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), "test")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)

@@ -6,18 +6,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func DeleteSecret(ctx context.Context, domainType string, domainID uuid.UUID, idOrName string) (*pb.DeleteSecretResponse, error) {
+func DeleteSecret(ctx context.Context, domainType, domainID, idOrName string) (*pb.DeleteSecretResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {
-		secret, err = models.FindSecretByName(domainType, domainID, idOrName)
+		secret, err = models.FindSecretByName(domainType, uuid.MustParse(domainID), idOrName)
 	} else {
-		secret, err = models.FindSecretByID(domainType, domainID, idOrName)
+		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 
 	if err != nil {

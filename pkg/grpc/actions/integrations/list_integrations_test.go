@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -17,7 +17,7 @@ func Test__ListIntegrations(t *testing.T) {
 	defer r.Close()
 
 	t.Run("returns list of integrations", func(t *testing.T) {
-		res, err := ListIntegrations(context.Background(), models.DomainTypeCanvas, r.Canvas.ID)
+		res, err := ListIntegrations(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Integrations, 1)

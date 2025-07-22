@@ -11,7 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,8 +22,7 @@ import (
 func CreateIntegration(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
-	domainType string,
-	domainID uuid.UUID,
+	domainType, domainID string,
 	spec *pb.Integration,
 ) (*pb.CreateIntegrationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
@@ -38,7 +37,7 @@ func CreateIntegration(
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := buildIntegration(ctx, encryptor, domainType, domainID, spec)
+	integration, err := buildIntegration(ctx, encryptor, domainType, uuid.MustParse(domainID), spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

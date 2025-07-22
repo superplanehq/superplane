@@ -7,18 +7,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
+func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {
-		secret, err = models.FindSecretByName(domainType, domainID, idOrName)
+		secret, err = models.FindSecretByName(domainType, uuid.MustParse(domainID), idOrName)
 	} else {
-		secret, err = models.FindSecretByID(domainType, domainID, idOrName)
+		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 
 	if err != nil {

@@ -6,18 +6,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func DescribeIntegration(ctx context.Context, domainType string, domainID uuid.UUID, idOrName string) (*pb.DescribeIntegrationResponse, error) {
+func DescribeIntegration(ctx context.Context, domainType, domainID, idOrName string) (*pb.DescribeIntegrationResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
 	var integration *models.Integration
 	if err != nil {
-		integration, err = models.FindIntegrationByName(domainType, domainID, idOrName)
+		integration, err = models.FindIntegrationByName(domainType, uuid.MustParse(domainID), idOrName)
 	} else {
-		integration, err = models.FindDomainIntegration(domainType, domainID, uuid.MustParse(idOrName))
+		integration, err = models.FindDomainIntegration(domainType, uuid.MustParse(domainID), uuid.MustParse(idOrName))
 	}
 
 	if err != nil {

@@ -5,13 +5,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func ListIntegrations(ctx context.Context, domainType string, domainID uuid.UUID) (*pb.ListIntegrationsResponse, error) {
-	integrations, err := models.ListIntegrations(domainType, domainID)
+func ListIntegrations(ctx context.Context, domainType, domainID string) (*pb.ListIntegrationsResponse, error) {
+	integrations, err := models.ListIntegrations(domainType, uuid.MustParse(domainID))
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list integrations")
 	}

@@ -10,13 +10,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, spec *pb.Secret) (*pb.CreateSecretResponse, error) {
+func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, spec *pb.Secret) (*pb.CreateSecretResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -44,7 +44,7 @@ func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType st
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, domainID, data)
+	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
