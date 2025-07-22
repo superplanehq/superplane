@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -24,7 +24,7 @@ func Test_CreateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "test-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		resp, err := CreateGroup(ctx, req, authService)
@@ -42,12 +42,12 @@ func Test_CreateGroup(t *testing.T) {
 		canvasID := uuid.New().String()
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		
+
 		req := &CreateGroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,
 			GroupName:  "canvas-group",
-			Role:       authorization.RoleCanvasAdmin,
+			Role:       models.RoleCanvasAdmin,
 		}
 
 		resp, err := CreateGroup(ctx, req, authService)
@@ -63,7 +63,7 @@ func Test_CreateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := CreateGroup(ctx, req, authService)

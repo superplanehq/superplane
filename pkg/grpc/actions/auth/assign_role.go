@@ -20,9 +20,9 @@ func AssignRole(ctx context.Context, req *pb.AssignRoleRequest, authService auth
 
 	switch req.RoleAssignment.DomainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainTypeStr = authorization.DomainOrg
+		domainTypeStr = models.DomainOrg
 	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainTypeStr = authorization.DomainCanvas
+		domainTypeStr = models.DomainCanvas
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
@@ -38,32 +38,21 @@ func AssignRole(ctx context.Context, req *pb.AssignRoleRequest, authService auth
 	}
 
 	var userID string
+	var userEmail string
 	switch identifier := req.UserIdentifier.(type) {
 	case *pb.AssignRoleRequest_UserId:
-		err := actions.ValidateUUIDs(identifier.UserId)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid user ID")
-		}
 		userID = identifier.UserId
 	case *pb.AssignRoleRequest_UserEmail:
-		user, err := models.FindUserByEmail(identifier.UserEmail)
-		if err != nil {
-			user, err = models.FindInactiveUserByEmail(identifier.UserEmail)
-			if err != nil {
-				// Create inactive user with email
-				user = &models.User{
-					Name:     identifier.UserEmail,
-					IsActive: false,
-				}
-				if err := user.Create(); err != nil {
-					return nil, status.Error(codes.Internal, "failed to create user")
-				}
-			}
-		}
-		userID = user.ID.String()
+		userEmail = identifier.UserEmail
 	default:
 		return nil, status.Error(codes.InvalidArgument, "user identifier must be specified")
 	}
+
+	resolvedUserID, err := ResolveUserID(userID, userEmail)
+	if err != nil {
+		return nil, err
+	}
+	userID = resolvedUserID
 
 	err = authService.AssignRole(userID, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
 	if err != nil {

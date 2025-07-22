@@ -149,7 +149,7 @@ func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (m
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result := make(map[string]*RoleMetadata)
 	for i := range metadata {
 		result[metadata[i].RoleName] = &metadata[i]
@@ -162,12 +162,12 @@ func GetRoleDisplayNameWithFallback(roleName, domainType, domainID string, metad
 	if metadata != nil {
 		return metadata.DisplayName
 	}
-	
+
 	// For default roles, provide beautiful display names
 	if displayName := getDefaultRoleDisplayName(roleName, domainType); displayName != "" {
 		return displayName
 	}
-	
+
 	return roleName // Fallback to role name
 }
 
@@ -176,12 +176,12 @@ func GetRoleDescriptionWithFallback(roleName, domainType, domainID string, metad
 	if metadata != nil {
 		return metadata.Description
 	}
-	
+
 	// For default roles, provide beautiful descriptions
 	if description := getDefaultRoleDescription(roleName, domainType); description != "" {
 		return description
 	}
-	
+
 	return "" // No description available
 }
 
@@ -191,11 +191,11 @@ func getDefaultRoleDisplayName(roleName, domainType string) string {
 	if domainType == "org" {
 		switch roleName {
 		case "org_owner":
-			return "Owner"
+			return DisplayNameOwner
 		case "org_admin":
-			return "Admin"
+			return DisplayNameAdmin
 		case "org_viewer":
-			return "Viewer"
+			return DisplayNameViewer
 		}
 	}
 
@@ -203,11 +203,11 @@ func getDefaultRoleDisplayName(roleName, domainType string) string {
 	if domainType == "canvas" {
 		switch roleName {
 		case "canvas_owner":
-			return "Owner"
+			return DisplayNameOwner
 		case "canvas_admin":
-			return "Admin"
+			return DisplayNameAdmin
 		case "canvas_viewer":
-			return "Viewer"
+			return DisplayNameViewer
 		}
 	}
 
@@ -220,11 +220,11 @@ func getDefaultRoleDescription(roleName, domainType string) string {
 	if domainType == "org" {
 		switch roleName {
 		case "org_owner":
-			return "Full control over organization settings, billing, and member management."
+			return MetaDescOrgOwner
 		case "org_admin":
-			return "Can manage canvases, users, groups, and roles within the organization."
+			return MetaDescOrgAdmin
 		case "org_viewer":
-			return "Read-only access to organization resources and information."
+			return MetaDescOrgViewer
 		}
 	}
 
@@ -232,11 +232,11 @@ func getDefaultRoleDescription(roleName, domainType string) string {
 	if domainType == "canvas" {
 		switch roleName {
 		case "canvas_owner":
-			return "Full control over canvas settings, members, and deletion."
+			return MetaDescCanvasOwner
 		case "canvas_admin":
-			return "Can manage stages, events, connections, and secrets within the canvas."
+			return MetaDescCanvasAdmin
 		case "canvas_viewer":
-			return "Read-only access to canvas resources and execution information."
+			return MetaDescCanvasViewer
 		}
 	}
 

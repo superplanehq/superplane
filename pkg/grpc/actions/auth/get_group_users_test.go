@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -22,7 +22,7 @@ func Test_GetGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, "org", "test-group", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, "org", "test-group", models.RoleOrgAdmin)
 	require.NoError(t, err)
 
 	// Add user to group
@@ -83,7 +83,7 @@ func Test_GetGroupUsers(t *testing.T) {
 		// Setup canvas roles and create canvas group
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", models.RoleCanvasAdmin)
 		require.NoError(t, err)
 		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
@@ -109,7 +109,7 @@ func Test_GetGroupUsers(t *testing.T) {
 
 	t.Run("empty group - no users", func(t *testing.T) {
 		// Create another group without users
-		err = authService.CreateGroup(orgID, "org", "empty-group", authorization.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, "org", "empty-group", models.RoleOrgViewer)
 		require.NoError(t, err)
 
 		req := &GetGroupUsersRequest{

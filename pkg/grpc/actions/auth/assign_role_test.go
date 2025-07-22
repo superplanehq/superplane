@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -30,7 +29,7 @@ func Test_AssignRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -48,7 +47,7 @@ func Test_AssignRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -85,7 +84,7 @@ func Test_AssignRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -102,7 +101,7 @@ func Test_AssignRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 

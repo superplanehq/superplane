@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
@@ -21,9 +20,9 @@ func Test_ListGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create some groups first
-	err = authService.CreateGroup(orgID, "org", "test-group-1", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, "org", "test-group-1", models.RoleOrgAdmin)
 	require.NoError(t, err)
-	err = authService.CreateGroup(orgID, "org", "test-group-2", authorization.RoleOrgViewer)
+	err = authService.CreateGroup(orgID, "org", "test-group-2", models.RoleOrgViewer)
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
@@ -73,9 +72,9 @@ func Test_ListGroups(t *testing.T) {
 		// Setup canvas roles and create canvas groups
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-1", authorization.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-1", models.RoleCanvasAdmin)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", authorization.RoleCanvasViewer)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", models.RoleCanvasViewer)
 		require.NoError(t, err)
 
 		req := &GroupRequest{

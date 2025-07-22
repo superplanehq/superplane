@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -23,15 +23,15 @@ func Test_DescribeRole(t *testing.T) {
 		req := &pb.DescribeRoleRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		resp, err := DescribeRole(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.NotNil(t, resp.Role.InheritedRole)
-		assert.Equal(t, authorization.RoleOrgAdmin, resp.Role.Name)
-		assert.Equal(t, authorization.RoleOrgViewer, resp.Role.InheritedRole.Name)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Role.Name)
+		assert.Equal(t, models.RoleOrgViewer, resp.Role.InheritedRole.Name)
 		assert.Len(t, resp.Role.Permissions, 18)
 		assert.Len(t, resp.Role.InheritedRole.Permissions, 2)
 
@@ -50,13 +50,13 @@ func Test_DescribeRole(t *testing.T) {
 		req := &pb.DescribeRoleRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
-			Role:       authorization.RoleCanvasAdmin,
+			Role:       models.RoleCanvasAdmin,
 		}
 
 		resp, err := DescribeRole(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
-		assert.Equal(t, authorization.RoleCanvasAdmin, resp.Role.Name)
+		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Name)
 
 		// Test beautiful display names and descriptions for canvas roles
 		assert.Equal(t, "Admin", resp.Role.DisplayName)
@@ -67,7 +67,7 @@ func Test_DescribeRole(t *testing.T) {
 		req := &pb.DescribeRoleRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   "",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := DescribeRole(ctx, req, authService)

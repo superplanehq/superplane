@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -22,7 +22,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgViewer, orgID, authorization.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainOrg)
 	require.NoError(t, err)
 
 	t.Run("successful list user permissions", func(t *testing.T) {

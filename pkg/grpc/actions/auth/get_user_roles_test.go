@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -22,7 +22,7 @@ func Test_GetUserRoles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgAdmin, orgID, authorization.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
 	require.NoError(t, err)
 
 	t.Run("successful get user roles", func(t *testing.T) {
@@ -41,9 +41,9 @@ func Test_GetUserRoles(t *testing.T) {
 		for i, role := range resp.Roles {
 			roleNames[i] = role.Name
 		}
-		assert.Contains(t, roleNames, authorization.RoleOrgAdmin)
-		assert.Contains(t, roleNames, authorization.RoleOrgViewer)
-		assert.NotContains(t, roleNames, authorization.RoleOrgOwner)
+		assert.Contains(t, roleNames, models.RoleOrgAdmin)
+		assert.Contains(t, roleNames, models.RoleOrgViewer)
+		assert.NotContains(t, roleNames, models.RoleOrgOwner)
 	})
 
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {

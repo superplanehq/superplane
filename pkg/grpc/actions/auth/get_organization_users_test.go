@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
@@ -27,10 +26,10 @@ func TestGetOrganizationUsers(t *testing.T) {
 	userID2 := uuid.New().String()
 
 	// Assign roles to users
-	err = authService.AssignRole(userID1, "org_admin", orgID, authorization.DomainOrg)
+	err = authService.AssignRole(userID1, "org_admin", orgID, models.DomainOrg)
 	require.NoError(t, err)
 
-	err = authService.AssignRole(userID2, "org_viewer", orgID, authorization.DomainOrg)
+	err = authService.AssignRole(userID2, "org_viewer", orgID, models.DomainOrg)
 	require.NoError(t, err)
 
 	// Test getting organization users
@@ -113,7 +112,7 @@ func TestGetOrganizationUsersWithActiveUser(t *testing.T) {
 	err = user.Create()
 	require.NoError(t, err)
 
-	err = authService.AssignRole(user.ID.String(), "org_admin", orgID, authorization.DomainOrg)
+	err = authService.AssignRole(user.ID.String(), "org_admin", orgID, models.DomainOrg)
 	require.NoError(t, err)
 
 	req := &pb.GetOrganizationUsersRequest{

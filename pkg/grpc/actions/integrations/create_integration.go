@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -91,7 +90,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *m
 
 	return &models.Integration{
 		Name:       integration.Metadata.Name,
-		DomainType: authorization.DomainCanvas,
+		DomainType: models.DomainCanvas,
 		DomainID:   canvas.ID,
 		Type:       t,
 		URL:        integration.Spec.Url,

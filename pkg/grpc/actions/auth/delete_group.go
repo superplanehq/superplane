@@ -22,7 +22,7 @@ func DeleteOrganizationGroup(ctx context.Context, req *pb.DeleteOrganizationGrou
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	domainType := authorization.DomainOrg
+	domainType := models.DomainOrg
 
 	groups, err := authService.GetGroups(req.OrganizationId, domainType)
 	if err != nil {
@@ -87,7 +87,7 @@ func DeleteCanvasGroup(ctx context.Context, req *pb.DeleteCanvasGroupRequest, au
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	domainType := authorization.DomainCanvas
+	domainType := models.DomainCanvas
 
 	groups, err := authService.GetGroups(canvasID, domainType)
 	if err != nil {

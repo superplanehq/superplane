@@ -20,9 +20,9 @@ func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService auth
 
 	switch req.RoleAssignment.DomainType {
 	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainTypeStr = authorization.DomainOrg
+		domainTypeStr = models.DomainOrg
 	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainTypeStr = authorization.DomainCanvas
+		domainTypeStr = models.DomainCanvas
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}

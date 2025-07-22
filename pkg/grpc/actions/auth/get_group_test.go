@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -23,7 +23,7 @@ func Test_GetGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group with metadata
-	err = CreateGroupWithMetadata(orgID, "org", "test-group", authorization.RoleOrgAdmin, "Test Group", "Test group description", authService)
+	err = CreateGroupWithMetadata(orgID, "org", "test-group", models.RoleOrgAdmin, "Test Group", "Test group description", authService)
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
@@ -51,7 +51,7 @@ func Test_GetGroup(t *testing.T) {
 		// Setup canvas roles and create canvas group with metadata
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = CreateGroupWithMetadata(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
+		err = CreateGroupWithMetadata(canvasID, "canvas", "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
 		require.NoError(t, err)
 
 		req := &GetGroupRequest{
@@ -138,7 +138,7 @@ func Test_GetGroup(t *testing.T) {
 
 	t.Run("get group with viewer role", func(t *testing.T) {
 		// Create a group with viewer role
-		err = authService.CreateGroup(orgID, "org", "viewer-group", authorization.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, "org", "viewer-group", models.RoleOrgViewer)
 		require.NoError(t, err)
 
 		req := &GetGroupRequest{
@@ -159,7 +159,7 @@ func Test_GetGroup(t *testing.T) {
 
 	t.Run("get group with owner role", func(t *testing.T) {
 		// Create a group with owner role
-		err = authService.CreateGroup(orgID, "org", "owner-group", authorization.RoleOrgOwner)
+		err = authService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner)
 		require.NoError(t, err)
 
 		req := &GetGroupRequest{

@@ -3,7 +3,6 @@ package integrations
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -24,7 +23,7 @@ func ListIntegrations(ctx context.Context, req *pb.ListIntegrationsRequest) (*pb
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	integrations, err := models.ListIntegrations(authorization.DomainCanvas, canvas.ID)
+	integrations, err := models.ListIntegrations(models.DomainCanvas, canvas.ID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to list integrations")
 	}

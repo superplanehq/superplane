@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
@@ -28,9 +27,9 @@ func DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest
 	err = actions.ValidateUUIDs(req.IdOrName)
 	var integration *models.Integration
 	if err != nil {
-		integration, err = models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, req.IdOrName)
+		integration, err = models.FindIntegrationByName(models.DomainCanvas, canvas.ID, req.IdOrName)
 	} else {
-		integration, err = models.FindDomainIntegration(authorization.DomainCanvas, canvas.ID, uuid.MustParse(req.IdOrName))
+		integration, err = models.FindDomainIntegration(models.DomainCanvas, canvas.ID, uuid.MustParse(req.IdOrName))
 	}
 
 	if err != nil {

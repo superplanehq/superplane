@@ -68,7 +68,7 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, err
 	}
 
-	err = authorizationService.AssignRole(userID, authorization.RoleCanvasOwner, canvas.ID.String(), authorization.DomainCanvas)
+	err = authorizationService.AssignRole(userID, models.RoleCanvasOwner, canvas.ID.String(), models.DomainCanvas)
 	if err != nil {
 		log.Errorf("Error assigning canvas owner role on %v for CreateCanvas: %v", req, err)
 		return nil, err

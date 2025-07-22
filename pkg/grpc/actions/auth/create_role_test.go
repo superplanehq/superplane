@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -43,10 +43,10 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created by verifying we can get its definition
-		roleDef, err := authService.GetRoleDefinition("custom-role", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role", models.DomainOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role", roleDef.Name)
-		assert.Equal(t, authorization.DomainOrg, roleDef.DomainType)
+		assert.Equal(t, models.DomainOrg, roleDef.DomainType)
 		assert.Len(t, roleDef.Permissions, 2)
 	})
 
@@ -55,7 +55,7 @@ func Test_CreateRole(t *testing.T) {
 			Name:          "custom-role-with-inheritance",
 			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:      orgID,
-			InheritedRole: authorization.RoleOrgViewer,
+			InheritedRole: models.RoleOrgViewer,
 			Permissions: []*pb.Permission{
 				{
 					Resource:   "canvas",
@@ -70,11 +70,11 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", models.DomainOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role-with-inheritance", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
-		assert.Equal(t, authorization.RoleOrgViewer, roleDef.InheritsFrom.Name)
+		assert.Equal(t, models.RoleOrgViewer, roleDef.InheritsFrom.Name)
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {
@@ -117,7 +117,7 @@ func Test_CreateRole(t *testing.T) {
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
-			Name:       authorization.RoleOrgAdmin,
+			Name:       models.RoleOrgAdmin,
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			Permissions: []*pb.Permission{

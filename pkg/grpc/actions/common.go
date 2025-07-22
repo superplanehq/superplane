@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -268,9 +267,9 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 
 func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
-	case authorization.DomainCanvas:
+	case models.DomainCanvas:
 		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
-	case authorization.DomainOrg:
+	case models.DomainOrg:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
@@ -283,7 +282,7 @@ func ValidateIntegration(canvas *models.Canvas, integrationName string) (*models
 	}
 
 	// TODO: support for organization level integration
-	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationName)
+	integration, err := models.FindIntegrationByName(models.DomainCanvas, canvas.ID, integrationName)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
 	}

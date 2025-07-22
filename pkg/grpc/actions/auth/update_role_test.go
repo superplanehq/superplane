@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -22,12 +23,12 @@ func Test_UpdateRole(t *testing.T) {
 	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role",
-		DomainType: authorization.DomainOrg,
+		DomainType: models.DomainOrg,
 		Permissions: []*authorization.Permission{
 			{
 				Resource:   "canvas",
 				Action:     "read",
-				DomainType: authorization.DomainOrg,
+				DomainType: models.DomainOrg,
 			},
 		},
 	}
@@ -63,7 +64,7 @@ func Test_UpdateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was updated by verifying permissions
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.Len(t, roleDef.Permissions, 3)
@@ -74,7 +75,7 @@ func Test_UpdateRole(t *testing.T) {
 			RoleName:      "test-custom-role",
 			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:      orgID,
-			InheritedRole: authorization.RoleOrgViewer,
+			InheritedRole: models.RoleOrgViewer,
 			Permissions: []*pb.Permission{
 				{
 					Resource:   "canvas",
@@ -89,11 +90,11 @@ func Test_UpdateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was updated with inheritance
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
-		assert.Equal(t, authorization.RoleOrgViewer, roleDef.InheritsFrom.Name)
+		assert.Equal(t, models.RoleOrgViewer, roleDef.InheritsFrom.Name)
 		assert.Len(t, roleDef.Permissions, 1)
 	})
 
@@ -137,7 +138,7 @@ func Test_UpdateRole(t *testing.T) {
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		req := &pb.UpdateRoleRequest{
-			RoleName:   authorization.RoleOrgAdmin,
+			RoleName:   models.RoleOrgAdmin,
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 			Permissions: []*pb.Permission{

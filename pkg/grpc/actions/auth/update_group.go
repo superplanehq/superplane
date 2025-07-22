@@ -89,7 +89,7 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 		updatedRole = currentRole
 	}
 
-	membersCount, err := authService.GetGroupMembersCount(groupMetadata.DomainID, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(groupMetadata.DomainID, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
@@ -101,7 +101,7 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 		Role:         updatedRole,
 		DisplayName:  displayName,
 		Description:  description,
-		MembersCount: int32(membersCount),
+		MembersCount: int32(len(groupUsers)),
 		CreatedAt:    groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z"),
 		UpdatedAt:    groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z"),
 	}

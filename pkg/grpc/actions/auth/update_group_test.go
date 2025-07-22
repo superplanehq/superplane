@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -21,7 +21,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, authorization.DomainOrg, "test-group", authorization.RoleOrgViewer, "Test Group", "Test Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
 		require.NoError(t, err)
 
 		// Update the group role
@@ -29,23 +29,23 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "test-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, authorization.RoleOrgAdmin, resp.Group.Role)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Role)
 
 		// Verify the role was updated
-		role, err := authService.GetGroupRole(orgID, authorization.DomainOrg, "test-group")
+		role, err := authService.GetGroupRole(orgID, models.DomainOrg, "test-group")
 		require.NoError(t, err)
-		assert.Equal(t, authorization.RoleOrgAdmin, role)
+		assert.Equal(t, models.RoleOrgAdmin, role)
 	})
 
 	t.Run("successful metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, authorization.DomainOrg, "metadata-group", authorization.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
 		require.NoError(t, err)
 
 		// Update the group metadata
@@ -66,7 +66,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, authorization.DomainOrg, "full-update-group", authorization.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
 		require.NoError(t, err)
 
 		// Update both role and metadata
@@ -74,7 +74,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType:  pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:    orgID,
 			GroupName:   "full-update-group",
-			Role:        authorization.RoleOrgAdmin,
+			Role:        models.RoleOrgAdmin,
 			DisplayName: "Full Update Display",
 			Description: "Full Update Description",
 		}
@@ -82,22 +82,22 @@ func TestUpdateGroup(t *testing.T) {
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, authorization.RoleOrgAdmin, resp.Group.Role)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Role)
 		assert.Equal(t, "Full Update Display", resp.Group.DisplayName)
 		assert.Equal(t, "Full Update Description", resp.Group.Description)
 	})
 
 	t.Run("update preserves group membership", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, authorization.DomainOrg, "membership-group", authorization.RoleOrgViewer, "Membership Group", "Membership Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
 		require.NoError(t, err)
 
 		// Add users to the group
 		userID1 := uuid.New().String()
 		userID2 := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, authorization.DomainOrg, userID1, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainOrg, userID1, "membership-group")
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(orgID, authorization.DomainOrg, userID2, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainOrg, userID2, "membership-group")
 		require.NoError(t, err)
 
 		// Update the group role
@@ -105,7 +105,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "membership-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		resp, err := UpdateGroup(ctx, req, authService)
@@ -113,7 +113,7 @@ func TestUpdateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Verify users are still in the group
-		users, err := authService.GetGroupUsers(orgID, authorization.DomainOrg, "membership-group")
+		users, err := authService.GetGroupUsers(orgID, models.DomainOrg, "membership-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID1)
 		assert.Contains(t, users, userID2)
@@ -126,7 +126,7 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a canvas group first
-		err = CreateGroupWithMetadata(canvasID, authorization.DomainCanvas, "canvas-group", authorization.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
+		err = CreateGroupWithMetadata(canvasID, models.DomainCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
 		require.NoError(t, err)
 
 		// Update the canvas group
@@ -134,13 +134,13 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,
 			GroupName:  "canvas-group",
-			Role:       authorization.RoleCanvasAdmin,
+			Role:       models.RoleCanvasAdmin,
 		}
 
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, authorization.RoleCanvasAdmin, resp.Group.Role)
+		assert.Equal(t, models.RoleCanvasAdmin, resp.Group.Role)
 	})
 
 	t.Run("group not found", func(t *testing.T) {
@@ -148,7 +148,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "non-existent-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := UpdateGroup(ctx, req, authService)
@@ -161,7 +161,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   "invalid-uuid",
 			GroupName:  "test-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := UpdateGroup(ctx, req, authService)
@@ -174,7 +174,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainID:   orgID,
 			GroupName:  "",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := UpdateGroup(ctx, req, authService)
@@ -200,7 +200,7 @@ func TestUpdateGroup(t *testing.T) {
 			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainID:   orgID,
 			GroupName:  "test-group",
-			Role:       authorization.RoleOrgAdmin,
+			Role:       models.RoleOrgAdmin,
 		}
 
 		_, err := UpdateGroup(ctx, req, authService)

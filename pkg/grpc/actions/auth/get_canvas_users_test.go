@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
@@ -23,10 +22,10 @@ func TestGetCanvasUsers(t *testing.T) {
 	userID1 := uuid.New().String()
 	userID2 := uuid.New().String()
 
-	err = authService.AssignRole(userID1, "canvas_admin", canvasID, authorization.DomainCanvas)
+	err = authService.AssignRole(userID1, "canvas_admin", canvasID, models.DomainCanvas)
 	require.NoError(t, err)
 
-	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, authorization.DomainCanvas)
+	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainCanvas)
 	require.NoError(t, err)
 
 	req := &pb.GetCanvasUsersRequest{
@@ -104,7 +103,7 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to the active user
-	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, authorization.DomainCanvas)
+	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainCanvas)
 	require.NoError(t, err)
 
 	req := &pb.GetCanvasUsersRequest{

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -22,17 +23,17 @@ func Test_DeleteRole(t *testing.T) {
 	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role-to-delete",
-		DomainType: authorization.DomainOrg,
+		DomainType: models.DomainOrg,
 		Permissions: []*authorization.Permission{
 			{
 				Resource:   "canvas",
 				Action:     "read",
-				DomainType: authorization.DomainOrg,
+				DomainType: models.DomainOrg,
 			},
 			{
 				Resource:   "canvas",
 				Action:     "write",
-				DomainType: authorization.DomainOrg,
+				DomainType: models.DomainOrg,
 			},
 		},
 	}
@@ -41,7 +42,7 @@ func Test_DeleteRole(t *testing.T) {
 
 	t.Run("successful custom role deletion", func(t *testing.T) {
 		// Verify role exists before deletion
-		roleDef, err := authService.GetRoleDefinition("test-custom-role-to-delete", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role-to-delete", models.DomainOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role-to-delete", roleDef.Name)
 
@@ -56,7 +57,7 @@ func Test_DeleteRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Verify role was deleted
-		_, err = authService.GetRoleDefinition("test-custom-role-to-delete", authorization.DomainOrg, orgID)
+		_, err = authService.GetRoleDefinition("test-custom-role-to-delete", models.DomainOrg, orgID)
 		assert.Error(t, err)
 	})
 
@@ -86,7 +87,7 @@ func Test_DeleteRole(t *testing.T) {
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
-			RoleName:   authorization.RoleOrgAdmin,
+			RoleName:   models.RoleOrgAdmin,
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
@@ -124,12 +125,12 @@ func Test_DeleteRole(t *testing.T) {
 		// Create another custom role
 		customRoleWithUsers := &authorization.RoleDefinition{
 			Name:       "test-role-with-users",
-			DomainType: authorization.DomainOrg,
+			DomainType: models.DomainOrg,
 			Permissions: []*authorization.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: authorization.DomainOrg,
+					DomainType: models.DomainOrg,
 				},
 			},
 		}
@@ -138,7 +139,7 @@ func Test_DeleteRole(t *testing.T) {
 
 		// Assign role to a user
 		userID := uuid.New().String()
-		err = authService.AssignRole(userID, "test-role-with-users", orgID, authorization.DomainOrg)
+		err = authService.AssignRole(userID, "test-role-with-users", orgID, models.DomainOrg)
 		require.NoError(t, err)
 
 		req := &pb.DeleteRoleRequest{
@@ -152,7 +153,7 @@ func Test_DeleteRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Verify role was deleted and user no longer has the role
-		_, err = authService.GetRoleDefinition("test-role-with-users", authorization.DomainOrg, orgID)
+		_, err = authService.GetRoleDefinition("test-role-with-users", models.DomainOrg, orgID)
 		assert.Error(t, err)
 
 		// Verify user no longer has the deleted role

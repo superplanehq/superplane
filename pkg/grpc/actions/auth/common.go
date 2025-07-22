@@ -5,16 +5,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func convertDomainType(domainType pbAuth.DomainType) string {
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return authorization.DomainOrg
+		return models.DomainOrg
 	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		return authorization.DomainCanvas
+		return models.DomainCanvas
 	default:
 		return ""
 	}
@@ -46,7 +49,6 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authSer
 	return role, nil
 }
 
-
 func convertPermissionsToProto(permissions []*authorization.Permission) []*pbAuth.Permission {
 	permList := make([]*pbAuth.Permission, len(permissions))
 	for i, perm := range permissions {
@@ -65,9 +67,9 @@ func convertPermissionToProto(permission *authorization.Permission) *pbAuth.Perm
 
 func convertDomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
-	case authorization.DomainOrg:
+	case models.DomainOrg:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
-	case authorization.DomainCanvas:
+	case models.DomainCanvas:
 		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
@@ -97,4 +99,57 @@ func CreateRoleWithMetadata(domainID string, roleDef *authorization.RoleDefiniti
 	}
 
 	return models.UpsertRoleMetadata(roleDef.Name, roleDef.DomainType, domainID, displayName, description)
+}
+
+func ResolveUserID(userID, userEmail string) (string, error) {
+	if userID == "" && userEmail == "" {
+		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
+	}
+
+	if userID != "" {
+		return resolveByID(userID)
+	}
+
+	return resolveByEmail(userEmail)
+}
+
+func resolveByID(userID string) (string, error) {
+	if err := actions.ValidateUUIDs(userID); err != nil {
+		return "", status.Error(codes.InvalidArgument, "invalid user ID")
+	}
+
+	if _, err := models.FindUserByID(userID); err != nil {
+		return "", status.Error(codes.NotFound, "user not found")
+	}
+
+	return userID, nil
+}
+
+func resolveByEmail(userEmail string) (string, error) {
+	user, err := findOrCreateUser(userEmail)
+	if err != nil {
+		return "", err
+	}
+	return user.ID.String(), nil
+}
+
+func findOrCreateUser(email string) (*models.User, error) {
+	if user, err := models.FindUserByEmail(email); err == nil {
+		return user, nil
+	}
+
+	if user, err := models.FindInactiveUserByEmail(email); err == nil {
+		return user, nil
+	}
+
+	user := &models.User{
+		Name:     email,
+		IsActive: false,
+	}
+
+	if err := user.Create(); err != nil {
+		return nil, status.Error(codes.Internal, "failed to create user")
+	}
+
+	return user, nil
 }

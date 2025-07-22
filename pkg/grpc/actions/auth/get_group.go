@@ -62,7 +62,7 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 		description = ""
 	}
 
-	membersCount, err := authService.GetGroupMembersCount(req.DomainID, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(req.DomainID, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
@@ -74,7 +74,7 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 		Role:         role,
 		DisplayName:  displayName,
 		Description:  description,
-		MembersCount: int32(membersCount),
+		MembersCount: int32(len(groupUsers)),
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 	}

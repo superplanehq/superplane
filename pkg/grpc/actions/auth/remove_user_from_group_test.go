@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -23,7 +22,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, "org", "test-group", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, "org", "test-group", models.RoleOrgAdmin)
 	require.NoError(t, err)
 
 	// Add user to group first
@@ -44,7 +43,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 
 	t.Run("successful remove user from group with user email", func(t *testing.T) {
 		testEmail := "test-remove-group@example.com"
-		
+
 		// Create user and add to group first
 		user := &models.User{
 			Name:     testEmail,
@@ -52,11 +51,11 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		}
 		err := user.Create()
 		require.NoError(t, err)
-		
+
 		// Create another group to avoid conflicts
-		err = authService.CreateGroup(orgID, "org", "test-group-email-remove", authorization.RoleOrgAdmin)
+		err = authService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin)
 		require.NoError(t, err)
-		
+
 		err = authService.AddUserToGroup(orgID, "org", user.ID.String(), "test-group-email-remove")
 		require.NoError(t, err)
 
@@ -137,15 +136,15 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 
 	t.Run("successful canvas group remove user", func(t *testing.T) {
 		canvasID := uuid.New().String()
-		
+
 		// Setup canvas roles and create canvas group
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", models.RoleCanvasAdmin)
 		require.NoError(t, err)
 		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
 		require.NoError(t, err)
-		
+
 		req := &GroupUserRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,

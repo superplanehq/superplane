@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -34,24 +34,24 @@ func Test_ListRoles(t *testing.T) {
 		for i, role := range resp.Roles {
 			roleNames[i] = role.Name
 		}
-		assert.Contains(t, roleNames, authorization.RoleOrgViewer)
-		assert.Contains(t, roleNames, authorization.RoleOrgAdmin)
-		assert.Contains(t, roleNames, authorization.RoleOrgOwner)
+		assert.Contains(t, roleNames, models.RoleOrgViewer)
+		assert.Contains(t, roleNames, models.RoleOrgAdmin)
+		assert.Contains(t, roleNames, models.RoleOrgOwner)
 		assert.Len(t, resp.Roles, 3)
 
 		// Test beautiful display names and descriptions for each role
 		for _, role := range resp.Roles {
 			assert.NotEmpty(t, role.DisplayName, "DisplayName should not be empty for role %s", role.Name)
 			assert.NotEmpty(t, role.Description, "Description should not be empty for role %s", role.Name)
-			
+
 			switch role.Name {
-			case authorization.RoleOrgOwner:
+			case models.RoleOrgOwner:
 				assert.Equal(t, "Owner", role.DisplayName)
 				assert.Contains(t, role.Description, "Full control over organization settings")
-			case authorization.RoleOrgAdmin:
+			case models.RoleOrgAdmin:
 				assert.Equal(t, "Admin", role.DisplayName)
 				assert.Contains(t, role.Description, "Can manage canvases, users, groups, and roles")
-			case authorization.RoleOrgViewer:
+			case models.RoleOrgViewer:
 				assert.Equal(t, "Viewer", role.DisplayName)
 				assert.Contains(t, role.Description, "Read-only access to organization resources")
 			}
@@ -76,15 +76,15 @@ func Test_ListRoles(t *testing.T) {
 		for _, role := range resp.Roles {
 			assert.NotEmpty(t, role.DisplayName, "DisplayName should not be empty for role %s", role.Name)
 			assert.NotEmpty(t, role.Description, "Description should not be empty for role %s", role.Name)
-			
+
 			switch role.Name {
-			case authorization.RoleCanvasOwner:
+			case models.RoleCanvasOwner:
 				assert.Equal(t, "Owner", role.DisplayName)
 				assert.Contains(t, role.Description, "Full control over canvas settings")
-			case authorization.RoleCanvasAdmin:
+			case models.RoleCanvasAdmin:
 				assert.Equal(t, "Admin", role.DisplayName)
 				assert.Contains(t, role.Description, "Can manage stages, events, connections, and secrets")
-			case authorization.RoleCanvasViewer:
+			case models.RoleCanvasViewer:
 				assert.Equal(t, "Viewer", role.DisplayName)
 				assert.Contains(t, role.Description, "Read-only access to canvas resources")
 			}

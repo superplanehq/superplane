@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
@@ -23,7 +22,7 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgAdmin, orgID, authorization.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
 	require.NoError(t, err)
 
 	t.Run("successful role removal with user ID", func(t *testing.T) {
@@ -34,7 +33,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -45,7 +44,7 @@ func Test_RemoveRole(t *testing.T) {
 
 	t.Run("successful role removal with user email", func(t *testing.T) {
 		testEmail := "test-remove@example.com"
-		
+
 		// Create user and assign role first
 		user := &models.User{
 			Name:     testEmail,
@@ -53,8 +52,8 @@ func Test_RemoveRole(t *testing.T) {
 		}
 		err := user.Create()
 		require.NoError(t, err)
-		
-		err = authService.AssignRole(user.ID.String(), authorization.RoleOrgAdmin, orgID, authorization.DomainOrg)
+
+		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
 		require.NoError(t, err)
 
 		req := &pb.RemoveRoleRequest{
@@ -64,7 +63,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -81,7 +80,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -98,7 +97,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -112,7 +111,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 
@@ -129,7 +128,7 @@ func Test_RemoveRole(t *testing.T) {
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
+				Role:       models.RoleOrgAdmin,
 			},
 		}
 

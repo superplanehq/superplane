@@ -38,7 +38,7 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			return nil, status.Error(codes.Internal, "failed to get group roles")
 		}
 
-		membersCount, err := authService.GetGroupMembersCount(req.DomainID, domainType, groupName)
+		groupUsers, err := authService.GetGroupUsers(req.DomainID, domainType, groupName)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to get group members count")
 		}
@@ -63,7 +63,7 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 			Role:         role,
 			DisplayName:  displayName,
 			Description:  description,
-			MembersCount: int32(membersCount),
+			MembersCount: int32(len(groupUsers)),
 			CreatedAt:    createdAt,
 			UpdatedAt:    updatedAt,
 		}
