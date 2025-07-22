@@ -16,11 +16,10 @@ import { useMutation } from '@tanstack/react-query'
 
 interface CanvasDeleteProps {
   canvasId: string
-  canvasName: string
   organizationId: string
 }
 
-export function CanvasDelete({ canvasId, canvasName, organizationId }: CanvasDeleteProps) {
+export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [confirmationText, setConfirmationText] = useState('')
   const navigate = useNavigate()
@@ -52,44 +51,37 @@ export function CanvasDelete({ canvasId, canvasName, organizationId }: CanvasDel
   }
 
   const handleConfirmDelete = async () => {
-    if (confirmationText === canvasName) {
-      try {
-        await deleteCanvasMutation.mutateAsync()
-      } catch (err) {
-        console.error('Error deleting canvas:', err)
-      }
+    if (confirmationText === 'DELETE') {
+      await deleteCanvasMutation.mutateAsync()
     }
+    handleCloseModal()
   }
-
-  const isConfirmationValid = confirmationText === canvasName
 
   return (
     <div className="space-y-6">
-      <Heading level={2}>Delete Canvas</Heading>
-      
-      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-red-200 dark:border-red-800 p-6">
+      <Heading level={3} className="text-left text-black dark:text-white sm:text-sm">Danger Zone</Heading>
+
+      <div className="text-left bg-red-50 dark:bg-zinc-800 rounded-lg border border-red-200 dark:border-red-800 p-6">
         <div className="flex items-start gap-4">
           <div className="flex-shrink-0">
             <MaterialSymbol name="warning" className="text-red-500" size="lg" />
           </div>
           <div className="flex-1">
-            <Heading level={3} className="text-lg text-red-900 dark:text-red-100 mb-2">
-              Delete "{canvasName}"
+            <Heading level={3} className="sm:text-sm text-black dark:text-white mb-2">
+              Delete canvas
             </Heading>
             <div className="space-y-3 mb-6">
               <Text className="text-zinc-600 dark:text-zinc-400">
-                Once you delete a canvas, there is no going back. This action will permanently delete:
+                Once you delete this canvas, there is no going back. This action cannot be undone. All workflows, configurations, and associated data will be permanently removed
               </Text>
-              <ul className="list-disc list-inside space-y-1 text-sm text-zinc-600 dark:text-zinc-400 ml-4">
-                <li>All stages and workflow configurations</li>
-                <li>Historical execution data and logs</li>
-                <li>Associated secrets and environment variables</li>
-                <li>Canvas permissions and member access</li>
-                <li>All connected integrations and webhooks</li>
+              <Text>This will permanently delete:</Text>
+              <ul className="list-disc list-inside space-y-1 text-sm text-red-600 dark:text-zinc-400 ml-4">
+                <li>All workflow stages and configurations</li>
+                <li>All secrets and environment variables</li>
+                <li>All integration connections</li>
+                <li>All execution history and logs</li>
+                <li>All team member access</li>
               </ul>
-              <Text className="text-zinc-600 dark:text-zinc-400 font-medium">
-                This action cannot be undone.
-              </Text>
             </div>
             <Button color="red" onClick={handleDeleteClick}>
               <MaterialSymbol name="delete" size="sm" />
@@ -107,29 +99,29 @@ export function CanvasDelete({ canvasId, canvasName, organizationId }: CanvasDel
         <DialogDescription>
           This action cannot be undone. Please confirm that you want to permanently delete this canvas.
         </DialogDescription>
-        
+
         <DialogBody>
           <div className="space-y-4">
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex items-center gap-3 mb-3">
                 <MaterialSymbol name="warning" className="text-red-500" size="sm" />
                 <Text className="font-medium text-red-900 dark:text-red-100">
-                  This will permanently delete the canvas "{canvasName}"
+                  This will permanently delete the canvas
                 </Text>
               </div>
               <Text className="text-sm text-red-700 dark:text-red-300">
                 All associated data, stages, execution history, secrets, and configurations will be permanently removed.
               </Text>
             </div>
-            
+
             <div>
               <label htmlFor="confirm-deletion" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                Type <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">{canvasName}</span> to confirm deletion:
+                Type <span className="font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">DELETE</span> to confirm deletion:
               </label>
               <Input
                 id="confirm-deletion"
                 type="text"
-                placeholder={`Type "${canvasName}" to confirm`}
+                placeholder="Type DELETE to confirm"
                 value={confirmationText}
                 onChange={(e) => setConfirmationText(e.target.value)}
                 className="w-full"
@@ -143,10 +135,10 @@ export function CanvasDelete({ canvasId, canvasName, organizationId }: CanvasDel
           <Button plain onClick={handleCloseModal}>
             Cancel
           </Button>
-          <Button 
-            color="red" 
+          <Button
+            color="red"
             onClick={handleConfirmDelete}
-            disabled={!isConfirmationValid || deleteCanvasMutation.isPending}
+            disabled={confirmationText !== 'DELETE' || deleteCanvasMutation.isPending}
             className="flex items-center gap-2"
           >
             <MaterialSymbol name="delete" size="sm" />

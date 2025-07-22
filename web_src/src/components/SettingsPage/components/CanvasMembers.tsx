@@ -1,15 +1,15 @@
 import { useState, useMemo } from 'react'
-import { Heading } from '../../Heading/heading'
 import { Text } from '../../Text/text'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Avatar } from '../../Avatar/avatar'
 import { Input, InputGroup } from '../../Input/input'
-import { Button } from '../../Button/button'
 import {
   Dropdown,
   DropdownButton,
   DropdownMenu,
   DropdownItem,
+  DropdownLabel,
+  DropdownDescription
 } from '../../Dropdown/dropdown'
 import {
   Table,
@@ -19,13 +19,13 @@ import {
   TableHeader,
   TableCell
 } from '../../Table/table'
-import { Textarea } from '../../Textarea/textarea'
+import { AddCanvasMembersSection } from './AddCanvasMembersSection'
 import {
-  authorizationGetCanvasUsers,
-  authorizationAddUserToCanvasGroup,
-  authorizationRemoveUserFromCanvasGroup
-} from '../../../api-client/sdk.gen'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+  useCanvasRoles,
+  useCanvasUsers,
+  useAssignCanvasRole,
+  useRemoveCanvasRole
+} from '../../../hooks/useCanvasData'
 
 interface CanvasMembersProps {
   canvasId: string
@@ -37,65 +37,29 @@ interface CanvasMember {
   name: string
   email: string
   role: string
+  roleName: string
   status: 'Active' | 'Pending' | 'Inactive'
   lastActive: string
   initials: string
   avatar?: string
 }
 
-export function CanvasMembers({ canvasId }: CanvasMembersProps) {
+export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) {
   const [searchTerm, setSearchTerm] = useState('')
-  const [inviteEmails, setInviteEmails] = useState('')
   const [sortConfig, setSortConfig] = useState<{
     key: keyof CanvasMember | null
     direction: 'asc' | 'desc'
   }>({ key: null, direction: 'asc' })
 
-  const queryClient = useQueryClient()
+  // Use new hooks for data fetching
+  const { data: canvasUsers = [], isLoading: loadingMembers, error: usersError } = useCanvasUsers(canvasId)
+  const { data: canvasRoles = [], isLoading: loadingRoles, error: rolesError } = useCanvasRoles(canvasId)
 
-  // Fetch canvas users
-  const { data: canvasUsers = [], isLoading: loadingMembers, error } = useQuery({
-    queryKey: ['canvasUsers', canvasId],
-    queryFn: async () => {
-      const response = await authorizationGetCanvasUsers({
-        path: { canvasIdOrName: canvasId },
-      })
-      return response.data?.users || []
-    },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
-    enabled: !!canvasId
-  })
+  // Mutations
+  const assignRoleMutation = useAssignCanvasRole(canvasId)
+  const removeRoleMutation = useRemoveCanvasRole(canvasId)
 
-  // Add user mutation
-  const addUserMutation = useMutation({
-    mutationFn: async ({ userEmail }: { userEmail: string }) => {
-      return await authorizationAddUserToCanvasGroup({
-        path: { canvasIdOrName: canvasId, groupName: '' },
-        body: {
-          userEmail,
-        }
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['canvasUsers', canvasId] })
-    }
-  })
-
-  // Remove user mutation
-  const removeUserMutation = useMutation({
-    mutationFn: async ({ userId }: { userId: string }) => {
-      return await authorizationRemoveUserFromCanvasGroup({
-        path: { canvasIdOrName: canvasId, groupName: '' },
-        body: {
-          userId,
-        }
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['canvasUsers', canvasId] })
-    }
-  })
+  const error = usersError || rolesError
 
   // Transform users to CanvasMember interface format
   const members = useMemo(() => {
@@ -103,15 +67,20 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
       const name = user.displayName || user.userId || 'Unknown User'
       const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
+      // Get primary role name and display name from role assignments
+      const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
+      const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
+
       return {
         id: user.userId || '',
         name: name,
         email: user.email || `${user.userId}@email.placeholder`,
-        role: user.roleAssignments?.[0]?.roleName || 'Member',
+        role: primaryRoleDisplayName,
         status: user.isActive ? 'Active' as const : 'Pending' as const,
         lastActive: user.isActive ? 'Recently' : 'Never',
         initials: initials,
-        avatar: user.avatarUrl
+        avatar: user.avatarUrl,
+        roleName: primaryRoleName // Keep track of the actual role name for mutations
       }
     })
   }, [canvasUsers])
@@ -162,30 +131,35 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
     )
   }
 
-  const isEmailValid = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return emailRegex.test(email)
+  const handleMemberAdded = () => {
+    // No need to manually refresh - React Query will handle cache invalidation
   }
 
-  const handleInviteMembers = async () => {
-    if (!inviteEmails.trim()) return
-
+  const handleRoleChange = async (memberId: string, newRoleName: string) => {
     try {
-      const emails = inviteEmails.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
-
-      for (const email of emails) {
-        await addUserMutation.mutateAsync({ userEmail: email })
-      }
-
-      setInviteEmails('')
+      await assignRoleMutation.mutateAsync({
+        userId: memberId,
+        roleAssignment: {
+          role: newRoleName,
+          domainType: 'DOMAIN_TYPE_CANVAS',
+          domainId: canvasId
+        }
+      })
     } catch (err) {
-      console.error('Failed to invite members:', err)
+      console.error('Error updating role:', err)
     }
   }
 
-  const handleRemoveMember = async (userId: string) => {
+  const handleRemoveMember = async (userId: string, roleName: string) => {
     try {
-      await removeUserMutation.mutateAsync({ userId })
+      await removeRoleMutation.mutateAsync({
+        userId,
+        roleAssignment: {
+          role: roleName,
+          domainType: 'DOMAIN_TYPE_CANVAS',
+          domainId: canvasId
+        }
+      })
     } catch (err) {
       console.error('Error removing member:', err)
     }
@@ -193,32 +167,11 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
 
   return (
     <div className="space-y-6">
-      <Heading level={2}>Members</Heading>
-
-      {/* Invite new members section */}
-      <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-        <Heading level={3} className="text-base mb-4">Invite new members</Heading>
-        <div className="flex items-start gap-4">
-          <div className="flex-1">
-            <Textarea
-              rows={2}
-              placeholder="Email addresses, separated by commas"
-              value={inviteEmails}
-              onChange={(e) => setInviteEmails(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <Button
-            color='blue'
-            onClick={handleInviteMembers}
-            disabled={!inviteEmails.trim() || addUserMutation.isPending}
-            className="flex items-center gap-2"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            {addUserMutation.isPending ? 'Inviting...' : 'Invite'}
-          </Button>
-        </div>
-      </div>
+      <AddCanvasMembersSection
+        canvasId={canvasId}
+        organizationId={organizationId}
+        onMemberAdded={handleMemberAdded}
+      />
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -244,7 +197,7 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
                       placeholder="Search members..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 w-full"
                     />
                   </InputGroup>
                 </div>
@@ -325,9 +278,31 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
                       {member.email}
                     </TableCell>
                     <TableCell>
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {member.role}
-                      </span>
+                      <Dropdown>
+                        <DropdownButton outline className="flex items-center gap-2 text-sm">
+                          {member.role}
+                          <MaterialSymbol name="keyboard_arrow_down" />
+                        </DropdownButton>
+                        <DropdownMenu>
+                          {canvasRoles.map((role) => (
+                            <DropdownItem
+                              key={role.name}
+                              onClick={() => handleRoleChange(member.id, role.name || '')}
+                              disabled={assignRoleMutation.isPending}
+                            >
+                              <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
+                              {role.description && (
+                                <DropdownDescription>{role.description}</DropdownDescription>
+                              )}
+                            </DropdownItem>
+                          ))}
+                          {loadingRoles && (
+                            <DropdownItem disabled>
+                              <DropdownLabel>Loading roles...</DropdownLabel>
+                            </DropdownItem>
+                          )}
+                        </DropdownMenu>
+                      </Dropdown>
                     </TableCell>
                     <TableCell>
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status === 'Active'
@@ -347,8 +322,8 @@ export function CanvasMembers({ canvasId }: CanvasMembersProps) {
                           </DropdownButton>
                           <DropdownMenu>
                             <DropdownItem
-                              onClick={() => handleRemoveMember(member.id)}
-                              disabled={removeUserMutation.isPending}
+                              onClick={() => handleRemoveMember(member.id, member.roleName)}
+                              disabled={removeRoleMutation.isPending}
                             >
                               <MaterialSymbol name="delete" />
                               Remove

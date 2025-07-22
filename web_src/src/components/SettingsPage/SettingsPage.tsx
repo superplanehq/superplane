@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { Sidebar, SidebarBody, SidebarItem, SidebarLabel } from '../Sidebar/sidebar'
 import { CanvasMembers, CanvasSecrets, CanvasIntegrations, CanvasDelete } from './components'
 import { useParams } from 'react-router-dom'
@@ -11,38 +10,30 @@ interface SettingsPageProps {
 interface Tab {
   id: string
   label: string
-  icon: React.ReactNode
 }
 
 type TabType = 'members' | 'secrets' | 'integrations' | 'delete';
 
 export function SettingsPage({ organizationId }: SettingsPageProps) {
-  // Get canvas ID from URL params
   const { canvasId } = useParams<{ canvasId: string }>()
-  // Mock canvas name - in real app this would come from canvas data
-  const canvasName = 'Sample Canvas'
   const [activeTab, setActiveTab] = useState<TabType>('members')
 
   const tabs: Tab[] = [
     {
       id: 'members',
       label: 'Members',
-      icon: <MaterialSymbol name="person" size="sm" />,
     },
     {
       id: 'secrets',
       label: 'Secrets',
-      icon: <MaterialSymbol name="key" size="sm" />,
     },
     {
       id: 'integrations',
       label: 'Integrations',
-      icon: <MaterialSymbol name="integration_instructions" size="sm" />,
     },
     {
       id: 'delete',
       label: 'Delete',
-      icon: <MaterialSymbol name="delete" size="sm" />,
     },
   ]
 
@@ -61,8 +52,7 @@ export function SettingsPage({ organizationId }: SettingsPageProps) {
                   onClick={() => setActiveTab(tab.id as TabType)}
                   className={`${activeTab === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
                 >
-                  <div className={`flex items-center gap-3 px-3 py-2 ${activeTab === tab.id ? 'font-semibold' : 'font-normal'}`}>
-                    {tab.icon}
+                  <div className={`flex items-center gap-3 px-3 ${activeTab === tab.id ? 'font-semibold' : 'font-normal'}`}>
                     <SidebarLabel>{tab.label}</SidebarLabel>
                   </div>
                 </SidebarItem>
@@ -89,7 +79,6 @@ export function SettingsPage({ organizationId }: SettingsPageProps) {
               {activeTab === 'delete' && (
                 <CanvasDelete
                   canvasId={canvasId!}
-                  canvasName={canvasName}
                   organizationId={organizationId}
                 />
               )}

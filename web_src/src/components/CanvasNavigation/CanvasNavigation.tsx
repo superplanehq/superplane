@@ -33,7 +33,7 @@ export function CanvasNavigation({
   const navigationTabs: Tab[] = [
     {
       id: 'editor',
-      label: 'Editor',
+      label: 'Workflow',
     },
     {
       id: 'settings',
