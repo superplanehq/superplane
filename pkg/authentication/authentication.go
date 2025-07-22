@@ -19,6 +19,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+const (
+	ProviderGitHub = "github"
+	ScopeUser      = "user"
+)
+
 type Handler struct {
 	jwtSigner *jwt.Signer
 	encryptor crypto.Encryptor
@@ -77,8 +82,8 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		}
 
 		switch providerName {
-		case "github":
-			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, "user"))
+		case ProviderGitHub:
+			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, ScopeUser))
 			log.Infof("GitHub OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
@@ -134,7 +139,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountProvider, err := models.FindAccountProviderByProviderID("github", fmt.Sprintf("%d", githubUser.ID))
+	accountProvider, err := models.FindAccountProviderByProviderID(ProviderGitHub, fmt.Sprintf("%d", githubUser.ID))
 	if err != nil {
 		// If not found by provider ID, try to find by email
 		user, err := models.FindUserByEmail(githubUser.Email)
@@ -149,7 +154,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 
 			accountProvider = &models.AccountProvider{
 				UserID:     user.ID,
-				Provider:   "github",
+				Provider:   ProviderGitHub,
 				ProviderID: fmt.Sprintf("%d", githubUser.ID),
 				Username:   githubUser.Login,
 				Email:      githubUser.Email,
@@ -163,7 +168,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
-			accountProvider, err = user.GetAccountProvider("github")
+			accountProvider, err = user.GetAccountProvider(ProviderGitHub)
 			if err != nil {
 				log.Errorf("User %s exists but has no GitHub account provider", githubUser.Email)
 				http.Error(w, "Account exists but GitHub provider not connected. Please connect GitHub through the web interface.", http.StatusNotFound)
@@ -215,12 +220,8 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 	accountProviders, _ := dbUser.GetAccountProviders()
 
 	// Extract primary email and avatar from account providers
-	primaryEmail := ""
-	primaryAvatar := ""
-	if len(accountProviders) > 0 {
-		primaryEmail = accountProviders[0].Email
-		primaryAvatar = accountProviders[0].AvatarURL
-	}
+	primaryEmail := getPrimaryEmail(accountProviders)
+	primaryAvatar := getPrimaryAvatar(accountProviders)
 
 	authUser := User{
 		ID:               dbUser.ID.String(),
@@ -315,12 +316,8 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		accountProviders, _ := dbUser.GetAccountProviders()
 
 		// Extract primary email and avatar from account providers
-		primaryEmail := ""
-		primaryAvatar := ""
-		if len(accountProviders) > 0 {
-			primaryEmail = accountProviders[0].Email
-			primaryAvatar = accountProviders[0].AvatarURL
-		}
+		primaryEmail := getPrimaryEmail(accountProviders)
+		primaryAvatar := getPrimaryAvatar(accountProviders)
 
 		authUser := User{
 			ID:               dbUser.ID.String(),
@@ -405,12 +402,8 @@ func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract primary email and avatar from account providers
-	primaryEmail := ""
-	primaryAvatar := ""
-	if len(accountProviders) > 0 {
-		primaryEmail = accountProviders[0].Email
-		primaryAvatar = accountProviders[0].AvatarURL
-	}
+	primaryEmail := getPrimaryEmail(accountProviders)
+	primaryAvatar := getPrimaryAvatar(accountProviders)
 
 	authUser := User{
 		ID:               user.ID.String(),
@@ -564,6 +557,20 @@ func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	}
 
 	return user, nil
+}
+
+func getPrimaryEmail(accountProviders []models.AccountProvider) string {
+	if len(accountProviders) > 0 {
+		return accountProviders[0].Email
+	}
+	return ""
+}
+
+func getPrimaryAvatar(accountProviders []models.AccountProvider) string {
+	if len(accountProviders) > 0 {
+		return accountProviders[0].AvatarURL
+	}
+	return ""
 }
 
 func (a *Handler) Middleware(next http.Handler) http.Handler {
