@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 	"google.golang.org/grpc/codes"
@@ -120,7 +121,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
-				Integration: &protos.IntegrationRef{
+				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
 				Semaphore: &protos.EventSource_Spec_Semaphore{
@@ -154,7 +155,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.EventSource_Spec{
-				Integration: &protos.IntegrationRef{
+				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
 				Semaphore: &protos.EventSource_Spec_Semaphore{
@@ -201,7 +202,7 @@ func Test__CreateEventSource(t *testing.T) {
 				Name: externalName,
 			},
 			Spec: &protos.EventSource_Spec{
-				Integration: &protos.IntegrationRef{
+				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
 				Semaphore: &protos.EventSource_Spec_Semaphore{

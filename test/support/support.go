@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
 	"gorm.io/datatypes"
@@ -83,7 +84,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			Name:       RandomName("integration"),
 			CreatedBy:  r.User,
 			Type:       models.IntegrationTypeSemaphore,
-			DomainType: "canvas",
+			DomainType: models.DomainTypeCanvas,
 			DomainID:   r.Canvas.ID,
 			URL:        r.SemaphoreAPIMock.Server.URL,
 			AuthType:   models.IntegrationAuthTypeToken,
@@ -244,7 +245,7 @@ func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.R
 func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	return &pb.ExecutorSpec{
 		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
-		Integration: &pb.IntegrationRef{
+		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},
@@ -260,7 +261,7 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
-	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }

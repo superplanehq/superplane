@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -22,7 +23,7 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgAdmin, orgID, authorization.DomainOrg)
+	err = authService.AssignRole(r.User.String(), authorization.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful role removal", func(t *testing.T) {

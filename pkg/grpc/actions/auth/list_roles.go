@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,9 +19,9 @@ func ListRoles(ctx context.Context, req *pb.ListRolesRequest, authService author
 		return nil, status.Error(codes.InvalidArgument, "domain ID must be specified")
 	}
 
-	domainType := convertDomainType(req.DomainType)
-	if domainType == "" {
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
 	}
 
 	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, req.DomainId)

@@ -20,7 +20,7 @@ func ListGroups(ctx context.Context, req *GroupRequest, authService authorizatio
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, err
 	}

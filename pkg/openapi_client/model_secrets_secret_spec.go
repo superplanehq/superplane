@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -15,38 +15,38 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneSecretSpec type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneSecretSpec{}
+// checks if the SecretsSecretSpec type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SecretsSecretSpec{}
 
-// SuperplaneSecretSpec struct for SuperplaneSecretSpec
-type SuperplaneSecretSpec struct {
+// SecretsSecretSpec struct for SecretsSecretSpec
+type SecretsSecretSpec struct {
 	Provider *SecretProvider `json:"provider,omitempty"`
 	Local *SecretLocal `json:"local,omitempty"`
 }
 
-// NewSuperplaneSecretSpec instantiates a new SuperplaneSecretSpec object
+// NewSecretsSecretSpec instantiates a new SecretsSecretSpec object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneSecretSpec() *SuperplaneSecretSpec {
-	this := SuperplaneSecretSpec{}
+func NewSecretsSecretSpec() *SecretsSecretSpec {
+	this := SecretsSecretSpec{}
 	var provider SecretProvider = SECRETPROVIDER_PROVIDER_UNKNOWN
 	this.Provider = &provider
 	return &this
 }
 
-// NewSuperplaneSecretSpecWithDefaults instantiates a new SuperplaneSecretSpec object
+// NewSecretsSecretSpecWithDefaults instantiates a new SecretsSecretSpec object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneSecretSpecWithDefaults() *SuperplaneSecretSpec {
-	this := SuperplaneSecretSpec{}
+func NewSecretsSecretSpecWithDefaults() *SecretsSecretSpec {
+	this := SecretsSecretSpec{}
 	var provider SecretProvider = SECRETPROVIDER_PROVIDER_UNKNOWN
 	this.Provider = &provider
 	return &this
 }
 
 // GetProvider returns the Provider field value if set, zero value otherwise.
-func (o *SuperplaneSecretSpec) GetProvider() SecretProvider {
+func (o *SecretsSecretSpec) GetProvider() SecretProvider {
 	if o == nil || IsNil(o.Provider) {
 		var ret SecretProvider
 		return ret
@@ -56,7 +56,7 @@ func (o *SuperplaneSecretSpec) GetProvider() SecretProvider {
 
 // GetProviderOk returns a tuple with the Provider field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecretSpec) GetProviderOk() (*SecretProvider, bool) {
+func (o *SecretsSecretSpec) GetProviderOk() (*SecretProvider, bool) {
 	if o == nil || IsNil(o.Provider) {
 		return nil, false
 	}
@@ -64,7 +64,7 @@ func (o *SuperplaneSecretSpec) GetProviderOk() (*SecretProvider, bool) {
 }
 
 // HasProvider returns a boolean if a field has been set.
-func (o *SuperplaneSecretSpec) HasProvider() bool {
+func (o *SecretsSecretSpec) HasProvider() bool {
 	if o != nil && !IsNil(o.Provider) {
 		return true
 	}
@@ -73,12 +73,12 @@ func (o *SuperplaneSecretSpec) HasProvider() bool {
 }
 
 // SetProvider gets a reference to the given SecretProvider and assigns it to the Provider field.
-func (o *SuperplaneSecretSpec) SetProvider(v SecretProvider) {
+func (o *SecretsSecretSpec) SetProvider(v SecretProvider) {
 	o.Provider = &v
 }
 
 // GetLocal returns the Local field value if set, zero value otherwise.
-func (o *SuperplaneSecretSpec) GetLocal() SecretLocal {
+func (o *SecretsSecretSpec) GetLocal() SecretLocal {
 	if o == nil || IsNil(o.Local) {
 		var ret SecretLocal
 		return ret
@@ -88,7 +88,7 @@ func (o *SuperplaneSecretSpec) GetLocal() SecretLocal {
 
 // GetLocalOk returns a tuple with the Local field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecretSpec) GetLocalOk() (*SecretLocal, bool) {
+func (o *SecretsSecretSpec) GetLocalOk() (*SecretLocal, bool) {
 	if o == nil || IsNil(o.Local) {
 		return nil, false
 	}
@@ -96,7 +96,7 @@ func (o *SuperplaneSecretSpec) GetLocalOk() (*SecretLocal, bool) {
 }
 
 // HasLocal returns a boolean if a field has been set.
-func (o *SuperplaneSecretSpec) HasLocal() bool {
+func (o *SecretsSecretSpec) HasLocal() bool {
 	if o != nil && !IsNil(o.Local) {
 		return true
 	}
@@ -105,11 +105,11 @@ func (o *SuperplaneSecretSpec) HasLocal() bool {
 }
 
 // SetLocal gets a reference to the given SecretLocal and assigns it to the Local field.
-func (o *SuperplaneSecretSpec) SetLocal(v SecretLocal) {
+func (o *SecretsSecretSpec) SetLocal(v SecretLocal) {
 	o.Local = &v
 }
 
-func (o SuperplaneSecretSpec) MarshalJSON() ([]byte, error) {
+func (o SecretsSecretSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -117,7 +117,7 @@ func (o SuperplaneSecretSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneSecretSpec) ToMap() (map[string]interface{}, error) {
+func (o SecretsSecretSpec) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Provider) {
 		toSerialize["provider"] = o.Provider
@@ -128,38 +128,38 @@ func (o SuperplaneSecretSpec) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneSecretSpec struct {
-	value *SuperplaneSecretSpec
+type NullableSecretsSecretSpec struct {
+	value *SecretsSecretSpec
 	isSet bool
 }
 
-func (v NullableSuperplaneSecretSpec) Get() *SuperplaneSecretSpec {
+func (v NullableSecretsSecretSpec) Get() *SecretsSecretSpec {
 	return v.value
 }
 
-func (v *NullableSuperplaneSecretSpec) Set(val *SuperplaneSecretSpec) {
+func (v *NullableSecretsSecretSpec) Set(val *SecretsSecretSpec) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneSecretSpec) IsSet() bool {
+func (v NullableSecretsSecretSpec) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneSecretSpec) Unset() {
+func (v *NullableSecretsSecretSpec) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneSecretSpec(val *SuperplaneSecretSpec) *NullableSuperplaneSecretSpec {
-	return &NullableSuperplaneSecretSpec{value: val, isSet: true}
+func NewNullableSecretsSecretSpec(val *SecretsSecretSpec) *NullableSecretsSecretSpec {
+	return &NullableSecretsSecretSpec{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneSecretSpec) MarshalJSON() ([]byte, error) {
+func (v NullableSecretsSecretSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneSecretSpec) UnmarshalJSON(src []byte) error {
+func (v *NullableSecretsSecretSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

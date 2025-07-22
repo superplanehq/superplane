@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
 
@@ -43,10 +44,10 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created by verifying we can get its definition
-		roleDef, err := authService.GetRoleDefinition("custom-role", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role", roleDef.Name)
-		assert.Equal(t, authorization.DomainOrg, roleDef.DomainType)
+		assert.Equal(t, models.DomainTypeOrganization, roleDef.DomainType)
 		assert.Len(t, roleDef.Permissions, 2)
 	})
 
@@ -70,7 +71,7 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", authorization.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role-with-inheritance", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)

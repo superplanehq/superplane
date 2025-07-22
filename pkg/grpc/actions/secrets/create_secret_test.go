@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	"github.com/superplanehq/superplane/pkg/models"
+	protos "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,50 +22,22 @@ func Test__CreateSecret(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.CreateSecretRequest{
-			CanvasIdOrName: uuid.New().String(),
-			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
-					},
-				},
-			},
-		}
-
-		_, err := CreateSecret(ctx, encryptor, req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("unauthenticated user", func(t *testing.T) {
-		req := &protos.CreateSecretRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
 		}
 
-		_, err := CreateSecret(context.Background(), encryptor, req)
+		_, err := CreateSecret(context.Background(), encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -72,24 +45,21 @@ func Test__CreateSecret(t *testing.T) {
 	})
 
 	t.Run("name still not used -> secret is created", func(t *testing.T) {
-		req := &protos.CreateSecretRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
 		}
 
-		response, err := CreateSecret(ctx, encryptor, req)
+		response, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Secret)
@@ -102,24 +72,21 @@ func Test__CreateSecret(t *testing.T) {
 
 	t.Run("name already used", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateSecretRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Secret: &protos.Secret{
-				Metadata: &protos.Secret_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Secret_Spec{
-					Provider: protos.Secret_PROVIDER_LOCAL,
-					Local: &protos.Secret_Local{
-						Data: map[string]string{
-							"test": "test",
-						},
+		secret := &protos.Secret{
+			Metadata: &protos.Secret_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Secret_Spec{
+				Provider: protos.Secret_PROVIDER_LOCAL,
+				Local: &protos.Secret_Local{
+					Data: map[string]string{
+						"test": "test",
 					},
 				},
 			},
 		}
 
-		_, err := CreateSecret(ctx, encryptor, req)
+		_, err := CreateSecret(ctx, encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), secret)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

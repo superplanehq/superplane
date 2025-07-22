@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -142,21 +144,36 @@ var listSecretsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		domainType, _ := cmd.Flags().GetString("domain-type")
+		domainID, _ := cmd.Flags().GetString("domain-id")
+		if domainID == "" {
+			fmt.Println("Domain ID not provided")
+			os.Exit(1)
+		}
 
 		c := DefaultClient()
-		response, _, err := c.SecretAPI.SuperplaneListSecrets(context.Background(), canvasIDOrName).Execute()
-		Check(err)
+		response, httpResponse, err := c.SecretAPI.
+			SecretsListSecrets(context.Background()).
+			DomainId(domainID).
+			DomainType(domainType).
+			Execute()
+
+		if err != nil {
+			b, _ := io.ReadAll(httpResponse.Body)
+			fmt.Printf("%s\n", string(b))
+			os.Exit(1)
+		}
 
 		if len(response.Secrets) == 0 {
-			fmt.Println("No secrets found for this canvas.")
+			fmt.Println("No secrets found.")
 			return
 		}
 
 		fmt.Printf("Found %d secrets:\n\n", len(response.Secrets))
 		for i, secret := range response.Secrets {
 			fmt.Printf("%d. %s (ID: %s)\n", i+1, *secret.GetMetadata().Name, *secret.GetMetadata().Id)
-			fmt.Printf("   Canvas: %s\n", *secret.GetMetadata().CanvasId)
+			fmt.Printf("   Domain Type: %s\n", *secret.GetMetadata().DomainType)
+			fmt.Printf("   Domain ID: %s\n", *secret.GetMetadata().DomainId)
 			fmt.Printf("   Provider: %s\n", string(*secret.GetSpec().Provider))
 			fmt.Printf("   Created at: %s\n", *secret.GetMetadata().CreatedAt)
 
@@ -335,8 +352,8 @@ func init() {
 
 	// Secrets command
 	listCmd.AddCommand(listSecretsCmd)
-	listSecretsCmd.Flags().String("canvas-id", "", "Canvas ID")
-	listSecretsCmd.Flags().String("canvas-name", "", "Canvas name")
+	listSecretsCmd.Flags().String("domain-type", "DOMAIN_TYPE_ORGANIZATION", "Domain to list secrets from (organization, canvas)")
+	listSecretsCmd.Flags().String("domain-id", "", "ID of the domain (organization ID, canvas ID)")
 
 	// Stage events command
 	listCmd.AddCommand(listStageEventsCmd)

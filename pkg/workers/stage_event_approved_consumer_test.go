@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/protos/superplane"
+	superplane "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 

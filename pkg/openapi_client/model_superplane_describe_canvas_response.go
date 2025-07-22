@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com

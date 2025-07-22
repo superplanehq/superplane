@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/models"
 
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -24,36 +24,21 @@ func Test__CreateIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CreateIntegration(context.Background(), r.Encryptor, &protos.CreateIntegrationRequest{})
+		_, err := CreateIntegration(context.Background(), r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), &protos.Integration{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
 		assert.Equal(t, "user not authenticated", s.Message())
 	})
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: uuid.New().String(),
-		}
-
-		_, err := CreateIntegration(ctx, r.Encryptor, req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("missing name", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "",
-				},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "",
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -61,17 +46,14 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("invalid integration type", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Integration_Spec{},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
 			},
+			Spec: &protos.Integration_Spec{},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -79,22 +61,19 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("invalid secret", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Integration_Spec{
-					Type: protos.Integration_TYPE_SEMAPHORE,
-					Auth: &protos.Integration_Auth{
-						Use: protos.Integration_AUTH_TYPE_TOKEN,
-						Token: &protos.Integration_Auth_Token{
-							ValueFrom: &protos.ValueFrom{
-								Secret: &protos.ValueFromSecret{
-									Name: "does-not-exist",
-									Key:  "nope",
-								},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Integration_Spec{
+				Type: protos.Integration_TYPE_SEMAPHORE,
+				Auth: &protos.Integration_Auth{
+					Use: protos.Integration_AUTH_TYPE_TOKEN,
+					Token: &protos.Integration_Auth_Token{
+						ValueFrom: &protos.ValueFrom{
+							Secret: &protos.ValueFromSecret{
+								Name: "does-not-exist",
+								Key:  "nope",
 							},
 						},
 					},
@@ -102,7 +81,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -110,22 +89,19 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("invalid secret key", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Integration_Spec{
-					Type: protos.Integration_TYPE_SEMAPHORE,
-					Auth: &protos.Integration_Auth{
-						Use: protos.Integration_AUTH_TYPE_TOKEN,
-						Token: &protos.Integration_Auth_Token{
-							ValueFrom: &protos.ValueFrom{
-								Secret: &protos.ValueFromSecret{
-									Name: secret.Name,
-									Key:  "nope",
-								},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Integration_Spec{
+				Type: protos.Integration_TYPE_SEMAPHORE,
+				Auth: &protos.Integration_Auth{
+					Use: protos.Integration_AUTH_TYPE_TOKEN,
+					Token: &protos.Integration_Auth_Token{
+						ValueFrom: &protos.ValueFrom{
+							Secret: &protos.ValueFromSecret{
+								Name: secret.Name,
+								Key:  "nope",
 							},
 						},
 					},
@@ -133,7 +109,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err = CreateIntegration(ctx, r.Encryptor, req)
+		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -141,22 +117,19 @@ func Test__CreateIntegration(t *testing.T) {
 	})
 
 	t.Run("integration is created", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Integration_Spec{
-					Type: protos.Integration_TYPE_SEMAPHORE,
-					Auth: &protos.Integration_Auth{
-						Use: protos.Integration_AUTH_TYPE_TOKEN,
-						Token: &protos.Integration_Auth_Token{
-							ValueFrom: &protos.ValueFrom{
-								Secret: &protos.ValueFromSecret{
-									Name: secret.Name,
-									Key:  "key",
-								},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Integration_Spec{
+				Type: protos.Integration_TYPE_SEMAPHORE,
+				Auth: &protos.Integration_Auth{
+					Use: protos.Integration_AUTH_TYPE_TOKEN,
+					Token: &protos.Integration_Auth_Token{
+						ValueFrom: &protos.ValueFrom{
+							Secret: &protos.ValueFromSecret{
+								Name: secret.Name,
+								Key:  "key",
 							},
 						},
 					},
@@ -164,28 +137,25 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		integration, err := CreateIntegration(ctx, r.Encryptor, req)
+		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		require.NoError(t, err)
-		assert.Equal(t, "test", integration.Integration.Metadata.Name)
+		assert.Equal(t, "test", response.Integration.Metadata.Name)
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {
-		req := &protos.CreateIntegrationRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Integration: &protos.Integration{
-				Metadata: &protos.Integration_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.Integration_Spec{
-					Type: protos.Integration_TYPE_SEMAPHORE,
-					Auth: &protos.Integration_Auth{
-						Use: protos.Integration_AUTH_TYPE_TOKEN,
-						Token: &protos.Integration_Auth_Token{
-							ValueFrom: &protos.ValueFrom{
-								Secret: &protos.ValueFromSecret{
-									Name: secret.Name,
-									Key:  "key",
-								},
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Integration_Spec{
+				Type: protos.Integration_TYPE_SEMAPHORE,
+				Auth: &protos.Integration_Auth{
+					Use: protos.Integration_AUTH_TYPE_TOKEN,
+					Token: &protos.Integration_Auth_Token{
+						ValueFrom: &protos.ValueFrom{
+							Secret: &protos.ValueFromSecret{
+								Name: secret.Name,
+								Key:  "key",
 							},
 						},
 					},
@@ -193,7 +163,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, req)
+		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

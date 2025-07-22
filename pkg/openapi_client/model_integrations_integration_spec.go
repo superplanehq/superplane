@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -15,42 +15,42 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneIntegrationSpec type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneIntegrationSpec{}
+// checks if the IntegrationsIntegrationSpec type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &IntegrationsIntegrationSpec{}
 
-// SuperplaneIntegrationSpec struct for SuperplaneIntegrationSpec
-type SuperplaneIntegrationSpec struct {
-	Type *SuperplaneIntegrationType `json:"type,omitempty"`
+// IntegrationsIntegrationSpec struct for IntegrationsIntegrationSpec
+type IntegrationsIntegrationSpec struct {
+	Type *IntegrationsIntegrationType `json:"type,omitempty"`
 	Url *string `json:"url,omitempty"`
 	Auth *IntegrationAuth `json:"auth,omitempty"`
 	Oidc *IntegrationOIDC `json:"oidc,omitempty"`
 }
 
-// NewSuperplaneIntegrationSpec instantiates a new SuperplaneIntegrationSpec object
+// NewIntegrationsIntegrationSpec instantiates a new IntegrationsIntegrationSpec object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneIntegrationSpec() *SuperplaneIntegrationSpec {
-	this := SuperplaneIntegrationSpec{}
-	var type_ SuperplaneIntegrationType = SUPERPLANEINTEGRATIONTYPE_TYPE_NONE
+func NewIntegrationsIntegrationSpec() *IntegrationsIntegrationSpec {
+	this := IntegrationsIntegrationSpec{}
+	var type_ IntegrationsIntegrationType = INTEGRATIONSINTEGRATIONTYPE_TYPE_NONE
 	this.Type = &type_
 	return &this
 }
 
-// NewSuperplaneIntegrationSpecWithDefaults instantiates a new SuperplaneIntegrationSpec object
+// NewIntegrationsIntegrationSpecWithDefaults instantiates a new IntegrationsIntegrationSpec object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneIntegrationSpecWithDefaults() *SuperplaneIntegrationSpec {
-	this := SuperplaneIntegrationSpec{}
-	var type_ SuperplaneIntegrationType = SUPERPLANEINTEGRATIONTYPE_TYPE_NONE
+func NewIntegrationsIntegrationSpecWithDefaults() *IntegrationsIntegrationSpec {
+	this := IntegrationsIntegrationSpec{}
+	var type_ IntegrationsIntegrationType = INTEGRATIONSINTEGRATIONTYPE_TYPE_NONE
 	this.Type = &type_
 	return &this
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationSpec) GetType() SuperplaneIntegrationType {
+func (o *IntegrationsIntegrationSpec) GetType() IntegrationsIntegrationType {
 	if o == nil || IsNil(o.Type) {
-		var ret SuperplaneIntegrationType
+		var ret IntegrationsIntegrationType
 		return ret
 	}
 	return *o.Type
@@ -58,7 +58,7 @@ func (o *SuperplaneIntegrationSpec) GetType() SuperplaneIntegrationType {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationSpec) GetTypeOk() (*SuperplaneIntegrationType, bool) {
+func (o *IntegrationsIntegrationSpec) GetTypeOk() (*IntegrationsIntegrationType, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *SuperplaneIntegrationSpec) GetTypeOk() (*SuperplaneIntegrationType, boo
 }
 
 // HasType returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationSpec) HasType() bool {
+func (o *IntegrationsIntegrationSpec) HasType() bool {
 	if o != nil && !IsNil(o.Type) {
 		return true
 	}
@@ -74,13 +74,13 @@ func (o *SuperplaneIntegrationSpec) HasType() bool {
 	return false
 }
 
-// SetType gets a reference to the given SuperplaneIntegrationType and assigns it to the Type field.
-func (o *SuperplaneIntegrationSpec) SetType(v SuperplaneIntegrationType) {
+// SetType gets a reference to the given IntegrationsIntegrationType and assigns it to the Type field.
+func (o *IntegrationsIntegrationSpec) SetType(v IntegrationsIntegrationType) {
 	o.Type = &v
 }
 
 // GetUrl returns the Url field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationSpec) GetUrl() string {
+func (o *IntegrationsIntegrationSpec) GetUrl() string {
 	if o == nil || IsNil(o.Url) {
 		var ret string
 		return ret
@@ -90,7 +90,7 @@ func (o *SuperplaneIntegrationSpec) GetUrl() string {
 
 // GetUrlOk returns a tuple with the Url field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationSpec) GetUrlOk() (*string, bool) {
+func (o *IntegrationsIntegrationSpec) GetUrlOk() (*string, bool) {
 	if o == nil || IsNil(o.Url) {
 		return nil, false
 	}
@@ -98,7 +98,7 @@ func (o *SuperplaneIntegrationSpec) GetUrlOk() (*string, bool) {
 }
 
 // HasUrl returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationSpec) HasUrl() bool {
+func (o *IntegrationsIntegrationSpec) HasUrl() bool {
 	if o != nil && !IsNil(o.Url) {
 		return true
 	}
@@ -107,12 +107,12 @@ func (o *SuperplaneIntegrationSpec) HasUrl() bool {
 }
 
 // SetUrl gets a reference to the given string and assigns it to the Url field.
-func (o *SuperplaneIntegrationSpec) SetUrl(v string) {
+func (o *IntegrationsIntegrationSpec) SetUrl(v string) {
 	o.Url = &v
 }
 
 // GetAuth returns the Auth field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationSpec) GetAuth() IntegrationAuth {
+func (o *IntegrationsIntegrationSpec) GetAuth() IntegrationAuth {
 	if o == nil || IsNil(o.Auth) {
 		var ret IntegrationAuth
 		return ret
@@ -122,7 +122,7 @@ func (o *SuperplaneIntegrationSpec) GetAuth() IntegrationAuth {
 
 // GetAuthOk returns a tuple with the Auth field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationSpec) GetAuthOk() (*IntegrationAuth, bool) {
+func (o *IntegrationsIntegrationSpec) GetAuthOk() (*IntegrationAuth, bool) {
 	if o == nil || IsNil(o.Auth) {
 		return nil, false
 	}
@@ -130,7 +130,7 @@ func (o *SuperplaneIntegrationSpec) GetAuthOk() (*IntegrationAuth, bool) {
 }
 
 // HasAuth returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationSpec) HasAuth() bool {
+func (o *IntegrationsIntegrationSpec) HasAuth() bool {
 	if o != nil && !IsNil(o.Auth) {
 		return true
 	}
@@ -139,12 +139,12 @@ func (o *SuperplaneIntegrationSpec) HasAuth() bool {
 }
 
 // SetAuth gets a reference to the given IntegrationAuth and assigns it to the Auth field.
-func (o *SuperplaneIntegrationSpec) SetAuth(v IntegrationAuth) {
+func (o *IntegrationsIntegrationSpec) SetAuth(v IntegrationAuth) {
 	o.Auth = &v
 }
 
 // GetOidc returns the Oidc field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationSpec) GetOidc() IntegrationOIDC {
+func (o *IntegrationsIntegrationSpec) GetOidc() IntegrationOIDC {
 	if o == nil || IsNil(o.Oidc) {
 		var ret IntegrationOIDC
 		return ret
@@ -154,7 +154,7 @@ func (o *SuperplaneIntegrationSpec) GetOidc() IntegrationOIDC {
 
 // GetOidcOk returns a tuple with the Oidc field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationSpec) GetOidcOk() (*IntegrationOIDC, bool) {
+func (o *IntegrationsIntegrationSpec) GetOidcOk() (*IntegrationOIDC, bool) {
 	if o == nil || IsNil(o.Oidc) {
 		return nil, false
 	}
@@ -162,7 +162,7 @@ func (o *SuperplaneIntegrationSpec) GetOidcOk() (*IntegrationOIDC, bool) {
 }
 
 // HasOidc returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationSpec) HasOidc() bool {
+func (o *IntegrationsIntegrationSpec) HasOidc() bool {
 	if o != nil && !IsNil(o.Oidc) {
 		return true
 	}
@@ -171,11 +171,11 @@ func (o *SuperplaneIntegrationSpec) HasOidc() bool {
 }
 
 // SetOidc gets a reference to the given IntegrationOIDC and assigns it to the Oidc field.
-func (o *SuperplaneIntegrationSpec) SetOidc(v IntegrationOIDC) {
+func (o *IntegrationsIntegrationSpec) SetOidc(v IntegrationOIDC) {
 	o.Oidc = &v
 }
 
-func (o SuperplaneIntegrationSpec) MarshalJSON() ([]byte, error) {
+func (o IntegrationsIntegrationSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -183,7 +183,7 @@ func (o SuperplaneIntegrationSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneIntegrationSpec) ToMap() (map[string]interface{}, error) {
+func (o IntegrationsIntegrationSpec) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Type) {
 		toSerialize["type"] = o.Type
@@ -200,38 +200,38 @@ func (o SuperplaneIntegrationSpec) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneIntegrationSpec struct {
-	value *SuperplaneIntegrationSpec
+type NullableIntegrationsIntegrationSpec struct {
+	value *IntegrationsIntegrationSpec
 	isSet bool
 }
 
-func (v NullableSuperplaneIntegrationSpec) Get() *SuperplaneIntegrationSpec {
+func (v NullableIntegrationsIntegrationSpec) Get() *IntegrationsIntegrationSpec {
 	return v.value
 }
 
-func (v *NullableSuperplaneIntegrationSpec) Set(val *SuperplaneIntegrationSpec) {
+func (v *NullableIntegrationsIntegrationSpec) Set(val *IntegrationsIntegrationSpec) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneIntegrationSpec) IsSet() bool {
+func (v NullableIntegrationsIntegrationSpec) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneIntegrationSpec) Unset() {
+func (v *NullableIntegrationsIntegrationSpec) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneIntegrationSpec(val *SuperplaneIntegrationSpec) *NullableSuperplaneIntegrationSpec {
-	return &NullableSuperplaneIntegrationSpec{value: val, isSet: true}
+func NewNullableIntegrationsIntegrationSpec(val *IntegrationsIntegrationSpec) *NullableIntegrationsIntegrationSpec {
+	return &NullableIntegrationsIntegrationSpec{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneIntegrationSpec) MarshalJSON() ([]byte, error) {
+func (v NullableIntegrationsIntegrationSpec) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneIntegrationSpec) UnmarshalJSON(src []byte) error {
+func (v *NullableIntegrationsIntegrationSpec) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

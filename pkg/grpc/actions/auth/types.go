@@ -2,7 +2,6 @@ package auth
 
 import (
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"google.golang.org/grpc/codes"
@@ -97,17 +96,6 @@ func ConvertCanvasIdOrNameToId(canvasIdOrName string) (string, error) {
 		return canvas.ID.String(), nil
 	}
 	return canvasIdOrName, nil
-}
-
-func ConvertDomainType(domainType pb.DomainType) (string, error) {
-	switch domainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return authorization.DomainOrg, nil
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		return authorization.DomainCanvas, nil
-	default:
-		return "", status.Error(codes.InvalidArgument, "unsupported domain type")
-	}
 }
 
 // Organization group adapters
