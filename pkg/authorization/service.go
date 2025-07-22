@@ -90,8 +90,8 @@ func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, actio
 }
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedUserID := prefixUserID(userID)
 	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
@@ -100,15 +100,15 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 		return err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
 
 	// Check if role exists in this domain using the enforcer
 	if !a.roleExistsInDomain(role, domain) {
 		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
 	}
 
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	prefixedGroupName := prefixGroupName(groupName)
 
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
 	if err != nil {
@@ -125,8 +125,8 @@ func (a *AuthService) CreateGroup(domainID string, domainType string, groupName 
 
 // DeleteGroup removes a group from the authorization system
 func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(groupName)
 
 	// Remove group-to-role assignment (the group itself)
 	_, err := a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
@@ -149,14 +149,14 @@ func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupN
 		return err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	domain := prefixDomain(domainType, domainID)
 
 	// Check if role exists in this domain using the enforcer
 	if !a.roleExistsInDomain(newRole, domain) {
 		return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
 	}
 
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	prefixedGroupName := prefixGroupName(groupName)
 
 	// Get current role
 	currentRole, err := a.GetGroupRole(domainID, domainType, groupName)
@@ -165,7 +165,7 @@ func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupN
 	}
 
 	// Remove old role assignment
-	prefixedOldRole := fmt.Sprintf("role:%s", currentRole)
+	prefixedOldRole := prefixRoleName(currentRole)
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove old group role: %w", err)
@@ -175,7 +175,7 @@ func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupN
 	}
 
 	// Add new role assignment
-	prefixedNewRole := fmt.Sprintf("role:%s", newRole)
+	prefixedNewRole := prefixRoleName(newRole)
 	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to add new group role: %w", err)
@@ -189,9 +189,9 @@ func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupN
 }
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
+	prefixedUserID := prefixUserID(userID)
 
 	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
@@ -223,9 +223,9 @@ func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID 
 }
 
 func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
+	prefixedUserID := prefixUserID(userID)
 
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
@@ -240,8 +240,8 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 }
 
 func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
 	if err != nil {
@@ -258,7 +258,7 @@ func (a *AuthService) GetGroupUsers(domainID string, domainType string, group st
 }
 
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	domain := prefixDomain(domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups: %w", err)
@@ -282,8 +282,8 @@ func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, e
 }
 
 func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
 	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
 	unprefixedRoles := []string{}
 	for _, role := range roles {
@@ -298,8 +298,8 @@ func (a *AuthService) GetGroupRole(domainID string, domainType string, group str
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
 
 	// Check if it's a default role
 	validRoles := map[string][]string{
@@ -320,7 +320,7 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 		}
 	}
 
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 
 	existingRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
 	if err != nil {
@@ -349,9 +349,9 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 }
 
 func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
+	prefixedUserID := prefixUserID(userID)
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
@@ -363,7 +363,7 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 }
 
 func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedRole := prefixRoleName(role)
 	orgDomain := fmt.Sprintf("org:%s", orgID)
 	users, err := a.enforcer.GetUsersForRole(prefixedRole, orgDomain)
 	if err != nil {
@@ -380,7 +380,7 @@ func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, e
 }
 
 func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]string, error) {
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedRole := prefixRoleName(role)
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
 	users, err := a.enforcer.GetUsersForRole(prefixedRole, canvasDomain)
 	if err != nil {
@@ -441,7 +441,7 @@ func (a *AuthService) DestroyOrganizationRoles(orgID string) error {
 }
 
 func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
@@ -458,7 +458,7 @@ func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) 
 }
 
 func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, err
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := fmt.Sprintf("org:%s", orgID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {
 		return nil, err
@@ -503,7 +503,7 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error) {
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, canvasDomain)
 	if err != nil {
 		return nil, err
@@ -583,8 +583,8 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -627,7 +627,7 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 }
 
 func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	domain := prefixDomain(domainType, domainID)
 
 	roles, err := a.getRolesFromPolicies(domain)
 	if err != nil {
@@ -651,8 +651,8 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -677,8 +677,8 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -1051,13 +1051,13 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 	}
 
 	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
+	prefixedRoleName := prefixRoleName(roleDefinition.Name)
 
 	// Validate inherited role exists if specified
 	if roleDefinition.InheritsFrom != nil {
 		// For inherited roles, check if it's a default role or if it has policies
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
@@ -1075,7 +1075,7 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 
 	// Add inheritance if specified
 	if roleDefinition.InheritsFrom != nil {
-		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+		prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
 		if err != nil {
 			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
@@ -1093,7 +1093,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	}
 
 	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
+	prefixedRoleName := prefixRoleName(roleDefinition.Name)
 
 	// Check if role exists by looking for existing policies
 	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
@@ -1104,7 +1104,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 	// Validate inherited role exists if specified
 	if roleDefinition.InheritsFrom != nil {
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
@@ -1134,7 +1134,7 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 
 	// Add inheritance if specified
 	if roleDefinition.InheritsFrom != nil {
-		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+		prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
 		if err != nil {
 			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
@@ -1151,8 +1151,8 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 		return fmt.Errorf("cannot delete default role: %s", roleName)
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// Check if role exists by looking for existing policies
 	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
@@ -1218,7 +1218,7 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 }
 
 func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// Check if role has any policies in this domain
 	policies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
@@ -1246,7 +1246,7 @@ func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 }
 
 func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	// Get all permissions including inherited ones
 	permissions, err := a.enforcer.GetImplicitPermissionsForUser(prefixedRoleName, domain)
 	if err != nil {
@@ -1268,7 +1268,7 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 }
 
 func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType string) []*Permission {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	// Get only direct permissions for this role, not inherited ones
 	permissions, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
@@ -1290,7 +1290,7 @@ func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType stri
 }
 
 func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *RoleDefinition {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
 	if err != nil || len(implicitRoles) == 0 {
 		return nil
@@ -1451,4 +1451,20 @@ func (a *AuthService) setupDefaultCanvasRoleMetadata(canvasID string) error {
 	}
 
 	return nil
+}
+
+func prefixRoleName(roleName string) string {
+	return fmt.Sprintf("role:%s", roleName)
+}
+
+func prefixGroupName(groupName string) string {
+	return fmt.Sprintf("group:%s", groupName)
+}
+
+func prefixUserID(userID string) string {
+	return fmt.Sprintf("user:%s", userID)
+}
+
+func prefixDomain(domainType string, domainID string) string {
+	return fmt.Sprintf("%s:%s", domainType, domainID)
 }
