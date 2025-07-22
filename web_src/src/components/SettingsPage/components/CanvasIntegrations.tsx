@@ -4,15 +4,15 @@ import { Text } from '../../Text/text'
 import { Button } from '../../Button/button'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Input } from '../../Input/input'
-import { useIntegrations, useCreateIntegration, type CreateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
+import { useIntegrations, useCreateIntegration, useUpdateIntegration, type CreateIntegrationParams, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
+import { SuperplaneIntegration, SuperplaneIntegrationType } from '@/api-client'
 
 interface CanvasIntegrationsProps {
   canvasId: string
   organizationId: string
 }
 
-type IntegrationSection = 'list' | 'choose-type' | 'new'
-type IntegrationType = 'TYPE_SEMAPHORE' | 'TYPE_GITHUB'
+type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
 
 const INTEGRATION_TYPES = [
   {
@@ -35,21 +35,23 @@ const INTEGRATION_TYPES = [
 
 export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
-  const [selectedType, setSelectedType] = useState<IntegrationType>('TYPE_SEMAPHORE')
+  const [selectedType, setSelectedType] = useState<SuperplaneIntegrationType>('TYPE_SEMAPHORE')
   const [integrationName, setIntegrationName] = useState('')
   const [integrationUrl, setIntegrationUrl] = useState('')
   const [authType, setAuthType] = useState<'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'>('AUTH_TYPE_NONE')
   const [tokenSecretName, setTokenSecretName] = useState('')
   const [oidcEnabled, setOidcEnabled] = useState(false)
-  
+  const [editingIntegration, setEditingIntegration] = useState<SuperplaneIntegration | null>(null)
+
   const { data: integrations, isLoading, error } = useIntegrations(canvasId)
   const createIntegrationMutation = useCreateIntegration(canvasId)
+  const updateIntegrationMutation = useUpdateIntegration(canvasId)
 
   const handleAddIntegration = () => {
     setSection('choose-type')
   }
 
-  const handleTypeSelection = (type: IntegrationType) => {
+  const handleTypeSelection = (type: SuperplaneIntegrationType) => {
     setSelectedType(type)
     setSection('new')
     // Set default URL placeholder based on type
@@ -66,6 +68,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
     setAuthType('AUTH_TYPE_NONE')
     setTokenSecretName('')
     setOidcEnabled(false)
+    setEditingIntegration(null)
   }
 
   const handleCreateIntegration = async () => {
@@ -75,7 +78,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
 
     const integrationData: CreateIntegrationParams = {
       name: integrationName.trim(),
-      type: selectedType,
+      type: selectedType as 'TYPE_SEMAPHORE' | 'TYPE_GITHUB',
       url: integrationUrl.trim(),
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? tokenSecretName.trim() : undefined,
@@ -91,6 +94,41 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
     }
   }
 
+  const handleConfigureIntegration = (integration: SuperplaneIntegration) => {
+    setEditingIntegration(integration)
+    setSelectedType(integration.spec?.type || 'TYPE_SEMAPHORE' as SuperplaneIntegrationType)
+    setIntegrationName(integration.metadata?.name || '')
+    setIntegrationUrl(integration.spec?.url || '')
+    setAuthType(integration.spec?.auth?.use || 'AUTH_TYPE_NONE' as 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE')
+    setTokenSecretName(integration.spec?.auth?.token?.valueFrom?.secret?.name || '')
+    setOidcEnabled(integration.spec?.oidc?.enabled || false)
+    setSection('edit')
+  }
+
+  const handleUpdateIntegration = async () => {
+    if (!integrationName.trim() || !integrationUrl.trim() || !editingIntegration) {
+      return
+    }
+
+    const updateData: UpdateIntegrationParams = {
+      id: editingIntegration.metadata?.id as string,
+      name: integrationName.trim(),
+      type: selectedType as 'TYPE_SEMAPHORE' | 'TYPE_GITHUB',
+      url: integrationUrl.trim(),
+      authType,
+      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? tokenSecretName.trim() : undefined,
+      oidcEnabled: authType === 'AUTH_TYPE_OIDC' ? oidcEnabled : undefined,
+    }
+
+    try {
+      await updateIntegrationMutation.mutateAsync(updateData)
+      resetForm()
+      setSection('list')
+    } catch (error) {
+      console.error('Failed to update integration:', error)
+    }
+  }
+
   const hasIntegrations = integrations && integrations.length > 0
 
   return (
@@ -103,18 +141,30 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
             <span className="font-medium text-zinc-900 dark:text-zinc-100">Choose integration type</span>
           </>
         )}
-        {section === 'new' && (
+        {(section === 'new' || section === 'edit') && (
           <>
             <MaterialSymbol name="chevron_right" size="sm" />
-            <button 
-              onClick={() => setSection('choose-type')}
-              className="hover:text-zinc-900 dark:hover:text-zinc-100"
-            >
-              Choose integration type
-            </button>
+            {section === 'new' ? (
+              <button
+                onClick={() => setSection('choose-type')}
+                className="hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                Choose integration type
+              </button>
+            ) : (
+              <button
+                onClick={() => setSection('list')}
+                className="hover:text-zinc-900 dark:hover:text-zinc-100"
+              >
+                Integrations
+              </button>
+            )}
             <MaterialSymbol name="chevron_right" size="sm" />
             <span className="font-medium text-zinc-900 dark:text-zinc-100">
-              New {INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration
+              {section === 'new'
+                ? `New ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+                : `Edit ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+              }
             </span>
           </>
         )}
@@ -132,7 +182,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
               </Button>
             )}
           </div>
-          
+
           {isLoading ? (
             <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
               <div className="text-center py-12">
@@ -165,48 +215,41 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {integrations.map((integration) => (
                 <div
                   key={integration.metadata?.id}
-                  className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6"
+                  className="bg-white dark:bg-zinc-800 p-6 rounded-lg border border-zinc-200 dark:border-zinc-700"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                        <MaterialSymbol 
-                          name={integration.spec?.type === 'TYPE_GITHUB' ? 'code' : 'build_circle'} 
-                          className="text-blue-600 dark:text-blue-400" 
-                          size="lg" 
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_GITHUB' ? 'bg-black' : 'bg-orange-500'} rounded flex items-center justify-center`}>
+                        <MaterialSymbol
+                          name={integration.spec?.type === 'TYPE_GITHUB' ? 'code' : 'build_circle'}
+                          className="text-white"
+                          size="sm"
                         />
                       </div>
-                      <div>
-                        <Heading level={3} className="text-lg mb-1">
-                          {integration.metadata?.name}
-                        </Heading>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-2">
-                          {integration.spec?.type === 'TYPE_GITHUB' ? 'GitHub' : 
-                           integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' : 
-                           'Unknown'} Integration
-                        </Text>
-                        {integration.spec?.url && (
-                          <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                            {integration.spec.url}
-                          </Text>
-                        )}
-                      </div>
+                      <Heading level={3}>
+                        {integration.spec?.type === 'TYPE_GITHUB' ? 'GitHub' :
+                          integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' :
+                            integration.metadata?.name}
+                      </Heading>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        integration.spec?.auth?.use === 'AUTH_TYPE_TOKEN' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' :
-                        integration.spec?.auth?.use === 'AUTH_TYPE_OIDC' ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' :
-                        'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400'
-                      }`}>
-                        {integration.spec?.auth?.use === 'AUTH_TYPE_TOKEN' ? 'Token Auth' :
-                         integration.spec?.auth?.use === 'AUTH_TYPE_OIDC' ? 'OIDC Auth' :
-                         'No Auth'}
-                      </div>
-                    </div>
+
+                  </div>
+                  <Text className="text-zinc-600 dark:text-zinc-400 mb-4 text-left">
+                    {integration.spec?.type === 'TYPE_GITHUB'
+                      ? `Connected to ${integration.metadata?.name || 'your GitHub account'} for repository access and webhook triggers.`
+                      : integration.spec?.type === 'TYPE_SEMAPHORE'
+                        ? `Connected to ${integration.metadata?.name || 'Semaphore'} for CI/CD pipeline automation and deployment workflows.`
+                        : `Integration: ${integration.metadata?.name}`}
+                  </Text>
+                  <div className="flex space-x-2 items-center">
+                    <Button className="flex items-center gap-2" plain onClick={() => handleConfigureIntegration(integration)}>
+                      <MaterialSymbol name="settings" />
+                      Configure
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -252,10 +295,10 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                       {integrationType.description}
                     </Text>
                   </div>
-                  <MaterialSymbol 
-                    name="arrow_forward" 
+                  <MaterialSymbol
+                    name="arrow_forward"
                     className="text-zinc-400 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors"
-                    size="sm" 
+                    size="sm"
                   />
                 </button>
               ))}
@@ -271,16 +314,19 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
         </>
       )}
 
-      {/* New Integration Section */}
-      {section === 'new' && (
+      {/* New/Edit Integration Section */}
+      {(section === 'new' || section === 'edit') && (
         <>
           <div className="flex items-center justify-between">
             <Heading level={2}>
-              New {INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration
+              {section === 'new'
+                ? `New ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+                : `Edit ${INTEGRATION_TYPES.find(t => t.value === selectedType)?.label} integration`
+              }
             </Heading>
           </div>
 
-          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 text-left">
             <div className="space-y-6">
               {/* Integration Name */}
               <div>
@@ -306,8 +352,8 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                   id="integration-url"
                   type="url"
                   placeholder={
-                    selectedType === 'TYPE_GITHUB' 
-                      ? 'https://github.com/owner/repo' 
+                    selectedType === 'TYPE_GITHUB'
+                      ? 'https://github.com/owner/repo'
                       : 'https://api.semaphoreci.com'
                   }
                   value={integrationUrl}
@@ -370,24 +416,28 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
 
               {/* Action buttons */}
               <div className="flex gap-3">
-                <Button onClick={() => setSection('choose-type')}>
+                <Button onClick={() => section === 'edit' ? setSection('list') : setSection('choose-type')}>
                   <MaterialSymbol name="arrow_back" size="sm" />
                   Back
                 </Button>
-                <Button 
-                  color="blue" 
-                  onClick={handleCreateIntegration}
-                  disabled={createIntegrationMutation.isPending || !integrationName.trim() || !integrationUrl.trim()}
+                <Button
+                  color="blue"
+                  onClick={section === 'edit' ? handleUpdateIntegration : handleCreateIntegration}
+                  disabled={
+                    (section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ||
+                    !integrationName.trim() ||
+                    !integrationUrl.trim()
+                  }
                 >
-                  {createIntegrationMutation.isPending ? (
+                  {(section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ? (
                     <>
                       <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
-                      Creating...
+                      {section === 'edit' ? 'Updating...' : 'Creating...'}
                     </>
                   ) : (
                     <>
-                      <MaterialSymbol name="add" size="sm" />
-                      Create Integration
+                      <MaterialSymbol name={section === 'edit' ? 'save' : 'add'} size="sm" />
+                      {section === 'edit' ? 'Update Integration' : 'Create Integration'}
                     </>
                   )}
                 </Button>

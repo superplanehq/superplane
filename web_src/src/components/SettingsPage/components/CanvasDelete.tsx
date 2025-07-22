@@ -92,7 +92,7 @@ export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
       </div>
 
       {/* Confirmation Dialog */}
-      <Dialog open={isDeleteModalOpen} onClose={handleCloseModal} size="lg">
+      <Dialog className="text-left" open={isDeleteModalOpen} onClose={handleCloseModal} size="lg">
         <DialogTitle className="text-red-900 dark:text-red-100">
           Delete Canvas
         </DialogTitle>

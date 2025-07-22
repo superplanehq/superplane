@@ -1,24 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Heading } from '../../Heading/heading'
 import { Text } from '../../Text/text'
 import { Button } from '../../Button/button'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Input } from '../../Input/input'
-import {
-  Table,
-  TableHead,
-  TableBody,
-  TableRow,
-  TableHeader,
-  TableCell
-} from '../../Table/table'
-import {
-  Dropdown,
-  DropdownButton,
-  DropdownMenu,
-  DropdownItem,
-} from '../../Dropdown/dropdown'
-import { useSecrets, useCreateSecret, useDeleteSecret } from '../../../pages/canvas/hooks/useSecrets'
+import { useSecrets, useCreateSecret, useDeleteSecret, useUpdateSecret, useSecret } from '../../../pages/canvas/hooks/useSecrets'
+
+// Utility function to format relative time
+const formatRelativeTime = (dateString: string | undefined): string => {
+  if (!dateString) return 'recently'
+
+  const date = new Date(dateString)
+  const now = new Date()
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (diffInSeconds < 60) return 'just now'
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`
+  if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`
+  if (diffInSeconds < 31536000) return `${Math.floor(diffInSeconds / 2592000)} months ago`
+  return `${Math.floor(diffInSeconds / 31536000)} years ago`
+}
 
 interface CanvasSecretsProps {
   canvasId: string
@@ -26,8 +28,9 @@ interface CanvasSecretsProps {
 }
 
 export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
-  const [secretsSection, setSecretsSection] = useState<'list' | 'new'>('list')
+  const [secretsSection, setSecretsSection] = useState<'list' | 'new' | 'edit'>('list')
   const [secretName, setSecretName] = useState('')
+  const [editingSecretId, setEditingSecretId] = useState<string | null>(null)
   const [environmentVariables, setEnvironmentVariables] = useState<Array<{ id: string, name: string, value: string }>>([
     { id: '1', name: '', value: '' }
   ])
@@ -36,13 +39,47 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
   const { data: secrets = [], isLoading: loadingSecrets, error: secretsError } = useSecrets(canvasId)
   const createSecretMutation = useCreateSecret(canvasId)
   const deleteSecretMutation = useDeleteSecret(canvasId)
+  const updateSecretMutation = useUpdateSecret(canvasId, editingSecretId || '')
+  const { data: editingSecret, isLoading: loadingSecret } = useSecret(canvasId, editingSecretId || '')
 
   const isCreating = createSecretMutation.isPending
   const isDeleting = deleteSecretMutation.isPending
+  const isUpdating = updateSecretMutation.isPending
 
   const handleCreateSecret = () => {
+    // Reset form for new secret
+    setSecretName('')
+    setEnvironmentVariables([{ id: '1', name: '', value: '' }])
+    setEditingSecretId(null)
     setSecretsSection('new')
   }
+
+  const handleEditSecret = (secretId: string) => {
+    setEditingSecretId(secretId)
+    setSecretsSection('edit')
+  }
+
+  // Effect to populate form when editing
+  useEffect(() => {
+    if (editingSecret && secretsSection === 'edit') {
+      setSecretName(editingSecret.metadata?.name || '')
+
+      // Convert secret data to environment variables format
+      const secretData = editingSecret.spec?.local?.data || {}
+      const envVars = Object.entries(secretData).map(([key, value], index) => ({
+        id: (index + 1).toString(),
+        name: key,
+        value: value as string
+      }))
+
+      // Ensure at least one empty row if no variables
+      if (envVars.length === 0) {
+        envVars.push({ id: '1', name: '', value: '' })
+      }
+
+      setEnvironmentVariables(envVars)
+    }
+  }, [editingSecret, secretsSection])
 
   const handleAddEnvironmentVariable = () => {
     setEnvironmentVariables(prev => [...prev, { id: Date.now().toString(), name: '', value: '' }])
@@ -55,27 +92,39 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
   const handleSaveSecret = async () => {
     try {
       const validEnvironmentVariables = environmentVariables.filter(env => env.name.trim() && env.value.trim())
-      
-      await createSecretMutation.mutateAsync({
+      const secretData = {
         name: secretName,
-        environmentVariables: validEnvironmentVariables.map(env => ({
-          name: env.name,
-          value: env.value
-        }))
-      })
+        environmentVariables: validEnvironmentVariables
+          .filter(env => env.name.trim() && env.value.trim() != '***')
+          .map(env => ({
+            name: env.name,
+            value: env.value
+          }))
+      }
 
-      // Reset form
+      if (secretsSection === 'edit' && editingSecretId) {
+        // Update existing secret
+        await updateSecretMutation.mutateAsync(secretData)
+      } else {
+        // Create new secret
+        await createSecretMutation.mutateAsync(secretData)
+      }
+
+      // Reset form and return to list
       setSecretName('')
       setEnvironmentVariables([{ id: '1', name: '', value: '' }])
+      setEditingSecretId(null)
       setSecretsSection('list')
     } catch (error) {
-      console.error('Failed to create secret:', error)
+      console.error(`Failed to ${secretsSection === 'edit' ? 'update' : 'create'} secret:`, error)
     }
   }
 
   const handleDeleteSecret = async (secretId: string) => {
     try {
-      await deleteSecretMutation.mutateAsync(secretId)
+      if (confirm(`Are you sure you want to delete secret ${secretName}? This action cannot be undone.`)) {
+        await deleteSecretMutation.mutateAsync(secretId)
+      }
     } catch (error) {
       console.error('Failed to delete secret:', error)
     }
@@ -89,6 +138,12 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
           <>
             <MaterialSymbol name="chevron_right" size="sm" />
             <span className="font-medium text-zinc-900 dark:text-zinc-100">New secret</span>
+          </>
+        )}
+        {secretsSection === 'edit' && (
+          <>
+            <MaterialSymbol name="chevron_right" size="sm" />
+            <span className="font-medium text-zinc-900 dark:text-zinc-100">Edit secret</span>
           </>
         )}
       </div>
@@ -109,8 +164,8 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
             </div>
           )}
 
-          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
-            <Text className="text-zinc-600 text-left dark:text-zinc-400 mb-4">
+          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 text-left">
+            <Text className="text-zinc-600 dark:text-zinc-400 mb-4">
               Manage environment variables and secrets for your canvas workflows. These values are encrypted and can be used in your stage configurations.
             </Text>
 
@@ -127,86 +182,64 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
                 </Text>
               </div>
             ) : (
-              <Table dense>
-                <TableHead>
-                  <TableRow>
-                    <TableHeader>Name</TableHeader>
-                    <TableHeader>Description</TableHeader>
-                    <TableHeader>Variables</TableHeader>
-                    <TableHeader>Created</TableHeader>
-                    <TableHeader></TableHeader>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {secrets.map((secret) => (
-                    <TableRow key={secret.metadata?.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <MaterialSymbol name="key" className="text-zinc-400" size="sm" />
-                          <div>
-                            <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                              {secret.metadata?.name || 'Unnamed Secret'}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          No description
-                        </Text>
-                      </TableCell>
-                      <TableCell>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {Object.keys(secret.spec?.local?.data || {}).length} variables
-                        </Text>
-                      </TableCell>
-                      <TableCell>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {secret.metadata?.createdAt ? new Date(secret.metadata.createdAt).toLocaleDateString() : 'Unknown'}
-                        </Text>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end">
-                          <Dropdown>
-                            <DropdownButton plain className="flex items-center gap-2 text-sm">
-                              <MaterialSymbol name="more_vert" size="sm" />
-                            </DropdownButton>
-                            <DropdownMenu>
-                              <DropdownItem
-                                onClick={() => handleDeleteSecret(secret.metadata?.id || '')}
-                                disabled={isDeleting}
-                              >
-                                <MaterialSymbol name="delete" />
-                                Delete
-                              </DropdownItem>
-                            </DropdownMenu>
-                          </Dropdown>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <div className="space-y-4">
+                {secrets.map((secret, index) => (
+                  <div
+                    key={secret.metadata?.id}
+                    className={`flex items-center justify-between py-3 ${index < secrets.length - 1 ? 'border-b border-zinc-200 dark:border-zinc-700' : ''
+                      }`}
+                  >
+                    <div>
+                      <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                        {secret.metadata?.name || 'Unnamed Secret'}
+                      </div>
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400">
+                        Added {formatRelativeTime(secret.metadata?.createdAt)}
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button plain onClick={() => handleEditSecret(secret.metadata?.id || '')}>
+                        <MaterialSymbol name="edit" />
+                      </Button>
+                      <Button
+                        plain
+                        onClick={() => handleDeleteSecret(secret.metadata?.id || '')}
+                        disabled={isDeleting}
+                      >
+                        <MaterialSymbol name="delete" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </>
       )}
 
-      {secretsSection === 'new' && (
+      {(secretsSection === 'new' || secretsSection === 'edit') && (
         <>
           <div className="flex items-center justify-between">
-            <Heading level={2}>New secret</Heading>
+            <Heading level={2}>
+              {secretsSection === 'edit' ? 'Edit secret' : 'New secret'}
+            </Heading>
           </div>
 
-          {(createSecretMutation.error || deleteSecretMutation.error) && (
+          {(createSecretMutation.error || updateSecretMutation.error || deleteSecretMutation.error) && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
               <Text>
-                {createSecretMutation.error?.message || deleteSecretMutation.error?.message || 'An error occurred'}
+                {createSecretMutation.error?.message || updateSecretMutation.error?.message || deleteSecretMutation.error?.message || 'An error occurred'}
               </Text>
             </div>
           )}
 
-          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6">
+          {loadingSecret && secretsSection === 'edit' && (
+            <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+              <Text>Loading secret details...</Text>
+            </div>
+          )}
+
+          <div className="bg-white dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 text-left">
             <div className="space-y-6">
               <div>
                 <label htmlFor="secretName" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
@@ -275,15 +308,24 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
               </div>
 
               <div className="flex gap-3">
-                <Button onClick={() => setSecretsSection('list')} disabled={isCreating}>
+                <Button
+                  onClick={() => {
+                    setSecretsSection('list')
+                    setEditingSecretId(null)
+                  }}
+                  disabled={isCreating || isUpdating}
+                >
                   Cancel
                 </Button>
-                <Button 
-                  color="blue" 
-                  onClick={handleSaveSecret} 
-                  disabled={!secretName.trim() || isCreating}
+                <Button
+                  color="blue"
+                  onClick={handleSaveSecret}
+                  disabled={!secretName.trim() || isCreating || isUpdating || (secretsSection === 'edit' && loadingSecret)}
                 >
-                  {isCreating ? 'Creating...' : 'Save Secret'}
+                  {secretsSection === 'edit'
+                    ? (isUpdating ? 'Updating...' : 'Update Secret')
+                    : (isCreating ? 'Creating...' : 'Save Secret')
+                  }
                 </Button>
               </div>
             </div>

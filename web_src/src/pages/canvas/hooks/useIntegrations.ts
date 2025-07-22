@@ -54,6 +54,10 @@ export interface CreateIntegrationParams {
   oidcEnabled?: boolean
 }
 
+export interface UpdateIntegrationParams extends CreateIntegrationParams {
+  id: string
+}
+
 export const useCreateIntegration = (canvasId: string) => {
   const queryClient = useQueryClient()
   
@@ -62,12 +66,7 @@ export const useCreateIntegration = (canvasId: string) => {
       const integration: SuperplaneCreateIntegrationData['body'] = {
         integration: {
           metadata: {
-            name: params.name,
-            id: '',
-            createdBy: '',
-            createdAt: '',
-            domainType: 'DOMAIN_TYPE_CANVAS',
-            domainId: canvasId,
+            name: params.name
           },
           spec: {
             type: params.type,
@@ -96,6 +95,47 @@ export const useCreateIntegration = (canvasId: string) => {
         path: { canvasIdOrName: canvasId },
         body: integration
       })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: integrationKeys.byCanvas(canvasId) 
+      })
+    }
+  })
+}
+
+export const useUpdateIntegration = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: UpdateIntegrationParams) => {
+      // Mock update integration - in real implementation this would call an update API
+      console.log('Updating integration:', params)
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      return { success: true, integrationId: params.id }
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ 
+        queryKey: integrationKeys.byCanvas(canvasId) 
+      })
+      queryClient.invalidateQueries({ 
+        queryKey: integrationKeys.detail(canvasId, data.integrationId) 
+      })
+    }
+  })
+}
+
+export const useDeleteIntegration = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (integrationId: string) => {
+      // Mock delete integration - in real implementation this would call a delete API
+      console.log('Deleting integration:', integrationId)
+      // Simulate API call delay
+      await new Promise(resolve => setTimeout(resolve, 500))
+      return { success: true, integrationId }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 

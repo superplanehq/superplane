@@ -182,7 +182,7 @@ const HomePage = () => {
                   /* Grid View */
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {filteredCanvases.map((canvas) => (
-                      <div key={canvas.id} className="min-h-50 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow group">
+                      <div key={canvas.id} className="max-h-45 bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:shadow-md transition-shadow group">
                         <div className="p-6 flex flex-col justify-between h-full">
                           <div>
                             {/* Header */}
@@ -271,7 +271,7 @@ const HomePage = () => {
                                 </div>
 
                                 {canvas.description && (
-                                  <Text className="text-sm text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
+                                  <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
                                     {canvas.description}
                                   </Text>
                                 )}

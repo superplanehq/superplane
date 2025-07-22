@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import * as Headless from '@headlessui/react'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
-import { Button } from '../Button/button'
 import {
   Dropdown,
   DropdownMenu,
@@ -15,8 +14,6 @@ export interface CanvasNavigationProps {
   canvasName: string
   activeView: 'editor' | 'settings'
   onViewChange: (view: 'editor' | 'settings') => void
-  onStarClick?: () => void
-  onMembersClick?: () => void
   organizationId: string
 }
 
@@ -24,8 +21,6 @@ export function CanvasNavigation({
   canvasName,
   activeView,
   onViewChange,
-  onStarClick,
-  onMembersClick,
   organizationId
 }: CanvasNavigationProps) {
   const { data: canvasesData = [] } = useOrganizationCanvases(organizationId)
@@ -67,7 +62,7 @@ export function CanvasNavigation({
             </span>
             <MaterialSymbol className='text-zinc-950 dark:text-white' size='lg' weight={400} name="expand_more" />
           </Headless.MenuButton>
-          <DropdownMenu className="min-w-(--button-width)">
+          <DropdownMenu className="min-w-(--button-width) z-50">
             {canvasesData.map((canvas) => (
               <DropdownItem
                 key={canvas.metadata?.id}
@@ -80,15 +75,6 @@ export function CanvasNavigation({
         </Dropdown>
       </div>
 
-      {/* Star and Members Buttons */}
-      <div className='border-r border-zinc-400 dark:border-zinc-600'>
-        <Button plain onClick={onStarClick}>
-          <MaterialSymbol size='lg' weight={400} name="star" />
-        </Button>
-        <Button plain onClick={onMembersClick}>
-          <MaterialSymbol size='lg' weight={400} name="person" />
-        </Button>
-      </div>
 
       {/* Navigation Tabs */}
       <div className="flex items-center h-full">

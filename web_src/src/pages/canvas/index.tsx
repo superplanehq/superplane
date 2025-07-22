@@ -170,13 +170,6 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleStarClick = () => {
-    console.log('Canvas starred');
-  };
-
-  const handleMembersClick = () => {
-    console.log('Show members modal');
-  };
 
   return (
     <StrictMode>
@@ -188,8 +181,6 @@ export function Canvas() {
           canvasName={canvasName}
           activeView={activeView}
           onViewChange={handleViewChange}
-          onStarClick={handleStarClick}
-          onMembersClick={handleMembersClick}
           organizationId={orgId!}
         />
 
@@ -217,7 +208,7 @@ export function Canvas() {
             {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
           </div>
         ) : (
-          <div >
+          <div className="h-[calc(100%-2.7rem)]" >
             <SettingsPage organizationId={orgId!} />
           </div>
         )}
