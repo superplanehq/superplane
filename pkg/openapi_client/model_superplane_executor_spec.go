@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneExecutorSpec{}
 // SuperplaneExecutorSpec struct for SuperplaneExecutorSpec
 type SuperplaneExecutorSpec struct {
 	Type *SuperplaneExecutorSpecType `json:"type,omitempty"`
-	Integration *SuperplaneIntegrationRef `json:"integration,omitempty"`
+	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Semaphore *SuperplaneExecutorSpecSemaphore `json:"semaphore,omitempty"`
 	Http *ExecutorSpecHTTP `json:"http,omitempty"`
 }
@@ -80,9 +80,9 @@ func (o *SuperplaneExecutorSpec) SetType(v SuperplaneExecutorSpecType) {
 }
 
 // GetIntegration returns the Integration field value if set, zero value otherwise.
-func (o *SuperplaneExecutorSpec) GetIntegration() SuperplaneIntegrationRef {
+func (o *SuperplaneExecutorSpec) GetIntegration() IntegrationsIntegrationRef {
 	if o == nil || IsNil(o.Integration) {
-		var ret SuperplaneIntegrationRef
+		var ret IntegrationsIntegrationRef
 		return ret
 	}
 	return *o.Integration
@@ -90,7 +90,7 @@ func (o *SuperplaneExecutorSpec) GetIntegration() SuperplaneIntegrationRef {
 
 // GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneExecutorSpec) GetIntegrationOk() (*SuperplaneIntegrationRef, bool) {
+func (o *SuperplaneExecutorSpec) GetIntegrationOk() (*IntegrationsIntegrationRef, bool) {
 	if o == nil || IsNil(o.Integration) {
 		return nil, false
 	}
@@ -106,8 +106,8 @@ func (o *SuperplaneExecutorSpec) HasIntegration() bool {
 	return false
 }
 
-// SetIntegration gets a reference to the given SuperplaneIntegrationRef and assigns it to the Integration field.
-func (o *SuperplaneExecutorSpec) SetIntegration(v SuperplaneIntegrationRef) {
+// SetIntegration gets a reference to the given IntegrationsIntegrationRef and assigns it to the Integration field.
+func (o *SuperplaneExecutorSpec) SetIntegration(v IntegrationsIntegrationRef) {
 	o.Integration = &v
 }
 

@@ -3,6 +3,8 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/goccy/go-yaml"
 	"github.com/spf13/cobra"
@@ -115,16 +117,25 @@ var getSecretCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		domainType, _ := cmd.Flags().GetString("domain-type")
+		domainID, _ := cmd.Flags().GetString("domain-id")
+		if domainID == "" {
+			fmt.Println("Domain ID not provided")
+			os.Exit(1)
+		}
 
 		c := DefaultClient()
-		response, _, err := c.SecretAPI.SuperplaneDescribeSecret(
-			context.Background(),
-			canvasIDOrName,
-			idOrName,
-		).Execute()
+		response, httpResponse, err := c.SecretAPI.
+			SecretsDescribeSecret(context.Background(), idOrName).
+			DomainId(domainID).
+			DomainType(domainType).
+			Execute()
 
-		Check(err)
+		if err != nil {
+			b, _ := io.ReadAll(httpResponse.Body)
+			fmt.Printf("%s\n", string(b))
+			os.Exit(1)
+		}
 
 		out, err := yaml.Marshal(response.Secret)
 		Check(err)
@@ -165,6 +176,6 @@ func init() {
 
 	// Secret command
 	getCmd.AddCommand(getSecretCmd)
-	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
-	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
+	getSecretCmd.Flags().String("domain-type", "DOMAIN_TYPE_ORGANIZATION", "Domain to list secrets from (organization, canvas)")
+	getSecretCmd.Flags().String("domain-id", "", "ID of the domain (organization ID, canvas ID)")
 }

@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -15,36 +15,36 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneSecret type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneSecret{}
+// checks if the SecretsSecret type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &SecretsSecret{}
 
-// SuperplaneSecret struct for SuperplaneSecret
-type SuperplaneSecret struct {
-	Metadata *SuperplaneSecretMetadata `json:"metadata,omitempty"`
-	Spec *SuperplaneSecretSpec `json:"spec,omitempty"`
+// SecretsSecret struct for SecretsSecret
+type SecretsSecret struct {
+	Metadata *SecretsSecretMetadata `json:"metadata,omitempty"`
+	Spec *SecretsSecretSpec `json:"spec,omitempty"`
 }
 
-// NewSuperplaneSecret instantiates a new SuperplaneSecret object
+// NewSecretsSecret instantiates a new SecretsSecret object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneSecret() *SuperplaneSecret {
-	this := SuperplaneSecret{}
+func NewSecretsSecret() *SecretsSecret {
+	this := SecretsSecret{}
 	return &this
 }
 
-// NewSuperplaneSecretWithDefaults instantiates a new SuperplaneSecret object
+// NewSecretsSecretWithDefaults instantiates a new SecretsSecret object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneSecretWithDefaults() *SuperplaneSecret {
-	this := SuperplaneSecret{}
+func NewSecretsSecretWithDefaults() *SecretsSecret {
+	this := SecretsSecret{}
 	return &this
 }
 
 // GetMetadata returns the Metadata field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetMetadata() SuperplaneSecretMetadata {
+func (o *SecretsSecret) GetMetadata() SecretsSecretMetadata {
 	if o == nil || IsNil(o.Metadata) {
-		var ret SuperplaneSecretMetadata
+		var ret SecretsSecretMetadata
 		return ret
 	}
 	return *o.Metadata
@@ -52,7 +52,7 @@ func (o *SuperplaneSecret) GetMetadata() SuperplaneSecretMetadata {
 
 // GetMetadataOk returns a tuple with the Metadata field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetMetadataOk() (*SuperplaneSecretMetadata, bool) {
+func (o *SecretsSecret) GetMetadataOk() (*SecretsSecretMetadata, bool) {
 	if o == nil || IsNil(o.Metadata) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *SuperplaneSecret) GetMetadataOk() (*SuperplaneSecretMetadata, bool) {
 }
 
 // HasMetadata returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasMetadata() bool {
+func (o *SecretsSecret) HasMetadata() bool {
 	if o != nil && !IsNil(o.Metadata) {
 		return true
 	}
@@ -68,15 +68,15 @@ func (o *SuperplaneSecret) HasMetadata() bool {
 	return false
 }
 
-// SetMetadata gets a reference to the given SuperplaneSecretMetadata and assigns it to the Metadata field.
-func (o *SuperplaneSecret) SetMetadata(v SuperplaneSecretMetadata) {
+// SetMetadata gets a reference to the given SecretsSecretMetadata and assigns it to the Metadata field.
+func (o *SecretsSecret) SetMetadata(v SecretsSecretMetadata) {
 	o.Metadata = &v
 }
 
 // GetSpec returns the Spec field value if set, zero value otherwise.
-func (o *SuperplaneSecret) GetSpec() SuperplaneSecretSpec {
+func (o *SecretsSecret) GetSpec() SecretsSecretSpec {
 	if o == nil || IsNil(o.Spec) {
-		var ret SuperplaneSecretSpec
+		var ret SecretsSecretSpec
 		return ret
 	}
 	return *o.Spec
@@ -84,7 +84,7 @@ func (o *SuperplaneSecret) GetSpec() SuperplaneSecretSpec {
 
 // GetSpecOk returns a tuple with the Spec field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneSecret) GetSpecOk() (*SuperplaneSecretSpec, bool) {
+func (o *SecretsSecret) GetSpecOk() (*SecretsSecretSpec, bool) {
 	if o == nil || IsNil(o.Spec) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *SuperplaneSecret) GetSpecOk() (*SuperplaneSecretSpec, bool) {
 }
 
 // HasSpec returns a boolean if a field has been set.
-func (o *SuperplaneSecret) HasSpec() bool {
+func (o *SecretsSecret) HasSpec() bool {
 	if o != nil && !IsNil(o.Spec) {
 		return true
 	}
@@ -100,12 +100,12 @@ func (o *SuperplaneSecret) HasSpec() bool {
 	return false
 }
 
-// SetSpec gets a reference to the given SuperplaneSecretSpec and assigns it to the Spec field.
-func (o *SuperplaneSecret) SetSpec(v SuperplaneSecretSpec) {
+// SetSpec gets a reference to the given SecretsSecretSpec and assigns it to the Spec field.
+func (o *SecretsSecret) SetSpec(v SecretsSecretSpec) {
 	o.Spec = &v
 }
 
-func (o SuperplaneSecret) MarshalJSON() ([]byte, error) {
+func (o SecretsSecret) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o SuperplaneSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneSecret) ToMap() (map[string]interface{}, error) {
+func (o SecretsSecret) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Metadata) {
 		toSerialize["metadata"] = o.Metadata
@@ -124,38 +124,38 @@ func (o SuperplaneSecret) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneSecret struct {
-	value *SuperplaneSecret
+type NullableSecretsSecret struct {
+	value *SecretsSecret
 	isSet bool
 }
 
-func (v NullableSuperplaneSecret) Get() *SuperplaneSecret {
+func (v NullableSecretsSecret) Get() *SecretsSecret {
 	return v.value
 }
 
-func (v *NullableSuperplaneSecret) Set(val *SuperplaneSecret) {
+func (v *NullableSecretsSecret) Set(val *SecretsSecret) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneSecret) IsSet() bool {
+func (v NullableSecretsSecret) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneSecret) Unset() {
+func (v *NullableSecretsSecret) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneSecret(val *SuperplaneSecret) *NullableSuperplaneSecret {
-	return &NullableSuperplaneSecret{value: val, isSet: true}
+func NewNullableSecretsSecret(val *SecretsSecret) *NullableSecretsSecret {
+	return &NullableSecretsSecret{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneSecret) MarshalJSON() ([]byte, error) {
+func (v NullableSecretsSecret) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneSecret) UnmarshalJSON(src []byte) error {
+func (v *NullableSecretsSecret) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

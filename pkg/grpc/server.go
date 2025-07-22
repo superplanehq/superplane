@@ -61,7 +61,7 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	//
 	// Initialize services exposed by this server.
 	//
-	service := NewSuperplaneService(encryptor, authService)
+	service := NewCanvasService(encryptor, authService)
 	canvasPb.RegisterSuperplaneServer(grpcServer, service)
 
 	organizationService := NewOrganizationService(authService)

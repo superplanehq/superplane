@@ -145,7 +145,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		newContext := context.WithValue(ctx, DomainTypeContextKey, domainType)
 		newContext = context.WithValue(newContext, DomainIdContextKey, domainID)
-		return handler(ctx, req)
+		return handler(newContext, req)
 	}
 }
 
