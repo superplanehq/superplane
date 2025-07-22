@@ -37,24 +37,12 @@ func AssignRole(ctx context.Context, req *pb.AssignRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	var userID string
-	var userEmail string
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.AssignRoleRequest_UserId:
-		userID = identifier.UserId
-	case *pb.AssignRoleRequest_UserEmail:
-		userEmail = identifier.UserEmail
-	default:
-		return nil, status.Error(codes.InvalidArgument, "user identifier must be specified")
-	}
-
-	resolvedUserID, err := ResolveUserID(userID, userEmail)
+	resolvedUserID, err := "", nil
 	if err != nil {
 		return nil, err
 	}
-	userID = resolvedUserID
 
-	err = authService.AssignRole(userID, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
+	err = authService.AssignRole(resolvedUserID, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to assign role")
 	}

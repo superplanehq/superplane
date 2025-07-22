@@ -458,21 +458,17 @@ message ListUserPermissionsResponse {
 
 // Role assignment messages
 message AssignRoleRequest {
-  oneof user_identifier {
-    string user_id = 1;
-    string user_email = 3;
-  }
-  RoleAssignment role_assignment = 2;
+  string user_id = 1;
+  string user_email = 2;
+  RoleAssignment role_assignment = 3;
 }
 
 message AssignRoleResponse {}
 
 message RemoveRoleRequest {
-  oneof user_identifier {
-    string user_id = 1;
-    string user_email = 3;
-  }
-  RoleAssignment role_assignment = 2;
+  string user_id = 1;
+  string user_email = 2;
+  RoleAssignment role_assignment = 3;
 }
 
 message RemoveRoleResponse {}
@@ -533,10 +529,8 @@ message CreateOrganizationGroupResponse {
 message AddUserToOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  oneof user_identifier {
-    string user_id = 3;
-    string user_email = 4;
-  }
+  string user_id = 3;
+  string user_email = 4;
 }
 
 message AddUserToOrganizationGroupResponse {}
@@ -544,10 +538,8 @@ message AddUserToOrganizationGroupResponse {}
 message RemoveUserFromOrganizationGroupRequest {
   string organization_id = 1;
   string group_name = 2;
-  oneof user_identifier {
-    string user_id = 3;
-    string user_email = 4;
-  }
+  string user_id = 3;
+  string user_email = 4;
 }
 
 message RemoveUserFromOrganizationGroupResponse {}
@@ -596,10 +588,8 @@ message CreateCanvasGroupResponse {
 message AddUserToCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  oneof user_identifier {
-    string user_id = 3;
-    string user_email = 4;
-  }
+  string user_id = 3;
+  string user_email = 4;
 }
 
 message AddUserToCanvasGroupResponse {}
@@ -607,10 +597,8 @@ message AddUserToCanvasGroupResponse {}
 message RemoveUserFromCanvasGroupRequest {
   string canvas_id_or_name = 1;
   string group_name = 2;
-  oneof user_identifier {
-    string user_id = 3;
-    string user_email = 4;
-  }
+  string user_id = 3;
+  string user_email = 4;
 }
 
 message RemoveUserFromCanvasGroupResponse {}

@@ -37,30 +37,12 @@ func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	var userID string
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.RemoveRoleRequest_UserId:
-		err := actions.ValidateUUIDs(identifier.UserId)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid user ID")
-		}
-		userID = identifier.UserId
-	case *pb.RemoveRoleRequest_UserEmail:
-		// Find user by email - first try with account providers
-		user, err := models.FindUserByEmail(identifier.UserEmail)
-		if err != nil {
-			// If not found by account provider, try to find inactive user by email
-			user, err = models.FindInactiveUserByEmail(identifier.UserEmail)
-			if err != nil {
-				return nil, status.Error(codes.NotFound, "user not found")
-			}
-		}
-		userID = user.ID.String()
-	default:
-		return nil, status.Error(codes.InvalidArgument, "user identifier must be specified")
+	userId, err := ResolveUserID(req.UserId, req.UserEmail)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
 	}
 
-	err = authService.RemoveRole(userID, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
+	err = authService.RemoveRole(userId, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove role")
 	}

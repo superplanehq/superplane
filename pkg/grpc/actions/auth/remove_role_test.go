@@ -27,9 +27,7 @@ func Test_RemoveRole(t *testing.T) {
 
 	t.Run("successful role removal with user ID", func(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
-			UserIdentifier: &pb.RemoveRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
+			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -57,9 +55,7 @@ func Test_RemoveRole(t *testing.T) {
 		require.NoError(t, err)
 
 		req := &pb.RemoveRoleRequest{
-			UserIdentifier: &pb.RemoveRoleRequest_UserEmail{
-				UserEmail: testEmail,
-			},
+			UserEmail: testEmail,
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -74,9 +70,7 @@ func Test_RemoveRole(t *testing.T) {
 
 	t.Run("user not found by email", func(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
-			UserIdentifier: &pb.RemoveRoleRequest_UserEmail{
-				UserEmail: "nonexistent@example.com",
-			},
+			UserEmail: "nonexistent@example.com",
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -91,9 +85,7 @@ func Test_RemoveRole(t *testing.T) {
 
 	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
-			UserIdentifier: &pb.RemoveRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
+			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 				DomainId:   orgID,
@@ -122,9 +114,7 @@ func Test_RemoveRole(t *testing.T) {
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
-			UserIdentifier: &pb.RemoveRoleRequest_UserId{
-				UserId: "invalid-uuid",
-			},
+			UserId: "invalid-uuid",
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,

@@ -23,9 +23,7 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("successful role assignment with user ID", func(t *testing.T) {
 		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
+			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -41,9 +39,7 @@ func Test_AssignRole(t *testing.T) {
 	t.Run("successful role assignment with user email", func(t *testing.T) {
 		testEmail := "test@example.com"
 		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserEmail{
-				UserEmail: testEmail,
-			},
+			UserEmail: testEmail,
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -64,9 +60,7 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
 		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
+			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
@@ -95,9 +89,7 @@ func Test_AssignRole(t *testing.T) {
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
 		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: "invalid-uuid",
-			},
+			UserId: "invalid-uuid",
 			RoleAssignment: &pb.RoleAssignment{
 				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,

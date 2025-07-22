@@ -135,16 +135,10 @@ func ConvertAddUserToOrganizationGroupRequest(req *pb.AddUserToOrganizationGroup
 		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		UserID:     req.UserId,
+		UserEmail:  req.UserEmail,
 	}
-	
-	// Handle oneof user_identifier
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.AddUserToOrganizationGroupRequest_UserId:
-		groupReq.UserID = identifier.UserId
-	case *pb.AddUserToOrganizationGroupRequest_UserEmail:
-		groupReq.UserEmail = identifier.UserEmail
-	}
-	
+
 	return groupReq
 }
 
@@ -153,16 +147,10 @@ func ConvertRemoveUserFromOrganizationGroupRequest(req *pb.RemoveUserFromOrganiz
 		DomainID:   "", // Organization ID will be set by server
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		UserID:     req.UserId,
+		UserEmail:  req.UserEmail,
 	}
-	
-	// Handle oneof user_identifier
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.RemoveUserFromOrganizationGroupRequest_UserId:
-		groupReq.UserID = identifier.UserId
-	case *pb.RemoveUserFromOrganizationGroupRequest_UserEmail:
-		groupReq.UserEmail = identifier.UserEmail
-	}
-	
+
 	return groupReq
 }
 
@@ -253,21 +241,15 @@ func ConvertAddUserToCanvasGroupRequest(req *pb.AddUserToCanvasGroupRequest) (*G
 	if err != nil {
 		return nil, err
 	}
-	
+
 	groupReq := &GroupUserRequest{
 		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+		UserID:     req.UserId,
+		UserEmail:  req.UserEmail,
 	}
-	
-	// Handle oneof user_identifier
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.AddUserToCanvasGroupRequest_UserId:
-		groupReq.UserID = identifier.UserId
-	case *pb.AddUserToCanvasGroupRequest_UserEmail:
-		groupReq.UserEmail = identifier.UserEmail
-	}
-	
+
 	return groupReq, nil
 }
 
@@ -276,21 +258,15 @@ func ConvertRemoveUserFromCanvasGroupRequest(req *pb.RemoveUserFromCanvasGroupRe
 	if err != nil {
 		return nil, err
 	}
-	
+
 	groupReq := &GroupUserRequest{
 		DomainID:   canvasID,
 		GroupName:  req.GroupName,
 		DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+		UserID:     req.UserId,
+		UserEmail:  req.UserEmail,
 	}
-	
-	// Handle oneof user_identifier
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.RemoveUserFromCanvasGroupRequest_UserId:
-		groupReq.UserID = identifier.UserId
-	case *pb.RemoveUserFromCanvasGroupRequest_UserEmail:
-		groupReq.UserEmail = identifier.UserEmail
-	}
-	
+
 	return groupReq, nil
 }
 
