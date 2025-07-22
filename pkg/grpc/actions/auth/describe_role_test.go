@@ -32,7 +32,7 @@ func Test_DescribeRole(t *testing.T) {
 		assert.NotNil(t, resp.Role.InheritedRole)
 		assert.Equal(t, authorization.RoleOrgAdmin, resp.Role.Name)
 		assert.Equal(t, authorization.RoleOrgViewer, resp.Role.InheritedRole.Name)
-		assert.Len(t, resp.Role.Permissions, 23)
+		assert.Len(t, resp.Role.Permissions, 24)
 		assert.Len(t, resp.Role.InheritedRole.Permissions, 2)
 	})
 
