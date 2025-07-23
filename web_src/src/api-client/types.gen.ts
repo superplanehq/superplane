@@ -82,7 +82,6 @@ export type GroupsGroup = {
 };
 
 export type GroupsGroupMetadata = {
-    id?: string;
     name?: string;
     domainType?: AuthorizationDomainType;
     domainId?: string;
@@ -292,7 +291,6 @@ export type RolesRoleAssignment = {
 };
 
 export type RolesRoleMetadata = {
-    id?: string;
     name?: string;
     domainType?: AuthorizationDomainType;
     domainId?: string;

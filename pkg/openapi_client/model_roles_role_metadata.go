@@ -21,7 +21,6 @@ var _ MappedNullable = &RolesRoleMetadata{}
 
 // RolesRoleMetadata struct for RolesRoleMetadata
 type RolesRoleMetadata struct {
-	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
@@ -48,38 +47,6 @@ func NewRolesRoleMetadataWithDefaults() *RolesRoleMetadata {
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
-}
-
-// GetId returns the Id field value if set, zero value otherwise.
-func (o *RolesRoleMetadata) GetId() string {
-	if o == nil || IsNil(o.Id) {
-		var ret string
-		return ret
-	}
-	return *o.Id
-}
-
-// GetIdOk returns a tuple with the Id field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesRoleMetadata) GetIdOk() (*string, bool) {
-	if o == nil || IsNil(o.Id) {
-		return nil, false
-	}
-	return o.Id, true
-}
-
-// HasId returns a boolean if a field has been set.
-func (o *RolesRoleMetadata) HasId() bool {
-	if o != nil && !IsNil(o.Id) {
-		return true
-	}
-
-	return false
-}
-
-// SetId gets a reference to the given string and assigns it to the Id field.
-func (o *RolesRoleMetadata) SetId(v string) {
-	o.Id = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
@@ -252,9 +219,6 @@ func (o RolesRoleMetadata) MarshalJSON() ([]byte, error) {
 
 func (o RolesRoleMetadata) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Id) {
-		toSerialize["id"] = o.Id
-	}
 	if !IsNil(o.Name) {
 		toSerialize["name"] = o.Name
 	}

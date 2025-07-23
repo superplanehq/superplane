@@ -241,12 +241,11 @@ message DeleteGroupResponse {}
 // Group data structure
 message Group {
   message Metadata {
-    string id = 1;
-    string name = 2;
-    Authorization.DomainType domain_type = 3;
-    string domain_id = 4;
-    google.protobuf.Timestamp created_at = 5;
-    google.protobuf.Timestamp updated_at = 6;
+    string name = 1;
+    Authorization.DomainType domain_type = 2;
+    string domain_id = 3;
+    google.protobuf.Timestamp created_at = 4;
+    google.protobuf.Timestamp updated_at = 5;
   }
 
   message Spec {

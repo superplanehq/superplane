@@ -903,7 +903,6 @@ func (x *Role) GetSpec() *Role_Spec {
 
 type Role_Metadata struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
-	Id            string                   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	DomainType    authorization.DomainType `protobuf:"varint,3,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,4,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
@@ -941,13 +940,6 @@ func (x *Role_Metadata) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Role_Metadata.ProtoReflect.Descriptor instead.
 func (*Role_Metadata) Descriptor() ([]byte, []int) {
 	return file_roles_proto_rawDescGZIP(), []int{15, 0}
-}
-
-func (x *Role_Metadata) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
 }
 
 func (x *Role_Metadata) GetName() string {
@@ -1115,12 +1107,11 @@ const file_roles_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\x14\n" +
-	"\x12DeleteRoleResponse\"\xd4\x04\n" +
+	"\x12DeleteRoleResponse\"\xc4\x04\n" +
 	"\x04Role\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Roles.Role.MetadataR\bmetadata\x12/\n" +
-	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Roles.Role.SpecR\x04spec\x1a\x88\x02\n" +
-	"\bMetadata\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Roles.Role.SpecR\x04spec\x1a\xf8\x01\n" +
+	"\bMetadata\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12E\n" +
 	"\vdomain_type\x18\x03 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +

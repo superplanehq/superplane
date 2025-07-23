@@ -979,12 +979,11 @@ func (x *Group) GetStatus() *Group_Status {
 
 type Group_Metadata struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
-	Id            string                   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                   `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	DomainType    authorization.DomainType `protobuf:"varint,3,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                   `protobuf:"bytes,4,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	CreatedAt     *timestamp.Timestamp     `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp     `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Name          string                   `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	DomainType    authorization.DomainType `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	CreatedAt     *timestamp.Timestamp     `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp     `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1017,13 +1016,6 @@ func (x *Group_Metadata) ProtoReflect() protoreflect.Message {
 // Deprecated: Use Group_Metadata.ProtoReflect.Descriptor instead.
 func (*Group_Metadata) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{16, 0}
-}
-
-func (x *Group_Metadata) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
 }
 
 func (x *Group_Metadata) GetName() string {
@@ -1241,21 +1233,20 @@ const file_groups_proto_rawDesc = "" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1d\n" +
 	"\n" +
 	"group_name\x18\x03 \x01(\tR\tgroupName\"\x15\n" +
-	"\x13DeleteGroupResponse\"\xcd\x04\n" +
+	"\x13DeleteGroupResponse\"\xbd\x04\n" +
 	"\x05Group\x12=\n" +
 	"\bmetadata\x18\x01 \x01(\v2!.Superplane.Groups.Group.MetadataR\bmetadata\x121\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1d.Superplane.Groups.Group.SpecR\x04spec\x127\n" +
-	"\x06status\x18\x03 \x01(\v2\x1f.Superplane.Groups.Group.StatusR\x06status\x1a\x88\x02\n" +
-	"\bMetadata\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12E\n" +
-	"\vdomain_type\x18\x03 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"\x06status\x18\x03 \x01(\v2\x1f.Superplane.Groups.Group.StatusR\x06status\x1a\xf8\x01\n" +
+	"\bMetadata\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
+	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x04 \x01(\tR\bdomainId\x129\n" +
+	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x129\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a_\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a_\n" +
 	"\x04Spec\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12!\n" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +

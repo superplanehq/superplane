@@ -2240,9 +2240,6 @@
     "GroupsGroupMetadata": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "name": {
           "type": "string"
         },
@@ -2720,9 +2717,6 @@
     "RolesRoleMetadata": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "name": {
           "type": "string"
         },
