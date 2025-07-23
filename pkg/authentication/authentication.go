@@ -604,12 +604,18 @@ func (a *Handler) findOrCreateAccountProvider(githubUser *GitHubUserInfo) (*mode
 func (a *Handler) findOrCreateUser(gothUser goth.User) (*models.User, error) {
 	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
 	if err == nil {
-		return a.updateUserInfo(user, gothUser.Name), nil
+		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
 	user, err = models.FindInactiveUserByEmail(gothUser.Email)
 	if err == nil {
-		return a.updateUserInfo(user, gothUser.Name), nil
+		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
+			return nil, err
+		}
+		return user, nil
 	}
 
 	user = &models.User{
@@ -624,11 +630,10 @@ func (a *Handler) findOrCreateUser(gothUser goth.User) (*models.User, error) {
 	return user, nil
 }
 
-func (a *Handler) updateUserInfo(user *models.User, name string) *models.User {
+func (a *Handler) updateUserInfo(user *models.User, name string) error {
 	user.Name = name
 	user.IsActive = true
-	user.Update()
-	return user
+	return user.Update()
 }
 
 const loginTemplate = `
