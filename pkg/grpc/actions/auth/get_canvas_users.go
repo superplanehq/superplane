@@ -16,7 +16,7 @@ func GetCanvasUsers(ctx context.Context, req *pb.GetCanvasUsersRequest, authServ
 		return nil, err
 	}
 
-	users, err := GetUsersWithRolesInDomain(canvasID, models.DomainCanvas, authService)
+	users, err := GetUsersWithRolesInDomain(canvasID, models.DomainTypeCanvas, authService)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get canvas users")
 	}

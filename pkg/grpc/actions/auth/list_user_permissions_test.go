@@ -22,7 +22,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	t.Run("successful list user permissions", func(t *testing.T) {

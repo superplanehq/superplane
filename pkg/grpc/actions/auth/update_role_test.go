@@ -23,12 +23,12 @@ func Test_UpdateRole(t *testing.T) {
 	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role",
-		DomainType: models.DomainOrg,
+		DomainType: models.DomainTypeOrg,
 		Permissions: []*authorization.Permission{
 			{
 				Resource:   "canvas",
 				Action:     "read",
-				DomainType: models.DomainOrg,
+				DomainType: models.DomainTypeOrg,
 			},
 		},
 	}
@@ -64,7 +64,7 @@ func Test_UpdateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was updated by verifying permissions
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.Len(t, roleDef.Permissions, 3)
@@ -90,7 +90,7 @@ func Test_UpdateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was updated with inheritance
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)

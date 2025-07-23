@@ -22,7 +22,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, "org", "test-group", models.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
 	require.NoError(t, err)
 
 	t.Run("successful add user to group with user ID", func(t *testing.T) {
@@ -133,7 +133,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a canvas group first
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-test-group", models.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-test-group", models.RoleCanvasAdmin)
 		require.NoError(t, err)
 
 		req := &GroupUserRequest{

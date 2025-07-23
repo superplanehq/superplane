@@ -21,7 +21,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
 		require.NoError(t, err)
 
 		// Update the group role
@@ -38,14 +38,14 @@ func TestUpdateGroup(t *testing.T) {
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Role)
 
 		// Verify the role was updated
-		role, err := authService.GetGroupRole(orgID, models.DomainOrg, "test-group")
+		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrg, "test-group")
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgAdmin, role)
 	})
 
 	t.Run("successful metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
 		require.NoError(t, err)
 
 		// Update the group metadata
@@ -66,7 +66,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
 		require.NoError(t, err)
 
 		// Update both role and metadata
@@ -89,15 +89,15 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("update preserves group membership", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
+		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
 		require.NoError(t, err)
 
 		// Add users to the group
 		userID1 := uuid.New().String()
 		userID2 := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, models.DomainOrg, userID1, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID1, "membership-group")
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(orgID, models.DomainOrg, userID2, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID2, "membership-group")
 		require.NoError(t, err)
 
 		// Update the group role
@@ -113,7 +113,7 @@ func TestUpdateGroup(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Verify users are still in the group
-		users, err := authService.GetGroupUsers(orgID, models.DomainOrg, "membership-group")
+		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrg, "membership-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID1)
 		assert.Contains(t, users, userID2)
@@ -126,7 +126,7 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a canvas group first
-		err = CreateGroupWithMetadata(canvasID, models.DomainCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
+		err = CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
 		require.NoError(t, err)
 
 		// Update the canvas group

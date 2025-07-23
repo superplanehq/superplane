@@ -6,30 +6,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+func DescribeIntegration(ctx context.Context, domainType, domainID, idOrName string) (*pb.DescribeIntegrationResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var integration *models.Integration
 	if err != nil {
-		integration, err = models.FindIntegrationByName(models.DomainCanvas, canvas.ID, req.IdOrName)
+		integration, err = models.FindIntegrationByName(domainType, uuid.MustParse(domainID), idOrName)
 	} else {
-		integration, err = models.FindDomainIntegration(models.DomainCanvas, canvas.ID, uuid.MustParse(req.IdOrName))
+		integration, err = models.FindDomainIntegration(domainType, uuid.MustParse(domainID), uuid.MustParse(idOrName))
 	}
 
 	if err != nil {

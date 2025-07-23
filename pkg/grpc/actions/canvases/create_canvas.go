@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -68,7 +68,7 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, err
 	}
 
-	err = authorizationService.AssignRole(userID, models.RoleCanvasOwner, canvas.ID.String(), models.DomainCanvas)
+	err = authorizationService.AssignRole(userID, models.RoleCanvasOwner, canvas.ID.String(), models.DomainTypeCanvas)
 	if err != nil {
 		log.Errorf("Error assigning canvas owner role on %v for CreateCanvas: %v", req, err)
 		return nil, err

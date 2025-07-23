@@ -20,7 +20,7 @@ func AddUserToGroup(ctx context.Context, req *GroupUserRequest, authService auth
 		return err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return err
 	}

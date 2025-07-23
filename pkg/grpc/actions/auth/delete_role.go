@@ -21,8 +21,8 @@ func DeleteRole(ctx context.Context, req *pb.DeleteRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	domainType := convertDomainType(req.DomainType)
-	if domainType == "" {
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
 	}
 

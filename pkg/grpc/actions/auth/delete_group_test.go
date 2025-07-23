@@ -21,18 +21,18 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 
 	t.Run("successful group deletion", func(t *testing.T) {
 
-		err := authService.CreateGroup(orgID, models.DomainOrg, "test-group", models.RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, models.DomainOrg, userID, "test-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID, "test-group")
 		require.NoError(t, err)
 
-		groups, err := authService.GetGroups(orgID, models.DomainOrg)
+		groups, err := authService.GetGroups(orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 
-		users, err := authService.GetGroupUsers(orgID, models.DomainOrg, "test-group")
+		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrg, "test-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
@@ -45,12 +45,12 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err = authService.GetGroupUsers(orgID, models.DomainOrg, "test-group")
+		users, err = authService.GetGroupUsers(orgID, models.DomainTypeOrg, "test-group")
 		require.NoError(t, err)
 		assert.Empty(t, users)
 
 		// Verify the group no longer exists in the groups list
-		groups, err = authService.GetGroups(orgID, models.DomainOrg)
+		groups, err = authService.GetGroups(orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 		assert.NotContains(t, groups, "test-group")
 	})
@@ -99,18 +99,18 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 
 	t.Run("successful canvas group deletion", func(t *testing.T) {
 
-		err := authService.CreateGroup(canvasID, models.DomainCanvas, "canvas-group", models.RoleCanvasAdmin)
+		err := authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin)
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
-		err = authService.AddUserToGroup(canvasID, models.DomainCanvas, userID, "canvas-group")
+		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, userID, "canvas-group")
 		require.NoError(t, err)
 
-		groups, err := authService.GetGroups(canvasID, models.DomainCanvas)
+		groups, err := authService.GetGroups(canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "canvas-group")
 
-		users, err := authService.GetGroupUsers(canvasID, models.DomainCanvas, "canvas-group")
+		users, err := authService.GetGroupUsers(canvasID, models.DomainTypeCanvas, "canvas-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
@@ -123,12 +123,12 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err = authService.GetGroupUsers(canvasID, models.DomainCanvas, "canvas-group")
+		users, err = authService.GetGroupUsers(canvasID, models.DomainTypeCanvas, "canvas-group")
 		require.NoError(t, err)
 		assert.Empty(t, users)
 
 		// Verify the group no longer exists in the groups list
-		groups, err = authService.GetGroups(canvasID, models.DomainCanvas)
+		groups, err = authService.GetGroups(canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 		assert.NotContains(t, groups, "canvas-group")
 	})

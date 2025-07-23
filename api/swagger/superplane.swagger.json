@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "Superplane API",
-    "description": "API for the Superplane service",
+    "title": "Superplane Authorization API",
+    "description": "API for the Superplane Authorization service",
     "version": "1.0",
     "contact": {
       "name": "API Support",
@@ -11,13 +11,19 @@
   },
   "tags": [
     {
-      "name": "Superplane"
-    },
-    {
       "name": "Authorization"
     },
     {
       "name": "Organizations"
+    },
+    {
+      "name": "Secrets"
+    },
+    {
+      "name": "Integrations"
+    },
+    {
+      "name": "Superplane"
     }
   ],
   "schemes": [
@@ -1499,16 +1505,16 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/integrations": {
+    "/api/v1/canvases/{canvasIdOrName}/groups": {
       "get": {
-        "summary": "List integrations for a canvas",
-        "description": "List integrations for a canvas",
-        "operationId": "Superplane_ListIntegrations",
+        "summary": "List canvas groups",
+        "description": "Returns a list of groups within a canvas",
+        "operationId": "Authorization_ListCanvasGroups",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListIntegrationsResponse"
+              "$ref": "#/definitions/AuthorizationListCanvasGroupsResponse"
             }
           },
           "default": {
@@ -1527,18 +1533,18 @@
           }
         ],
         "tags": [
-          "Integration"
+          "Authorization"
         ]
       },
       "post": {
-        "summary": "Create a new canvas integration",
-        "description": "Creates a new canvas integration",
-        "operationId": "Superplane_CreateIntegration",
+        "summary": "Create canvas group",
+        "description": "Creates a new group within a canvas with a specific role",
+        "operationId": "Authorization_CreateCanvasGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateIntegrationResponse"
+              "$ref": "#/definitions/AuthorizationCreateCanvasGroupResponse"
             }
           },
           "default": {
@@ -1560,25 +1566,25 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateIntegrationBody"
+              "$ref": "#/definitions/AuthorizationCreateCanvasGroupBody"
             }
           }
         ],
         "tags": [
-          "Integration"
+          "Authorization"
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/integrations/{idOrName}": {
+    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}": {
       "get": {
-        "summary": "Describe an integration for a canvas",
-        "description": "Describe an integration for a canvas",
-        "operationId": "Superplane_DescribeIntegration",
+        "summary": "Get canvas group",
+        "description": "Returns details of a specific group within a canvas",
+        "operationId": "Authorization_GetCanvasGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeIntegrationResponse"
+              "$ref": "#/definitions/AuthorizationGetCanvasGroupResponse"
             }
           },
           "default": {
@@ -1596,27 +1602,27 @@
             "type": "string"
           },
           {
-            "name": "idOrName",
+            "name": "groupName",
             "in": "path",
             "required": true,
             "type": "string"
           }
         ],
         "tags": [
-          "Integration"
+          "Authorization"
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/secrets": {
+    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users": {
       "get": {
-        "summary": "List secrets",
-        "description": "Returns a list of all secrets for the specified canvas (can be referenced by ID or name)",
-        "operationId": "Superplane_ListSecrets",
+        "summary": "Get canvas group users",
+        "description": "Returns users that belong to a specific group within a canvas",
+        "operationId": "Authorization_GetCanvasGroupUsers",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneListSecretsResponse"
+              "$ref": "#/definitions/AuthorizationGetCanvasGroupUsersResponse"
             }
           },
           "default": {
@@ -1632,21 +1638,27 @@
             "in": "path",
             "required": true,
             "type": "string"
+          },
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
           }
         ],
         "tags": [
-          "Secret"
+          "Authorization"
         ]
       },
       "post": {
-        "summary": "Create a new canvas secret",
-        "description": "Creates a new canvas secret",
-        "operationId": "Superplane_CreateSecret",
+        "summary": "Add user to canvas group",
+        "description": "Adds a user to a group within a canvas",
+        "operationId": "Authorization_AddUserToCanvasGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateSecretResponse"
+              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupResponse"
             }
           },
           "default": {
@@ -1659,6 +1671,12 @@
         "parameters": [
           {
             "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "groupName",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1668,61 +1686,25 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/SuperplaneCreateSecretBody"
+              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupBody"
             }
           }
         ],
         "tags": [
-          "Secret"
+          "Authorization"
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}": {
-      "get": {
-        "summary": "Get secret details",
-        "description": "Returns the details of a specific secret (canvas can be referenced by ID or name)",
-        "operationId": "Superplane_DescribeSecret",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeSecretResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Secret"
-        ]
-      },
+    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}": {
       "delete": {
-        "summary": "Deletes a canvas secret",
-        "description": "Deletes the specified canvas secret",
-        "operationId": "Superplane_DeleteSecret",
+        "summary": "Remove user from canvas group",
+        "description": "Removes a user from a group within a canvas",
+        "operationId": "Authorization_RemoveUserFromCanvasGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/SuperplaneDeleteSecretResponse"
+              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupResponse"
             }
           },
           "default": {
@@ -1740,58 +1722,20 @@
             "type": "string"
           },
           {
-            "name": "idOrName",
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
             "in": "path",
             "required": true,
             "type": "string"
           }
         ],
         "tags": [
-          "Secret"
-        ]
-      },
-      "patch": {
-        "summary": "Updates a secret",
-        "description": "Updates the specified secret (can be referenced by ID or name)",
-        "operationId": "Superplane_UpdateSecret",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateSecretResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "idOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/SuperplaneUpdateSecretBody"
-            }
-          }
-        ],
-        "tags": [
-          "Secret"
+          "Authorization"
         ]
       }
     },
@@ -2124,6 +2068,354 @@
         ]
       }
     },
+    "/api/v1/groups": {
+      "get": {
+        "summary": "List organization groups",
+        "description": "Returns a list of groups within an organization",
+        "operationId": "Authorization_ListOrganizationGroups",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Create group",
+        "description": "Creates a new group within an organization with a specific role",
+        "operationId": "Authorization_CreateOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/groups/{groupName}": {
+      "get": {
+        "summary": "Get organization group",
+        "description": "Returns details of a specific group within an organization",
+        "operationId": "Authorization_GetOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/groups/{groupName}/users": {
+      "get": {
+        "summary": "Get organization group users",
+        "description": "Returns users that belong to a specific group within an organization",
+        "operationId": "Authorization_GetOrganizationGroupUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationGetOrganizationGroupUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      },
+      "post": {
+        "summary": "Add user to organization group",
+        "description": "Adds a user to a group within an organization",
+        "operationId": "Authorization_AddUserToOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/groups/{groupName}/users/{userId}": {
+      "delete": {
+        "summary": "Remove user from organization group",
+        "description": "Removes a user from a group within an organization",
+        "operationId": "Authorization_RemoveUserFromOrganizationGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Authorization"
+        ]
+      }
+    },
+    "/api/v1/integrations": {
+      "get": {
+        "summary": "List integrations",
+        "description": "List integrations",
+        "operationId": "Integrations_ListIntegrations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsListIntegrationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      },
+      "post": {
+        "summary": "Create a new canvas integration",
+        "description": "Creates a new canvas integration",
+        "operationId": "Integrations_CreateIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsCreateIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/IntegrationsCreateIntegrationRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
+    "/api/v1/integrations/{idOrName}": {
+      "get": {
+        "summary": "Describe an integration",
+        "description": "Describe an integration",
+        "operationId": "Integrations_DescribeIntegration",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/IntegrationsDescribeIntegrationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Integration"
+        ]
+      }
+    },
     "/api/v1/organizations": {
       "get": {
         "summary": "List organizations",
@@ -2279,6 +2571,218 @@
           "Organization"
         ]
       }
+    },
+    "/api/v1/secrets": {
+      "get": {
+        "summary": "List secrets",
+        "description": "Returns the list of secrets",
+        "operationId": "Secrets_ListSecrets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsListSecretsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "post": {
+        "summary": "Create a new secret",
+        "description": "Creates a new secret",
+        "operationId": "Secrets_CreateSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsCreateSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SecretsCreateSecretRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
+    },
+    "/api/v1/secrets/{idOrName}": {
+      "get": {
+        "summary": "Get secret details",
+        "description": "Returns the details of a specific secret",
+        "operationId": "Secrets_DescribeSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsDescribeSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "delete": {
+        "summary": "Deletes a secret",
+        "description": "Deletes the specified secret",
+        "operationId": "Secrets_DeleteSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsDeleteSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      },
+      "patch": {
+        "summary": "Updates a secret",
+        "description": "Updates the specified secret",
+        "operationId": "Secrets_UpdateSecret",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/SecretsUpdateSecretBody"
+            }
+          }
+        ],
+        "tags": [
+          "Secret"
+        ]
+      }
     }
   },
   "definitions": {
@@ -2286,7 +2790,7 @@
       "type": "object",
       "properties": {
         "valueFrom": {
-          "$ref": "#/definitions/SuperplaneValueFrom"
+          "$ref": "#/definitions/SuperplaneIntegrationsValueFrom"
         }
       }
     },
@@ -3018,6 +3522,120 @@
         }
       }
     },
+    "IntegrationsCreateIntegrationRequest": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
+    "IntegrationsCreateIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
+    "IntegrationsDescribeIntegrationResponse": {
+      "type": "object",
+      "properties": {
+        "integration": {
+          "$ref": "#/definitions/IntegrationsIntegration"
+        }
+      }
+    },
+    "IntegrationsIntegration": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/IntegrationsIntegrationMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/IntegrationsIntegrationSpec"
+        }
+      }
+    },
+    "IntegrationsIntegrationMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "IntegrationsIntegrationRef": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "IntegrationsIntegrationSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/IntegrationsIntegrationType"
+        },
+        "url": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/definitions/IntegrationAuth"
+        },
+        "oidc": {
+          "$ref": "#/definitions/IntegrationOIDC"
+        }
+      }
+    },
+    "IntegrationsIntegrationType": {
+      "type": "string",
+      "enum": [
+        "TYPE_NONE",
+        "TYPE_SEMAPHORE",
+        "TYPE_GITHUB"
+      ],
+      "default": "TYPE_NONE"
+    },
+    "IntegrationsListIntegrationsResponse": {
+      "type": "object",
+      "properties": {
+        "integrations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/IntegrationsIntegration"
+          }
+        }
+      }
+    },
     "OrganizationsCreateOrganizationRequest": {
       "type": "object",
       "properties": {
@@ -3128,6 +3746,116 @@
         "PROVIDER_LOCAL"
       ],
       "default": "PROVIDER_UNKNOWN"
+    },
+    "SecretsCreateSecretRequest": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SecretsCreateSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        }
+      }
+    },
+    "SecretsDeleteSecretResponse": {
+      "type": "object"
+    },
+    "SecretsDescribeSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        }
+      }
+    },
+    "SecretsListSecretsResponse": {
+      "type": "object",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SecretsSecret"
+          }
+        }
+      }
+    },
+    "SecretsSecret": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/SecretsSecretMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/SecretsSecretSpec"
+        }
+      }
+    },
+    "SecretsSecretMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "SecretsSecretSpec": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/SecretProvider"
+        },
+        "local": {
+          "$ref": "#/definitions/SecretLocal"
+        }
+      }
+    },
+    "SecretsUpdateSecretBody": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        }
+      }
+    },
+    "SecretsUpdateSecretResponse": {
+      "type": "object",
+      "properties": {
+        "secret": {
+          "$ref": "#/definitions/SecretsSecret"
+        }
+      }
     },
     "SpecGroupBy": {
       "type": "object",
@@ -3458,38 +4186,6 @@
         }
       }
     },
-    "SuperplaneCreateIntegrationBody": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/SuperplaneIntegration"
-        }
-      }
-    },
-    "SuperplaneCreateIntegrationResponse": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/SuperplaneIntegration"
-        }
-      }
-    },
-    "SuperplaneCreateSecretBody": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
-        }
-      }
-    },
-    "SuperplaneCreateSecretResponse": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
-        }
-      }
-    },
     "SuperplaneCreateStageBody": {
       "type": "object",
       "properties": {
@@ -3514,9 +4210,6 @@
         }
       }
     },
-    "SuperplaneDeleteSecretResponse": {
-      "type": "object"
-    },
     "SuperplaneDescribeCanvasResponse": {
       "type": "object",
       "properties": {
@@ -3538,22 +4231,6 @@
       "properties": {
         "eventSource": {
           "$ref": "#/definitions/SuperplaneEventSource"
-        }
-      }
-    },
-    "SuperplaneDescribeIntegrationResponse": {
-      "type": "object",
-      "properties": {
-        "integration": {
-          "$ref": "#/definitions/SuperplaneIntegration"
-        }
-      }
-    },
-    "SuperplaneDescribeSecretResponse": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
         }
       }
     },
@@ -3602,7 +4279,7 @@
       "type": "object",
       "properties": {
         "integration": {
-          "$ref": "#/definitions/SuperplaneIntegrationRef"
+          "$ref": "#/definitions/IntegrationsIntegrationRef"
         },
         "semaphore": {
           "$ref": "#/definitions/EventSourceSpecSemaphore"
@@ -3674,7 +4351,7 @@
           "$ref": "#/definitions/SuperplaneExecutorSpecType"
         },
         "integration": {
-          "$ref": "#/definitions/SuperplaneIntegrationRef"
+          "$ref": "#/definitions/IntegrationsIntegrationRef"
         },
         "semaphore": {
           "$ref": "#/definitions/SuperplaneExecutorSpecSemaphore"
@@ -3782,77 +4459,24 @@
         }
       }
     },
-    "SuperplaneIntegration": {
+    "SuperplaneIntegrationsValueFrom": {
       "type": "object",
       "properties": {
-        "metadata": {
-          "$ref": "#/definitions/SuperplaneIntegrationMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/SuperplaneIntegrationSpec"
+        "secret": {
+          "$ref": "#/definitions/SuperplaneIntegrationsValueFromSecret"
         }
       }
     },
-    "SuperplaneIntegrationMetadata": {
+    "SuperplaneIntegrationsValueFromSecret": {
       "type": "object",
       "properties": {
-        "id": {
-          "type": "string"
-        },
         "name": {
           "type": "string"
         },
-        "createdBy": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
+        "key": {
           "type": "string"
         }
       }
-    },
-    "SuperplaneIntegrationRef": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "name": {
-          "type": "string"
-        }
-      }
-    },
-    "SuperplaneIntegrationSpec": {
-      "type": "object",
-      "properties": {
-        "type": {
-          "$ref": "#/definitions/SuperplaneIntegrationType"
-        },
-        "url": {
-          "type": "string"
-        },
-        "auth": {
-          "$ref": "#/definitions/IntegrationAuth"
-        },
-        "oidc": {
-          "$ref": "#/definitions/IntegrationOIDC"
-        }
-      }
-    },
-    "SuperplaneIntegrationType": {
-      "type": "string",
-      "enum": [
-        "TYPE_NONE",
-        "TYPE_SEMAPHORE",
-        "TYPE_GITHUB"
-      ],
-      "default": "TYPE_NONE"
     },
     "SuperplaneKeyValuePair": {
       "type": "object",
@@ -3909,30 +4533,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/SuperplaneEventSource"
-          }
-        }
-      }
-    },
-    "SuperplaneListIntegrationsResponse": {
-      "type": "object",
-      "properties": {
-        "integrations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneIntegration"
-          }
-        }
-      }
-    },
-    "SuperplaneListSecretsResponse": {
-      "type": "object",
-      "properties": {
-        "secrets": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/SuperplaneSecret"
           }
         }
       }
@@ -3997,46 +4597,6 @@
         },
         "key": {
           "type": "string"
-        }
-      }
-    },
-    "SuperplaneSecret": {
-      "type": "object",
-      "properties": {
-        "metadata": {
-          "$ref": "#/definitions/SuperplaneSecretMetadata"
-        },
-        "spec": {
-          "$ref": "#/definitions/SuperplaneSecretSpec"
-        }
-      }
-    },
-    "SuperplaneSecretMetadata": {
-      "type": "object",
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "name": {
-          "type": "string"
-        },
-        "canvasId": {
-          "type": "string"
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        }
-      }
-    },
-    "SuperplaneSecretSpec": {
-      "type": "object",
-      "properties": {
-        "provider": {
-          "$ref": "#/definitions/SecretProvider"
-        },
-        "local": {
-          "$ref": "#/definitions/SecretLocal"
         }
       }
     },
@@ -4208,22 +4768,6 @@
       "properties": {
         "connectionGroup": {
           "$ref": "#/definitions/SuperplaneConnectionGroup"
-        }
-      }
-    },
-    "SuperplaneUpdateSecretBody": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
-        }
-      }
-    },
-    "SuperplaneUpdateSecretResponse": {
-      "type": "object",
-      "properties": {
-        "secret": {
-          "$ref": "#/definitions/SuperplaneSecret"
         }
       }
     },

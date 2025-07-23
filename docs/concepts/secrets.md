@@ -4,6 +4,8 @@ Secrets allow you to store sensitive values and share them in your canvas. You c
 kind: Secret
 metadata:
   name: my-secret
+  domainType: DOMAIN_TYPE_CANVAS
+  domainId: canvas-123
 spec:
   provider: local
   local:

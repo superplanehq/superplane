@@ -36,7 +36,7 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 		return nil, err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, err
 	}

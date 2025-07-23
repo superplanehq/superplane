@@ -22,7 +22,7 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	t.Run("successful role removal with user ID", func(t *testing.T) {
@@ -59,7 +59,7 @@ func Test_RemoveRole(t *testing.T) {
 		err = accountProvider.Create()
 		require.NoError(t, err)
 
-		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
+		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 
 		req := &pb.RemoveRoleRequest{

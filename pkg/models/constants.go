@@ -6,8 +6,8 @@ const (
 	ProviderGitHub = "github"
 	ScopeUser      = "user"
 
-	DomainOrg    = "org"
-	DomainCanvas = "canvas"
+	DomainTypeOrg    = "org"
+	DomainTypeCanvas = "canvas"
 
 	DisplayNameOwner  = "Owner"
 	DisplayNameAdmin  = "Admin"
@@ -22,24 +22,24 @@ const (
 	RoleCanvasViewer = "canvas_viewer"
 
 	// Role descriptions
-	DescOrgOwner    = "Complete control over the organization including settings and deletion"
-	DescOrgAdmin    = "Full management access to organization resources including canvases and users"
-	DescOrgViewer   = "Read-only access to organization resources"
-	DescCanvasOwner = "Complete control over the canvas including member management"
-	DescCanvasAdmin = "Full management access to canvas resources including stages and events"
+	DescOrgOwner     = "Complete control over the organization including settings and deletion"
+	DescOrgAdmin     = "Full management access to organization resources including canvases and users"
+	DescOrgViewer    = "Read-only access to organization resources"
+	DescCanvasOwner  = "Complete control over the canvas including member management"
+	DescCanvasAdmin  = "Full management access to canvas resources including stages and events"
 	DescCanvasViewer = "Read-only access to canvas resources"
 
 	// Metadata descriptions
-	MetaDescOrgOwner    = "Full control over organization settings, billing, and member management."
-	MetaDescOrgAdmin    = "Can manage canvases, users, groups, and roles within the organization."
-	MetaDescOrgViewer   = "Read-only access to organization resources and information."
-	MetaDescCanvasOwner = "Full control over canvas settings, members, and deletion."
-	MetaDescCanvasAdmin = "Can manage stages, events, connections, and secrets within the canvas."
+	MetaDescOrgOwner     = "Full control over organization settings, billing, and member management."
+	MetaDescOrgAdmin     = "Can manage canvases, users, groups, and roles within the organization."
+	MetaDescOrgViewer    = "Read-only access to organization resources and information."
+	MetaDescCanvasOwner  = "Full control over canvas settings, members, and deletion."
+	MetaDescCanvasAdmin  = "Can manage stages, events, connections, and secrets within the canvas."
 	MetaDescCanvasViewer = "Read-only access to canvas resources and execution information."
 )
 
 func ValidateDomainType(domainType string) error {
-	if domainType != DomainOrg && domainType != DomainCanvas {
+	if domainType != DomainTypeOrg && domainType != DomainTypeCanvas {
 		return fmt.Errorf("invalid domain type %s", domainType)
 	}
 	return nil

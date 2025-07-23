@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/superplanehq/superplane/pkg/protos/superplane"
+	superplane "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 func Test__InputValidator(t *testing.T) {

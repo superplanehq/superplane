@@ -6,57 +6,45 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateSecretRequest) (*pb.CreateSecretResponse, error) {
+func CreateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, spec *pb.Secret) (*pb.CreateSecretResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	if req.Secret == nil {
+	if spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing secret")
 	}
 
-	if req.Secret.Metadata == nil || req.Secret.Metadata.Name == "" {
+	if spec.Metadata == nil || spec.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "empty secret name")
 	}
 
-	if req.Secret.Spec == nil {
+	if spec.Spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
 	}
 
-	provider := protoToSecretProvider(req.Secret.Spec.Provider)
+	provider := protoToSecretProvider(spec.Spec.Provider)
 	if provider == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, req.Secret)
+	data, err := prepareSecretData(ctx, encryptor, spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secret, err := models.CreateSecret(req.Secret.Metadata.Name, provider, userID, canvas.ID, data)
+	secret, err := models.CreateSecret(spec.Metadata.Name, provider, userID, domainType, uuid.MustParse(domainID), data)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())

@@ -19,7 +19,7 @@ func GetOrganizationUsers(ctx context.Context, req *pb.GetOrganizationUsersReque
 	}
 
 	// Get all users with roles in the organization
-	users, err := GetUsersWithRolesInDomain(req.OrganizationId, models.DomainOrg, authService)
+	users, err := GetUsersWithRolesInDomain(req.OrganizationId, models.DomainTypeOrg, authService)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get organization users")
 	}
@@ -53,7 +53,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	for _, roleDef := range roleDefinitions {
 		var userIDs []string
 
-		if domainType == models.DomainOrg {
+		if domainType == models.DomainTypeOrg {
 			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
 		} else {
 			userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
@@ -68,7 +68,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 			RoleName:        roleDef.Name,
 			RoleDisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
 			RoleDescription: models.GetRoleDescriptionWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
-			DomainType:      convertDomainTypeToProto(domainType),
+			DomainType:      actions.DomainTypeToProto(domainType),
 			DomainId:        domainID,
 			AssignedAt:      time.Now().Format(time.RFC3339),
 		}

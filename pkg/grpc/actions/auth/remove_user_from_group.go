@@ -21,7 +21,7 @@ func RemoveUserFromGroup(ctx context.Context, req *GroupUserRequest, authService
 		return err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return err
 	}

@@ -101,17 +101,6 @@ func ConvertCanvasIdOrNameToId(canvasIdOrName string) (string, error) {
 	return canvasIdOrName, nil
 }
 
-func ConvertDomainType(domainType pb.DomainType) (string, error) {
-	switch domainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return models.DomainOrg, nil
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		return models.DomainCanvas, nil
-	default:
-		return "", status.Error(codes.InvalidArgument, "unsupported domain type")
-	}
-}
-
 // Organization group adapters
 func ConvertCreateOrganizationGroupRequest(req *pb.CreateOrganizationGroupRequest) *CreateGroupRequest {
 	return &CreateGroupRequest{

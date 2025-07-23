@@ -38,7 +38,7 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 		return nil, err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, err
 	}

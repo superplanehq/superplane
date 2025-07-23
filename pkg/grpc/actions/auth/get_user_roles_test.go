@@ -22,7 +22,7 @@ func Test_GetUserRoles(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	t.Run("successful get user roles", func(t *testing.T) {

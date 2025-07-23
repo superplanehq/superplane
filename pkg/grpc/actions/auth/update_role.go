@@ -22,9 +22,9 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	domainType := convertDomainType(req.DomainType)
-	if domainType == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
 	}
 
 	// Check if role exists
@@ -40,7 +40,7 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 		permissions[i] = &authorization.Permission{
 			Resource:   perm.Resource,
 			Action:     perm.Action,
-			DomainType: convertDomainType(perm.DomainType),
+			DomainType: domainType,
 		}
 	}
 

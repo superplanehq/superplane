@@ -18,14 +18,19 @@ var deleteSecretCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		domainType, _ := cmd.Flags().GetString("domain-type")
+		domainID, _ := cmd.Flags().GetString("domain-id")
+		if domainID == "" {
+			fmt.Println("Domain ID not provided")
+			os.Exit(1)
+		}
 
 		c := DefaultClient()
-		_, httpResponse, err := c.SecretAPI.SuperplaneDeleteSecret(
-			context.Background(),
-			canvasIDOrName,
-			idOrName,
-		).Execute()
+		_, httpResponse, err := c.SecretAPI.
+			SecretsDeleteSecret(context.Background(), idOrName).
+			DomainId(domainID).
+			DomainType(domainType).
+			Execute()
 
 		if err != nil {
 			b, _ := io.ReadAll(httpResponse.Body)
@@ -49,6 +54,6 @@ func init() {
 
 	// Secret command
 	deleteCmd.AddCommand(deleteSecretCmd)
-	deleteSecretCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
-	deleteSecretCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
+	deleteSecretCmd.Flags().String("domain-type", "DOMAIN_TYPE_ORGANIZATION", "Domain to list secrets from (organization, canvas)")
+	deleteSecretCmd.Flags().String("domain-id", "", "ID of the domain (organization ID, canvas ID)")
 }

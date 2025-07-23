@@ -82,11 +82,11 @@ func NewAuthService() (*AuthService, error) {
 }
 
 func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, canvasID, models.DomainCanvas, resource, action)
+	return a.checkPermission(userID, canvasID, models.DomainTypeCanvas, resource, action)
 }
 
 func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, orgID, models.DomainOrg, resource, action)
+	return a.checkPermission(userID, orgID, models.DomainTypeOrg, resource, action)
 }
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
@@ -303,8 +303,8 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 
 	// Check if it's a default role
 	validRoles := map[string][]string{
-		models.DomainOrg:    {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
-		models.DomainCanvas: {models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner},
+		models.DomainTypeOrg:    {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
+		models.DomainTypeCanvas: {models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner},
 	}
 
 	isValidDefaultRole := false
@@ -400,13 +400,12 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
 
 	for _, policy := range a.orgPolicyTemplates {
-		if policy[0] == "g" {
-			// g,lower_role,higher_role,org:{ORG_ID}
+		switch policy[0] {
+		case "g":
 			a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
-		} else if policy[0] == "p" {
-			// p,role,org:{ORG_ID},resource,action
+		case "p":
 			a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
-		} else {
+		default:
 			return fmt.Errorf("unknown policy type: %s", policy[0])
 		}
 	}
@@ -491,7 +490,7 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 	roles := []*RoleDefinition{}
 	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, models.DomainOrg, orgID)
+		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeOrg, orgID)
 		if err != nil {
 			continue
 		}
@@ -518,7 +517,7 @@ func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*
 
 	roles := []*RoleDefinition{}
 	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, models.DomainCanvas, canvasID)
+		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeCanvas, canvasID)
 		if err != nil {
 			continue
 		}
@@ -711,7 +710,7 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 }
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
-	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainOrg)
+	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrg)
 }
 
 func (a *AuthService) SyncDefaultRoles() error {
@@ -787,14 +786,6 @@ func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
 	}
 
 	return missingPerms, nil
-}
-
-func (a *AuthService) getAllOrganizations() ([]models.Organization, error) {
-	return models.ListOrganizations()
-}
-
-func (a *AuthService) getAllCanvases() ([]models.Canvas, error) {
-	return models.ListCanvases()
 }
 
 // Optimized function to get only organization IDs that have missing permissions
@@ -1184,8 +1175,8 @@ func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleN
 // IsDefaultRole checks if a role is a default system role
 func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
 	defaultRoles := map[string][]string{
-		models.DomainOrg:    {models.RoleOrgOwner, models.RoleOrgAdmin, models.RoleOrgViewer},
-		models.DomainCanvas: {models.RoleCanvasOwner, models.RoleCanvasAdmin, models.RoleCanvasViewer},
+		models.DomainTypeOrg:    {models.RoleOrgOwner, models.RoleOrgAdmin, models.RoleOrgViewer},
+		models.DomainTypeCanvas: {models.RoleCanvasOwner, models.RoleCanvasAdmin, models.RoleCanvasViewer},
 	}
 
 	roles, exists := defaultRoles[domainType]
@@ -1380,9 +1371,9 @@ func contains(slice []string, item string) bool {
 
 func (a *AuthService) getDomainTypeFromDomain(domain string) string {
 	if strings.HasPrefix(domain, "org:") {
-		return models.DomainOrg
+		return models.DomainTypeOrg
 	} else if strings.HasPrefix(domain, "canvas:") {
-		return models.DomainCanvas
+		return models.DomainTypeCanvas
 	}
 	return ""
 }
@@ -1412,7 +1403,7 @@ func (a *AuthService) setupDefaultOrganizationRoleMetadata(orgID string) error {
 	}
 
 	for _, role := range defaultRoles {
-		if err := models.UpsertRoleMetadata(role.name, models.DomainOrg, orgID, role.displayName, role.description); err != nil {
+		if err := models.UpsertRoleMetadata(role.name, models.DomainTypeOrg, orgID, role.displayName, role.description); err != nil {
 			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
 		}
 	}
@@ -1445,7 +1436,7 @@ func (a *AuthService) setupDefaultCanvasRoleMetadata(canvasID string) error {
 	}
 
 	for _, role := range defaultRoles {
-		if err := models.UpsertRoleMetadata(role.name, models.DomainCanvas, canvasID, role.displayName, role.description); err != nil {
+		if err := models.UpsertRoleMetadata(role.name, models.DomainTypeCanvas, canvasID, role.displayName, role.description); err != nil {
 			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
 		}
 	}

@@ -22,10 +22,10 @@ func TestGetCanvasUsers(t *testing.T) {
 	userID1 := uuid.New().String()
 	userID2 := uuid.New().String()
 
-	err = authService.AssignRole(userID1, "canvas_admin", canvasID, models.DomainCanvas)
+	err = authService.AssignRole(userID1, "canvas_admin", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
-	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainCanvas)
+	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
 	req := &pb.GetCanvasUsersRequest{
@@ -103,7 +103,7 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to the active user
-	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainCanvas)
+	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
 	req := &pb.GetCanvasUsersRequest{

@@ -43,10 +43,10 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created by verifying we can get its definition
-		roleDef, err := authService.GetRoleDefinition("custom-role", models.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role", models.DomainTypeOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role", roleDef.Name)
-		assert.Equal(t, models.DomainOrg, roleDef.DomainType)
+		assert.Equal(t, models.DomainTypeOrg, roleDef.DomainType)
 		assert.Len(t, roleDef.Permissions, 2)
 	})
 
@@ -70,7 +70,7 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", models.DomainOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", models.DomainTypeOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "custom-role-with-inheritance", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)

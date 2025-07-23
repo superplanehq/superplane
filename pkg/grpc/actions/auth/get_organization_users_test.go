@@ -26,10 +26,10 @@ func TestGetOrganizationUsers(t *testing.T) {
 	userID2 := uuid.New().String()
 
 	// Assign roles to users
-	err = authService.AssignRole(userID1, "org_admin", orgID, models.DomainOrg)
+	err = authService.AssignRole(userID1, "org_admin", orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
-	err = authService.AssignRole(userID2, "org_viewer", orgID, models.DomainOrg)
+	err = authService.AssignRole(userID2, "org_viewer", orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	// Test getting organization users
@@ -112,7 +112,7 @@ func TestGetOrganizationUsersWithActiveUser(t *testing.T) {
 	err = user.Create()
 	require.NoError(t, err)
 
-	err = authService.AssignRole(user.ID.String(), "org_admin", orgID, models.DomainOrg)
+	err = authService.AssignRole(user.ID.String(), "org_admin", orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	req := &pb.GetOrganizationUsersRequest{

@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -27,7 +27,7 @@ func Test__ListCanvases(t *testing.T) {
 		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 		authService.SetupCanvasRoles(r.Canvas.ID.String())
-		authService.AssignRole(user.ID.String(), models.RoleCanvasOwner, r.Canvas.ID.String(), models.DomainCanvas)
+		authService.AssignRole(user.ID.String(), models.RoleCanvasOwner, r.Canvas.ID.String(), models.DomainTypeCanvas)
 
 		res, err := ListCanvases(ctx, &protos.ListCanvasesRequest{}, authService)
 		require.NoError(t, err)
@@ -45,7 +45,7 @@ func Test__ListCanvases(t *testing.T) {
 		ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
 
 		authService.SetupCanvasRoles(r.Canvas.ID.String())
-		authService.AssignRole(user.ID.String(), models.RoleCanvasOwner, r.Canvas.ID.String(), models.DomainCanvas)
+		authService.AssignRole(user.ID.String(), models.RoleCanvasOwner, r.Canvas.ID.String(), models.DomainTypeCanvas)
 
 		res, err := ListCanvases(ctx, &protos.ListCanvasesRequest{
 			OrganizationId: r.Organization.ID.String(),

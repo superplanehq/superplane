@@ -36,7 +36,10 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 	}
 
 	// Extract all role names for batch metadata lookup
-	domainType := convertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	if err != nil {
+		return nil, err
+	}
 	roleNames := make([]string, len(roles))
 	for i, role := range roles {
 		roleNames[i] = role.Name

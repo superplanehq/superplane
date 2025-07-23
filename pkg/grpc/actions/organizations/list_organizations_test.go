@@ -26,7 +26,7 @@ func Test__ListOrganizations(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "This is a test organization")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(userID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrg)
 
 		res, err := ListOrganizations(ctx, &protos.ListOrganizationsRequest{}, authService)
 		require.NoError(t, err)
@@ -55,9 +55,9 @@ func Test__ListOrganizations(t *testing.T) {
 		authService.SetupOrganizationRoles(org1.ID.String())
 		authService.SetupOrganizationRoles(org2.ID.String())
 
-		authService.AssignRole(user1ID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainOrg)
+		authService.AssignRole(user1ID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrg)
 
-		authService.AssignRole(user2ID.String(), models.RoleOrgOwner, org2.ID.String(), models.DomainOrg)
+		authService.AssignRole(user2ID.String(), models.RoleOrgOwner, org2.ID.String(), models.DomainTypeOrg)
 
 		// User1 should only see org1
 		ctx1 := context.Background()
@@ -90,7 +90,7 @@ func Test__ListOrganizations(t *testing.T) {
 		organization, err := models.CreateOrganization(otherUserID, "other-org", "Other User Organization", "Organization for other user")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainOrg)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrg)
 
 		ctx := context.Background()
 		ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
@@ -118,11 +118,11 @@ func Test__ListOrganizations(t *testing.T) {
 		authService.SetupOrganizationRoles(org2.ID.String())
 		authService.SetupOrganizationRoles(org3.ID.String())
 
-		authService.AssignRole(userID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrg)
 
-		authService.AssignRole(userID.String(), models.RoleOrgViewer, org2.ID.String(), models.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgViewer, org2.ID.String(), models.DomainTypeOrg)
 
-		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, org3.ID.String(), models.DomainOrg)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, org3.ID.String(), models.DomainTypeOrg)
 
 		// user should see org1 and org2, but not org3
 		ctx := context.Background()
