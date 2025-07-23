@@ -23,7 +23,7 @@ type RolesRoleSpec struct {
 	DisplayName *string `json:"displayName,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Permissions []AuthorizationPermission `json:"permissions,omitempty"`
-	InheritedRole *string `json:"inheritedRole,omitempty"`
+	InheritedRole *RolesRole `json:"inheritedRole,omitempty"`
 }
 
 // NewRolesRoleSpec instantiates a new RolesRoleSpec object
@@ -140,9 +140,9 @@ func (o *RolesRoleSpec) SetPermissions(v []AuthorizationPermission) {
 }
 
 // GetInheritedRole returns the InheritedRole field value if set, zero value otherwise.
-func (o *RolesRoleSpec) GetInheritedRole() string {
+func (o *RolesRoleSpec) GetInheritedRole() RolesRole {
 	if o == nil || IsNil(o.InheritedRole) {
-		var ret string
+		var ret RolesRole
 		return ret
 	}
 	return *o.InheritedRole
@@ -150,7 +150,7 @@ func (o *RolesRoleSpec) GetInheritedRole() string {
 
 // GetInheritedRoleOk returns a tuple with the InheritedRole field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesRoleSpec) GetInheritedRoleOk() (*string, bool) {
+func (o *RolesRoleSpec) GetInheritedRoleOk() (*RolesRole, bool) {
 	if o == nil || IsNil(o.InheritedRole) {
 		return nil, false
 	}
@@ -166,8 +166,8 @@ func (o *RolesRoleSpec) HasInheritedRole() bool {
 	return false
 }
 
-// SetInheritedRole gets a reference to the given string and assigns it to the InheritedRole field.
-func (o *RolesRoleSpec) SetInheritedRole(v string) {
+// SetInheritedRole gets a reference to the given RolesRole and assigns it to the InheritedRole field.
+func (o *RolesRoleSpec) SetInheritedRole(v RolesRole) {
 	o.InheritedRole = &v
 }
 

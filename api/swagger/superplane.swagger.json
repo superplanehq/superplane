@@ -2759,7 +2759,7 @@
           }
         },
         "inheritedRole": {
-          "type": "string"
+          "$ref": "#/definitions/RolesRole"
         }
       }
     },

@@ -6,7 +6,8 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,15 +18,15 @@ func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+	if req.DomainType == pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
 	var roles []*authorization.RoleDefinition
 	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		roles, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
 		roles, err = authService.GetUserRolesForCanvas(req.UserId, req.DomainId)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
@@ -35,14 +36,14 @@ func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest
 		return nil, status.Error(codes.Internal, "failed to get user roles")
 	}
 
-	permissionSet := make(map[string]*pb.Permission)
+	permissionSet := make(map[string]*pbAuth.Permission)
 
 	for _, role := range roles {
 		rolePermissions := role.Permissions
 
 		for _, perm := range rolePermissions {
 			key := fmt.Sprintf("%s:%s", perm.Resource, perm.Action)
-			permissionSet[key] = &pb.Permission{
+			permissionSet[key] = &pbAuth.Permission{
 				Resource:   perm.Resource,
 				Action:     perm.Action,
 				DomainType: req.DomainType,
@@ -50,7 +51,7 @@ func ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest
 		}
 	}
 
-	permissions := make([]*pb.Permission, 0, len(permissionSet))
+	permissions := make([]*pbAuth.Permission, 0, len(permissionSet))
 	for _, perm := range permissionSet {
 		permissions = append(permissions, perm)
 	}

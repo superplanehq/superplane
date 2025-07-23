@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_CreateRole(t *testing.T) {
@@ -22,18 +23,18 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("successful custom role creation", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:       "custom-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 				{
 					Resource:   "canvas",
 					Action:     "write",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -53,14 +54,14 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("successful custom role creation with inheritance", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:          "custom-role-with-inheritance",
-			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType:    pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:      orgID,
 			InheritedRole: models.RoleOrgViewer,
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "create",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -80,13 +81,13 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("invalid request - missing role name", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:       "",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -99,13 +100,13 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("invalid request - invalid domain type", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:       "test-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -118,13 +119,13 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:       models.RoleOrgAdmin,
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -137,13 +138,13 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:       "test-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   "invalid-uuid",
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
@@ -156,14 +157,14 @@ func Test_CreateRole(t *testing.T) {
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {
 		req := &pb.CreateRoleRequest{
 			Name:          "test-role",
-			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType:    pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:      orgID,
 			InheritedRole: "nonexistent-role",
-			Permissions: []*pb.Permission{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}

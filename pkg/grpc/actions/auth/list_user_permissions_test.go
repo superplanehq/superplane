@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -28,7 +29,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	t.Run("successful list user permissions", func(t *testing.T) {
 		req := &pb.ListUserPermissionsRequest{
 			UserId:     r.User.String(),
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -55,7 +56,7 @@ func Test_ListUserPermissions(t *testing.T) {
 	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
 		req := &pb.ListUserPermissionsRequest{
 			UserId:     r.User.String(),
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 		}
 

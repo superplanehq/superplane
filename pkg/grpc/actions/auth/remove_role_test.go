@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -29,7 +30,7 @@ func Test_RemoveRole(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},
@@ -65,7 +66,7 @@ func Test_RemoveRole(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			UserEmail: testEmail,
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},
@@ -80,7 +81,7 @@ func Test_RemoveRole(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			UserEmail: "nonexistent@example.com",
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},
@@ -95,7 +96,7 @@ func Test_RemoveRole(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			UserId: r.User.String(),
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},
@@ -109,7 +110,7 @@ func Test_RemoveRole(t *testing.T) {
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},
@@ -124,7 +125,7 @@ func Test_RemoveRole(t *testing.T) {
 		req := &pb.RemoveRoleRequest{
 			UserId: "invalid-uuid",
 			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				DomainId:   orgID,
 				Role:       models.RoleOrgAdmin,
 			},

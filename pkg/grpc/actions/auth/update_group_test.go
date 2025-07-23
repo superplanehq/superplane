@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 
 func TestUpdateGroup(t *testing.T) {
@@ -25,9 +26,9 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the group role
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 			Role:       models.RoleOrgAdmin,
 		}
@@ -35,7 +36,7 @@ func TestUpdateGroup(t *testing.T) {
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Role)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
 
 		// Verify the role was updated
 		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrg, "test-group")
@@ -49,9 +50,9 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the group metadata
-		req := &UpdateGroupRequest{
-			DomainType:  pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:    orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType:  pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:    orgID,
 			GroupName:   "metadata-group",
 			DisplayName: "Updated Display Name",
 			Description: "Updated Description",
@@ -60,8 +61,8 @@ func TestUpdateGroup(t *testing.T) {
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, "Updated Display Name", resp.Group.DisplayName)
-		assert.Equal(t, "Updated Description", resp.Group.Description)
+		assert.Equal(t, "Updated Display Name", resp.Group.Spec.DisplayName)
+		assert.Equal(t, "Updated Description", resp.Group.Spec.Description)
 	})
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
@@ -70,9 +71,9 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update both role and metadata
-		req := &UpdateGroupRequest{
-			DomainType:  pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:    orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType:  pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:    orgID,
 			GroupName:   "full-update-group",
 			Role:        models.RoleOrgAdmin,
 			DisplayName: "Full Update Display",
@@ -82,9 +83,9 @@ func TestUpdateGroup(t *testing.T) {
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Role)
-		assert.Equal(t, "Full Update Display", resp.Group.DisplayName)
-		assert.Equal(t, "Full Update Description", resp.Group.Description)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
+		assert.Equal(t, "Full Update Display", resp.Group.Spec.DisplayName)
+		assert.Equal(t, "Full Update Description", resp.Group.Spec.Description)
 	})
 
 	t.Run("update preserves group membership", func(t *testing.T) {
@@ -101,9 +102,9 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the group role
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "membership-group",
 			Role:       models.RoleOrgAdmin,
 		}
@@ -130,9 +131,9 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Update the canvas group
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainID:   canvasID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
 			GroupName:  "canvas-group",
 			Role:       models.RoleCanvasAdmin,
 		}
@@ -140,13 +141,13 @@ func TestUpdateGroup(t *testing.T) {
 		resp, err := UpdateGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, models.RoleCanvasAdmin, resp.Group.Role)
+		assert.Equal(t, models.RoleCanvasAdmin, resp.Group.Spec.Role)
 	})
 
 	t.Run("group not found", func(t *testing.T) {
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "non-existent-group",
 			Role:       models.RoleOrgAdmin,
 		}
@@ -157,9 +158,9 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("invalid domain ID", func(t *testing.T) {
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   "invalid-uuid",
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   "invalid-uuid",
 			GroupName:  "test-group",
 			Role:       models.RoleOrgAdmin,
 		}
@@ -170,9 +171,9 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("missing group name", func(t *testing.T) {
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "",
 			Role:       models.RoleOrgAdmin,
 		}
@@ -183,9 +184,9 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("no fields to update", func(t *testing.T) {
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 			// No fields to update
 		}
@@ -196,9 +197,9 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("invalid domain type", func(t *testing.T) {
-		req := &UpdateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainID:   orgID,
+		req := &pb.UpdateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 			Role:       models.RoleOrgAdmin,
 		}

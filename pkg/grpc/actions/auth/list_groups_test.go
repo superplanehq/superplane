@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 
 func Test_ListGroups(t *testing.T) {
@@ -31,9 +32,9 @@ func Test_ListGroups(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
-		req := &GroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.ListGroupsRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 		}
 
 		resp, err := ListGroups(ctx, req, authService)
@@ -43,28 +44,28 @@ func Test_ListGroups(t *testing.T) {
 
 		// Check that groups have the correct structure
 		for _, group := range resp.Groups {
-			assert.NotEmpty(t, group.Name)
-			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, group.DomainType)
-			assert.Equal(t, orgID, group.DomainId)
-			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Role)
-			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
-			assert.NotEmpty(t, group.CreatedAt)
-			assert.NotEmpty(t, group.UpdatedAt)
+			assert.NotEmpty(t, group.Metadata.Name)
+			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, group.Metadata.DomainType)
+			assert.Equal(t, orgID, group.Metadata.DomainId)
+			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Spec.Role)
+			assert.GreaterOrEqual(t, group.Status.MembersCount, int32(0))
+			assert.NotEmpty(t, group.Metadata.CreatedAt)
+			assert.NotEmpty(t, group.Metadata.UpdatedAt)
 		}
 
 		// Check specific group names
 		groupNames := make([]string, len(resp.Groups))
 		for i, group := range resp.Groups {
-			groupNames[i] = group.Name
+			groupNames[i] = group.Metadata.Name
 		}
 		assert.Contains(t, groupNames, "test-group-1")
 		assert.Contains(t, groupNames, "test-group-2")
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &GroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainID:   orgID,
+		req := &pb.ListGroupsRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainId:   orgID,
 		}
 
 		_, err := ListGroups(ctx, req, authService)
@@ -88,9 +89,9 @@ func Test_ListGroups(t *testing.T) {
 		err = models.UpsertGroupMetadata("canvas-group-2", "canvas", canvasID, "Canvas Group 2", "Another canvas group")
 		require.NoError(t, err)
 
-		req := &GroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainID:   canvasID,
+		req := &pb.ListGroupsRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
 		}
 
 		resp, err := ListGroups(ctx, req, authService)
@@ -100,18 +101,18 @@ func Test_ListGroups(t *testing.T) {
 
 		// Check that groups have the correct structure
 		for _, group := range resp.Groups {
-			assert.NotEmpty(t, group.Name)
-			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, group.DomainType)
-			assert.Equal(t, canvasID, group.DomainId)
-			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
-			assert.NotEmpty(t, group.CreatedAt)
-			assert.NotEmpty(t, group.UpdatedAt)
+			assert.NotEmpty(t, group.Metadata.Name)
+			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, group.Metadata.DomainType)
+			assert.Equal(t, canvasID, group.Metadata.DomainId)
+			assert.GreaterOrEqual(t, group.Status.MembersCount, int32(0))
+			assert.NotEmpty(t, group.Metadata.CreatedAt)
+			assert.NotEmpty(t, group.Metadata.UpdatedAt)
 		}
 
 		// Check specific group names
 		groupNames := make([]string, len(resp.Groups))
 		for i, group := range resp.Groups {
-			groupNames[i] = group.Name
+			groupNames[i] = group.Metadata.Name
 		}
 		assert.Contains(t, groupNames, "canvas-group-1")
 		assert.Contains(t, groupNames, "canvas-group-2")
@@ -126,9 +127,9 @@ func Test_ListGroups(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, "org", "test-user-1", "test-group-1")
 		require.NoError(t, err)
 
-		req := &GroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.ListGroupsRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 		}
 
 		resp, err := ListGroups(ctx, req, authService)
@@ -137,17 +138,17 @@ func Test_ListGroups(t *testing.T) {
 		// Find the group with metadata
 		var groupWithMetadata *pb.Group
 		for _, group := range resp.Groups {
-			if group.Name == "test-group-1" {
+			if group.Metadata.Name == "test-group-1" {
 				groupWithMetadata = group
 				break
 			}
 		}
 
 		require.NotNil(t, groupWithMetadata)
-		assert.NotEmpty(t, groupWithMetadata.CreatedAt)
-		assert.NotEmpty(t, groupWithMetadata.UpdatedAt)
-		assert.Equal(t, int32(1), groupWithMetadata.MembersCount)
-		assert.Equal(t, "Test Group 1", groupWithMetadata.DisplayName)
-		assert.Equal(t, "A test group", groupWithMetadata.Description)
+		assert.NotEmpty(t, groupWithMetadata.Metadata.CreatedAt)
+		assert.NotEmpty(t, groupWithMetadata.Metadata.UpdatedAt)
+		assert.Equal(t, int32(1), groupWithMetadata.Status.MembersCount)
+		assert.Equal(t, "Test Group 1", groupWithMetadata.Spec.DisplayName)
+		assert.Equal(t, "A test group", groupWithMetadata.Spec.Description)
 	})
 }

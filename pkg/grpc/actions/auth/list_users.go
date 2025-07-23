@@ -2,29 +2,27 @@ package auth
 
 import (
 	"context"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func GetOrganizationUsers(ctx context.Context, req *pb.GetOrganizationUsersRequest, authService authorization.Authorization) (*pb.GetOrganizationUsersResponse, error) {
-	err := actions.ValidateUUIDs(req.OrganizationId)
+func ListUsers(ctx context.Context, req *pb.ListUsersRequest, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
+	}
+	users, err := GetUsersWithRolesInDomain(req.DomainId, domainType, authService)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get canvas users")
 	}
 
-	// Get all users with roles in the organization
-	users, err := GetUsersWithRolesInDomain(req.OrganizationId, models.DomainTypeOrg, authService)
-	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get organization users")
-	}
-
-	return &pb.GetOrganizationUsersResponse{
+	return &pb.ListUsersResponse{
 		Users: users,
 	}, nil
 }
@@ -70,7 +68,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 			RoleDescription: models.GetRoleDescriptionWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
 			DomainType:      actions.DomainTypeToProto(domainType),
 			DomainId:        domainID,
-			AssignedAt:      time.Now().Format(time.RFC3339),
+			AssignedAt:      timestamppb.Now(),
 		}
 
 		for _, userID := range userIDs {
@@ -94,15 +92,21 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 	dbUser, err := models.FindUserByID(userID)
 	if err != nil {
 		return &pb.User{
-			UserId:           userID,
-			DisplayName:      "Test User",
-			Email:            "test@example.com",
-			AvatarUrl:        "",
-			IsActive:         false,
-			CreatedAt:        time.Now().Format(time.RFC3339),
-			UpdatedAt:        time.Now().Format(time.RFC3339),
-			RoleAssignments:  roleAssignments,
-			AccountProviders: []*pb.AccountProvider{},
+			Metadata: &pb.User_Metadata{
+				Id:        userID,
+				Email:     "test@example.com",
+				CreatedAt: timestamppb.Now(),
+				UpdatedAt: timestamppb.Now(),
+			},
+			Spec: &pb.User_Spec{
+				DisplayName:      "Test User",
+				AvatarUrl:        "",
+				AccountProviders: []*pb.AccountProvider{},
+			},
+			Status: &pb.User_Status{
+				IsActive:        false,
+				RoleAssignments: roleAssignments,
+			},
 		}, nil
 	}
 
@@ -120,8 +124,8 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 			DisplayName:  provider.Name,
 			AvatarUrl:    provider.AvatarURL,
 			IsPrimary:    i == 0, // TODO: Change when we have another login besides github
-			CreatedAt:    provider.CreatedAt.Format(time.RFC3339),
-			UpdatedAt:    provider.UpdatedAt.Format(time.RFC3339),
+			CreatedAt:    timestamppb.New(provider.CreatedAt),
+			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
 		}
 	}
 
@@ -141,14 +145,20 @@ func convertUserToProto(userID string, roleAssignments []*pb.UserRoleAssignment)
 	}
 
 	return &pb.User{
-		UserId:           userID,
-		DisplayName:      primaryDisplayName,
-		Email:            primaryEmail,
-		AvatarUrl:        primaryAvatar,
-		IsActive:         dbUser.IsActive,
-		CreatedAt:        dbUser.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:        dbUser.UpdatedAt.Format(time.RFC3339),
-		RoleAssignments:  roleAssignments,
-		AccountProviders: pbAccountProviders,
+		Metadata: &pb.User_Metadata{
+			Id:        userID,
+			Email:     primaryEmail,
+			CreatedAt: timestamppb.New(dbUser.CreatedAt),
+			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
+		},
+		Spec: &pb.User_Spec{
+			DisplayName:      primaryDisplayName,
+			AvatarUrl:        primaryAvatar,
+			AccountProviders: pbAccountProviders,
+		},
+		Status: &pb.User_Status{
+			IsActive:        dbUser.IsActive,
+			RoleAssignments: roleAssignments,
+		},
 	}, nil
 }

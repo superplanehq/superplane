@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 )
 
 func TestGetCanvasUsers(t *testing.T) {
@@ -28,27 +29,28 @@ func TestGetCanvasUsers(t *testing.T) {
 	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
-	req := &pb.GetCanvasUsersRequest{
-		CanvasIdOrName: canvasID,
+	req := &pb.ListUsersRequest{
+		DomainId:   canvasID,
+		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := GetCanvasUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
 	assert.Len(t, resp.Users, 2)
 
 	for _, user := range resp.Users {
-		assert.NotEmpty(t, user.UserId)
-		assert.NotEmpty(t, user.RoleAssignments)
+		assert.NotEmpty(t, user.Metadata.Id)
+		assert.NotEmpty(t, user.Status.RoleAssignments)
 
 		// Check that is_active field is properly set
 		// For test fallback users, should be false
-		assert.False(t, user.IsActive)
+		assert.False(t, user.Status.IsActive)
 
-		for _, roleAssignment := range user.RoleAssignments {
+		for _, roleAssignment := range user.Status.RoleAssignments {
 			assert.NotEmpty(t, roleAssignment.RoleName)
-			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, roleAssignment.DomainType)
+			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, roleAssignment.DomainType)
 			assert.Equal(t, canvasID, roleAssignment.DomainId)
 		}
 	}
@@ -62,11 +64,12 @@ func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
 	err := authService.SetupCanvasRoles(canvasID)
 	require.NoError(t, err)
 
-	req := &pb.GetCanvasUsersRequest{
-		CanvasIdOrName: canvasID,
+	req := &pb.ListUsersRequest{
+		DomainId:   canvasID,
+		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := GetCanvasUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -76,11 +79,12 @@ func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
 func TestGetCanvasUsersInvalidCanvasId(t *testing.T) {
 	authService := SetupTestAuthService(t)
 
-	req := &pb.GetCanvasUsersRequest{
-		CanvasIdOrName: "invalid-uuid",
+	req := &pb.ListUsersRequest{
+		DomainId:   "invalid-uuid",
+		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := GetCanvasUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), req, authService)
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "canvas not found")
@@ -106,11 +110,12 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
-	req := &pb.GetCanvasUsersRequest{
-		CanvasIdOrName: canvasID,
+	req := &pb.ListUsersRequest{
+		DomainId:   canvasID,
+		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := GetCanvasUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -119,13 +124,13 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 
 	// Check that the active user is properly returned
 	activeUser := resp.Users[0]
-	assert.Equal(t, user.ID.String(), activeUser.UserId)
-	assert.True(t, activeUser.IsActive)
-	assert.Equal(t, "Active Canvas User", activeUser.DisplayName)
-	assert.NotEmpty(t, activeUser.RoleAssignments)
+	assert.Equal(t, user.ID.String(), activeUser.Metadata.Id)
+	assert.True(t, activeUser.Status.IsActive)
+	assert.Equal(t, "Active Canvas User", activeUser.Spec.DisplayName)
+	assert.NotEmpty(t, activeUser.Status.RoleAssignments)
 
 	// Check role assignment details
-	assert.Equal(t, "canvas_admin", activeUser.RoleAssignments[0].RoleName)
-	assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, activeUser.RoleAssignments[0].DomainType)
-	assert.Equal(t, canvasID, activeUser.RoleAssignments[0].DomainId)
+	assert.Equal(t, "canvas_admin", activeUser.Status.RoleAssignments[0].RoleName)
+	assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, activeUser.Status.RoleAssignments[0].DomainType)
+	assert.Equal(t, canvasID, activeUser.Status.RoleAssignments[0].DomainId)
 }

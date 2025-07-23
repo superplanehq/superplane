@@ -6,29 +6,20 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type GetGroupRequest struct {
-	DomainID   string
-	GroupName  string
-	DomainType pb.DomainType
-}
-
-type GetGroupResponse struct {
-	Group *pb.Group
-}
-
-func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorization.Authorization) (*GetGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainID)
+func GetGroup(ctx context.Context, req *pb.GetGroupRequest, authService authorization.Authorization) (*pb.GetGroupResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
 	groupReq := &GroupRequest{
-		DomainID:   req.DomainID,
+		DomainID:   req.DomainId,
 		GroupName:  req.GroupName,
 		DomainType: req.DomainType,
 	}
@@ -44,42 +35,49 @@ func GetGroup(ctx context.Context, req *GetGroupRequest, authService authorizati
 	}
 
 	// Check if the group exists by getting its role
-	role, err := authService.GetGroupRole(req.DomainID, domainType, req.GroupName)
+	role, err := authService.GetGroupRole(req.DomainId, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainID)
-	var displayName, description, createdAt, updatedAt string
+	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainId)
+	var displayName, description string
+	var createdAt, updatedAt *timestamppb.Timestamp
 	if err == nil {
 		displayName = groupMetadata.DisplayName
 		description = groupMetadata.Description
-		createdAt = groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z")
-		updatedAt = groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z")
+		createdAt = timestamppb.New(groupMetadata.CreatedAt)
+		updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
 	} else {
 		// Use fallback values when metadata is not found
 		displayName = req.GroupName
 		description = ""
 	}
 
-	groupUsers, err := authService.GetGroupUsers(req.DomainID, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
 
 	group := &pb.Group{
-		Name:         req.GroupName,
-		DomainType:   req.DomainType,
-		DomainId:     req.DomainID,
-		Role:         role,
-		DisplayName:  displayName,
-		Description:  description,
-		MembersCount: int32(len(groupUsers)),
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
+		Metadata: &pb.Group_Metadata{
+			Name:       req.GroupName,
+			DomainType: req.DomainType,
+			DomainId:   req.DomainId,
+			CreatedAt:  createdAt,
+			UpdatedAt:  updatedAt,
+		},
+		Spec: &pb.Group_Spec{
+			Description: description,
+			Role:        role,
+			DisplayName: displayName,
+		},
+		Status: &pb.Group_Status{
+			MembersCount: int32(len(groupUsers)),
+		},
 	}
 
-	return &GetGroupResponse{
+	return &pb.GetGroupResponse{
 		Group: group,
 	}, nil
 }

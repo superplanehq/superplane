@@ -8,30 +8,46 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbAuth.Role, error) {
+func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbRoles.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
 	roleMetadata := roleMetadataMap[roleDef.Name]
-	role := &pbAuth.Role{
-		Name:        roleDef.Name,
-		DomainType:  actions.DomainTypeToProto(roleDef.DomainType),
-		Permissions: permissions,
-		DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
-		Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+	role := &pbRoles.Role{
+		Metadata: &pbRoles.Role_Metadata{
+			Name:       roleDef.Name,
+			DomainType: actions.DomainTypeToProto(roleDef.DomainType),
+			DomainId:   domainID,
+			CreatedAt:  timestamppb.New(roleMetadataMap[roleDef.Name].CreatedAt),
+			UpdatedAt:  timestamppb.New(roleMetadataMap[roleDef.Name].UpdatedAt),
+		},
+		Spec: &pbRoles.Role_Spec{
+			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+			Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+			Permissions: permissions,
+		},
 	}
 
 	if roleDef.InheritsFrom != nil {
 		inheritedRoleMetadata := roleMetadataMap[roleDef.InheritsFrom.Name]
-		role.InheritedRole = &pbAuth.Role{
-			Name:        roleDef.InheritsFrom.Name,
-			DomainType:  actions.DomainTypeToProto(roleDef.InheritsFrom.DomainType),
-			Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
-			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
-			Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+		role.Spec.InheritedRole = &pbRoles.Role{
+			Metadata: &pbRoles.Role_Metadata{
+				Name:       roleDef.InheritsFrom.Name,
+				DomainType: actions.DomainTypeToProto(roleDef.InheritsFrom.DomainType),
+				DomainId:   domainID,
+				CreatedAt:  timestamppb.New(inheritedRoleMetadata.CreatedAt),
+				UpdatedAt:  timestamppb.New(inheritedRoleMetadata.UpdatedAt),
+			},
+			Spec: &pbRoles.Role_Spec{
+				DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+				Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+				Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
+			},
 		}
 	}
 

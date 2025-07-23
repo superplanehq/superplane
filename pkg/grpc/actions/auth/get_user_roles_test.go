@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -28,7 +29,7 @@ func Test_GetUserRoles(t *testing.T) {
 	t.Run("successful get user roles", func(t *testing.T) {
 		req := &pb.GetUserRolesRequest{
 			UserId:     r.User.String(),
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -39,7 +40,7 @@ func Test_GetUserRoles(t *testing.T) {
 		// Should have at least the assigned role
 		roleNames := make([]string, len(resp.Roles))
 		for i, role := range resp.Roles {
-			roleNames[i] = role.Name
+			roleNames[i] = role.Metadata.Name
 		}
 		assert.Contains(t, roleNames, models.RoleOrgAdmin)
 		assert.Contains(t, roleNames, models.RoleOrgViewer)
@@ -49,7 +50,7 @@ func Test_GetUserRoles(t *testing.T) {
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
 		req := &pb.GetUserRolesRequest{
 			UserId:     "invalid-uuid",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 

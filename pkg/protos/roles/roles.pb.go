@@ -990,7 +990,7 @@ type Role_Spec struct {
 	DisplayName   string                      `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	Description   string                      `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Permissions   []*authorization.Permission `protobuf:"bytes,3,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	InheritedRole string                      `protobuf:"bytes,4,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
+	InheritedRole *Role                       `protobuf:"bytes,4,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1046,11 +1046,11 @@ func (x *Role_Spec) GetPermissions() []*authorization.Permission {
 	return nil
 }
 
-func (x *Role_Spec) GetInheritedRole() string {
+func (x *Role_Spec) GetInheritedRole() *Role {
 	if x != nil {
 		return x.InheritedRole
 	}
-	return ""
+	return nil
 }
 
 var File_roles_proto protoreflect.FileDescriptor
@@ -1115,7 +1115,7 @@ const file_roles_proto_rawDesc = "" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\x14\n" +
-	"\x12DeleteRoleResponse\"\xbc\x04\n" +
+	"\x12DeleteRoleResponse\"\xd4\x04\n" +
 	"\x04Role\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Roles.Role.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Roles.Role.SpecR\x04spec\x1a\x88\x02\n" +
@@ -1128,12 +1128,12 @@ const file_roles_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\xba\x01\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\xd2\x01\n" +
 	"\x04Spec\x12!\n" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12F\n" +
-	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
-	"\x0einherited_role\x18\x04 \x01(\tR\rinheritedRole2\x98\v\n" +
+	"\vpermissions\x18\x03 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12=\n" +
+	"\x0einherited_role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\rinheritedRole2\x98\v\n" +
 	"\x05Roles\x12\xb9\x01\n" +
 	"\n" +
 	"AssignRole\x12#.Superplane.Roles.AssignRoleRequest\x1a$.Superplane.Roles.AssignRoleResponse\"`\x92A>\n" +
@@ -1215,25 +1215,26 @@ var file_roles_proto_depIdxs = []int32{
 	20, // 17: Superplane.Roles.Role.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	20, // 18: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
 	19, // 19: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
-	0,  // 20: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
-	2,  // 21: Superplane.Roles.Roles.RemoveRole:input_type -> Superplane.Roles.RemoveRoleRequest
-	5,  // 22: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
-	7,  // 23: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
-	9,  // 24: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
-	11, // 25: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
-	13, // 26: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
-	1,  // 27: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
-	3,  // 28: Superplane.Roles.Roles.RemoveRole:output_type -> Superplane.Roles.RemoveRoleResponse
-	6,  // 29: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
-	8,  // 30: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
-	10, // 31: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
-	12, // 32: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
-	14, // 33: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
-	27, // [27:34] is the sub-list for method output_type
-	20, // [20:27] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	15, // 20: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
+	0,  // 21: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
+	2,  // 22: Superplane.Roles.Roles.RemoveRole:input_type -> Superplane.Roles.RemoveRoleRequest
+	5,  // 23: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
+	7,  // 24: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
+	9,  // 25: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
+	11, // 26: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
+	13, // 27: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
+	1,  // 28: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
+	3,  // 29: Superplane.Roles.Roles.RemoveRole:output_type -> Superplane.Roles.RemoveRoleResponse
+	6,  // 30: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
+	8,  // 31: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
+	10, // 32: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
+	12, // 33: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
+	14, // 34: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
+	28, // [28:35] is the sub-list for method output_type
+	21, // [21:28] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_roles_proto_init() }

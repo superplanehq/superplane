@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_ListRoles(t *testing.T) {
@@ -21,7 +22,7 @@ func Test_ListRoles(t *testing.T) {
 
 	t.Run("successful list roles", func(t *testing.T) {
 		req := &pb.ListRolesRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -32,7 +33,7 @@ func Test_ListRoles(t *testing.T) {
 		// Should have expected roles
 		roleNames := make([]string, len(resp.Roles))
 		for i, role := range resp.Roles {
-			roleNames[i] = role.Name
+			roleNames[i] = role.Metadata.Name
 		}
 		assert.Contains(t, roleNames, models.RoleOrgViewer)
 		assert.Contains(t, roleNames, models.RoleOrgAdmin)
@@ -41,19 +42,19 @@ func Test_ListRoles(t *testing.T) {
 
 		// Test beautiful display names and descriptions for each role
 		for _, role := range resp.Roles {
-			assert.NotEmpty(t, role.DisplayName, "DisplayName should not be empty for role %s", role.Name)
-			assert.NotEmpty(t, role.Description, "Description should not be empty for role %s", role.Name)
+			assert.NotEmpty(t, role.Spec.DisplayName, "DisplayName should not be empty for role %s", role.Metadata.Name)
+			assert.NotEmpty(t, role.Spec.Description, "Description should not be empty for role %s", role.Metadata.Name)
 
-			switch role.Name {
+			switch role.Metadata.Name {
 			case models.RoleOrgOwner:
-				assert.Equal(t, "Owner", role.DisplayName)
-				assert.Contains(t, role.Description, "Full control over organization settings")
+				assert.Equal(t, "Owner", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Full control over organization settings")
 			case models.RoleOrgAdmin:
-				assert.Equal(t, "Admin", role.DisplayName)
-				assert.Contains(t, role.Description, "Can manage canvases, users, groups, and roles")
+				assert.Equal(t, "Admin", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Can manage canvases, users, groups, and roles")
 			case models.RoleOrgViewer:
-				assert.Equal(t, "Viewer", role.DisplayName)
-				assert.Contains(t, role.Description, "Read-only access to organization resources")
+				assert.Equal(t, "Viewer", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Read-only access to organization resources")
 			}
 		}
 	})
@@ -64,7 +65,7 @@ func Test_ListRoles(t *testing.T) {
 		require.NoError(t, err)
 
 		req := &pb.ListRolesRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
 		}
 
@@ -74,26 +75,26 @@ func Test_ListRoles(t *testing.T) {
 
 		// Test beautiful display names and descriptions for canvas roles
 		for _, role := range resp.Roles {
-			assert.NotEmpty(t, role.DisplayName, "DisplayName should not be empty for role %s", role.Name)
-			assert.NotEmpty(t, role.Description, "Description should not be empty for role %s", role.Name)
+			assert.NotEmpty(t, role.Spec.DisplayName, "DisplayName should not be empty for role %s", role.Metadata.Name)
+			assert.NotEmpty(t, role.Spec.Description, "Description should not be empty for role %s", role.Metadata.Name)
 
-			switch role.Name {
+			switch role.Metadata.Name {
 			case models.RoleCanvasOwner:
-				assert.Equal(t, "Owner", role.DisplayName)
-				assert.Contains(t, role.Description, "Full control over canvas settings")
+				assert.Equal(t, "Owner", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Full control over canvas settings")
 			case models.RoleCanvasAdmin:
-				assert.Equal(t, "Admin", role.DisplayName)
-				assert.Contains(t, role.Description, "Can manage stages, events, connections, and secrets")
+				assert.Equal(t, "Admin", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Can manage stages, events, connections, and secrets")
 			case models.RoleCanvasViewer:
-				assert.Equal(t, "Viewer", role.DisplayName)
-				assert.Contains(t, role.Description, "Read-only access to canvas resources")
+				assert.Equal(t, "Viewer", role.Spec.DisplayName)
+				assert.Contains(t, role.Spec.Description, "Read-only access to canvas resources")
 			}
 		}
 	})
 
 	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
 		req := &pb.ListRolesRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 		}
 

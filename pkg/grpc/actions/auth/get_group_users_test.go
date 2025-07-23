@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -30,9 +31,9 @@ func Test_GetGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful get group users", func(t *testing.T) {
-		req := &GetGroupUsersRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.GetGroupUsersRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 		}
 
@@ -40,23 +41,23 @@ func Test_GetGroupUsers(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
-		assert.Equal(t, r.User.String(), resp.Users[0].UserId)
-		assert.NotEmpty(t, resp.Users[0].DisplayName)
-		assert.NotEmpty(t, resp.Users[0].Email)
-		assert.NotEmpty(t, resp.Users[0].RoleAssignments)
+		assert.Equal(t, r.User.String(), resp.Users[0].Metadata.Id)
+		assert.NotEmpty(t, resp.Users[0].Spec.DisplayName)
+		assert.NotEmpty(t, resp.Users[0].Metadata.Email)
+		assert.NotEmpty(t, resp.Users[0].Status.RoleAssignments)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "test-group", resp.Group.Name)
-		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.DomainType)
-		assert.Equal(t, orgID, resp.Group.DomainId)
-		assert.Equal(t, "org_admin", resp.Group.Role)
+		assert.Equal(t, "test-group", resp.Group.Metadata.Name)
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.Metadata.DomainType)
+		assert.Equal(t, orgID, resp.Group.Metadata.DomainId)
+		assert.Equal(t, "org_admin", resp.Group.Spec.Role)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &GetGroupUsersRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.GetGroupUsersRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "",
 		}
 
@@ -66,9 +67,9 @@ func Test_GetGroupUsers(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &GetGroupUsersRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainID:   orgID,
+		req := &pb.GetGroupUsersRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 		}
 
@@ -88,9 +89,9 @@ func Test_GetGroupUsers(t *testing.T) {
 		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
 		require.NoError(t, err)
 
-		req := &GetGroupUsersRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainID:   canvasID,
+		req := &pb.GetGroupUsersRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
 			GroupName:  "canvas-group",
 		}
 
@@ -98,13 +99,13 @@ func Test_GetGroupUsers(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
-		assert.Equal(t, r.User.String(), resp.Users[0].UserId)
+		assert.Equal(t, r.User.String(), resp.Users[0].Metadata.Id)
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "canvas-group", resp.Group.Name)
-		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.DomainType)
-		assert.Equal(t, canvasID, resp.Group.DomainId)
+		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
+		assert.Equal(t, canvasID, resp.Group.Metadata.DomainId)
 	})
 
 	t.Run("empty group - no users", func(t *testing.T) {
@@ -112,9 +113,9 @@ func Test_GetGroupUsers(t *testing.T) {
 		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "empty-group", models.RoleOrgViewer)
 		require.NoError(t, err)
 
-		req := &GetGroupUsersRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.GetGroupUsersRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "empty-group",
 		}
 
@@ -125,8 +126,8 @@ func Test_GetGroupUsers(t *testing.T) {
 
 		// Check the group object in response
 		assert.NotNil(t, resp.Group)
-		assert.Equal(t, "empty-group", resp.Group.Name)
-		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.DomainType)
-		assert.Equal(t, orgID, resp.Group.DomainId)
+		assert.Equal(t, "empty-group", resp.Group.Metadata.Name)
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, resp.Group.Metadata.DomainType)
+		assert.Equal(t, orgID, resp.Group.Metadata.DomainId)
 	})
 }

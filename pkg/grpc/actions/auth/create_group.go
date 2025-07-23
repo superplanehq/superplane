@@ -7,13 +7,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService authorization.Authorization) (*CreateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainID)
+func CreateGroup(ctx context.Context, req *pb.CreateGroupRequest, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
@@ -28,9 +29,9 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		return nil, err
 	}
 
-	err = authService.CreateGroup(req.DomainID, domainType, req.GroupName, req.Role)
+	err = authService.CreateGroup(req.DomainId, domainType, req.GroupName, req.Role)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainID, err)
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainId, err)
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
@@ -43,24 +44,29 @@ func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService autho
 		}
 		description = req.Description
 
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, description)
+		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainId, displayName, description)
 		if err != nil {
 			log.Errorf("failed to create group metadata for %s: %v", req.GroupName, err)
 		}
 	}
 
-	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainID, req.DomainType.String())
+	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainId, req.DomainType.String())
 
 	group := &pb.Group{
-		Name:        req.GroupName,
-		DomainType:  req.DomainType,
-		DomainId:    req.DomainID,
-		Role:        req.Role,
-		DisplayName: displayName,
-		Description: description,
+		Metadata: &pb.Group_Metadata{
+			Name:       req.GroupName,
+			DomainType: actions.DomainTypeToProto(domainType),
+			DomainId:   req.DomainId,
+			CreatedAt:  timestamppb.Now(),
+			UpdatedAt:  timestamppb.Now(),
+		},
+		Spec: &pb.Group_Spec{
+			DisplayName: displayName,
+			Description: description,
+		},
 	}
 
-	return &CreateGroupResponse{
+	return &pb.CreateGroupResponse{
 		Group: group,
 	}, nil
 }

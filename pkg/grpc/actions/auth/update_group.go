@@ -7,26 +7,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type UpdateGroupRequest struct {
-	DomainID    string
-	GroupName   string
-	DomainType  pb.DomainType
-	Role        string
-	DisplayName string
-	Description string
-}
-
-type UpdateGroupResponse struct {
-	Group *pb.Group
-}
-
-func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService authorization.Authorization) (*UpdateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainID)
+func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
@@ -42,25 +30,25 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 	}
 
 	// Check if the group exists by getting its current role
-	currentRole, err := authService.GetGroupRole(req.DomainID, domainType, req.GroupName)
+	currentRole, err := authService.GetGroupRole(req.DomainId, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
 	// Update the group role if it changed
 	if req.Role != "" && req.Role != currentRole {
-		err = authService.UpdateGroupRole(req.DomainID, domainType, req.GroupName, req.Role)
+		err = authService.UpdateGroupRole(req.DomainId, domainType, req.GroupName, req.Role)
 		if err != nil {
 			log.Errorf("failed to update group %s role from %s to %s: %v", req.GroupName, currentRole, req.Role, err)
 			return nil, status.Error(codes.Internal, "failed to update group role")
 		}
 
-		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, req.DomainID, domainType)
+		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, req.DomainId, domainType)
 	}
 
 	var displayName string
 	var description string
-	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainID)
+	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group metadata")
 	}
@@ -76,7 +64,7 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 			description = groupMetadata.Description
 		}
 
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, description)
+		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainId, displayName, description)
 		if err != nil {
 			log.Errorf("failed to update group metadata for %s: %v", req.GroupName, err)
 			// Don't fail the entire operation for metadata errors
@@ -95,35 +83,24 @@ func UpdateGroup(ctx context.Context, req *UpdateGroupRequest, authService autho
 	}
 
 	group := &pb.Group{
-		Name:         req.GroupName,
-		DomainType:   req.DomainType,
-		DomainId:     req.DomainID,
-		Role:         updatedRole,
-		DisplayName:  displayName,
-		Description:  description,
-		MembersCount: int32(len(groupUsers)),
-		CreatedAt:    groupMetadata.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		UpdatedAt:    groupMetadata.UpdatedAt.Format("2006-01-02T15:04:05Z"),
+		Metadata: &pb.Group_Metadata{
+			Name:       req.GroupName,
+			DomainType: req.DomainType,
+			DomainId:   req.DomainId,
+			CreatedAt:  timestamppb.Now(),
+			UpdatedAt:  timestamppb.Now(),
+		},
+		Spec: &pb.Group_Spec{
+			Role:        updatedRole,
+			DisplayName: displayName,
+			Description: description,
+		},
+		Status: &pb.Group_Status{
+			MembersCount: int32(len(groupUsers)),
+		},
 	}
 
-	return &UpdateGroupResponse{
+	return &pb.UpdateGroupResponse{
 		Group: group,
 	}, nil
-}
-
-func ValidateUpdateGroupRequest(req *UpdateGroupRequest) error {
-	if req.GroupName == "" {
-		return status.Error(codes.InvalidArgument, "group name must be specified")
-	}
-
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
-	// At least one field must be provided for update
-	if req.Role == "" && req.DisplayName == "" && req.Description == "" {
-		return status.Error(codes.InvalidArgument, "at least one field must be provided for update")
-	}
-
-	return nil
 }

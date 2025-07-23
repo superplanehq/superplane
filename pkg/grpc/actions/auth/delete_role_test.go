@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_DeleteRole(t *testing.T) {
@@ -48,7 +49,7 @@ func Test_DeleteRole(t *testing.T) {
 
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "test-custom-role-to-delete",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -64,7 +65,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - missing role name", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -76,7 +77,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - invalid domain type", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "test-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
 			DomainId:   orgID,
 		}
 
@@ -88,7 +89,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - default role name", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
 			RoleName:   models.RoleOrgAdmin,
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -100,7 +101,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "nonexistent-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 
@@ -112,7 +113,7 @@ func Test_DeleteRole(t *testing.T) {
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "test-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   "invalid-uuid",
 		}
 
@@ -144,7 +145,7 @@ func Test_DeleteRole(t *testing.T) {
 
 		req := &pb.DeleteRoleRequest{
 			RoleName:   "test-role-with-users",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
 		}
 

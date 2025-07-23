@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -30,14 +31,14 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful remove user from group with user ID", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
-			UserID:     r.User.String(),
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		require.NoError(t, err)
 	})
 
@@ -59,77 +60,77 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, "org", user.ID.String(), "test-group-email-remove")
 		require.NoError(t, err)
 
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			UserEmail:  testEmail,
 			GroupName:  "test-group-email-remove",
 		}
 
-		err = RemoveUserFromGroup(ctx, req, authService)
+		_, err = RemoveUserFromGroup(ctx, req, authService)
 		require.NoError(t, err)
 	})
 
 	t.Run("user not found by email", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			UserEmail:  "nonexistent@example.com",
 			GroupName:  "test-group",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
-			UserID:     r.User.String(),
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
 			GroupName:  "",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainID:   orgID,
-			UserID:     r.User.String(),
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
+			DomainId:   orgID,
+			UserId:     r.User.String(),
 			GroupName:  "test-group",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
 			GroupName:  "test-group",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user identifier must be specified")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
-			UserID:     "invalid-uuid",
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			UserId:     "invalid-uuid",
 			GroupName:  "test-group",
 		}
 
-		err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
@@ -145,14 +146,14 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
 		require.NoError(t, err)
 
-		req := &GroupUserRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainID:   canvasID,
-			UserID:     r.User.String(),
+		req := &pb.RemoveUserFromGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
+			UserId:     r.User.String(),
 			GroupName:  "canvas-group",
 		}
 
-		err = RemoveUserFromGroup(ctx, req, authService)
+		_, err = RemoveUserFromGroup(ctx, req, authService)
 		require.NoError(t, err)
 	})
 }

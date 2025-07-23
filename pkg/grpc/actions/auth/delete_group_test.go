@@ -8,7 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 
 func Test_DeleteOrganizationGroup(t *testing.T) {
@@ -36,12 +37,13 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
-		req := &pb.DeleteOrganizationGroupRequest{
-			OrganizationId: orgID,
-			GroupName:      "test-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   orgID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			GroupName:  "test-group",
 		}
 
-		resp, err := DeleteOrganizationGroup(ctx, req, authService)
+		resp, err := DeleteGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -56,34 +58,37 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 	})
 
 	t.Run("delete non-existent group", func(t *testing.T) {
-		req := &pb.DeleteOrganizationGroupRequest{
-			OrganizationId: orgID,
-			GroupName:      "non-existent-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   orgID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			GroupName:  "non-existent-group",
 		}
 
-		_, err := DeleteOrganizationGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.DeleteOrganizationGroupRequest{
-			OrganizationId: orgID,
-			GroupName:      "",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   orgID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			GroupName:  "",
 		}
 
-		_, err := DeleteOrganizationGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - invalid organization ID", func(t *testing.T) {
-		req := &pb.DeleteOrganizationGroupRequest{
-			OrganizationId: "invalid-uuid",
-			GroupName:      "test-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   "invalid-uuid",
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			GroupName:  "test-group",
 		}
 
-		_, err := DeleteOrganizationGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})
@@ -114,12 +119,13 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
-		req := &pb.DeleteCanvasGroupRequest{
-			CanvasIdOrName: canvasID,
-			GroupName:      "canvas-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   canvasID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			GroupName:  "canvas-group",
 		}
 
-		resp, err := DeleteCanvasGroup(ctx, req, authService)
+		resp, err := DeleteGroup(ctx, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -134,34 +140,37 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 	})
 
 	t.Run("delete non-existent canvas group", func(t *testing.T) {
-		req := &pb.DeleteCanvasGroupRequest{
-			CanvasIdOrName: canvasID,
-			GroupName:      "non-existent-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   canvasID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			GroupName:  "non-existent-group",
 		}
 
-		_, err := DeleteCanvasGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.DeleteCanvasGroupRequest{
-			CanvasIdOrName: canvasID,
-			GroupName:      "",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   canvasID,
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			GroupName:  "",
 		}
 
-		_, err := DeleteCanvasGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - invalid canvas ID", func(t *testing.T) {
-		req := &pb.DeleteCanvasGroupRequest{
-			CanvasIdOrName: "invalid-uuid",
-			GroupName:      "test-group",
+		req := &pb.DeleteGroupRequest{
+			DomainId:   "invalid-uuid",
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			GroupName:  "test-group",
 		}
 
-		_, err := DeleteCanvasGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "canvas not found")
 	})

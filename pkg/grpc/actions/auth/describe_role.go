@@ -6,13 +6,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest, authService authorization.Authorization) (*pb.DescribeRoleResponse, error) {
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+	if req.DomainType == pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 

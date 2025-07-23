@@ -6,7 +6,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -17,15 +19,15 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
+	if req.DomainType == pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
 	var roles []*authorization.RoleDefinition
 	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
+	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		roles, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
+	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
 		roles, err = authService.GetUserRolesForCanvas(req.UserId, req.DomainId)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
@@ -56,7 +58,7 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		roleMetadataMap = make(map[string]*models.RoleMetadata)
 	}
 
-	var rolesProto []*pb.Role
+	var rolesProto []*pbRoles.Role
 	for _, role := range roles {
 		roleProto, err := convertRoleDefinitionToProto(role, authService, req.DomainId, roleMetadataMap)
 		if err != nil {
