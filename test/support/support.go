@@ -92,8 +92,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
+							DomainType: models.DomainTypeCanvas,
+							Name:       secret.Name,
+							Key:        "key",
 						},
 					},
 				},

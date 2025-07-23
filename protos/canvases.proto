@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package Superplane;
 
+import "authorization.proto";
 import "integrations.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
@@ -519,8 +520,9 @@ message ValueFromLastExecution {
 }
 
 message ValueFromSecret {
-  string name = 1;
-  string key = 2;
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+  string key = 3;
 }
 
 message Condition {

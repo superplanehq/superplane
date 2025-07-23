@@ -347,3 +347,41 @@ func GetResourceType(integration *models.Integration) (string, error) {
 		return "", status.Error(codes.InvalidArgument, "unsupported integration type")
 	}
 }
+
+func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.UUID, domainType pbAuth.DomainType) (string, *uuid.UUID, error) {
+	domainTypeForSecret, err := ProtoToDomainType(domainType)
+	if err != nil {
+		domainTypeForSecret = domainTypeForResource
+	}
+
+	//
+	// If an organization-level resource is being created,
+	// the secret must be on the organization level as well.
+	//
+	if domainTypeForResource == models.DomainTypeOrganization {
+		if domainTypeForSecret != models.DomainTypeOrganization {
+			return "", nil, fmt.Errorf("integration on organization level must use organization-level secret")
+		}
+
+		return domainTypeForSecret, domainIdForResource, nil
+	}
+
+	//
+	// If a canvas-level resource is being created and a canvas-level secret is being used,
+	// we can just re-use the same domain type and ID for the resource.
+	//
+	if domainTypeForSecret == models.DomainTypeCanvas {
+		return domainTypeForSecret, domainIdForResource, nil
+	}
+
+	//
+	// If a canvas-level resource is being created and is using a org-level secret,
+	// we need to find the organization ID for the canvas where the resource is being created.
+	//
+	canvas, err := models.FindCanvasByID(domainIdForResource.String())
+	if err != nil {
+		return "", nil, fmt.Errorf("canvas not found")
+	}
+
+	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
+}

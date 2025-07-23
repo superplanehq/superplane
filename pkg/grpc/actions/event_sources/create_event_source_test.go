@@ -192,8 +192,9 @@ func Test__CreateEventSource(t *testing.T) {
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
+							DomainType: models.DomainTypeOrganization,
+							Name:       secret.Name,
+							Key:        "key",
 						},
 					},
 				},

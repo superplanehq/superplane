@@ -113,7 +113,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
+	secrets, err := validateSecrets(ctx, encryptor, canvas, req.Stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
