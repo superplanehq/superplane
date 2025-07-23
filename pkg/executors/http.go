@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -54,11 +53,8 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	return nil
 }
 
-func NewHTTPExecutor(execution *models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
-	return &HTTPExecutor{
-		execution: execution,
-		jwtSigner: jwtSigner,
-	}, nil
+func NewHTTPExecutor() (*HTTPExecutor, error) {
+	return &HTTPExecutor{}, nil
 }
 
 func (e *HTTPExecutor) Name() string {
@@ -69,8 +65,8 @@ func (e *HTTPExecutor) HandleWebhook(data []byte) (Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, _ integrations.Resource) (Response, error) {
-	payload, err := e.buildPayload(spec.HTTP)
+func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, parameters ExecutionParameters) (Response, error) {
+	payload, err := e.buildPayload(spec.HTTP, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
@@ -114,10 +110,10 @@ func (e *HTTPExecutor) Check(id string) (Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec) (map[string]string, error) {
+func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec, parameters ExecutionParameters) (map[string]string, error) {
 	payload := map[string]string{
-		"stageId":     e.execution.StageID.String(),
-		"executionId": e.execution.ID.String(),
+		"stageId":     parameters.StageID,
+		"executionId": parameters.ExecutionID,
 	}
 
 	for key, value := range spec.Payload {

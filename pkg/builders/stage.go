@@ -164,7 +164,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		//
 		// Create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
+		eventSourceResourceID, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}
@@ -172,7 +172,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		executor := models.StageExecutor{
 			Type:       b.executorType,
 			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: *eventSource.ResourceID,
+			ResourceID: eventSourceResourceID,
 			StageID:    stage.ID,
 		}
 
@@ -186,7 +186,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 	return stage, nil
 }
 
-func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.EventSource, error) {
+func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UUID, error) {
 	//
 	// If this stage is not using an integration, it does not need an event source.
 	//
@@ -212,7 +212,7 @@ func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.
 		return nil, err
 	}
 
-	return eventSource, nil
+	return eventSource.ResourceID, nil
 }
 
 func (b *StageBuilder) Update() (*models.Stage, error) {
@@ -264,7 +264,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		// Re-create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
+		resourceID, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}
@@ -272,7 +272,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		executor := models.StageExecutor{
 			Type:       b.executorType,
 			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: *eventSource.ResourceID,
+			ResourceID: resourceID,
 			StageID:    b.existingStage.ID,
 		}
 

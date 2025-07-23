@@ -23,7 +23,7 @@ func Test_HTTP(t *testing.T) {
 	}
 
 	t.Run("200 response is successful", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(&execution, nil)
+		executor, err := NewHTTPExecutor()
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -40,7 +40,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		}, nil)
+		}, ExecutionParameters{StageID: stageID.String(), ExecutionID: executionID.String()})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -48,7 +48,7 @@ func Test_HTTP(t *testing.T) {
 	})
 
 	t.Run("400 response is not successful", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(&execution, nil)
+		executor, err := NewHTTPExecutor()
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -65,7 +65,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		}, nil)
+		}, ExecutionParameters{StageID: stageID.String(), ExecutionID: executionID.String()})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -73,7 +73,7 @@ func Test_HTTP(t *testing.T) {
 	})
 
 	t.Run("body contains spec payload", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(&execution, nil)
+		executor, err := NewHTTPExecutor()
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -94,7 +94,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		}, nil)
+		}, ExecutionParameters{StageID: stageID.String(), ExecutionID: executionID.String()})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -105,7 +105,7 @@ func Test_HTTP(t *testing.T) {
 	})
 
 	t.Run("headers contains spec payload", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(&execution, nil)
+		executor, err := NewHTTPExecutor()
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -127,7 +127,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		}, nil)
+		}, ExecutionParameters{StageID: stageID.String(), ExecutionID: executionID.String()})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
@@ -136,7 +136,7 @@ func Test_HTTP(t *testing.T) {
 	})
 
 	t.Run("outputs are returned in the response body", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(&execution, nil)
+		executor, err := NewHTTPExecutor()
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -153,7 +153,7 @@ func Test_HTTP(t *testing.T) {
 					StatusCodes: []uint32{200},
 				},
 			},
-		}, nil)
+		}, ExecutionParameters{StageID: stageID.String(), ExecutionID: executionID.String()})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)

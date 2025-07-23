@@ -202,14 +202,10 @@ func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, exe
 		all[k] = v
 	}
 
-	assert.Len(t, req.Parameters, len(all)+1)
+	assert.Len(t, req.Parameters, len(all))
 	for name, value := range all {
 		v, ok := req.Parameters[name]
 		assert.True(t, ok)
 		assert.Equal(t, value, v)
 	}
-
-	v, ok := req.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"]
-	assert.True(t, ok)
-	assert.NotEmpty(t, v)
 }

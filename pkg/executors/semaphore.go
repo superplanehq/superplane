@@ -4,17 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"time"
 
 	"github.com/superplanehq/superplane/pkg/integrations"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type SemaphoreExecutor struct {
 	integration integrations.Integration
-	execution   *models.StageExecution
-	jwtSigner   *jwt.Signer
+	resource    integrations.Resource
 }
 
 type SemaphoreResponse struct {
@@ -68,24 +65,20 @@ type SemaphoreHookPipeline struct {
 	Result string `json:"result"`
 }
 
-func NewSemaphoreExecutor(integration integrations.Integration, execution *models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
-	return &SemaphoreExecutor{
-		integration: integration,
-		execution:   execution,
-		jwtSigner:   jwtSigner,
-	}, nil
+func NewSemaphoreExecutor(integration integrations.Integration, resource integrations.Resource) (*SemaphoreExecutor, error) {
+	return &SemaphoreExecutor{integration: integration, resource: resource}, nil
 }
 
 func (e *SemaphoreExecutor) Name() string {
 	return models.ExecutorSpecTypeSemaphore
 }
 
-func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, resource integrations.Resource) (Response, error) {
+func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, parameters ExecutionParameters) (Response, error) {
 	if spec.Semaphore.TaskId != nil {
-		return e.runTask(spec)
+		return e.runTask(spec, parameters)
 	}
 
-	return e.runWorkflow(spec, resource)
+	return e.runWorkflow(spec, parameters)
 }
 
 func (e *SemaphoreExecutor) Check(id string) (Response, error) {
@@ -121,17 +114,12 @@ func (e *SemaphoreExecutor) HandleWebhook(data []byte) (Response, error) {
 	}, nil
 }
 
-func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, resource integrations.Resource) (Response, error) {
-	parameters, err := e.workflowParameters(spec.Semaphore.Parameters)
-	if err != nil {
-		return nil, fmt.Errorf("error building parameters: %v", err)
-	}
-
+func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, parameters ExecutionParameters) (Response, error) {
 	workflow, err := e.integration.Create(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowRequest{
-		ProjectID:    resource.Id(),
+		ProjectID:    e.resource.Id(),
 		Reference:    "refs/heads/" + spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   parameters,
+		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
 	})
 
 	if err != nil {
@@ -141,17 +129,12 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, resource integ
 	return &SemaphoreResponse{wfID: workflow.Id(), pipeline: nil}, nil
 }
 
-func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec) (Response, error) {
-	parameters, err := e.workflowParameters(spec.Semaphore.Parameters)
-	if err != nil {
-		return nil, fmt.Errorf("error building parameters: %v", err)
-	}
-
+func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec, parameters ExecutionParameters) (Response, error) {
 	workflow, err := e.integration.Create(integrations.ResourceTypeTaskTrigger, &integrations.RunTaskRequest{
 		TaskID:       *spec.Semaphore.TaskId,
 		Branch:       spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   parameters,
+		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
 	})
 
 	if err != nil {
@@ -161,26 +144,14 @@ func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec) (Response, error) 
 	return &SemaphoreResponse{wfID: workflow.Id(), pipeline: nil}, nil
 }
 
-func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string) (map[string]string, error) {
-	parameters := maps.Clone(fromSpec)
-	parameters["SEMAPHORE_STAGE_ID"] = e.execution.StageID.String()
-	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = e.execution.ID.String()
+func (e *SemaphoreExecutor) workflowParameters(paramsFromSpec map[string]string, paramsFromExecution ExecutionParameters) map[string]string {
+	parameters := maps.Clone(paramsFromSpec)
+	parameters["SEMAPHORE_STAGE_ID"] = paramsFromExecution.StageID
+	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = paramsFromExecution.ExecutionID
 
-	//
-	// TODO: the fact that we have this check here means
-	// that all new implementations of Executor need to do it by themselves,
-	// which is clearly a code smell that indicates poor extensibility.
-	// We should move this check up.
-	//
-	if e.integration.HasOidcSupport() {
-		return parameters, nil
+	if paramsFromExecution.Token != "" {
+		parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = paramsFromExecution.Token
 	}
 
-	token, err := e.jwtSigner.Generate(e.execution.ID.String(), 24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("error generating tags token: %v", err)
-	}
-
-	parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = token
-	return parameters, nil
+	return parameters
 }

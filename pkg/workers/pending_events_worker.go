@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
@@ -110,7 +112,17 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	executor, err := executors.NewExecutor(integration, e, nil, nil, w.Encryptor)
+	integrationResource, err := e.GetResource()
+	if err != nil {
+		return err
+	}
+
+	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
+	if err != nil {
+		return fmt.Errorf("error creating integration: %v", err)
+	}
+
+	executor, err := executors.NewExecutorWithIntegration(integrationImpl, integrationResource, e)
 	if err != nil {
 		return err
 	}

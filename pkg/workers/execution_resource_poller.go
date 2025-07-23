@@ -1,11 +1,14 @@
 package workers
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -62,7 +65,17 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 		return err
 	}
 
-	executor, err := executors.NewExecutor(integration, stageExecutor, nil, nil, w.Encryptor)
+	integrationResource, err := stageExecutor.GetResource()
+	if err != nil {
+		return err
+	}
+
+	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
+	if err != nil {
+		return fmt.Errorf("error creating integration: %v", err)
+	}
+
+	executor, err := executors.NewExecutorWithIntegration(integrationImpl, integrationResource, stageExecutor)
 	if err != nil {
 		return err
 	}

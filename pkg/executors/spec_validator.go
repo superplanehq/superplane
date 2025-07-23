@@ -26,13 +26,17 @@ func (v *SpecValidator) Validate(ctx context.Context, canvas *models.Canvas, in 
 	case pb.ExecutorSpec_TYPE_SEMAPHORE:
 		return v.validateSemaphoreExecutorSpec(ctx, canvas, in, integration, resource)
 	case pb.ExecutorSpec_TYPE_HTTP:
-		return v.validateHTTPExecutorSpec(in)
+		return v.validateHTTPExecutorSpec(in, integration, resource)
 	default:
 		return "", nil, errors.New("invalid executor spec type")
 	}
 }
 
-func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec) (string, *models.ExecutorSpec, error) {
+func (v *SpecValidator) validateHTTPExecutorSpec(in *pb.ExecutorSpec, integration *models.Integration, resource integrations.Resource) (string, *models.ExecutorSpec, error) {
+	if integration != nil || resource != nil {
+		return "", nil, fmt.Errorf("invalid HTTP executor spec: integration is not supported")
+	}
+
 	if in.Http == nil {
 		return "", nil, fmt.Errorf("invalid HTTP executor spec: missing HTTP executor spec")
 	}

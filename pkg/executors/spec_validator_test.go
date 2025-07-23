@@ -60,7 +60,7 @@ func Test__SpecValidator(t *testing.T) {
 			},
 		}
 
-		_, _, err := validator.validateHTTPExecutorSpec(in)
+		_, _, err := validator.validateHTTPExecutorSpec(in, nil, nil)
 		require.NoError(t, err)
 	})
 }

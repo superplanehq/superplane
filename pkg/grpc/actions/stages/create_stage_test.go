@@ -327,6 +327,36 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "invalid condition: invalid time window condition: invalid day DoesNotExist", s.Message())
 	})
 
+	t.Run("stage without integration", func(t *testing.T) {
+		name := support.RandomName("test")
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{
+					Name: name,
+				},
+				Spec: &pb.Stage_Spec{
+					Executor: &pb.ExecutorSpec{
+						Type: pb.ExecutorSpec_TYPE_HTTP,
+						Http: &pb.ExecutorSpec_HTTP{Url: "https://example.com"},
+					},
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, pb.ExecutorSpec_TYPE_HTTP, res.Stage.Spec.Executor.Type)
+		assert.Nil(t, res.Stage.Spec.Executor.Integration)
+		assert.Equal(t, "https://example.com", res.Stage.Spec.Executor.Http.Url)
+	})
+
 	t.Run("stage with integration", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
 		testconsumer := testconsumer.New(amqpURL, StageCreatedRoutingKey)

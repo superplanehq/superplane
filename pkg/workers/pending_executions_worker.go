@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -62,24 +63,19 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	secrets, err := w.FindSecrets(stage, w.Encryptor)
-	if err != nil {
-		return fmt.Errorf("error finding secrets for execution: %v", err)
-	}
-
 	stageExecutor, err := stage.GetExecutor()
 	if err != nil {
 		return fmt.Errorf("error getting executor for stage: %v", err)
 	}
 
-	resource, err := stageExecutor.GetResource()
+	integration, executor, err := w.getExecutor(stageExecutor)
 	if err != nil {
-		return fmt.Errorf("error getting resource for stage executor: %v", err)
+		return fmt.Errorf("error getting executor: %v", err)
 	}
 
-	integration, err := stageExecutor.FindIntegration()
+	secrets, err := w.FindSecrets(stage, w.Encryptor)
 	if err != nil {
-		return fmt.Errorf("error finding integration: %v", err)
+		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
 	executorSpec := stageExecutor.Spec.Data()
@@ -88,15 +84,15 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return err
 	}
 
-	executor, err := executors.NewExecutor(integration, stageExecutor, &execution, w.JwtSigner, w.Encryptor)
+	parameters, err := w.buildExecutionParameters(&execution, integration)
 	if err != nil {
-		return fmt.Errorf("error creating executor: %v", err)
+		return fmt.Errorf("error building execution parameters: %v", err)
 	}
 
 	//
 	// If we get an error calling the executor, we fail the execution.
 	//
-	response, err := executor.Execute(*spec, resource)
+	response, err := executor.Execute(*spec, *parameters)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
 		err := execution.Finish(stage, models.ResultFailed)
@@ -113,6 +109,57 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	}
 
 	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) getExecutor(stageExecutor *models.StageExecutor) (integrations.Integration, executors.Executor, error) {
+	if stageExecutor.ResourceID == nil {
+		executor, err := executors.NewExecutorWithoutIntegration(stageExecutor)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error creating executor: %v", err)
+		}
+
+		return nil, executor, nil
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error getting resource for stage executor: %v", err)
+	}
+
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error finding integration: %v", err)
+	}
+
+	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating integration: %v", err)
+	}
+
+	executor, err := executors.NewExecutorWithIntegration(integrationImpl, resource, stageExecutor)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error creating executor: %v", err)
+	}
+
+	return integrationImpl, executor, nil
+}
+
+func (w *PendingExecutionsWorker) buildExecutionParameters(execution *models.StageExecution, integration integrations.Integration) (*executors.ExecutionParameters, error) {
+	parameters := executors.ExecutionParameters{
+		StageID:     execution.StageID.String(),
+		ExecutionID: execution.ID.String(),
+	}
+
+	if integration != nil && !integration.HasSupportFor(integrations.FeatureOpenIdConnectToken) {
+		token, err := w.JwtSigner.Generate(execution.ID.String(), time.Hour)
+		if err != nil {
+			return nil, fmt.Errorf("error generating token: %v", err)
+		}
+
+		parameters.Token = token
+	}
+
+	return &parameters, nil
 }
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
@@ -176,7 +223,7 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 }
 
 func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, executor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
-	_, err := execution.AddResource(response.Id(), executor.ResourceID)
+	_, err := execution.AddResource(response.Id(), *executor.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
 	}

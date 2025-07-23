@@ -26,8 +26,13 @@ func NewSemaphoreIntegration(URL, token string) (Integration, error) {
 	}, nil
 }
 
-func (s *SemaphoreIntegration) HasOidcSupport() bool {
-	return true
+func (s *SemaphoreIntegration) HasSupportFor(featureName string) bool {
+	switch featureName {
+	case FeatureOpenIdConnectToken:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]Resource, error) {
