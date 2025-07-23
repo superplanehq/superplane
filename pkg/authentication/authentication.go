@@ -574,7 +574,7 @@ func (a *Handler) findOrCreateAccountProvider(githubUser *GitHubUserInfo) (*mode
 	if err != nil {
 		user, err = models.FindInactiveUserByEmail(githubUser.Email)
 		if err != nil {
-			return nil, fmt.Errorf("No existing account found. Please sign up through the web interface first.")
+			return nil, fmt.Errorf("No existing account found. Please sign up through the web interface first")
 		}
 
 		accountProvider = &models.AccountProvider{
@@ -595,7 +595,7 @@ func (a *Handler) findOrCreateAccountProvider(githubUser *GitHubUserInfo) (*mode
 
 	accountProvider, err = user.GetAccountProvider(models.ProviderGitHub)
 	if err != nil {
-		return nil, fmt.Errorf("Account exists but GitHub provider not connected. Please connect GitHub through the web interface.")
+		return nil, fmt.Errorf("Account exists but GitHub provider not connected. Please connect GitHub through the web interface")
 	}
 
 	return accountProvider, nil
