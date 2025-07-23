@@ -87,7 +87,7 @@ func TestGetCanvasUsersInvalidCanvasId(t *testing.T) {
 	resp, err := ListUsers(context.Background(), req, authService)
 	assert.Error(t, err)
 	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "canvas not found")
+	assert.Contains(t, err.Error(), "invalid domain ID")
 }
 
 func TestGetCanvasUsersWithActiveUser(t *testing.T) {

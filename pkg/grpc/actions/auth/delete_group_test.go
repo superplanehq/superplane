@@ -172,6 +172,6 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 
 		_, err := DeleteGroup(ctx, req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "canvas not found")
+		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})
 }

@@ -13,6 +13,11 @@ import (
 )
 
 func ListUsers(ctx context.Context, req *pb.ListUsersRequest, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
+	err := actions.ValidateUUIDs(req.DomainId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
+	}
+
 	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
