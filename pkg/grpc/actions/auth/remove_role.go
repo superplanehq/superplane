@@ -37,7 +37,7 @@ func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	userId, err := ResolveUserID(req.UserId, req.UserEmail)
+	userId, err := ResolveUserIDWithoutCreation(req.UserId, req.UserEmail)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
 	}

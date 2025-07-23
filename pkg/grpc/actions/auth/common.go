@@ -110,7 +110,19 @@ func ResolveUserID(userID, userEmail string) (string, error) {
 		return resolveByID(userID)
 	}
 
-	return resolveByEmail(userEmail)
+	return resolveByEmail(userEmail, true)
+}
+
+func ResolveUserIDWithoutCreation(userID, userEmail string) (string, error) {
+	if userID == "" && userEmail == "" {
+		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
+	}
+
+	if userID != "" {
+		return resolveByID(userID)
+	}
+
+	return resolveByEmail(userEmail, false)
 }
 
 func resolveByID(userID string) (string, error) {
@@ -125,7 +137,15 @@ func resolveByID(userID string) (string, error) {
 	return userID, nil
 }
 
-func resolveByEmail(userEmail string) (string, error) {
+func resolveByEmail(userEmail string, create bool) (string, error) {
+	if !create {
+		user, err := models.FindUserByEmail(userEmail)
+		if err != nil {
+			return "", status.Error(codes.NotFound, "user not found")
+		}
+		return user.ID.String(), nil
+	}
+
 	user, err := findOrCreateUser(userEmail)
 	if err != nil {
 		return "", err

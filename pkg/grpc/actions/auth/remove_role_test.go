@@ -51,6 +51,14 @@ func Test_RemoveRole(t *testing.T) {
 		err := user.Create()
 		require.NoError(t, err)
 
+		accountProvider := &models.AccountProvider{
+			Provider: "github",
+			UserID:   user.ID,
+			Email:    testEmail,
+		}
+		err = accountProvider.Create()
+		require.NoError(t, err)
+
 		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainOrg)
 		require.NoError(t, err)
 
@@ -80,7 +88,7 @@ func Test_RemoveRole(t *testing.T) {
 
 		_, err := RemoveRole(ctx, req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user not found")
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
@@ -109,7 +117,7 @@ func Test_RemoveRole(t *testing.T) {
 
 		_, err := RemoveRole(ctx, req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user identifier must be specified")
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {

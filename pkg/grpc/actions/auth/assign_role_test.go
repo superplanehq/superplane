@@ -84,7 +84,7 @@ func Test_AssignRole(t *testing.T) {
 
 		_, err := AssignRole(ctx, req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user identifier must be specified")
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
