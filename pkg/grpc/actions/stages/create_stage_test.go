@@ -12,11 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 const StageCreatedRoutingKey = "stage-created"
@@ -327,6 +330,41 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, "invalid condition: invalid time window condition: invalid day DoesNotExist", s.Message())
 	})
 
+	t.Run("stage with integration that does not exist -> error", func(t *testing.T) {
+		amqpURL, _ := config.RabbitMQURL()
+		testconsumer := testconsumer.New(amqpURL, StageCreatedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		name := support.RandomName("test")
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{Name: name},
+				Spec: &pb.Stage_Spec{
+					Executor: &pb.ExecutorSpec{
+						Type:        executor.Type,
+						Integration: &integrationpb.IntegrationRef{Name: "does-not-exist"},
+						Semaphore:   executor.Semaphore,
+					},
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "integration does-not-exist not found", s.Message())
+	})
+
 	t.Run("stage with integration", func(t *testing.T) {
 		amqpURL, _ := config.RabbitMQURL()
 		testconsumer := testconsumer.New(amqpURL, StageCreatedRoutingKey)
@@ -422,7 +460,88 @@ func Test__CreateStage(t *testing.T) {
 		eventSource, err := resource.FindEventSource()
 		require.NoError(t, err)
 		require.NotNil(t, eventSource)
-		require.Equal(t, eventSource.Name, executor.Semaphore.Project)
+		require.Equal(t, eventSource.Name, executor.Integration.Name+"-"+executor.Semaphore.Project)
+		require.Equal(t, eventSource.Scope, models.EventSourceScopeInternal)
+	})
+
+	t.Run("stage with org-level integration", func(t *testing.T) {
+		secret, err := support.CreateOrganizationSecret(t, r, map[string]string{"key": "test"})
+		require.NoError(t, err)
+		integration, err := models.CreateIntegration(&models.Integration{
+			Name:       support.RandomName("integration"),
+			CreatedBy:  r.User,
+			Type:       models.IntegrationTypeSemaphore,
+			DomainType: models.DomainTypeOrganization,
+			DomainID:   r.Organization.ID,
+			URL:        r.SemaphoreAPIMock.Server.URL,
+			AuthType:   models.IntegrationAuthTypeToken,
+			Auth: datatypes.NewJSONType(models.IntegrationAuth{
+				Token: &models.IntegrationAuthToken{
+					ValueFrom: models.ValueDefinitionFrom{
+						Secret: &models.ValueDefinitionFromSecret{
+							Name: secret.Name,
+							Key:  "key",
+						},
+					},
+				},
+			}),
+		})
+
+		name := support.RandomName("test")
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+			CanvasIdOrName: r.Canvas.ID.String(),
+			Stage: &pb.Stage{
+				Metadata: &pb.Stage_Metadata{Name: name},
+				Spec: &pb.Stage_Spec{
+					Executor: &pb.ExecutorSpec{
+						Type: executor.Type,
+						Integration: &integrationpb.IntegrationRef{
+							Name:       integration.Name,
+							DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+						},
+						Semaphore: executor.Semaphore,
+					},
+					Conditions: []*pb.Condition{},
+					Connections: []*pb.Connection{
+						{
+							Name: r.Source.Name,
+							Type: pb.Connection_TYPE_EVENT_SOURCE,
+						},
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.NotNil(t, res.Stage.Metadata)
+		assert.NotNil(t, res.Stage.Metadata.Id)
+		assert.NotNil(t, res.Stage.Metadata.CreatedAt)
+		assert.Equal(t, r.Canvas.ID.String(), res.Stage.Metadata.CanvasId)
+		assert.Equal(t, name, res.Stage.Metadata.Name)
+
+		// Assert executor is correct
+		require.NotNil(t, res.Stage.Spec)
+		assert.Equal(t, executor.Type, res.Stage.Spec.Executor.Type)
+		assert.Equal(t, integration.Name, res.Stage.Spec.Executor.Integration.Name)
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, res.Stage.Spec.Executor.Integration.DomainType)
+		assert.Equal(t, executor.Semaphore.Project, res.Stage.Spec.Executor.Semaphore.Project)
+		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Spec.Executor.Semaphore.Branch)
+		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Spec.Executor.Semaphore.PipelineFile)
+		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Spec.Executor.Semaphore.Parameters)
+
+		// Check that we have a connection to the source
+		require.Len(t, res.Stage.Spec.Connections, 1)
+
+		// Assert internally scoped event source was created
+		resource, err := models.FindResource(integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		require.NoError(t, err)
+		require.NotNil(t, resource)
+		eventSource, err := resource.FindEventSource()
+		require.NoError(t, err)
+		require.NotNil(t, eventSource)
+		require.Equal(t, eventSource.Name, integration.Name+"-"+executor.Semaphore.Project)
 		require.Equal(t, eventSource.Scope, models.EventSourceScopeInternal)
 	})
 
@@ -487,7 +606,7 @@ func Test__CreateStage(t *testing.T) {
 		sources, err := resources[0].ListEventSources()
 		require.NoError(t, err)
 		assert.Len(t, sources, 1)
-		assert.Equal(t, sources[0].Name, executor.Semaphore.Project)
+		assert.Equal(t, sources[0].Name, r.Integration.Name+"-"+executor.Semaphore.Project)
 		assert.Equal(t, sources[0].Scope, models.EventSourceScopeInternal)
 	})
 

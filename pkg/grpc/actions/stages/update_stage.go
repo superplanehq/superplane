@@ -64,7 +64,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var integration *models.Integration
 	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
 		}

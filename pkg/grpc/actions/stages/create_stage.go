@@ -85,7 +85,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var integration *models.Integration
 	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -471,7 +471,8 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: spec,
 			Integration: &integrationPb.IntegrationRef{
-				Name: resource.IntegrationName,
+				Name:       resource.IntegrationName,
+				DomainType: actions.DomainTypeToProto(resource.DomainType),
 			},
 		}, nil
 

@@ -47,7 +47,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	//
 	var integration *models.Integration
 	if req.EventSource.Spec != nil && req.EventSource.Spec.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.EventSource.Spec.Integration.Name)
+		integration, err = actions.ValidateIntegration(canvas, req.EventSource.Spec.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,10 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 			return nil, fmt.Errorf("integration not found: %v", err)
 		}
 
-		spec.Integration = &integrationPb.IntegrationRef{Name: integration.Name}
+		spec.Integration = &integrationPb.IntegrationRef{
+			Name:       integration.Name,
+			DomainType: actions.DomainTypeToProto(integration.DomainType),
+		}
 
 		switch integration.Type {
 		case models.IntegrationTypeSemaphore:

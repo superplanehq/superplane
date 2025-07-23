@@ -104,15 +104,20 @@ func validateType(t pb.Integration_Type) (string, error) {
 	}
 }
 
-func validateAuth(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDomainType string, integrationDomainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
 			return nil, "", fmt.Errorf("secret is required")
 		}
 
+		domainType, domainID, err := getDomainForSecret(integrationDomainType, &integrationDomainID, auth.Token.ValueFrom.Secret)
+		if err != nil {
+			return nil, "", err
+		}
+
 		name := auth.Token.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(encryptor, name, domainType, domainID)
+		provider, err := secrets.NewProvider(encryptor, name, domainType, *domainID)
 		if err != nil {
 			return nil, "", err
 		}
@@ -211,4 +216,41 @@ func integrationAuthTypeToProto(authType string) pb.Integration_AuthType {
 	default:
 		return pb.Integration_AUTH_TYPE_NONE
 	}
+}
+
+func getDomainForSecret(domainTypeForIntegration string, integrationDomainID *uuid.UUID, ref *pb.ValueFromSecret) (string, *uuid.UUID, error) {
+	domainTypeForSecret, err := actions.ProtoToDomainType(ref.DomainType)
+	if err != nil {
+		domainTypeForSecret = domainTypeForIntegration
+	}
+
+	//
+	// If an organization-level integration is being created, the secret must be on the organization level as well.
+	//
+	if domainTypeForIntegration == models.DomainTypeOrganization {
+		if domainTypeForSecret != models.DomainTypeOrganization {
+			return "", nil, fmt.Errorf("integration on organization level must use organization-level secret")
+		}
+
+		return domainTypeForSecret, integrationDomainID, nil
+	}
+
+	//
+	// If a canvas-level integration is being created and using a canvas-level secret,
+	// we can just re-use the domain type and ID coming in from the request.
+	//
+	if domainTypeForSecret == models.DomainTypeCanvas {
+		return domainTypeForSecret, integrationDomainID, nil
+	}
+
+	//
+	// If a canvas-level integration is being created and using a org-level secret,
+	// we need to find the organization ID for the canvas where the integration is being created.
+	//
+	canvas, err := models.FindCanvasByID(integrationDomainID.String())
+	if err != nil {
+		return "", nil, fmt.Errorf("canvas not found")
+	}
+
+	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
 }

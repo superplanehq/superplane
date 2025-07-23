@@ -11,8 +11,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
+	"github.com/superplanehq/superplane/pkg/protos/authorization"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/test/support"
@@ -144,6 +146,96 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
+		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
+		assert.True(t, testconsumer.HasReceivedMessage())
+	})
+
+	t.Run("event source for integration that does not exist -> error", func(t *testing.T) {
+		name := support.RandomName("source")
+		eventSource := &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: "does-not-exist",
+				},
+				Semaphore: &protos.EventSource_Spec_Semaphore{
+					Project: "demo-project",
+				},
+			},
+		}
+
+		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+			CanvasIdOrName: r.Canvas.Name,
+			EventSource:    eventSource,
+		})
+
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "integration does-not-exist not found", s.Message())
+	})
+
+	t.Run("event source with organization-level integration is created", func(t *testing.T) {
+		secret, err := support.CreateOrganizationSecret(t, r, map[string]string{"key": "test"})
+		require.NoError(t, err)
+		integration, err := models.CreateIntegration(&models.Integration{
+			Name:       support.RandomName("integration"),
+			CreatedBy:  r.User,
+			Type:       models.IntegrationTypeSemaphore,
+			DomainType: models.DomainTypeOrganization,
+			DomainID:   r.Organization.ID,
+			URL:        r.SemaphoreAPIMock.Server.URL,
+			AuthType:   models.IntegrationAuthTypeToken,
+			Auth: datatypes.NewJSONType(models.IntegrationAuth{
+				Token: &models.IntegrationAuthToken{
+					ValueFrom: models.ValueDefinitionFrom{
+						Secret: &models.ValueDefinitionFromSecret{
+							Name: secret.Name,
+							Key:  "key",
+						},
+					},
+				},
+			}),
+		})
+
+		amqpURL, _ := config.RabbitMQURL()
+		testconsumer := testconsumer.New(amqpURL, EventSourceCreatedRoutingKey)
+		testconsumer.Start()
+		defer testconsumer.Stop()
+
+		name := support.RandomName("source")
+		eventSource := &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					DomainType: authorization.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					Name:       integration.Name,
+				},
+				Semaphore: &protos.EventSource_Spec_Semaphore{
+					Project: "demo-project",
+				},
+			},
+		}
+
+		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+			CanvasIdOrName: r.Canvas.Name,
+			EventSource:    eventSource,
+		})
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.EventSource)
+		assert.NotEmpty(t, response.EventSource.Metadata.Id)
+		assert.NotEmpty(t, response.EventSource.Metadata.CreatedAt)
+		assert.NotEmpty(t, response.Key)
+		assert.Equal(t, name, response.EventSource.Metadata.Name)
+		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
+		assert.Equal(t, integration.Name, response.EventSource.Spec.Integration.Name)
+		assert.Equal(t, authorization.DomainType_DOMAIN_TYPE_ORGANIZATION, response.EventSource.Spec.Integration.DomainType)
 		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})

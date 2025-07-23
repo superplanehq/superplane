@@ -62,7 +62,7 @@ func (e *StageExecutor) GetIntegrationResource() (*IntegrationResource, error) {
 	err := database.Conn().
 		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
-		Select("resources.name as name, integrations.name as integration_name").
+		Select("resources.name as name, integrations.name as integration_name, integrations.domain_type as domain_type").
 		Where("resources.id = ?", e.ResourceID).
 		First(&r).
 		Error
