@@ -25,6 +25,11 @@ func Test_ListGroups(t *testing.T) {
 	err = authService.CreateGroup(orgID, "org", "test-group-2", models.RoleOrgViewer)
 	require.NoError(t, err)
 
+	err = models.UpsertGroupMetadata("test-group-1", "org", orgID, "Test Group 1", "A test group")
+	require.NoError(t, err)
+	err = models.UpsertGroupMetadata("test-group-2", "org", orgID, "Test Group 2", "Another test group")
+	require.NoError(t, err)
+
 	t.Run("successful list groups", func(t *testing.T) {
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
@@ -43,7 +48,8 @@ func Test_ListGroups(t *testing.T) {
 			assert.Equal(t, orgID, group.DomainId)
 			assert.Contains(t, []string{"org_admin", "org_viewer"}, group.Role)
 			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
-			// CreatedAt and UpdatedAt may be empty if no metadata exists
+			assert.NotEmpty(t, group.CreatedAt)
+			assert.NotEmpty(t, group.UpdatedAt)
 		}
 
 		// Check specific group names
@@ -77,6 +83,11 @@ func Test_ListGroups(t *testing.T) {
 		err = authService.CreateGroup(canvasID, "canvas", "canvas-group-2", models.RoleCanvasViewer)
 		require.NoError(t, err)
 
+		err = models.UpsertGroupMetadata("canvas-group-1", "canvas", canvasID, "Canvas Group 1", "A canvas group")
+		require.NoError(t, err)
+		err = models.UpsertGroupMetadata("canvas-group-2", "canvas", canvasID, "Canvas Group 2", "Another canvas group")
+		require.NoError(t, err)
+
 		req := &GroupRequest{
 			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainID:   canvasID,
@@ -93,7 +104,8 @@ func Test_ListGroups(t *testing.T) {
 			assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, group.DomainType)
 			assert.Equal(t, canvasID, group.DomainId)
 			assert.GreaterOrEqual(t, group.MembersCount, int32(0))
-			// CreatedAt and UpdatedAt may be empty if no metadata exists
+			assert.NotEmpty(t, group.CreatedAt)
+			assert.NotEmpty(t, group.UpdatedAt)
 		}
 
 		// Check specific group names
