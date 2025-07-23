@@ -412,6 +412,7 @@ func (a *AuthService) SetupOrganizationRoles(orgID string) error {
 
 	if err := a.setupDefaultOrganizationRoleMetadata(orgID); err != nil {
 		log.Errorf("Error setting up default organization role metadata: %v", err)
+		return err
 	}
 
 	return nil
@@ -549,7 +550,7 @@ func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	// Set up metadata for default canvas roles
 	if err := a.setupDefaultCanvasRoleMetadata(canvasID); err != nil {
 		log.Errorf("Error setting up default canvas role metadata: %v", err)
-		// Don't fail the entire setup if metadata fails
+		return err
 	}
 
 	return nil
