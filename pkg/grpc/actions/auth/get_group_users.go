@@ -27,7 +27,7 @@ func GetGroupUsers(ctx context.Context, req *GetGroupUsersRequest, authService a
 		return nil, err
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
+	domainType, err := actions.ProtoToDomainType(req.DomainType)
 	if err != nil {
 		return nil, err
 	}

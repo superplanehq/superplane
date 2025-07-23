@@ -16,7 +16,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -469,7 +470,7 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 		return &pb.ExecutorSpec{
 			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: spec,
-			Integration: &pb.IntegrationRef{
+			Integration: &integrationPb.IntegrationRef{
 				Name: resource.IntegrationName,
 			},
 		}, nil

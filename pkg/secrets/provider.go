@@ -24,8 +24,8 @@ type Options struct {
 	Encryptor  crypto.Encryptor
 }
 
-func NewProvider(encryptor crypto.Encryptor, name string, canvasId string) (Provider, error) {
-	secret, err := models.FindSecretByName(canvasId, name)
+func NewProvider(encryptor crypto.Encryptor, name, domainType string, domainID uuid.UUID) (Provider, error) {
+	secret, err := models.FindSecretByName(domainType, domainID, name)
 	if err != nil {
 		return nil, fmt.Errorf("error finding secret %s: %v", name, err)
 	}

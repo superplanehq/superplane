@@ -37,7 +37,7 @@ func NewIntegration(ctx context.Context, integration *models.Integration, encryp
 	switch integration.Type {
 	case models.IntegrationTypeSemaphore:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := secrets.NewProvider(encryptor, secretInfo.Name, integration.DomainID.String())
+		provider, err := secrets.NewProvider(encryptor, secretInfo.Name, integration.DomainType, integration.DomainID)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}

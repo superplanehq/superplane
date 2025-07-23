@@ -119,7 +119,9 @@ func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor cry
 	secretMap := map[string]string{}
 	for _, secretDef := range stage.Secrets {
 		secretName := secretDef.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(encryptor, secretName, stage.CanvasID.String())
+
+		// TODO: it should be possible for organization secrets to be used here too.
+		provider, err := secrets.NewProvider(encryptor, secretName, models.DomainTypeCanvas, stage.CanvasID)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
 		}

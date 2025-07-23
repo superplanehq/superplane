@@ -5,33 +5,23 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 )
-
-func convertDomainType(domainType pbAuth.DomainType) string {
-	switch domainType {
-	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return authorization.DomainOrg
-	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		return authorization.DomainCanvas
-	default:
-		return ""
-	}
-}
 
 func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string) (*pbAuth.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
 	role := &pbAuth.Role{
 		Name:        roleDef.Name,
-		DomainType:  convertDomainTypeToProto(roleDef.DomainType),
+		DomainType:  actions.DomainTypeToProto(roleDef.DomainType),
 		Permissions: permissions,
 	}
 
 	if roleDef.InheritsFrom != nil {
 		role.InheritedRole = &pbAuth.Role{
 			Name:        roleDef.InheritsFrom.Name,
-			DomainType:  convertDomainTypeToProto(roleDef.InheritsFrom.DomainType),
+			DomainType:  actions.DomainTypeToProto(roleDef.InheritsFrom.DomainType),
 			Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
 		}
 	}
@@ -51,18 +41,7 @@ func convertPermissionToProto(permission *authorization.Permission) *pbAuth.Perm
 	return &pbAuth.Permission{
 		Resource:   permission.Resource,
 		Action:     permission.Action,
-		DomainType: convertDomainTypeToProto(permission.DomainType),
-	}
-}
-
-func convertDomainTypeToProto(domainType string) pbAuth.DomainType {
-	switch domainType {
-	case authorization.DomainOrg:
-		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
-	case authorization.DomainCanvas:
-		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
-	default:
-		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
+		DomainType: actions.DomainTypeToProto(permission.DomainType),
 	}
 }
 

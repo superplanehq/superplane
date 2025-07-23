@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -16,11 +16,11 @@ import (
 	"time"
 )
 
-// checks if the SuperplaneIntegrationMetadata type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneIntegrationMetadata{}
+// checks if the IntegrationsIntegrationMetadata type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &IntegrationsIntegrationMetadata{}
 
-// SuperplaneIntegrationMetadata struct for SuperplaneIntegrationMetadata
-type SuperplaneIntegrationMetadata struct {
+// IntegrationsIntegrationMetadata struct for IntegrationsIntegrationMetadata
+type IntegrationsIntegrationMetadata struct {
 	Id *string `json:"id,omitempty"`
 	Name *string `json:"name,omitempty"`
 	CreatedBy *string `json:"createdBy,omitempty"`
@@ -29,29 +29,29 @@ type SuperplaneIntegrationMetadata struct {
 	DomainId *string `json:"domainId,omitempty"`
 }
 
-// NewSuperplaneIntegrationMetadata instantiates a new SuperplaneIntegrationMetadata object
+// NewIntegrationsIntegrationMetadata instantiates a new IntegrationsIntegrationMetadata object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneIntegrationMetadata() *SuperplaneIntegrationMetadata {
-	this := SuperplaneIntegrationMetadata{}
+func NewIntegrationsIntegrationMetadata() *IntegrationsIntegrationMetadata {
+	this := IntegrationsIntegrationMetadata{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewSuperplaneIntegrationMetadataWithDefaults instantiates a new SuperplaneIntegrationMetadata object
+// NewIntegrationsIntegrationMetadataWithDefaults instantiates a new IntegrationsIntegrationMetadata object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneIntegrationMetadataWithDefaults() *SuperplaneIntegrationMetadata {
-	this := SuperplaneIntegrationMetadata{}
+func NewIntegrationsIntegrationMetadataWithDefaults() *IntegrationsIntegrationMetadata {
+	this := IntegrationsIntegrationMetadata{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
 // GetId returns the Id field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetId() string {
+func (o *IntegrationsIntegrationMetadata) GetId() string {
 	if o == nil || IsNil(o.Id) {
 		var ret string
 		return ret
@@ -61,7 +61,7 @@ func (o *SuperplaneIntegrationMetadata) GetId() string {
 
 // GetIdOk returns a tuple with the Id field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetIdOk() (*string, bool) {
+func (o *IntegrationsIntegrationMetadata) GetIdOk() (*string, bool) {
 	if o == nil || IsNil(o.Id) {
 		return nil, false
 	}
@@ -69,7 +69,7 @@ func (o *SuperplaneIntegrationMetadata) GetIdOk() (*string, bool) {
 }
 
 // HasId returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasId() bool {
+func (o *IntegrationsIntegrationMetadata) HasId() bool {
 	if o != nil && !IsNil(o.Id) {
 		return true
 	}
@@ -78,12 +78,12 @@ func (o *SuperplaneIntegrationMetadata) HasId() bool {
 }
 
 // SetId gets a reference to the given string and assigns it to the Id field.
-func (o *SuperplaneIntegrationMetadata) SetId(v string) {
+func (o *IntegrationsIntegrationMetadata) SetId(v string) {
 	o.Id = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetName() string {
+func (o *IntegrationsIntegrationMetadata) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -93,7 +93,7 @@ func (o *SuperplaneIntegrationMetadata) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetNameOk() (*string, bool) {
+func (o *IntegrationsIntegrationMetadata) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -101,7 +101,7 @@ func (o *SuperplaneIntegrationMetadata) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasName() bool {
+func (o *IntegrationsIntegrationMetadata) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -110,12 +110,12 @@ func (o *SuperplaneIntegrationMetadata) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneIntegrationMetadata) SetName(v string) {
+func (o *IntegrationsIntegrationMetadata) SetName(v string) {
 	o.Name = &v
 }
 
 // GetCreatedBy returns the CreatedBy field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetCreatedBy() string {
+func (o *IntegrationsIntegrationMetadata) GetCreatedBy() string {
 	if o == nil || IsNil(o.CreatedBy) {
 		var ret string
 		return ret
@@ -125,7 +125,7 @@ func (o *SuperplaneIntegrationMetadata) GetCreatedBy() string {
 
 // GetCreatedByOk returns a tuple with the CreatedBy field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetCreatedByOk() (*string, bool) {
+func (o *IntegrationsIntegrationMetadata) GetCreatedByOk() (*string, bool) {
 	if o == nil || IsNil(o.CreatedBy) {
 		return nil, false
 	}
@@ -133,7 +133,7 @@ func (o *SuperplaneIntegrationMetadata) GetCreatedByOk() (*string, bool) {
 }
 
 // HasCreatedBy returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasCreatedBy() bool {
+func (o *IntegrationsIntegrationMetadata) HasCreatedBy() bool {
 	if o != nil && !IsNil(o.CreatedBy) {
 		return true
 	}
@@ -142,12 +142,12 @@ func (o *SuperplaneIntegrationMetadata) HasCreatedBy() bool {
 }
 
 // SetCreatedBy gets a reference to the given string and assigns it to the CreatedBy field.
-func (o *SuperplaneIntegrationMetadata) SetCreatedBy(v string) {
+func (o *IntegrationsIntegrationMetadata) SetCreatedBy(v string) {
 	o.CreatedBy = &v
 }
 
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetCreatedAt() time.Time {
+func (o *IntegrationsIntegrationMetadata) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
 		var ret time.Time
 		return ret
@@ -157,7 +157,7 @@ func (o *SuperplaneIntegrationMetadata) GetCreatedAt() time.Time {
 
 // GetCreatedAtOk returns a tuple with the CreatedAt field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetCreatedAtOk() (*time.Time, bool) {
+func (o *IntegrationsIntegrationMetadata) GetCreatedAtOk() (*time.Time, bool) {
 	if o == nil || IsNil(o.CreatedAt) {
 		return nil, false
 	}
@@ -165,7 +165,7 @@ func (o *SuperplaneIntegrationMetadata) GetCreatedAtOk() (*time.Time, bool) {
 }
 
 // HasCreatedAt returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasCreatedAt() bool {
+func (o *IntegrationsIntegrationMetadata) HasCreatedAt() bool {
 	if o != nil && !IsNil(o.CreatedAt) {
 		return true
 	}
@@ -174,12 +174,12 @@ func (o *SuperplaneIntegrationMetadata) HasCreatedAt() bool {
 }
 
 // SetCreatedAt gets a reference to the given time.Time and assigns it to the CreatedAt field.
-func (o *SuperplaneIntegrationMetadata) SetCreatedAt(v time.Time) {
+func (o *IntegrationsIntegrationMetadata) SetCreatedAt(v time.Time) {
 	o.CreatedAt = &v
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetDomainType() AuthorizationDomainType {
+func (o *IntegrationsIntegrationMetadata) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -189,7 +189,7 @@ func (o *SuperplaneIntegrationMetadata) GetDomainType() AuthorizationDomainType 
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *IntegrationsIntegrationMetadata) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -197,7 +197,7 @@ func (o *SuperplaneIntegrationMetadata) GetDomainTypeOk() (*AuthorizationDomainT
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasDomainType() bool {
+func (o *IntegrationsIntegrationMetadata) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -206,12 +206,12 @@ func (o *SuperplaneIntegrationMetadata) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *SuperplaneIntegrationMetadata) SetDomainType(v AuthorizationDomainType) {
+func (o *IntegrationsIntegrationMetadata) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetDomainId returns the DomainId field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationMetadata) GetDomainId() string {
+func (o *IntegrationsIntegrationMetadata) GetDomainId() string {
 	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
@@ -221,7 +221,7 @@ func (o *SuperplaneIntegrationMetadata) GetDomainId() string {
 
 // GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationMetadata) GetDomainIdOk() (*string, bool) {
+func (o *IntegrationsIntegrationMetadata) GetDomainIdOk() (*string, bool) {
 	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
@@ -229,7 +229,7 @@ func (o *SuperplaneIntegrationMetadata) GetDomainIdOk() (*string, bool) {
 }
 
 // HasDomainId returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationMetadata) HasDomainId() bool {
+func (o *IntegrationsIntegrationMetadata) HasDomainId() bool {
 	if o != nil && !IsNil(o.DomainId) {
 		return true
 	}
@@ -238,11 +238,11 @@ func (o *SuperplaneIntegrationMetadata) HasDomainId() bool {
 }
 
 // SetDomainId gets a reference to the given string and assigns it to the DomainId field.
-func (o *SuperplaneIntegrationMetadata) SetDomainId(v string) {
+func (o *IntegrationsIntegrationMetadata) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-func (o SuperplaneIntegrationMetadata) MarshalJSON() ([]byte, error) {
+func (o IntegrationsIntegrationMetadata) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -250,7 +250,7 @@ func (o SuperplaneIntegrationMetadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneIntegrationMetadata) ToMap() (map[string]interface{}, error) {
+func (o IntegrationsIntegrationMetadata) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Id) {
 		toSerialize["id"] = o.Id
@@ -273,38 +273,38 @@ func (o SuperplaneIntegrationMetadata) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneIntegrationMetadata struct {
-	value *SuperplaneIntegrationMetadata
+type NullableIntegrationsIntegrationMetadata struct {
+	value *IntegrationsIntegrationMetadata
 	isSet bool
 }
 
-func (v NullableSuperplaneIntegrationMetadata) Get() *SuperplaneIntegrationMetadata {
+func (v NullableIntegrationsIntegrationMetadata) Get() *IntegrationsIntegrationMetadata {
 	return v.value
 }
 
-func (v *NullableSuperplaneIntegrationMetadata) Set(val *SuperplaneIntegrationMetadata) {
+func (v *NullableIntegrationsIntegrationMetadata) Set(val *IntegrationsIntegrationMetadata) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneIntegrationMetadata) IsSet() bool {
+func (v NullableIntegrationsIntegrationMetadata) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneIntegrationMetadata) Unset() {
+func (v *NullableIntegrationsIntegrationMetadata) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneIntegrationMetadata(val *SuperplaneIntegrationMetadata) *NullableSuperplaneIntegrationMetadata {
-	return &NullableSuperplaneIntegrationMetadata{value: val, isSet: true}
+func NewNullableIntegrationsIntegrationMetadata(val *IntegrationsIntegrationMetadata) *NullableIntegrationsIntegrationMetadata {
+	return &NullableIntegrationsIntegrationMetadata{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneIntegrationMetadata) MarshalJSON() ([]byte, error) {
+func (v NullableIntegrationsIntegrationMetadata) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneIntegrationMetadata) UnmarshalJSON(src []byte) error {
+func (v *NullableIntegrationsIntegrationMetadata) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

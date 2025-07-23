@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package Superplane;
 
-import "authorization.proto";
+import "integrations.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
-option go_package = "github.com/superplanehq/superplane/pkg/protos/superplane";
+option go_package = "github.com/superplanehq/superplane/pkg/protos/canvases";
 
 option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
   info: {
@@ -49,18 +49,6 @@ service Superplane {
     };
   }
 
-  rpc CreateSecret(CreateSecretRequest) returns (CreateSecretResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/secrets"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create a new canvas secret";
-      description: "Creates a new canvas secret";
-      tags: "Secret";
-    };
-  }
-
   rpc CreateConnectionGroup(CreateConnectionGroupRequest) returns (CreateConnectionGroupResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
@@ -70,40 +58,6 @@ service Superplane {
       summary: "Create a new canvas connection group";
       description: "Creates a new canvas connection group";
       tags: "ConnectionGroup";
-    };
-  }
-
-  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/integrations"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List integrations for a canvas";
-      description: "List integrations for a canvas";
-      tags: "Integration";
-    };
-  }
-
-  rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/integrations/{id_or_name}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Describe an integration for a canvas";
-      description: "Describe an integration for a canvas";
-      tags: "Integration";
-    };
-  }
-
-  rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id_or_name}/integrations"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create a new canvas integration";
-      description: "Creates a new canvas integration";
-      tags: "Integration";
     };
   }
 
@@ -187,17 +141,6 @@ service Superplane {
     };
   }
 
-  rpc DescribeSecret(DescribeSecretRequest) returns (DescribeSecretResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Get secret details";
-      description: "Returns the details of a specific secret (canvas can be referenced by ID or name)";
-      tags: "Secret";
-    };
-  }
-
   rpc ListStages(ListStagesRequest) returns (ListStagesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id_or_name}/stages"
@@ -228,17 +171,6 @@ service Superplane {
       summary: "List connection groups";
       description: "Returns a list of all connection groups for the specified canvas (can be referenced by ID or name)";
       tags: "ConnectionGroup";
-    };
-  }
-
-  rpc ListSecrets(ListSecretsRequest) returns (ListSecretsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/canvases/{canvas_id_or_name}/secrets"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List secrets";
-      description: "Returns a list of all secrets for the specified canvas (can be referenced by ID or name)";
-      tags: "Secret";
     };
   }
 
@@ -288,18 +220,6 @@ service Superplane {
     };
   }
 
-  rpc UpdateSecret(UpdateSecretRequest) returns (UpdateSecretResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Updates a secret";
-      description: "Updates the specified secret (can be referenced by ID or name)";
-      tags: "Secret";
-    };
-  }
-
   rpc ApproveStageEvent(ApproveStageEventRequest) returns (ApproveStageEventResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/stages/{stage_id_or_name}/events/{event_id}/approve"
@@ -311,89 +231,6 @@ service Superplane {
       tags: "Stage";
     };
   }
-
-  rpc DeleteSecret(DeleteSecretRequest) returns (DeleteSecretResponse) {
-    option (google.api.http) = {
-      delete: "/api/v1/canvases/{canvas_id_or_name}/secrets/{id_or_name}"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Deletes a canvas secret";
-      description: "Deletes the specified canvas secret";
-      tags: "Secret";
-    };
-  }
-}
-
-message CreateIntegrationRequest {
-  string canvas_id_or_name = 1;
-  Integration integration = 2;
-}
-
-message CreateIntegrationResponse {
-  Integration integration = 1;
-}
-
-message ListIntegrationsRequest {
-  string canvas_id_or_name = 1;
-}
-
-message ListIntegrationsResponse {
-  repeated Integration integrations = 1;
-}
-
-message DescribeIntegrationRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
-}
-
-message DescribeIntegrationResponse {
-  Integration integration = 1;
-}
-
-message Integration {
-  message Metadata {
-    string id = 1;
-    string name = 2;
-    string created_by = 3;
-    google.protobuf.Timestamp created_at = 4;
-    Authorization.DomainType domain_type = 5;
-    string domain_id = 6;
-  }
-
-  enum Type {
-    TYPE_NONE = 0;
-    TYPE_SEMAPHORE = 1;
-    TYPE_GITHUB = 2;
-  }
-
-  message Auth {
-    message Token {
-      ValueFrom value_from = 1;
-    }
-
-    AuthType use = 1;
-    Token token = 2;
-  }
-
-  enum AuthType {
-    AUTH_TYPE_NONE = 0;
-    AUTH_TYPE_TOKEN = 1;
-    AUTH_TYPE_OIDC = 2;
-  }
-
-  message OIDC {
-    bool supported = 1;
-  }
-
-  message Spec {
-    Type type = 1;
-    string url = 2;
-    Auth auth = 3;
-    OIDC oidc = 4;
-  }
-
-  Metadata metadata = 1;
-  Spec spec = 2;
 }
 
 message ListCanvasesRequest {
@@ -449,7 +286,7 @@ message EventSource {
       string project = 1;
     }
 
-    IntegrationRef integration = 1;
+    Integrations.IntegrationRef integration = 1;
     Semaphore semaphore = 2;
   }
 
@@ -486,78 +323,6 @@ message ResetEventSourceKeyResponse {
   EventSource event_source = 1;
   string key = 2;
 }
-
-message Secret {
-  enum Provider {
-    PROVIDER_UNKNOWN = 0;
-    PROVIDER_LOCAL = 1;
-  }
-
-  //
-  // Local secrets are stored and managed by SuperPlane itself.
-  //
-  message Local {
-    map<string, string> data = 1;
-  }
-
-  message Metadata {
-    string id = 1;
-    string name = 2;
-    string canvas_id = 3;
-    google.protobuf.Timestamp created_at = 4;
-  }
-
-  message Spec {
-    Provider provider = 1;
-    Local local = 2;
-  }
-
-  Metadata metadata = 1;
-  Spec spec = 2;
-}
-
-message CreateSecretRequest {
-  Secret secret = 1;
-  string canvas_id_or_name = 2;
-}
-
-message CreateSecretResponse {
-  Secret secret = 1;
-}
-
-message UpdateSecretRequest {
-  Secret secret = 1;
-  string id_or_name = 2;
-  string canvas_id_or_name = 3;
-}
-
-message UpdateSecretResponse {
-  Secret secret = 1;
-}
-
-message DescribeSecretRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
-}
-
-message DescribeSecretResponse {
-  Secret secret = 1;
-}
-
-message ListSecretsRequest {
-  string canvas_id_or_name = 1;
-}
-
-message ListSecretsResponse {
-  repeated Secret secrets = 1;
-}
-
-message DeleteSecretRequest {
-  string canvas_id_or_name = 1;
-  string id_or_name = 2;
-}
-
-message DeleteSecretResponse {}
 
 message DescribeEventSourceRequest {
   string id = 1;
@@ -785,11 +550,6 @@ message CreateStageRequest {
   string canvas_id_or_name = 2;
 }
 
-message IntegrationRef {
-  Authorization.DomainType domain_type = 1;
-  string name = 2;
-}
-
 message ExecutorSpec {
   enum Type {
     TYPE_UNKNOWN = 0;
@@ -817,7 +577,7 @@ message ExecutorSpec {
   }
 
   Type type = 1;
-  IntegrationRef integration = 2;
+  Integrations.IntegrationRef integration = 2;
   Semaphore semaphore = 3;
   HTTP http = 4;
 }

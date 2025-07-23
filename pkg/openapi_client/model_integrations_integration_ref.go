@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -15,38 +15,38 @@ import (
 	"encoding/json"
 )
 
-// checks if the SuperplaneIntegrationRef type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &SuperplaneIntegrationRef{}
+// checks if the IntegrationsIntegrationRef type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &IntegrationsIntegrationRef{}
 
-// SuperplaneIntegrationRef struct for SuperplaneIntegrationRef
-type SuperplaneIntegrationRef struct {
+// IntegrationsIntegrationRef struct for IntegrationsIntegrationRef
+type IntegrationsIntegrationRef struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	Name *string `json:"name,omitempty"`
 }
 
-// NewSuperplaneIntegrationRef instantiates a new SuperplaneIntegrationRef object
+// NewIntegrationsIntegrationRef instantiates a new IntegrationsIntegrationRef object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewSuperplaneIntegrationRef() *SuperplaneIntegrationRef {
-	this := SuperplaneIntegrationRef{}
+func NewIntegrationsIntegrationRef() *IntegrationsIntegrationRef {
+	this := IntegrationsIntegrationRef{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewSuperplaneIntegrationRefWithDefaults instantiates a new SuperplaneIntegrationRef object
+// NewIntegrationsIntegrationRefWithDefaults instantiates a new IntegrationsIntegrationRef object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewSuperplaneIntegrationRefWithDefaults() *SuperplaneIntegrationRef {
-	this := SuperplaneIntegrationRef{}
+func NewIntegrationsIntegrationRefWithDefaults() *IntegrationsIntegrationRef {
+	this := IntegrationsIntegrationRef{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationRef) GetDomainType() AuthorizationDomainType {
+func (o *IntegrationsIntegrationRef) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -56,7 +56,7 @@ func (o *SuperplaneIntegrationRef) GetDomainType() AuthorizationDomainType {
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationRef) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *IntegrationsIntegrationRef) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -64,7 +64,7 @@ func (o *SuperplaneIntegrationRef) GetDomainTypeOk() (*AuthorizationDomainType, 
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationRef) HasDomainType() bool {
+func (o *IntegrationsIntegrationRef) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -73,12 +73,12 @@ func (o *SuperplaneIntegrationRef) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *SuperplaneIntegrationRef) SetDomainType(v AuthorizationDomainType) {
+func (o *IntegrationsIntegrationRef) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetName returns the Name field value if set, zero value otherwise.
-func (o *SuperplaneIntegrationRef) GetName() string {
+func (o *IntegrationsIntegrationRef) GetName() string {
 	if o == nil || IsNil(o.Name) {
 		var ret string
 		return ret
@@ -88,7 +88,7 @@ func (o *SuperplaneIntegrationRef) GetName() string {
 
 // GetNameOk returns a tuple with the Name field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneIntegrationRef) GetNameOk() (*string, bool) {
+func (o *IntegrationsIntegrationRef) GetNameOk() (*string, bool) {
 	if o == nil || IsNil(o.Name) {
 		return nil, false
 	}
@@ -96,7 +96,7 @@ func (o *SuperplaneIntegrationRef) GetNameOk() (*string, bool) {
 }
 
 // HasName returns a boolean if a field has been set.
-func (o *SuperplaneIntegrationRef) HasName() bool {
+func (o *IntegrationsIntegrationRef) HasName() bool {
 	if o != nil && !IsNil(o.Name) {
 		return true
 	}
@@ -105,11 +105,11 @@ func (o *SuperplaneIntegrationRef) HasName() bool {
 }
 
 // SetName gets a reference to the given string and assigns it to the Name field.
-func (o *SuperplaneIntegrationRef) SetName(v string) {
+func (o *IntegrationsIntegrationRef) SetName(v string) {
 	o.Name = &v
 }
 
-func (o SuperplaneIntegrationRef) MarshalJSON() ([]byte, error) {
+func (o IntegrationsIntegrationRef) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -117,7 +117,7 @@ func (o SuperplaneIntegrationRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o SuperplaneIntegrationRef) ToMap() (map[string]interface{}, error) {
+func (o IntegrationsIntegrationRef) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.DomainType) {
 		toSerialize["domainType"] = o.DomainType
@@ -128,38 +128,38 @@ func (o SuperplaneIntegrationRef) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableSuperplaneIntegrationRef struct {
-	value *SuperplaneIntegrationRef
+type NullableIntegrationsIntegrationRef struct {
+	value *IntegrationsIntegrationRef
 	isSet bool
 }
 
-func (v NullableSuperplaneIntegrationRef) Get() *SuperplaneIntegrationRef {
+func (v NullableIntegrationsIntegrationRef) Get() *IntegrationsIntegrationRef {
 	return v.value
 }
 
-func (v *NullableSuperplaneIntegrationRef) Set(val *SuperplaneIntegrationRef) {
+func (v *NullableIntegrationsIntegrationRef) Set(val *IntegrationsIntegrationRef) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableSuperplaneIntegrationRef) IsSet() bool {
+func (v NullableIntegrationsIntegrationRef) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableSuperplaneIntegrationRef) Unset() {
+func (v *NullableIntegrationsIntegrationRef) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableSuperplaneIntegrationRef(val *SuperplaneIntegrationRef) *NullableSuperplaneIntegrationRef {
-	return &NullableSuperplaneIntegrationRef{value: val, isSet: true}
+func NewNullableIntegrationsIntegrationRef(val *IntegrationsIntegrationRef) *NullableIntegrationsIntegrationRef {
+	return &NullableIntegrationsIntegrationRef{value: val, isSet: true}
 }
 
-func (v NullableSuperplaneIntegrationRef) MarshalJSON() ([]byte, error) {
+func (v NullableIntegrationsIntegrationRef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableSuperplaneIntegrationRef) UnmarshalJSON(src []byte) error {
+func (v *NullableIntegrationsIntegrationRef) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

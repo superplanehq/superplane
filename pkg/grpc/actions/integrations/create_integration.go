@@ -8,11 +8,10 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -20,32 +19,25 @@ import (
 	"gorm.io/datatypes"
 )
 
-func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
+func CreateIntegration(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	domainType, domainID string,
+	spec *pb.Integration,
+) (*pb.CreateIntegrationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
 	//
 	// Validate request
 	//
-	if req.Integration == nil || req.Integration.Metadata == nil || req.Integration.Metadata.Name == "" {
+	if spec == nil || spec.Metadata == nil || spec.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := buildIntegration(ctx, encryptor, canvas, req.Integration)
+	integration, err := buildIntegration(ctx, encryptor, domainType, uuid.MustParse(domainID), spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -57,7 +49,7 @@ func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		log.Errorf("Error creating integration. Request: %v. Error: %v", req, err)
+		log.Errorf("Error creating integration. Error: %v", err)
 		return nil, err
 	}
 
@@ -68,7 +60,7 @@ func CreateIntegration(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	return response, nil
 }
 
-func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, integration *pb.Integration) (*models.Integration, error) {
+func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, integration *pb.Integration) (*models.Integration, error) {
 	t, err := validateType(integration.Spec.Type)
 	if err != nil {
 		return nil, err
@@ -78,7 +70,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *m
 		return nil, fmt.Errorf("auth is required")
 	}
 
-	auth, authType, err := validateAuth(ctx, encryptor, canvas, integration.Spec.Auth)
+	auth, authType, err := validateAuth(ctx, encryptor, domainType, domainID, integration.Spec.Auth)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +83,8 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, canvas *m
 
 	return &models.Integration{
 		Name:       integration.Metadata.Name,
-		DomainType: authorization.DomainCanvas,
-		DomainID:   canvas.ID,
+		DomainType: domainType,
+		DomainID:   domainID,
 		Type:       t,
 		URL:        integration.Spec.Url,
 		AuthType:   authType,
@@ -112,7 +104,7 @@ func validateType(t pb.Integration_Type) (string, error) {
 	}
 }
 
-func validateAuth(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
@@ -120,7 +112,7 @@ func validateAuth(ctx context.Context, encryptor crypto.Encryptor, canvas *model
 		}
 
 		name := auth.Token.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(encryptor, name, canvas.ID.String())
+		provider, err := secrets.NewProvider(encryptor, name, domainType, domainID)
 		if err != nil {
 			return nil, "", err
 		}

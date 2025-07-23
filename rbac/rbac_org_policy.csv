@@ -17,5 +17,12 @@ p,role:org_admin,org:{ORG_ID},role,delete
 p,role:org_admin,org:{ORG_ID},group,create
 p,role:org_admin,org:{ORG_ID},group,read
 p,role:org_admin,org:{ORG_ID},group,update
+p,role:org_admin,org:{ORG_ID},integration,create
+p,role:org_admin,org:{ORG_ID},integration,read
+p,role:org_admin,org:{ORG_ID},integration,update
+p,role:org_admin,org:{ORG_ID},secret,create
+p,role:org_admin,org:{ORG_ID},secret,read
+p,role:org_admin,org:{ORG_ID},secret,update
+p,role:org_admin,org:{ORG_ID},secret,delete
 p,role:org_owner,org:{ORG_ID},org,update
 p,role:org_owner,org:{ORG_ID},org,delete

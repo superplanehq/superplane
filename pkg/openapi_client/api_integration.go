@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Authorization API
 
-API for the Superplane service
+API for the Superplane Authorization service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -24,56 +24,52 @@ import (
 // IntegrationAPIService IntegrationAPI service
 type IntegrationAPIService service
 
-type ApiSuperplaneCreateIntegrationRequest struct {
+type ApiIntegrationsCreateIntegrationRequest struct {
 	ctx context.Context
 	ApiService *IntegrationAPIService
-	canvasIdOrName string
-	body *SuperplaneCreateIntegrationBody
+	body *IntegrationsCreateIntegrationRequest
 }
 
-func (r ApiSuperplaneCreateIntegrationRequest) Body(body SuperplaneCreateIntegrationBody) ApiSuperplaneCreateIntegrationRequest {
+func (r ApiIntegrationsCreateIntegrationRequest) Body(body IntegrationsCreateIntegrationRequest) ApiIntegrationsCreateIntegrationRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiSuperplaneCreateIntegrationRequest) Execute() (*SuperplaneCreateIntegrationResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneCreateIntegrationExecute(r)
+func (r ApiIntegrationsCreateIntegrationRequest) Execute() (*IntegrationsCreateIntegrationResponse, *http.Response, error) {
+	return r.ApiService.IntegrationsCreateIntegrationExecute(r)
 }
 
 /*
-SuperplaneCreateIntegration Create a new canvas integration
+IntegrationsCreateIntegration Create a new canvas integration
 
 Creates a new canvas integration
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneCreateIntegrationRequest
+ @return ApiIntegrationsCreateIntegrationRequest
 */
-func (a *IntegrationAPIService) SuperplaneCreateIntegration(ctx context.Context, canvasIdOrName string) ApiSuperplaneCreateIntegrationRequest {
-	return ApiSuperplaneCreateIntegrationRequest{
+func (a *IntegrationAPIService) IntegrationsCreateIntegration(ctx context.Context) ApiIntegrationsCreateIntegrationRequest {
+	return ApiIntegrationsCreateIntegrationRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneCreateIntegrationResponse
-func (a *IntegrationAPIService) SuperplaneCreateIntegrationExecute(r ApiSuperplaneCreateIntegrationRequest) (*SuperplaneCreateIntegrationResponse, *http.Response, error) {
+//  @return IntegrationsCreateIntegrationResponse
+func (a *IntegrationAPIService) IntegrationsCreateIntegrationExecute(r ApiIntegrationsCreateIntegrationRequest) (*IntegrationsCreateIntegrationResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneCreateIntegrationResponse
+		localVarReturnValue  *IntegrationsCreateIntegrationResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.SuperplaneCreateIntegration")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsCreateIntegration")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/integrations"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/integrations"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -146,59 +142,76 @@ func (a *IntegrationAPIService) SuperplaneCreateIntegrationExecute(r ApiSuperpla
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneDescribeIntegrationRequest struct {
+type ApiIntegrationsDescribeIntegrationRequest struct {
 	ctx context.Context
 	ApiService *IntegrationAPIService
-	canvasIdOrName string
 	idOrName string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiSuperplaneDescribeIntegrationRequest) Execute() (*SuperplaneDescribeIntegrationResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneDescribeIntegrationExecute(r)
+func (r ApiIntegrationsDescribeIntegrationRequest) DomainType(domainType string) ApiIntegrationsDescribeIntegrationRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiIntegrationsDescribeIntegrationRequest) DomainId(domainId string) ApiIntegrationsDescribeIntegrationRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiIntegrationsDescribeIntegrationRequest) Execute() (*IntegrationsDescribeIntegrationResponse, *http.Response, error) {
+	return r.ApiService.IntegrationsDescribeIntegrationExecute(r)
 }
 
 /*
-SuperplaneDescribeIntegration Describe an integration for a canvas
+IntegrationsDescribeIntegration Describe an integration
 
-Describe an integration for a canvas
+Describe an integration
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
  @param idOrName
- @return ApiSuperplaneDescribeIntegrationRequest
+ @return ApiIntegrationsDescribeIntegrationRequest
 */
-func (a *IntegrationAPIService) SuperplaneDescribeIntegration(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneDescribeIntegrationRequest {
-	return ApiSuperplaneDescribeIntegrationRequest{
+func (a *IntegrationAPIService) IntegrationsDescribeIntegration(ctx context.Context, idOrName string) ApiIntegrationsDescribeIntegrationRequest {
+	return ApiIntegrationsDescribeIntegrationRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 		idOrName: idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeIntegrationResponse
-func (a *IntegrationAPIService) SuperplaneDescribeIntegrationExecute(r ApiSuperplaneDescribeIntegrationRequest) (*SuperplaneDescribeIntegrationResponse, *http.Response, error) {
+//  @return IntegrationsDescribeIntegrationResponse
+func (a *IntegrationAPIService) IntegrationsDescribeIntegrationExecute(r ApiIntegrationsDescribeIntegrationRequest) (*IntegrationsDescribeIntegrationResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeIntegrationResponse
+		localVarReturnValue  *IntegrationsDescribeIntegrationResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.SuperplaneDescribeIntegration")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsDescribeIntegration")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/integrations/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/integrations/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -261,55 +274,72 @@ func (a *IntegrationAPIService) SuperplaneDescribeIntegrationExecute(r ApiSuperp
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneListIntegrationsRequest struct {
+type ApiIntegrationsListIntegrationsRequest struct {
 	ctx context.Context
 	ApiService *IntegrationAPIService
-	canvasIdOrName string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiSuperplaneListIntegrationsRequest) Execute() (*SuperplaneListIntegrationsResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneListIntegrationsExecute(r)
+func (r ApiIntegrationsListIntegrationsRequest) DomainType(domainType string) ApiIntegrationsListIntegrationsRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiIntegrationsListIntegrationsRequest) DomainId(domainId string) ApiIntegrationsListIntegrationsRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiIntegrationsListIntegrationsRequest) Execute() (*IntegrationsListIntegrationsResponse, *http.Response, error) {
+	return r.ApiService.IntegrationsListIntegrationsExecute(r)
 }
 
 /*
-SuperplaneListIntegrations List integrations for a canvas
+IntegrationsListIntegrations List integrations
 
-List integrations for a canvas
+List integrations
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneListIntegrationsRequest
+ @return ApiIntegrationsListIntegrationsRequest
 */
-func (a *IntegrationAPIService) SuperplaneListIntegrations(ctx context.Context, canvasIdOrName string) ApiSuperplaneListIntegrationsRequest {
-	return ApiSuperplaneListIntegrationsRequest{
+func (a *IntegrationAPIService) IntegrationsListIntegrations(ctx context.Context) ApiIntegrationsListIntegrationsRequest {
+	return ApiIntegrationsListIntegrationsRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneListIntegrationsResponse
-func (a *IntegrationAPIService) SuperplaneListIntegrationsExecute(r ApiSuperplaneListIntegrationsRequest) (*SuperplaneListIntegrationsResponse, *http.Response, error) {
+//  @return IntegrationsListIntegrationsResponse
+func (a *IntegrationAPIService) IntegrationsListIntegrationsExecute(r ApiIntegrationsListIntegrationsRequest) (*IntegrationsListIntegrationsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListIntegrationsResponse
+		localVarReturnValue  *IntegrationsListIntegrationsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.SuperplaneListIntegrations")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "IntegrationAPIService.IntegrationsListIntegrations")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/integrations"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/integrations"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

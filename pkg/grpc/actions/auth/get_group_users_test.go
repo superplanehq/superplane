@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -22,11 +23,11 @@ func Test_GetGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, "org", "test-group", authorization.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", authorization.RoleOrgAdmin)
 	require.NoError(t, err)
 
 	// Add user to group
-	err = authService.AddUserToGroup(orgID, "org", r.User.String(), "test-group")
+	err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, r.User.String(), "test-group")
 	require.NoError(t, err)
 
 	t.Run("successful get group users", func(t *testing.T) {
@@ -80,9 +81,9 @@ func Test_GetGroupUsers(t *testing.T) {
 		// Setup canvas roles and create canvas group
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, "canvas", "canvas-group", authorization.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", authorization.RoleCanvasAdmin)
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(canvasID, "canvas", r.User.String(), "canvas-group")
+		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
 		require.NoError(t, err)
 
 		req := &GetGroupUsersRequest{
@@ -106,7 +107,7 @@ func Test_GetGroupUsers(t *testing.T) {
 
 	t.Run("empty group - no users", func(t *testing.T) {
 		// Create another group without users
-		err = authService.CreateGroup(orgID, "org", "empty-group", authorization.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "empty-group", authorization.RoleOrgViewer)
 		require.NoError(t, err)
 
 		req := &GetGroupUsersRequest{

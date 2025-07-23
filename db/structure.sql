@@ -286,13 +286,14 @@ CREATE TABLE public.schema_migrations (
 
 CREATE TABLE public.secrets (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    canvas_id uuid NOT NULL,
     name character varying(128) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
     provider character varying(64) NOT NULL,
-    data bytea NOT NULL
+    data bytea NOT NULL,
+    domain_type character varying(64) NOT NULL,
+    domain_id character varying(64) NOT NULL
 );
 
 
@@ -573,11 +574,11 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: secrets secrets_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.secrets
-    ADD CONSTRAINT secrets_canvas_id_name_key UNIQUE (canvas_id, name);
+    ADD CONSTRAINT secrets_domain_id_name_key UNIQUE (domain_type, domain_id, name);
 
 
 --
@@ -838,14 +839,6 @@ ALTER TABLE ONLY public.resources
 
 
 --
--- Name: secrets secrets_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.secrets
-    ADD CONSTRAINT secrets_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
-
-
---
 -- Name: stage_event_approvals stage_event_approvals_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -929,7 +922,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250703133505	f
+20250721193920	f
 \.
 
 

@@ -3,57 +3,46 @@ package secrets
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, req *pb.UpdateSecretRequest) (*pb.UpdateSecretResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {
-		secret, err = models.FindSecretByName(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByName(domainType, uuid.MustParse(domainID), idOrName)
 	} else {
-		secret, err = models.FindSecretByID(canvas.ID.String(), req.IdOrName)
+		secret, err = models.FindSecretByID(domainType, uuid.MustParse(domainID), idOrName)
 	}
 
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "secret not found")
 	}
 
-	if req.Secret == nil {
+	if spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing secret")
 	}
 
-	if req.Secret.Metadata == nil || req.Secret.Metadata.Name == "" {
+	if spec.Metadata == nil || spec.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "empty secret name")
 	}
 
-	if req.Secret.Spec == nil {
+	if spec.Spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "missing secret spec")
 	}
 
-	provider := protoToSecretProvider(req.Secret.Spec.Provider)
+	provider := protoToSecretProvider(spec.Spec.Provider)
 	if provider != secret.Provider {
 		return nil, status.Error(codes.InvalidArgument, "cannot update provider")
 	}
 
-	data, err := prepareSecretData(ctx, encryptor, req.Secret)
+	data, err := prepareSecretData(ctx, encryptor, spec)
 	if err != nil {
 		return nil, err
 	}

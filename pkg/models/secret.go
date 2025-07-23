@@ -10,14 +10,15 @@ import (
 )
 
 type Secret struct {
-	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID  uuid.UUID
-	Name      string
-	CreatedAt *time.Time
-	CreatedBy uuid.UUID
-	UpdatedAt *time.Time
-	Provider  string
-	Data      []byte
+	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	DomainType string
+	DomainID   uuid.UUID
+	Name       string
+	CreatedAt  *time.Time
+	CreatedBy  uuid.UUID
+	UpdatedAt  *time.Time
+	Provider   string
+	Data       []byte
 }
 
 type SecretData struct {
@@ -46,11 +47,12 @@ func (s *Secret) Delete() error {
 	return database.Conn().Delete(s).Error
 }
 
-func FindSecretByName(canvasID, name string) (*Secret, error) {
+func FindSecretByName(domainType string, domainID uuid.UUID, name string) (*Secret, error) {
 	var secret Secret
 
 	err := database.Conn().
-		Where("canvas_id = ?", canvasID).
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
 		Where("name = ?", name).
 		First(&secret).
 		Error
@@ -62,11 +64,12 @@ func FindSecretByName(canvasID, name string) (*Secret, error) {
 	return &secret, nil
 }
 
-func FindSecretByID(canvasID, id string) (*Secret, error) {
+func FindSecretByID(domainType string, domainID uuid.UUID, id string) (*Secret, error) {
 	var secret Secret
 
 	err := database.Conn().
-		Where("canvas_id = ?", canvasID).
+		Where("domain_type = ?", domainType).
+		Where("domain_id = ?", domainID).
 		Where("id = ?", id).
 		First(&secret).
 		Error
@@ -78,17 +81,18 @@ func FindSecretByID(canvasID, id string) (*Secret, error) {
 	return &secret, nil
 }
 
-func CreateSecret(name, provider, requesterID string, canvasID uuid.UUID, data []byte) (*Secret, error) {
+func CreateSecret(name, provider, requesterID, domainType string, domainID uuid.UUID, data []byte) (*Secret, error) {
 	now := time.Now()
 
 	secret := Secret{
-		Name:      name,
-		CanvasID:  canvasID,
-		CreatedAt: &now,
-		CreatedBy: uuid.MustParse(requesterID),
-		UpdatedAt: &now,
-		Provider:  provider,
-		Data:      data,
+		Name:       name,
+		DomainType: domainType,
+		DomainID:   domainID,
+		CreatedAt:  &now,
+		CreatedBy:  uuid.MustParse(requesterID),
+		UpdatedAt:  &now,
+		Provider:   provider,
+		Data:       data,
 	}
 
 	err := database.Conn().
@@ -107,11 +111,12 @@ func CreateSecret(name, provider, requesterID string, canvasID uuid.UUID, data [
 	return nil, err
 }
 
-func ListSecrets(canvasID string) ([]Secret, error) {
+func ListSecrets(domainType string, domainID uuid.UUID) ([]Secret, error) {
 	var secrets []Secret
 
 	err := database.Conn().
-		Where("canvas_id = ?", canvasID).
+		Where("domain_id = ?", domainID).
+		Where("domain_type = ?", domainType).
 		Find(&secrets).
 		Error
 
