@@ -372,7 +372,7 @@ func (s *Server) Close() {
 	}
 }
 
-func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request) *models.StageExecution {
+func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, executionID string) *models.StageExecution {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -386,20 +386,31 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request) *
 	}
 
 	token := headerParts[1]
-	vars := mux.Vars(r)
-	executionIDFromRequest := vars["executionID"]
-	executionID, err := uuid.Parse(executionIDFromRequest)
+	ID, err := uuid.Parse(executionID)
 	if err != nil {
 		http.Error(w, "Execution not found", http.StatusNotFound)
 		return nil
 	}
 
-	execution, err := models.FindExecutionByID(executionID)
+	execution, err := models.FindExecutionByID(ID)
 	if err != nil {
 		http.Error(w, "Execution not found", http.StatusNotFound)
 		return nil
 	}
 
+	//
+	// Try to authenticate using the token issued by SuperPlane itself.
+	// It the integration does not support OIDC tokens, this is the method of authentication used.
+	//
+	err = s.jwt.Validate(token, executionID)
+	if err == nil {
+		return execution
+	}
+
+	//
+	// If authenticating with the token issued by SuperPlane itself fails,
+	// try to authenticate expecting an OIDC ID token issued by the integration.
+	//
 	integration, err := execution.GetIntegration()
 	if err != nil {
 		http.Error(w, "Integration not found", http.StatusNotFound)
@@ -407,27 +418,18 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request) *
 	}
 
 	//
-	// If OIDC is not supported by the integration,
-	// we expect the JWT token issued by SuperPlane itself.
+	// TODO: for Semaphore integration (the only available right now), the audience in the token
+	// is the same as the integration URL set up in SuperPlane, but that might not always be the case.
 	//
-	if !integration.OIDC.Data().Supported {
-		err = s.jwt.Validate(token, executionID.String())
-		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return nil
-		}
-	}
-
-	//
-	// If OIDC is supported by the integration,
-	// we expect the JWT token issued by the integration.
-	// TODO: check claims
-	//
-	_, err = s.oidcVerifier.Verify(r.Context(), headerParts[1], integration.URL)
+	_, err = s.oidcVerifier.Verify(r.Context(), integration.URL, integration.URL, headerParts[1])
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
+
+	// TODO: check claims
+	// - execution_resources.external_id == claims["wf_id"]
+	// - resources.external_id == claims["prj_id"]
 
 	return execution
 }
@@ -464,7 +466,7 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	execution := s.authenticateExecution(w, r)
+	execution := s.authenticateExecution(w, r, req.ExecutionID)
 	if execution == nil {
 		return
 	}

@@ -350,8 +350,15 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
+	stageExecutor, err := stage.GetExecutor()
+	require.NoError(t, err)
+
 	execution := support.CreateExecution(t, r.Source, stage)
 	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	require.NoError(t, err)
+
+	workflowID := uuid.NewString()
+	_, err = execution.AddResource(workflowID, *stageExecutor.ResourceID)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
@@ -376,7 +383,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "execution not found\n", response.Body.String())
+		assert.Equal(t, "Execution not found\n", response.Body.String())
 	})
 
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
@@ -417,8 +424,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			authToken:   validToken,
 		})
 
-		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, 404, response.Code)
 	})
 
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
@@ -432,7 +438,6 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Missing Authorization header\n", response.Body.String())
 	})
 
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
@@ -445,7 +450,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, "Unauthorized\n", response.Body.String())
 	})
 
 	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {

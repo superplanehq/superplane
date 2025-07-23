@@ -146,11 +146,12 @@ func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 		Error
 }
 
+// TODO: check if this query can be improved
 func (e *StageExecution) GetIntegration() (*Integration, error) {
 	var integration Integration
 	err := database.Conn().
 		Table("execution_resources").
-		Joins("INNER JOIN resources ON resources.id = execution_resources.resource_id").
+		Joins("INNER JOIN resources ON resources.id = execution_resources.parent_resource_id").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
 		Where("execution_resources.execution_id = ?", e.ID).
 		Select("integrations.*").

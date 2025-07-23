@@ -19,17 +19,7 @@ func NewOIDCVerifier() *OIDCVerifier {
 	}
 }
 
-func (v *OIDCVerifier) AddVerifier(ctx context.Context, issuer, audience string) error {
-	provider, err := oidc.NewProvider(ctx, issuer)
-	if err != nil {
-		return err
-	}
-
-	v.verifiers[issuer] = provider.Verifier(&oidc.Config{ClientID: audience})
-	return nil
-}
-
-func (v *OIDCVerifier) Verify(ctx context.Context, issuer, token string) (*oidc.IDToken, error) {
+func (v *OIDCVerifier) Verify(ctx context.Context, issuer, audience, token string) (*oidc.IDToken, error) {
 	verifier, ok := v.verifiers[issuer]
 	if ok {
 		return verifier.Verify(ctx, token)
@@ -40,7 +30,7 @@ func (v *OIDCVerifier) Verify(ctx context.Context, issuer, token string) (*oidc.
 		return nil, err
 	}
 
-	verifier = provider.Verifier(&oidc.Config{ClientID: issuer})
+	verifier = provider.Verifier(&oidc.Config{ClientID: audience})
 	v.verifiers[issuer] = verifier
 	return verifier.Verify(ctx, token)
 }
