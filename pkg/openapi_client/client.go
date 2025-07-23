@@ -1,7 +1,7 @@
 /*
-Superplane Authorization API
+Superplane Organizations API
 
-API for the Superplane Authorization service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -42,7 +42,7 @@ var (
 	queryDescape    = strings.NewReplacer( "%5B", "[", "%5D", "]" )
 )
 
-// APIClient manages communication with the Superplane Authorization API API v1.0
+// APIClient manages communication with the Superplane Organizations API API v1.0
 // In most cases there should be only one, shared, APIClient.
 type APIClient struct {
 	cfg    *Configuration
@@ -50,21 +50,25 @@ type APIClient struct {
 
 	// API Services
 
-	AuthorizationAPI *AuthorizationAPIService
-
 	CanvasAPI *CanvasAPIService
 
 	ConnectionGroupAPI *ConnectionGroupAPIService
 
 	EventSourceAPI *EventSourceAPIService
 
+	GroupsAPI *GroupsAPIService
+
 	IntegrationAPI *IntegrationAPIService
 
 	OrganizationAPI *OrganizationAPIService
 
+	RolesAPI *RolesAPIService
+
 	SecretAPI *SecretAPIService
 
 	StageAPI *StageAPIService
+
+	UsersAPI *UsersAPIService
 }
 
 type service struct {
@@ -83,14 +87,16 @@ func NewAPIClient(cfg *Configuration) *APIClient {
 	c.common.client = c
 
 	// API Services
-	c.AuthorizationAPI = (*AuthorizationAPIService)(&c.common)
 	c.CanvasAPI = (*CanvasAPIService)(&c.common)
 	c.ConnectionGroupAPI = (*ConnectionGroupAPIService)(&c.common)
 	c.EventSourceAPI = (*EventSourceAPIService)(&c.common)
+	c.GroupsAPI = (*GroupsAPIService)(&c.common)
 	c.IntegrationAPI = (*IntegrationAPIService)(&c.common)
 	c.OrganizationAPI = (*OrganizationAPIService)(&c.common)
+	c.RolesAPI = (*RolesAPIService)(&c.common)
 	c.SecretAPI = (*SecretAPIService)(&c.common)
 	c.StageAPI = (*StageAPIService)(&c.common)
+	c.UsersAPI = (*UsersAPIService)(&c.common)
 
 	return c
 }

@@ -1,7 +1,7 @@
 /*
-Superplane Authorization API
+Superplane Organizations API
 
-API for the Superplane Authorization service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -132,7 +132,7 @@ func (a *StageAPIService) SuperplaneApproveStageEventExecute(r ApiSuperplaneAppr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -254,7 +254,7 @@ func (a *StageAPIService) SuperplaneCreateStageExecute(r ApiSuperplaneCreateStag
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -378,7 +378,7 @@ func (a *StageAPIService) SuperplaneDescribeStageExecute(r ApiSuperplaneDescribe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -527,7 +527,7 @@ func (a *StageAPIService) SuperplaneListStageEventsExecute(r ApiSuperplaneListSt
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -638,7 +638,7 @@ func (a *StageAPIService) SuperplaneListStagesExecute(r ApiSuperplaneListStagesR
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -764,7 +764,7 @@ func (a *StageAPIService) SuperplaneUpdateStageExecute(r ApiSuperplaneUpdateStag
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

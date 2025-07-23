@@ -1,0 +1,265 @@
+syntax = "proto3";
+
+package Superplane.Groups;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "authorization.proto";
+import "users.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/groups";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Groups API";
+    version: "1.0";
+    description: "API for Superplane Groups";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Groups {
+  //
+  // Endpoint for creating a group within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc CreateGroup(CreateGroupRequest) returns (CreateGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/groups"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create group";
+      description: "Creates a new group within a domain with a specific role";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for adding a user to a group
+  // Operation is synchronous and idempotent.
+  //
+  rpc AddUserToGroup(AddUserToGroupRequest) returns (AddUserToGroupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/groups/{group_name}/users"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Add user to group";
+      description: "Adds a user to a group within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for removing a user from a group
+  // Operation is synchronous and idempotent.
+  //
+  rpc RemoveUserFromGroup(RemoveUserFromGroupRequest) returns (RemoveUserFromGroupResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/groups/{group_name}/users/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove user from group";
+      description: "Removes a user from a group within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for listing groups within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListGroups(ListGroupsRequest) returns (ListGroupsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List groups";
+      description: "Returns a list of groups within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for getting users in a specific group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetGroupUsers(GetGroupUsersRequest) returns (GetGroupUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups/{group_name}/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get group users";
+      description: "Returns users that belong to a specific group within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for getting details of a specific group
+  // Operation is synchronous and idempotent.
+  //
+  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get group";
+      description: "Returns details of a specific group within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for updating a group
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateGroup(UpdateGroupRequest) returns (UpdateGroupResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/groups/{group_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update group";
+      description: "Updates an existing group within a domain";
+      tags: "Groups";
+    };
+  }
+
+  //
+  // Endpoint for deleting a group
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteGroup(DeleteGroupRequest) returns (DeleteGroupResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/groups/{group_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete group";
+      description: "Deletes an existing group within a domain";
+      tags: "Groups";
+    };
+  }
+}
+
+// Group management messages
+message CreateGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+  string role = 4;
+  string display_name = 5;
+  string description = 6;
+}
+
+message CreateGroupResponse {
+  Group group = 1;
+}
+
+message AddUserToGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+  string user_id = 4;
+  string user_email = 5;
+}
+
+message AddUserToGroupResponse {}
+
+message RemoveUserFromGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+  string user_id = 4;
+  string user_email = 5;
+}
+
+message RemoveUserFromGroupResponse {}
+
+message ListGroupsRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+}
+
+message ListGroupsResponse {
+  repeated Group groups = 1;
+}
+
+message GetGroupUsersRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+}
+
+message GetGroupUsersResponse {
+  repeated Users.User users = 1;
+  Group group = 2;
+}
+
+// Group detail messages
+message GetGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+}
+
+message GetGroupResponse {
+  Group group = 1;
+}
+
+message UpdateGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+  string role = 4;
+  string display_name = 5;
+  string description = 6;
+}
+
+message UpdateGroupResponse {
+  Group group = 1;
+}
+
+message DeleteGroupRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string group_name = 3;
+}
+
+message DeleteGroupResponse {}
+
+// Group data structure
+message Group {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    Authorization.DomainType domain_type = 3;
+    string domain_id = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+  }
+
+  message Spec {
+    string role = 1;
+    string display_name = 2;
+    string description = 3;
+  }
+
+  message Status {
+    int32 members_count = 1;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+  Status status = 3;
+}

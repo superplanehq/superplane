@@ -1,0 +1,239 @@
+syntax = "proto3";
+
+package Superplane.Roles;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "authorization.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/roles";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Roles API";
+    version: "1.0";
+    description: "API for Superplane Roles";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Roles {
+  //
+  // Endpoint for assigning a role to a user in a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc AssignRole(AssignRoleRequest) returns (AssignRoleResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/roles/assign"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Assign role";
+      description: "Assigns a role to a user within a domain";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for removing a role from a user in a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc RemoveRole(RemoveRoleRequest) returns (RemoveRoleResponse) {
+    option (google.api.http) = {
+      patch: "/api/v1/roles/remove"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Remove role";
+      description: "Removes a role from a user within a domain";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for listing available roles within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListRoles(ListRolesRequest) returns (ListRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List roles";
+      description: "Returns available roles for a specific domain type with their permissions and inheritance";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for describing a specific role
+  // Operation is synchronous and idempotent.
+  //
+  rpc DescribeRole(DescribeRoleRequest) returns (DescribeRoleResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/roles/describe"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe role";
+      description: "Returns detailed information about a specific role including permissions and inheritance";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for creating a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc CreateRole(CreateRoleRequest) returns (CreateRoleResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/roles"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create role";
+      description: "Creates a new custom role with specified permissions";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for updating a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc UpdateRole(UpdateRoleRequest) returns (UpdateRoleResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/roles/{role_name}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update role";
+      description: "Updates an existing custom role with new permissions";
+      tags: "Roles";
+    };
+  }
+
+  //
+  // Endpoint for deleting a custom role
+  // Operation is synchronous and idempotent.
+  //
+  rpc DeleteRole(DeleteRoleRequest) returns (DeleteRoleResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/roles/{role_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete role";
+      description: "Deletes an existing custom role";
+      tags: "Roles";
+    };
+  }
+}
+
+// Role assignment messages
+message AssignRoleRequest {
+  string user_id = 1;
+  string user_email = 2;
+  RoleAssignment role_assignment = 3;
+}
+
+message AssignRoleResponse {}
+
+message RemoveRoleRequest {
+  string user_id = 1;
+  string user_email = 2;
+  RoleAssignment role_assignment = 3;
+}
+
+message RemoveRoleResponse {}
+
+message RoleAssignment {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role = 3;
+}
+
+// Role discovery messages
+message ListRolesRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+}
+
+message ListRolesResponse {
+  repeated Role roles = 1;
+}
+
+message DescribeRoleRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role = 3;
+}
+
+message DescribeRoleResponse {
+  Role role = 1;
+}
+
+// Custom role management messages
+message CreateRoleRequest {
+  string name = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Authorization.Permission permissions = 4;
+  string inherited_role = 5;
+  string display_name = 6;
+  string description = 7;
+}
+
+message CreateRoleResponse {
+  Role role = 1;
+}
+
+message UpdateRoleRequest {
+  string role_name = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Authorization.Permission permissions = 4;
+  string inherited_role = 5;
+  string display_name = 6;
+  string description = 7;
+}
+
+message UpdateRoleResponse {
+  Role role = 1;
+}
+
+message DeleteRoleRequest {
+  string role_name = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+}
+
+message DeleteRoleResponse {}
+
+// Role data structure
+message Role {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    Authorization.DomainType domain_type = 3;
+    string domain_id = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
+  }
+
+  message Spec {
+    string display_name = 1;
+    string description = 2;
+    repeated Authorization.Permission permissions = 3;
+    string inherited_role = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}

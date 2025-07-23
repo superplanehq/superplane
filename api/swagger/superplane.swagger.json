@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-    "title": "Superplane Authorization API",
-    "description": "API for the Superplane Authorization service",
+    "title": "Superplane Organizations API",
+    "description": "API for managing organizations in the Superplane service",
     "version": "1.0",
     "contact": {
       "name": "API Support",
@@ -10,9 +10,6 @@
     }
   },
   "tags": [
-    {
-      "name": "Authorization"
-    },
     {
       "name": "Organizations"
     },
@@ -24,6 +21,15 @@
     },
     {
       "name": "Superplane"
+    },
+    {
+      "name": "Users"
+    },
+    {
+      "name": "Groups"
+    },
+    {
+      "name": "Roles"
     }
   ],
   "schemes": [
@@ -37,1060 +43,6 @@
     "application/json"
   ],
   "paths": {
-    "/api/v1/authorization/canvases/{canvasIdOrName}/groups": {
-      "get": {
-        "summary": "List canvas groups",
-        "description": "Returns a list of groups within a canvas",
-        "operationId": "Authorization_ListCanvasGroups",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListCanvasGroupsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create canvas group",
-        "description": "Creates a new group within a canvas with a specific role",
-        "operationId": "Authorization_CreateCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}": {
-      "get": {
-        "summary": "Get canvas group",
-        "description": "Returns details of a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "delete": {
-        "summary": "Delete canvas group",
-        "description": "Deletes an existing group within a canvas",
-        "operationId": "Authorization_DeleteCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationDeleteCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "put": {
-        "summary": "Update canvas group",
-        "description": "Updates an existing group within a canvas",
-        "operationId": "Authorization_UpdateCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get canvas group users",
-        "description": "Returns users that belong to a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Add user to canvas group",
-        "description": "Adds a user to a group within a canvas",
-        "operationId": "Authorization_AddUserToCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/canvases/{canvasIdOrName}/groups/{groupName}/users/remove": {
-      "patch": {
-        "summary": "Remove user from canvas group",
-        "description": "Removes a user from a group within a canvas",
-        "operationId": "Authorization_RemoveUserFromCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/canvases/{canvasIdOrName}/users": {
-      "get": {
-        "summary": "Get canvas users",
-        "description": "Returns all users that have roles within a canvas",
-        "operationId": "Authorization_GetCanvasUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/groups": {
-      "get": {
-        "summary": "List organization groups",
-        "description": "Returns a list of groups within an organization",
-        "operationId": "Authorization_ListOrganizationGroups",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create group",
-        "description": "Creates a new group within an organization with a specific role",
-        "operationId": "Authorization_CreateOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/groups/{groupName}": {
-      "get": {
-        "summary": "Get organization group",
-        "description": "Returns details of a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "delete": {
-        "summary": "Delete organization group",
-        "description": "Deletes an existing group within an organization",
-        "operationId": "Authorization_DeleteOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationDeleteOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "put": {
-        "summary": "Update organization group",
-        "description": "Updates an existing group within an organization",
-        "operationId": "Authorization_UpdateOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateOrganizationGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get organization group users",
-        "description": "Returns users that belong to a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Add user to organization group",
-        "description": "Adds a user to a group within an organization",
-        "operationId": "Authorization_AddUserToOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/groups/{groupName}/users/remove": {
-      "patch": {
-        "summary": "Remove user from organization group",
-        "description": "Removes a user from a group within an organization",
-        "operationId": "Authorization_RemoveUserFromOrganizationGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/organizations/{organizationId}/users": {
-      "get": {
-        "summary": "Get organization users",
-        "description": "Returns all users that have roles within an organization",
-        "operationId": "Authorization_GetOrganizationUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "organizationId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/roles": {
-      "get": {
-        "summary": "List roles",
-        "description": "Returns available roles for a specific domain type with their permissions and inheritance",
-        "operationId": "Authorization_ListRoles",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListRolesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create role",
-        "description": "Creates a new custom role with specified permissions",
-        "operationId": "Authorization_CreateRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateRoleRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/roles/assign": {
-      "patch": {
-        "summary": "Assign role",
-        "description": "Assigns a role to a user within an organization or canvas",
-        "operationId": "Authorization_AssignRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAssignRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAssignRoleRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/roles/describe": {
-      "get": {
-        "summary": "Describe role",
-        "description": "Returns detailed information about a specific role including permissions and inheritance",
-        "operationId": "Authorization_DescribeRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationDescribeRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          },
-          {
-            "name": "role",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/roles/remove": {
-      "patch": {
-        "summary": "Remove role",
-        "description": "Removes a role from a user within an organization or canvas",
-        "operationId": "Authorization_RemoveRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveRoleRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/roles/{roleName}": {
-      "delete": {
-        "summary": "Delete role",
-        "description": "Deletes an existing custom role",
-        "operationId": "Authorization_DeleteRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationDeleteRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "roleName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "put": {
-        "summary": "Update role",
-        "description": "Updates an existing custom role with new permissions",
-        "operationId": "Authorization_UpdateRole",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateRoleResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "roleName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationUpdateRoleBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/users/{userId}/permissions": {
-      "get": {
-        "summary": "List user permissions",
-        "description": "Returns all permissions a user has within a specific domain",
-        "operationId": "Authorization_ListUserPermissions",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListUserPermissionsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/authorization/users/{userId}/roles": {
-      "get": {
-        "summary": "Get user roles",
-        "description": "Returns the roles a user has within a specific domain",
-        "operationId": "Authorization_GetUserRoles",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetUserRolesResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "domainType",
-            "in": "query",
-            "required": false,
-            "type": "string",
-            "enum": [
-              "DOMAIN_TYPE_UNSPECIFIED",
-              "DOMAIN_TYPE_ORGANIZATION",
-              "DOMAIN_TYPE_CANVAS"
-            ],
-            "default": "DOMAIN_TYPE_UNSPECIFIED"
-          },
-          {
-            "name": "domainId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/canvases": {
       "get": {
         "summary": "List canvases",
@@ -1106,7 +58,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1136,7 +88,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1170,7 +122,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1200,7 +152,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1240,7 +192,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1276,7 +228,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1322,7 +274,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1360,7 +312,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1390,7 +342,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1430,7 +382,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1476,7 +428,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1505,240 +457,6 @@
         ]
       }
     },
-    "/api/v1/canvases/{canvasIdOrName}/groups": {
-      "get": {
-        "summary": "List canvas groups",
-        "description": "Returns a list of groups within a canvas",
-        "operationId": "Authorization_ListCanvasGroups",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationListCanvasGroupsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Create canvas group",
-        "description": "Creates a new group within a canvas with a specific role",
-        "operationId": "Authorization_CreateCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationCreateCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}": {
-      "get": {
-        "summary": "Get canvas group",
-        "description": "Returns details of a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get canvas group users",
-        "description": "Returns users that belong to a specific group within a canvas",
-        "operationId": "Authorization_GetCanvasGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetCanvasGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      },
-      "post": {
-        "summary": "Add user to canvas group",
-        "description": "Adds a user to a group within a canvas",
-        "operationId": "Authorization_AddUserToCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToCanvasGroupBody"
-            }
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove user from canvas group",
-        "description": "Removes a user from a group within a canvas",
-        "operationId": "Authorization_RemoveUserFromCanvasGroup",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromCanvasGroupResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
-        ]
-      }
-    },
     "/api/v1/canvases/{canvasIdOrName}/stages": {
       "get": {
         "summary": "List stages",
@@ -1754,7 +472,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1784,7 +502,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1824,7 +542,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1870,7 +588,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1914,7 +632,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -1987,7 +705,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2039,7 +757,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2070,50 +788,62 @@
     },
     "/api/v1/groups": {
       "get": {
-        "summary": "List organization groups",
-        "description": "Returns a list of groups within an organization",
-        "operationId": "Authorization_ListOrganizationGroups",
+        "summary": "List groups",
+        "description": "Returns a list of groups within a domain",
+        "operationId": "Groups_ListGroups",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationListOrganizationGroupsResponse"
+              "$ref": "#/definitions/GroupsListGroupsResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
         "parameters": [
           {
-            "name": "organizationId",
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
             "in": "query",
             "required": false,
             "type": "string"
           }
         ],
         "tags": [
-          "Authorization"
+          "Groups"
         ]
       },
       "post": {
         "summary": "Create group",
-        "description": "Creates a new group within an organization with a specific role",
-        "operationId": "Authorization_CreateOrganizationGroup",
+        "description": "Creates a new group within a domain with a specific role",
+        "operationId": "Groups_CreateGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupResponse"
+              "$ref": "#/definitions/GroupsCreateGroupResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2123,31 +853,31 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AuthorizationCreateOrganizationGroupRequest"
+              "$ref": "#/definitions/GroupsCreateGroupRequest"
             }
           }
         ],
         "tags": [
-          "Authorization"
+          "Groups"
         ]
       }
     },
     "/api/v1/groups/{groupName}": {
       "get": {
-        "summary": "Get organization group",
-        "description": "Returns details of a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroup",
+        "summary": "Get group",
+        "description": "Returns details of a specific group within a domain",
+        "operationId": "Groups_GetGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupResponse"
+              "$ref": "#/definitions/GroupsGetGroupResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2159,69 +889,91 @@
             "type": "string"
           },
           {
-            "name": "organizationId",
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
             "in": "query",
             "required": false,
             "type": "string"
           }
         ],
         "tags": [
-          "Authorization"
-        ]
-      }
-    },
-    "/api/v1/groups/{groupName}/users": {
-      "get": {
-        "summary": "Get organization group users",
-        "description": "Returns users that belong to a specific group within an organization",
-        "operationId": "Authorization_GetOrganizationGroupUsers",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/AuthorizationGetOrganizationGroupUsersResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "groupName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "organizationId",
-            "in": "query",
-            "required": false,
-            "type": "string"
-          }
-        ],
-        "tags": [
-          "Authorization"
+          "Groups"
         ]
       },
-      "post": {
-        "summary": "Add user to organization group",
-        "description": "Adds a user to a group within an organization",
-        "operationId": "Authorization_AddUserToOrganizationGroup",
+      "delete": {
+        "summary": "Delete group",
+        "description": "Deletes an existing group within a domain",
+        "operationId": "Groups_DeleteGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupResponse"
+              "$ref": "#/definitions/GroupsDeleteGroupResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      },
+      "put": {
+        "summary": "Update group",
+        "description": "Updates an existing group within a domain",
+        "operationId": "Groups_UpdateGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GroupsUpdateGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2237,31 +989,31 @@
             "in": "body",
             "required": true,
             "schema": {
-              "$ref": "#/definitions/AuthorizationAddUserToOrganizationGroupBody"
+              "$ref": "#/definitions/GroupsUpdateGroupBody"
             }
           }
         ],
         "tags": [
-          "Authorization"
+          "Groups"
         ]
       }
     },
-    "/api/v1/groups/{groupName}/users/{userId}": {
-      "delete": {
-        "summary": "Remove user from organization group",
-        "description": "Removes a user from a group within an organization",
-        "operationId": "Authorization_RemoveUserFromOrganizationGroup",
+    "/api/v1/groups/{groupName}/users": {
+      "get": {
+        "summary": "Get group users",
+        "description": "Returns users that belong to a specific group within a domain",
+        "operationId": "Groups_GetGroupUsers",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/AuthorizationRemoveUserFromOrganizationGroupResponse"
+              "$ref": "#/definitions/GroupsGetGroupUsersResponse"
             }
           },
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2273,20 +1025,104 @@
             "type": "string"
           },
           {
-            "name": "userId",
-            "in": "path",
-            "required": true,
-            "type": "string"
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
           },
           {
-            "name": "organizationId",
+            "name": "domainId",
             "in": "query",
             "required": false,
             "type": "string"
           }
         ],
         "tags": [
-          "Authorization"
+          "Groups"
+        ]
+      },
+      "post": {
+        "summary": "Add user to group",
+        "description": "Adds a user to a group within a domain",
+        "operationId": "Groups_AddUserToGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GroupsAddUserToGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GroupsAddUserToGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Groups"
+        ]
+      }
+    },
+    "/api/v1/groups/{groupName}/users/remove": {
+      "patch": {
+        "summary": "Remove user from group",
+        "description": "Removes a user from a group within a domain",
+        "operationId": "Groups_RemoveUserFromGroup",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/GroupsRemoveUserFromGroupResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/GroupsRemoveUserFromGroupBody"
+            }
+          }
+        ],
+        "tags": [
+          "Groups"
         ]
       }
     },
@@ -2305,7 +1141,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2347,7 +1183,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2381,7 +1217,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2431,7 +1267,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2453,7 +1289,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2487,7 +1323,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2517,7 +1353,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2547,7 +1383,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2572,6 +1408,288 @@
         ]
       }
     },
+    "/api/v1/roles": {
+      "get": {
+        "summary": "List roles",
+        "description": "Returns available roles for a specific domain type with their permissions and inheritance",
+        "operationId": "Roles_ListRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesListRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      },
+      "post": {
+        "summary": "Create role",
+        "description": "Creates a new custom role with specified permissions",
+        "operationId": "Roles_CreateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesCreateRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesCreateRoleRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/assign": {
+      "patch": {
+        "summary": "Assign role",
+        "description": "Assigns a role to a user within a domain",
+        "operationId": "Roles_AssignRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesAssignRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesAssignRoleRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/describe": {
+      "get": {
+        "summary": "Describe role",
+        "description": "Returns detailed information about a specific role including permissions and inheritance",
+        "operationId": "Roles_DescribeRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesDescribeRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/remove": {
+      "patch": {
+        "summary": "Remove role",
+        "description": "Removes a role from a user within a domain",
+        "operationId": "Roles_RemoveRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesRemoveRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesRemoveRoleRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
+    "/api/v1/roles/{roleName}": {
+      "delete": {
+        "summary": "Delete role",
+        "description": "Deletes an existing custom role",
+        "operationId": "Roles_DeleteRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesDeleteRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      },
+      "put": {
+        "summary": "Update role",
+        "description": "Updates an existing custom role with new permissions",
+        "operationId": "Roles_UpdateRole",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/RolesUpdateRoleResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "roleName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RolesUpdateRoleBody"
+            }
+          }
+        ],
+        "tags": [
+          "Roles"
+        ]
+      }
+    },
     "/api/v1/secrets": {
       "get": {
         "summary": "List secrets",
@@ -2587,7 +1705,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2629,7 +1747,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2663,7 +1781,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2711,7 +1829,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2759,7 +1877,7 @@
           "default": {
             "description": "An unexpected error response.",
             "schema": {
-              "$ref": "#/definitions/rpcStatus"
+              "$ref": "#/definitions/googlerpcStatus"
             }
           }
         },
@@ -2783,6 +1901,150 @@
           "Secret"
         ]
       }
+    },
+    "/api/v1/users": {
+      "get": {
+        "summary": "List users",
+        "description": "Returns all users that have roles within a domain",
+        "operationId": "Users_ListUsers",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/UsersListUsersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/permissions": {
+      "get": {
+        "summary": "List user permissions",
+        "description": "Returns all permissions a user has within a specific domain",
+        "operationId": "Users_ListUserPermissions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/UsersListUserPermissionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/roles": {
+      "get": {
+        "summary": "Get user roles",
+        "description": "Returns the roles a user has within a specific domain",
+        "operationId": "Users_GetUserRoles",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/UsersGetUserRolesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "domainType",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "DOMAIN_TYPE_UNSPECIFIED",
+              "DOMAIN_TYPE_ORGANIZATION",
+              "DOMAIN_TYPE_CANVAS"
+            ],
+            "default": "DOMAIN_TYPE_UNSPECIFIED"
+          },
+          {
+            "name": "domainId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Users"
+        ]
+      }
     }
   },
   "definitions": {
@@ -2791,192 +2053,6 @@
       "properties": {
         "valueFrom": {
           "$ref": "#/definitions/SuperplaneIntegrationsValueFrom"
-        }
-      }
-    },
-    "AuthorizationAccountProvider": {
-      "type": "object",
-      "properties": {
-        "providerType": {
-          "type": "string",
-          "title": "e.g., \"google\", \"github\", \"email\""
-        },
-        "providerId": {
-          "type": "string",
-          "title": "unique ID from the provider"
-        },
-        "email": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "avatarUrl": {
-          "type": "string"
-        },
-        "isPrimary": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "type": "string"
-        },
-        "updatedAt": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationAddUserToCanvasGroupBody": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationAddUserToCanvasGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationAddUserToOrganizationGroupBody": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationAddUserToOrganizationGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationAssignRoleRequest": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        },
-        "roleAssignment": {
-          "$ref": "#/definitions/AuthorizationRoleAssignment"
-        }
-      },
-      "title": "Role assignment messages"
-    },
-    "AuthorizationAssignRoleResponse": {
-      "type": "object"
-    },
-    "AuthorizationCreateCanvasGroupBody": {
-      "type": "object",
-      "properties": {
-        "groupName": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      },
-      "title": "Canvas group management messages"
-    },
-    "AuthorizationCreateCanvasGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationCreateOrganizationGroupRequest": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "groupName": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      },
-      "title": "Group management messages"
-    },
-    "AuthorizationCreateOrganizationGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationCreateRoleRequest": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        },
-        "inheritedRole": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      },
-      "title": "Custom role management messages"
-    },
-    "AuthorizationCreateRoleResponse": {
-      "type": "object"
-    },
-    "AuthorizationDeleteCanvasGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationDeleteOrganizationGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationDeleteRoleResponse": {
-      "type": "object"
-    },
-    "AuthorizationDescribeRoleResponse": {
-      "type": "object",
-      "properties": {
-        "role": {
-          "$ref": "#/definitions/AuthorizationRole"
         }
       }
     },
@@ -2990,188 +2066,6 @@
       "default": "DOMAIN_TYPE_UNSPECIFIED",
       "title": "Enums"
     },
-    "AuthorizationGetCanvasGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationGetCanvasGroupUsersResponse": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationUser"
-          }
-        },
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationGetCanvasUsersResponse": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationUser"
-          }
-        }
-      }
-    },
-    "AuthorizationGetOrganizationGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationGetOrganizationGroupUsersResponse": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationUser"
-          }
-        },
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationGetOrganizationUsersResponse": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationUser"
-          }
-        }
-      }
-    },
-    "AuthorizationGetUserRolesResponse": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "roles": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationRole"
-          }
-        }
-      }
-    },
-    "AuthorizationGroup": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "membersCount": {
-          "type": "integer",
-          "format": "int32"
-        },
-        "createdAt": {
-          "type": "string"
-        },
-        "updatedAt": {
-          "type": "string"
-        }
-      },
-      "title": "Core data structures"
-    },
-    "AuthorizationListCanvasGroupsResponse": {
-      "type": "object",
-      "properties": {
-        "groups": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationGroup"
-          }
-        }
-      }
-    },
-    "AuthorizationListOrganizationGroupsResponse": {
-      "type": "object",
-      "properties": {
-        "groups": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationGroup"
-          }
-        }
-      }
-    },
-    "AuthorizationListRolesResponse": {
-      "type": "object",
-      "properties": {
-        "roles": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationRole"
-          }
-        }
-      }
-    },
-    "AuthorizationListUserPermissionsResponse": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        }
-      }
-    },
     "AuthorizationPermission": {
       "type": "object",
       "properties": {
@@ -3184,236 +2078,8 @@
         "domainType": {
           "$ref": "#/definitions/AuthorizationDomainType"
         }
-      }
-    },
-    "AuthorizationRemoveRoleRequest": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        },
-        "roleAssignment": {
-          "$ref": "#/definitions/AuthorizationRoleAssignment"
-        }
-      }
-    },
-    "AuthorizationRemoveRoleResponse": {
-      "type": "object"
-    },
-    "AuthorizationRemoveUserFromCanvasGroupBody": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationRemoveUserFromCanvasGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationRemoveUserFromOrganizationGroupBody": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "userId": {
-          "type": "string"
-        },
-        "userEmail": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationRemoveUserFromOrganizationGroupResponse": {
-      "type": "object"
-    },
-    "AuthorizationRole": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        },
-        "inheritedRole": {
-          "$ref": "#/definitions/AuthorizationRole"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationRoleAssignment": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationUpdateCanvasGroupBody": {
-      "type": "object",
-      "properties": {
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationUpdateCanvasGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationUpdateOrganizationGroupBody": {
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationUpdateOrganizationGroupResponse": {
-      "type": "object",
-      "properties": {
-        "group": {
-          "$ref": "#/definitions/AuthorizationGroup"
-        }
-      }
-    },
-    "AuthorizationUpdateRoleBody": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        },
-        "inheritedRole": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        }
-      }
-    },
-    "AuthorizationUpdateRoleResponse": {
-      "type": "object"
-    },
-    "AuthorizationUser": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "email": {
-          "type": "string"
-        },
-        "avatarUrl": {
-          "type": "string"
-        },
-        "isActive": {
-          "type": "boolean"
-        },
-        "createdAt": {
-          "type": "string"
-        },
-        "updatedAt": {
-          "type": "string"
-        },
-        "roleAssignments": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationUserRoleAssignment"
-          }
-        },
-        "accountProviders": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationAccountProvider"
-          }
-        }
-      }
-    },
-    "AuthorizationUserRoleAssignment": {
-      "type": "object",
-      "properties": {
-        "roleName": {
-          "type": "string"
-        },
-        "roleDisplayName": {
-          "type": "string"
-        },
-        "roleDescription": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "assignedAt": {
-          "type": "string"
-        }
-      }
+      },
+      "title": "Common data structures"
     },
     "EventSourceSpecSemaphore": {
       "type": "object",
@@ -3475,6 +2141,207 @@
         },
         "expression": {
           "type": "string"
+        }
+      }
+    },
+    "GroupsAddUserToGroupBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        }
+      }
+    },
+    "GroupsAddUserToGroupResponse": {
+      "type": "object"
+    },
+    "GroupsCreateGroupRequest": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "title": "Group management messages"
+    },
+    "GroupsCreateGroupResponse": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
+        }
+      }
+    },
+    "GroupsDeleteGroupResponse": {
+      "type": "object"
+    },
+    "GroupsGetGroupResponse": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
+        }
+      }
+    },
+    "GroupsGetGroupUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersUser"
+          }
+        },
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
+        }
+      }
+    },
+    "GroupsGroup": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/GroupsGroupMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/GroupsGroupSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/GroupsGroupStatus"
+        }
+      },
+      "title": "Group data structure"
+    },
+    "GroupsGroupMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "GroupsGroupSpec": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "GroupsGroupStatus": {
+      "type": "object",
+      "properties": {
+        "membersCount": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    },
+    "GroupsListGroupsResponse": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/GroupsGroup"
+          }
+        }
+      }
+    },
+    "GroupsRemoveUserFromGroupBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        }
+      }
+    },
+    "GroupsRemoveUserFromGroupResponse": {
+      "type": "object"
+    },
+    "GroupsUpdateGroupBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "GroupsUpdateGroupResponse": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
         }
       }
     },
@@ -3724,6 +2591,210 @@
       "properties": {
         "organization": {
           "$ref": "#/definitions/OrganizationsOrganization"
+        }
+      }
+    },
+    "RolesAssignRoleRequest": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        },
+        "roleAssignment": {
+          "$ref": "#/definitions/RolesRoleAssignment"
+        }
+      },
+      "title": "Role assignment messages"
+    },
+    "RolesAssignRoleResponse": {
+      "type": "object"
+    },
+    "RolesCreateRoleRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "inheritedRole": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "title": "Custom role management messages"
+    },
+    "RolesCreateRoleResponse": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/RolesRole"
+        }
+      }
+    },
+    "RolesDeleteRoleResponse": {
+      "type": "object"
+    },
+    "RolesDescribeRoleResponse": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/RolesRole"
+        }
+      }
+    },
+    "RolesListRolesResponse": {
+      "type": "object",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/RolesRole"
+          }
+        }
+      }
+    },
+    "RolesRemoveRoleRequest": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "userEmail": {
+          "type": "string"
+        },
+        "roleAssignment": {
+          "$ref": "#/definitions/RolesRoleAssignment"
+        }
+      }
+    },
+    "RolesRemoveRoleResponse": {
+      "type": "object"
+    },
+    "RolesRole": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/RolesRoleMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/RolesRoleSpec"
+        }
+      },
+      "title": "Role data structure"
+    },
+    "RolesRoleAssignment": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        }
+      }
+    },
+    "RolesRoleMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "RolesRoleSpec": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "inheritedRole": {
+          "type": "string"
+        }
+      }
+    },
+    "RolesUpdateRoleBody": {
+      "type": "object",
+      "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        },
+        "inheritedRole": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "RolesUpdateRoleResponse": {
+      "type": "object",
+      "properties": {
+        "role": {
+          "$ref": "#/definitions/RolesRole"
         }
       }
     },
@@ -4848,16 +3919,185 @@
         }
       }
     },
-    "protobufAny": {
+    "UsersAccountProvider": {
       "type": "object",
       "properties": {
-        "@type": {
+        "providerType": {
+          "type": "string",
+          "title": "e.g., \"google\", \"github\", \"email\""
+        },
+        "providerId": {
+          "type": "string",
+          "title": "unique ID from the provider"
+        },
+        "email": {
           "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "isPrimary": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "UsersGetUserRolesResponse": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/RolesRole"
+          }
+        }
+      }
+    },
+    "UsersListUserPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/AuthorizationPermission"
+          }
+        }
+      }
+    },
+    "UsersListUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersUser"
+          }
+        }
+      }
+    },
+    "UsersUser": {
+      "type": "object",
+      "properties": {
+        "metadata": {
+          "$ref": "#/definitions/UsersUserMetadata"
+        },
+        "spec": {
+          "$ref": "#/definitions/UsersUserSpec"
+        },
+        "status": {
+          "$ref": "#/definitions/UsersUserStatus"
         }
       },
-      "additionalProperties": {}
+      "title": "User data structure"
     },
-    "rpcStatus": {
+    "UsersUserMetadata": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "UsersUserRoleAssignment": {
+      "type": "object",
+      "properties": {
+        "roleName": {
+          "type": "string"
+        },
+        "roleDisplayName": {
+          "type": "string"
+        },
+        "roleDescription": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "assignedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "UsersUserSpec": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string"
+        },
+        "avatarUrl": {
+          "type": "string"
+        },
+        "accountProviders": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersAccountProvider"
+          }
+        }
+      }
+    },
+    "UsersUserStatus": {
+      "type": "object",
+      "properties": {
+        "isActive": {
+          "type": "boolean"
+        },
+        "roleAssignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersUserRoleAssignment"
+          }
+        }
+      }
+    },
+    "googlerpcStatus": {
       "type": "object",
       "properties": {
         "code": {
@@ -4875,6 +4115,15 @@
           }
         }
       }
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
     }
   }
 }
