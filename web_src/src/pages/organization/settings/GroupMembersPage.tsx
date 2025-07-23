@@ -31,7 +31,7 @@ import {
   useDeleteGroup,
   useRemoveUserFromGroup
 } from '../../../hooks/useOrganizationData'
-import { AuthorizationUser } from '@/api-client'
+import { UsersUser } from '@/api-client'
 
 export function GroupMembersPage() {
   const { orgId, groupName: encodedGroupName } = useParams<{ orgId: string; groupName: string }>()
@@ -71,7 +71,7 @@ export function GroupMembersPage() {
 
   const handleEditGroupName = () => {
     if (group) {
-      setEditedGroupName(group.displayName || '')
+      setEditedGroupName(group.spec?.displayName || '')
       setIsEditingGroupName(true)
     }
   }
@@ -101,7 +101,7 @@ export function GroupMembersPage() {
 
   const handleEditGroupDescription = () => {
     if (group) {
-      setEditedGroupDescription(group.description || '')
+      setEditedGroupDescription(group.spec?.description || '')
       setIsEditingGroupDescription(true)
     }
   }
@@ -136,12 +136,12 @@ export function GroupMembersPage() {
     }))
   }
 
-  const getSortedData = (data: AuthorizationUser[]) => {
+  const getSortedData = (data: UsersUser[]) => {
     if (!sortConfig.key) return data
 
     return [...data].sort((a, b) => {
-      const aValue = a[sortConfig.key as keyof AuthorizationUser]
-      const bValue = b[sortConfig.key as keyof AuthorizationUser]
+      const aValue = a[sortConfig.key as keyof UsersUser]
+      const bValue = b[sortConfig.key as keyof UsersUser]
 
       if (aValue && bValue && aValue < bValue) {
         return sortConfig.direction === 'asc' ? -1 : 1
@@ -218,8 +218,8 @@ export function GroupMembersPage() {
   }
 
   const filteredMembers = members.filter(member =>
-    member.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    member.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    member.spec?.displayName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    member.metadata?.email?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   if (loading) {
@@ -266,7 +266,7 @@ export function GroupMembersPage() {
               onClick: handleBackToGroups
             },
             {
-              label: group?.displayName || groupName || 'Group',
+              label: group?.spec?.displayName || groupName || 'Group',
               current: true
             }
           ]}
@@ -281,7 +281,7 @@ export function GroupMembersPage() {
             <Avatar
               className='w-12 bg-blue-200 dark:bg-blue-800 border border-blue-300 dark:border-blue-700'
               square
-              initials={group?.displayName?.charAt(0) || 'G'}
+              initials={group?.spec?.displayName?.charAt(0) || 'G'}
             />
             <div className='flex flex-col space-y-2'>
               {/* Group Name - Inline Edit */}
@@ -309,7 +309,7 @@ export function GroupMembersPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <Heading level={2} className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                      {group?.displayName}
+                      {group?.spec?.displayName}
                     </Heading>
                     <Button
                       plain
@@ -347,7 +347,7 @@ export function GroupMembersPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <Subheading level={3} className="text-lg !font-normal text-zinc-600 dark:text-zinc-400">
-                      {group?.description || 'No description'}
+                      {group?.spec?.description || 'No description'}
                     </Subheading>
                     <Button
                       plain
@@ -367,17 +367,17 @@ export function GroupMembersPage() {
                 className="flex items-center gap-2 text-sm"
                 disabled={loadingRoles}
               >
-                {loadingRoles ? 'Loading...' : roles.find(role => role.name === group?.role)?.displayName || 'Member'}
+                {loadingRoles ? 'Loading...' : roles.find(role => role.metadata?.name === group?.spec?.role)?.spec?.displayName || 'Member'}
                 <MaterialSymbol name="keyboard_arrow_down" />
               </DropdownButton>
               <DropdownMenu>
                 {roles.map((role) => (
                   <DropdownItem
-                    key={role.name}
-                    onClick={() => handleRoleUpdate(role.name!)}
+                    key={role.metadata?.name}
+                    onClick={() => handleRoleUpdate(role.metadata!.name!)}
                   >
-                    <DropdownLabel>{role.displayName}</DropdownLabel>
-                    <DropdownDescription>{role.description}</DropdownDescription>
+                    <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                    <DropdownDescription>{role.spec?.description}</DropdownDescription>
                   </DropdownItem>
                 ))}
               </DropdownMenu>
@@ -460,17 +460,17 @@ export function GroupMembersPage() {
               </TableHead>
               <TableBody>
                 {getSortedData(filteredMembers).map((member) => (
-                  <TableRow key={member.userId}>
+                  <TableRow key={member.metadata?.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={member.avatarUrl}
-                          initials={member.displayName?.charAt(0) || 'U'}
+                          src={member.spec?.avatarUrl}
+                          initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />
                         <div>
                           <div className="text-sm font-medium text-zinc-900 dark:text-white">
-                            {member.displayName}
+                            {member.spec?.displayName}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400">
                             Member since {new Date().toLocaleDateString()}
@@ -479,11 +479,11 @@ export function GroupMembersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {member.email}
+                      {member.metadata?.email}
                     </TableCell>
                     <TableCell>
                       {
-                        member.isActive ?
+                        member.status?.isActive ?
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
                             Active
                           </span>
@@ -500,7 +500,7 @@ export function GroupMembersPage() {
                             <MaterialSymbol name="more_vert" size="sm" />
                           </DropdownButton>
                           <DropdownMenu>
-                            <DropdownItem onClick={() => handleRemoveMember(member.userId!)}>
+                            <DropdownItem onClick={() => handleRemoveMember(member.metadata!.id!)}>
                               <MaterialSymbol name="person_remove" />
                               Remove from Group
                             </DropdownItem>

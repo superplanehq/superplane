@@ -69,8 +69,8 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     const existingMembers = useMemo(() => {
       if (!groupName) return []
 
-      const existingMemberIds = new Set(groupUsers.map(user => user.userId))
-      return orgUsers.filter(user => !existingMemberIds.has(user.userId))
+      const existingMemberIds = new Set(groupUsers.map(user => user.metadata?.id))
+      return orgUsers.filter(user => !existingMemberIds.has(user.metadata?.id))
     }, [orgUsers, groupUsers, groupName])
 
     const loadingMembers = loadingOrgUsers || loadingGroupUsers
@@ -78,8 +78,8 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     // Set default roles when roles are loaded
     useEffect(() => {
       if (roles.length > 0) {
-        const orgMemberRole = roles.find(role => role.name?.includes('member'))
-        const defaultRole = orgMemberRole?.name || roles[0]?.name || ''
+        const orgMemberRole = roles.find(role => role.metadata?.name?.includes('member'))
+        const defaultRole = orgMemberRole?.metadata?.name || roles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
         setEmailRole(defaultRole)
       }
@@ -132,7 +132,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           throw new Error('No valid email addresses found in the CSV file. Please ensure the CSV has an "email" column.')
         }
 
-        const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
+        const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
 
         // Process each email
         for (const email of emailsToAdd) {
@@ -158,7 +158,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
 
         setUploadFile(null)
-        const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
+        const defaultRole = roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
         setAddMembersTab('emails')
 
@@ -178,7 +178,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
       try {
         const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
-        const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || '')
+        const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
 
         // Process each email
         for (const email of emails) {
@@ -204,7 +204,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
 
         setEmailsInput('')
-        const defaultRole = roles.find(r => r.name?.includes('member'))?.name || roles[0]?.name || ''
+        const defaultRole = roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || ''
         setEmailRole(defaultRole)
 
         onMemberAdded?.()
@@ -217,7 +217,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       if (selectedMembers.size === 0) return
 
       try {
-        const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.userId!))
+        const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.metadata?.id || ''))
 
         // Process each selected member
         for (const member of selectedUsers) {
@@ -226,15 +226,15 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             try {
               await addUserToGroupMutation.mutateAsync({
                 groupName,
-                userId: member.userId,
+                userId: member.metadata?.id || '',
                 organizationId
               })
             } catch (err) {
               // If userId fails, try with email
-              if (member.email) {
+              if (member.metadata?.email) {
                 await addUserToGroupMutation.mutateAsync({
                   groupName,
-                  userEmail: member.email,
+                  userEmail: member.metadata?.email,
                   organizationId
                 })
               } else {
@@ -260,7 +260,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       if (selectedMembers.size === filteredMembers.length) {
         setSelectedMembers(new Set())
       } else {
-        setSelectedMembers(new Set(filteredMembers.map(m => m.userId!)))
+        setSelectedMembers(new Set(filteredMembers.map(m => m.metadata!.id!)))
       }
     }
 
@@ -268,8 +268,8 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       if (!memberSearchTerm) return existingMembers
 
       return existingMembers.filter(member =>
-        member.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
-        member.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
+        member.spec?.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+        member.metadata?.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
       )
     }
 
@@ -331,14 +331,14 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               {showRoleSelection && !groupName && (
                 <Dropdown>
                   <DropdownButton outline className="flex items-center gap-2 text-sm">
-                    {emailRole ? roles.find(r => r.name === emailRole)?.displayName || emailRole : 'Select Role'}
+                    {emailRole ? roles.find(r => r.metadata?.name === emailRole)?.spec?.displayName || emailRole : 'Select Role'}
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
                     {roles.map((role) => (
-                      <DropdownItem key={role.name} onClick={() => setEmailRole(role.name || '')}>
-                        <DropdownLabel>{role.displayName}</DropdownLabel>
-                        <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
+                      <DropdownItem key={role.metadata?.name} onClick={() => setEmailRole(role.metadata?.name || '')}>
+                        <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                        <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
                       </DropdownItem>
                     ))}
                   </DropdownMenu>
@@ -407,40 +407,40 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 ) : (
                   <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
                     {getFilteredExistingMembers().map((member) => (
-                      <div key={member.userId} className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                      <div key={member.metadata!.id!} className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                         <Checkbox
-                          checked={selectedMembers.has(member.userId!)}
+                          checked={selectedMembers.has(member.metadata!.id!)}
                           onChange={(checked) => {
                             setSelectedMembers(prev => {
                               const newSet = new Set(prev)
                               if (checked) {
-                                newSet.add(member.userId!)
+                                newSet.add(member.metadata!.id!)
                               } else {
-                                newSet.delete(member.userId!)
+                                newSet.delete(member.metadata!.id!)
                               }
                               return newSet
                             })
                           }}
                         />
                         <Avatar
-                          src={member.avatarUrl}
-                          initials={member.displayName?.charAt(0) || 'U'}
+                          src={member.spec?.avatarUrl}
+                          initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                            {member.displayName || member.userId}
+                            {member.spec?.displayName || member.metadata!.id!}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                            {member.email || `${member.userId}@email.placeholder`}
+                            {member.metadata?.email || `${member.metadata!.id!}@email.placeholder`}
                           </div>
                         </div>
                         <div className="flex items-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.isActive
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member?.status?.isActive
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                             : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
                             }`}>
-                            {member.isActive ? 'Active' : 'Pending'}
+                            {member?.status?.isActive ? 'Active' : 'Pending'}
                           </span>
                         </div>
                       </div>
@@ -493,14 +493,14 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 </Label>
                 <Dropdown>
                   <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                    {bulkUserRole ? roles.find(r => r.name === bulkUserRole)?.displayName || bulkUserRole : 'Select Role'}
+                    {bulkUserRole ? roles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
                   <DropdownMenu>
                     {roles.map((role) => (
-                      <DropdownItem key={role.name} onClick={() => setBulkUserRole(role.name || '')}>
-                        <DropdownLabel>{role.displayName}</DropdownLabel>
-                        <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
+                      <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
+                        <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                        <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
                       </DropdownItem>
                     ))}
                   </DropdownMenu>

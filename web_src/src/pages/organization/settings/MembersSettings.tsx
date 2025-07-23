@@ -59,27 +59,27 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
   const members = useMemo(() => {
     return users.map((user) => {
       // Generate initials from displayName or userId
-      const name = user.displayName || user.userId || 'Unknown User'
+      const name = user.spec?.displayName || 'Unknown User'
       const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
       // Get primary role name and display name from role assignments
-      const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
-      const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
+      const primaryRoleName = user.status?.roleAssignments?.[0]?.roleName || 'Member'
+      const primaryRoleDisplayName = user.status?.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
 
       // Calculate last active time
-      const lastLoginAt = user.isActive ? Date.now() : null
+      const lastLoginAt = user.status?.isActive ? Date.now() : null
       const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
 
       return {
-        id: user.userId || '',
+        id: user.metadata?.id || '',
         name: name,
-        email: user.email || `${user.userId}@email.placeholder`, // Keep email placeholder as requested
+        email: user.metadata?.email || '',
         role: primaryRoleDisplayName,
         roleName: primaryRoleName,
-        status: user.isActive ? 'Active' : 'Pending',
+        status: user.status?.isActive ? 'Active' : 'Pending',
         lastActive: lastActive,
         initials: initials,
-        avatar: user.avatarUrl
+        avatar: user.spec?.avatarUrl
       }
     })
   }, [users])
@@ -286,13 +286,13 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                         <DropdownMenu>
                           {organizationRoles.map((role) => (
                             <DropdownItem
-                              key={role.name}
-                              onClick={() => handleRoleChange(member.id, role.name || '')}
+                              key={role.metadata?.name}
+                              onClick={() => handleRoleChange(member.id, role.metadata?.name || '')}
                               disabled={loadingRoles}
                             >
-                              <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
-                              {role.description && (
-                                <DropdownDescription>{role.description}</DropdownDescription>
+                              <DropdownLabel>{role.spec?.displayName || role.metadata?.name}</DropdownLabel>
+                              {role.spec?.description && (
+                                <DropdownDescription>{role.spec?.description}</DropdownDescription>
                               )}
                             </DropdownItem>
                           ))}

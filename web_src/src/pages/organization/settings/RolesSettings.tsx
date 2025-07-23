@@ -20,7 +20,7 @@ import {
   TableCell
 } from '../../../components/Table/table'
 import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
-import { AuthorizationRole } from '../../../api-client/types.gen'
+import { RolesRole } from '../../../api-client/types.gen'
 
 interface RolesSettingsProps {
   organizationId: string
@@ -42,7 +42,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
 
   // Use React Query hooks for data fetching
   const { data: roles = [], isLoading: loadingRoles, error } = useOrganizationRoles(organizationId)
-  
+
   // Mutation for role deletion
   const deleteRoleMutation = useDeleteRole(organizationId)
 
@@ -50,22 +50,22 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     navigate(`/organization/${organizationId}/settings/create-role`)
   }
 
-  const handleEditRole = (role: AuthorizationRole) => {
-    navigate(`/organization/${organizationId}/settings/create-role/${role.name}`)
+  const handleEditRole = (role: RolesRole) => {
+    navigate(`/organization/${organizationId}/settings/create-role/${role.metadata?.name}`)
   }
 
-  const handleDeleteRole = async (role: AuthorizationRole) => {
-    if (!role.name) return
+  const handleDeleteRole = async (role: RolesRole) => {
+    if (!role.metadata?.name) return
 
     const confirmed = window.confirm(
-      `Are you sure you want to delete the role "${role.name}"? This action cannot be undone.`
+      `Are you sure you want to delete the role "${role.metadata?.name}"? This action cannot be undone.`
     )
 
     if (!confirmed) return
 
     try {
       await deleteRoleMutation.mutateAsync({
-        roleName: role.name,
+        roleName: role.metadata?.name,
         domainType: 'DOMAIN_TYPE_ORGANIZATION',
         domainId: organizationId
       })
@@ -81,7 +81,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
     }))
   }
 
-  const getSortedData = (data: AuthorizationRole[]) => {
+  const getSortedData = (data: RolesRole[]) => {
     if (!sortConfig.key) return data
 
     return [...data].sort((a, b) => {
@@ -90,12 +90,12 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
 
       switch (sortConfig.key) {
         case 'name':
-          aValue = (a.displayName || a.name || '').toLowerCase()
-          bValue = (b.displayName || b.name || '').toLowerCase()
+          aValue = (a.spec?.displayName || a.metadata?.name || '').toLowerCase()
+          bValue = (b.spec?.displayName || b.metadata?.name || '').toLowerCase()
           break
         case 'permissions':
-          aValue = a.permissions?.length || 0
-          bValue = b.permissions?.length || 0
+          aValue = a.spec?.permissions?.length || 0
+          bValue = b.spec?.permissions?.length || 0
           break
         default:
           return 0
@@ -132,7 +132,7 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
         return true
       }
       // Search by display name if available, otherwise by name
-      const searchText = role.displayName || role.name || ''
+      const searchText = role.spec?.displayName || role.metadata?.name || ''
       return searchText.toLowerCase().includes(search.toLowerCase())
     })
     return getSortedData(filtered)
@@ -206,13 +206,13 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
                   </TableRow>
                 ) : (
                   filteredAndSortedRoles.map((role, index) => {
-                    const isDefault = isDefaultRole(role.name)
+                    const isDefault = isDefaultRole(role.metadata?.name)
                     return (
-                      <TableRow key={role.name || index}>
+                      <TableRow key={role.metadata?.name || index}>
                         <TableCell className="font-semibold">
-                          {role.displayName || role.name}
+                          {role.spec?.displayName || role.metadata?.name}
                         </TableCell>
-                        <TableCell>{role.permissions?.length || 0}</TableCell>
+                        <TableCell>{role.spec?.permissions?.length || 0}</TableCell>
                         <TableCell>
                           <div className="flex justify-end">
                             {isDefault ? (

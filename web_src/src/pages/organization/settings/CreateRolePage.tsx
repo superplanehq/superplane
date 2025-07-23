@@ -112,12 +112,12 @@ export function CreateRolePage() {
   // Load role data when in edit mode
   useEffect(() => {
     if (isEditMode && existingRole) {
-      setRoleName(existingRole.displayName || existingRole.name || '')
-      setRoleDescription(existingRole.description || '')
+      setRoleName(existingRole.spec?.displayName || existingRole.metadata?.name || '')
+      setRoleDescription(existingRole.spec?.description || '')
 
       // Convert permissions back to selected format
       const permissionIds = new Set<string>()
-      existingRole.permissions?.forEach(perm => {
+      existingRole.spec?.permissions?.forEach(perm => {
         const matchingPerm = ORGANIZATION_PERMISSIONS
           .flatMap(cat => cat.permissions)
           .find(p => p.resource === perm.resource && p.action === perm.action)
