@@ -182,8 +182,9 @@ func serializeIntegrationAuth(authType string, auth models.IntegrationAuth) *pb.
 			Token: &pb.Integration_Auth_Token{
 				ValueFrom: &pb.ValueFrom{
 					Secret: &pb.ValueFromSecret{
-						Name: auth.Token.ValueFrom.Secret.Name,
-						Key:  auth.Token.ValueFrom.Secret.Key,
+						DomainType: actions.DomainTypeToProto(auth.Token.ValueFrom.Secret.DomainType),
+						Name:       auth.Token.ValueFrom.Secret.Name,
+						Key:        auth.Token.ValueFrom.Secret.Key,
 					},
 				},
 			},

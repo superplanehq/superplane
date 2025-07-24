@@ -17,8 +17,8 @@ var approveEventCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		eventID := args[0]
 
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
-		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name", true)
 
 		c := DefaultClient()
 
