@@ -3539,6 +3539,9 @@
     "SuperplaneIntegrationsValueFromSecret": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
         "name": {
           "type": "string"
         },
@@ -3909,6 +3912,9 @@
     "SuperplaneValueFromSecret": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
         "name": {
           "type": "string"
         },

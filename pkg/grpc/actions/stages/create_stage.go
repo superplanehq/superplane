@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -75,7 +76,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
+	secrets, err := validateSecrets(ctx, encryptor, canvas, req.Stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -85,7 +86,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var integration *models.Integration
 	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -163,7 +164,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	return response, nil
 }
 
-func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error) {
+func validateSecrets(ctx context.Context, encryptor crypto.Encryptor, canvas *models.Canvas, in []*pb.ValueDefinition) ([]models.ValueDefinition, error) {
 	out := []models.ValueDefinition{}
 	for _, s := range in {
 		if s.Name == "" {
@@ -178,13 +179,36 @@ func validateSecrets(in []*pb.ValueDefinition) ([]models.ValueDefinition, error)
 			return nil, fmt.Errorf("missing secret name or key")
 		}
 
+		domainType, domainID, err := actions.GetDomainForSecret(models.DomainTypeCanvas, &canvas.ID, s.ValueFrom.Secret.DomainType)
+		if err != nil {
+			return nil, err
+		}
+
+		name := s.ValueFrom.Secret.Name
+		provider, err := secrets.NewProvider(encryptor, name, domainType, *domainID)
+		if err != nil {
+			return nil, err
+		}
+
+		values, err := provider.Load(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error loading values for secret %s: %v", name, err)
+		}
+
+		key := s.ValueFrom.Secret.Key
+		_, ok := values[key]
+		if !ok {
+			return nil, fmt.Errorf("key %s not found in secret %s", key, name)
+		}
+
 		out = append(out, models.ValueDefinition{
 			Name:  s.Name,
 			Value: nil,
 			ValueFrom: &models.ValueDefinitionFrom{
 				Secret: &models.ValueDefinitionFromSecret{
-					Name: s.ValueFrom.Secret.Name,
-					Key:  s.ValueFrom.Secret.Key,
+					DomainType: domainType,
+					Name:       s.ValueFrom.Secret.Name,
+					Key:        s.ValueFrom.Secret.Key,
 				},
 			},
 		})
@@ -471,7 +495,8 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error)
 			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
 			Semaphore: spec,
 			Integration: &integrationPb.IntegrationRef{
-				Name: resource.IntegrationName,
+				Name:       resource.IntegrationName,
+				DomainType: actions.DomainTypeToProto(resource.DomainType),
 			},
 		}, nil
 

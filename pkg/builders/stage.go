@@ -202,7 +202,7 @@ func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.
 		WithTransaction(tx).
 		WithContext(b.ctx).
 		InCanvas(b.canvas).
-		WithName(b.resource.Name()).
+		WithName(b.integration.Name + "-" + b.resource.Name()).
 		WithScope(models.EventSourceScopeInternal).
 		ForIntegration(b.integration).
 		ForResource(b.resource).

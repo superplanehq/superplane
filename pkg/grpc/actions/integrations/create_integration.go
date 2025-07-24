@@ -104,15 +104,20 @@ func validateType(t pb.Integration_Type) (string, error) {
 	}
 }
 
-func validateAuth(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
+func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDomainType string, integrationDomainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
 	switch auth.Use {
 	case pb.Integration_AUTH_TYPE_TOKEN:
 		if auth.Token == nil || auth.Token.ValueFrom == nil || auth.Token.ValueFrom.Secret == nil {
 			return nil, "", fmt.Errorf("secret is required")
 		}
 
+		domainType, domainID, err := actions.GetDomainForSecret(integrationDomainType, &integrationDomainID, auth.Token.ValueFrom.Secret.DomainType)
+		if err != nil {
+			return nil, "", err
+		}
+
 		name := auth.Token.ValueFrom.Secret.Name
-		provider, err := secrets.NewProvider(encryptor, name, domainType, domainID)
+		provider, err := secrets.NewProvider(encryptor, name, domainType, *domainID)
 		if err != nil {
 			return nil, "", err
 		}
@@ -132,8 +137,9 @@ func validateAuth(ctx context.Context, encryptor crypto.Encryptor, domainType st
 			Token: &models.IntegrationAuthToken{
 				ValueFrom: models.ValueDefinitionFrom{
 					Secret: &models.ValueDefinitionFromSecret{
-						Name: auth.Token.ValueFrom.Secret.Name,
-						Key:  auth.Token.ValueFrom.Secret.Key,
+						DomainType: domainType,
+						Name:       auth.Token.ValueFrom.Secret.Name,
+						Key:        auth.Token.ValueFrom.Secret.Key,
 					},
 				},
 			},

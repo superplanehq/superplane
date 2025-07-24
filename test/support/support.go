@@ -78,7 +78,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 
 	if options.Integration {
-		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
+		secret, err := CreateCanvasSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
 		integration, err := models.CreateIntegration(&models.Integration{
 			Name:       RandomName("integration"),
@@ -92,8 +92,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
+							DomainType: models.DomainTypeCanvas,
+							Name:       secret.Name,
+							Key:        "key",
 						},
 					},
 				},
@@ -258,10 +259,18 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	}
 }
 
-func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+func CreateCanvasSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
 	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
+	require.NoError(t, err)
+	return secret, nil
+}
+
+func CreateOrganizationSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }
