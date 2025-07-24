@@ -27,7 +27,6 @@ func AddUserToGroup(ctx context.Context, domainType string, domainID string, req
 		return nil, err
 	}
 
-
 	// Handle user identification using shared function
 	userID, err := ResolveUserID(req.UserId, req.UserEmail)
 	if err != nil {
