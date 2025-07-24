@@ -22,10 +22,7 @@ var _ MappedNullable = &RolesUpdateRoleBody{}
 type RolesUpdateRoleBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	Permissions []AuthorizationPermission `json:"permissions,omitempty"`
-	InheritedRole *string `json:"inheritedRole,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Role *RolesRole `json:"role,omitempty"`
 }
 
 // NewRolesUpdateRoleBody instantiates a new RolesUpdateRoleBody object
@@ -113,132 +110,36 @@ func (o *RolesUpdateRoleBody) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetPermissions returns the Permissions field value if set, zero value otherwise.
-func (o *RolesUpdateRoleBody) GetPermissions() []AuthorizationPermission {
-	if o == nil || IsNil(o.Permissions) {
-		var ret []AuthorizationPermission
+// GetRole returns the Role field value if set, zero value otherwise.
+func (o *RolesUpdateRoleBody) GetRole() RolesRole {
+	if o == nil || IsNil(o.Role) {
+		var ret RolesRole
 		return ret
 	}
-	return o.Permissions
+	return *o.Role
 }
 
-// GetPermissionsOk returns a tuple with the Permissions field value if set, nil otherwise
+// GetRoleOk returns a tuple with the Role field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesUpdateRoleBody) GetPermissionsOk() ([]AuthorizationPermission, bool) {
-	if o == nil || IsNil(o.Permissions) {
+func (o *RolesUpdateRoleBody) GetRoleOk() (*RolesRole, bool) {
+	if o == nil || IsNil(o.Role) {
 		return nil, false
 	}
-	return o.Permissions, true
+	return o.Role, true
 }
 
-// HasPermissions returns a boolean if a field has been set.
-func (o *RolesUpdateRoleBody) HasPermissions() bool {
-	if o != nil && !IsNil(o.Permissions) {
+// HasRole returns a boolean if a field has been set.
+func (o *RolesUpdateRoleBody) HasRole() bool {
+	if o != nil && !IsNil(o.Role) {
 		return true
 	}
 
 	return false
 }
 
-// SetPermissions gets a reference to the given []AuthorizationPermission and assigns it to the Permissions field.
-func (o *RolesUpdateRoleBody) SetPermissions(v []AuthorizationPermission) {
-	o.Permissions = v
-}
-
-// GetInheritedRole returns the InheritedRole field value if set, zero value otherwise.
-func (o *RolesUpdateRoleBody) GetInheritedRole() string {
-	if o == nil || IsNil(o.InheritedRole) {
-		var ret string
-		return ret
-	}
-	return *o.InheritedRole
-}
-
-// GetInheritedRoleOk returns a tuple with the InheritedRole field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesUpdateRoleBody) GetInheritedRoleOk() (*string, bool) {
-	if o == nil || IsNil(o.InheritedRole) {
-		return nil, false
-	}
-	return o.InheritedRole, true
-}
-
-// HasInheritedRole returns a boolean if a field has been set.
-func (o *RolesUpdateRoleBody) HasInheritedRole() bool {
-	if o != nil && !IsNil(o.InheritedRole) {
-		return true
-	}
-
-	return false
-}
-
-// SetInheritedRole gets a reference to the given string and assigns it to the InheritedRole field.
-func (o *RolesUpdateRoleBody) SetInheritedRole(v string) {
-	o.InheritedRole = &v
-}
-
-// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
-func (o *RolesUpdateRoleBody) GetDisplayName() string {
-	if o == nil || IsNil(o.DisplayName) {
-		var ret string
-		return ret
-	}
-	return *o.DisplayName
-}
-
-// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesUpdateRoleBody) GetDisplayNameOk() (*string, bool) {
-	if o == nil || IsNil(o.DisplayName) {
-		return nil, false
-	}
-	return o.DisplayName, true
-}
-
-// HasDisplayName returns a boolean if a field has been set.
-func (o *RolesUpdateRoleBody) HasDisplayName() bool {
-	if o != nil && !IsNil(o.DisplayName) {
-		return true
-	}
-
-	return false
-}
-
-// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
-func (o *RolesUpdateRoleBody) SetDisplayName(v string) {
-	o.DisplayName = &v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *RolesUpdateRoleBody) GetDescription() string {
-	if o == nil || IsNil(o.Description) {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesUpdateRoleBody) GetDescriptionOk() (*string, bool) {
-	if o == nil || IsNil(o.Description) {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *RolesUpdateRoleBody) HasDescription() bool {
-	if o != nil && !IsNil(o.Description) {
-		return true
-	}
-
-	return false
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *RolesUpdateRoleBody) SetDescription(v string) {
-	o.Description = &v
+// SetRole gets a reference to the given RolesRole and assigns it to the Role field.
+func (o *RolesUpdateRoleBody) SetRole(v RolesRole) {
+	o.Role = &v
 }
 
 func (o RolesUpdateRoleBody) MarshalJSON() ([]byte, error) {
@@ -257,17 +158,8 @@ func (o RolesUpdateRoleBody) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
 	}
-	if !IsNil(o.Permissions) {
-		toSerialize["permissions"] = o.Permissions
-	}
-	if !IsNil(o.InheritedRole) {
-		toSerialize["inheritedRole"] = o.InheritedRole
-	}
-	if !IsNil(o.DisplayName) {
-		toSerialize["displayName"] = o.DisplayName
-	}
-	if !IsNil(o.Description) {
-		toSerialize["description"] = o.Description
+	if !IsNil(o.Role) {
+		toSerialize["role"] = o.Role
 	}
 	return toSerialize, nil
 }

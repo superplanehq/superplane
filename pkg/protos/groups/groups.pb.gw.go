@@ -176,11 +176,11 @@ func local_request_Groups_ListGroups_0(ctx context.Context, marshaler runtime.Ma
 	return msg, metadata, err
 }
 
-var filter_Groups_GetGroupUsers_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+var filter_Groups_ListGroupUsers_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
-func request_Groups_GetGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, client GroupsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Groups_ListGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, client GroupsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetGroupUsersRequest
+		protoReq ListGroupUsersRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -196,16 +196,16 @@ func request_Groups_GetGroupUsers_0(ctx context.Context, marshaler runtime.Marsh
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_GetGroupUsers_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_ListGroupUsers_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := client.GetGroupUsers(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.ListGroupUsers(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Groups_GetGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, server GroupsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Groups_ListGroupUsers_0(ctx context.Context, marshaler runtime.Marshaler, server GroupsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetGroupUsersRequest
+		protoReq ListGroupUsersRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -220,18 +220,18 @@ func local_request_Groups_GetGroupUsers_0(ctx context.Context, marshaler runtime
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_GetGroupUsers_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_ListGroupUsers_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.GetGroupUsers(ctx, &protoReq)
+	msg, err := server.ListGroupUsers(ctx, &protoReq)
 	return msg, metadata, err
 }
 
-var filter_Groups_GetGroup_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+var filter_Groups_DescribeGroup_0 = &utilities.DoubleArray{Encoding: map[string]int{"group_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
 
-func request_Groups_GetGroup_0(ctx context.Context, marshaler runtime.Marshaler, client GroupsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func request_Groups_DescribeGroup_0(ctx context.Context, marshaler runtime.Marshaler, client GroupsClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetGroupRequest
+		protoReq DescribeGroupRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -247,16 +247,16 @@ func request_Groups_GetGroup_0(ctx context.Context, marshaler runtime.Marshaler,
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_GetGroup_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_DescribeGroup_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := client.GetGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	msg, err := client.DescribeGroup(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 }
 
-func local_request_Groups_GetGroup_0(ctx context.Context, marshaler runtime.Marshaler, server GroupsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+func local_request_Groups_DescribeGroup_0(ctx context.Context, marshaler runtime.Marshaler, server GroupsServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
-		protoReq GetGroupRequest
+		protoReq DescribeGroupRequest
 		metadata runtime.ServerMetadata
 		err      error
 	)
@@ -271,10 +271,10 @@ func local_request_Groups_GetGroup_0(ctx context.Context, marshaler runtime.Mars
 	if err := req.ParseForm(); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_GetGroup_0); err != nil {
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Groups_DescribeGroup_0); err != nil {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-	msg, err := server.GetGroup(ctx, &protoReq)
+	msg, err := server.DescribeGroup(ctx, &protoReq)
 	return msg, metadata, err
 }
 
@@ -457,45 +457,45 @@ func RegisterGroupsHandlerServer(ctx context.Context, mux *runtime.ServeMux, ser
 		}
 		forward_Groups_ListGroups_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_Groups_GetGroupUsers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Groups_ListGroupUsers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Groups.Groups/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Groups.Groups/ListGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Groups_GetGroupUsers_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Groups_ListGroupUsers_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Groups_GetGroupUsers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Groups_ListGroupUsers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_Groups_GetGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Groups_DescribeGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		var stream runtime.ServerTransportStream
 		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Groups.Groups/GetGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Groups.Groups/DescribeGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := local_request_Groups_GetGroup_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		resp, md, err := local_request_Groups_DescribeGroup_0(annotatedContext, inboundMarshaler, server, req, pathParams)
 		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Groups_GetGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Groups_DescribeGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPut, pattern_Groups_UpdateGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -645,39 +645,39 @@ func RegisterGroupsHandlerClient(ctx context.Context, mux *runtime.ServeMux, cli
 		}
 		forward_Groups_ListGroups_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_Groups_GetGroupUsers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Groups_ListGroupUsers_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Groups.Groups/GetGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Groups.Groups/ListGroupUsers", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}/users"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Groups_GetGroupUsers_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Groups_ListGroupUsers_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Groups_GetGroupUsers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Groups_ListGroupUsers_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
-	mux.Handle(http.MethodGet, pattern_Groups_GetGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+	mux.Handle(http.MethodGet, pattern_Groups_DescribeGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
-		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Groups.Groups/GetGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Groups.Groups/DescribeGroup", runtime.WithHTTPPathPattern("/api/v1/groups/{group_name}"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		resp, md, err := request_Groups_GetGroup_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		resp, md, err := request_Groups_DescribeGroup_0(annotatedContext, inboundMarshaler, client, req, pathParams)
 		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
 		if err != nil {
 			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
 			return
 		}
-		forward_Groups_GetGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+		forward_Groups_DescribeGroup_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
 	mux.Handle(http.MethodPut, pattern_Groups_UpdateGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
@@ -721,8 +721,8 @@ var (
 	pattern_Groups_AddUserToGroup_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "groups", "group_name", "users"}, ""))
 	pattern_Groups_RemoveUserFromGroup_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 2, 5}, []string{"api", "v1", "groups", "group_name", "users", "remove"}, ""))
 	pattern_Groups_ListGroups_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "groups"}, ""))
-	pattern_Groups_GetGroupUsers_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "groups", "group_name", "users"}, ""))
-	pattern_Groups_GetGroup_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "groups", "group_name"}, ""))
+	pattern_Groups_ListGroupUsers_0      = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "groups", "group_name", "users"}, ""))
+	pattern_Groups_DescribeGroup_0       = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "groups", "group_name"}, ""))
 	pattern_Groups_UpdateGroup_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "groups", "group_name"}, ""))
 	pattern_Groups_DeleteGroup_0         = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "groups", "group_name"}, ""))
 )
@@ -732,8 +732,8 @@ var (
 	forward_Groups_AddUserToGroup_0      = runtime.ForwardResponseMessage
 	forward_Groups_RemoveUserFromGroup_0 = runtime.ForwardResponseMessage
 	forward_Groups_ListGroups_0          = runtime.ForwardResponseMessage
-	forward_Groups_GetGroupUsers_0       = runtime.ForwardResponseMessage
-	forward_Groups_GetGroup_0            = runtime.ForwardResponseMessage
+	forward_Groups_ListGroupUsers_0      = runtime.ForwardResponseMessage
+	forward_Groups_DescribeGroup_0       = runtime.ForwardResponseMessage
 	forward_Groups_UpdateGroup_0         = runtime.ForwardResponseMessage
 	forward_Groups_DeleteGroup_0         = runtime.ForwardResponseMessage
 )

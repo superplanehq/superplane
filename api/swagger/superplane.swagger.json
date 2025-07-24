@@ -866,12 +866,12 @@
       "get": {
         "summary": "Get group",
         "description": "Returns details of a specific group within a domain",
-        "operationId": "Groups_GetGroup",
+        "operationId": "Groups_DescribeGroup",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/GroupsGetGroupResponse"
+              "$ref": "#/definitions/GroupsDescribeGroupResponse"
             }
           },
           "default": {
@@ -1002,12 +1002,12 @@
       "get": {
         "summary": "Get group users",
         "description": "Returns users that belong to a specific group within a domain",
-        "operationId": "Groups_GetGroupUsers",
+        "operationId": "Groups_ListGroupUsers",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/GroupsGetGroupUsersResponse"
+              "$ref": "#/definitions/GroupsListGroupUsersResponse"
             }
           },
           "default": {
@@ -2000,12 +2000,12 @@
       "get": {
         "summary": "Get user roles",
         "description": "Returns the roles a user has within a specific domain",
-        "operationId": "Users_GetUserRoles",
+        "operationId": "Users_ListUserRoles",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/UsersGetUserRolesResponse"
+              "$ref": "#/definitions/UsersListUserRolesResponse"
             }
           },
           "default": {
@@ -2173,20 +2173,10 @@
         "domainId": {
           "type": "string"
         },
-        "groupName": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
         }
-      },
-      "title": "Group management messages"
+      }
     },
     "GroupsCreateGroupResponse": {
       "type": "object",
@@ -2199,24 +2189,9 @@
     "GroupsDeleteGroupResponse": {
       "type": "object"
     },
-    "GroupsGetGroupResponse": {
+    "GroupsDescribeGroupResponse": {
       "type": "object",
       "properties": {
-        "group": {
-          "$ref": "#/definitions/GroupsGroup"
-        }
-      }
-    },
-    "GroupsGetGroupUsersResponse": {
-      "type": "object",
-      "properties": {
-        "users": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/UsersUser"
-          }
-        },
         "group": {
           "$ref": "#/definitions/GroupsGroup"
         }
@@ -2234,8 +2209,7 @@
         "status": {
           "$ref": "#/definitions/GroupsGroupStatus"
         }
-      },
-      "title": "Group data structure"
+      }
     },
     "GroupsGroupMetadata": {
       "type": "object",
@@ -2282,6 +2256,21 @@
         }
       }
     },
+    "GroupsListGroupUsersResponse": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/UsersUser"
+          }
+        },
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
+        }
+      }
+    },
     "GroupsListGroupsResponse": {
       "type": "object",
       "properties": {
@@ -2323,14 +2312,8 @@
         "domainId": {
           "type": "string"
         },
-        "role": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
+        "group": {
+          "$ref": "#/definitions/GroupsGroup"
         }
       }
     },
@@ -2594,17 +2577,22 @@
     "RolesAssignRoleRequest": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        },
         "userId": {
           "type": "string"
         },
         "userEmail": {
           "type": "string"
-        },
-        "roleAssignment": {
-          "$ref": "#/definitions/RolesRoleAssignment"
         }
-      },
-      "title": "Role assignment messages"
+      }
     },
     "RolesAssignRoleResponse": {
       "type": "object"
@@ -2612,33 +2600,16 @@
     "RolesCreateRoleRequest": {
       "type": "object",
       "properties": {
-        "name": {
-          "type": "string"
-        },
         "domainType": {
           "$ref": "#/definitions/AuthorizationDomainType"
         },
         "domainId": {
           "type": "string"
         },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        },
-        "inheritedRole": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
+        "role": {
+          "$ref": "#/definitions/RolesRole"
         }
-      },
-      "title": "Custom role management messages"
+      }
     },
     "RolesCreateRoleResponse": {
       "type": "object",
@@ -2674,14 +2645,20 @@
     "RolesRemoveRoleRequest": {
       "type": "object",
       "properties": {
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "roleName": {
+          "type": "string"
+        },
         "userId": {
           "type": "string"
         },
         "userEmail": {
           "type": "string"
-        },
-        "roleAssignment": {
-          "$ref": "#/definitions/RolesRoleAssignment"
         }
       }
     },
@@ -2696,21 +2673,6 @@
         },
         "spec": {
           "$ref": "#/definitions/RolesRoleSpec"
-        }
-      },
-      "title": "Role data structure"
-    },
-    "RolesRoleAssignment": {
-      "type": "object",
-      "properties": {
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "role": {
-          "type": "string"
         }
       }
     },
@@ -2766,21 +2728,8 @@
         "domainId": {
           "type": "string"
         },
-        "permissions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/AuthorizationPermission"
-          }
-        },
-        "inheritedRole": {
-          "type": "string"
-        },
-        "displayName": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
+        "role": {
+          "$ref": "#/definitions/RolesRole"
         }
       }
     },
@@ -3946,27 +3895,6 @@
         }
       }
     },
-    "UsersGetUserRolesResponse": {
-      "type": "object",
-      "properties": {
-        "userId": {
-          "type": "string"
-        },
-        "domainType": {
-          "$ref": "#/definitions/AuthorizationDomainType"
-        },
-        "domainId": {
-          "type": "string"
-        },
-        "roles": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/RolesRole"
-          }
-        }
-      }
-    },
     "UsersListUserPermissionsResponse": {
       "type": "object",
       "properties": {
@@ -3984,6 +3912,27 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/AuthorizationPermission"
+          }
+        }
+      }
+    },
+    "UsersListUserRolesResponse": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "domainType": {
+          "$ref": "#/definitions/AuthorizationDomainType"
+        },
+        "domainId": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/RolesRole"
           }
         }
       }

@@ -136,30 +136,26 @@ service Roles {
   }
 }
 
-// Role assignment messages
 message AssignRoleRequest {
-  string user_id = 1;
-  string user_email = 2;
-  RoleAssignment role_assignment = 3;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role_name = 3;
+  string user_id = 4;
+  string user_email = 5;
 }
 
 message AssignRoleResponse {}
 
 message RemoveRoleRequest {
-  string user_id = 1;
-  string user_email = 2;
-  RoleAssignment role_assignment = 3;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role_name = 3;
+  string user_id = 4;
+  string user_email = 5;
 }
 
 message RemoveRoleResponse {}
 
-message RoleAssignment {
-  Authorization.DomainType domain_type = 1;
-  string domain_id = 2;
-  string role = 3;
-}
-
-// Role discovery messages
 message ListRolesRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
@@ -179,15 +175,10 @@ message DescribeRoleResponse {
   Role role = 1;
 }
 
-// Custom role management messages
 message CreateRoleRequest {
-  string name = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-  repeated Authorization.Permission permissions = 4;
-  string inherited_role = 5;
-  string display_name = 6;
-  string description = 7;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  Role role = 3;
 }
 
 message CreateRoleResponse {
@@ -195,13 +186,10 @@ message CreateRoleResponse {
 }
 
 message UpdateRoleRequest {
-  string role_name = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
-  repeated Authorization.Permission permissions = 4;
-  string inherited_role = 5;
-  string display_name = 6;
-  string description = 7;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role_name = 3;
+  Role role = 4;
 }
 
 message UpdateRoleResponse {
@@ -209,14 +197,13 @@ message UpdateRoleResponse {
 }
 
 message DeleteRoleRequest {
-  string role_name = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string role_name = 3;
 }
 
 message DeleteRoleResponse {}
 
-// Role data structure
 message Role {
   message Metadata {
     string name = 1;

@@ -52,10 +52,7 @@ export type GroupsAddUserToGroupResponse = {
 export type GroupsCreateGroupRequest = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    groupName?: string;
-    role?: string;
-    displayName?: string;
-    description?: string;
+    group?: GroupsGroup;
 };
 
 export type GroupsCreateGroupResponse = {
@@ -66,12 +63,7 @@ export type GroupsDeleteGroupResponse = {
     [key: string]: unknown;
 };
 
-export type GroupsGetGroupResponse = {
-    group?: GroupsGroup;
-};
-
-export type GroupsGetGroupUsersResponse = {
-    users?: Array<UsersUser>;
+export type GroupsDescribeGroupResponse = {
     group?: GroupsGroup;
 };
 
@@ -99,6 +91,11 @@ export type GroupsGroupStatus = {
     membersCount?: number;
 };
 
+export type GroupsListGroupUsersResponse = {
+    users?: Array<UsersUser>;
+    group?: GroupsGroup;
+};
+
 export type GroupsListGroupsResponse = {
     groups?: Array<GroupsGroup>;
 };
@@ -117,9 +114,7 @@ export type GroupsRemoveUserFromGroupResponse = {
 export type GroupsUpdateGroupBody = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    role?: string;
-    displayName?: string;
-    description?: string;
+    group?: GroupsGroup;
 };
 
 export type GroupsUpdateGroupResponse = {
@@ -234,9 +229,11 @@ export type OrganizationsUpdateOrganizationResponse = {
 };
 
 export type RolesAssignRoleRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roleName?: string;
     userId?: string;
     userEmail?: string;
-    roleAssignment?: RolesRoleAssignment;
 };
 
 export type RolesAssignRoleResponse = {
@@ -244,13 +241,9 @@ export type RolesAssignRoleResponse = {
 };
 
 export type RolesCreateRoleRequest = {
-    name?: string;
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    permissions?: Array<AuthorizationPermission>;
-    inheritedRole?: string;
-    displayName?: string;
-    description?: string;
+    role?: RolesRole;
 };
 
 export type RolesCreateRoleResponse = {
@@ -270,9 +263,11 @@ export type RolesListRolesResponse = {
 };
 
 export type RolesRemoveRoleRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roleName?: string;
     userId?: string;
     userEmail?: string;
-    roleAssignment?: RolesRoleAssignment;
 };
 
 export type RolesRemoveRoleResponse = {
@@ -282,12 +277,6 @@ export type RolesRemoveRoleResponse = {
 export type RolesRole = {
     metadata?: RolesRoleMetadata;
     spec?: RolesRoleSpec;
-};
-
-export type RolesRoleAssignment = {
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    role?: string;
 };
 
 export type RolesRoleMetadata = {
@@ -308,10 +297,7 @@ export type RolesRoleSpec = {
 export type RolesUpdateRoleBody = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
-    permissions?: Array<AuthorizationPermission>;
-    inheritedRole?: string;
-    displayName?: string;
-    description?: string;
+    role?: RolesRole;
 };
 
 export type RolesUpdateRoleResponse = {
@@ -761,18 +747,18 @@ export type UsersAccountProvider = {
     updatedAt?: string;
 };
 
-export type UsersGetUserRolesResponse = {
-    userId?: string;
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    roles?: Array<RolesRole>;
-};
-
 export type UsersListUserPermissionsResponse = {
     userId?: string;
     domainType?: AuthorizationDomainType;
     domainId?: string;
     permissions?: Array<AuthorizationPermission>;
+};
+
+export type UsersListUserRolesResponse = {
+    userId?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roles?: Array<RolesRole>;
 };
 
 export type UsersListUsersResponse = {
@@ -1410,7 +1396,7 @@ export type GroupsDeleteGroupResponses = {
 
 export type GroupsDeleteGroupResponse2 = GroupsDeleteGroupResponses[keyof GroupsDeleteGroupResponses];
 
-export type GroupsGetGroupData = {
+export type GroupsDescribeGroupData = {
     body?: never;
     path: {
         groupName: string;
@@ -1422,23 +1408,23 @@ export type GroupsGetGroupData = {
     url: '/api/v1/groups/{groupName}';
 };
 
-export type GroupsGetGroupErrors = {
+export type GroupsDescribeGroupErrors = {
     /**
      * An unexpected error response.
      */
     default: GooglerpcStatus;
 };
 
-export type GroupsGetGroupError = GroupsGetGroupErrors[keyof GroupsGetGroupErrors];
+export type GroupsDescribeGroupError = GroupsDescribeGroupErrors[keyof GroupsDescribeGroupErrors];
 
-export type GroupsGetGroupResponses = {
+export type GroupsDescribeGroupResponses = {
     /**
      * A successful response.
      */
-    200: GroupsGetGroupResponse;
+    200: GroupsDescribeGroupResponse;
 };
 
-export type GroupsGetGroupResponse2 = GroupsGetGroupResponses[keyof GroupsGetGroupResponses];
+export type GroupsDescribeGroupResponse2 = GroupsDescribeGroupResponses[keyof GroupsDescribeGroupResponses];
 
 export type GroupsUpdateGroupData = {
     body: GroupsUpdateGroupBody;
@@ -1467,7 +1453,7 @@ export type GroupsUpdateGroupResponses = {
 
 export type GroupsUpdateGroupResponse2 = GroupsUpdateGroupResponses[keyof GroupsUpdateGroupResponses];
 
-export type GroupsGetGroupUsersData = {
+export type GroupsListGroupUsersData = {
     body?: never;
     path: {
         groupName: string;
@@ -1479,23 +1465,23 @@ export type GroupsGetGroupUsersData = {
     url: '/api/v1/groups/{groupName}/users';
 };
 
-export type GroupsGetGroupUsersErrors = {
+export type GroupsListGroupUsersErrors = {
     /**
      * An unexpected error response.
      */
     default: GooglerpcStatus;
 };
 
-export type GroupsGetGroupUsersError = GroupsGetGroupUsersErrors[keyof GroupsGetGroupUsersErrors];
+export type GroupsListGroupUsersError = GroupsListGroupUsersErrors[keyof GroupsListGroupUsersErrors];
 
-export type GroupsGetGroupUsersResponses = {
+export type GroupsListGroupUsersResponses = {
     /**
      * A successful response.
      */
-    200: GroupsGetGroupUsersResponse;
+    200: GroupsListGroupUsersResponse;
 };
 
-export type GroupsGetGroupUsersResponse2 = GroupsGetGroupUsersResponses[keyof GroupsGetGroupUsersResponses];
+export type GroupsListGroupUsersResponse2 = GroupsListGroupUsersResponses[keyof GroupsListGroupUsersResponses];
 
 export type GroupsAddUserToGroupData = {
     body: GroupsAddUserToGroupBody;
@@ -2152,7 +2138,7 @@ export type UsersListUserPermissionsResponses = {
 
 export type UsersListUserPermissionsResponse2 = UsersListUserPermissionsResponses[keyof UsersListUserPermissionsResponses];
 
-export type UsersGetUserRolesData = {
+export type UsersListUserRolesData = {
     body?: never;
     path: {
         userId: string;
@@ -2164,23 +2150,23 @@ export type UsersGetUserRolesData = {
     url: '/api/v1/users/{userId}/roles';
 };
 
-export type UsersGetUserRolesErrors = {
+export type UsersListUserRolesErrors = {
     /**
      * An unexpected error response.
      */
     default: GooglerpcStatus;
 };
 
-export type UsersGetUserRolesError = UsersGetUserRolesErrors[keyof UsersGetUserRolesErrors];
+export type UsersListUserRolesError = UsersListUserRolesErrors[keyof UsersListUserRolesErrors];
 
-export type UsersGetUserRolesResponses = {
+export type UsersListUserRolesResponses = {
     /**
      * A successful response.
      */
-    200: UsersGetUserRolesResponse;
+    200: UsersListUserRolesResponse;
 };
 
-export type UsersGetUserRolesResponse2 = UsersGetUserRolesResponses[keyof UsersGetUserRolesResponses];
+export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

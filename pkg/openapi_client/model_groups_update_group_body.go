@@ -22,9 +22,7 @@ var _ MappedNullable = &GroupsUpdateGroupBody{}
 type GroupsUpdateGroupBody struct {
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	Role *string `json:"role,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Group *GroupsGroup `json:"group,omitempty"`
 }
 
 // NewGroupsUpdateGroupBody instantiates a new GroupsUpdateGroupBody object
@@ -112,100 +110,36 @@ func (o *GroupsUpdateGroupBody) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetRole returns the Role field value if set, zero value otherwise.
-func (o *GroupsUpdateGroupBody) GetRole() string {
-	if o == nil || IsNil(o.Role) {
-		var ret string
+// GetGroup returns the Group field value if set, zero value otherwise.
+func (o *GroupsUpdateGroupBody) GetGroup() GroupsGroup {
+	if o == nil || IsNil(o.Group) {
+		var ret GroupsGroup
 		return ret
 	}
-	return *o.Role
+	return *o.Group
 }
 
-// GetRoleOk returns a tuple with the Role field value if set, nil otherwise
+// GetGroupOk returns a tuple with the Group field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *GroupsUpdateGroupBody) GetRoleOk() (*string, bool) {
-	if o == nil || IsNil(o.Role) {
+func (o *GroupsUpdateGroupBody) GetGroupOk() (*GroupsGroup, bool) {
+	if o == nil || IsNil(o.Group) {
 		return nil, false
 	}
-	return o.Role, true
+	return o.Group, true
 }
 
-// HasRole returns a boolean if a field has been set.
-func (o *GroupsUpdateGroupBody) HasRole() bool {
-	if o != nil && !IsNil(o.Role) {
+// HasGroup returns a boolean if a field has been set.
+func (o *GroupsUpdateGroupBody) HasGroup() bool {
+	if o != nil && !IsNil(o.Group) {
 		return true
 	}
 
 	return false
 }
 
-// SetRole gets a reference to the given string and assigns it to the Role field.
-func (o *GroupsUpdateGroupBody) SetRole(v string) {
-	o.Role = &v
-}
-
-// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
-func (o *GroupsUpdateGroupBody) GetDisplayName() string {
-	if o == nil || IsNil(o.DisplayName) {
-		var ret string
-		return ret
-	}
-	return *o.DisplayName
-}
-
-// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *GroupsUpdateGroupBody) GetDisplayNameOk() (*string, bool) {
-	if o == nil || IsNil(o.DisplayName) {
-		return nil, false
-	}
-	return o.DisplayName, true
-}
-
-// HasDisplayName returns a boolean if a field has been set.
-func (o *GroupsUpdateGroupBody) HasDisplayName() bool {
-	if o != nil && !IsNil(o.DisplayName) {
-		return true
-	}
-
-	return false
-}
-
-// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
-func (o *GroupsUpdateGroupBody) SetDisplayName(v string) {
-	o.DisplayName = &v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *GroupsUpdateGroupBody) GetDescription() string {
-	if o == nil || IsNil(o.Description) {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *GroupsUpdateGroupBody) GetDescriptionOk() (*string, bool) {
-	if o == nil || IsNil(o.Description) {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *GroupsUpdateGroupBody) HasDescription() bool {
-	if o != nil && !IsNil(o.Description) {
-		return true
-	}
-
-	return false
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *GroupsUpdateGroupBody) SetDescription(v string) {
-	o.Description = &v
+// SetGroup gets a reference to the given GroupsGroup and assigns it to the Group field.
+func (o *GroupsUpdateGroupBody) SetGroup(v GroupsGroup) {
+	o.Group = &v
 }
 
 func (o GroupsUpdateGroupBody) MarshalJSON() ([]byte, error) {
@@ -224,14 +158,8 @@ func (o GroupsUpdateGroupBody) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
 	}
-	if !IsNil(o.Role) {
-		toSerialize["role"] = o.Role
-	}
-	if !IsNil(o.DisplayName) {
-		toSerialize["displayName"] = o.DisplayName
-	}
-	if !IsNil(o.Description) {
-		toSerialize["description"] = o.Description
+	if !IsNil(o.Group) {
+		toSerialize["group"] = o.Group
 	}
 	return toSerialize, nil
 }

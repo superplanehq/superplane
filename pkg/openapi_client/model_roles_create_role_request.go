@@ -20,13 +20,9 @@ var _ MappedNullable = &RolesCreateRoleRequest{}
 
 // RolesCreateRoleRequest struct for RolesCreateRoleRequest
 type RolesCreateRoleRequest struct {
-	Name *string `json:"name,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
-	Permissions []AuthorizationPermission `json:"permissions,omitempty"`
-	InheritedRole *string `json:"inheritedRole,omitempty"`
-	DisplayName *string `json:"displayName,omitempty"`
-	Description *string `json:"description,omitempty"`
+	Role *RolesRole `json:"role,omitempty"`
 }
 
 // NewRolesCreateRoleRequest instantiates a new RolesCreateRoleRequest object
@@ -48,38 +44,6 @@ func NewRolesCreateRoleRequestWithDefaults() *RolesCreateRoleRequest {
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
-}
-
-// GetName returns the Name field value if set, zero value otherwise.
-func (o *RolesCreateRoleRequest) GetName() string {
-	if o == nil || IsNil(o.Name) {
-		var ret string
-		return ret
-	}
-	return *o.Name
-}
-
-// GetNameOk returns a tuple with the Name field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesCreateRoleRequest) GetNameOk() (*string, bool) {
-	if o == nil || IsNil(o.Name) {
-		return nil, false
-	}
-	return o.Name, true
-}
-
-// HasName returns a boolean if a field has been set.
-func (o *RolesCreateRoleRequest) HasName() bool {
-	if o != nil && !IsNil(o.Name) {
-		return true
-	}
-
-	return false
-}
-
-// SetName gets a reference to the given string and assigns it to the Name field.
-func (o *RolesCreateRoleRequest) SetName(v string) {
-	o.Name = &v
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
@@ -146,132 +110,36 @@ func (o *RolesCreateRoleRequest) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
-// GetPermissions returns the Permissions field value if set, zero value otherwise.
-func (o *RolesCreateRoleRequest) GetPermissions() []AuthorizationPermission {
-	if o == nil || IsNil(o.Permissions) {
-		var ret []AuthorizationPermission
+// GetRole returns the Role field value if set, zero value otherwise.
+func (o *RolesCreateRoleRequest) GetRole() RolesRole {
+	if o == nil || IsNil(o.Role) {
+		var ret RolesRole
 		return ret
 	}
-	return o.Permissions
+	return *o.Role
 }
 
-// GetPermissionsOk returns a tuple with the Permissions field value if set, nil otherwise
+// GetRoleOk returns a tuple with the Role field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *RolesCreateRoleRequest) GetPermissionsOk() ([]AuthorizationPermission, bool) {
-	if o == nil || IsNil(o.Permissions) {
+func (o *RolesCreateRoleRequest) GetRoleOk() (*RolesRole, bool) {
+	if o == nil || IsNil(o.Role) {
 		return nil, false
 	}
-	return o.Permissions, true
+	return o.Role, true
 }
 
-// HasPermissions returns a boolean if a field has been set.
-func (o *RolesCreateRoleRequest) HasPermissions() bool {
-	if o != nil && !IsNil(o.Permissions) {
+// HasRole returns a boolean if a field has been set.
+func (o *RolesCreateRoleRequest) HasRole() bool {
+	if o != nil && !IsNil(o.Role) {
 		return true
 	}
 
 	return false
 }
 
-// SetPermissions gets a reference to the given []AuthorizationPermission and assigns it to the Permissions field.
-func (o *RolesCreateRoleRequest) SetPermissions(v []AuthorizationPermission) {
-	o.Permissions = v
-}
-
-// GetInheritedRole returns the InheritedRole field value if set, zero value otherwise.
-func (o *RolesCreateRoleRequest) GetInheritedRole() string {
-	if o == nil || IsNil(o.InheritedRole) {
-		var ret string
-		return ret
-	}
-	return *o.InheritedRole
-}
-
-// GetInheritedRoleOk returns a tuple with the InheritedRole field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesCreateRoleRequest) GetInheritedRoleOk() (*string, bool) {
-	if o == nil || IsNil(o.InheritedRole) {
-		return nil, false
-	}
-	return o.InheritedRole, true
-}
-
-// HasInheritedRole returns a boolean if a field has been set.
-func (o *RolesCreateRoleRequest) HasInheritedRole() bool {
-	if o != nil && !IsNil(o.InheritedRole) {
-		return true
-	}
-
-	return false
-}
-
-// SetInheritedRole gets a reference to the given string and assigns it to the InheritedRole field.
-func (o *RolesCreateRoleRequest) SetInheritedRole(v string) {
-	o.InheritedRole = &v
-}
-
-// GetDisplayName returns the DisplayName field value if set, zero value otherwise.
-func (o *RolesCreateRoleRequest) GetDisplayName() string {
-	if o == nil || IsNil(o.DisplayName) {
-		var ret string
-		return ret
-	}
-	return *o.DisplayName
-}
-
-// GetDisplayNameOk returns a tuple with the DisplayName field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesCreateRoleRequest) GetDisplayNameOk() (*string, bool) {
-	if o == nil || IsNil(o.DisplayName) {
-		return nil, false
-	}
-	return o.DisplayName, true
-}
-
-// HasDisplayName returns a boolean if a field has been set.
-func (o *RolesCreateRoleRequest) HasDisplayName() bool {
-	if o != nil && !IsNil(o.DisplayName) {
-		return true
-	}
-
-	return false
-}
-
-// SetDisplayName gets a reference to the given string and assigns it to the DisplayName field.
-func (o *RolesCreateRoleRequest) SetDisplayName(v string) {
-	o.DisplayName = &v
-}
-
-// GetDescription returns the Description field value if set, zero value otherwise.
-func (o *RolesCreateRoleRequest) GetDescription() string {
-	if o == nil || IsNil(o.Description) {
-		var ret string
-		return ret
-	}
-	return *o.Description
-}
-
-// GetDescriptionOk returns a tuple with the Description field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesCreateRoleRequest) GetDescriptionOk() (*string, bool) {
-	if o == nil || IsNil(o.Description) {
-		return nil, false
-	}
-	return o.Description, true
-}
-
-// HasDescription returns a boolean if a field has been set.
-func (o *RolesCreateRoleRequest) HasDescription() bool {
-	if o != nil && !IsNil(o.Description) {
-		return true
-	}
-
-	return false
-}
-
-// SetDescription gets a reference to the given string and assigns it to the Description field.
-func (o *RolesCreateRoleRequest) SetDescription(v string) {
-	o.Description = &v
+// SetRole gets a reference to the given RolesRole and assigns it to the Role field.
+func (o *RolesCreateRoleRequest) SetRole(v RolesRole) {
+	o.Role = &v
 }
 
 func (o RolesCreateRoleRequest) MarshalJSON() ([]byte, error) {
@@ -284,26 +152,14 @@ func (o RolesCreateRoleRequest) MarshalJSON() ([]byte, error) {
 
 func (o RolesCreateRoleRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.Name) {
-		toSerialize["name"] = o.Name
-	}
 	if !IsNil(o.DomainType) {
 		toSerialize["domainType"] = o.DomainType
 	}
 	if !IsNil(o.DomainId) {
 		toSerialize["domainId"] = o.DomainId
 	}
-	if !IsNil(o.Permissions) {
-		toSerialize["permissions"] = o.Permissions
-	}
-	if !IsNil(o.InheritedRole) {
-		toSerialize["inheritedRole"] = o.InheritedRole
-	}
-	if !IsNil(o.DisplayName) {
-		toSerialize["displayName"] = o.DisplayName
-	}
-	if !IsNil(o.Description) {
-		toSerialize["description"] = o.Description
+	if !IsNil(o.Role) {
+		toSerialize["role"] = o.Role
 	}
 	return toSerialize, nil
 }

@@ -26,12 +26,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// User permissions listing messages
 type ListUserPermissionsRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
-	UserId        string                   `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	DomainType    authorization.DomainType `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                   `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	UserId        string                   `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -66,13 +65,6 @@ func (*ListUserPermissionsRequest) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *ListUserPermissionsRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
-}
-
 func (x *ListUserPermissionsRequest) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
@@ -83,6 +75,13 @@ func (x *ListUserPermissionsRequest) GetDomainType() authorization.DomainType {
 func (x *ListUserPermissionsRequest) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
+	}
+	return ""
+}
+
+func (x *ListUserPermissionsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
 	}
 	return ""
 }
@@ -155,8 +154,7 @@ func (x *ListUserPermissionsResponse) GetPermissions() []*authorization.Permissi
 	return nil
 }
 
-// User roles messages
-type GetUserRolesRequest struct {
+type ListUserRolesRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	UserId        string                   `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	DomainType    authorization.DomainType `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
@@ -165,20 +163,20 @@ type GetUserRolesRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetUserRolesRequest) Reset() {
-	*x = GetUserRolesRequest{}
+func (x *ListUserRolesRequest) Reset() {
+	*x = ListUserRolesRequest{}
 	mi := &file_users_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetUserRolesRequest) String() string {
+func (x *ListUserRolesRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUserRolesRequest) ProtoMessage() {}
+func (*ListUserRolesRequest) ProtoMessage() {}
 
-func (x *GetUserRolesRequest) ProtoReflect() protoreflect.Message {
+func (x *ListUserRolesRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_users_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -190,33 +188,33 @@ func (x *GetUserRolesRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUserRolesRequest.ProtoReflect.Descriptor instead.
-func (*GetUserRolesRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListUserRolesRequest.ProtoReflect.Descriptor instead.
+func (*ListUserRolesRequest) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *GetUserRolesRequest) GetUserId() string {
+func (x *ListUserRolesRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-func (x *GetUserRolesRequest) GetDomainType() authorization.DomainType {
+func (x *ListUserRolesRequest) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
 	}
 	return authorization.DomainType(0)
 }
 
-func (x *GetUserRolesRequest) GetDomainId() string {
+func (x *ListUserRolesRequest) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
 	}
 	return ""
 }
 
-type GetUserRolesResponse struct {
+type ListUserRolesResponse struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	UserId        string                   `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	DomainType    authorization.DomainType `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
@@ -226,20 +224,20 @@ type GetUserRolesResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetUserRolesResponse) Reset() {
-	*x = GetUserRolesResponse{}
+func (x *ListUserRolesResponse) Reset() {
+	*x = ListUserRolesResponse{}
 	mi := &file_users_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetUserRolesResponse) String() string {
+func (x *ListUserRolesResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetUserRolesResponse) ProtoMessage() {}
+func (*ListUserRolesResponse) ProtoMessage() {}
 
-func (x *GetUserRolesResponse) ProtoReflect() protoreflect.Message {
+func (x *ListUserRolesResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_users_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -251,40 +249,39 @@ func (x *GetUserRolesResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetUserRolesResponse.ProtoReflect.Descriptor instead.
-func (*GetUserRolesResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListUserRolesResponse.ProtoReflect.Descriptor instead.
+func (*ListUserRolesResponse) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetUserRolesResponse) GetUserId() string {
+func (x *ListUserRolesResponse) GetUserId() string {
 	if x != nil {
 		return x.UserId
 	}
 	return ""
 }
 
-func (x *GetUserRolesResponse) GetDomainType() authorization.DomainType {
+func (x *ListUserRolesResponse) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
 	}
 	return authorization.DomainType(0)
 }
 
-func (x *GetUserRolesResponse) GetDomainId() string {
+func (x *ListUserRolesResponse) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
 	}
 	return ""
 }
 
-func (x *GetUserRolesResponse) GetRoles() []*roles.Role {
+func (x *ListUserRolesResponse) GetRoles() []*roles.Role {
 	if x != nil {
 		return x.Roles
 	}
 	return nil
 }
 
-// List users messages
 type ListUsersRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
@@ -811,23 +808,23 @@ var File_users_proto protoreflect.FileDescriptor
 const file_users_proto_rawDesc = "" +
 	"\n" +
 	"\vusers.proto\x12\x10Superplane.Users\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\x1a\vroles.proto\"\x99\x01\n" +
-	"\x1aListUserPermissionsRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12E\n" +
-	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"\x1aListUserPermissionsRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\xe2\x01\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\"\xe2\x01\n" +
 	"\x1bListUserPermissionsResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
-	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\"\x92\x01\n" +
-	"\x13GetUserRolesRequest\x12\x17\n" +
+	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\"\x93\x01\n" +
+	"\x14ListUserRolesRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\xc1\x01\n" +
-	"\x14GetUserRolesResponse\x12\x17\n" +
+	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\xc2\x01\n" +
+	"\x15ListUserRolesResponse\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12E\n" +
 	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
@@ -880,11 +877,11 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x97\x05\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9a\x05\n" +
 	"\x05Users\x12\xfe\x01\n" +
 	"\x13ListUserPermissions\x12,.Superplane.Users.ListUserPermissionsRequest\x1a-.Superplane.Users.ListUserPermissionsResponse\"\x89\x01\x92A[\n" +
-	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02%\x12#/api/v1/users/{user_id}/permissions\x12\xd5\x01\n" +
-	"\fGetUserRoles\x12%.Superplane.Users.GetUserRolesRequest\x1a&.Superplane.Users.GetUserRolesResponse\"v\x92AN\n" +
+	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02%\x12#/api/v1/users/{user_id}/permissions\x12\xd8\x01\n" +
+	"\rListUserRoles\x12&.Superplane.Users.ListUserRolesRequest\x1a'.Superplane.Users.ListUserRolesResponse\"v\x92AN\n" +
 	"\x05Users\x12\x0eGet user roles\x1a5Returns the roles a user has within a specific domain\x82\xd3\xe4\x93\x02\x1f\x12\x1d/api/v1/users/{user_id}/roles\x12\xb4\x01\n" +
 	"\tListUsers\x12\".Superplane.Users.ListUsersRequest\x1a#.Superplane.Users.ListUsersResponse\"^\x92AF\n" +
 	"\x05Users\x12\n" +
@@ -908,8 +905,8 @@ var file_users_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_users_proto_goTypes = []any{
 	(*ListUserPermissionsRequest)(nil),  // 0: Superplane.Users.ListUserPermissionsRequest
 	(*ListUserPermissionsResponse)(nil), // 1: Superplane.Users.ListUserPermissionsResponse
-	(*GetUserRolesRequest)(nil),         // 2: Superplane.Users.GetUserRolesRequest
-	(*GetUserRolesResponse)(nil),        // 3: Superplane.Users.GetUserRolesResponse
+	(*ListUserRolesRequest)(nil),        // 2: Superplane.Users.ListUserRolesRequest
+	(*ListUserRolesResponse)(nil),       // 3: Superplane.Users.ListUserRolesResponse
 	(*ListUsersRequest)(nil),            // 4: Superplane.Users.ListUsersRequest
 	(*ListUsersResponse)(nil),           // 5: Superplane.Users.ListUsersResponse
 	(*User)(nil),                        // 6: Superplane.Users.User
@@ -927,9 +924,9 @@ var file_users_proto_depIdxs = []int32{
 	12, // 0: Superplane.Users.ListUserPermissionsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	12, // 1: Superplane.Users.ListUserPermissionsResponse.domain_type:type_name -> Superplane.Authorization.DomainType
 	13, // 2: Superplane.Users.ListUserPermissionsResponse.permissions:type_name -> Superplane.Authorization.Permission
-	12, // 3: Superplane.Users.GetUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	12, // 4: Superplane.Users.GetUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
-	14, // 5: Superplane.Users.GetUserRolesResponse.roles:type_name -> Superplane.Roles.Role
+	12, // 3: Superplane.Users.ListUserRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	12, // 4: Superplane.Users.ListUserRolesResponse.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 5: Superplane.Users.ListUserRolesResponse.roles:type_name -> Superplane.Roles.Role
 	12, // 6: Superplane.Users.ListUsersRequest.domain_type:type_name -> Superplane.Authorization.DomainType
 	6,  // 7: Superplane.Users.ListUsersResponse.users:type_name -> Superplane.Users.User
 	9,  // 8: Superplane.Users.User.metadata:type_name -> Superplane.Users.User.Metadata
@@ -944,10 +941,10 @@ var file_users_proto_depIdxs = []int32{
 	8,  // 17: Superplane.Users.User.Spec.account_providers:type_name -> Superplane.Users.AccountProvider
 	7,  // 18: Superplane.Users.User.Status.role_assignments:type_name -> Superplane.Users.UserRoleAssignment
 	0,  // 19: Superplane.Users.Users.ListUserPermissions:input_type -> Superplane.Users.ListUserPermissionsRequest
-	2,  // 20: Superplane.Users.Users.GetUserRoles:input_type -> Superplane.Users.GetUserRolesRequest
+	2,  // 20: Superplane.Users.Users.ListUserRoles:input_type -> Superplane.Users.ListUserRolesRequest
 	4,  // 21: Superplane.Users.Users.ListUsers:input_type -> Superplane.Users.ListUsersRequest
 	1,  // 22: Superplane.Users.Users.ListUserPermissions:output_type -> Superplane.Users.ListUserPermissionsResponse
-	3,  // 23: Superplane.Users.Users.GetUserRoles:output_type -> Superplane.Users.GetUserRolesResponse
+	3,  // 23: Superplane.Users.Users.ListUserRoles:output_type -> Superplane.Users.ListUserRolesResponse
 	5,  // 24: Superplane.Users.Users.ListUsers:output_type -> Superplane.Users.ListUsersResponse
 	22, // [22:25] is the sub-list for method output_type
 	19, // [19:22] is the sub-list for method input_type

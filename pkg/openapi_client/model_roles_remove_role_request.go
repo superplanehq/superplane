@@ -20,9 +20,11 @@ var _ MappedNullable = &RolesRemoveRoleRequest{}
 
 // RolesRemoveRoleRequest struct for RolesRemoveRoleRequest
 type RolesRemoveRoleRequest struct {
+	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
+	DomainId *string `json:"domainId,omitempty"`
+	RoleName *string `json:"roleName,omitempty"`
 	UserId *string `json:"userId,omitempty"`
 	UserEmail *string `json:"userEmail,omitempty"`
-	RoleAssignment *RolesRoleAssignment `json:"roleAssignment,omitempty"`
 }
 
 // NewRolesRemoveRoleRequest instantiates a new RolesRemoveRoleRequest object
@@ -31,6 +33,8 @@ type RolesRemoveRoleRequest struct {
 // will change when the set of required properties is changed
 func NewRolesRemoveRoleRequest() *RolesRemoveRoleRequest {
 	this := RolesRemoveRoleRequest{}
+	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
+	this.DomainType = &domainType
 	return &this
 }
 
@@ -39,7 +43,105 @@ func NewRolesRemoveRoleRequest() *RolesRemoveRoleRequest {
 // but it doesn't guarantee that properties required by API are set
 func NewRolesRemoveRoleRequestWithDefaults() *RolesRemoveRoleRequest {
 	this := RolesRemoveRoleRequest{}
+	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
+	this.DomainType = &domainType
 	return &this
+}
+
+// GetDomainType returns the DomainType field value if set, zero value otherwise.
+func (o *RolesRemoveRoleRequest) GetDomainType() AuthorizationDomainType {
+	if o == nil || IsNil(o.DomainType) {
+		var ret AuthorizationDomainType
+		return ret
+	}
+	return *o.DomainType
+}
+
+// GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *RolesRemoveRoleRequest) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+	if o == nil || IsNil(o.DomainType) {
+		return nil, false
+	}
+	return o.DomainType, true
+}
+
+// HasDomainType returns a boolean if a field has been set.
+func (o *RolesRemoveRoleRequest) HasDomainType() bool {
+	if o != nil && !IsNil(o.DomainType) {
+		return true
+	}
+
+	return false
+}
+
+// SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
+func (o *RolesRemoveRoleRequest) SetDomainType(v AuthorizationDomainType) {
+	o.DomainType = &v
+}
+
+// GetDomainId returns the DomainId field value if set, zero value otherwise.
+func (o *RolesRemoveRoleRequest) GetDomainId() string {
+	if o == nil || IsNil(o.DomainId) {
+		var ret string
+		return ret
+	}
+	return *o.DomainId
+}
+
+// GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *RolesRemoveRoleRequest) GetDomainIdOk() (*string, bool) {
+	if o == nil || IsNil(o.DomainId) {
+		return nil, false
+	}
+	return o.DomainId, true
+}
+
+// HasDomainId returns a boolean if a field has been set.
+func (o *RolesRemoveRoleRequest) HasDomainId() bool {
+	if o != nil && !IsNil(o.DomainId) {
+		return true
+	}
+
+	return false
+}
+
+// SetDomainId gets a reference to the given string and assigns it to the DomainId field.
+func (o *RolesRemoveRoleRequest) SetDomainId(v string) {
+	o.DomainId = &v
+}
+
+// GetRoleName returns the RoleName field value if set, zero value otherwise.
+func (o *RolesRemoveRoleRequest) GetRoleName() string {
+	if o == nil || IsNil(o.RoleName) {
+		var ret string
+		return ret
+	}
+	return *o.RoleName
+}
+
+// GetRoleNameOk returns a tuple with the RoleName field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *RolesRemoveRoleRequest) GetRoleNameOk() (*string, bool) {
+	if o == nil || IsNil(o.RoleName) {
+		return nil, false
+	}
+	return o.RoleName, true
+}
+
+// HasRoleName returns a boolean if a field has been set.
+func (o *RolesRemoveRoleRequest) HasRoleName() bool {
+	if o != nil && !IsNil(o.RoleName) {
+		return true
+	}
+
+	return false
+}
+
+// SetRoleName gets a reference to the given string and assigns it to the RoleName field.
+func (o *RolesRemoveRoleRequest) SetRoleName(v string) {
+	o.RoleName = &v
 }
 
 // GetUserId returns the UserId field value if set, zero value otherwise.
@@ -106,38 +208,6 @@ func (o *RolesRemoveRoleRequest) SetUserEmail(v string) {
 	o.UserEmail = &v
 }
 
-// GetRoleAssignment returns the RoleAssignment field value if set, zero value otherwise.
-func (o *RolesRemoveRoleRequest) GetRoleAssignment() RolesRoleAssignment {
-	if o == nil || IsNil(o.RoleAssignment) {
-		var ret RolesRoleAssignment
-		return ret
-	}
-	return *o.RoleAssignment
-}
-
-// GetRoleAssignmentOk returns a tuple with the RoleAssignment field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *RolesRemoveRoleRequest) GetRoleAssignmentOk() (*RolesRoleAssignment, bool) {
-	if o == nil || IsNil(o.RoleAssignment) {
-		return nil, false
-	}
-	return o.RoleAssignment, true
-}
-
-// HasRoleAssignment returns a boolean if a field has been set.
-func (o *RolesRemoveRoleRequest) HasRoleAssignment() bool {
-	if o != nil && !IsNil(o.RoleAssignment) {
-		return true
-	}
-
-	return false
-}
-
-// SetRoleAssignment gets a reference to the given RolesRoleAssignment and assigns it to the RoleAssignment field.
-func (o *RolesRemoveRoleRequest) SetRoleAssignment(v RolesRoleAssignment) {
-	o.RoleAssignment = &v
-}
-
 func (o RolesRemoveRoleRequest) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -148,14 +218,20 @@ func (o RolesRemoveRoleRequest) MarshalJSON() ([]byte, error) {
 
 func (o RolesRemoveRoleRequest) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
+	if !IsNil(o.DomainType) {
+		toSerialize["domainType"] = o.DomainType
+	}
+	if !IsNil(o.DomainId) {
+		toSerialize["domainId"] = o.DomainId
+	}
+	if !IsNil(o.RoleName) {
+		toSerialize["roleName"] = o.RoleName
+	}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
 	}
 	if !IsNil(o.UserEmail) {
 		toSerialize["userEmail"] = o.UserEmail
-	}
-	if !IsNil(o.RoleAssignment) {
-		toSerialize["roleAssignment"] = o.RoleAssignment
 	}
 	return toSerialize, nil
 }

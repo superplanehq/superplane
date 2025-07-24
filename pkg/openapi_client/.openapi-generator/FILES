@@ -31,12 +31,12 @@ docs/GroupsAPI.md
 docs/GroupsAddUserToGroupBody.md
 docs/GroupsCreateGroupRequest.md
 docs/GroupsCreateGroupResponse.md
-docs/GroupsGetGroupResponse.md
-docs/GroupsGetGroupUsersResponse.md
+docs/GroupsDescribeGroupResponse.md
 docs/GroupsGroup.md
 docs/GroupsGroupMetadata.md
 docs/GroupsGroupSpec.md
 docs/GroupsGroupStatus.md
+docs/GroupsListGroupUsersResponse.md
 docs/GroupsListGroupsResponse.md
 docs/GroupsRemoveUserFromGroupBody.md
 docs/GroupsUpdateGroupBody.md
@@ -74,7 +74,6 @@ docs/RolesDescribeRoleResponse.md
 docs/RolesListRolesResponse.md
 docs/RolesRemoveRoleRequest.md
 docs/RolesRole.md
-docs/RolesRoleAssignment.md
 docs/RolesRoleMetadata.md
 docs/RolesRoleSpec.md
 docs/RolesUpdateRoleBody.md
@@ -168,8 +167,8 @@ docs/SuperplaneValueFromLastExecution.md
 docs/SuperplaneValueFromSecret.md
 docs/UsersAPI.md
 docs/UsersAccountProvider.md
-docs/UsersGetUserRolesResponse.md
 docs/UsersListUserPermissionsResponse.md
+docs/UsersListUserRolesResponse.md
 docs/UsersListUsersResponse.md
 docs/UsersUser.md
 docs/UsersUserMetadata.md
@@ -189,12 +188,12 @@ model_group_by_field.go
 model_groups_add_user_to_group_body.go
 model_groups_create_group_request.go
 model_groups_create_group_response.go
-model_groups_get_group_response.go
-model_groups_get_group_users_response.go
+model_groups_describe_group_response.go
 model_groups_group.go
 model_groups_group_metadata.go
 model_groups_group_spec.go
 model_groups_group_status.go
+model_groups_list_group_users_response.go
 model_groups_list_groups_response.go
 model_groups_remove_user_from_group_body.go
 model_groups_update_group_body.go
@@ -229,7 +228,6 @@ model_roles_describe_role_response.go
 model_roles_list_roles_response.go
 model_roles_remove_role_request.go
 model_roles_role.go
-model_roles_role_assignment.go
 model_roles_role_metadata.go
 model_roles_role_spec.go
 model_roles_update_role_body.go
@@ -320,8 +318,8 @@ model_superplane_value_from_event_data.go
 model_superplane_value_from_last_execution.go
 model_superplane_value_from_secret.go
 model_users_account_provider.go
-model_users_get_user_roles_response.go
 model_users_list_user_permissions_response.go
+model_users_list_user_roles_response.go
 model_users_list_users_response.go
 model_users_user.go
 model_users_user_metadata.go

@@ -46,7 +46,7 @@ service Users {
   // Endpoint for getting user roles within a domain
   // Operation is synchronous and idempotent.
   //
-  rpc GetUserRoles(GetUserRolesRequest) returns (GetUserRolesResponse) {
+  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
     option (google.api.http) = {
       get: "/api/v1/users/{user_id}/roles"
     };
@@ -73,11 +73,10 @@ service Users {
   }
 }
 
-// User permissions listing messages
 message ListUserPermissionsRequest {
-  string user_id = 1;
-  Authorization.DomainType domain_type = 2;
-  string domain_id = 3;
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string user_id = 3;
 }
 
 message ListUserPermissionsResponse {
@@ -87,21 +86,19 @@ message ListUserPermissionsResponse {
   repeated Authorization.Permission permissions = 4;
 }
 
-// User roles messages
-message GetUserRolesRequest {
+message ListUserRolesRequest {
   string user_id = 1;
   Authorization.DomainType domain_type = 2;
   string domain_id = 3;
 }
 
-message GetUserRolesResponse {
+message ListUserRolesResponse {
   string user_id = 1;
   Authorization.DomainType domain_type = 2;
   string domain_id = 3;
   repeated Roles.Role roles = 4;
 }
 
-// List users messages
 message ListUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;

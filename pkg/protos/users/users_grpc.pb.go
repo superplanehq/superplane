@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	Users_ListUserPermissions_FullMethodName = "/Superplane.Users.Users/ListUserPermissions"
-	Users_GetUserRoles_FullMethodName        = "/Superplane.Users.Users/GetUserRoles"
+	Users_ListUserRoles_FullMethodName       = "/Superplane.Users.Users/ListUserRoles"
 	Users_ListUsers_FullMethodName           = "/Superplane.Users.Users/ListUsers"
 )
 
@@ -33,7 +33,7 @@ type UsersClient interface {
 	ListUserPermissions(ctx context.Context, in *ListUserPermissionsRequest, opts ...grpc.CallOption) (*ListUserPermissionsResponse, error)
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
-	GetUserRoles(ctx context.Context, in *GetUserRolesRequest, opts ...grpc.CallOption) (*GetUserRolesResponse, error)
+	ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*ListUserRolesResponse, error)
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(ctx context.Context, in *ListUsersRequest, opts ...grpc.CallOption) (*ListUsersResponse, error)
@@ -57,10 +57,10 @@ func (c *usersClient) ListUserPermissions(ctx context.Context, in *ListUserPermi
 	return out, nil
 }
 
-func (c *usersClient) GetUserRoles(ctx context.Context, in *GetUserRolesRequest, opts ...grpc.CallOption) (*GetUserRolesResponse, error) {
+func (c *usersClient) ListUserRoles(ctx context.Context, in *ListUserRolesRequest, opts ...grpc.CallOption) (*ListUserRolesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUserRolesResponse)
-	err := c.cc.Invoke(ctx, Users_GetUserRoles_FullMethodName, in, out, cOpts...)
+	out := new(ListUserRolesResponse)
+	err := c.cc.Invoke(ctx, Users_ListUserRoles_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ type UsersServer interface {
 	ListUserPermissions(context.Context, *ListUserPermissionsRequest) (*ListUserPermissionsResponse, error)
 	// Endpoint for getting user roles within a domain
 	// Operation is synchronous and idempotent.
-	GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error)
+	ListUserRoles(context.Context, *ListUserRolesRequest) (*ListUserRolesResponse, error)
 	// Endpoint for getting all users in a domain
 	// Operation is synchronous and idempotent.
 	ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error)
@@ -102,8 +102,8 @@ type UnimplementedUsersServer struct{}
 func (UnimplementedUsersServer) ListUserPermissions(context.Context, *ListUserPermissionsRequest) (*ListUserPermissionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUserPermissions not implemented")
 }
-func (UnimplementedUsersServer) GetUserRoles(context.Context, *GetUserRolesRequest) (*GetUserRolesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserRoles not implemented")
+func (UnimplementedUsersServer) ListUserRoles(context.Context, *ListUserRolesRequest) (*ListUserRolesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListUserRoles not implemented")
 }
 func (UnimplementedUsersServer) ListUsers(context.Context, *ListUsersRequest) (*ListUsersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListUsers not implemented")
@@ -146,20 +146,20 @@ func _Users_ListUserPermissions_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Users_GetUserRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUserRolesRequest)
+func _Users_ListUserRoles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUserRolesRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(UsersServer).GetUserRoles(ctx, in)
+		return srv.(UsersServer).ListUserRoles(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Users_GetUserRoles_FullMethodName,
+		FullMethod: Users_ListUserRoles_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(UsersServer).GetUserRoles(ctx, req.(*GetUserRolesRequest))
+		return srv.(UsersServer).ListUserRoles(ctx, req.(*ListUserRolesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -194,8 +194,8 @@ var Users_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Users_ListUserPermissions_Handler,
 		},
 		{
-			MethodName: "GetUserRoles",
-			Handler:    _Users_GetUserRoles_Handler,
+			MethodName: "ListUserRoles",
+			Handler:    _Users_ListUserRoles_Handler,
 		},
 		{
 			MethodName: "ListUsers",

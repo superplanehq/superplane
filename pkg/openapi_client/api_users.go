@@ -24,7 +24,7 @@ import (
 // UsersAPIService UsersAPI service
 type UsersAPIService service
 
-type ApiUsersGetUserRolesRequest struct {
+type ApiUsersListUserPermissionsRequest struct {
 	ctx context.Context
 	ApiService *UsersAPIService
 	userId string
@@ -32,31 +32,31 @@ type ApiUsersGetUserRolesRequest struct {
 	domainId *string
 }
 
-func (r ApiUsersGetUserRolesRequest) DomainType(domainType string) ApiUsersGetUserRolesRequest {
+func (r ApiUsersListUserPermissionsRequest) DomainType(domainType string) ApiUsersListUserPermissionsRequest {
 	r.domainType = &domainType
 	return r
 }
 
-func (r ApiUsersGetUserRolesRequest) DomainId(domainId string) ApiUsersGetUserRolesRequest {
+func (r ApiUsersListUserPermissionsRequest) DomainId(domainId string) ApiUsersListUserPermissionsRequest {
 	r.domainId = &domainId
 	return r
 }
 
-func (r ApiUsersGetUserRolesRequest) Execute() (*UsersGetUserRolesResponse, *http.Response, error) {
-	return r.ApiService.UsersGetUserRolesExecute(r)
+func (r ApiUsersListUserPermissionsRequest) Execute() (*UsersListUserPermissionsResponse, *http.Response, error) {
+	return r.ApiService.UsersListUserPermissionsExecute(r)
 }
 
 /*
-UsersGetUserRoles Get user roles
+UsersListUserPermissions List user permissions
 
-Returns the roles a user has within a specific domain
+Returns all permissions a user has within a specific domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param userId
- @return ApiUsersGetUserRolesRequest
+ @return ApiUsersListUserPermissionsRequest
 */
-func (a *UsersAPIService) UsersGetUserRoles(ctx context.Context, userId string) ApiUsersGetUserRolesRequest {
-	return ApiUsersGetUserRolesRequest{
+func (a *UsersAPIService) UsersListUserPermissions(ctx context.Context, userId string) ApiUsersListUserPermissionsRequest {
+	return ApiUsersListUserPermissionsRequest{
 		ApiService: a,
 		ctx: ctx,
 		userId: userId,
@@ -64,21 +64,21 @@ func (a *UsersAPIService) UsersGetUserRoles(ctx context.Context, userId string) 
 }
 
 // Execute executes the request
-//  @return UsersGetUserRolesResponse
-func (a *UsersAPIService) UsersGetUserRolesExecute(r ApiUsersGetUserRolesRequest) (*UsersGetUserRolesResponse, *http.Response, error) {
+//  @return UsersListUserPermissionsResponse
+func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPermissionsRequest) (*UsersListUserPermissionsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *UsersGetUserRolesResponse
+		localVarReturnValue  *UsersListUserPermissionsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersGetUserRoles")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUserPermissions")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/users/{userId}/roles"
+	localVarPath := localBasePath + "/api/v1/users/{userId}/permissions"
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -156,7 +156,7 @@ func (a *UsersAPIService) UsersGetUserRolesExecute(r ApiUsersGetUserRolesRequest
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiUsersListUserPermissionsRequest struct {
+type ApiUsersListUserRolesRequest struct {
 	ctx context.Context
 	ApiService *UsersAPIService
 	userId string
@@ -164,31 +164,31 @@ type ApiUsersListUserPermissionsRequest struct {
 	domainId *string
 }
 
-func (r ApiUsersListUserPermissionsRequest) DomainType(domainType string) ApiUsersListUserPermissionsRequest {
+func (r ApiUsersListUserRolesRequest) DomainType(domainType string) ApiUsersListUserRolesRequest {
 	r.domainType = &domainType
 	return r
 }
 
-func (r ApiUsersListUserPermissionsRequest) DomainId(domainId string) ApiUsersListUserPermissionsRequest {
+func (r ApiUsersListUserRolesRequest) DomainId(domainId string) ApiUsersListUserRolesRequest {
 	r.domainId = &domainId
 	return r
 }
 
-func (r ApiUsersListUserPermissionsRequest) Execute() (*UsersListUserPermissionsResponse, *http.Response, error) {
-	return r.ApiService.UsersListUserPermissionsExecute(r)
+func (r ApiUsersListUserRolesRequest) Execute() (*UsersListUserRolesResponse, *http.Response, error) {
+	return r.ApiService.UsersListUserRolesExecute(r)
 }
 
 /*
-UsersListUserPermissions List user permissions
+UsersListUserRoles Get user roles
 
-Returns all permissions a user has within a specific domain
+Returns the roles a user has within a specific domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param userId
- @return ApiUsersListUserPermissionsRequest
+ @return ApiUsersListUserRolesRequest
 */
-func (a *UsersAPIService) UsersListUserPermissions(ctx context.Context, userId string) ApiUsersListUserPermissionsRequest {
-	return ApiUsersListUserPermissionsRequest{
+func (a *UsersAPIService) UsersListUserRoles(ctx context.Context, userId string) ApiUsersListUserRolesRequest {
+	return ApiUsersListUserRolesRequest{
 		ApiService: a,
 		ctx: ctx,
 		userId: userId,
@@ -196,21 +196,21 @@ func (a *UsersAPIService) UsersListUserPermissions(ctx context.Context, userId s
 }
 
 // Execute executes the request
-//  @return UsersListUserPermissionsResponse
-func (a *UsersAPIService) UsersListUserPermissionsExecute(r ApiUsersListUserPermissionsRequest) (*UsersListUserPermissionsResponse, *http.Response, error) {
+//  @return UsersListUserRolesResponse
+func (a *UsersAPIService) UsersListUserRolesExecute(r ApiUsersListUserRolesRequest) (*UsersListUserRolesResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *UsersListUserPermissionsResponse
+		localVarReturnValue  *UsersListUserRolesResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUserPermissions")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "UsersAPIService.UsersListUserRoles")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/users/{userId}/permissions"
+	localVarPath := localBasePath + "/api/v1/users/{userId}/roles"
 	localVarPath = strings.Replace(localVarPath, "{"+"userId"+"}", url.PathEscape(parameterValueToString(r.userId, "userId")), -1)
 
 	localVarHeaderParams := make(map[string]string)

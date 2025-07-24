@@ -396,7 +396,7 @@ func (a *GroupsAPIService) GroupsDeleteGroupExecute(r ApiGroupsDeleteGroupReques
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiGroupsGetGroupRequest struct {
+type ApiGroupsDescribeGroupRequest struct {
 	ctx context.Context
 	ApiService *GroupsAPIService
 	groupName string
@@ -404,31 +404,31 @@ type ApiGroupsGetGroupRequest struct {
 	domainId *string
 }
 
-func (r ApiGroupsGetGroupRequest) DomainType(domainType string) ApiGroupsGetGroupRequest {
+func (r ApiGroupsDescribeGroupRequest) DomainType(domainType string) ApiGroupsDescribeGroupRequest {
 	r.domainType = &domainType
 	return r
 }
 
-func (r ApiGroupsGetGroupRequest) DomainId(domainId string) ApiGroupsGetGroupRequest {
+func (r ApiGroupsDescribeGroupRequest) DomainId(domainId string) ApiGroupsDescribeGroupRequest {
 	r.domainId = &domainId
 	return r
 }
 
-func (r ApiGroupsGetGroupRequest) Execute() (*GroupsGetGroupResponse, *http.Response, error) {
-	return r.ApiService.GroupsGetGroupExecute(r)
+func (r ApiGroupsDescribeGroupRequest) Execute() (*GroupsDescribeGroupResponse, *http.Response, error) {
+	return r.ApiService.GroupsDescribeGroupExecute(r)
 }
 
 /*
-GroupsGetGroup Get group
+GroupsDescribeGroup Get group
 
 Returns details of a specific group within a domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param groupName
- @return ApiGroupsGetGroupRequest
+ @return ApiGroupsDescribeGroupRequest
 */
-func (a *GroupsAPIService) GroupsGetGroup(ctx context.Context, groupName string) ApiGroupsGetGroupRequest {
-	return ApiGroupsGetGroupRequest{
+func (a *GroupsAPIService) GroupsDescribeGroup(ctx context.Context, groupName string) ApiGroupsDescribeGroupRequest {
+	return ApiGroupsDescribeGroupRequest{
 		ApiService: a,
 		ctx: ctx,
 		groupName: groupName,
@@ -436,16 +436,16 @@ func (a *GroupsAPIService) GroupsGetGroup(ctx context.Context, groupName string)
 }
 
 // Execute executes the request
-//  @return GroupsGetGroupResponse
-func (a *GroupsAPIService) GroupsGetGroupExecute(r ApiGroupsGetGroupRequest) (*GroupsGetGroupResponse, *http.Response, error) {
+//  @return GroupsDescribeGroupResponse
+func (a *GroupsAPIService) GroupsDescribeGroupExecute(r ApiGroupsDescribeGroupRequest) (*GroupsDescribeGroupResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *GroupsGetGroupResponse
+		localVarReturnValue  *GroupsDescribeGroupResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsGetGroup")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsDescribeGroup")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
@@ -528,7 +528,7 @@ func (a *GroupsAPIService) GroupsGetGroupExecute(r ApiGroupsGetGroupRequest) (*G
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiGroupsGetGroupUsersRequest struct {
+type ApiGroupsListGroupUsersRequest struct {
 	ctx context.Context
 	ApiService *GroupsAPIService
 	groupName string
@@ -536,31 +536,31 @@ type ApiGroupsGetGroupUsersRequest struct {
 	domainId *string
 }
 
-func (r ApiGroupsGetGroupUsersRequest) DomainType(domainType string) ApiGroupsGetGroupUsersRequest {
+func (r ApiGroupsListGroupUsersRequest) DomainType(domainType string) ApiGroupsListGroupUsersRequest {
 	r.domainType = &domainType
 	return r
 }
 
-func (r ApiGroupsGetGroupUsersRequest) DomainId(domainId string) ApiGroupsGetGroupUsersRequest {
+func (r ApiGroupsListGroupUsersRequest) DomainId(domainId string) ApiGroupsListGroupUsersRequest {
 	r.domainId = &domainId
 	return r
 }
 
-func (r ApiGroupsGetGroupUsersRequest) Execute() (*GroupsGetGroupUsersResponse, *http.Response, error) {
-	return r.ApiService.GroupsGetGroupUsersExecute(r)
+func (r ApiGroupsListGroupUsersRequest) Execute() (*GroupsListGroupUsersResponse, *http.Response, error) {
+	return r.ApiService.GroupsListGroupUsersExecute(r)
 }
 
 /*
-GroupsGetGroupUsers Get group users
+GroupsListGroupUsers Get group users
 
 Returns users that belong to a specific group within a domain
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param groupName
- @return ApiGroupsGetGroupUsersRequest
+ @return ApiGroupsListGroupUsersRequest
 */
-func (a *GroupsAPIService) GroupsGetGroupUsers(ctx context.Context, groupName string) ApiGroupsGetGroupUsersRequest {
-	return ApiGroupsGetGroupUsersRequest{
+func (a *GroupsAPIService) GroupsListGroupUsers(ctx context.Context, groupName string) ApiGroupsListGroupUsersRequest {
+	return ApiGroupsListGroupUsersRequest{
 		ApiService: a,
 		ctx: ctx,
 		groupName: groupName,
@@ -568,16 +568,16 @@ func (a *GroupsAPIService) GroupsGetGroupUsers(ctx context.Context, groupName st
 }
 
 // Execute executes the request
-//  @return GroupsGetGroupUsersResponse
-func (a *GroupsAPIService) GroupsGetGroupUsersExecute(r ApiGroupsGetGroupUsersRequest) (*GroupsGetGroupUsersResponse, *http.Response, error) {
+//  @return GroupsListGroupUsersResponse
+func (a *GroupsAPIService) GroupsListGroupUsersExecute(r ApiGroupsListGroupUsersRequest) (*GroupsListGroupUsersResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *GroupsGetGroupUsersResponse
+		localVarReturnValue  *GroupsListGroupUsersResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsGetGroupUsers")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "GroupsAPIService.GroupsListGroupUsers")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}

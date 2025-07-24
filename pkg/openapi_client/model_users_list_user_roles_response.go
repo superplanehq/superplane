@@ -15,40 +15,40 @@ import (
 	"encoding/json"
 )
 
-// checks if the UsersGetUserRolesResponse type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &UsersGetUserRolesResponse{}
+// checks if the UsersListUserRolesResponse type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &UsersListUserRolesResponse{}
 
-// UsersGetUserRolesResponse struct for UsersGetUserRolesResponse
-type UsersGetUserRolesResponse struct {
+// UsersListUserRolesResponse struct for UsersListUserRolesResponse
+type UsersListUserRolesResponse struct {
 	UserId *string `json:"userId,omitempty"`
 	DomainType *AuthorizationDomainType `json:"domainType,omitempty"`
 	DomainId *string `json:"domainId,omitempty"`
 	Roles []RolesRole `json:"roles,omitempty"`
 }
 
-// NewUsersGetUserRolesResponse instantiates a new UsersGetUserRolesResponse object
+// NewUsersListUserRolesResponse instantiates a new UsersListUserRolesResponse object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewUsersGetUserRolesResponse() *UsersGetUserRolesResponse {
-	this := UsersGetUserRolesResponse{}
+func NewUsersListUserRolesResponse() *UsersListUserRolesResponse {
+	this := UsersListUserRolesResponse{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
-// NewUsersGetUserRolesResponseWithDefaults instantiates a new UsersGetUserRolesResponse object
+// NewUsersListUserRolesResponseWithDefaults instantiates a new UsersListUserRolesResponse object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewUsersGetUserRolesResponseWithDefaults() *UsersGetUserRolesResponse {
-	this := UsersGetUserRolesResponse{}
+func NewUsersListUserRolesResponseWithDefaults() *UsersListUserRolesResponse {
+	this := UsersListUserRolesResponse{}
 	var domainType AuthorizationDomainType = AUTHORIZATIONDOMAINTYPE_DOMAIN_TYPE_UNSPECIFIED
 	this.DomainType = &domainType
 	return &this
 }
 
 // GetUserId returns the UserId field value if set, zero value otherwise.
-func (o *UsersGetUserRolesResponse) GetUserId() string {
+func (o *UsersListUserRolesResponse) GetUserId() string {
 	if o == nil || IsNil(o.UserId) {
 		var ret string
 		return ret
@@ -58,7 +58,7 @@ func (o *UsersGetUserRolesResponse) GetUserId() string {
 
 // GetUserIdOk returns a tuple with the UserId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersGetUserRolesResponse) GetUserIdOk() (*string, bool) {
+func (o *UsersListUserRolesResponse) GetUserIdOk() (*string, bool) {
 	if o == nil || IsNil(o.UserId) {
 		return nil, false
 	}
@@ -66,7 +66,7 @@ func (o *UsersGetUserRolesResponse) GetUserIdOk() (*string, bool) {
 }
 
 // HasUserId returns a boolean if a field has been set.
-func (o *UsersGetUserRolesResponse) HasUserId() bool {
+func (o *UsersListUserRolesResponse) HasUserId() bool {
 	if o != nil && !IsNil(o.UserId) {
 		return true
 	}
@@ -75,12 +75,12 @@ func (o *UsersGetUserRolesResponse) HasUserId() bool {
 }
 
 // SetUserId gets a reference to the given string and assigns it to the UserId field.
-func (o *UsersGetUserRolesResponse) SetUserId(v string) {
+func (o *UsersListUserRolesResponse) SetUserId(v string) {
 	o.UserId = &v
 }
 
 // GetDomainType returns the DomainType field value if set, zero value otherwise.
-func (o *UsersGetUserRolesResponse) GetDomainType() AuthorizationDomainType {
+func (o *UsersListUserRolesResponse) GetDomainType() AuthorizationDomainType {
 	if o == nil || IsNil(o.DomainType) {
 		var ret AuthorizationDomainType
 		return ret
@@ -90,7 +90,7 @@ func (o *UsersGetUserRolesResponse) GetDomainType() AuthorizationDomainType {
 
 // GetDomainTypeOk returns a tuple with the DomainType field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersGetUserRolesResponse) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
+func (o *UsersListUserRolesResponse) GetDomainTypeOk() (*AuthorizationDomainType, bool) {
 	if o == nil || IsNil(o.DomainType) {
 		return nil, false
 	}
@@ -98,7 +98,7 @@ func (o *UsersGetUserRolesResponse) GetDomainTypeOk() (*AuthorizationDomainType,
 }
 
 // HasDomainType returns a boolean if a field has been set.
-func (o *UsersGetUserRolesResponse) HasDomainType() bool {
+func (o *UsersListUserRolesResponse) HasDomainType() bool {
 	if o != nil && !IsNil(o.DomainType) {
 		return true
 	}
@@ -107,12 +107,12 @@ func (o *UsersGetUserRolesResponse) HasDomainType() bool {
 }
 
 // SetDomainType gets a reference to the given AuthorizationDomainType and assigns it to the DomainType field.
-func (o *UsersGetUserRolesResponse) SetDomainType(v AuthorizationDomainType) {
+func (o *UsersListUserRolesResponse) SetDomainType(v AuthorizationDomainType) {
 	o.DomainType = &v
 }
 
 // GetDomainId returns the DomainId field value if set, zero value otherwise.
-func (o *UsersGetUserRolesResponse) GetDomainId() string {
+func (o *UsersListUserRolesResponse) GetDomainId() string {
 	if o == nil || IsNil(o.DomainId) {
 		var ret string
 		return ret
@@ -122,7 +122,7 @@ func (o *UsersGetUserRolesResponse) GetDomainId() string {
 
 // GetDomainIdOk returns a tuple with the DomainId field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersGetUserRolesResponse) GetDomainIdOk() (*string, bool) {
+func (o *UsersListUserRolesResponse) GetDomainIdOk() (*string, bool) {
 	if o == nil || IsNil(o.DomainId) {
 		return nil, false
 	}
@@ -130,7 +130,7 @@ func (o *UsersGetUserRolesResponse) GetDomainIdOk() (*string, bool) {
 }
 
 // HasDomainId returns a boolean if a field has been set.
-func (o *UsersGetUserRolesResponse) HasDomainId() bool {
+func (o *UsersListUserRolesResponse) HasDomainId() bool {
 	if o != nil && !IsNil(o.DomainId) {
 		return true
 	}
@@ -139,12 +139,12 @@ func (o *UsersGetUserRolesResponse) HasDomainId() bool {
 }
 
 // SetDomainId gets a reference to the given string and assigns it to the DomainId field.
-func (o *UsersGetUserRolesResponse) SetDomainId(v string) {
+func (o *UsersListUserRolesResponse) SetDomainId(v string) {
 	o.DomainId = &v
 }
 
 // GetRoles returns the Roles field value if set, zero value otherwise.
-func (o *UsersGetUserRolesResponse) GetRoles() []RolesRole {
+func (o *UsersListUserRolesResponse) GetRoles() []RolesRole {
 	if o == nil || IsNil(o.Roles) {
 		var ret []RolesRole
 		return ret
@@ -154,7 +154,7 @@ func (o *UsersGetUserRolesResponse) GetRoles() []RolesRole {
 
 // GetRolesOk returns a tuple with the Roles field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *UsersGetUserRolesResponse) GetRolesOk() ([]RolesRole, bool) {
+func (o *UsersListUserRolesResponse) GetRolesOk() ([]RolesRole, bool) {
 	if o == nil || IsNil(o.Roles) {
 		return nil, false
 	}
@@ -162,7 +162,7 @@ func (o *UsersGetUserRolesResponse) GetRolesOk() ([]RolesRole, bool) {
 }
 
 // HasRoles returns a boolean if a field has been set.
-func (o *UsersGetUserRolesResponse) HasRoles() bool {
+func (o *UsersListUserRolesResponse) HasRoles() bool {
 	if o != nil && !IsNil(o.Roles) {
 		return true
 	}
@@ -171,11 +171,11 @@ func (o *UsersGetUserRolesResponse) HasRoles() bool {
 }
 
 // SetRoles gets a reference to the given []RolesRole and assigns it to the Roles field.
-func (o *UsersGetUserRolesResponse) SetRoles(v []RolesRole) {
+func (o *UsersListUserRolesResponse) SetRoles(v []RolesRole) {
 	o.Roles = v
 }
 
-func (o UsersGetUserRolesResponse) MarshalJSON() ([]byte, error) {
+func (o UsersListUserRolesResponse) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -183,7 +183,7 @@ func (o UsersGetUserRolesResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o UsersGetUserRolesResponse) ToMap() (map[string]interface{}, error) {
+func (o UsersListUserRolesResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.UserId) {
 		toSerialize["userId"] = o.UserId
@@ -200,38 +200,38 @@ func (o UsersGetUserRolesResponse) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableUsersGetUserRolesResponse struct {
-	value *UsersGetUserRolesResponse
+type NullableUsersListUserRolesResponse struct {
+	value *UsersListUserRolesResponse
 	isSet bool
 }
 
-func (v NullableUsersGetUserRolesResponse) Get() *UsersGetUserRolesResponse {
+func (v NullableUsersListUserRolesResponse) Get() *UsersListUserRolesResponse {
 	return v.value
 }
 
-func (v *NullableUsersGetUserRolesResponse) Set(val *UsersGetUserRolesResponse) {
+func (v *NullableUsersListUserRolesResponse) Set(val *UsersListUserRolesResponse) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableUsersGetUserRolesResponse) IsSet() bool {
+func (v NullableUsersListUserRolesResponse) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableUsersGetUserRolesResponse) Unset() {
+func (v *NullableUsersListUserRolesResponse) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableUsersGetUserRolesResponse(val *UsersGetUserRolesResponse) *NullableUsersGetUserRolesResponse {
-	return &NullableUsersGetUserRolesResponse{value: val, isSet: true}
+func NewNullableUsersListUserRolesResponse(val *UsersListUserRolesResponse) *NullableUsersListUserRolesResponse {
+	return &NullableUsersListUserRolesResponse{value: val, isSet: true}
 }
 
-func (v NullableUsersGetUserRolesResponse) MarshalJSON() ([]byte, error) {
+func (v NullableUsersListUserRolesResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableUsersGetUserRolesResponse) UnmarshalJSON(src []byte) error {
+func (v *NullableUsersListUserRolesResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

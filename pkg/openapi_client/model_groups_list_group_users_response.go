@@ -15,34 +15,34 @@ import (
 	"encoding/json"
 )
 
-// checks if the GroupsGetGroupUsersResponse type satisfies the MappedNullable interface at compile time
-var _ MappedNullable = &GroupsGetGroupUsersResponse{}
+// checks if the GroupsListGroupUsersResponse type satisfies the MappedNullable interface at compile time
+var _ MappedNullable = &GroupsListGroupUsersResponse{}
 
-// GroupsGetGroupUsersResponse struct for GroupsGetGroupUsersResponse
-type GroupsGetGroupUsersResponse struct {
+// GroupsListGroupUsersResponse struct for GroupsListGroupUsersResponse
+type GroupsListGroupUsersResponse struct {
 	Users []UsersUser `json:"users,omitempty"`
 	Group *GroupsGroup `json:"group,omitempty"`
 }
 
-// NewGroupsGetGroupUsersResponse instantiates a new GroupsGetGroupUsersResponse object
+// NewGroupsListGroupUsersResponse instantiates a new GroupsListGroupUsersResponse object
 // This constructor will assign default values to properties that have it defined,
 // and makes sure properties required by API are set, but the set of arguments
 // will change when the set of required properties is changed
-func NewGroupsGetGroupUsersResponse() *GroupsGetGroupUsersResponse {
-	this := GroupsGetGroupUsersResponse{}
+func NewGroupsListGroupUsersResponse() *GroupsListGroupUsersResponse {
+	this := GroupsListGroupUsersResponse{}
 	return &this
 }
 
-// NewGroupsGetGroupUsersResponseWithDefaults instantiates a new GroupsGetGroupUsersResponse object
+// NewGroupsListGroupUsersResponseWithDefaults instantiates a new GroupsListGroupUsersResponse object
 // This constructor will only assign default values to properties that have it defined,
 // but it doesn't guarantee that properties required by API are set
-func NewGroupsGetGroupUsersResponseWithDefaults() *GroupsGetGroupUsersResponse {
-	this := GroupsGetGroupUsersResponse{}
+func NewGroupsListGroupUsersResponseWithDefaults() *GroupsListGroupUsersResponse {
+	this := GroupsListGroupUsersResponse{}
 	return &this
 }
 
 // GetUsers returns the Users field value if set, zero value otherwise.
-func (o *GroupsGetGroupUsersResponse) GetUsers() []UsersUser {
+func (o *GroupsListGroupUsersResponse) GetUsers() []UsersUser {
 	if o == nil || IsNil(o.Users) {
 		var ret []UsersUser
 		return ret
@@ -52,7 +52,7 @@ func (o *GroupsGetGroupUsersResponse) GetUsers() []UsersUser {
 
 // GetUsersOk returns a tuple with the Users field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *GroupsGetGroupUsersResponse) GetUsersOk() ([]UsersUser, bool) {
+func (o *GroupsListGroupUsersResponse) GetUsersOk() ([]UsersUser, bool) {
 	if o == nil || IsNil(o.Users) {
 		return nil, false
 	}
@@ -60,7 +60,7 @@ func (o *GroupsGetGroupUsersResponse) GetUsersOk() ([]UsersUser, bool) {
 }
 
 // HasUsers returns a boolean if a field has been set.
-func (o *GroupsGetGroupUsersResponse) HasUsers() bool {
+func (o *GroupsListGroupUsersResponse) HasUsers() bool {
 	if o != nil && !IsNil(o.Users) {
 		return true
 	}
@@ -69,12 +69,12 @@ func (o *GroupsGetGroupUsersResponse) HasUsers() bool {
 }
 
 // SetUsers gets a reference to the given []UsersUser and assigns it to the Users field.
-func (o *GroupsGetGroupUsersResponse) SetUsers(v []UsersUser) {
+func (o *GroupsListGroupUsersResponse) SetUsers(v []UsersUser) {
 	o.Users = v
 }
 
 // GetGroup returns the Group field value if set, zero value otherwise.
-func (o *GroupsGetGroupUsersResponse) GetGroup() GroupsGroup {
+func (o *GroupsListGroupUsersResponse) GetGroup() GroupsGroup {
 	if o == nil || IsNil(o.Group) {
 		var ret GroupsGroup
 		return ret
@@ -84,7 +84,7 @@ func (o *GroupsGetGroupUsersResponse) GetGroup() GroupsGroup {
 
 // GetGroupOk returns a tuple with the Group field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *GroupsGetGroupUsersResponse) GetGroupOk() (*GroupsGroup, bool) {
+func (o *GroupsListGroupUsersResponse) GetGroupOk() (*GroupsGroup, bool) {
 	if o == nil || IsNil(o.Group) {
 		return nil, false
 	}
@@ -92,7 +92,7 @@ func (o *GroupsGetGroupUsersResponse) GetGroupOk() (*GroupsGroup, bool) {
 }
 
 // HasGroup returns a boolean if a field has been set.
-func (o *GroupsGetGroupUsersResponse) HasGroup() bool {
+func (o *GroupsListGroupUsersResponse) HasGroup() bool {
 	if o != nil && !IsNil(o.Group) {
 		return true
 	}
@@ -101,11 +101,11 @@ func (o *GroupsGetGroupUsersResponse) HasGroup() bool {
 }
 
 // SetGroup gets a reference to the given GroupsGroup and assigns it to the Group field.
-func (o *GroupsGetGroupUsersResponse) SetGroup(v GroupsGroup) {
+func (o *GroupsListGroupUsersResponse) SetGroup(v GroupsGroup) {
 	o.Group = &v
 }
 
-func (o GroupsGetGroupUsersResponse) MarshalJSON() ([]byte, error) {
+func (o GroupsListGroupUsersResponse) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
 		return []byte{}, err
@@ -113,7 +113,7 @@ func (o GroupsGetGroupUsersResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(toSerialize)
 }
 
-func (o GroupsGetGroupUsersResponse) ToMap() (map[string]interface{}, error) {
+func (o GroupsListGroupUsersResponse) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.Users) {
 		toSerialize["users"] = o.Users
@@ -124,38 +124,38 @@ func (o GroupsGetGroupUsersResponse) ToMap() (map[string]interface{}, error) {
 	return toSerialize, nil
 }
 
-type NullableGroupsGetGroupUsersResponse struct {
-	value *GroupsGetGroupUsersResponse
+type NullableGroupsListGroupUsersResponse struct {
+	value *GroupsListGroupUsersResponse
 	isSet bool
 }
 
-func (v NullableGroupsGetGroupUsersResponse) Get() *GroupsGetGroupUsersResponse {
+func (v NullableGroupsListGroupUsersResponse) Get() *GroupsListGroupUsersResponse {
 	return v.value
 }
 
-func (v *NullableGroupsGetGroupUsersResponse) Set(val *GroupsGetGroupUsersResponse) {
+func (v *NullableGroupsListGroupUsersResponse) Set(val *GroupsListGroupUsersResponse) {
 	v.value = val
 	v.isSet = true
 }
 
-func (v NullableGroupsGetGroupUsersResponse) IsSet() bool {
+func (v NullableGroupsListGroupUsersResponse) IsSet() bool {
 	return v.isSet
 }
 
-func (v *NullableGroupsGetGroupUsersResponse) Unset() {
+func (v *NullableGroupsListGroupUsersResponse) Unset() {
 	v.value = nil
 	v.isSet = false
 }
 
-func NewNullableGroupsGetGroupUsersResponse(val *GroupsGetGroupUsersResponse) *NullableGroupsGetGroupUsersResponse {
-	return &NullableGroupsGetGroupUsersResponse{value: val, isSet: true}
+func NewNullableGroupsListGroupUsersResponse(val *GroupsListGroupUsersResponse) *NullableGroupsListGroupUsersResponse {
+	return &NullableGroupsListGroupUsersResponse{value: val, isSet: true}
 }
 
-func (v NullableGroupsGetGroupUsersResponse) MarshalJSON() ([]byte, error) {
+func (v NullableGroupsListGroupUsersResponse) MarshalJSON() ([]byte, error) {
 	return json.Marshal(v.value)
 }
 
-func (v *NullableGroupsGetGroupUsersResponse) UnmarshalJSON(src []byte) error {
+func (v *NullableGroupsListGroupUsersResponse) UnmarshalJSON(src []byte) error {
 	v.isSet = true
 	return json.Unmarshal(src, &v.value)
 }

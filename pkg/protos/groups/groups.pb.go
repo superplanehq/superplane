@@ -26,15 +26,11 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Group management messages
 type CreateGroupRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	GroupName     string                   `protobuf:"bytes,3,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	Role          string                   `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
-	DisplayName   string                   `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Description   string                   `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Group         *Group                   `protobuf:"bytes,3,opt,name=group,proto3" json:"group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -83,32 +79,11 @@ func (x *CreateGroupRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *CreateGroupRequest) GetGroupName() string {
+func (x *CreateGroupRequest) GetGroup() *Group {
 	if x != nil {
-		return x.GroupName
+		return x.Group
 	}
-	return ""
-}
-
-func (x *CreateGroupRequest) GetRole() string {
-	if x != nil {
-		return x.Role
-	}
-	return ""
-}
-
-func (x *CreateGroupRequest) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
-}
-
-func (x *CreateGroupRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
+	return nil
 }
 
 type CreateGroupResponse struct {
@@ -475,7 +450,7 @@ func (x *ListGroupsResponse) GetGroups() []*Group {
 	return nil
 }
 
-type GetGroupUsersRequest struct {
+type ListGroupUsersRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
@@ -484,20 +459,20 @@ type GetGroupUsersRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetGroupUsersRequest) Reset() {
-	*x = GetGroupUsersRequest{}
+func (x *ListGroupUsersRequest) Reset() {
+	*x = ListGroupUsersRequest{}
 	mi := &file_groups_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetGroupUsersRequest) String() string {
+func (x *ListGroupUsersRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetGroupUsersRequest) ProtoMessage() {}
+func (*ListGroupUsersRequest) ProtoMessage() {}
 
-func (x *GetGroupUsersRequest) ProtoReflect() protoreflect.Message {
+func (x *ListGroupUsersRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_groups_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -509,33 +484,33 @@ func (x *GetGroupUsersRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetGroupUsersRequest.ProtoReflect.Descriptor instead.
-func (*GetGroupUsersRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListGroupUsersRequest.ProtoReflect.Descriptor instead.
+func (*ListGroupUsersRequest) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetGroupUsersRequest) GetDomainType() authorization.DomainType {
+func (x *ListGroupUsersRequest) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
 	}
 	return authorization.DomainType(0)
 }
 
-func (x *GetGroupUsersRequest) GetDomainId() string {
+func (x *ListGroupUsersRequest) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
 	}
 	return ""
 }
 
-func (x *GetGroupUsersRequest) GetGroupName() string {
+func (x *ListGroupUsersRequest) GetGroupName() string {
 	if x != nil {
 		return x.GroupName
 	}
 	return ""
 }
 
-type GetGroupUsersResponse struct {
+type ListGroupUsersResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Users         []*users.User          `protobuf:"bytes,1,rep,name=users,proto3" json:"users,omitempty"`
 	Group         *Group                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"`
@@ -543,20 +518,20 @@ type GetGroupUsersResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetGroupUsersResponse) Reset() {
-	*x = GetGroupUsersResponse{}
+func (x *ListGroupUsersResponse) Reset() {
+	*x = ListGroupUsersResponse{}
 	mi := &file_groups_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetGroupUsersResponse) String() string {
+func (x *ListGroupUsersResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetGroupUsersResponse) ProtoMessage() {}
+func (*ListGroupUsersResponse) ProtoMessage() {}
 
-func (x *GetGroupUsersResponse) ProtoReflect() protoreflect.Message {
+func (x *ListGroupUsersResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_groups_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -568,27 +543,26 @@ func (x *GetGroupUsersResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetGroupUsersResponse.ProtoReflect.Descriptor instead.
-func (*GetGroupUsersResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use ListGroupUsersResponse.ProtoReflect.Descriptor instead.
+func (*ListGroupUsersResponse) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GetGroupUsersResponse) GetUsers() []*users.User {
+func (x *ListGroupUsersResponse) GetUsers() []*users.User {
 	if x != nil {
 		return x.Users
 	}
 	return nil
 }
 
-func (x *GetGroupUsersResponse) GetGroup() *Group {
+func (x *ListGroupUsersResponse) GetGroup() *Group {
 	if x != nil {
 		return x.Group
 	}
 	return nil
 }
 
-// Group detail messages
-type GetGroupRequest struct {
+type DescribeGroupRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
@@ -597,20 +571,20 @@ type GetGroupRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetGroupRequest) Reset() {
-	*x = GetGroupRequest{}
+func (x *DescribeGroupRequest) Reset() {
+	*x = DescribeGroupRequest{}
 	mi := &file_groups_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetGroupRequest) String() string {
+func (x *DescribeGroupRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetGroupRequest) ProtoMessage() {}
+func (*DescribeGroupRequest) ProtoMessage() {}
 
-func (x *GetGroupRequest) ProtoReflect() protoreflect.Message {
+func (x *DescribeGroupRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_groups_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -622,53 +596,53 @@ func (x *GetGroupRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetGroupRequest.ProtoReflect.Descriptor instead.
-func (*GetGroupRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use DescribeGroupRequest.ProtoReflect.Descriptor instead.
+func (*DescribeGroupRequest) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *GetGroupRequest) GetDomainType() authorization.DomainType {
+func (x *DescribeGroupRequest) GetDomainType() authorization.DomainType {
 	if x != nil {
 		return x.DomainType
 	}
 	return authorization.DomainType(0)
 }
 
-func (x *GetGroupRequest) GetDomainId() string {
+func (x *DescribeGroupRequest) GetDomainId() string {
 	if x != nil {
 		return x.DomainId
 	}
 	return ""
 }
 
-func (x *GetGroupRequest) GetGroupName() string {
+func (x *DescribeGroupRequest) GetGroupName() string {
 	if x != nil {
 		return x.GroupName
 	}
 	return ""
 }
 
-type GetGroupResponse struct {
+type DescribeGroupResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Group         *Group                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetGroupResponse) Reset() {
-	*x = GetGroupResponse{}
+func (x *DescribeGroupResponse) Reset() {
+	*x = DescribeGroupResponse{}
 	mi := &file_groups_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetGroupResponse) String() string {
+func (x *DescribeGroupResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetGroupResponse) ProtoMessage() {}
+func (*DescribeGroupResponse) ProtoMessage() {}
 
-func (x *GetGroupResponse) ProtoReflect() protoreflect.Message {
+func (x *DescribeGroupResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_groups_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -680,12 +654,12 @@ func (x *GetGroupResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetGroupResponse.ProtoReflect.Descriptor instead.
-func (*GetGroupResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use DescribeGroupResponse.ProtoReflect.Descriptor instead.
+func (*DescribeGroupResponse) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{11}
 }
 
-func (x *GetGroupResponse) GetGroup() *Group {
+func (x *DescribeGroupResponse) GetGroup() *Group {
 	if x != nil {
 		return x.Group
 	}
@@ -697,9 +671,7 @@ type UpdateGroupRequest struct {
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
 	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
 	GroupName     string                   `protobuf:"bytes,3,opt,name=group_name,json=groupName,proto3" json:"group_name,omitempty"`
-	Role          string                   `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
-	DisplayName   string                   `protobuf:"bytes,5,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Description   string                   `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	Group         *Group                   `protobuf:"bytes,4,opt,name=group,proto3" json:"group,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -755,25 +727,11 @@ func (x *UpdateGroupRequest) GetGroupName() string {
 	return ""
 }
 
-func (x *UpdateGroupRequest) GetRole() string {
+func (x *UpdateGroupRequest) GetGroup() *Group {
 	if x != nil {
-		return x.Role
+		return x.Group
 	}
-	return ""
-}
-
-func (x *UpdateGroupRequest) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
-}
-
-func (x *UpdateGroupRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
+	return nil
 }
 
 type UpdateGroupResponse struct {
@@ -916,7 +874,6 @@ func (*DeleteGroupResponse) Descriptor() ([]byte, []int) {
 	return file_groups_proto_rawDescGZIP(), []int{15}
 }
 
-// Group data structure
 type Group struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Group_Metadata        `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -1161,16 +1118,12 @@ var File_groups_proto protoreflect.FileDescriptor
 
 const file_groups_proto_rawDesc = "" +
 	"\n" +
-	"\fgroups.proto\x12\x11Superplane.Groups\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\x1a\vusers.proto\"\xf0\x01\n" +
+	"\fgroups.proto\x12\x11Superplane.Groups\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\x1a\vusers.proto\"\xa8\x01\n" +
 	"\x12CreateGroupRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1d\n" +
-	"\n" +
-	"group_name\x18\x03 \x01(\tR\tgroupName\x12\x12\n" +
-	"\x04role\x18\x04 \x01(\tR\x04role\x12!\n" +
-	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\x06 \x01(\tR\vdescription\"E\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12.\n" +
+	"\x05group\x18\x03 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"E\n" +
 	"\x13CreateGroupResponse\x12.\n" +
 	"\x05group\x18\x01 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\xd2\x01\n" +
 	"\x15AddUserToGroupRequest\x12E\n" +
@@ -1198,33 +1151,31 @@ const file_groups_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"F\n" +
 	"\x12ListGroupsResponse\x120\n" +
-	"\x06groups\x18\x01 \x03(\v2\x18.Superplane.Groups.GroupR\x06groups\"\x99\x01\n" +
-	"\x14GetGroupUsersRequest\x12E\n" +
+	"\x06groups\x18\x01 \x03(\v2\x18.Superplane.Groups.GroupR\x06groups\"\x9a\x01\n" +
+	"\x15ListGroupUsersRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x03 \x01(\tR\tgroupName\"u\n" +
-	"\x15GetGroupUsersResponse\x12,\n" +
+	"group_name\x18\x03 \x01(\tR\tgroupName\"v\n" +
+	"\x16ListGroupUsersResponse\x12,\n" +
 	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\x12.\n" +
-	"\x05group\x18\x02 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\x94\x01\n" +
-	"\x0fGetGroupRequest\x12E\n" +
+	"\x05group\x18\x02 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\x99\x01\n" +
+	"\x14DescribeGroupRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x03 \x01(\tR\tgroupName\"B\n" +
-	"\x10GetGroupResponse\x12.\n" +
-	"\x05group\x18\x01 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\xf0\x01\n" +
+	"group_name\x18\x03 \x01(\tR\tgroupName\"G\n" +
+	"\x15DescribeGroupResponse\x12.\n" +
+	"\x05group\x18\x01 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\xc7\x01\n" +
 	"\x12UpdateGroupRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1d\n" +
 	"\n" +
-	"group_name\x18\x03 \x01(\tR\tgroupName\x12\x12\n" +
-	"\x04role\x18\x04 \x01(\tR\x04role\x12!\n" +
-	"\fdisplay_name\x18\x05 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\x06 \x01(\tR\vdescription\"E\n" +
+	"group_name\x18\x03 \x01(\tR\tgroupName\x12.\n" +
+	"\x05group\x18\x04 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"E\n" +
 	"\x13UpdateGroupResponse\x12.\n" +
 	"\x05group\x18\x01 \x01(\v2\x18.Superplane.Groups.GroupR\x05group\"\x97\x01\n" +
 	"\x12DeleteGroupRequest\x12E\n" +
@@ -1252,7 +1203,7 @@ const file_groups_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12 \n" +
 	"\vdescription\x18\x03 \x01(\tR\vdescription\x1a-\n" +
 	"\x06Status\x12#\n" +
-	"\rmembers_count\x18\x01 \x01(\x05R\fmembersCount2\xa9\r\n" +
+	"\rmembers_count\x18\x01 \x01(\x05R\fmembersCount2\xbb\r\n" +
 	"\x06Groups\x12\xca\x01\n" +
 	"\vCreateGroup\x12%.Superplane.Groups.CreateGroupRequest\x1a&.Superplane.Groups.CreateGroupResponse\"l\x92AP\n" +
 	"\x06Groups\x12\fCreate group\x1a8Creates a new group within a domain with a specific role\x82\xd3\xe4\x93\x02\x13:\x01*\"\x0e/api/v1/groups\x12\xd9\x01\n" +
@@ -1262,10 +1213,10 @@ const file_groups_proto_rawDesc = "" +
 	"\x06Groups\x12\x16Remove user from group\x1a+Removes a user from a group within a domain\x82\xd3\xe4\x93\x02-:\x01*2(/api/v1/groups/{group_name}/users/remove\x12\xb3\x01\n" +
 	"\n" +
 	"ListGroups\x12$.Superplane.Groups.ListGroupsRequest\x1a%.Superplane.Groups.ListGroupsResponse\"X\x92A?\n" +
-	"\x06Groups\x12\vList groups\x1a(Returns a list of groups within a domain\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xe9\x01\n" +
-	"\rGetGroupUsers\x12'.Superplane.Groups.GetGroupUsersRequest\x1a(.Superplane.Groups.GetGroupUsersResponse\"\x84\x01\x92AX\n" +
-	"\x06Groups\x12\x0fGet group users\x1a=Returns users that belong to a specific group within a domain\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xc3\x01\n" +
-	"\bGetGroup\x12\".Superplane.Groups.GetGroupRequest\x1a#.Superplane.Groups.GetGroupResponse\"n\x92AH\n" +
+	"\x06Groups\x12\vList groups\x1a(Returns a list of groups within a domain\x82\xd3\xe4\x93\x02\x10\x12\x0e/api/v1/groups\x12\xec\x01\n" +
+	"\x0eListGroupUsers\x12(.Superplane.Groups.ListGroupUsersRequest\x1a).Superplane.Groups.ListGroupUsersResponse\"\x84\x01\x92AX\n" +
+	"\x06Groups\x12\x0fGet group users\x1a=Returns users that belong to a specific group within a domain\x82\xd3\xe4\x93\x02#\x12!/api/v1/groups/{group_name}/users\x12\xd2\x01\n" +
+	"\rDescribeGroup\x12'.Superplane.Groups.DescribeGroupRequest\x1a(.Superplane.Groups.DescribeGroupResponse\"n\x92AH\n" +
 	"\x06Groups\x12\tGet group\x1a3Returns details of a specific group within a domain\x82\xd3\xe4\x93\x02\x1d\x12\x1b/api/v1/groups/{group_name}\x12\xc8\x01\n" +
 	"\vUpdateGroup\x12%.Superplane.Groups.UpdateGroupRequest\x1a&.Superplane.Groups.UpdateGroupResponse\"j\x92AA\n" +
 	"\x06Groups\x12\fUpdate group\x1a)Updates an existing group within a domain\x82\xd3\xe4\x93\x02 :\x01*\x1a\x1b/api/v1/groups/{group_name}\x12\xc5\x01\n" +
@@ -1296,10 +1247,10 @@ var file_groups_proto_goTypes = []any{
 	(*RemoveUserFromGroupResponse)(nil), // 5: Superplane.Groups.RemoveUserFromGroupResponse
 	(*ListGroupsRequest)(nil),           // 6: Superplane.Groups.ListGroupsRequest
 	(*ListGroupsResponse)(nil),          // 7: Superplane.Groups.ListGroupsResponse
-	(*GetGroupUsersRequest)(nil),        // 8: Superplane.Groups.GetGroupUsersRequest
-	(*GetGroupUsersResponse)(nil),       // 9: Superplane.Groups.GetGroupUsersResponse
-	(*GetGroupRequest)(nil),             // 10: Superplane.Groups.GetGroupRequest
-	(*GetGroupResponse)(nil),            // 11: Superplane.Groups.GetGroupResponse
+	(*ListGroupUsersRequest)(nil),       // 8: Superplane.Groups.ListGroupUsersRequest
+	(*ListGroupUsersResponse)(nil),      // 9: Superplane.Groups.ListGroupUsersResponse
+	(*DescribeGroupRequest)(nil),        // 10: Superplane.Groups.DescribeGroupRequest
+	(*DescribeGroupResponse)(nil),       // 11: Superplane.Groups.DescribeGroupResponse
 	(*UpdateGroupRequest)(nil),          // 12: Superplane.Groups.UpdateGroupRequest
 	(*UpdateGroupResponse)(nil),         // 13: Superplane.Groups.UpdateGroupResponse
 	(*DeleteGroupRequest)(nil),          // 14: Superplane.Groups.DeleteGroupRequest
@@ -1314,46 +1265,48 @@ var file_groups_proto_goTypes = []any{
 }
 var file_groups_proto_depIdxs = []int32{
 	20, // 0: Superplane.Groups.CreateGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 1: Superplane.Groups.CreateGroupResponse.group:type_name -> Superplane.Groups.Group
-	20, // 2: Superplane.Groups.AddUserToGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	20, // 3: Superplane.Groups.RemoveUserFromGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	20, // 4: Superplane.Groups.ListGroupsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 5: Superplane.Groups.ListGroupsResponse.groups:type_name -> Superplane.Groups.Group
-	20, // 6: Superplane.Groups.GetGroupUsersRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	21, // 7: Superplane.Groups.GetGroupUsersResponse.users:type_name -> Superplane.Users.User
-	16, // 8: Superplane.Groups.GetGroupUsersResponse.group:type_name -> Superplane.Groups.Group
-	20, // 9: Superplane.Groups.GetGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 10: Superplane.Groups.GetGroupResponse.group:type_name -> Superplane.Groups.Group
-	20, // 11: Superplane.Groups.UpdateGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 12: Superplane.Groups.UpdateGroupResponse.group:type_name -> Superplane.Groups.Group
-	20, // 13: Superplane.Groups.DeleteGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	17, // 14: Superplane.Groups.Group.metadata:type_name -> Superplane.Groups.Group.Metadata
-	18, // 15: Superplane.Groups.Group.spec:type_name -> Superplane.Groups.Group.Spec
-	19, // 16: Superplane.Groups.Group.status:type_name -> Superplane.Groups.Group.Status
-	20, // 17: Superplane.Groups.Group.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	22, // 18: Superplane.Groups.Group.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	22, // 19: Superplane.Groups.Group.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 20: Superplane.Groups.Groups.CreateGroup:input_type -> Superplane.Groups.CreateGroupRequest
-	2,  // 21: Superplane.Groups.Groups.AddUserToGroup:input_type -> Superplane.Groups.AddUserToGroupRequest
-	4,  // 22: Superplane.Groups.Groups.RemoveUserFromGroup:input_type -> Superplane.Groups.RemoveUserFromGroupRequest
-	6,  // 23: Superplane.Groups.Groups.ListGroups:input_type -> Superplane.Groups.ListGroupsRequest
-	8,  // 24: Superplane.Groups.Groups.GetGroupUsers:input_type -> Superplane.Groups.GetGroupUsersRequest
-	10, // 25: Superplane.Groups.Groups.GetGroup:input_type -> Superplane.Groups.GetGroupRequest
-	12, // 26: Superplane.Groups.Groups.UpdateGroup:input_type -> Superplane.Groups.UpdateGroupRequest
-	14, // 27: Superplane.Groups.Groups.DeleteGroup:input_type -> Superplane.Groups.DeleteGroupRequest
-	1,  // 28: Superplane.Groups.Groups.CreateGroup:output_type -> Superplane.Groups.CreateGroupResponse
-	3,  // 29: Superplane.Groups.Groups.AddUserToGroup:output_type -> Superplane.Groups.AddUserToGroupResponse
-	5,  // 30: Superplane.Groups.Groups.RemoveUserFromGroup:output_type -> Superplane.Groups.RemoveUserFromGroupResponse
-	7,  // 31: Superplane.Groups.Groups.ListGroups:output_type -> Superplane.Groups.ListGroupsResponse
-	9,  // 32: Superplane.Groups.Groups.GetGroupUsers:output_type -> Superplane.Groups.GetGroupUsersResponse
-	11, // 33: Superplane.Groups.Groups.GetGroup:output_type -> Superplane.Groups.GetGroupResponse
-	13, // 34: Superplane.Groups.Groups.UpdateGroup:output_type -> Superplane.Groups.UpdateGroupResponse
-	15, // 35: Superplane.Groups.Groups.DeleteGroup:output_type -> Superplane.Groups.DeleteGroupResponse
-	28, // [28:36] is the sub-list for method output_type
-	20, // [20:28] is the sub-list for method input_type
-	20, // [20:20] is the sub-list for extension type_name
-	20, // [20:20] is the sub-list for extension extendee
-	0,  // [0:20] is the sub-list for field type_name
+	16, // 1: Superplane.Groups.CreateGroupRequest.group:type_name -> Superplane.Groups.Group
+	16, // 2: Superplane.Groups.CreateGroupResponse.group:type_name -> Superplane.Groups.Group
+	20, // 3: Superplane.Groups.AddUserToGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	20, // 4: Superplane.Groups.RemoveUserFromGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	20, // 5: Superplane.Groups.ListGroupsRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	16, // 6: Superplane.Groups.ListGroupsResponse.groups:type_name -> Superplane.Groups.Group
+	20, // 7: Superplane.Groups.ListGroupUsersRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	21, // 8: Superplane.Groups.ListGroupUsersResponse.users:type_name -> Superplane.Users.User
+	16, // 9: Superplane.Groups.ListGroupUsersResponse.group:type_name -> Superplane.Groups.Group
+	20, // 10: Superplane.Groups.DescribeGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	16, // 11: Superplane.Groups.DescribeGroupResponse.group:type_name -> Superplane.Groups.Group
+	20, // 12: Superplane.Groups.UpdateGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	16, // 13: Superplane.Groups.UpdateGroupRequest.group:type_name -> Superplane.Groups.Group
+	16, // 14: Superplane.Groups.UpdateGroupResponse.group:type_name -> Superplane.Groups.Group
+	20, // 15: Superplane.Groups.DeleteGroupRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	17, // 16: Superplane.Groups.Group.metadata:type_name -> Superplane.Groups.Group.Metadata
+	18, // 17: Superplane.Groups.Group.spec:type_name -> Superplane.Groups.Group.Spec
+	19, // 18: Superplane.Groups.Group.status:type_name -> Superplane.Groups.Group.Status
+	20, // 19: Superplane.Groups.Group.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	22, // 20: Superplane.Groups.Group.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	22, // 21: Superplane.Groups.Group.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	0,  // 22: Superplane.Groups.Groups.CreateGroup:input_type -> Superplane.Groups.CreateGroupRequest
+	2,  // 23: Superplane.Groups.Groups.AddUserToGroup:input_type -> Superplane.Groups.AddUserToGroupRequest
+	4,  // 24: Superplane.Groups.Groups.RemoveUserFromGroup:input_type -> Superplane.Groups.RemoveUserFromGroupRequest
+	6,  // 25: Superplane.Groups.Groups.ListGroups:input_type -> Superplane.Groups.ListGroupsRequest
+	8,  // 26: Superplane.Groups.Groups.ListGroupUsers:input_type -> Superplane.Groups.ListGroupUsersRequest
+	10, // 27: Superplane.Groups.Groups.DescribeGroup:input_type -> Superplane.Groups.DescribeGroupRequest
+	12, // 28: Superplane.Groups.Groups.UpdateGroup:input_type -> Superplane.Groups.UpdateGroupRequest
+	14, // 29: Superplane.Groups.Groups.DeleteGroup:input_type -> Superplane.Groups.DeleteGroupRequest
+	1,  // 30: Superplane.Groups.Groups.CreateGroup:output_type -> Superplane.Groups.CreateGroupResponse
+	3,  // 31: Superplane.Groups.Groups.AddUserToGroup:output_type -> Superplane.Groups.AddUserToGroupResponse
+	5,  // 32: Superplane.Groups.Groups.RemoveUserFromGroup:output_type -> Superplane.Groups.RemoveUserFromGroupResponse
+	7,  // 33: Superplane.Groups.Groups.ListGroups:output_type -> Superplane.Groups.ListGroupsResponse
+	9,  // 34: Superplane.Groups.Groups.ListGroupUsers:output_type -> Superplane.Groups.ListGroupUsersResponse
+	11, // 35: Superplane.Groups.Groups.DescribeGroup:output_type -> Superplane.Groups.DescribeGroupResponse
+	13, // 36: Superplane.Groups.Groups.UpdateGroup:output_type -> Superplane.Groups.UpdateGroupResponse
+	15, // 37: Superplane.Groups.Groups.DeleteGroup:output_type -> Superplane.Groups.DeleteGroupResponse
+	30, // [30:38] is the sub-list for method output_type
+	22, // [22:30] is the sub-list for method input_type
+	22, // [22:22] is the sub-list for extension type_name
+	22, // [22:22] is the sub-list for extension extendee
+	0,  // [0:22] is the sub-list for field type_name
 }
 
 func init() { file_groups_proto_init() }

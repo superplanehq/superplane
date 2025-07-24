@@ -94,7 +94,7 @@ service Groups {
   // Endpoint for getting users in a specific group
   // Operation is synchronous and idempotent.
   //
-  rpc GetGroupUsers(GetGroupUsersRequest) returns (GetGroupUsersResponse) {
+  rpc ListGroupUsers(ListGroupUsersRequest) returns (ListGroupUsersResponse) {
     option (google.api.http) = {
       get: "/api/v1/groups/{group_name}/users"
     };
@@ -109,7 +109,7 @@ service Groups {
   // Endpoint for getting details of a specific group
   // Operation is synchronous and idempotent.
   //
-  rpc GetGroup(GetGroupRequest) returns (GetGroupResponse) {
+  rpc DescribeGroup(DescribeGroupRequest) returns (DescribeGroupResponse) {
     option (google.api.http) = {
       get: "/api/v1/groups/{group_name}"
     };
@@ -152,14 +152,10 @@ service Groups {
   }
 }
 
-// Group management messages
 message CreateGroupRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
-  string group_name = 3;
-  string role = 4;
-  string display_name = 5;
-  string description = 6;
+  Group group = 3;
 }
 
 message CreateGroupResponse {
@@ -195,25 +191,24 @@ message ListGroupsResponse {
   repeated Group groups = 1;
 }
 
-message GetGroupUsersRequest {
+message ListGroupUsersRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
   string group_name = 3;
 }
 
-message GetGroupUsersResponse {
+message ListGroupUsersResponse {
   repeated Users.User users = 1;
   Group group = 2;
 }
 
-// Group detail messages
-message GetGroupRequest {
+message DescribeGroupRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
   string group_name = 3;
 }
 
-message GetGroupResponse {
+message DescribeGroupResponse {
   Group group = 1;
 }
 
@@ -221,9 +216,7 @@ message UpdateGroupRequest {
   Authorization.DomainType domain_type = 1;
   string domain_id = 2;
   string group_name = 3;
-  string role = 4;
-  string display_name = 5;
-  string description = 6;
+  Group group = 4;
 }
 
 message UpdateGroupResponse {
@@ -238,7 +231,6 @@ message DeleteGroupRequest {
 
 message DeleteGroupResponse {}
 
-// Group data structure
 message Group {
   message Metadata {
     string name = 1;

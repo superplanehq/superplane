@@ -23,8 +23,8 @@ const (
 	Groups_AddUserToGroup_FullMethodName      = "/Superplane.Groups.Groups/AddUserToGroup"
 	Groups_RemoveUserFromGroup_FullMethodName = "/Superplane.Groups.Groups/RemoveUserFromGroup"
 	Groups_ListGroups_FullMethodName          = "/Superplane.Groups.Groups/ListGroups"
-	Groups_GetGroupUsers_FullMethodName       = "/Superplane.Groups.Groups/GetGroupUsers"
-	Groups_GetGroup_FullMethodName            = "/Superplane.Groups.Groups/GetGroup"
+	Groups_ListGroupUsers_FullMethodName      = "/Superplane.Groups.Groups/ListGroupUsers"
+	Groups_DescribeGroup_FullMethodName       = "/Superplane.Groups.Groups/DescribeGroup"
 	Groups_UpdateGroup_FullMethodName         = "/Superplane.Groups.Groups/UpdateGroup"
 	Groups_DeleteGroup_FullMethodName         = "/Superplane.Groups.Groups/DeleteGroup"
 )
@@ -47,10 +47,10 @@ type GroupsClient interface {
 	ListGroups(ctx context.Context, in *ListGroupsRequest, opts ...grpc.CallOption) (*ListGroupsResponse, error)
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
-	GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error)
+	ListGroupUsers(ctx context.Context, in *ListGroupUsersRequest, opts ...grpc.CallOption) (*ListGroupUsersResponse, error)
 	// Endpoint for getting details of a specific group
 	// Operation is synchronous and idempotent.
-	GetGroup(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*GetGroupResponse, error)
+	DescribeGroup(ctx context.Context, in *DescribeGroupRequest, opts ...grpc.CallOption) (*DescribeGroupResponse, error)
 	// Endpoint for updating a group
 	// Operation is synchronous and idempotent.
 	UpdateGroup(ctx context.Context, in *UpdateGroupRequest, opts ...grpc.CallOption) (*UpdateGroupResponse, error)
@@ -107,20 +107,20 @@ func (c *groupsClient) ListGroups(ctx context.Context, in *ListGroupsRequest, op
 	return out, nil
 }
 
-func (c *groupsClient) GetGroupUsers(ctx context.Context, in *GetGroupUsersRequest, opts ...grpc.CallOption) (*GetGroupUsersResponse, error) {
+func (c *groupsClient) ListGroupUsers(ctx context.Context, in *ListGroupUsersRequest, opts ...grpc.CallOption) (*ListGroupUsersResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetGroupUsersResponse)
-	err := c.cc.Invoke(ctx, Groups_GetGroupUsers_FullMethodName, in, out, cOpts...)
+	out := new(ListGroupUsersResponse)
+	err := c.cc.Invoke(ctx, Groups_ListGroupUsers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *groupsClient) GetGroup(ctx context.Context, in *GetGroupRequest, opts ...grpc.CallOption) (*GetGroupResponse, error) {
+func (c *groupsClient) DescribeGroup(ctx context.Context, in *DescribeGroupRequest, opts ...grpc.CallOption) (*DescribeGroupResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetGroupResponse)
-	err := c.cc.Invoke(ctx, Groups_GetGroup_FullMethodName, in, out, cOpts...)
+	out := new(DescribeGroupResponse)
+	err := c.cc.Invoke(ctx, Groups_DescribeGroup_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +165,10 @@ type GroupsServer interface {
 	ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error)
 	// Endpoint for getting users in a specific group
 	// Operation is synchronous and idempotent.
-	GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error)
+	ListGroupUsers(context.Context, *ListGroupUsersRequest) (*ListGroupUsersResponse, error)
 	// Endpoint for getting details of a specific group
 	// Operation is synchronous and idempotent.
-	GetGroup(context.Context, *GetGroupRequest) (*GetGroupResponse, error)
+	DescribeGroup(context.Context, *DescribeGroupRequest) (*DescribeGroupResponse, error)
 	// Endpoint for updating a group
 	// Operation is synchronous and idempotent.
 	UpdateGroup(context.Context, *UpdateGroupRequest) (*UpdateGroupResponse, error)
@@ -196,11 +196,11 @@ func (UnimplementedGroupsServer) RemoveUserFromGroup(context.Context, *RemoveUse
 func (UnimplementedGroupsServer) ListGroups(context.Context, *ListGroupsRequest) (*ListGroupsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListGroups not implemented")
 }
-func (UnimplementedGroupsServer) GetGroupUsers(context.Context, *GetGroupUsersRequest) (*GetGroupUsersResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetGroupUsers not implemented")
+func (UnimplementedGroupsServer) ListGroupUsers(context.Context, *ListGroupUsersRequest) (*ListGroupUsersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListGroupUsers not implemented")
 }
-func (UnimplementedGroupsServer) GetGroup(context.Context, *GetGroupRequest) (*GetGroupResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetGroup not implemented")
+func (UnimplementedGroupsServer) DescribeGroup(context.Context, *DescribeGroupRequest) (*DescribeGroupResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DescribeGroup not implemented")
 }
 func (UnimplementedGroupsServer) UpdateGroup(context.Context, *UpdateGroupRequest) (*UpdateGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateGroup not implemented")
@@ -300,38 +300,38 @@ func _Groups_ListGroups_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Groups_GetGroupUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGroupUsersRequest)
+func _Groups_ListGroupUsers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGroupUsersRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GroupsServer).GetGroupUsers(ctx, in)
+		return srv.(GroupsServer).ListGroupUsers(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Groups_GetGroupUsers_FullMethodName,
+		FullMethod: Groups_ListGroupUsers_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GroupsServer).GetGroupUsers(ctx, req.(*GetGroupUsersRequest))
+		return srv.(GroupsServer).ListGroupUsers(ctx, req.(*ListGroupUsersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Groups_GetGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetGroupRequest)
+func _Groups_DescribeGroup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DescribeGroupRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GroupsServer).GetGroup(ctx, in)
+		return srv.(GroupsServer).DescribeGroup(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Groups_GetGroup_FullMethodName,
+		FullMethod: Groups_DescribeGroup_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GroupsServer).GetGroup(ctx, req.(*GetGroupRequest))
+		return srv.(GroupsServer).DescribeGroup(ctx, req.(*DescribeGroupRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -396,12 +396,12 @@ var Groups_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Groups_ListGroups_Handler,
 		},
 		{
-			MethodName: "GetGroupUsers",
-			Handler:    _Groups_GetGroupUsers_Handler,
+			MethodName: "ListGroupUsers",
+			Handler:    _Groups_ListGroupUsers_Handler,
 		},
 		{
-			MethodName: "GetGroup",
-			Handler:    _Groups_GetGroup_Handler,
+			MethodName: "DescribeGroup",
+			Handler:    _Groups_DescribeGroup_Handler,
 		},
 		{
 			MethodName: "UpdateGroup",

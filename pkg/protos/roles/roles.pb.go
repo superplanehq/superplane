@@ -25,14 +25,15 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Role assignment messages
 type AssignRoleRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	UserEmail      string                 `protobuf:"bytes,2,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
-	RoleAssignment *RoleAssignment        `protobuf:"bytes,3,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	UserId        string                   `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserEmail     string                   `protobuf:"bytes,5,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *AssignRoleRequest) Reset() {
@@ -65,6 +66,27 @@ func (*AssignRoleRequest) Descriptor() ([]byte, []int) {
 	return file_roles_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *AssignRoleRequest) GetDomainType() authorization.DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return authorization.DomainType(0)
+}
+
+func (x *AssignRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *AssignRoleRequest) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
 func (x *AssignRoleRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
@@ -77,13 +99,6 @@ func (x *AssignRoleRequest) GetUserEmail() string {
 		return x.UserEmail
 	}
 	return ""
-}
-
-func (x *AssignRoleRequest) GetRoleAssignment() *RoleAssignment {
-	if x != nil {
-		return x.RoleAssignment
-	}
-	return nil
 }
 
 type AssignRoleResponse struct {
@@ -123,12 +138,14 @@ func (*AssignRoleResponse) Descriptor() ([]byte, []int) {
 }
 
 type RemoveRoleRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	UserEmail      string                 `protobuf:"bytes,2,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
-	RoleAssignment *RoleAssignment        `protobuf:"bytes,3,opt,name=role_assignment,json=roleAssignment,proto3" json:"role_assignment,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	UserId        string                   `protobuf:"bytes,4,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	UserEmail     string                   `protobuf:"bytes,5,opt,name=user_email,json=userEmail,proto3" json:"user_email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoveRoleRequest) Reset() {
@@ -161,6 +178,27 @@ func (*RemoveRoleRequest) Descriptor() ([]byte, []int) {
 	return file_roles_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *RemoveRoleRequest) GetDomainType() authorization.DomainType {
+	if x != nil {
+		return x.DomainType
+	}
+	return authorization.DomainType(0)
+}
+
+func (x *RemoveRoleRequest) GetDomainId() string {
+	if x != nil {
+		return x.DomainId
+	}
+	return ""
+}
+
+func (x *RemoveRoleRequest) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
 func (x *RemoveRoleRequest) GetUserId() string {
 	if x != nil {
 		return x.UserId
@@ -173,13 +211,6 @@ func (x *RemoveRoleRequest) GetUserEmail() string {
 		return x.UserEmail
 	}
 	return ""
-}
-
-func (x *RemoveRoleRequest) GetRoleAssignment() *RoleAssignment {
-	if x != nil {
-		return x.RoleAssignment
-	}
-	return nil
 }
 
 type RemoveRoleResponse struct {
@@ -218,67 +249,6 @@ func (*RemoveRoleResponse) Descriptor() ([]byte, []int) {
 	return file_roles_proto_rawDescGZIP(), []int{3}
 }
 
-type RoleAssignment struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	Role          string                   `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RoleAssignment) Reset() {
-	*x = RoleAssignment{}
-	mi := &file_roles_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RoleAssignment) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RoleAssignment) ProtoMessage() {}
-
-func (x *RoleAssignment) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RoleAssignment.ProtoReflect.Descriptor instead.
-func (*RoleAssignment) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *RoleAssignment) GetDomainType() authorization.DomainType {
-	if x != nil {
-		return x.DomainType
-	}
-	return authorization.DomainType(0)
-}
-
-func (x *RoleAssignment) GetDomainId() string {
-	if x != nil {
-		return x.DomainId
-	}
-	return ""
-}
-
-func (x *RoleAssignment) GetRole() string {
-	if x != nil {
-		return x.Role
-	}
-	return ""
-}
-
-// Role discovery messages
 type ListRolesRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
 	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
@@ -289,7 +259,7 @@ type ListRolesRequest struct {
 
 func (x *ListRolesRequest) Reset() {
 	*x = ListRolesRequest{}
-	mi := &file_roles_proto_msgTypes[5]
+	mi := &file_roles_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -301,7 +271,7 @@ func (x *ListRolesRequest) String() string {
 func (*ListRolesRequest) ProtoMessage() {}
 
 func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[5]
+	mi := &file_roles_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -314,7 +284,7 @@ func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesRequest.ProtoReflect.Descriptor instead.
 func (*ListRolesRequest) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{5}
+	return file_roles_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ListRolesRequest) GetDomainType() authorization.DomainType {
@@ -340,7 +310,7 @@ type ListRolesResponse struct {
 
 func (x *ListRolesResponse) Reset() {
 	*x = ListRolesResponse{}
-	mi := &file_roles_proto_msgTypes[6]
+	mi := &file_roles_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -352,7 +322,7 @@ func (x *ListRolesResponse) String() string {
 func (*ListRolesResponse) ProtoMessage() {}
 
 func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[6]
+	mi := &file_roles_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -365,7 +335,7 @@ func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesResponse.ProtoReflect.Descriptor instead.
 func (*ListRolesResponse) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{6}
+	return file_roles_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ListRolesResponse) GetRoles() []*Role {
@@ -386,7 +356,7 @@ type DescribeRoleRequest struct {
 
 func (x *DescribeRoleRequest) Reset() {
 	*x = DescribeRoleRequest{}
-	mi := &file_roles_proto_msgTypes[7]
+	mi := &file_roles_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -398,7 +368,7 @@ func (x *DescribeRoleRequest) String() string {
 func (*DescribeRoleRequest) ProtoMessage() {}
 
 func (x *DescribeRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[7]
+	mi := &file_roles_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -411,7 +381,7 @@ func (x *DescribeRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRoleRequest.ProtoReflect.Descriptor instead.
 func (*DescribeRoleRequest) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{7}
+	return file_roles_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *DescribeRoleRequest) GetDomainType() authorization.DomainType {
@@ -444,7 +414,7 @@ type DescribeRoleResponse struct {
 
 func (x *DescribeRoleResponse) Reset() {
 	*x = DescribeRoleResponse{}
-	mi := &file_roles_proto_msgTypes[8]
+	mi := &file_roles_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -456,7 +426,7 @@ func (x *DescribeRoleResponse) String() string {
 func (*DescribeRoleResponse) ProtoMessage() {}
 
 func (x *DescribeRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[8]
+	mi := &file_roles_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -469,7 +439,7 @@ func (x *DescribeRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DescribeRoleResponse.ProtoReflect.Descriptor instead.
 func (*DescribeRoleResponse) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{8}
+	return file_roles_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DescribeRoleResponse) GetRole() *Role {
@@ -479,23 +449,18 @@ func (x *DescribeRoleResponse) GetRole() *Role {
 	return nil
 }
 
-// Custom role management messages
 type CreateRoleRequest struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	Name          string                      `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	DomainType    authorization.DomainType    `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                      `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	Permissions   []*authorization.Permission `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	InheritedRole string                      `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
-	DisplayName   string                      `protobuf:"bytes,6,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Description   string                      `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	Role          *Role                    `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateRoleRequest) Reset() {
 	*x = CreateRoleRequest{}
-	mi := &file_roles_proto_msgTypes[9]
+	mi := &file_roles_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -507,7 +472,7 @@ func (x *CreateRoleRequest) String() string {
 func (*CreateRoleRequest) ProtoMessage() {}
 
 func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[9]
+	mi := &file_roles_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -520,14 +485,7 @@ func (x *CreateRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoleRequest.ProtoReflect.Descriptor instead.
 func (*CreateRoleRequest) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *CreateRoleRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
+	return file_roles_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreateRoleRequest) GetDomainType() authorization.DomainType {
@@ -544,32 +502,11 @@ func (x *CreateRoleRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *CreateRoleRequest) GetPermissions() []*authorization.Permission {
+func (x *CreateRoleRequest) GetRole() *Role {
 	if x != nil {
-		return x.Permissions
+		return x.Role
 	}
 	return nil
-}
-
-func (x *CreateRoleRequest) GetInheritedRole() string {
-	if x != nil {
-		return x.InheritedRole
-	}
-	return ""
-}
-
-func (x *CreateRoleRequest) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
-}
-
-func (x *CreateRoleRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
 }
 
 type CreateRoleResponse struct {
@@ -581,7 +518,7 @@ type CreateRoleResponse struct {
 
 func (x *CreateRoleResponse) Reset() {
 	*x = CreateRoleResponse{}
-	mi := &file_roles_proto_msgTypes[10]
+	mi := &file_roles_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -593,7 +530,7 @@ func (x *CreateRoleResponse) String() string {
 func (*CreateRoleResponse) ProtoMessage() {}
 
 func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[10]
+	mi := &file_roles_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -606,7 +543,7 @@ func (x *CreateRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRoleResponse.ProtoReflect.Descriptor instead.
 func (*CreateRoleResponse) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{10}
+	return file_roles_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *CreateRoleResponse) GetRole() *Role {
@@ -617,21 +554,18 @@ func (x *CreateRoleResponse) GetRole() *Role {
 }
 
 type UpdateRoleRequest struct {
-	state         protoimpl.MessageState      `protogen:"open.v1"`
-	RoleName      string                      `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
-	DomainType    authorization.DomainType    `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                      `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
-	Permissions   []*authorization.Permission `protobuf:"bytes,4,rep,name=permissions,proto3" json:"permissions,omitempty"`
-	InheritedRole string                      `protobuf:"bytes,5,opt,name=inherited_role,json=inheritedRole,proto3" json:"inherited_role,omitempty"`
-	DisplayName   string                      `protobuf:"bytes,6,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	Description   string                      `protobuf:"bytes,7,opt,name=description,proto3" json:"description,omitempty"`
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
+	Role          *Role                    `protobuf:"bytes,4,opt,name=role,proto3" json:"role,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UpdateRoleRequest) Reset() {
 	*x = UpdateRoleRequest{}
-	mi := &file_roles_proto_msgTypes[11]
+	mi := &file_roles_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -643,7 +577,7 @@ func (x *UpdateRoleRequest) String() string {
 func (*UpdateRoleRequest) ProtoMessage() {}
 
 func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[11]
+	mi := &file_roles_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -656,14 +590,7 @@ func (x *UpdateRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRoleRequest) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *UpdateRoleRequest) GetRoleName() string {
-	if x != nil {
-		return x.RoleName
-	}
-	return ""
+	return file_roles_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateRoleRequest) GetDomainType() authorization.DomainType {
@@ -680,32 +607,18 @@ func (x *UpdateRoleRequest) GetDomainId() string {
 	return ""
 }
 
-func (x *UpdateRoleRequest) GetPermissions() []*authorization.Permission {
+func (x *UpdateRoleRequest) GetRoleName() string {
 	if x != nil {
-		return x.Permissions
+		return x.RoleName
+	}
+	return ""
+}
+
+func (x *UpdateRoleRequest) GetRole() *Role {
+	if x != nil {
+		return x.Role
 	}
 	return nil
-}
-
-func (x *UpdateRoleRequest) GetInheritedRole() string {
-	if x != nil {
-		return x.InheritedRole
-	}
-	return ""
-}
-
-func (x *UpdateRoleRequest) GetDisplayName() string {
-	if x != nil {
-		return x.DisplayName
-	}
-	return ""
-}
-
-func (x *UpdateRoleRequest) GetDescription() string {
-	if x != nil {
-		return x.Description
-	}
-	return ""
 }
 
 type UpdateRoleResponse struct {
@@ -717,7 +630,7 @@ type UpdateRoleResponse struct {
 
 func (x *UpdateRoleResponse) Reset() {
 	*x = UpdateRoleResponse{}
-	mi := &file_roles_proto_msgTypes[12]
+	mi := &file_roles_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -729,7 +642,7 @@ func (x *UpdateRoleResponse) String() string {
 func (*UpdateRoleResponse) ProtoMessage() {}
 
 func (x *UpdateRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[12]
+	mi := &file_roles_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -742,7 +655,7 @@ func (x *UpdateRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRoleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRoleResponse) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{12}
+	return file_roles_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateRoleResponse) GetRole() *Role {
@@ -754,16 +667,16 @@ func (x *UpdateRoleResponse) GetRole() *Role {
 
 type DeleteRoleRequest struct {
 	state         protoimpl.MessageState   `protogen:"open.v1"`
-	RoleName      string                   `protobuf:"bytes,1,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
-	DomainType    authorization.DomainType `protobuf:"varint,2,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
-	DomainId      string                   `protobuf:"bytes,3,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	DomainType    authorization.DomainType `protobuf:"varint,1,opt,name=domain_type,json=domainType,proto3,enum=Superplane.Authorization.DomainType" json:"domain_type,omitempty"`
+	DomainId      string                   `protobuf:"bytes,2,opt,name=domain_id,json=domainId,proto3" json:"domain_id,omitempty"`
+	RoleName      string                   `protobuf:"bytes,3,opt,name=role_name,json=roleName,proto3" json:"role_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeleteRoleRequest) Reset() {
 	*x = DeleteRoleRequest{}
-	mi := &file_roles_proto_msgTypes[13]
+	mi := &file_roles_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -775,7 +688,7 @@ func (x *DeleteRoleRequest) String() string {
 func (*DeleteRoleRequest) ProtoMessage() {}
 
 func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[13]
+	mi := &file_roles_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -788,14 +701,7 @@ func (x *DeleteRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRoleRequest) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *DeleteRoleRequest) GetRoleName() string {
-	if x != nil {
-		return x.RoleName
-	}
-	return ""
+	return file_roles_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DeleteRoleRequest) GetDomainType() authorization.DomainType {
@@ -812,6 +718,13 @@ func (x *DeleteRoleRequest) GetDomainId() string {
 	return ""
 }
 
+func (x *DeleteRoleRequest) GetRoleName() string {
+	if x != nil {
+		return x.RoleName
+	}
+	return ""
+}
+
 type DeleteRoleResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -820,7 +733,7 @@ type DeleteRoleResponse struct {
 
 func (x *DeleteRoleResponse) Reset() {
 	*x = DeleteRoleResponse{}
-	mi := &file_roles_proto_msgTypes[14]
+	mi := &file_roles_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -832,7 +745,7 @@ func (x *DeleteRoleResponse) String() string {
 func (*DeleteRoleResponse) ProtoMessage() {}
 
 func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[14]
+	mi := &file_roles_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -845,10 +758,9 @@ func (x *DeleteRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRoleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRoleResponse) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{14}
+	return file_roles_proto_rawDescGZIP(), []int{13}
 }
 
-// Role data structure
 type Role struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *Role_Metadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -859,7 +771,7 @@ type Role struct {
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_roles_proto_msgTypes[15]
+	mi := &file_roles_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -871,7 +783,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[15]
+	mi := &file_roles_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -884,7 +796,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{15}
+	return file_roles_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *Role) GetMetadata() *Role_Metadata {
@@ -914,7 +826,7 @@ type Role_Metadata struct {
 
 func (x *Role_Metadata) Reset() {
 	*x = Role_Metadata{}
-	mi := &file_roles_proto_msgTypes[16]
+	mi := &file_roles_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -926,7 +838,7 @@ func (x *Role_Metadata) String() string {
 func (*Role_Metadata) ProtoMessage() {}
 
 func (x *Role_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[16]
+	mi := &file_roles_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -939,7 +851,7 @@ func (x *Role_Metadata) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role_Metadata.ProtoReflect.Descriptor instead.
 func (*Role_Metadata) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{15, 0}
+	return file_roles_proto_rawDescGZIP(), []int{14, 0}
 }
 
 func (x *Role_Metadata) GetName() string {
@@ -989,7 +901,7 @@ type Role_Spec struct {
 
 func (x *Role_Spec) Reset() {
 	*x = Role_Spec{}
-	mi := &file_roles_proto_msgTypes[17]
+	mi := &file_roles_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1001,7 +913,7 @@ func (x *Role_Spec) String() string {
 func (*Role_Spec) ProtoMessage() {}
 
 func (x *Role_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_roles_proto_msgTypes[17]
+	mi := &file_roles_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1014,7 +926,7 @@ func (x *Role_Spec) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role_Spec.ProtoReflect.Descriptor instead.
 func (*Role_Spec) Descriptor() ([]byte, []int) {
-	return file_roles_proto_rawDescGZIP(), []int{15, 1}
+	return file_roles_proto_rawDescGZIP(), []int{14, 1}
 }
 
 func (x *Role_Spec) GetDisplayName() string {
@@ -1049,24 +961,25 @@ var File_roles_proto protoreflect.FileDescriptor
 
 const file_roles_proto_rawDesc = "" +
 	"\n" +
-	"\vroles.proto\x12\x10Superplane.Roles\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\"\x96\x01\n" +
-	"\x11AssignRoleRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
-	"\n" +
-	"user_email\x18\x02 \x01(\tR\tuserEmail\x12I\n" +
-	"\x0frole_assignment\x18\x03 \x01(\v2 .Superplane.Roles.RoleAssignmentR\x0eroleAssignment\"\x14\n" +
-	"\x12AssignRoleResponse\"\x96\x01\n" +
-	"\x11RemoveRoleRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
-	"\n" +
-	"user_email\x18\x02 \x01(\tR\tuserEmail\x12I\n" +
-	"\x0frole_assignment\x18\x03 \x01(\v2 .Superplane.Roles.RoleAssignmentR\x0eroleAssignment\"\x14\n" +
-	"\x12RemoveRoleResponse\"\x88\x01\n" +
-	"\x0eRoleAssignment\x12E\n" +
+	"\vroles.proto\x12\x10Superplane.Roles\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\x1a\x13authorization.proto\"\xcc\x01\n" +
+	"\x11AssignRoleRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x12\n" +
-	"\x04role\x18\x03 \x01(\tR\x04role\"v\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"user_email\x18\x05 \x01(\tR\tuserEmail\"\x14\n" +
+	"\x12AssignRoleResponse\"\xcc\x01\n" +
+	"\x11RemoveRoleRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"domainType\x12\x1b\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\x12\x17\n" +
+	"\auser_id\x18\x04 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"user_email\x18\x05 \x01(\tR\tuserEmail\"\x14\n" +
+	"\x12RemoveRoleResponse\"v\n" +
 	"\x10ListRolesRequest\x12E\n" +
 	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
@@ -1079,34 +992,27 @@ const file_roles_proto_rawDesc = "" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x12\n" +
 	"\x04role\x18\x03 \x01(\tR\x04role\"B\n" +
 	"\x14DescribeRoleResponse\x12*\n" +
-	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\xbf\x02\n" +
-	"\x11CreateRoleRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12E\n" +
-	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\xa3\x01\n" +
+	"\x11CreateRoleRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
-	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
-	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\x12!\n" +
-	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\a \x01(\tR\vdescription\"@\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12*\n" +
+	"\x04role\x18\x03 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"@\n" +
 	"\x12CreateRoleResponse\x12*\n" +
-	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\xc8\x02\n" +
-	"\x11UpdateRoleRequest\x12\x1b\n" +
-	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
-	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\xc0\x01\n" +
+	"\x11UpdateRoleRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\x12F\n" +
-	"\vpermissions\x18\x04 \x03(\v2$.Superplane.Authorization.PermissionR\vpermissions\x12%\n" +
-	"\x0einherited_role\x18\x05 \x01(\tR\rinheritedRole\x12!\n" +
-	"\fdisplay_name\x18\x06 \x01(\tR\vdisplayName\x12 \n" +
-	"\vdescription\x18\a \x01(\tR\vdescription\"@\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\x12*\n" +
+	"\x04role\x18\x04 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"@\n" +
 	"\x12UpdateRoleResponse\x12*\n" +
 	"\x04role\x18\x01 \x01(\v2\x16.Superplane.Roles.RoleR\x04role\"\x94\x01\n" +
-	"\x11DeleteRoleRequest\x12\x1b\n" +
-	"\trole_name\x18\x01 \x01(\tR\broleName\x12E\n" +
-	"\vdomain_type\x18\x02 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
+	"\x11DeleteRoleRequest\x12E\n" +
+	"\vdomain_type\x18\x01 \x01(\x0e2$.Superplane.Authorization.DomainTypeR\n" +
 	"domainType\x12\x1b\n" +
-	"\tdomain_id\x18\x03 \x01(\tR\bdomainId\"\x14\n" +
+	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\x12\x1b\n" +
+	"\trole_name\x18\x03 \x01(\tR\broleName\"\x14\n" +
 	"\x12DeleteRoleResponse\"\xc4\x04\n" +
 	"\x04Role\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Roles.Role.MetadataR\bmetadata\x12/\n" +
@@ -1161,71 +1067,69 @@ func file_roles_proto_rawDescGZIP() []byte {
 	return file_roles_proto_rawDescData
 }
 
-var file_roles_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_roles_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_roles_proto_goTypes = []any{
 	(*AssignRoleRequest)(nil),        // 0: Superplane.Roles.AssignRoleRequest
 	(*AssignRoleResponse)(nil),       // 1: Superplane.Roles.AssignRoleResponse
 	(*RemoveRoleRequest)(nil),        // 2: Superplane.Roles.RemoveRoleRequest
 	(*RemoveRoleResponse)(nil),       // 3: Superplane.Roles.RemoveRoleResponse
-	(*RoleAssignment)(nil),           // 4: Superplane.Roles.RoleAssignment
-	(*ListRolesRequest)(nil),         // 5: Superplane.Roles.ListRolesRequest
-	(*ListRolesResponse)(nil),        // 6: Superplane.Roles.ListRolesResponse
-	(*DescribeRoleRequest)(nil),      // 7: Superplane.Roles.DescribeRoleRequest
-	(*DescribeRoleResponse)(nil),     // 8: Superplane.Roles.DescribeRoleResponse
-	(*CreateRoleRequest)(nil),        // 9: Superplane.Roles.CreateRoleRequest
-	(*CreateRoleResponse)(nil),       // 10: Superplane.Roles.CreateRoleResponse
-	(*UpdateRoleRequest)(nil),        // 11: Superplane.Roles.UpdateRoleRequest
-	(*UpdateRoleResponse)(nil),       // 12: Superplane.Roles.UpdateRoleResponse
-	(*DeleteRoleRequest)(nil),        // 13: Superplane.Roles.DeleteRoleRequest
-	(*DeleteRoleResponse)(nil),       // 14: Superplane.Roles.DeleteRoleResponse
-	(*Role)(nil),                     // 15: Superplane.Roles.Role
-	(*Role_Metadata)(nil),            // 16: Superplane.Roles.Role.Metadata
-	(*Role_Spec)(nil),                // 17: Superplane.Roles.Role.Spec
-	(authorization.DomainType)(0),    // 18: Superplane.Authorization.DomainType
+	(*ListRolesRequest)(nil),         // 4: Superplane.Roles.ListRolesRequest
+	(*ListRolesResponse)(nil),        // 5: Superplane.Roles.ListRolesResponse
+	(*DescribeRoleRequest)(nil),      // 6: Superplane.Roles.DescribeRoleRequest
+	(*DescribeRoleResponse)(nil),     // 7: Superplane.Roles.DescribeRoleResponse
+	(*CreateRoleRequest)(nil),        // 8: Superplane.Roles.CreateRoleRequest
+	(*CreateRoleResponse)(nil),       // 9: Superplane.Roles.CreateRoleResponse
+	(*UpdateRoleRequest)(nil),        // 10: Superplane.Roles.UpdateRoleRequest
+	(*UpdateRoleResponse)(nil),       // 11: Superplane.Roles.UpdateRoleResponse
+	(*DeleteRoleRequest)(nil),        // 12: Superplane.Roles.DeleteRoleRequest
+	(*DeleteRoleResponse)(nil),       // 13: Superplane.Roles.DeleteRoleResponse
+	(*Role)(nil),                     // 14: Superplane.Roles.Role
+	(*Role_Metadata)(nil),            // 15: Superplane.Roles.Role.Metadata
+	(*Role_Spec)(nil),                // 16: Superplane.Roles.Role.Spec
+	(authorization.DomainType)(0),    // 17: Superplane.Authorization.DomainType
+	(*timestamp.Timestamp)(nil),      // 18: google.protobuf.Timestamp
 	(*authorization.Permission)(nil), // 19: Superplane.Authorization.Permission
-	(*timestamp.Timestamp)(nil),      // 20: google.protobuf.Timestamp
 }
 var file_roles_proto_depIdxs = []int32{
-	4,  // 0: Superplane.Roles.AssignRoleRequest.role_assignment:type_name -> Superplane.Roles.RoleAssignment
-	4,  // 1: Superplane.Roles.RemoveRoleRequest.role_assignment:type_name -> Superplane.Roles.RoleAssignment
-	18, // 2: Superplane.Roles.RoleAssignment.domain_type:type_name -> Superplane.Authorization.DomainType
-	18, // 3: Superplane.Roles.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	15, // 4: Superplane.Roles.ListRolesResponse.roles:type_name -> Superplane.Roles.Role
-	18, // 5: Superplane.Roles.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	15, // 6: Superplane.Roles.DescribeRoleResponse.role:type_name -> Superplane.Roles.Role
-	18, // 7: Superplane.Roles.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	19, // 8: Superplane.Roles.CreateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
-	15, // 9: Superplane.Roles.CreateRoleResponse.role:type_name -> Superplane.Roles.Role
-	18, // 10: Superplane.Roles.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	19, // 11: Superplane.Roles.UpdateRoleRequest.permissions:type_name -> Superplane.Authorization.Permission
-	15, // 12: Superplane.Roles.UpdateRoleResponse.role:type_name -> Superplane.Roles.Role
-	18, // 13: Superplane.Roles.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
-	16, // 14: Superplane.Roles.Role.metadata:type_name -> Superplane.Roles.Role.Metadata
-	17, // 15: Superplane.Roles.Role.spec:type_name -> Superplane.Roles.Role.Spec
-	18, // 16: Superplane.Roles.Role.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
-	20, // 17: Superplane.Roles.Role.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	20, // 18: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	19, // 19: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
-	15, // 20: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
-	0,  // 21: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
-	2,  // 22: Superplane.Roles.Roles.RemoveRole:input_type -> Superplane.Roles.RemoveRoleRequest
-	5,  // 23: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
-	7,  // 24: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
-	9,  // 25: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
-	11, // 26: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
-	13, // 27: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
-	1,  // 28: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
-	3,  // 29: Superplane.Roles.Roles.RemoveRole:output_type -> Superplane.Roles.RemoveRoleResponse
-	6,  // 30: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
-	8,  // 31: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
-	10, // 32: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
-	12, // 33: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
-	14, // 34: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
-	28, // [28:35] is the sub-list for method output_type
-	21, // [21:28] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	17, // 0: Superplane.Roles.AssignRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	17, // 1: Superplane.Roles.RemoveRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	17, // 2: Superplane.Roles.ListRolesRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 3: Superplane.Roles.ListRolesResponse.roles:type_name -> Superplane.Roles.Role
+	17, // 4: Superplane.Roles.DescribeRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 5: Superplane.Roles.DescribeRoleResponse.role:type_name -> Superplane.Roles.Role
+	17, // 6: Superplane.Roles.CreateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 7: Superplane.Roles.CreateRoleRequest.role:type_name -> Superplane.Roles.Role
+	14, // 8: Superplane.Roles.CreateRoleResponse.role:type_name -> Superplane.Roles.Role
+	17, // 9: Superplane.Roles.UpdateRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	14, // 10: Superplane.Roles.UpdateRoleRequest.role:type_name -> Superplane.Roles.Role
+	14, // 11: Superplane.Roles.UpdateRoleResponse.role:type_name -> Superplane.Roles.Role
+	17, // 12: Superplane.Roles.DeleteRoleRequest.domain_type:type_name -> Superplane.Authorization.DomainType
+	15, // 13: Superplane.Roles.Role.metadata:type_name -> Superplane.Roles.Role.Metadata
+	16, // 14: Superplane.Roles.Role.spec:type_name -> Superplane.Roles.Role.Spec
+	17, // 15: Superplane.Roles.Role.Metadata.domain_type:type_name -> Superplane.Authorization.DomainType
+	18, // 16: Superplane.Roles.Role.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	18, // 17: Superplane.Roles.Role.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	19, // 18: Superplane.Roles.Role.Spec.permissions:type_name -> Superplane.Authorization.Permission
+	14, // 19: Superplane.Roles.Role.Spec.inherited_role:type_name -> Superplane.Roles.Role
+	0,  // 20: Superplane.Roles.Roles.AssignRole:input_type -> Superplane.Roles.AssignRoleRequest
+	2,  // 21: Superplane.Roles.Roles.RemoveRole:input_type -> Superplane.Roles.RemoveRoleRequest
+	4,  // 22: Superplane.Roles.Roles.ListRoles:input_type -> Superplane.Roles.ListRolesRequest
+	6,  // 23: Superplane.Roles.Roles.DescribeRole:input_type -> Superplane.Roles.DescribeRoleRequest
+	8,  // 24: Superplane.Roles.Roles.CreateRole:input_type -> Superplane.Roles.CreateRoleRequest
+	10, // 25: Superplane.Roles.Roles.UpdateRole:input_type -> Superplane.Roles.UpdateRoleRequest
+	12, // 26: Superplane.Roles.Roles.DeleteRole:input_type -> Superplane.Roles.DeleteRoleRequest
+	1,  // 27: Superplane.Roles.Roles.AssignRole:output_type -> Superplane.Roles.AssignRoleResponse
+	3,  // 28: Superplane.Roles.Roles.RemoveRole:output_type -> Superplane.Roles.RemoveRoleResponse
+	5,  // 29: Superplane.Roles.Roles.ListRoles:output_type -> Superplane.Roles.ListRolesResponse
+	7,  // 30: Superplane.Roles.Roles.DescribeRole:output_type -> Superplane.Roles.DescribeRoleResponse
+	9,  // 31: Superplane.Roles.Roles.CreateRole:output_type -> Superplane.Roles.CreateRoleResponse
+	11, // 32: Superplane.Roles.Roles.UpdateRole:output_type -> Superplane.Roles.UpdateRoleResponse
+	13, // 33: Superplane.Roles.Roles.DeleteRole:output_type -> Superplane.Roles.DeleteRoleResponse
+	27, // [27:34] is the sub-list for method output_type
+	20, // [20:27] is the sub-list for method input_type
+	20, // [20:20] is the sub-list for extension type_name
+	20, // [20:20] is the sub-list for extension extendee
+	0,  // [0:20] is the sub-list for field type_name
 }
 
 func init() { file_roles_proto_init() }
@@ -1239,7 +1143,7 @@ func file_roles_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_roles_proto_rawDesc), len(file_roles_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
