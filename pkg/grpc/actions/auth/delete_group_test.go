@@ -43,7 +43,7 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		resp, err := DeleteGroup(ctx, req, authService)
+		resp, err := DeleteGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -64,7 +64,7 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 			GroupName:  "non-existent-group",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -76,21 +76,24 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
-	t.Run("invalid request - invalid organization ID", func(t *testing.T) {
+	t.Run("invalid request - invalid organization ID for group", func(t *testing.T) {
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+		require.NoError(t, err)
+
 		req := &pb.DeleteGroupRequest{
 			DomainId:   "invalid-uuid",
 			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			GroupName:  "test-group",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err = DeleteGroup(ctx, "org", "invalid-uuid", req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid UUIDs")
+		assert.Contains(t, err.Error(), "group not found")
 	})
 }
 
@@ -125,7 +128,7 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 			GroupName:  "canvas-group",
 		}
 
-		resp, err := DeleteGroup(ctx, req, authService)
+		resp, err := DeleteGroup(ctx, "canvas", canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -146,7 +149,7 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 			GroupName:  "non-existent-group",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, "canvas", canvasID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -158,7 +161,7 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, "canvas", canvasID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -170,8 +173,8 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := DeleteGroup(ctx, req, authService)
+		_, err := DeleteGroup(ctx, "canvas", "invalid-uuid", req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid UUIDs")
+		assert.Contains(t, err.Error(), "group not found")
 	})
 }

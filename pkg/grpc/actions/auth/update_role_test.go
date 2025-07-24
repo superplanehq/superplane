@@ -60,7 +60,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, req, authService)
+		resp, err := UpdateRole(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -86,7 +86,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, req, authService)
+		resp, err := UpdateRole(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -113,28 +113,9 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
-	})
-
-	t.Run("invalid request - invalid domain type", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "test-custom-role",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				},
-			},
-		}
-
-		_, err := UpdateRole(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid domain type")
 	})
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
@@ -151,7 +132,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot update default role")
 	})
@@ -170,7 +151,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
@@ -189,9 +170,9 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrg, "invalid-uuid", req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid UUIDs")
+		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {
@@ -209,7 +190,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

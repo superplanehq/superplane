@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func RemoveUserFromGroup(ctx context.Context, req *pbGroups.RemoveUserFromGroupRequest, authService authorization.Authorization) (*pbGroups.RemoveUserFromGroupResponse, error) {
+func RemoveUserFromGroup(ctx context.Context, domainType string, domainID string, req *pbGroups.RemoveUserFromGroupRequest, authService authorization.Authorization) (*pbGroups.RemoveUserFromGroupResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
@@ -28,10 +28,6 @@ func RemoveUserFromGroup(ctx context.Context, req *pbGroups.RemoveUserFromGroupR
 		return nil, err
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 
 	var userID string
 	if req.UserId != "" {

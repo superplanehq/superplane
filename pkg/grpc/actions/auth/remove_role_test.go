@@ -36,7 +36,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		resp, err := RemoveRole(ctx, req, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -72,7 +72,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		resp, err := RemoveRole(ctx, req, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -87,7 +87,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		_, err := RemoveRole(ctx, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
@@ -102,7 +102,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		_, err := RemoveRole(ctx, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -116,7 +116,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		_, err := RemoveRole(ctx, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
@@ -131,7 +131,7 @@ func Test_RemoveRole(t *testing.T) {
 			},
 		}
 
-		_, err := RemoveRole(ctx, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

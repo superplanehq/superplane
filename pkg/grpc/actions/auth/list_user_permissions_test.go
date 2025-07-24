@@ -33,7 +33,7 @@ func Test_ListUserPermissions(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := ListUserPermissions(ctx, req, authService)
+		resp, err := ListUserPermissions(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Permissions)
 
@@ -60,7 +60,7 @@ func Test_ListUserPermissions(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := ListUserPermissions(ctx, req, authService)
+		_, err := ListUserPermissions(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})

@@ -5,30 +5,20 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService authorization.Authorization) (*pb.UpdateRoleResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
-	}
-
+func UpdateRole(ctx context.Context, domainType string, domainID string, req *pb.UpdateRoleRequest, authService authorization.Authorization) (*pb.UpdateRoleResponse, error) {
 	if req.RoleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 
 	// Check if role exists
-	_, err = authService.GetRoleDefinition(req.RoleName, domainType, req.DomainId)
+	_, err := authService.GetRoleDefinition(req.RoleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", req.RoleName, err)
 		return nil, status.Error(codes.NotFound, "role not found")
@@ -52,7 +42,7 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 
 	// Handle inherited role if specified
 	if req.InheritedRole != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(req.InheritedRole, domainType, req.DomainId)
+		inheritedRoleDef, err := authService.GetRoleDefinition(req.InheritedRole, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", req.InheritedRole, err)
 			return nil, status.Error(codes.InvalidArgument, "inherited role not found")
@@ -60,7 +50,7 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
 
-	err = authService.UpdateCustomRole(req.DomainId, roleDefinition)
+	err = authService.UpdateCustomRole(domainID, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", req.RoleName, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -73,14 +63,14 @@ func UpdateRole(ctx context.Context, req *pb.UpdateRoleRequest, authService auth
 			displayName = req.RoleName // Fallback to role name
 		}
 
-		err = models.UpsertRoleMetadata(req.RoleName, domainType, req.DomainId, displayName, req.Description)
+		err = models.UpsertRoleMetadata(req.RoleName, domainType, domainID, displayName, req.Description)
 		if err != nil {
 			log.Errorf("failed to update role metadata for %s: %v", req.RoleName, err)
-			// Don't fail the entire operation for metadata errors
+			return nil, status.Error(codes.Internal, "failed to update role metadata")
 		}
 	}
 
-	log.Infof("updated custom role %s in domain %s (%s)", req.RoleName, req.DomainId, domainType)
+	log.Infof("updated custom role %s in domain %s (%s)", req.RoleName, domainID, domainType)
 
 	return &pb.UpdateRoleResponse{}, nil
 }

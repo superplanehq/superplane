@@ -34,7 +34,7 @@ func TestGetCanvasUsers(t *testing.T) {
 		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := ListUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -69,7 +69,7 @@ func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
 		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := ListUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -84,7 +84,7 @@ func TestGetCanvasUsersInvalidCanvasId(t *testing.T) {
 		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := ListUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, "invalid-uuid", req, authService)
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Contains(t, err.Error(), "invalid domain ID")
@@ -115,7 +115,7 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 	}
 
-	resp, err := ListUsers(context.Background(), req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 

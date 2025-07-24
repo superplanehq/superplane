@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func GetGroup(ctx context.Context, req *pb.GetGroupRequest, authService authorization.Authorization) (*pb.GetGroupResponse, error) {
+func GetGroup(ctx context.Context, domainType string, domainID string, req *pb.GetGroupRequest, authService authorization.Authorization) (*pb.GetGroupResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
@@ -29,10 +29,6 @@ func GetGroup(ctx context.Context, req *pb.GetGroupRequest, authService authoriz
 		return nil, err
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 
 	// Check if the group exists by getting its role
 	role, err := authService.GetGroupRole(req.DomainId, domainType, req.GroupName)

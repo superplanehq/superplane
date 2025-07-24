@@ -26,7 +26,7 @@ func Test_ListRoles(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := ListRoles(ctx, req, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.Equal(t, len(resp.Roles), 3) // viewer, admin, owner
 
@@ -69,7 +69,7 @@ func Test_ListRoles(t *testing.T) {
 			DomainId:   canvasID,
 		}
 
-		resp, err := ListRoles(ctx, req, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 		assert.Equal(t, len(resp.Roles), 3) // viewer, admin, owner
 
@@ -98,7 +98,7 @@ func Test_ListRoles(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := ListRoles(ctx, req, authService)
+		_, err := ListRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})

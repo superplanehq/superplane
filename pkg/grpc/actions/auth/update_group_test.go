@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestUpdateGroup(t *testing.T) {
@@ -22,7 +23,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
+		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
 		require.NoError(t, err)
 
 		// Update the group role
@@ -33,7 +34,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, req, authService)
+		resp, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
@@ -46,7 +47,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
+		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
 		require.NoError(t, err)
 
 		// Update the group metadata
@@ -58,7 +59,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Updated Description",
 		}
 
-		resp, err := UpdateGroup(ctx, req, authService)
+		resp, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "Updated Display Name", resp.Group.Spec.DisplayName)
@@ -67,7 +68,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
+		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
 		require.NoError(t, err)
 
 		// Update both role and metadata
@@ -80,7 +81,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Full Update Description",
 		}
 
-		resp, err := UpdateGroup(ctx, req, authService)
+		resp, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
@@ -90,7 +91,7 @@ func TestUpdateGroup(t *testing.T) {
 
 	t.Run("update preserves group membership", func(t *testing.T) {
 		// Create a group first
-		err := CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
+		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
 		require.NoError(t, err)
 
 		// Add users to the group
@@ -109,7 +110,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, req, authService)
+		resp, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -127,7 +128,7 @@ func TestUpdateGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a canvas group first
-		err = CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
+		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
 		require.NoError(t, err)
 
 		// Update the canvas group
@@ -138,7 +139,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleCanvasAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, req, authService)
+		resp, err := UpdateGroup(ctx, "canvas", canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleCanvasAdmin, resp.Group.Spec.Role)
@@ -152,7 +153,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, req, authService)
+		_, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -165,9 +166,9 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, req, authService)
+		_, err := UpdateGroup(ctx, "org", "invalid-uuid", req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid domain ID")
+		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("missing group name", func(t *testing.T) {
@@ -178,34 +179,8 @@ func TestUpdateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, req, authService)
+		_, err := UpdateGroup(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
-	})
-
-	t.Run("no fields to update", func(t *testing.T) {
-		req := &pb.UpdateGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "test-group",
-			// No fields to update
-		}
-
-		_, err := UpdateGroup(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "at least one field must be provided for update")
-	})
-
-	t.Run("invalid domain type", func(t *testing.T) {
-		req := &pb.UpdateGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			GroupName:  "test-group",
-			Role:       models.RoleOrgAdmin,
-		}
-
-		_, err := UpdateGroup(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 }

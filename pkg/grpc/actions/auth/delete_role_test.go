@@ -53,7 +53,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := DeleteRole(ctx, req, authService)
+		resp, err := DeleteRole(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -69,7 +69,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := DeleteRole(ctx, req, authService)
+		_, err := DeleteRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
@@ -81,9 +81,9 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := DeleteRole(ctx, req, authService)
+		_, err := DeleteRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid domain type")
+		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
@@ -93,7 +93,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := DeleteRole(ctx, req, authService)
+		_, err := DeleteRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot delete default role")
 	})
@@ -105,7 +105,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := DeleteRole(ctx, req, authService)
+		_, err := DeleteRole(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
@@ -117,9 +117,9 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   "invalid-uuid",
 		}
 
-		_, err := DeleteRole(ctx, req, authService)
+		_, err := DeleteRole(ctx, "org", "invalid-uuid", req, authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid UUIDs")
+		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("delete role that users are assigned to", func(t *testing.T) {
@@ -149,7 +149,7 @@ func Test_DeleteRole(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := DeleteRole(ctx, req, authService)
+		resp, err := DeleteRole(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 

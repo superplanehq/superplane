@@ -38,7 +38,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 	})
 
@@ -67,7 +67,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group-email-remove",
 		}
 
-		_, err = RemoveUserFromGroup(ctx, req, authService)
+		_, err = RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 	})
 
@@ -79,7 +79,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user not found")
 	})
@@ -92,7 +92,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -105,7 +105,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -117,7 +117,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user identifier must be specified")
 	})
@@ -130,7 +130,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := RemoveUserFromGroup(ctx, req, authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
@@ -153,7 +153,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			GroupName:  "canvas-group",
 		}
 
-		_, err = RemoveUserFromGroup(ctx, req, authService)
+		_, err = RemoveUserFromGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 	})
 }

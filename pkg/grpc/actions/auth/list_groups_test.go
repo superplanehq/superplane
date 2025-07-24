@@ -37,7 +37,7 @@ func Test_ListGroups(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := ListGroups(ctx, req, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
@@ -68,7 +68,7 @@ func Test_ListGroups(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := ListGroups(ctx, req, authService)
+		_, err := ListGroups(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -94,7 +94,7 @@ func Test_ListGroups(t *testing.T) {
 			DomainId:   canvasID,
 		}
 
-		resp, err := ListGroups(ctx, req, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
@@ -132,7 +132,7 @@ func Test_ListGroups(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := ListGroups(ctx, req, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 
 		// Find the group with metadata

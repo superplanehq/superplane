@@ -5,26 +5,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
-	}
-
+func CreateRole(ctx context.Context, domainType string, domainID string, req *pb.CreateRoleRequest, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
-	}
-
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
 	}
 
 	// Convert protobuf permissions to authorization permissions
@@ -45,7 +34,7 @@ func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService auth
 
 	// Handle inherited role if specified
 	if req.InheritedRole != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(req.InheritedRole, domainType, req.DomainId)
+		inheritedRoleDef, err := authService.GetRoleDefinition(req.InheritedRole, domainType, domainID)
 		if err != nil {
 			log.Errorf("failed to get inherited role %s: %v", req.InheritedRole, err)
 			return nil, status.Error(codes.InvalidArgument, "inherited role not found")
@@ -53,7 +42,7 @@ func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService auth
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
 
-	err = authService.CreateCustomRole(req.DomainId, roleDefinition)
+	err := authService.CreateCustomRole(domainID, roleDefinition)
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", req.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -67,14 +56,14 @@ func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService auth
 			displayName = req.Name // Fallback to role name
 		}
 
-		err = models.UpsertRoleMetadata(req.Name, domainType, req.DomainId, displayName, req.Description)
+		err = models.UpsertRoleMetadata(req.Name, domainType, domainID, displayName, req.Description)
 		if err != nil {
 			log.Errorf("failed to create role metadata for %s: %v", req.Name, err)
-			// Don't fail the entire operation for metadata errors
+			return nil, status.Error(codes.Internal, "failed to create role metadata")
 		}
 	}
 
-	log.Infof("created custom role %s in domain %s (%s)", req.Name, req.DomainId, domainType)
+	log.Infof("created custom role %s in domain %s (%s)", req.Name, domainID, domainType)
 
 	return &pb.CreateRoleResponse{}, nil
 }

@@ -12,16 +12,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListUsers(ctx context.Context, req *pb.ListUsersRequest, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
+func ListUsers(ctx context.Context, domainType string, domainID string, req *pb.ListUsersRequest, authService authorization.Authorization) (*pb.ListUsersResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
-	}
 	users, err := GetUsersWithRolesInDomain(req.DomainId, domainType, authService)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get canvas users")

@@ -27,7 +27,7 @@ func Test_DescribeRole(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		resp, err := DescribeRole(ctx, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.NotNil(t, resp.Role.Spec.InheritedRole)
@@ -54,7 +54,7 @@ func Test_DescribeRole(t *testing.T) {
 			Role:       models.RoleCanvasAdmin,
 		}
 
-		resp, err := DescribeRole(ctx, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Metadata.Name)
@@ -71,7 +71,7 @@ func Test_DescribeRole(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		_, err := DescribeRole(ctx, req, authService)
+		_, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain ID must be specified")
 	})

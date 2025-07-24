@@ -23,8 +23,7 @@ func Test_GetGroup(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	// Create a group with metadata
-	err = CreateGroupWithMetadata(orgID, "org", "test-group", models.RoleOrgAdmin, "Test Group", "Test group description", authService)
+	err = support.CreateGroupWithMetadata(orgID, "org", "test-group", models.RoleOrgAdmin, "Test Group", "Test group description", authService)
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
@@ -34,7 +33,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		resp, err := GetGroup(ctx, req, authService)
+		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -52,7 +51,7 @@ func Test_GetGroup(t *testing.T) {
 		// Setup canvas roles and create canvas group with metadata
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = CreateGroupWithMetadata(canvasID, "canvas", "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
+		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
 		require.NoError(t, err)
 
 		req := &pb.GetGroupRequest{
@@ -61,7 +60,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "canvas-group",
 		}
 
-		resp, err := GetGroup(ctx, req, authService)
+		resp, err := GetGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -80,7 +79,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "non-existent-group",
 		}
 
-		_, err := GetGroup(ctx, req, authService)
+		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -92,7 +91,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := GetGroup(ctx, req, authService)
+		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -104,7 +103,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := GetGroup(ctx, req, authService)
+		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -116,7 +115,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := GetGroup(ctx, req, authService)
+		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid domain ID")
 	})
@@ -132,7 +131,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "test-group", // This group exists in the first org, not this one
 		}
 
-		_, err = GetGroup(ctx, req, authService)
+		_, err = GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -148,7 +147,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "viewer-group",
 		}
 
-		resp, err := GetGroup(ctx, req, authService)
+		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -169,7 +168,7 @@ func Test_GetGroup(t *testing.T) {
 			GroupName:  "owner-group",
 		}
 
-		resp, err := GetGroup(ctx, req, authService)
+		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)

@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService authorization.Authorization) (*pb.GetUserRolesResponse, error) {
+func GetUserRoles(ctx context.Context, domainType string, domainID string, req *pb.GetUserRolesRequest, authService authorization.Authorization) (*pb.GetUserRolesResponse, error) {
 	err := actions.ValidateUUIDs(req.UserId, req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
@@ -38,10 +38,6 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 	}
 
 	// Extract all role names for batch metadata lookup
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 	roleNames := make([]string, len(roles))
 	for i, role := range roles {
 		roleNames[i] = role.Name

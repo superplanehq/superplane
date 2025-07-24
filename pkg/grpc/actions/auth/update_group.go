@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
@@ -13,20 +12,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
-	}
-
-	err = ValidateUpdateGroupRequest(req)
-	if err != nil {
-		return nil, err
-	}
-
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
+func UpdateGroup(ctx context.Context, domainType string, domainID string, req *pb.UpdateGroupRequest, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
+	if req.GroupName == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
 	// Check if the group exists by getting its current role
@@ -37,13 +25,13 @@ func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService au
 
 	// Update the group role if it changed
 	if req.Role != "" && req.Role != currentRole {
-		err = authService.UpdateGroupRole(req.DomainId, domainType, req.GroupName, req.Role)
+		err = authService.UpdateGroupRole(domainID, domainType, req.GroupName, req.Role)
 		if err != nil {
 			log.Errorf("failed to update group %s role from %s to %s: %v", req.GroupName, currentRole, req.Role, err)
 			return nil, status.Error(codes.Internal, "failed to update group role")
 		}
 
-		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, req.DomainId, domainType)
+		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, domainID, domainType)
 	}
 
 	var displayName string
@@ -67,8 +55,11 @@ func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService au
 		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainId, displayName, description)
 		if err != nil {
 			log.Errorf("failed to update group metadata for %s: %v", req.GroupName, err)
-			// Don't fail the entire operation for metadata errors
+			return nil, status.Error(codes.Internal, "failed to update group metadata")
 		}
+	} else {
+		displayName = groupMetadata.DisplayName
+		description = groupMetadata.Description
 	}
 
 	// Get the updated role (in case it changed)
@@ -77,7 +68,7 @@ func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService au
 		updatedRole = currentRole
 	}
 
-	groupUsers, err := authService.GetGroupUsers(groupMetadata.DomainID, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(domainID, domainType, req.GroupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
@@ -86,7 +77,7 @@ func UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest, authService au
 		Metadata: &pb.Group_Metadata{
 			Name:       req.GroupName,
 			DomainType: req.DomainType,
-			DomainId:   req.DomainId,
+			DomainId:   domainID,
 			CreatedAt:  timestamppb.Now(),
 			UpdatedAt:  timestamppb.Now(),
 		},

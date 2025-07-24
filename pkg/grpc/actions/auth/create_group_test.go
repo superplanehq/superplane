@@ -28,7 +28,7 @@ func Test_CreateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		resp, err := CreateGroup(ctx, req, authService)
+		resp, err := CreateGroup(ctx, "org", orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -51,7 +51,7 @@ func Test_CreateGroup(t *testing.T) {
 			Role:       models.RoleCanvasAdmin,
 		}
 
-		resp, err := CreateGroup(ctx, req, authService)
+		resp, err := CreateGroup(ctx, "canvas", canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
@@ -67,7 +67,7 @@ func Test_CreateGroup(t *testing.T) {
 			Role:       models.RoleOrgAdmin,
 		}
 
-		_, err := CreateGroup(ctx, req, authService)
+		_, err := CreateGroup(ctx, "org", orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

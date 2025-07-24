@@ -33,7 +33,7 @@ func Test_GetUserRoles(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		resp, err := GetUserRoles(ctx, req, authService)
+		resp, err := GetUserRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Roles)
 
@@ -54,7 +54,7 @@ func Test_GetUserRoles(t *testing.T) {
 			DomainId:   orgID,
 		}
 
-		_, err := GetUserRoles(ctx, req, authService)
+		_, err := GetUserRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})

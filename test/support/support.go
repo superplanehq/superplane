@@ -285,3 +285,18 @@ func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]strin
 func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }
+
+// GroupManager defines the minimal interface needed for group operations
+// We use this to avoid import cycles
+type GroupManager interface {
+	CreateGroup(domainID string, domainType string, groupName string, role string) error
+}
+
+func CreateGroupWithMetadata(domainID, domainType, groupName, role, displayName, description string, authService GroupManager) error {
+	err := authService.CreateGroup(domainID, domainType, groupName, role)
+	if err != nil {
+		return err
+	}
+
+	return models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
+}

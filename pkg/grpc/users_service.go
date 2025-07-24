@@ -20,13 +20,19 @@ func NewUsersService(authService authorization.Authorization) *UsersService {
 }
 
 func (s *UsersService) ListUserPermissions(ctx context.Context, req *pb.ListUserPermissionsRequest) (*pb.ListUserPermissionsResponse, error) {
-	return auth.ListUserPermissions(ctx, req, s.authService)
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return auth.ListUserPermissions(ctx, domainType, domainID, req, s.authService)
 }
 
 func (s *UsersService) GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest) (*pb.GetUserRolesResponse, error) {
-	return auth.GetUserRoles(ctx, req, s.authService)
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return auth.GetUserRoles(ctx, domainType, domainID, req, s.authService)
 }
 
 func (s *UsersService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
-	return auth.ListUsers(ctx, req, s.authService)
+	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
+	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return auth.ListUsers(ctx, domainType, domainID, req, s.authService)
 }

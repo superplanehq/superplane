@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
+func ListGroups(ctx context.Context, domainType string, domainID string, req *pb.ListGroupsRequest, authService authorization.Authorization) (*pb.ListGroupsResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
@@ -23,10 +23,6 @@ func ListGroups(ctx context.Context, req *pb.ListGroupsRequest, authService auth
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 
 	groupNames, err := authService.GetGroups(req.DomainId, domainType)
 	if err != nil {

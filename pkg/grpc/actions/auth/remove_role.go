@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
+func RemoveRole(ctx context.Context, domainType string, domainID string, req *pb.RemoveRoleRequest, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
 	if req.RoleAssignment.DomainType == pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
 	}

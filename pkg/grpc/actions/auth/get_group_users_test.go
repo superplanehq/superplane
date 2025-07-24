@@ -37,7 +37,7 @@ func Test_GetGroupUsers(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		resp, err := GetGroupUsers(ctx, req, authService)
+		resp, err := GetGroupUsers(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
@@ -61,7 +61,7 @@ func Test_GetGroupUsers(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := GetGroupUsers(ctx, req, authService)
+		_, err := GetGroupUsers(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -73,7 +73,7 @@ func Test_GetGroupUsers(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := GetGroupUsers(ctx, req, authService)
+		_, err := GetGroupUsers(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -95,7 +95,7 @@ func Test_GetGroupUsers(t *testing.T) {
 			GroupName:  "canvas-group",
 		}
 
-		resp, err := GetGroupUsers(ctx, req, authService)
+		resp, err := GetGroupUsers(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
@@ -119,7 +119,7 @@ func Test_GetGroupUsers(t *testing.T) {
 			GroupName:  "empty-group",
 		}
 
-		resp, err := GetGroupUsers(ctx, req, authService)
+		resp, err := GetGroupUsers(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Empty(t, resp.Users)

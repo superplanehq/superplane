@@ -77,24 +77,6 @@ func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	return authService
 }
 
-func CreateGroupWithMetadata(domainID, domainType, groupName, role, displayName, description string, authService authorization.Authorization) error {
-	err := authService.CreateGroup(domainID, domainType, groupName, role)
-	if err != nil {
-		return err
-	}
-
-	return models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
-}
-
-func CreateRoleWithMetadata(domainID string, roleDef *authorization.RoleDefinition, displayName, description string, authService authorization.Authorization) error {
-	err := authService.CreateCustomRole(domainID, roleDef)
-	if err != nil {
-		return err
-	}
-
-	return models.UpsertRoleMetadata(roleDef.Name, roleDef.DomainType, domainID, displayName, description)
-}
-
 func ResolveUserID(userID, userEmail string) (string, error) {
 	if userID == "" && userEmail == "" {
 		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")

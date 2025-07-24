@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func AddUserToGroup(ctx context.Context, req *pbGroups.AddUserToGroupRequest, authService authorization.Authorization) (*pbGroups.AddUserToGroupResponse, error) {
+func AddUserToGroup(ctx context.Context, domainType string, domainID string, req *pbGroups.AddUserToGroupRequest, authService authorization.Authorization) (*pbGroups.AddUserToGroupResponse, error) {
 	err := actions.ValidateUUIDs(req.DomainId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
@@ -27,10 +27,6 @@ func AddUserToGroup(ctx context.Context, req *pbGroups.AddUserToGroupRequest, au
 		return nil, err
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
-	}
 
 	// Handle user identification using shared function
 	userID, err := ResolveUserID(req.UserId, req.UserEmail)

@@ -34,7 +34,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 	})
 
@@ -51,7 +51,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "test-group-email",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 
 		user, err := models.FindInactiveUserByEmail(testEmail)
@@ -68,7 +68,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -81,7 +81,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
@@ -93,7 +93,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user identifier must be specified")
 	})
@@ -106,7 +106,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "test-group",
 		}
 
-		_, err := AddUserToGroup(ctx, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
@@ -123,7 +123,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "non-existent-group",
 		}
 
-		_, err = AddUserToGroup(ctx, req, authService)
+		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group non-existent-group does not exist")
 	})
@@ -144,7 +144,7 @@ func Test_AddUserToGroup(t *testing.T) {
 			GroupName:  "canvas-test-group",
 		}
 
-		_, err = AddUserToGroup(ctx, req, authService)
+		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
 		require.NoError(t, err)
 	})
 }

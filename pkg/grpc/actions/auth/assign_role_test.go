@@ -32,7 +32,7 @@ func Test_AssignRole(t *testing.T) {
 			},
 		}
 
-		resp, err := AssignRole(ctx, req, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -48,7 +48,7 @@ func Test_AssignRole(t *testing.T) {
 			},
 		}
 
-		resp, err := AssignRole(ctx, req, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -69,7 +69,7 @@ func Test_AssignRole(t *testing.T) {
 			},
 		}
 
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
@@ -83,7 +83,7 @@ func Test_AssignRole(t *testing.T) {
 			},
 		}
 
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
@@ -98,7 +98,7 @@ func Test_AssignRole(t *testing.T) {
 			},
 		}
 
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
