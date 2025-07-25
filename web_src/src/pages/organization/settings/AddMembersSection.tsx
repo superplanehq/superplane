@@ -147,11 +147,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             // Add user to organization with role
             await assignRoleMutation.mutateAsync({
               userEmail: email,
-              roleAssignment: {
-                domainType: 'DOMAIN_TYPE_ORGANIZATION',
-                domainId: organizationId,
-                role: roleToAssign
-              }
+              roleName: roleToAssign,
             })
           }
         }
@@ -193,11 +189,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             // Add user to organization with role
             await assignRoleMutation.mutateAsync({
               userEmail: email,
-              roleAssignment: {
-                domainType: 'DOMAIN_TYPE_ORGANIZATION',
-                domainId: organizationId,
-                role: roleToAssign
-              }
+              roleName: roleToAssign
             })
           }
         }

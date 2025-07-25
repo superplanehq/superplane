@@ -3,8 +3,8 @@ import {
   usersListUsers,
   rolesListRoles,
   groupsListGroups,
-  groupsGetGroup,
-  groupsGetGroupUsers,
+  groupsDescribeGroup,
+  groupsListGroupUsers,
   rolesAssignRole,
   rolesRemoveRole,
   groupsCreateGroup,
@@ -19,7 +19,7 @@ import {
   organizationsDescribeOrganization,
   organizationsUpdateOrganization
 } from '../api-client/sdk.gen'
-import { RolesCreateRoleRequest, AuthorizationDomainType, RolesRoleAssignment } from '@/api-client'
+import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
 
 // Query Keys
 export const organizationKeys = {
@@ -95,7 +95,7 @@ export const useOrganizationGroup = (organizationId: string, groupName: string) 
   return useQuery({
     queryKey: organizationKeys.group(organizationId, groupName),
     queryFn: async () => {
-      const response = await groupsGetGroup({
+      const response = await groupsDescribeGroup({
         path: { groupName },
         query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
@@ -111,7 +111,7 @@ export const useOrganizationGroupUsers = (organizationId: string, groupName: str
   return useQuery({
     queryKey: organizationKeys.groupUsers(organizationId, groupName),
     queryFn: async () => {
-      const response = await groupsGetGroupUsers({
+      const response = await groupsListGroupUsers({
         path: { groupName },
         query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
@@ -149,14 +149,16 @@ export const useAssignRole = (organizationId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId?: string, 
-      userEmail?: string, 
-      roleAssignment: RolesRoleAssignment 
+      userEmail?: string,
+      roleName: string,
     }) => {
       return await rolesAssignRole({
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
-          roleAssignment: params.roleAssignment
+          roleName: params.roleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         },
       })
     },
@@ -173,12 +175,14 @@ export const useRemoveRole = (organizationId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId: string, 
-      roleAssignment: RolesRoleAssignment
+      roleName: string,
     }) => {
       return await rolesRemoveRole({
         body: {
           userId: params.userId,
-          roleAssignment: params.roleAssignment
+          roleName: params.roleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         }
       })
     },
@@ -202,12 +206,18 @@ export const useCreateGroup = (organizationId: string) => {
     }) => {
       return await groupsCreateGroup({
         body: {
+          group: {
+            metadata: {
+              name: params.groupName,
+            },
+            spec: {
+              displayName: params.displayName,
+              description: params.description,
+              role: params.role
+            }
+          },
           domainId: params.organizationId,
           domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          groupName: params.groupName,
-          displayName: params.displayName,
-          description: params.description,
-          role: params.role
         }
       })
     },
@@ -232,11 +242,18 @@ export const useUpdateGroup = (organizationId: string) => {
       return await groupsUpdateGroup({
         path: { groupName: params.groupName },
         body: {
+          group: {
+            metadata: {
+              name: params.groupName,
+            },
+            spec: {
+              displayName: params.displayName,
+              description: params.description,
+              role: params.role
+            }
+          },
           domainId: params.organizationId,
           domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          displayName: params.displayName,
-          description: params.description,
-          role: params.role
         }
       })
     },
@@ -351,9 +368,16 @@ export const useUpdateRole = (organizationId: string) => {
         body: {
           domainType: params.domainType,
           domainId: params.domainId,
-          permissions: params.permissions,
-          displayName: params.displayName,
-          description: params.description
+          role: {
+            metadata: {
+              name: params.roleName,
+            },
+            spec: {
+              permissions: params.permissions,
+              displayName: params.displayName,
+              description: params.description
+            }
+          }
         }
       })
     },

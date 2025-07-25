@@ -134,11 +134,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
-        roleAssignment: {
-          role: newRoleName,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        }
+        roleName: newRoleName,
       })
     } catch (err) {
       console.error('Error updating role:', err)
@@ -155,11 +151,7 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
 
       await removeRoleMutation.mutateAsync({
         userId: memberId,
-        roleAssignment: {
-          role: member.roleName,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        }
+        roleName: member.roleName,
       })
     } catch (err) {
       console.error('Error removing member:', err)

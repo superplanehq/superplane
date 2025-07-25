@@ -165,12 +165,18 @@ export function CreateRolePage() {
       } else {
         // Create new role
         await createRoleMutation.mutateAsync({
-          name: roleName.trim().toLowerCase().replace(/\s+/g, '_'),
+          role: {
+            metadata: {
+              name: roleName,
+            },
+            spec: {
+              permissions: permissions,
+              displayName: roleName.trim(),
+              description: roleDescription.trim() || undefined
+            }
+          },
           domainType: 'DOMAIN_TYPE_ORGANIZATION',
           domainId: orgId,
-          permissions: permissions,
-          displayName: roleName.trim(),
-          description: roleDescription.trim() || undefined
         })
       }
 
