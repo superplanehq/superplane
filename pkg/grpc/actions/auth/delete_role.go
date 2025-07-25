@@ -11,32 +11,31 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func DeleteRole(ctx context.Context, domainType string, domainID string, req *pb.DeleteRoleRequest, authService authorization.Authorization) (*pb.DeleteRoleResponse, error) {
-	if req.RoleName == "" {
+func DeleteRole(ctx context.Context, domainType, domainID, roleName string, authService authorization.Authorization) (*pb.DeleteRoleResponse, error) {
+	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-
 	// Check if role exists
-	_, err := authService.GetRoleDefinition(req.RoleName, domainType, domainID)
+	_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
 	if err != nil {
-		log.Errorf("role %s not found: %v", req.RoleName, err)
+		log.Errorf("role %s not found: %v", roleName, err)
 		return nil, status.Error(codes.NotFound, "role not found")
 	}
 
-	err = authService.DeleteCustomRole(domainID, domainType, req.RoleName)
+	err = authService.DeleteCustomRole(domainID, domainType, roleName)
 	if err != nil {
-		log.Errorf("failed to delete role %s: %v", req.RoleName, err)
+		log.Errorf("failed to delete role %s: %v", roleName, err)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = models.DeleteRoleMetadata(req.RoleName, domainType, domainID)
+	err = models.DeleteRoleMetadata(roleName, domainType, domainID)
 	if err != nil {
-		log.Errorf("failed to delete role metadata for %s: %v", req.RoleName, err)
+		log.Errorf("failed to delete role metadata for %s: %v", roleName, err)
 		return nil, status.Error(codes.Internal, "failed to delete role metadata")
 	}
 
-	log.Infof("deleted custom role %s from domain %s (%s)", req.RoleName, domainID, domainType)
+	log.Infof("deleted custom role %s from domain %s (%s)", roleName, domainID, domainType)
 
 	return &pb.DeleteRoleResponse{}, nil
 }

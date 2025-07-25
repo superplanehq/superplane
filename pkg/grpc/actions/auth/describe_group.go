@@ -12,31 +12,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func GetGroup(ctx context.Context, domainType string, domainID string, req *pb.GetGroupRequest, authService authorization.Authorization) (*pb.GetGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
+func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, authService authorization.Authorization) (*pb.DescribeGroupResponse, error) {
+	if groupName == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	groupReq := &GroupRequest{
-		DomainID:   req.DomainId,
-		GroupName:  req.GroupName,
-		DomainType: req.DomainType,
-	}
-
-	err = ValidateGroupRequest(groupReq)
-	if err != nil {
-		return nil, err
-	}
-
-
-	// Check if the group exists by getting its role
-	role, err := authService.GetGroupRole(req.DomainId, domainType, req.GroupName)
+	role, err := authService.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainId)
+	groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
 	var displayName, description string
 	var createdAt, updatedAt *timestamppb.Timestamp
 	if err == nil {
@@ -45,21 +31,20 @@ func GetGroup(ctx context.Context, domainType string, domainID string, req *pb.G
 		createdAt = timestamppb.New(groupMetadata.CreatedAt)
 		updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
 	} else {
-		// Use fallback values when metadata is not found
-		displayName = req.GroupName
+		displayName = groupName
 		description = ""
 	}
 
-	groupUsers, err := authService.GetGroupUsers(req.DomainId, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
 
 	group := &pb.Group{
 		Metadata: &pb.Group_Metadata{
-			Name:       req.GroupName,
-			DomainType: req.DomainType,
-			DomainId:   req.DomainId,
+			Name:       groupName,
+			DomainType: actions.DomainTypeToProto(domainType),
+			DomainId:   domainID,
 			CreatedAt:  createdAt,
 			UpdatedAt:  updatedAt,
 		},
@@ -73,7 +58,7 @@ func GetGroup(ctx context.Context, domainType string, domainID string, req *pb.G
 		},
 	}
 
-	return &pb.GetGroupResponse{
+	return &pb.DescribeGroupResponse{
 		Group: group,
 	}, nil
 }

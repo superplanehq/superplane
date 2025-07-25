@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/users"
 )
 
 func TestGetCanvasUsers(t *testing.T) {
@@ -29,12 +28,7 @@ func TestGetCanvasUsers(t *testing.T) {
 	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
-	req := &pb.ListUsersRequest{
-		DomainId:   canvasID,
-		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-	}
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -44,8 +38,6 @@ func TestGetCanvasUsers(t *testing.T) {
 		assert.NotEmpty(t, user.Metadata.Id)
 		assert.NotEmpty(t, user.Status.RoleAssignments)
 
-		// Check that is_active field is properly set
-		// For test fallback users, should be false
 		assert.False(t, user.Status.IsActive)
 
 		for _, roleAssignment := range user.Status.RoleAssignments {
@@ -64,30 +56,11 @@ func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
 	err := authService.SetupCanvasRoles(canvasID)
 	require.NoError(t, err)
 
-	req := &pb.ListUsersRequest{
-		DomainId:   canvasID,
-		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-	}
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
 	assert.Len(t, resp.Users, 0)
-}
-
-func TestGetCanvasUsersInvalidCanvasId(t *testing.T) {
-	authService := SetupTestAuthService(t)
-
-	req := &pb.ListUsersRequest{
-		DomainId:   "invalid-uuid",
-		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-	}
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, "invalid-uuid", req, authService)
-	assert.Error(t, err)
-	assert.Nil(t, resp)
-	assert.Contains(t, err.Error(), "invalid domain ID")
 }
 
 func TestGetCanvasUsersWithActiveUser(t *testing.T) {
@@ -110,12 +83,7 @@ func TestGetCanvasUsersWithActiveUser(t *testing.T) {
 	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainTypeCanvas)
 	require.NoError(t, err)
 
-	req := &pb.ListUsersRequest{
-		DomainId:   canvasID,
-		DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-	}
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, req, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 

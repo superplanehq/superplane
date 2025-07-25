@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -27,16 +25,7 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role removal with user ID", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserId: r.User.String(),
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -44,7 +33,6 @@ func Test_RemoveRole(t *testing.T) {
 	t.Run("successful role removal with user email", func(t *testing.T) {
 		testEmail := "test-remove@example.com"
 
-		// Create user and assign role first
 		user := &models.User{
 			Name:     testEmail,
 			IsActive: false,
@@ -63,75 +51,25 @@ func Test_RemoveRole(t *testing.T) {
 		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 
-		req := &pb.RemoveRoleRequest{
-			UserEmail: testEmail,
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", testEmail, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("user not found by email", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserEmail: "nonexistent@example.com",
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", "nonexistent@example.com", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
-	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserId: r.User.String(),
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
-	})
-
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserId: "invalid-uuid",
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       models.RoleOrgAdmin,
-			},
-		}
-
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

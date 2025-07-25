@@ -9,11 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test_GetGroup(t *testing.T) {
+func Test_DescribeGroup(t *testing.T) {
 	r := support.Setup(t)
 	_ = r // Avoid unused variable warning
 	authService := SetupTestAuthService(t)
@@ -27,13 +26,7 @@ func Test_GetGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "test-group",
-		}
-
-		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "test-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -54,13 +47,7 @@ func Test_GetGroup(t *testing.T) {
 		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
 		require.NoError(t, err)
 
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			GroupName:  "canvas-group",
-		}
-
-		resp, err := GetGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeCanvas, canvasID, "canvas-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -73,51 +60,15 @@ func Test_GetGroup(t *testing.T) {
 	})
 
 	t.Run("group not found", func(t *testing.T) {
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "non-existent-group",
-		}
-
-		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "non-existent-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "",
-		}
-
-		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
-	})
-
-	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			GroupName:  "test-group",
-		}
-
-		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
-	})
-
-	t.Run("invalid request - invalid domain ID", func(t *testing.T) {
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   "invalid-uuid",
-			GroupName:  "test-group",
-		}
-
-		_, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid domain ID")
 	})
 
 	t.Run("different organization - group not found", func(t *testing.T) {
@@ -125,13 +76,7 @@ func Test_GetGroup(t *testing.T) {
 		err := authService.SetupOrganizationRoles(anotherOrgID)
 		require.NoError(t, err)
 
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   anotherOrgID,
-			GroupName:  "test-group", // This group exists in the first org, not this one
-		}
-
-		_, err = GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err = DescribeGroup(ctx, models.DomainTypeOrg, anotherOrgID, "test-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -141,13 +86,7 @@ func Test_GetGroup(t *testing.T) {
 		err = authService.CreateGroup(orgID, "org", "viewer-group", models.RoleOrgViewer)
 		require.NoError(t, err)
 
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "viewer-group",
-		}
-
-		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "viewer-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -162,13 +101,7 @@ func Test_GetGroup(t *testing.T) {
 		err = authService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner)
 		require.NoError(t, err)
 
-		req := &pb.GetGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "owner-group",
-		}
-
-		resp, err := GetGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "owner-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)

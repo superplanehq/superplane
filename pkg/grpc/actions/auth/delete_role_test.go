@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_DeleteRole(t *testing.T) {
@@ -21,7 +19,6 @@ func Test_DeleteRole(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role-to-delete",
 		DomainType: models.DomainTypeOrg,
@@ -42,88 +39,49 @@ func Test_DeleteRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful custom role deletion", func(t *testing.T) {
-		// Verify role exists before deletion
 		roleDef, err := authService.GetRoleDefinition("test-custom-role-to-delete", models.DomainTypeOrg, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role-to-delete", roleDef.Name)
 
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "test-custom-role-to-delete",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		resp, err := DeleteRole(ctx, "org", orgID, req, authService)
+		resp, err := DeleteRole(ctx, models.DomainTypeOrg, orgID, "test-custom-role-to-delete", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// Verify role was deleted
 		_, err = authService.GetRoleDefinition("test-custom-role-to-delete", models.DomainTypeOrg, orgID)
 		assert.Error(t, err)
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		_, err := DeleteRole(ctx, "org", orgID, req, authService)
+		_, err := DeleteRole(ctx, models.DomainTypeOrg, orgID, "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
 
 	t.Run("invalid request - invalid domain type", func(t *testing.T) {
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "test-role",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-		}
-
-		_, err := DeleteRole(ctx, "org", orgID, req, authService)
+		_, err := DeleteRole(ctx, "invalid-domain-type", orgID, "test-role", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
-		req := &pb.DeleteRoleRequest{
-			RoleName:   models.RoleOrgAdmin,
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		_, err := DeleteRole(ctx, "org", orgID, req, authService)
+		_, err := DeleteRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot delete default role")
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "nonexistent-role",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		_, err := DeleteRole(ctx, "org", orgID, req, authService)
+		_, err := DeleteRole(ctx, models.DomainTypeOrg, orgID, "nonexistent-role", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "test-role",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   "invalid-uuid",
-		}
-
-		_, err := DeleteRole(ctx, "org", "invalid-uuid", req, authService)
+		_, err := DeleteRole(ctx, models.DomainTypeOrg, "invalid-uuid", "test-role", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
 
 	t.Run("delete role that users are assigned to", func(t *testing.T) {
-		// Create another custom role
 		customRoleWithUsers := &authorization.RoleDefinition{
 			Name:       "test-role-with-users",
 			DomainType: models.DomainTypeOrg,
@@ -138,26 +96,17 @@ func Test_DeleteRole(t *testing.T) {
 		err = authService.CreateCustomRole(orgID, customRoleWithUsers)
 		require.NoError(t, err)
 
-		// Assign role to a user
 		userID := uuid.New().String()
 		err = authService.AssignRole(userID, "test-role-with-users", orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 
-		req := &pb.DeleteRoleRequest{
-			RoleName:   "test-role-with-users",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		resp, err := DeleteRole(ctx, "org", orgID, req, authService)
+		resp, err := DeleteRole(ctx, models.DomainTypeOrg, orgID, "test-role-with-users", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// Verify role was deleted and user no longer has the role
 		_, err = authService.GetRoleDefinition("test-role-with-users", models.DomainTypeOrg, orgID)
 		assert.Error(t, err)
 
-		// Verify user no longer has the deleted role
 		userRoles, err := authService.GetUserRolesForOrg(userID, orgID)
 		require.NoError(t, err)
 		for _, role := range userRoles {

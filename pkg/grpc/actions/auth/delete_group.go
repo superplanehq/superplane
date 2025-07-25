@@ -11,44 +11,44 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func DeleteGroup(ctx context.Context, domainType string, domainID string, req *pb.DeleteGroupRequest, authService authorization.Authorization) (*pb.DeleteGroupResponse, error) {
-	if req.GroupName == "" {
+func DeleteGroup(ctx context.Context, domainType, domainID, groupName string, authService authorization.Authorization) (*pb.DeleteGroupResponse, error) {
+	if groupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	_, err := authService.GetGroupRole(domainID, domainType, req.GroupName)
+	_, err := authService.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
-		log.Errorf("failed to get group %s role in domain %s: %v", req.GroupName, domainID, err)
+		log.Errorf("failed to get group %s role in domain %s: %v", groupName, domainID, err)
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	users, err := authService.GetGroupUsers(domainID, domainType, req.GroupName)
+	users, err := authService.GetGroupUsers(domainID, domainType, groupName)
 	if err != nil {
-		log.Errorf("failed to get users in group %s: %v", req.GroupName, err)
+		log.Errorf("failed to get users in group %s: %v", groupName, err)
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
 
 	for _, userID := range users {
-		err = authService.RemoveUserFromGroup(domainID, domainType, userID, req.GroupName)
+		err = authService.RemoveUserFromGroup(domainID, domainType, userID, groupName)
 		if err != nil {
-			log.Errorf("failed to remove user %s from group %s: %v", userID, req.GroupName, err)
+			log.Errorf("failed to remove user %s from group %s: %v", userID, groupName, err)
 			return nil, status.Error(codes.Internal, "failed to remove users from group")
 		}
 	}
 
-	err = authService.DeleteGroup(domainID, domainType, req.GroupName)
+	err = authService.DeleteGroup(domainID, domainType, groupName)
 	if err != nil {
-		log.Errorf("failed to delete group %s: %v", req.GroupName, err)
+		log.Errorf("failed to delete group %s: %v", groupName, err)
 		return nil, status.Error(codes.Internal, "failed to delete group")
 	}
 
-	err = models.DeleteGroupMetadata(req.GroupName, domainType, domainID)
+	err = models.DeleteGroupMetadata(groupName, domainType, domainID)
 	if err != nil {
-		log.Errorf("failed to delete group metadata for %s: %v", req.GroupName, err)
+		log.Errorf("failed to delete group metadata for %s: %v", groupName, err)
 		return nil, status.Error(codes.Internal, "failed to delete group metadata")
 	}
 
-	log.Infof("deleted group %s from domain %s", req.GroupName, domainID)
+	log.Infof("deleted group %s from domain %s", groupName, domainID)
 
 	return &pb.DeleteGroupResponse{}, nil
 }

@@ -13,42 +13,54 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateGroup(ctx context.Context, domainType string, domainID string, req *pb.CreateGroupRequest, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
-	if req.GroupName == "" {
+func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+	if group == nil {
+		return nil, status.Error(codes.InvalidArgument, "group must be specified")
+	}
+
+	if group.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "group metadata must be specified")
+	}
+
+	if group.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "group spec must be specified")
+	}
+
+	if group.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	if req.Role == "" {
+	if group.Spec.Role == "" {
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
-	err := authService.CreateGroup(domainID, domainType, req.GroupName, req.Role)
+	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role)
 	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, domainID, err)
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
 		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
 	var displayName string
 	var description string
-	if req.DisplayName != "" || req.Description != "" {
-		displayName = req.DisplayName
+	if group.Spec.DisplayName != "" || group.Spec.Description != "" {
+		displayName = group.Spec.DisplayName
 		if displayName == "" {
-			displayName = req.GroupName
+			displayName = group.Metadata.Name
 		}
-		description = req.Description
+		description = group.Spec.Description
 
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, domainID, displayName, description)
+		err = models.UpsertGroupMetadata(group.Metadata.Name, domainType, domainID, displayName, description)
 		if err != nil {
-			log.Errorf("failed to create group metadata for %s: %v", req.GroupName, err)
+			log.Errorf("failed to create group metadata for %s: %v", group.Metadata.Name, err)
 			return nil, status.Error(codes.Internal, "failed to create group metadata")
 		}
 	}
 
-	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, domainID, domainType)
+	log.Infof("created group %s with role %s in domain %s (type: %s)", group.Metadata.Name, group.Spec.Role, domainID, domainType)
 
-	group := &pb.Group{
+	groupResponse := &pb.Group{
 		Metadata: &pb.Group_Metadata{
-			Name:       req.GroupName,
+			Name:       group.Metadata.Name,
 			DomainType: actions.DomainTypeToProto(domainType),
 			DomainId:   domainID,
 			CreatedAt:  timestamppb.Now(),
@@ -61,6 +73,6 @@ func CreateGroup(ctx context.Context, domainType string, domainID string, req *p
 	}
 
 	return &pb.CreateGroupResponse{
-		Group: group,
+		Group: groupResponse,
 	}, nil
 }

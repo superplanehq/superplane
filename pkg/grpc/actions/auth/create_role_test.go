@@ -21,25 +21,27 @@ func Test_CreateRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful custom role creation", func(t *testing.T) {
-		req := &pb.CreateRoleRequest{
-			Name:       "custom-role",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				},
-				{
-					Resource:   "canvas",
-					Action:     "write",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "custom-role",
+			},
+			Spec: &pb.Role_Spec{
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
+					{
+						Resource:   "canvas",
+						Action:     "write",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
 				},
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -52,21 +54,27 @@ func Test_CreateRole(t *testing.T) {
 	})
 
 	t.Run("successful custom role creation with inheritance", func(t *testing.T) {
-		req := &pb.CreateRoleRequest{
-			Name:          "custom-role-with-inheritance",
-			DomainType:    pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:      orgID,
-			InheritedRole: models.RoleOrgViewer,
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "create",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "custom-role-with-inheritance",
+			},
+			Spec: &pb.Role_Spec{
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "create",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
+				},
+				InheritedRole: &pb.Role{
+					Metadata: &pb.Role_Metadata{
+						Name: models.RoleOrgViewer,
+					},
 				},
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -79,59 +87,69 @@ func Test_CreateRole(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {
-		req := &pb.CreateRoleRequest{
-			Name:       "",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "",
+			},
+			Spec: &pb.Role_Spec{
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
 				},
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
 
 	t.Run("invalid request - default role name", func(t *testing.T) {
-		req := &pb.CreateRoleRequest{
-			Name:       models.RoleOrgAdmin,
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: models.RoleOrgAdmin,
+			},
+			Spec: &pb.Role_Spec{
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
 				},
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot create custom role with default role name")
 	})
 
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {
-		req := &pb.CreateRoleRequest{
-			Name:          "test-role",
-			DomainType:    pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:      orgID,
-			InheritedRole: "nonexistent-role",
-			Permissions: []*pbAuth.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+		role := &pb.Role{
+			Metadata: &pb.Role_Metadata{
+				Name: "test-role",
+			},
+			Spec: &pb.Role_Spec{
+				Permissions: []*pbAuth.Permission{
+					{
+						Resource:   "canvas",
+						Action:     "read",
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					},
+				},
+				InheritedRole: &pb.Role{
+					Metadata: &pb.Role_Metadata{
+						Name: "nonexistent-role",
+					},
 				},
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

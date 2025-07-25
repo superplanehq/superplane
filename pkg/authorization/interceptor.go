@@ -75,13 +75,13 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbGroups.Groups_RemoveUserFromGroup_FullMethodName: {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 		pbGroups.Groups_UpdateGroup_FullMethodName:         {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 		pbGroups.Groups_ListGroups_FullMethodName:          {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
-		pbGroups.Groups_GetGroupUsers_FullMethodName:       {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
-		pbGroups.Groups_GetGroup_FullMethodName:            {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
+		pbGroups.Groups_ListGroupUsers_FullMethodName:      {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
+		pbGroups.Groups_DescribeGroup_FullMethodName:       {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 		pbGroups.Groups_DeleteGroup_FullMethodName:         {Resource: "group", Action: "delete", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 
 		// Users rules
 		pbUsers.Users_ListUserPermissions_FullMethodName: {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
-		pbUsers.Users_GetUserRoles_FullMethodName:        {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
+		pbUsers.Users_ListUserRoles_FullMethodName:       {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrg, models.DomainTypeCanvas}},
 
 		// Roles rules
@@ -175,12 +175,6 @@ func (a *AuthorizationInterceptor) getDomainTypeAndIdFromRequest(req interface{}
 		GetDomainId() string
 	}:
 		return getDomainTypeAndId(r.GetDomainId(), r.GetDomainType())
-
-	case interface {
-		GetRoleAssignment() *pbRoles.RoleAssignment
-	}:
-		roleAssignment := r.GetRoleAssignment()
-		return getDomainTypeAndId(roleAssignment.DomainId, roleAssignment.DomainType)
 
 	default:
 		return "", "", fmt.Errorf("unable to extract domain information from request")

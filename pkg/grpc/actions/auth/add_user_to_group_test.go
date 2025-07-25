@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -27,14 +25,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful add user to group with user ID", func(t *testing.T) {
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
-			GroupName:  "test-group",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, r.User.String(), "", "test-group", authService)
 		require.NoError(t, err)
 	})
 
@@ -44,14 +35,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		err = authService.CreateGroup(orgID, "org", "test-group-email", models.RoleOrgAdmin)
 		require.NoError(t, err)
 
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserEmail:  testEmail,
-			GroupName:  "test-group-email",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, "", testEmail, "test-group-email", authService)
 		require.NoError(t, err)
 
 		user, err := models.FindInactiveUserByEmail(testEmail)
@@ -61,52 +45,19 @@ func Test_AddUserToGroup(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
-			GroupName:  "",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, r.User.String(), "", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
-	t.Run("invalid request - missing domain type", func(t *testing.T) {
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			UserId:     r.User.String(),
-			GroupName:  "test-group",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
-	})
-
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			GroupName:  "test-group",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, "", "", "test-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "user identifier must be specified")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			UserId:     "invalid-uuid",
-			GroupName:  "test-group",
-		}
-
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, "invalid-uuid", "", "test-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
@@ -116,14 +67,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			UserId:     r.User.String(),
-			GroupName:  "non-existent-group",
-		}
-
-		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
+		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, r.User.String(), "", "non-existent-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group non-existent-group does not exist")
 	})
@@ -137,14 +81,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-test-group", models.RoleCanvasAdmin)
 		require.NoError(t, err)
 
-		req := &pbGroups.AddUserToGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			UserId:     r.User.String(),
-			GroupName:  "canvas-test-group",
-		}
-
-		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, req, authService)
+		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, r.User.String(), "", "canvas-test-group", authService)
 		require.NoError(t, err)
 	})
 }

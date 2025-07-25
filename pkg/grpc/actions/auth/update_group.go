@@ -5,6 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
@@ -12,71 +13,68 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func UpdateGroup(ctx context.Context, domainType string, domainID string, req *pb.UpdateGroupRequest, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
-	if req.GroupName == "" {
+func UpdateGroup(ctx context.Context, domainType string, domainID string, groupName string, groupSpec *pb.Group_Spec, authService authorization.Authorization) (*pb.UpdateGroupResponse, error) {
+	if groupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	// Check if the group exists by getting its current role
-	currentRole, err := authService.GetGroupRole(req.DomainId, domainType, req.GroupName)
+	currentRole, err := authService.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	// Update the group role if it changed
-	if req.Role != "" && req.Role != currentRole {
-		err = authService.UpdateGroupRole(domainID, domainType, req.GroupName, req.Role)
+	if groupSpec != nil && groupSpec.Role != "" && groupSpec.Role != currentRole {
+		err = authService.UpdateGroupRole(domainID, domainType, groupName, groupSpec.Role)
 		if err != nil {
-			log.Errorf("failed to update group %s role from %s to %s: %v", req.GroupName, currentRole, req.Role, err)
+			log.Errorf("failed to update group %s role from %s to %s: %v", groupName, currentRole, groupSpec.Role, err)
 			return nil, status.Error(codes.Internal, "failed to update group role")
 		}
 
-		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", req.GroupName, currentRole, req.Role, domainID, domainType)
+		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", groupName, currentRole, groupSpec.Role, domainID, domainType)
 	}
 
 	var displayName string
 	var description string
-	groupMetadata, err := models.FindGroupMetadata(req.GroupName, domainType, req.DomainId)
+	groupModelMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group metadata")
 	}
 
-	if req.DisplayName != "" || req.Description != "" {
-		displayName = req.DisplayName
+	if groupSpec != nil && (groupSpec.DisplayName != "" || groupSpec.Description != "") {
+		displayName = groupSpec.DisplayName
 		if displayName == "" {
-			displayName = groupMetadata.DisplayName
+			displayName = groupModelMetadata.DisplayName
 		}
 
-		description = req.Description
+		description = groupSpec.Description
 		if description == "" {
-			description = groupMetadata.Description
+			description = groupModelMetadata.Description
 		}
 
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainId, displayName, description)
+		err = models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
 		if err != nil {
-			log.Errorf("failed to update group metadata for %s: %v", req.GroupName, err)
+			log.Errorf("failed to update group metadata for %s: %v", groupName, err)
 			return nil, status.Error(codes.Internal, "failed to update group metadata")
 		}
 	} else {
-		displayName = groupMetadata.DisplayName
-		description = groupMetadata.Description
+		displayName = groupModelMetadata.DisplayName
+		description = groupModelMetadata.Description
 	}
 
-	// Get the updated role (in case it changed)
-	updatedRole := req.Role
+	updatedRole := groupSpec.Role
 	if updatedRole == "" {
 		updatedRole = currentRole
 	}
 
-	groupUsers, err := authService.GetGroupUsers(domainID, domainType, req.GroupName)
+	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to get group members count")
 	}
 
 	group := &pb.Group{
 		Metadata: &pb.Group_Metadata{
-			Name:       req.GroupName,
-			DomainType: req.DomainType,
+			Name:       groupName,
+			DomainType: actions.DomainTypeToProto(domainType),
 			DomainId:   domainID,
 			CreatedAt:  timestamppb.Now(),
 			UpdatedAt:  timestamppb.Now(),

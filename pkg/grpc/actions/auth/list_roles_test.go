@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_ListRoles(t *testing.T) {
@@ -21,16 +19,10 @@ func Test_ListRoles(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful list roles", func(t *testing.T) {
-		req := &pb.ListRolesRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		resp, err := ListRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeOrg, orgID, authService)
 		require.NoError(t, err)
-		assert.Equal(t, len(resp.Roles), 3) // viewer, admin, owner
+		assert.Equal(t, len(resp.Roles), 3)
 
-		// Should have expected roles
 		roleNames := make([]string, len(resp.Roles))
 		for i, role := range resp.Roles {
 			roleNames[i] = role.Metadata.Name
@@ -64,16 +56,10 @@ func Test_ListRoles(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &pb.ListRolesRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-		}
-
-		resp, err := ListRoles(ctx, models.DomainTypeCanvas, canvasID, req, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeCanvas, canvasID, authService)
 		require.NoError(t, err)
-		assert.Equal(t, len(resp.Roles), 3) // viewer, admin, owner
+		assert.Equal(t, len(resp.Roles), 3)
 
-		// Test beautiful display names and descriptions for canvas roles
 		for _, role := range resp.Roles {
 			assert.NotEmpty(t, role.Spec.DisplayName, "DisplayName should not be empty for role %s", role.Metadata.Name)
 			assert.NotEmpty(t, role.Spec.Description, "Description should not be empty for role %s", role.Metadata.Name)
@@ -92,14 +78,4 @@ func Test_ListRoles(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
-		req := &pb.ListRolesRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-		}
-
-		_, err := ListRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
-	})
 }

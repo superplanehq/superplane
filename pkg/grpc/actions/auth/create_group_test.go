@@ -24,11 +24,19 @@ func Test_CreateGroup(t *testing.T) {
 		req := &pb.CreateGroupRequest{
 			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			GroupName:  "test-group",
-			Role:       models.RoleOrgAdmin,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "test-group",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleOrgAdmin,
+					DisplayName: "test-group",
+					Description: "test-group",
+				},
+			},
 		}
 
-		resp, err := CreateGroup(ctx, "org", orgID, req, authService)
+		resp, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -47,11 +55,19 @@ func Test_CreateGroup(t *testing.T) {
 		req := &pb.CreateGroupRequest{
 			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
 			DomainId:   canvasID,
-			GroupName:  "canvas-group",
-			Role:       models.RoleCanvasAdmin,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "canvas-group",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleCanvasAdmin,
+					DisplayName: "canvas-group",
+					Description: "canvas-group",
+				},
+			},
 		}
 
-		resp, err := CreateGroup(ctx, "canvas", canvasID, req, authService)
+		resp, err := CreateGroup(ctx, "canvas", canvasID, req.Group, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
@@ -63,11 +79,19 @@ func Test_CreateGroup(t *testing.T) {
 		req := &pb.CreateGroupRequest{
 			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 			DomainId:   orgID,
-			GroupName:  "",
-			Role:       models.RoleOrgAdmin,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleOrgAdmin,
+					DisplayName: "test-group",
+					Description: "test-group",
+				},
+			},
 		}
 
-		_, err := CreateGroup(ctx, "org", orgID, req, authService)
+		_, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

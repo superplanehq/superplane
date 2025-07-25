@@ -8,8 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_DescribeRole(t *testing.T) {
@@ -21,13 +19,7 @@ func Test_DescribeRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role description", func(t *testing.T) {
-		req := &pb.DescribeRoleRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Role:       models.RoleOrgAdmin,
-		}
-
-		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.NotNil(t, resp.Role.Spec.InheritedRole)
@@ -48,13 +40,7 @@ func Test_DescribeRole(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &pb.DescribeRoleRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			Role:       models.RoleCanvasAdmin,
-		}
-
-		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeCanvas, canvasID, models.RoleCanvasAdmin, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Metadata.Name)
@@ -62,17 +48,5 @@ func Test_DescribeRole(t *testing.T) {
 		// Test beautiful display names and descriptions for canvas roles
 		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)
 		assert.Contains(t, resp.Role.Spec.Description, "Can manage stages, events, connections, and secrets")
-	})
-
-	t.Run("invalid request - missing domain ID", func(t *testing.T) {
-		req := &pb.DescribeRoleRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   "",
-			Role:       models.RoleOrgAdmin,
-		}
-
-		_, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain ID must be specified")
 	})
 }

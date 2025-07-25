@@ -8,12 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test_GetUserRoles(t *testing.T) {
+func Test_ListUserRoles(t *testing.T) {
 	r := support.Setup(t)
 	authService := SetupTestAuthService(t)
 	ctx := context.Background()
@@ -22,22 +20,14 @@ func Test_GetUserRoles(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	// Assign role to user
 	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
 	require.NoError(t, err)
 
 	t.Run("successful get user roles", func(t *testing.T) {
-		req := &pb.GetUserRolesRequest{
-			UserId:     r.User.String(),
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		resp, err := GetUserRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
+		resp, err := ListUserRoles(ctx, models.DomainTypeOrg, orgID, r.User.String(), authService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Roles)
 
-		// Should have at least the assigned role
 		roleNames := make([]string, len(resp.Roles))
 		for i, role := range resp.Roles {
 			roleNames[i] = role.Metadata.Name
@@ -48,13 +38,7 @@ func Test_GetUserRoles(t *testing.T) {
 	})
 
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
-		req := &pb.GetUserRolesRequest{
-			UserId:     "invalid-uuid",
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		_, err := GetUserRoles(ctx, models.DomainTypeOrg, orgID, req, authService)
+		_, err := ListUserRoles(ctx, models.DomainTypeOrg, orgID, "invalid-uuid", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})
