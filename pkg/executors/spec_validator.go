@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
@@ -117,7 +118,7 @@ func (v *SpecValidator) findSemaphoreTaskId(i integrations.Integration, project 
 	//
 	_, err := uuid.Parse(spec.Task)
 	if err == nil {
-		task, err := i.Get(integrations.ResourceTypeTask, spec.Task, project.Id())
+		task, err := i.Get(semaphore.ResourceTypeTask, spec.Task, project.Id())
 		if err != nil {
 			return nil, fmt.Errorf("task %s not found: %v", spec.Task, err)
 		}
@@ -129,7 +130,7 @@ func (v *SpecValidator) findSemaphoreTaskId(i integrations.Integration, project 
 	//
 	// If task is a string, we have to list tasks and find the one that matches.
 	//
-	tasks, err := i.List(integrations.ResourceTypeTask, project.Id())
+	tasks, err := i.List(semaphore.ResourceTypeTask, project.Id())
 	if err != nil {
 		return nil, fmt.Errorf("error listing tasks: %v", err)
 	}

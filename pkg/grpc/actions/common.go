@@ -9,6 +9,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -341,7 +342,7 @@ func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integrati
 func GetResourceType(integration *models.Integration) (string, error) {
 	switch integration.Type {
 	case models.IntegrationTypeSemaphore:
-		return integrations.ResourceTypeProject, nil
+		return semaphore.ResourceTypeProject, nil
 
 	default:
 		return "", status.Error(codes.InvalidArgument, "unsupported integration type")

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -19,7 +20,7 @@ type SemaphoreExecutor struct {
 
 type SemaphoreResponse struct {
 	wfID     string
-	pipeline *integrations.SemaphorePipeline
+	pipeline *semaphore.SemaphorePipeline
 }
 
 // Since a Semaphore execution creates a Semaphore pipeline,
@@ -31,7 +32,7 @@ func (r *SemaphoreResponse) Finished() bool {
 		return false
 	}
 
-	return r.pipeline.State == integrations.SemaphorePipelineStateDone
+	return r.pipeline.State == semaphore.SemaphorePipelineStateDone
 }
 
 // The API call to run a pipeline gives me back a workflow ID,
@@ -45,7 +46,7 @@ func (r *SemaphoreResponse) Successful() bool {
 		return false
 	}
 
-	return r.pipeline.Result == integrations.SemaphorePipelineResultPassed
+	return r.pipeline.Result == semaphore.SemaphorePipelineResultPassed
 }
 
 // Outputs for Semaphore executions are sent via the /outputs API.
@@ -89,18 +90,18 @@ func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, resource integrati
 }
 
 func (e *SemaphoreExecutor) Check(id string) (Response, error) {
-	resource, err := e.integration.Get(integrations.ResourceTypeWorkflow, id)
+	resource, err := e.integration.Get(semaphore.ResourceTypeWorkflow, id)
 	if err != nil {
 		return nil, fmt.Errorf("workflow %s not found", id)
 	}
 
-	workflow := resource.(*integrations.SemaphoreWorkflow)
-	resource, err = e.integration.Get(integrations.ResourceTypePipeline, workflow.InitialPplID)
+	workflow := resource.(*semaphore.SemaphoreWorkflow)
+	resource, err = e.integration.Get(semaphore.ResourceTypePipeline, workflow.InitialPplID)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 	}
 
-	pipeline := resource.(*integrations.SemaphorePipeline)
+	pipeline := resource.(*semaphore.SemaphorePipeline)
 	return &SemaphoreResponse{wfID: id, pipeline: pipeline}, nil
 }
 
@@ -113,7 +114,7 @@ func (e *SemaphoreExecutor) HandleWebhook(data []byte) (Response, error) {
 
 	return &SemaphoreResponse{
 		wfID: hook.Workflow.ID,
-		pipeline: &integrations.SemaphorePipeline{
+		pipeline: &semaphore.SemaphorePipeline{
 			PipelineID: hook.Pipeline.ID,
 			State:      hook.Pipeline.State,
 			Result:     hook.Pipeline.Result,
@@ -127,7 +128,7 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, resource integ
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
 
-	workflow, err := e.integration.Create(integrations.ResourceTypeWorkflow, &integrations.CreateWorkflowRequest{
+	workflow, err := e.integration.Create(semaphore.ResourceTypeWorkflow, &semaphore.CreateWorkflowRequest{
 		ProjectID:    resource.Id(),
 		Reference:    "refs/heads/" + spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
@@ -147,7 +148,7 @@ func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec) (Response, error) 
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
 
-	workflow, err := e.integration.Create(integrations.ResourceTypeTaskTrigger, &integrations.RunTaskRequest{
+	workflow, err := e.integration.Create(semaphore.ResourceTypeTaskTrigger, &semaphore.RunTaskRequest{
 		TaskID:       *spec.Semaphore.TaskId,
 		Branch:       spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,

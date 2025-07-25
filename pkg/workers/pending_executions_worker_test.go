@@ -9,7 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -192,7 +192,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, req *semaphore.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
 		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
 		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),

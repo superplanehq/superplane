@@ -1,18 +1,22 @@
 package executors
 
 import (
+	"context"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	semaphoremock "github.com/superplanehq/superplane/test/semaphore"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_Semaphore(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
 	signer := jwt.NewSigner("test")
 	executionID := uuid.New()
 	stageID := uuid.New()
@@ -23,11 +27,7 @@ func Test_Semaphore(t *testing.T) {
 	}
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
-		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
-		semaphoreMock.Init()
-		defer semaphoreMock.Close()
-
-		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
+		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
 		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
@@ -41,13 +41,13 @@ func Test_Semaphore(t *testing.T) {
 				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
 		}, &models.Resource{
-			ResourceType: integrations.ResourceTypeProject,
+			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
 
 		require.NoError(t, err)
 
-		params := semaphoreMock.LastRunWorkflow
+		params := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, params)
 		assert.Equal(t, "refs/heads/main", params.Reference)
 		assert.Equal(t, ".semaphore/semaphore.yml", params.PipelineFile)
@@ -61,11 +61,7 @@ func Test_Semaphore(t *testing.T) {
 	})
 
 	t.Run("runs task if task ID is not empty", func(t *testing.T) {
-		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
-		semaphoreMock.Init()
-		defer semaphoreMock.Close()
-
-		integration, err := integrations.NewSemaphoreIntegration(semaphoreMock.Server.URL, "test")
+		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
 		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
@@ -81,13 +77,13 @@ func Test_Semaphore(t *testing.T) {
 				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
 		}, &models.Resource{
-			ResourceType: integrations.ResourceTypeTask,
+			ResourceType: semaphore.ResourceTypeTask,
 			ExternalID:   projectID,
 		})
 
 		require.NoError(t, err)
 
-		runTaskRequest := semaphoreMock.LastRunTask
+		runTaskRequest := r.SemaphoreAPIMock.LastRunTask
 		require.NotNil(t, runTaskRequest)
 		assert.Equal(t, "main", runTaskRequest.Branch)
 		assert.Equal(t, ".semaphore/semaphore.yml", runTaskRequest.PipelineFile)

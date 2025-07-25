@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -75,7 +75,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock failed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, integrations.SemaphorePipelineResultFailed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.SemaphorePipelineResultFailed)
 		err = w.Tick()
 		require.NoError(t, err)
 
@@ -118,7 +118,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock passed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, integrations.SemaphorePipelineResultPassed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.SemaphorePipelineResultPassed)
 		err = w.Tick()
 		require.NoError(t, err)
 

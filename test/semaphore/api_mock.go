@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 )
 
 type SemaphoreAPIMock struct {
@@ -18,8 +18,8 @@ type SemaphoreAPIMock struct {
 	Workflows map[string]Pipeline
 	Projects  []string
 
-	LastRunTask     *integrations.RunTaskRequest
-	LastRunWorkflow *integrations.CreateWorkflowRequest
+	LastRunTask     *semaphore.RunTaskRequest
+	LastRunWorkflow *semaphore.CreateWorkflowRequest
 }
 
 type Pipeline struct {
@@ -88,7 +88,7 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, _ := json.Marshal(integrations.SemaphoreWorkflow{InitialPplID: pipeline.ID})
+	data, _ := json.Marshal(semaphore.SemaphoreWorkflow{InitialPplID: pipeline.ID})
 	w.Write(data)
 }
 
@@ -101,8 +101,8 @@ func (s *SemaphoreAPIMock) DescribeProject(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	data, _ := json.Marshal(integrations.SemaphoreProject{
-		Metadata: &integrations.SemaphoreProjectMetadata{
+	data, _ := json.Marshal(semaphore.SemaphoreProject{
+		Metadata: &semaphore.SemaphoreProjectMetadata{
 			ProjectName: projectName,
 			ProjectID:   uuid.New().String(),
 		},
@@ -119,11 +119,11 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 
 	for wfID, p := range s.Workflows {
 		if p.ID == pipelineID {
-			data, _ := json.Marshal(integrations.SemaphorePipelineResponse{
-				Pipeline: &integrations.SemaphorePipeline{
+			data, _ := json.Marshal(semaphore.SemaphorePipelineResponse{
+				Pipeline: &semaphore.SemaphorePipeline{
 					PipelineID: p.ID,
 					WorkflowID: wfID,
-					State:      integrations.SemaphorePipelineStateDone,
+					State:      semaphore.SemaphorePipelineStateDone,
 					Result:     p.Result,
 				},
 			})
@@ -143,14 +143,14 @@ func (s *SemaphoreAPIMock) RunTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var runTaskRequest integrations.RunTaskRequest
+	var runTaskRequest semaphore.RunTaskRequest
 	err = json.Unmarshal(body, &runTaskRequest)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	response := integrations.RunTaskResponse{WorkflowID: uuid.New().String()}
+	response := semaphore.RunTaskResponse{WorkflowID: uuid.New().String()}
 	data, err := json.Marshal(response)
 	if err != nil {
 		w.WriteHeader(500)
@@ -168,14 +168,14 @@ func (s *SemaphoreAPIMock) RunWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var params integrations.CreateWorkflowRequest
+	var params semaphore.CreateWorkflowRequest
 	err = json.Unmarshal(body, &params)
 	if err != nil {
 		w.WriteHeader(500)
 		return
 	}
 
-	data, err := json.Marshal(integrations.CreateWorkflowResponse{
+	data, err := json.Marshal(semaphore.CreateWorkflowResponse{
 		WorkflowID: uuid.New().String(),
 	})
 
