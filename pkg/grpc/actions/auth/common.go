@@ -46,8 +46,8 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, domainI
 				UpdatedAt:  timestamppb.New(inheritedRoleMetadata.UpdatedAt),
 			},
 			Spec: &pbRoles.Role_Spec{
-				DisplayName: roleMetadata.DisplayName,
-				Description: roleMetadata.Description,
+				DisplayName: inheritedRoleMetadata.DisplayName,
+				Description: inheritedRoleMetadata.Description,
 				Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
 			},
 		}
