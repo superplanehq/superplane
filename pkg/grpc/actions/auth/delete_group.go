@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -40,12 +39,6 @@ func DeleteGroup(ctx context.Context, domainType, domainID, groupName string, au
 	if err != nil {
 		log.Errorf("failed to delete group %s: %v", groupName, err)
 		return nil, status.Error(codes.Internal, "failed to delete group")
-	}
-
-	err = models.DeleteGroupMetadata(groupName, domainType, domainID)
-	if err != nil {
-		log.Errorf("failed to delete group metadata for %s: %v", groupName, err)
-		return nil, status.Error(codes.Internal, "failed to delete group metadata")
 	}
 
 	log.Infof("deleted group %s from domain %s", groupName, domainID)

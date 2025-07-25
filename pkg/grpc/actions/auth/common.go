@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbRoles.Role, error) {
+func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbRoles.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
 	roleMetadata := roleMetadataMap[roleDef.Name]
@@ -29,8 +29,8 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authSer
 			UpdatedAt:  timestamppb.New(roleMetadataMap[roleDef.Name].UpdatedAt),
 		},
 		Spec: &pbRoles.Role_Spec{
-			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
-			Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+			DisplayName: roleMetadata.DisplayName,
+			Description: roleMetadata.Description,
 			Permissions: permissions,
 		},
 	}
@@ -46,8 +46,8 @@ func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authSer
 				UpdatedAt:  timestamppb.New(inheritedRoleMetadata.UpdatedAt),
 			},
 			Spec: &pbRoles.Role_Spec{
-				DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
-				Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+				DisplayName: roleMetadata.DisplayName,
+				Description: roleMetadata.Description,
 				Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
 			},
 		}
@@ -167,8 +167,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	// Batch fetch role metadata
 	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
-		// Log error but continue with fallback behavior
-		roleMetadataMap = make(map[string]*models.RoleMetadata)
+		return nil, status.Error(codes.NotFound, "role not found")
 	}
 
 	userRoleMap := make(map[string][]*pbUsers.UserRoleAssignment)
@@ -189,8 +188,8 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 		roleMetadata := roleMetadataMap[roleDef.Name]
 		roleAssignment := &pb.UserRoleAssignment{
 			RoleName:        roleDef.Name,
-			RoleDisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
-			RoleDescription: models.GetRoleDescriptionWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
+			RoleDisplayName: roleMetadata.DisplayName,
+			RoleDescription: roleMetadata.Description,
 			DomainType:      actions.DomainTypeToProto(domainType),
 			DomainId:        domainID,
 			AssignedAt:      timestamppb.Now(),

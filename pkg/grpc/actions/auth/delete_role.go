@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -27,12 +26,6 @@ func DeleteRole(ctx context.Context, domainType, domainID, roleName string, auth
 	if err != nil {
 		log.Errorf("failed to delete role %s: %v", roleName, err)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	err = models.DeleteRoleMetadata(roleName, domainType, domainID)
-	if err != nil {
-		log.Errorf("failed to delete role metadata for %s: %v", roleName, err)
-		return nil, status.Error(codes.Internal, "failed to delete role metadata")
 	}
 
 	log.Infof("deleted custom role %s from domain %s (%s)", roleName, domainID, domainType)
