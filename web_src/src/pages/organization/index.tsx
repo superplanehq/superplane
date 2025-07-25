@@ -15,7 +15,6 @@ interface Canvas {
   name: string
   description?: string
   createdAt: string
-  updatedAt: string
   createdBy: {
     name: string
     avatar?: string
@@ -46,9 +45,8 @@ const HomePage = () => {
   const canvases: Canvas[] = canvasesData.map((canvas: SuperplaneCanvas) => ({
     id: canvas.metadata!.id!,
     name: canvas.metadata!.name!,
-    description: canvas.metadata!.name, // Using name as description since description field doesn't exist in API
+    description: canvas.metadata!.description,
     createdAt: canvas.metadata!.createdAt ? new Date(canvas.metadata!.createdAt!).toLocaleDateString() : 'Unknown',
-    updatedAt: canvas.metadata!.createdAt ? new Date(canvas.metadata!.createdAt!).toLocaleDateString() : 'Unknown', // Using createdAt since updatedAt doesn't exist
     createdBy: {
       name: user?.name || 'Unknown User',
       initials: user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?',
@@ -208,11 +206,10 @@ const HomePage = () => {
 
                             {/* Content */}
                             <div className="mb-4">
-                              {canvas.description && (
-                                <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                                  {canvas.description}
-                                </Text>
-                              )}
+
+                              <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
+                                {canvas.description || 'No description available'}
+                              </Text>
                             </div>
                           </div>
 
@@ -230,7 +227,7 @@ const HomePage = () => {
                                   Created by <strong>{canvas.createdBy.name}</strong>
                                 </p>
                                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                                  Updated {canvas.updatedAt}
+                                  Created at {canvas.createdAt}
                                 </p>
                               </div>
                             </div>
@@ -270,11 +267,9 @@ const HomePage = () => {
                                   </Link>
                                 </div>
 
-                                {canvas.description && (
-                                  <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
-                                    {canvas.description}
-                                  </Text>
-                                )}
+                                <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
+                                  {canvas.description || 'No description available'}
+                                </Text>
                               </div>
                             </div>
 
@@ -286,7 +281,7 @@ const HomePage = () => {
                                     Created by <strong>{canvas.createdBy.name}</strong>
                                   </p>
                                   <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none">
-                                    Updated {canvas.updatedAt}
+                                    Created at {canvas.createdAt}
                                   </p>
                                 </div>
                                 <Avatar

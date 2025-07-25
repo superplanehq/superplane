@@ -29,7 +29,7 @@ func Test__ListStages(t *testing.T) {
 		org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
 		require.NoError(t, err)
 
-		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas")
+		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas", "empty canvas")
 		require.NoError(t, err)
 
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{

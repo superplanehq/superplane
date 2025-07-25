@@ -2959,6 +2959,9 @@
         "name": {
           "type": "string"
         },
+        "description": {
+          "type": "string"
+        },
         "createdBy": {
           "type": "string"
         },

@@ -257,8 +257,9 @@ message Canvas {
   message Metadata {
     string id = 1;
     string name = 2;
-    string created_by = 3;
-    google.protobuf.Timestamp created_at = 4;
+    string description = 3;
+    string created_by = 4;
+    google.protobuf.Timestamp created_at = 5;
   }
 
   Metadata metadata = 1;

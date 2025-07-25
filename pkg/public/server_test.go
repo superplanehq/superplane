@@ -50,7 +50,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, org.ID, "test")
+	canvas, err := models.CreateCanvas(userID, org.ID, "test", "test")
 	require.NoError(t, err)
 
 	eventSource, err := canvas.CreateEventSource("github-repo-1", []byte("my-key"), models.EventSourceScopeExternal, nil)
@@ -182,7 +182,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	require.NoError(t, err)
 
 	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, org.ID, "test")
+	canvas, err := models.CreateCanvas(userID, org.ID, "test", "test")
 	require.NoError(t, err)
 
 	eventSource, err := canvas.CreateEventSource("semaphore-source-1", []byte("my-key"), models.EventSourceScopeExternal, nil)

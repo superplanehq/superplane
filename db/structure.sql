@@ -67,7 +67,8 @@ CREATE TABLE public.canvases (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     organization_id uuid NOT NULL,
-    deleted_at timestamp with time zone
+    deleted_at timestamp with time zone,
+    description text
 );
 
 
@@ -1017,7 +1018,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250725093855	f
+20250725101741	f
 \.
 
 

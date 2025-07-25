@@ -35,7 +35,7 @@ func Test__DeleteCanvas(t *testing.T) {
 	t.Run("delete canvas successfully", func(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "")
 		require.NoError(t, err)
-		canvas, err := models.CreateCanvas(userID, organization.ID, "test")
+		canvas, err := models.CreateCanvas(userID, organization.ID, "test", "test")
 		require.NoError(t, err)
 		err = authService.SetupCanvasRoles(canvas.ID.String())
 		require.NoError(t, err)

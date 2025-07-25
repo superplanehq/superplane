@@ -386,6 +386,7 @@ export type SuperplaneCanvas = {
 export type SuperplaneCanvasMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     createdBy?: string;
     createdAt?: string;
 };

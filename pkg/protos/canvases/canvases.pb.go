@@ -4790,8 +4790,9 @@ type Canvas_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,3,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedBy     string                 `protobuf:"bytes,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4836,6 +4837,13 @@ func (x *Canvas_Metadata) GetId() string {
 func (x *Canvas_Metadata) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *Canvas_Metadata) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -5727,16 +5735,17 @@ const file_canvases_proto_rawDesc = "" +
 	"\x13ListCanvasesRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"F\n" +
 	"\x14ListCanvasesResponse\x12.\n" +
-	"\bcanvases\x18\x01 \x03(\v2\x12.Superplane.CanvasR\bcanvases\"\xcc\x01\n" +
+	"\bcanvases\x18\x01 \x03(\v2\x12.Superplane.CanvasR\bcanvases\"\xee\x01\n" +
 	"\x06Canvas\x127\n" +
-	"\bmetadata\x18\x01 \x01(\v2\x1b.Superplane.Canvas.MetadataR\bmetadata\x1a\x88\x01\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x1b.Superplane.Canvas.MetadataR\bmetadata\x1a\xaa\x01\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1d\n" +
 	"\n" +
-	"created_by\x18\x03 \x01(\tR\tcreatedBy\x129\n" +
+	"created_by\x18\x04 \x01(\tR\tcreatedBy\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"j\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"j\n" +
 	"\x13CreateCanvasRequest\x12*\n" +
 	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\x12'\n" +
 	"\x0forganization_id\x18\x02 \x01(\tR\x0eorganizationId\"B\n" +
