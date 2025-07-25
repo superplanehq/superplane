@@ -39,7 +39,7 @@ const (
 )
 
 func ValidateDomainType(domainType string) error {
-	if domainType != DomainTypeOrg && domainType != DomainTypeCanvas {
+	if domainType != DomainTypeOrganization && domainType != DomainTypeCanvas {
 		return fmt.Errorf("invalid domain type %s", domainType)
 	}
 	return nil
