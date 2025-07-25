@@ -20,52 +20,52 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 
 	t.Run("successful group deletion", func(t *testing.T) {
 
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID, "test-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID, "test-group")
 		require.NoError(t, err)
 
-		groups, err := authService.GetGroups(orgID, models.DomainTypeOrg)
+		groups, err := authService.GetGroups(orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 
-		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrg, "test-group")
+		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID)
 
-		resp, err := DeleteGroup(ctx, models.DomainTypeOrg, orgID, "test-group", authService)
+		resp, err := DeleteGroup(ctx, models.DomainTypeOrganization, orgID, "test-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err = authService.GetGroupUsers(orgID, models.DomainTypeOrg, "test-group")
+		users, err = authService.GetGroupUsers(orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Empty(t, users)
 
 		// Verify the group no longer exists in the groups list
-		groups, err = authService.GetGroups(orgID, models.DomainTypeOrg)
+		groups, err = authService.GetGroups(orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.NotContains(t, groups, "test-group")
 	})
 
 	t.Run("delete non-existent group", func(t *testing.T) {
-		_, err := DeleteGroup(ctx, models.DomainTypeOrg, orgID, "non-existent-group", authService)
+		_, err := DeleteGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		_, err := DeleteGroup(ctx, models.DomainTypeOrg, orgID, "", authService)
+		_, err := DeleteGroup(ctx, models.DomainTypeOrganization, orgID, "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - invalid organization ID for group", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
 		require.NoError(t, err)
 
-		_, err = DeleteGroup(ctx, models.DomainTypeOrg, "invalid-uuid", "test-group", authService)
+		_, err = DeleteGroup(ctx, models.DomainTypeOrganization, "invalid-uuid", "test-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})

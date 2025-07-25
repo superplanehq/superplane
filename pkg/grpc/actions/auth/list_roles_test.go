@@ -19,7 +19,7 @@ func Test_ListRoles(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful list roles", func(t *testing.T) {
-		resp, err := ListRoles(ctx, models.DomainTypeOrg, orgID, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeOrganization, orgID, authService)
 		require.NoError(t, err)
 		assert.Equal(t, len(resp.Roles), 3)
 

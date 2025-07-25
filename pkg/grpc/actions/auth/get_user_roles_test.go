@@ -20,11 +20,11 @@ func Test_ListUserRoles(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful get user roles", func(t *testing.T) {
-		resp, err := ListUserRoles(ctx, models.DomainTypeOrg, orgID, r.User.String(), authService)
+		resp, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, r.User.String(), authService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Roles)
 
@@ -38,7 +38,7 @@ func Test_ListUserRoles(t *testing.T) {
 	})
 
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
-		_, err := ListUserRoles(ctx, models.DomainTypeOrg, orgID, "invalid-uuid", authService)
+		_, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})

@@ -20,13 +20,13 @@ func Test_ListGroups(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group")
+	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group")
 	require.NoError(t, err)
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group")
+	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group")
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
-		resp, err := ListGroups(ctx, models.DomainTypeOrg, orgID, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
@@ -88,7 +88,7 @@ func Test_ListGroups(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, "org", "test-user-1", "test-group-1")
 		require.NoError(t, err)
 
-		resp, err := ListGroups(ctx, models.DomainTypeOrg, orgID, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, authService)
 		require.NoError(t, err)
 
 		var groupWithMetadata *pb.Group

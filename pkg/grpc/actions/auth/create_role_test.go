@@ -43,11 +43,11 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
+		resp, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		response, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, "custom-role", authService)
+		response, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role", authService)
 		require.NoError(t, err)
 		createdRole := response.GetRole()
 		assert.Equal(t, "custom-role", createdRole.GetMetadata().GetName())
@@ -80,12 +80,12 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
+		resp, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleResponse, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, "custom-role-with-inheritance", authService)
+		roleResponse, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, "custom-role-with-inheritance", authService)
 		require.NoError(t, err)
 		createdRole := roleResponse.GetRole()
 		assert.Equal(t, "custom-role-with-inheritance", createdRole.GetMetadata().GetName())
@@ -113,7 +113,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
@@ -136,7 +136,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot create custom role with default role name")
 	})
@@ -164,7 +164,7 @@ func Test_CreateRole(t *testing.T) {
 			},
 		}
 
-		_, err := CreateRole(ctx, models.DomainTypeOrg, orgID, role, authService)
+		_, err := CreateRole(ctx, models.DomainTypeOrganization, orgID, role, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

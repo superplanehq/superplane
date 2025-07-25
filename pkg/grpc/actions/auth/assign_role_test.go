@@ -21,14 +21,14 @@ func Test_AssignRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role assignment with user ID", func(t *testing.T) {
-		resp, err := AssignRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("successful role assignment with user email", func(t *testing.T) {
 		testEmail := "test@example.com"
-		resp, err := AssignRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", testEmail, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", testEmail, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -40,19 +40,19 @@ func Test_AssignRole(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, "", r.User.String(), "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, "", r.User.String(), "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

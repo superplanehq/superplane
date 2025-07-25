@@ -6,8 +6,8 @@ const (
 	ProviderGitHub = "github"
 	ScopeUser      = "user"
 
-	DomainTypeOrg    = "org"
-	DomainTypeCanvas = "canvas"
+	DomainTypeOrganization = "org"
+	DomainTypeCanvas       = "canvas"
 
 	DisplayNameOwner  = "Owner"
 	DisplayNameAdmin  = "Admin"

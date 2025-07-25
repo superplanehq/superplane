@@ -22,11 +22,11 @@ func Test_DescribeGroup(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
+	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
-		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "test-group", authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "test-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -60,13 +60,13 @@ func Test_DescribeGroup(t *testing.T) {
 	})
 
 	t.Run("group not found", func(t *testing.T) {
-		_, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "non-existent-group", authService)
+		_, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		_, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "", authService)
+		_, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -76,17 +76,17 @@ func Test_DescribeGroup(t *testing.T) {
 		err := authService.SetupOrganizationRoles(anotherOrgID)
 		require.NoError(t, err)
 
-		_, err = DescribeGroup(ctx, models.DomainTypeOrg, anotherOrgID, "test-group", authService)
+		_, err = DescribeGroup(ctx, models.DomainTypeOrganization, anotherOrgID, "test-group", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
 
 	t.Run("get group with viewer role", func(t *testing.T) {
 		// Create a group with viewer role
-		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "viewer-group", models.RoleOrgViewer, "Viewer Group", "Viewer group description")
+		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "viewer-group", models.RoleOrgViewer, "Viewer Group", "Viewer group description")
 		require.NoError(t, err)
 
-		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "viewer-group", authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "viewer-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)
@@ -101,7 +101,7 @@ func Test_DescribeGroup(t *testing.T) {
 		err = authService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner, "Owner Group", "Owner group description")
 		require.NoError(t, err)
 
-		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "owner-group", authService)
+		resp, err := DescribeGroup(ctx, models.DomainTypeOrganization, orgID, "owner-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.NotNil(t, resp.Group)

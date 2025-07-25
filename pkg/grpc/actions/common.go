@@ -269,7 +269,7 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return models.DomainTypeOrg, nil
+		return models.DomainTypeOrganization, nil
 	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
 		return models.DomainTypeCanvas, nil
 	default:
@@ -281,7 +281,7 @@ func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
 	case models.DomainTypeCanvas:
 		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
-	case models.DomainTypeOrg:
+	case models.DomainTypeOrganization:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED

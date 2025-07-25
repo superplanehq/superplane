@@ -20,25 +20,25 @@ func TestUpdateGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role update", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgViewer, "Test Group", "Test Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
 			Role: models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "test-group", groupSpec, authService)
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "test-group", groupSpec, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
 
-		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrg, "test-group")
+		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrganization, "test-group")
 		require.NoError(t, err)
 		assert.Equal(t, models.RoleOrgAdmin, role)
 	})
 
 	t.Run("successful metadata update", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -46,7 +46,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Updated Description",
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "metadata-group", groupSpec, authService)
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "metadata-group", groupSpec, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "Updated Display Name", resp.Group.Spec.DisplayName)
@@ -54,7 +54,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -63,7 +63,7 @@ func TestUpdateGroup(t *testing.T) {
 			Description: "Full Update Description",
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "full-update-group", groupSpec, authService)
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "full-update-group", groupSpec, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, models.RoleOrgAdmin, resp.Group.Spec.Role)
@@ -72,25 +72,25 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("update preserves group membership", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description")
 		require.NoError(t, err)
 
 		userID1 := uuid.New().String()
 		userID2 := uuid.New().String()
-		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID1, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID1, "membership-group")
 		require.NoError(t, err)
-		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, userID2, "membership-group")
+		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, userID2, "membership-group")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
 			Role: models.RoleOrgAdmin,
 		}
 
-		resp, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "membership-group", groupSpec, authService)
+		resp, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "membership-group", groupSpec, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrg, "membership-group")
+		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrganization, "membership-group")
 		require.NoError(t, err)
 		assert.Contains(t, users, userID1)
 		assert.Contains(t, users, userID2)
@@ -120,7 +120,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "non-existent-group", groupSpec, authService)
+		_, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "non-existent-group", groupSpec, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group not found")
 	})
@@ -130,7 +130,7 @@ func TestUpdateGroup(t *testing.T) {
 			Role: models.RoleOrgAdmin,
 		}
 
-		_, err := UpdateGroup(ctx, models.DomainTypeOrg, orgID, "", groupSpec, authService)
+		_, err := UpdateGroup(ctx, models.DomainTypeOrganization, orgID, "", groupSpec, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

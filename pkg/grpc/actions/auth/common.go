@@ -176,7 +176,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 	for _, roleDef := range roleDefinitions {
 		var userIDs []string
 
-		if domainType == models.DomainTypeOrg {
+		if domainType == models.DomainTypeOrganization {
 			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
 		} else {
 			userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)

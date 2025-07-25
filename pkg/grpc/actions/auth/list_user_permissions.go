@@ -17,7 +17,7 @@ func ListUserPermissions(ctx context.Context, domainType string, domainID string
 	var roles []*authorization.RoleDefinition
 	var err error
 	switch domainType {
-	case models.DomainTypeOrg:
+	case models.DomainTypeOrganization:
 		roles, err = authService.GetUserRolesForOrg(userID, domainID)
 	case models.DomainTypeCanvas:
 		roles, err = authService.GetUserRolesForCanvas(userID, domainID)

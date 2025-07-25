@@ -19,7 +19,7 @@ func Test_DescribeRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role description", func(t *testing.T) {
-		resp, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.NotNil(t, resp.Role.Spec.InheritedRole)

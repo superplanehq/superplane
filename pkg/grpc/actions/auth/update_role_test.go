@@ -24,12 +24,12 @@ func Test_UpdateRole(t *testing.T) {
 	// Create a custom role first
 	customRoleDef := &authorization.RoleDefinition{
 		Name:       "test-custom-role",
-		DomainType: models.DomainTypeOrg,
+		DomainType: models.DomainTypeOrganization,
 		Permissions: []*authorization.Permission{
 			{
 				Resource:   "canvas",
 				Action:     "read",
-				DomainType: models.DomainTypeOrg,
+				DomainType: models.DomainTypeOrganization,
 			},
 		},
 	}
@@ -57,11 +57,11 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, "test-custom-role", req, authService)
+		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.Len(t, roleDef.Permissions, 3)
@@ -83,11 +83,11 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		resp, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, "test-custom-role", req, authService)
+		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrg, orgID)
+		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
@@ -106,7 +106,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, "", req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
@@ -122,7 +122,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot update default role")
 	})
@@ -138,7 +138,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, "nonexistent-role", req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "nonexistent-role", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
@@ -159,7 +159,7 @@ func Test_UpdateRole(t *testing.T) {
 			},
 		}
 
-		_, err := UpdateRole(ctx, models.DomainTypeOrg, orgID, "test-custom-role", req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

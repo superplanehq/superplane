@@ -22,16 +22,16 @@ func Test_ListGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
+	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	// Add user to group
-	err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, r.User.String(), "test-group")
+	err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, r.User.String(), "test-group")
 	require.NoError(t, err)
 
 	t.Run("successful get group users", func(t *testing.T) {
 
-		resp, err := ListGroupUsers(ctx, models.DomainTypeOrg, orgID, "test-group", authService)
+		resp, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "test-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Users, 1)
@@ -48,7 +48,7 @@ func Test_ListGroupUsers(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		_, err := ListGroupUsers(ctx, models.DomainTypeOrg, orgID, "", authService)
+		_, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
@@ -76,10 +76,10 @@ func Test_ListGroupUsers(t *testing.T) {
 	})
 
 	t.Run("empty group - no users", func(t *testing.T) {
-		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "empty-group", models.RoleOrgViewer, "Empty Group", "Empty group description")
+		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "empty-group", models.RoleOrgViewer, "Empty Group", "Empty group description")
 		require.NoError(t, err)
 
-		resp, err := ListGroupUsers(ctx, models.DomainTypeOrg, orgID, "empty-group", authService)
+		resp, err := ListGroupUsers(ctx, models.DomainTypeOrganization, orgID, "empty-group", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Empty(t, resp.Users)

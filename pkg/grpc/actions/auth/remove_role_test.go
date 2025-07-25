@@ -21,11 +21,11 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful role removal with user ID", func(t *testing.T) {
-		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -48,28 +48,28 @@ func Test_RemoveRole(t *testing.T) {
 		err = accountProvider.Create()
 		require.NoError(t, err)
 
-		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrg)
+		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
-		resp, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", testEmail, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", testEmail, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("user not found by email", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", "nonexistent@example.com", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "nonexistent@example.com", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "", "", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrg, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
