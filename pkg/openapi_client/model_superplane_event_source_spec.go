@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Organizations API
 
-API for the Superplane service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -20,7 +20,7 @@ var _ MappedNullable = &SuperplaneEventSourceSpec{}
 
 // SuperplaneEventSourceSpec struct for SuperplaneEventSourceSpec
 type SuperplaneEventSourceSpec struct {
-	Integration *SuperplaneIntegrationRef `json:"integration,omitempty"`
+	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Semaphore *EventSourceSpecSemaphore `json:"semaphore,omitempty"`
 }
 
@@ -42,9 +42,9 @@ func NewSuperplaneEventSourceSpecWithDefaults() *SuperplaneEventSourceSpec {
 }
 
 // GetIntegration returns the Integration field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceSpec) GetIntegration() SuperplaneIntegrationRef {
+func (o *SuperplaneEventSourceSpec) GetIntegration() IntegrationsIntegrationRef {
 	if o == nil || IsNil(o.Integration) {
-		var ret SuperplaneIntegrationRef
+		var ret IntegrationsIntegrationRef
 		return ret
 	}
 	return *o.Integration
@@ -52,7 +52,7 @@ func (o *SuperplaneEventSourceSpec) GetIntegration() SuperplaneIntegrationRef {
 
 // GetIntegrationOk returns a tuple with the Integration field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceSpec) GetIntegrationOk() (*SuperplaneIntegrationRef, bool) {
+func (o *SuperplaneEventSourceSpec) GetIntegrationOk() (*IntegrationsIntegrationRef, bool) {
 	if o == nil || IsNil(o.Integration) {
 		return nil, false
 	}
@@ -68,8 +68,8 @@ func (o *SuperplaneEventSourceSpec) HasIntegration() bool {
 	return false
 }
 
-// SetIntegration gets a reference to the given SuperplaneIntegrationRef and assigns it to the Integration field.
-func (o *SuperplaneEventSourceSpec) SetIntegration(v SuperplaneIntegrationRef) {
+// SetIntegration gets a reference to the given IntegrationsIntegrationRef and assigns it to the Integration field.
+func (o *SuperplaneEventSourceSpec) SetIntegration(v IntegrationsIntegrationRef) {
 	o.Integration = &v
 }
 

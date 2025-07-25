@@ -31,7 +31,7 @@ export function CreateGroupPage() {
 
   useEffect(() => {
     if (roles.length > 0 && !selectedRole) {
-      setSelectedRole(roles[0].name || '')
+      setSelectedRole(roles[0].metadata?.name || '')
     }
   }, [roles, selectedRole])
 
@@ -172,15 +172,15 @@ export function CreateGroupPage() {
                 ) : (
                   <Dropdown>
                     <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                      {roles.find(r => r.name === selectedRole)?.displayName || 'Select Role'}
+                      {roles.find(r => r.metadata?.name === selectedRole)?.spec?.displayName || 'Select Role'}
                       <MaterialSymbol name="keyboard_arrow_down" />
                     </DropdownButton>
                     <DropdownMenu>
                       {roles.map((role) => (
-                        <DropdownItem key={role.name} onClick={() => setSelectedRole(role.name || '')}>
-                          <DropdownLabel >{role.displayName}</DropdownLabel>
+                        <DropdownItem key={role.metadata?.name} onClick={() => setSelectedRole(role.metadata?.name || '')}>
+                          <DropdownLabel >{role.spec?.displayName}</DropdownLabel>
                           <DropdownDescription>
-                            {role.description || 'No description available'}
+                            {role.spec?.description || 'No description available'}
                           </DropdownDescription>
                         </DropdownItem>
                       ))}

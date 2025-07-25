@@ -9,9 +9,13 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	authorizationProtos "github.com/superplanehq/superplane/pkg/protos/authorization"
-	organizationProtos "github.com/superplanehq/superplane/pkg/protos/organizations"
-	superplaneProtos "github.com/superplanehq/superplane/pkg/protos/superplane"
+	canvasPb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
@@ -59,14 +63,26 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	//
 	// Initialize services exposed by this server.
 	//
-	service := NewSuperplaneService(encryptor, authService)
-	superplaneProtos.RegisterSuperplaneServer(grpcServer, service)
+	service := NewCanvasService(encryptor, authService)
+	canvasPb.RegisterSuperplaneServer(grpcServer, service)
 
 	organizationService := NewOrganizationService(authService)
-	organizationProtos.RegisterOrganizationsServer(grpcServer, organizationService)
+	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
-	server := NewAuthorizationServer(authService)
-	authorizationProtos.RegisterAuthorizationServer(grpcServer, server)
+	userService := NewUsersService(authService)
+	pbUsers.RegisterUsersServer(grpcServer, userService)
+
+	groupService := NewGroupsService(authService)
+	pbGroups.RegisterGroupsServer(grpcServer, groupService)
+
+	roleService := NewRoleService(authService)
+	pbRoles.RegisterRolesServer(grpcServer, roleService)
+
+	secretsService := NewSecretService(encryptor, authService)
+	secretPb.RegisterSecretsServer(grpcServer, secretsService)
+
+	integrationsService := NewIntegrationService(encryptor, authService)
+	integrationPb.RegisterIntegrationsServer(grpcServer, integrationsService)
 
 	reflection.Register(grpcServer)
 

@@ -5,47 +5,56 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func convertDomainType(domainType pbAuth.DomainType) string {
-	switch domainType {
-	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		return authorization.DomainOrg
-	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		return authorization.DomainCanvas
-	default:
-		return ""
-	}
-}
-
-func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbAuth.Role, error) {
+func convertRoleDefinitionToProto(roleDef *authorization.RoleDefinition, authService authorization.Authorization, domainID string, roleMetadataMap map[string]*models.RoleMetadata) (*pbRoles.Role, error) {
 	permissions := convertPermissionsToProto(roleDef.Permissions)
 
 	roleMetadata := roleMetadataMap[roleDef.Name]
-	role := &pbAuth.Role{
-		Name:        roleDef.Name,
-		DomainType:  convertDomainTypeToProto(roleDef.DomainType),
-		Permissions: permissions,
-		DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
-		Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+	role := &pbRoles.Role{
+		Metadata: &pbRoles.Role_Metadata{
+			Name:       roleDef.Name,
+			DomainType: actions.DomainTypeToProto(roleDef.DomainType),
+			DomainId:   domainID,
+			CreatedAt:  timestamppb.New(roleMetadataMap[roleDef.Name].CreatedAt),
+			UpdatedAt:  timestamppb.New(roleMetadataMap[roleDef.Name].UpdatedAt),
+		},
+		Spec: &pbRoles.Role_Spec{
+			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+			Description: models.GetRoleDescriptionWithFallback(roleDef.Name, roleDef.DomainType, domainID, roleMetadata),
+			Permissions: permissions,
+		},
 	}
 
 	if roleDef.InheritsFrom != nil {
 		inheritedRoleMetadata := roleMetadataMap[roleDef.InheritsFrom.Name]
-		role.InheritedRole = &pbAuth.Role{
-			Name:        roleDef.InheritsFrom.Name,
-			DomainType:  convertDomainTypeToProto(roleDef.InheritsFrom.DomainType),
-			Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
-			DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
-			Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+		role.Spec.InheritedRole = &pbRoles.Role{
+			Metadata: &pbRoles.Role_Metadata{
+				Name:       roleDef.InheritsFrom.Name,
+				DomainType: actions.DomainTypeToProto(roleDef.InheritsFrom.DomainType),
+				DomainId:   domainID,
+				CreatedAt:  timestamppb.New(inheritedRoleMetadata.CreatedAt),
+				UpdatedAt:  timestamppb.New(inheritedRoleMetadata.UpdatedAt),
+			},
+			Spec: &pbRoles.Role_Spec{
+				DisplayName: models.GetRoleDisplayNameWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+				Description: models.GetRoleDescriptionWithFallback(roleDef.InheritsFrom.Name, roleDef.InheritsFrom.DomainType, domainID, inheritedRoleMetadata),
+				Permissions: convertPermissionsToProto(roleDef.InheritsFrom.Permissions),
+			},
 		}
 	}
 
 	return role, nil
 }
-
 
 func convertPermissionsToProto(permissions []*authorization.Permission) []*pbAuth.Permission {
 	permList := make([]*pbAuth.Permission, len(permissions))
@@ -59,18 +68,7 @@ func convertPermissionToProto(permission *authorization.Permission) *pbAuth.Perm
 	return &pbAuth.Permission{
 		Resource:   permission.Resource,
 		Action:     permission.Action,
-		DomainType: convertDomainTypeToProto(permission.DomainType),
-	}
-}
-
-func convertDomainTypeToProto(domainType string) pbAuth.DomainType {
-	switch domainType {
-	case authorization.DomainOrg:
-		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
-	case authorization.DomainCanvas:
-		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
-	default:
-		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
+		DomainType: actions.DomainTypeToProto(permission.DomainType),
 	}
 }
 
@@ -81,20 +79,211 @@ func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	return authService
 }
 
-func CreateGroupWithMetadata(domainID, domainType, groupName, role, displayName, description string, authService authorization.Authorization) error {
-	err := authService.CreateGroup(domainID, domainType, groupName, role)
-	if err != nil {
-		return err
+func ResolveUserID(userID, userEmail string) (string, error) {
+	if userID == "" && userEmail == "" {
+		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
 	}
 
-	return models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
+	if userID != "" {
+		return resolveByID(userID)
+	}
+
+	return resolveByEmail(userEmail, true)
 }
 
-func CreateRoleWithMetadata(domainID string, roleDef *authorization.RoleDefinition, displayName, description string, authService authorization.Authorization) error {
-	err := authService.CreateCustomRole(domainID, roleDef)
-	if err != nil {
-		return err
+func ResolveUserIDWithoutCreation(userID, userEmail string) (string, error) {
+	if userID == "" && userEmail == "" {
+		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
 	}
 
-	return models.UpsertRoleMetadata(roleDef.Name, roleDef.DomainType, domainID, displayName, description)
+	if userID != "" {
+		return resolveByID(userID)
+	}
+
+	return resolveByEmail(userEmail, false)
+}
+
+func resolveByID(userID string) (string, error) {
+	if err := actions.ValidateUUIDs(userID); err != nil {
+		return "", status.Error(codes.InvalidArgument, "invalid user ID")
+	}
+
+	if _, err := models.FindUserByID(userID); err != nil {
+		return "", status.Error(codes.NotFound, "user not found")
+	}
+
+	return userID, nil
+}
+
+func resolveByEmail(userEmail string, create bool) (string, error) {
+	if !create {
+		user, err := models.FindUserByEmail(userEmail)
+		if err != nil {
+			return "", status.Error(codes.NotFound, "user not found")
+		}
+		return user.ID.String(), nil
+	}
+
+	user, err := findOrCreateUser(userEmail)
+	if err != nil {
+		return "", err
+	}
+	return user.ID.String(), nil
+}
+
+func findOrCreateUser(email string) (*models.User, error) {
+	if user, err := models.FindUserByEmail(email); err == nil {
+		return user, nil
+	}
+
+	if user, err := models.FindInactiveUserByEmail(email); err == nil {
+		return user, nil
+	}
+
+	user := &models.User{
+		Name:     email,
+		IsActive: false,
+	}
+
+	if err := user.Create(); err != nil {
+		return nil, status.Error(codes.Internal, "failed to create user")
+	}
+
+	return user, nil
+}
+
+func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
+	roleDefinitions, err := authService.GetAllRoleDefinitions(domainType, domainID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract all role names for batch metadata lookup
+	roleNames := make([]string, len(roleDefinitions))
+	for i, roleDef := range roleDefinitions {
+		roleNames[i] = roleDef.Name
+	}
+
+	// Batch fetch role metadata
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	if err != nil {
+		// Log error but continue with fallback behavior
+		roleMetadataMap = make(map[string]*models.RoleMetadata)
+	}
+
+	userRoleMap := make(map[string][]*pbUsers.UserRoleAssignment)
+
+	for _, roleDef := range roleDefinitions {
+		var userIDs []string
+
+		if domainType == models.DomainTypeOrganization {
+			userIDs, err = authService.GetOrgUsersForRole(roleDef.Name, domainID)
+		} else {
+			userIDs, err = authService.GetCanvasUsersForRole(roleDef.Name, domainID)
+		}
+
+		if err != nil {
+			continue
+		}
+
+		roleMetadata := roleMetadataMap[roleDef.Name]
+		roleAssignment := &pb.UserRoleAssignment{
+			RoleName:        roleDef.Name,
+			RoleDisplayName: models.GetRoleDisplayNameWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
+			RoleDescription: models.GetRoleDescriptionWithFallback(roleDef.Name, domainType, domainID, roleMetadata),
+			DomainType:      actions.DomainTypeToProto(domainType),
+			DomainId:        domainID,
+			AssignedAt:      timestamppb.Now(),
+		}
+
+		for _, userID := range userIDs {
+			userRoleMap[userID] = append(userRoleMap[userID], roleAssignment)
+		}
+	}
+
+	var users []*pbUsers.User
+	for userID, roleAssignments := range userRoleMap {
+		user, err := convertUserToProto(userID, roleAssignments)
+		if err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
+	dbUser, err := models.FindUserByID(userID)
+	if err != nil {
+		return &pb.User{
+			Metadata: &pb.User_Metadata{
+				Id:        userID,
+				Email:     "test@example.com",
+				CreatedAt: timestamppb.Now(),
+				UpdatedAt: timestamppb.Now(),
+			},
+			Spec: &pb.User_Spec{
+				DisplayName:      "Test User",
+				AvatarUrl:        "",
+				AccountProviders: []*pbUsers.AccountProvider{},
+			},
+			Status: &pb.User_Status{
+				IsActive:        false,
+				RoleAssignments: roleAssignments,
+			},
+		}, nil
+	}
+
+	accountProviders, err := dbUser.GetAccountProviders()
+	if err != nil {
+		accountProviders = []models.AccountProvider{}
+	}
+
+	pbAccountProviders := make([]*pbUsers.AccountProvider, len(accountProviders))
+	for i, provider := range accountProviders {
+		pbAccountProviders[i] = &pb.AccountProvider{
+			ProviderType: provider.Provider,
+			ProviderId:   provider.ProviderID,
+			Email:        provider.Email,
+			DisplayName:  provider.Name,
+			AvatarUrl:    provider.AvatarURL,
+			IsPrimary:    i == 0, // TODO: Change when we have another login besides github
+			CreatedAt:    timestamppb.New(provider.CreatedAt),
+			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+		}
+	}
+
+	// Determine primary email and avatar
+	primaryEmail := ""
+	primaryAvatar := ""
+	primaryDisplayName := dbUser.Name
+
+	if !dbUser.IsActive {
+		primaryEmail = dbUser.Name
+	} else if len(accountProviders) > 0 {
+		primaryEmail = accountProviders[0].Email
+		primaryAvatar = accountProviders[0].AvatarURL
+		if primaryDisplayName == "" {
+			primaryDisplayName = accountProviders[0].Name
+		}
+	}
+
+	return &pb.User{
+		Metadata: &pb.User_Metadata{
+			Id:        userID,
+			Email:     primaryEmail,
+			CreatedAt: timestamppb.New(dbUser.CreatedAt),
+			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
+		},
+		Spec: &pb.User_Spec{
+			DisplayName:      primaryDisplayName,
+			AvatarUrl:        primaryAvatar,
+			AccountProviders: pbAccountProviders,
+		},
+		Status: &pb.User_Status{
+			IsActive:        dbUser.IsActive,
+			RoleAssignments: roleAssignments,
+		},
+	}, nil
 }

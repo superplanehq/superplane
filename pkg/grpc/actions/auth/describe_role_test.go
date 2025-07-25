@@ -7,8 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func Test_DescribeRole(t *testing.T) {
@@ -20,26 +19,20 @@ func Test_DescribeRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role description", func(t *testing.T) {
-		req := &pb.DescribeRoleRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Role:       authorization.RoleOrgAdmin,
-		}
-
-		resp, err := DescribeRole(ctx, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
-		assert.NotNil(t, resp.Role.InheritedRole)
-		assert.Equal(t, authorization.RoleOrgAdmin, resp.Role.Name)
-		assert.Equal(t, authorization.RoleOrgViewer, resp.Role.InheritedRole.Name)
-		assert.Len(t, resp.Role.Permissions, 18)
-		assert.Len(t, resp.Role.InheritedRole.Permissions, 2)
+		assert.NotNil(t, resp.Role.Spec.InheritedRole)
+		assert.Equal(t, models.RoleOrgAdmin, resp.Role.Metadata.Name)
+		assert.Equal(t, models.RoleOrgViewer, resp.Role.Spec.InheritedRole.Metadata.Name)
+		assert.Len(t, resp.Role.Spec.Permissions, 25)
+		assert.Len(t, resp.Role.Spec.InheritedRole.Spec.Permissions, 2)
 
 		// Test beautiful display names and descriptions
-		assert.Equal(t, "Admin", resp.Role.DisplayName)
-		assert.Equal(t, "Viewer", resp.Role.InheritedRole.DisplayName)
-		assert.Contains(t, resp.Role.Description, "Can manage canvases, users, groups, and roles")
-		assert.Contains(t, resp.Role.InheritedRole.Description, "Read-only access to organization resources")
+		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)
+		assert.Equal(t, "Viewer", resp.Role.Spec.InheritedRole.Spec.DisplayName)
+		assert.Contains(t, resp.Role.Spec.Description, "Can manage canvases, users, groups, and roles")
+		assert.Contains(t, resp.Role.Spec.InheritedRole.Spec.Description, "Read-only access to organization resources")
 	})
 
 	t.Run("successful canvas role description", func(t *testing.T) {
@@ -47,31 +40,13 @@ func Test_DescribeRole(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &pb.DescribeRoleRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   canvasID,
-			Role:       authorization.RoleCanvasAdmin,
-		}
-
-		resp, err := DescribeRole(ctx, req, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeCanvas, canvasID, models.RoleCanvasAdmin, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
-		assert.Equal(t, authorization.RoleCanvasAdmin, resp.Role.Name)
+		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Metadata.Name)
 
 		// Test beautiful display names and descriptions for canvas roles
-		assert.Equal(t, "Admin", resp.Role.DisplayName)
-		assert.Contains(t, resp.Role.Description, "Can manage stages, events, connections, and secrets")
-	})
-
-	t.Run("invalid request - missing domain ID", func(t *testing.T) {
-		req := &pb.DescribeRoleRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   "",
-			Role:       authorization.RoleOrgAdmin,
-		}
-
-		_, err := DescribeRole(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain ID must be specified")
+		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)
+		assert.Contains(t, resp.Role.Spec.Description, "Can manage stages, events, connections, and secrets")
 	})
 }

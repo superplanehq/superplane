@@ -7,12 +7,12 @@ import (
 	"sort"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -266,26 +266,51 @@ func ConnectionTypeToProto(t string) pb.Connection_Type {
 	}
 }
 
+func ProtoToDomainType(domainType pbAuth.DomainType) (string, error) {
+	switch domainType {
+	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
+		return models.DomainTypeOrganization, nil
+	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
+		return models.DomainTypeCanvas, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, "invalid domain type")
+	}
+}
+
 func DomainTypeToProto(domainType string) pbAuth.DomainType {
 	switch domainType {
-	case authorization.DomainCanvas:
+	case models.DomainTypeCanvas:
 		return pbAuth.DomainType_DOMAIN_TYPE_CANVAS
-	case authorization.DomainOrg:
+	case models.DomainTypeOrganization:
 		return pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION
 	default:
 		return pbAuth.DomainType_DOMAIN_TYPE_UNSPECIFIED
 	}
 }
 
-func ValidateIntegration(canvas *models.Canvas, integrationName string) (*models.Integration, error) {
-	if integrationName == "" {
+func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.IntegrationRef) (*models.Integration, error) {
+	if integrationRef.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	// TODO: support for organization level integration
-	integration, err := models.FindIntegrationByName(authorization.DomainCanvas, canvas.ID, integrationName)
+	//
+	// If the integration used is on the organization level, we need to find it there.
+	//
+	if integrationRef.DomainType == pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION {
+		integration, err := models.FindIntegrationByName(models.DomainTypeOrganization, canvas.OrganizationID, integrationRef.Name)
+		if err != nil {
+			return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
+		}
+
+		return integration, nil
+	}
+
+	//
+	// Otherwise, we look for it on the canvas level.
+	//
+	integration, err := models.FindIntegrationByName(models.DomainTypeCanvas, canvas.ID, integrationRef.Name)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationName)
+		return nil, status.Errorf(codes.InvalidArgument, "integration %s not found", integrationRef.Name)
 	}
 
 	return integration, nil
@@ -321,4 +346,42 @@ func GetResourceType(integration *models.Integration) (string, error) {
 	default:
 		return "", status.Error(codes.InvalidArgument, "unsupported integration type")
 	}
+}
+
+func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.UUID, domainType pbAuth.DomainType) (string, *uuid.UUID, error) {
+	domainTypeForSecret, err := ProtoToDomainType(domainType)
+	if err != nil {
+		domainTypeForSecret = domainTypeForResource
+	}
+
+	//
+	// If an organization-level resource is being created,
+	// the secret must be on the organization level as well.
+	//
+	if domainTypeForResource == models.DomainTypeOrganization {
+		if domainTypeForSecret != models.DomainTypeOrganization {
+			return "", nil, fmt.Errorf("integration on organization level must use organization-level secret")
+		}
+
+		return domainTypeForSecret, domainIdForResource, nil
+	}
+
+	//
+	// If a canvas-level resource is being created and a canvas-level secret is being used,
+	// we can just re-use the same domain type and ID for the resource.
+	//
+	if domainTypeForSecret == models.DomainTypeCanvas {
+		return domainTypeForSecret, domainIdForResource, nil
+	}
+
+	//
+	// If a canvas-level resource is being created and is using a org-level secret,
+	// we need to find the organization ID for the canvas where the resource is being created.
+	//
+	canvas, err := models.FindCanvasByID(domainIdForResource.String())
+	if err != nil {
+		return "", nil, fmt.Errorf("canvas not found")
+	}
+
+	return models.DomainTypeOrganization, &canvas.OrganizationID, nil
 }

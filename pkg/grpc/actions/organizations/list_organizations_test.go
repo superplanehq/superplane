@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -27,7 +26,7 @@ func Test__ListOrganizations(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "This is a test organization")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(userID.String(), authorization.RoleOrgOwner, organization.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
 
 		res, err := ListOrganizations(ctx, &protos.ListOrganizationsRequest{}, authService)
 		require.NoError(t, err)
@@ -56,9 +55,9 @@ func Test__ListOrganizations(t *testing.T) {
 		authService.SetupOrganizationRoles(org1.ID.String())
 		authService.SetupOrganizationRoles(org2.ID.String())
 
-		authService.AssignRole(user1ID.String(), authorization.RoleOrgOwner, org1.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(user1ID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(user2ID.String(), authorization.RoleOrgOwner, org2.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(user2ID.String(), models.RoleOrgOwner, org2.ID.String(), models.DomainTypeOrganization)
 
 		// User1 should only see org1
 		ctx1 := context.Background()
@@ -91,7 +90,7 @@ func Test__ListOrganizations(t *testing.T) {
 		organization, err := models.CreateOrganization(otherUserID, "other-org", "Other User Organization", "Organization for other user")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(otherUserID.String(), authorization.RoleOrgOwner, organization.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
 
 		ctx := context.Background()
 		ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
@@ -119,11 +118,11 @@ func Test__ListOrganizations(t *testing.T) {
 		authService.SetupOrganizationRoles(org2.ID.String())
 		authService.SetupOrganizationRoles(org3.ID.String())
 
-		authService.AssignRole(userID.String(), authorization.RoleOrgOwner, org1.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(userID.String(), authorization.RoleOrgViewer, org2.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(userID.String(), models.RoleOrgViewer, org2.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(otherUserID.String(), authorization.RoleOrgOwner, org3.ID.String(), authorization.DomainOrg)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, org3.ID.String(), models.DomainTypeOrganization)
 
 		// user should see org1 and org2, but not org3
 		ctx := context.Background()

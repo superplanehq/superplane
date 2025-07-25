@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Organizations API
 
-API for the Superplane service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -24,56 +24,52 @@ import (
 // SecretAPIService SecretAPI service
 type SecretAPIService service
 
-type ApiSuperplaneCreateSecretRequest struct {
+type ApiSecretsCreateSecretRequest struct {
 	ctx context.Context
 	ApiService *SecretAPIService
-	canvasIdOrName string
-	body *SuperplaneCreateSecretBody
+	body *SecretsCreateSecretRequest
 }
 
-func (r ApiSuperplaneCreateSecretRequest) Body(body SuperplaneCreateSecretBody) ApiSuperplaneCreateSecretRequest {
+func (r ApiSecretsCreateSecretRequest) Body(body SecretsCreateSecretRequest) ApiSecretsCreateSecretRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiSuperplaneCreateSecretRequest) Execute() (*SuperplaneCreateSecretResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneCreateSecretExecute(r)
+func (r ApiSecretsCreateSecretRequest) Execute() (*SecretsCreateSecretResponse, *http.Response, error) {
+	return r.ApiService.SecretsCreateSecretExecute(r)
 }
 
 /*
-SuperplaneCreateSecret Create a new canvas secret
+SecretsCreateSecret Create a new secret
 
-Creates a new canvas secret
+Creates a new secret
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneCreateSecretRequest
+ @return ApiSecretsCreateSecretRequest
 */
-func (a *SecretAPIService) SuperplaneCreateSecret(ctx context.Context, canvasIdOrName string) ApiSuperplaneCreateSecretRequest {
-	return ApiSuperplaneCreateSecretRequest{
+func (a *SecretAPIService) SecretsCreateSecret(ctx context.Context) ApiSecretsCreateSecretRequest {
+	return ApiSecretsCreateSecretRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneCreateSecretResponse
-func (a *SecretAPIService) SuperplaneCreateSecretExecute(r ApiSuperplaneCreateSecretRequest) (*SuperplaneCreateSecretResponse, *http.Response, error) {
+//  @return SecretsCreateSecretResponse
+func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRequest) (*SecretsCreateSecretResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPost
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneCreateSecretResponse
+		localVarReturnValue  *SecretsCreateSecretResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SuperplaneCreateSecret")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsCreateSecret")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/secrets"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/secrets"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -123,7 +119,7 @@ func (a *SecretAPIService) SuperplaneCreateSecretExecute(r ApiSuperplaneCreateSe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -146,39 +142,48 @@ func (a *SecretAPIService) SuperplaneCreateSecretExecute(r ApiSuperplaneCreateSe
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneDeleteSecretRequest struct {
+type ApiSecretsDeleteSecretRequest struct {
 	ctx context.Context
 	ApiService *SecretAPIService
-	canvasIdOrName string
 	idOrName string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiSuperplaneDeleteSecretRequest) Execute() (map[string]interface{}, *http.Response, error) {
-	return r.ApiService.SuperplaneDeleteSecretExecute(r)
+func (r ApiSecretsDeleteSecretRequest) DomainType(domainType string) ApiSecretsDeleteSecretRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiSecretsDeleteSecretRequest) DomainId(domainId string) ApiSecretsDeleteSecretRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiSecretsDeleteSecretRequest) Execute() (map[string]interface{}, *http.Response, error) {
+	return r.ApiService.SecretsDeleteSecretExecute(r)
 }
 
 /*
-SuperplaneDeleteSecret Deletes a canvas secret
+SecretsDeleteSecret Deletes a secret
 
-Deletes the specified canvas secret
+Deletes the specified secret
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
  @param idOrName
- @return ApiSuperplaneDeleteSecretRequest
+ @return ApiSecretsDeleteSecretRequest
 */
-func (a *SecretAPIService) SuperplaneDeleteSecret(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneDeleteSecretRequest {
-	return ApiSuperplaneDeleteSecretRequest{
+func (a *SecretAPIService) SecretsDeleteSecret(ctx context.Context, idOrName string) ApiSecretsDeleteSecretRequest {
+	return ApiSecretsDeleteSecretRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 		idOrName: idOrName,
 	}
 }
 
 // Execute executes the request
 //  @return map[string]interface{}
-func (a *SecretAPIService) SuperplaneDeleteSecretExecute(r ApiSuperplaneDeleteSecretRequest) (map[string]interface{}, *http.Response, error) {
+func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRequest) (map[string]interface{}, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodDelete
 		localVarPostBody     interface{}
@@ -186,19 +191,27 @@ func (a *SecretAPIService) SuperplaneDeleteSecretExecute(r ApiSuperplaneDeleteSe
 		localVarReturnValue  map[string]interface{}
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SuperplaneDeleteSecret")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsDeleteSecret")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -238,7 +251,7 @@ func (a *SecretAPIService) SuperplaneDeleteSecretExecute(r ApiSuperplaneDeleteSe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -261,59 +274,76 @@ func (a *SecretAPIService) SuperplaneDeleteSecretExecute(r ApiSuperplaneDeleteSe
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneDescribeSecretRequest struct {
+type ApiSecretsDescribeSecretRequest struct {
 	ctx context.Context
 	ApiService *SecretAPIService
-	canvasIdOrName string
 	idOrName string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiSuperplaneDescribeSecretRequest) Execute() (*SuperplaneDescribeSecretResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneDescribeSecretExecute(r)
+func (r ApiSecretsDescribeSecretRequest) DomainType(domainType string) ApiSecretsDescribeSecretRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiSecretsDescribeSecretRequest) DomainId(domainId string) ApiSecretsDescribeSecretRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiSecretsDescribeSecretRequest) Execute() (*SecretsDescribeSecretResponse, *http.Response, error) {
+	return r.ApiService.SecretsDescribeSecretExecute(r)
 }
 
 /*
-SuperplaneDescribeSecret Get secret details
+SecretsDescribeSecret Get secret details
 
-Returns the details of a specific secret (canvas can be referenced by ID or name)
+Returns the details of a specific secret
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
  @param idOrName
- @return ApiSuperplaneDescribeSecretRequest
+ @return ApiSecretsDescribeSecretRequest
 */
-func (a *SecretAPIService) SuperplaneDescribeSecret(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneDescribeSecretRequest {
-	return ApiSuperplaneDescribeSecretRequest{
+func (a *SecretAPIService) SecretsDescribeSecret(ctx context.Context, idOrName string) ApiSecretsDescribeSecretRequest {
+	return ApiSecretsDescribeSecretRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 		idOrName: idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneDescribeSecretResponse
-func (a *SecretAPIService) SuperplaneDescribeSecretExecute(r ApiSuperplaneDescribeSecretRequest) (*SuperplaneDescribeSecretResponse, *http.Response, error) {
+//  @return SecretsDescribeSecretResponse
+func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecretRequest) (*SecretsDescribeSecretResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneDescribeSecretResponse
+		localVarReturnValue  *SecretsDescribeSecretResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SuperplaneDescribeSecret")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsDescribeSecret")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -353,7 +383,7 @@ func (a *SecretAPIService) SuperplaneDescribeSecretExecute(r ApiSuperplaneDescri
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -376,55 +406,72 @@ func (a *SecretAPIService) SuperplaneDescribeSecretExecute(r ApiSuperplaneDescri
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneListSecretsRequest struct {
+type ApiSecretsListSecretsRequest struct {
 	ctx context.Context
 	ApiService *SecretAPIService
-	canvasIdOrName string
+	domainType *string
+	domainId *string
 }
 
-func (r ApiSuperplaneListSecretsRequest) Execute() (*SuperplaneListSecretsResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneListSecretsExecute(r)
+func (r ApiSecretsListSecretsRequest) DomainType(domainType string) ApiSecretsListSecretsRequest {
+	r.domainType = &domainType
+	return r
+}
+
+func (r ApiSecretsListSecretsRequest) DomainId(domainId string) ApiSecretsListSecretsRequest {
+	r.domainId = &domainId
+	return r
+}
+
+func (r ApiSecretsListSecretsRequest) Execute() (*SecretsListSecretsResponse, *http.Response, error) {
+	return r.ApiService.SecretsListSecretsExecute(r)
 }
 
 /*
-SuperplaneListSecrets List secrets
+SecretsListSecrets List secrets
 
-Returns a list of all secrets for the specified canvas (can be referenced by ID or name)
+Returns the list of secrets
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
- @return ApiSuperplaneListSecretsRequest
+ @return ApiSecretsListSecretsRequest
 */
-func (a *SecretAPIService) SuperplaneListSecrets(ctx context.Context, canvasIdOrName string) ApiSuperplaneListSecretsRequest {
-	return ApiSuperplaneListSecretsRequest{
+func (a *SecretAPIService) SecretsListSecrets(ctx context.Context) ApiSecretsListSecretsRequest {
+	return ApiSecretsListSecretsRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneListSecretsResponse
-func (a *SecretAPIService) SuperplaneListSecretsExecute(r ApiSuperplaneListSecretsRequest) (*SuperplaneListSecretsResponse, *http.Response, error) {
+//  @return SecretsListSecretsResponse
+func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequest) (*SecretsListSecretsResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodGet
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneListSecretsResponse
+		localVarReturnValue  *SecretsListSecretsResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SuperplaneListSecrets")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsListSecrets")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/secrets"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/secrets"
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
+	if r.domainType != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainType", r.domainType, "", "")
+	} else {
+		var defaultValue string = "DOMAIN_TYPE_UNSPECIFIED"
+		r.domainType = &defaultValue
+	}
+	if r.domainId != nil {
+		parameterAddToHeaderOrQuery(localVarQueryParams, "domainId", r.domainId, "", "")
+	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 
@@ -464,7 +511,7 @@ func (a *SecretAPIService) SuperplaneListSecretsExecute(r ApiSuperplaneListSecre
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -487,59 +534,55 @@ func (a *SecretAPIService) SuperplaneListSecretsExecute(r ApiSuperplaneListSecre
 	return localVarReturnValue, localVarHTTPResponse, nil
 }
 
-type ApiSuperplaneUpdateSecretRequest struct {
+type ApiSecretsUpdateSecretRequest struct {
 	ctx context.Context
 	ApiService *SecretAPIService
-	canvasIdOrName string
 	idOrName string
-	body *SuperplaneUpdateSecretBody
+	body *SecretsUpdateSecretBody
 }
 
-func (r ApiSuperplaneUpdateSecretRequest) Body(body SuperplaneUpdateSecretBody) ApiSuperplaneUpdateSecretRequest {
+func (r ApiSecretsUpdateSecretRequest) Body(body SecretsUpdateSecretBody) ApiSecretsUpdateSecretRequest {
 	r.body = &body
 	return r
 }
 
-func (r ApiSuperplaneUpdateSecretRequest) Execute() (*SuperplaneUpdateSecretResponse, *http.Response, error) {
-	return r.ApiService.SuperplaneUpdateSecretExecute(r)
+func (r ApiSecretsUpdateSecretRequest) Execute() (*SecretsUpdateSecretResponse, *http.Response, error) {
+	return r.ApiService.SecretsUpdateSecretExecute(r)
 }
 
 /*
-SuperplaneUpdateSecret Updates a secret
+SecretsUpdateSecret Updates a secret
 
-Updates the specified secret (can be referenced by ID or name)
+Updates the specified secret
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param canvasIdOrName
  @param idOrName
- @return ApiSuperplaneUpdateSecretRequest
+ @return ApiSecretsUpdateSecretRequest
 */
-func (a *SecretAPIService) SuperplaneUpdateSecret(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneUpdateSecretRequest {
-	return ApiSuperplaneUpdateSecretRequest{
+func (a *SecretAPIService) SecretsUpdateSecret(ctx context.Context, idOrName string) ApiSecretsUpdateSecretRequest {
+	return ApiSecretsUpdateSecretRequest{
 		ApiService: a,
 		ctx: ctx,
-		canvasIdOrName: canvasIdOrName,
 		idOrName: idOrName,
 	}
 }
 
 // Execute executes the request
-//  @return SuperplaneUpdateSecretResponse
-func (a *SecretAPIService) SuperplaneUpdateSecretExecute(r ApiSuperplaneUpdateSecretRequest) (*SuperplaneUpdateSecretResponse, *http.Response, error) {
+//  @return SecretsUpdateSecretResponse
+func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRequest) (*SecretsUpdateSecretResponse, *http.Response, error) {
 	var (
 		localVarHTTPMethod   = http.MethodPatch
 		localVarPostBody     interface{}
 		formFiles            []formFile
-		localVarReturnValue  *SuperplaneUpdateSecretResponse
+		localVarReturnValue  *SecretsUpdateSecretResponse
 	)
 
-	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SuperplaneUpdateSecret")
+	localBasePath, err := a.client.cfg.ServerURLWithContext(r.ctx, "SecretAPIService.SecretsUpdateSecret")
 	if err != nil {
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/secrets/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/secrets/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
@@ -590,7 +633,7 @@ func (a *SecretAPIService) SuperplaneUpdateSecretExecute(r ApiSuperplaneUpdateSe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

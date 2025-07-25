@@ -5,30 +5,17 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest, authService authorization.Authorization) (*pb.DescribeRoleResponse, error) {
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
-	if req.DomainId == "" {
-		return nil, status.Error(codes.InvalidArgument, "domain ID must be specified")
-	}
-
-	domainType := convertDomainType(req.DomainType)
-	if domainType == "" {
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
-	}
-
-	if req.Role == "" {
+func DescribeRole(ctx context.Context, domainType, domainID, roleName string, authService authorization.Authorization) (*pb.DescribeRoleResponse, error) {
+	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role specified")
 	}
 
-	roleDefinition, err := authService.GetRoleDefinition(req.Role, domainType, req.DomainId)
+	roleDefinition, err := authService.GetRoleDefinition(roleName, domainType, domainID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "role not found")
 	}
@@ -38,12 +25,12 @@ func DescribeRole(ctx context.Context, req *pb.DescribeRoleRequest, authService 
 		roleNames = append(roleNames, roleDefinition.InheritsFrom.Name)
 	}
 
-	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, req.DomainId)
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
 		roleMetadataMap = make(map[string]*models.RoleMetadata)
 	}
 
-	role, err := convertRoleDefinitionToProto(roleDefinition, authService, req.DomainId, roleMetadataMap)
+	role, err := convertRoleDefinitionToProto(roleDefinition, authService, domainID, roleMetadataMap)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to convert role definition")
 	}

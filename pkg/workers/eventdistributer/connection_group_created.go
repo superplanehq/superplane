@@ -7,7 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"google.golang.org/protobuf/proto"
 )

@@ -1,0 +1,153 @@
+syntax = "proto3";
+
+package Superplane.Integrations;
+
+import "authorization.proto";
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/integrations";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Integrations API";
+    version: "1.0";
+    description: "API for Superplane Integrations";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Integrations {
+
+  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List integrations";
+      description: "List integrations";
+      tags: "Integration";
+    };
+  }
+
+  rpc DescribeIntegration(DescribeIntegrationRequest) returns (DescribeIntegrationResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/integrations/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe an integration";
+      description: "Describe an integration";
+      tags: "Integration";
+    };
+  }
+
+  rpc CreateIntegration(CreateIntegrationRequest) returns (CreateIntegrationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/integrations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a new canvas integration";
+      description: "Creates a new canvas integration";
+      tags: "Integration";
+    };
+  }
+}
+
+message CreateIntegrationRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  Integration integration = 3;
+}
+
+message CreateIntegrationResponse {
+  Integration integration = 1;
+}
+
+message ListIntegrationsRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+}
+
+message ListIntegrationsResponse {
+  repeated Integration integrations = 1;
+}
+
+message DescribeIntegrationRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string id_or_name = 3;
+}
+
+message DescribeIntegrationResponse {
+  Integration integration = 1;
+}
+
+message Integration {
+  message Metadata {
+    string id = 1;
+    string name = 2;
+    string created_by = 3;
+    google.protobuf.Timestamp created_at = 4;
+    Authorization.DomainType domain_type = 5;
+    string domain_id = 6;
+  }
+
+  enum Type {
+    TYPE_NONE = 0;
+    TYPE_SEMAPHORE = 1;
+    TYPE_GITHUB = 2;
+  }
+
+  message Auth {
+    message Token {
+      ValueFrom value_from = 1;
+    }
+
+    AuthType use = 1;
+    Token token = 2;
+  }
+
+  enum AuthType {
+    AUTH_TYPE_NONE = 0;
+    AUTH_TYPE_TOKEN = 1;
+    AUTH_TYPE_OIDC = 2;
+  }
+
+  message OIDC {
+    bool enabled = 1;
+  }
+
+  message Spec {
+    Type type = 1;
+    string url = 2;
+    Auth auth = 3;
+    OIDC oidc = 4;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+}
+
+message IntegrationRef {
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+}
+
+message ValueFrom {
+  ValueFromSecret secret = 3;
+}
+
+message ValueFromSecret {
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+  string key = 3;
+}

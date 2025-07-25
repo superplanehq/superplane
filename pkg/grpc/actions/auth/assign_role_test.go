@@ -7,9 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -23,36 +21,14 @@ func Test_AssignRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role assignment with user ID", func(t *testing.T) {
-		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
-
-		resp, err := AssignRole(ctx, req, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("successful role assignment with user email", func(t *testing.T) {
 		testEmail := "test@example.com"
-		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserEmail{
-				UserEmail: testEmail,
-			},
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
-
-		resp, err := AssignRole(ctx, req, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", testEmail, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -64,49 +40,19 @@ func Test_AssignRole(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
-		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: r.User.String(),
-			},
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       "",
-			},
-		}
-
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, "", r.User.String(), "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		req := &pb.AssignRoleRequest{
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
-
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user identifier must be specified")
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		req := &pb.AssignRoleRequest{
-			UserIdentifier: &pb.AssignRoleRequest_UserId{
-				UserId: "invalid-uuid",
-			},
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
-
-		_, err := AssignRole(ctx, req, authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

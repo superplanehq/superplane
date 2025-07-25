@@ -36,7 +36,7 @@ func NewIntegration(ctx context.Context, integration *models.Integration, encryp
 	switch integration.Type {
 	case models.IntegrationTypeSemaphore:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := secrets.NewProvider(encryptor, secretInfo.Name, integration.DomainID.String())
+		provider, err := secretProvider(encryptor, secretInfo, integration)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -55,4 +55,32 @@ func NewIntegration(ctx context.Context, integration *models.Integration, encryp
 	default:
 		return nil, fmt.Errorf("unsupported integration type %s", integration.Type)
 	}
+}
+
+func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
+	//
+	// If the integration is scoped to an organization, the secret must also be scoped there.
+	//
+	if integration.DomainType == models.DomainTypeOrganization {
+		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+	}
+
+	//
+	// Here, we know the integration is on the canvas level.
+	// If the secret is also on the canvas level, we use the same domain type and ID.
+	//
+	if secretDef.DomainType == models.DomainTypeCanvas {
+		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+	}
+
+	//
+	// Otherwise, the integration is on the canvas level, but the secret is on the organization level,
+	// so we need to get the organization ID for the canvas where the integration is.
+	//
+	canvas, err := models.FindCanvasByID(integration.DomainID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
+	}
+
+	return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }

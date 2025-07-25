@@ -1,27 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  authorizationGetOrganizationUsers,
-  authorizationListRoles,
-  authorizationListOrganizationGroups,
-  authorizationGetOrganizationGroup,
-  authorizationGetOrganizationGroupUsers,
-  authorizationAssignRole,
-  authorizationRemoveRole,
-  authorizationCreateOrganizationGroup,
-  authorizationUpdateOrganizationGroup,
-  authorizationDeleteOrganizationGroup,
-  authorizationAddUserToOrganizationGroup,
-  authorizationRemoveUserFromOrganizationGroup,
-  authorizationCreateRole,
-  authorizationUpdateRole,
-  authorizationDeleteRole,
-  authorizationDescribeRole,
+  usersListUsers,
+  rolesListRoles,
+  groupsListGroups,
+  groupsDescribeGroup,
+  groupsListGroupUsers,
+  rolesAssignRole,
+  rolesRemoveRole,
+  groupsCreateGroup,
+  groupsUpdateGroup,
+  groupsDeleteGroup,
+  groupsAddUserToGroup,
+  groupsRemoveUserFromGroup,
+  rolesCreateRole,
+  rolesUpdateRole,
+  rolesDeleteRole,
+  rolesDescribeRole,
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
   superplaneListCanvases,
   superplaneCreateCanvas
 } from '../api-client/sdk.gen'
-import { AuthorizationCreateRoleRequest, AuthorizationDomainType, AuthorizationRoleAssignment } from '@/api-client'
+import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
 
 // Query Keys
 export const organizationKeys = {
@@ -56,8 +56,8 @@ export const useOrganizationUsers = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.users(organizationId),
     queryFn: async () => {
-      const response = await authorizationGetOrganizationUsers({
-        path: { organizationId }
+      const response = await usersListUsers({
+        query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
       })
       return response.data?.users || []
     },
@@ -70,7 +70,7 @@ export const useOrganizationRoles = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.roles(organizationId),
     queryFn: async () => {
-      const response = await authorizationListRoles({
+      const response = await rolesListRoles({
         query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
       })
       return response.data?.roles || []
@@ -84,8 +84,8 @@ export const useOrganizationGroups = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.groups(organizationId),
     queryFn: async () => {
-      const response = await authorizationListOrganizationGroups({
-        query: { organizationId }
+      const response = await groupsListGroups({
+        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
       return response.data?.groups || []
     },
@@ -98,9 +98,9 @@ export const useOrganizationGroup = (organizationId: string, groupName: string) 
   return useQuery({
     queryKey: organizationKeys.group(organizationId, groupName),
     queryFn: async () => {
-      const response = await authorizationGetOrganizationGroup({
+      const response = await groupsDescribeGroup({
         path: { groupName },
-        query: { organizationId }
+        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
       return response.data?.group || null
     },
@@ -114,9 +114,9 @@ export const useOrganizationGroupUsers = (organizationId: string, groupName: str
   return useQuery({
     queryKey: organizationKeys.groupUsers(organizationId, groupName),
     queryFn: async () => {
-      const response = await authorizationGetOrganizationGroupUsers({
+      const response = await groupsListGroupUsers({
         path: { groupName },
-        query: { organizationId }
+        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
       return response.data?.users || []
     },
@@ -130,7 +130,7 @@ export const useRole = (organizationId: string, roleName: string) => {
   return useQuery({
     queryKey: organizationKeys.role(organizationId, roleName),
     queryFn: async () => {
-      const response = await authorizationDescribeRole({
+      const response = await rolesDescribeRole({
         query: {
           domainType: 'DOMAIN_TYPE_ORGANIZATION',
           domainId: organizationId,
@@ -152,15 +152,17 @@ export const useAssignRole = (organizationId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId?: string, 
-      userEmail?: string, 
-      roleAssignment: AuthorizationRoleAssignment 
+      userEmail?: string,
+      roleName: string,
     }) => {
-      return await authorizationAssignRole({
+      return await rolesAssignRole({
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
-          roleAssignment: params.roleAssignment
-        }
+          roleName: params.roleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
+        },
       })
     },
     onSuccess: () => {
@@ -176,12 +178,14 @@ export const useRemoveRole = (organizationId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId: string, 
-      roleAssignment: AuthorizationRoleAssignment
+      roleName: string,
     }) => {
-      return await authorizationRemoveRole({
+      return await rolesRemoveRole({
         body: {
           userId: params.userId,
-          roleAssignment: params.roleAssignment
+          roleName: params.roleName,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          domainId: organizationId
         }
       })
     },
@@ -203,13 +207,20 @@ export const useCreateGroup = (organizationId: string) => {
       description?: string,
       role?: string 
     }) => {
-      return await authorizationCreateOrganizationGroup({
+      return await groupsCreateGroup({
         body: {
-          organizationId: params.organizationId,
-          groupName: params.groupName,
-          displayName: params.displayName,
-          description: params.description,
-          role: params.role
+          group: {
+            metadata: {
+              name: params.groupName,
+            },
+            spec: {
+              displayName: params.displayName,
+              description: params.description,
+              role: params.role
+            }
+          },
+          domainId: params.organizationId,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
         }
       })
     },
@@ -231,13 +242,21 @@ export const useUpdateGroup = (organizationId: string) => {
       description?: string,
       role?: string 
     }) => {
-      return await authorizationUpdateOrganizationGroup({
+      return await groupsUpdateGroup({
         path: { groupName: params.groupName },
         body: {
-          organizationId: params.organizationId,
-          displayName: params.displayName,
-          description: params.description,
-          role: params.role
+          group: {
+            metadata: {
+              name: params.groupName,
+            },
+            spec: {
+              displayName: params.displayName,
+              description: params.description,
+              role: params.role
+            }
+          },
+          domainId: params.organizationId,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION',
         }
       })
     },
@@ -254,9 +273,9 @@ export const useDeleteGroup = (organizationId: string) => {
   
   return useMutation({
     mutationFn: async (params: { groupName: string, organizationId: string }) => {
-      return await authorizationDeleteOrganizationGroup({
+      return await groupsDeleteGroup({
         path: { groupName: params.groupName },
-        query: { organizationId: params.organizationId }
+        query: { domainId: params.organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
       })
     },
     onSuccess: () => {
@@ -276,12 +295,13 @@ export const useAddUserToGroup = (organizationId: string) => {
       userEmail?: string, 
       organizationId: string 
     }) => {
-      return await authorizationAddUserToOrganizationGroup({
+      return await groupsAddUserToGroup({
         path: { groupName: params.groupName },
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
-          organizationId: params.organizationId
+          domainId: params.organizationId,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION'
         }
       })
     },
@@ -302,11 +322,12 @@ export const useRemoveUserFromGroup = (organizationId: string) => {
       userId: string, 
       organizationId: string 
     }) => {
-      return await authorizationRemoveUserFromOrganizationGroup({
+      return await groupsRemoveUserFromGroup({
         path: { groupName: params.groupName },
         body: {
           userId: params.userId,
-          organizationId: params.organizationId
+          domainId: params.organizationId,
+          domainType: 'DOMAIN_TYPE_ORGANIZATION'
         }
       })
     },
@@ -321,8 +342,8 @@ export const useCreateRole = (organizationId: string) => {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async (params: AuthorizationCreateRoleRequest) => {
-      return await authorizationCreateRole({
+    mutationFn: async (params: RolesCreateRoleRequest) => {
+      return await rolesCreateRole({
         body: params
       })
     },
@@ -345,14 +366,21 @@ export const useUpdateRole = (organizationId: string) => {
       displayName?: string,
       description?: string
     }) => {
-      return await authorizationUpdateRole({
+      return await rolesUpdateRole({
         path: { roleName: params.roleName },
         body: {
           domainType: params.domainType,
           domainId: params.domainId,
-          permissions: params.permissions,
-          displayName: params.displayName,
-          description: params.description
+          role: {
+            metadata: {
+              name: params.roleName,
+            },
+            spec: {
+              permissions: params.permissions,
+              displayName: params.displayName,
+              description: params.description
+            }
+          }
         }
       })
     },
@@ -373,7 +401,7 @@ export const useDeleteRole = (organizationId: string) => {
       domainType: AuthorizationDomainType,
       domainId: string
     }) => {
-      return await authorizationDeleteRole({
+      return await rolesDeleteRole({
         path: { roleName: params.roleName },
         query: {
           domainType: params.domainType,

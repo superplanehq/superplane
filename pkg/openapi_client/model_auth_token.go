@@ -1,7 +1,7 @@
 /*
-Superplane API
+Superplane Organizations API
 
-API for the Superplane service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -20,7 +20,7 @@ var _ MappedNullable = &AuthToken{}
 
 // AuthToken struct for AuthToken
 type AuthToken struct {
-	ValueFrom *SuperplaneValueFrom `json:"valueFrom,omitempty"`
+	ValueFrom *SuperplaneIntegrationsValueFrom `json:"valueFrom,omitempty"`
 }
 
 // NewAuthToken instantiates a new AuthToken object
@@ -41,9 +41,9 @@ func NewAuthTokenWithDefaults() *AuthToken {
 }
 
 // GetValueFrom returns the ValueFrom field value if set, zero value otherwise.
-func (o *AuthToken) GetValueFrom() SuperplaneValueFrom {
+func (o *AuthToken) GetValueFrom() SuperplaneIntegrationsValueFrom {
 	if o == nil || IsNil(o.ValueFrom) {
-		var ret SuperplaneValueFrom
+		var ret SuperplaneIntegrationsValueFrom
 		return ret
 	}
 	return *o.ValueFrom
@@ -51,7 +51,7 @@ func (o *AuthToken) GetValueFrom() SuperplaneValueFrom {
 
 // GetValueFromOk returns a tuple with the ValueFrom field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *AuthToken) GetValueFromOk() (*SuperplaneValueFrom, bool) {
+func (o *AuthToken) GetValueFromOk() (*SuperplaneIntegrationsValueFrom, bool) {
 	if o == nil || IsNil(o.ValueFrom) {
 		return nil, false
 	}
@@ -67,8 +67,8 @@ func (o *AuthToken) HasValueFrom() bool {
 	return false
 }
 
-// SetValueFrom gets a reference to the given SuperplaneValueFrom and assigns it to the ValueFrom field.
-func (o *AuthToken) SetValueFrom(v SuperplaneValueFrom) {
+// SetValueFrom gets a reference to the given SuperplaneIntegrationsValueFrom and assigns it to the ValueFrom field.
+func (o *AuthToken) SetValueFrom(v SuperplaneIntegrationsValueFrom) {
 	o.ValueFrom = &v
 }
 

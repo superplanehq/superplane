@@ -19,21 +19,16 @@ import (
 const (
 	OrgIDTemplate    = "{ORG_ID}"
 	CanvasIDTemplate = "{CANVAS_ID}"
-
-	RoleOrgOwner  = "org_owner"
-	RoleOrgAdmin  = "org_admin"
-	RoleOrgViewer = "org_viewer"
-
-	RoleCanvasOwner  = "canvas_owner"
-	RoleCanvasAdmin  = "canvas_admin"
-	RoleCanvasViewer = "canvas_viewer"
-
-	DomainCanvas = "canvas"
-	DomainOrg    = "org"
 )
 
 // implements Authorization
 var _ Authorization = (*AuthService)(nil)
+
+//
+// NOTE: We need to use nested transaction to update Group and Role Metadata with casbin policies since
+// Gorm Casbin Adapter GetDB() functions overrides the table name with casbin_rule. It is not possible
+// to fix this issue with default gorm methods like Table() or Model()
+//
 
 type AuthService struct {
 	enforcer              *casbin.CachedEnforcer
@@ -84,7 +79,7 @@ func NewAuthService() (*AuthService, error) {
 
 	service := &AuthService{
 		enforcer:              enforcer,
-		db:                    database.Conn(),
+		db:                    adapter.GetDb(),
 		orgPolicyTemplates:    orgPolicyTemplates,
 		canvasPolicyTemplates: canvasPolicyTemplates,
 	}
@@ -93,118 +88,188 @@ func NewAuthService() (*AuthService, error) {
 }
 
 func (a *AuthService) CheckCanvasPermission(userID, canvasID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, canvasID, DomainCanvas, resource, action)
+	return a.checkPermission(userID, canvasID, models.DomainTypeCanvas, resource, action)
 }
 
 func (a *AuthService) CheckOrganizationPermission(userID, orgID, resource, action string) (bool, error) {
-	return a.checkPermission(userID, orgID, DomainOrg, resource, action)
+	return a.checkPermission(userID, orgID, models.DomainTypeOrganization, resource, action)
 }
 
 func (a *AuthService) checkPermission(userID, domainID, domainType, resource, action string) (bool, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedUserID := prefixUserID(userID)
 	return a.enforcer.Enforce(prefixedUserID, domain, resource, action)
 }
 
-func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string) error {
-	// Validate domain type
-	if domainType != DomainOrg && domainType != DomainCanvas {
-		return fmt.Errorf("invalid domain type %s", domainType)
+func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string, displayName string, description string) error {
+	var err error
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
-
-	// Check if role exists in this domain using the enforcer
-	if !a.roleExistsInDomain(role, domain) {
-		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
-	}
-
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
-
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
+	err = a.CreateGroupWithNestedTransaction(domainID, domainType, groupName, role, displayName, description)
 	if err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}
 
-	if !ruleAdded {
-		return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
-	}
-
-	log.Infof("Created group %s with role %s in %s %s", groupName, role, domainType, domainID)
 	return nil
 }
 
-// DeleteGroup removes a group from the authorization system
+func (a *AuthService) CreateGroupWithNestedTransaction(domainID string, domainType string, groupName string, role string, displayName string, description string) error {
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
+
+	if !a.roleExistsInDomain(role, domain) {
+		return fmt.Errorf("invalid role %s for domain type %s", role, domainType)
+	}
+
+	prefixedGroupName := prefixGroupName(groupName)
+
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			err := models.UpsertGroupMetadataInTransaction(tx, groupName, domainType, domainID, displayName, description)
+			if err != nil {
+				return fmt.Errorf("failed to create group metadata: %w", err)
+			}
+
+			ruleAdded, err := e.AddGroupingPolicy(prefixedGroupName, prefixedRole, domain)
+			if err != nil {
+				return fmt.Errorf("failed to create group: %w", err)
+			}
+
+			if !ruleAdded {
+				return fmt.Errorf("group %s already exists with role %s in %s %s", groupName, role, domainType, domainID)
+			}
+
+			return e.SavePolicy()
+		})
+	})
+}
+
 func (a *AuthService) DeleteGroup(domainID string, domainType string, groupName string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	err := a.deleteGroupDataWithNestedTransaction(domainID, domainType, groupName)
 
-	// Remove group-to-role assignment (the group itself)
-	_, err := a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
-		return fmt.Errorf("failed to remove group role assignment: %w", err)
+		return fmt.Errorf("failed to delete group: %w", err)
 	}
 
-	// Remove all user-to-group assignments for this group
-	_, err = a.enforcer.RemoveFilteredGroupingPolicy(1, prefixedGroupName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove users from group: %w", err)
-	}
-
-	log.Infof("Deleted group %s from %s %s", groupName, domainType, domainID)
 	return nil
 }
 
-func (a *AuthService) UpdateGroupRole(domainID string, domainType string, groupName string, newRole string) error {
-	// Validate domain type
-	if domainType != DomainOrg && domainType != DomainCanvas {
-		return fmt.Errorf("invalid domain type %s", domainType)
+func (a *AuthService) deleteGroupDataWithNestedTransaction(domainID string, domainType string, groupName string) error {
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(groupName)
+
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			err := models.DeleteGroupMetadataInTransaction(tx, groupName, domainType, domainID)
+			if err != nil {
+				return fmt.Errorf("failed to delete group metadata: %w", err)
+			}
+
+			_, err = e.RemoveFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove group role assignment: %w", err)
+			}
+
+			_, err = e.RemoveFilteredGroupingPolicy(1, prefixedGroupName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove users from group: %w", err)
+			}
+
+			return e.SavePolicy()
+		})
+	})
+}
+
+func (a *AuthService) UpdateGroup(domainID string, domainType string, groupName string, newRole string, displayName string, description string) error {
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	err := a.updateGroupWithNestedTransaction(domainID, domainType, groupName, newRole, displayName, description)
+	if err != nil {
+		return fmt.Errorf("failed to update group: %w", err)
+	}
 
-	// Check if role exists in this domain using the enforcer
+	return nil
+}
+
+func (a *AuthService) updateGroupWithNestedTransaction(domainID string, domainType string, groupName string, newRole string, displayName string, description string) error {
+	domain := prefixDomain(domainType, domainID)
+
 	if !a.roleExistsInDomain(newRole, domain) {
 		return fmt.Errorf("invalid role %s for domain type %s", newRole, domainType)
 	}
 
-	prefixedGroupName := fmt.Sprintf("group:%s", groupName)
+	prefixedGroupName := prefixGroupName(groupName)
 
-	// Get current role
 	currentRole, err := a.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
 		return fmt.Errorf("failed to get current group role: %w", err)
 	}
 
-	// Remove old role assignment
-	prefixedOldRole := fmt.Sprintf("role:%s", currentRole)
-	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
+	currentGroupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
 	if err != nil {
-		return fmt.Errorf("failed to remove old group role: %w", err)
-	}
-	if !ruleRemoved {
-		return fmt.Errorf("old group role assignment not found")
+		return fmt.Errorf("failed to get current group metadata: %w", err)
 	}
 
-	// Add new role assignment
-	prefixedNewRole := fmt.Sprintf("role:%s", newRole)
-	ruleAdded, err := a.enforcer.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
-	if err != nil {
-		return fmt.Errorf("failed to add new group role: %w", err)
-	}
-	if !ruleAdded {
-		return fmt.Errorf("failed to add new group role assignment")
-	}
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			var updatedDisplayName, updatedDescription string
+			if displayName != "" {
+				updatedDisplayName = displayName
+			} else {
+				updatedDisplayName = currentGroupMetadata.DisplayName
+			}
+			if description != "" {
+				updatedDescription = description
+			} else {
+				updatedDescription = currentGroupMetadata.Description
+			}
 
-	log.Infof("Updated group %s role from %s to %s in %s %s", groupName, currentRole, newRole, domainType, domainID)
-	return nil
+			if displayName != "" || description != "" {
+				err := models.UpsertGroupMetadataInTransaction(tx, groupName, domainType, domainID, updatedDisplayName, updatedDescription)
+				if err != nil {
+					return fmt.Errorf("failed to update group metadata: %w", err)
+				}
+			}
+
+			prefixedOldRole := prefixRoleName(currentRole)
+			ruleRemoved, err := e.RemoveGroupingPolicy(prefixedGroupName, prefixedOldRole, domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove old group role: %w", err)
+			}
+			if !ruleRemoved {
+				return fmt.Errorf("old group role assignment not found")
+			}
+
+			prefixedNewRole := prefixRoleName(newRole)
+			ruleAdded, err := e.AddGroupingPolicy(prefixedGroupName, prefixedNewRole, domain)
+			if err != nil {
+				return fmt.Errorf("failed to add new group role: %w", err)
+			}
+			if !ruleAdded {
+				return fmt.Errorf("failed to add new group role assignment")
+			}
+
+			return e.SavePolicy()
+		})
+	})
 }
 
 func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID string, group string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
+	prefixedUserID := prefixUserID(userID)
 
 	groups, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedGroupName, "", domain)
 	if err != nil {
@@ -236,9 +301,9 @@ func (a *AuthService) AddUserToGroup(domainID string, domainType string, userID 
 }
 
 func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, userID string, group string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
+	prefixedUserID := prefixUserID(userID)
 
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedGroupName, domain)
 	if err != nil {
@@ -253,8 +318,8 @@ func (a *AuthService) RemoveUserFromGroup(domainID string, domainType string, us
 }
 
 func (a *AuthService) GetGroupUsers(domainID string, domainType string, group string) ([]string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
 
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(1, prefixedGroupName, domain)
 	if err != nil {
@@ -270,16 +335,8 @@ func (a *AuthService) GetGroupUsers(domainID string, domainType string, group st
 	return users, nil
 }
 
-func (a *AuthService) GetGroupMembersCount(domainID string, domainType string, group string) (int, error) {
-	users, err := a.GetGroupUsers(domainID, domainType, group)
-	if err != nil {
-		return 0, err
-	}
-	return len(users), nil
-}
-
 func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	domain := prefixDomain(domainType, domainID)
 	policies, err := a.enforcer.GetFilteredGroupingPolicy(2, domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups: %w", err)
@@ -303,8 +360,8 @@ func (a *AuthService) GetGroups(domainID string, domainType string) ([]string, e
 }
 
 func (a *AuthService) GetGroupRole(domainID string, domainType string, group string) (string, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedGroupName := fmt.Sprintf("group:%s", group)
+	domain := prefixDomain(domainType, domainID)
+	prefixedGroupName := prefixGroupName(group)
 	roles := a.enforcer.GetRolesForUserInDomain(prefixedGroupName, domain)
 	unprefixedRoles := []string{}
 	for _, role := range roles {
@@ -319,13 +376,13 @@ func (a *AuthService) GetGroupRole(domainID string, domainType string, group str
 }
 
 func (a *AuthService) AssignRole(userID, role, domainID string, domainType string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
 
 	// Check if it's a default role
 	validRoles := map[string][]string{
-		DomainOrg:    {RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner},
-		DomainCanvas: {RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner},
+		models.DomainTypeOrganization: {models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner},
+		models.DomainTypeCanvas:       {models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner},
 	}
 
 	isValidDefaultRole := false
@@ -341,7 +398,7 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 		}
 	}
 
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 
 	existingRoles, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID, "", domain)
 	if err != nil {
@@ -370,9 +427,9 @@ func (a *AuthService) AssignRole(userID, role, domainID string, domainType strin
 }
 
 func (a *AuthService) RemoveRole(userID, role, domainID string, domainType string) error {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRole := fmt.Sprintf("role:%s", role)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRole := prefixRoleName(role)
+	prefixedUserID := prefixUserID(userID)
 	ruleRemoved, err := a.enforcer.RemoveGroupingPolicy(prefixedUserID, prefixedRole, domain)
 	if err != nil {
 		return fmt.Errorf("failed to remove role: %w", err)
@@ -384,7 +441,7 @@ func (a *AuthService) RemoveRole(userID, role, domainID string, domainType strin
 }
 
 func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, error) {
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedRole := prefixRoleName(role)
 	orgDomain := fmt.Sprintf("org:%s", orgID)
 	users, err := a.enforcer.GetUsersForRole(prefixedRole, orgDomain)
 	if err != nil {
@@ -401,7 +458,7 @@ func (a *AuthService) GetOrgUsersForRole(role string, orgID string) ([]string, e
 }
 
 func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]string, error) {
-	prefixedRole := fmt.Sprintf("role:%s", role)
+	prefixedRole := prefixRoleName(role)
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
 	users, err := a.enforcer.GetUsersForRole(prefixedRole, canvasDomain)
 	if err != nil {
@@ -418,22 +475,41 @@ func (a *AuthService) GetCanvasUsersForRole(role string, canvasID string) ([]str
 }
 
 func (a *AuthService) SetupOrganizationRoles(orgID string) error {
-	domain := fmt.Sprintf("org:%s", orgID)
+	domain := prefixDomain(models.DomainTypeOrganization, orgID)
 
-	for _, policy := range a.orgPolicyTemplates {
-		if policy[0] == "g" {
-			// g,lower_role,higher_role,org:{ORG_ID}
-			a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
-		} else if policy[0] == "p" {
-			// p,role,org:{ORG_ID},resource,action
-			a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
-		} else {
-			return fmt.Errorf("unknown policy type: %s", policy[0])
-		}
-	}
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+	err := a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			for _, policy := range a.orgPolicyTemplates {
+				switch policy[0] {
+				case "g":
+					_, err := e.AddGroupingPolicy(policy[1], policy[2], domain)
+					if err != nil {
+						return fmt.Errorf("failed to add grouping policy: %w", err)
+					}
+				case "p":
+					_, err := e.AddPolicy(policy[1], domain, policy[3], policy[4])
+					if err != nil {
+						return fmt.Errorf("failed to add policy: %w", err)
+					}
+				default:
+					return fmt.Errorf("unknown policy type: %s", policy[0])
+				}
+			}
 
-	if err := a.setupDefaultOrganizationRoleMetadata(orgID); err != nil {
-		log.Errorf("Error setting up default organization role metadata: %v", err)
+			log.Infof("Setting up default organization role metadata for %s", orgID)
+			if err := a.setupDefaultOrganizationRoleMetadataInTransaction(tx, orgID); err != nil {
+				log.Errorf("Error setting up default organization role metadata: %v", err)
+				return err
+			}
+
+			return e.SavePolicy()
+		})
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to setup organization roles: %w", err)
 	}
 
 	return nil
@@ -462,7 +538,7 @@ func (a *AuthService) DestroyOrganizationRoles(orgID string) error {
 }
 
 func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
@@ -479,7 +555,7 @@ func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) 
 }
 
 func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
 	if err != nil {
 		return nil, err
@@ -497,7 +573,7 @@ func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, err
 
 func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error) {
 	orgDomain := fmt.Sprintf("org:%s", orgID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, orgDomain)
 	if err != nil {
 		return nil, err
@@ -512,7 +588,7 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 	roles := []*RoleDefinition{}
 	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, DomainOrg, orgID)
+		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeOrganization, orgID)
 		if err != nil {
 			continue
 		}
@@ -524,7 +600,7 @@ func (a *AuthService) GetUserRolesForOrg(userID string, orgID string) ([]*RoleDe
 
 func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error) {
 	canvasDomain := fmt.Sprintf("canvas:%s", canvasID)
-	prefixedUserID := fmt.Sprintf("user:%s", userID)
+	prefixedUserID := prefixUserID(userID)
 	roleNames, err := a.enforcer.GetImplicitRolesForUser(prefixedUserID, canvasDomain)
 	if err != nil {
 		return nil, err
@@ -539,7 +615,7 @@ func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*
 
 	roles := []*RoleDefinition{}
 	for _, roleName := range unprefixedRoleNames {
-		roleDef, err := a.GetRoleDefinition(roleName, DomainCanvas, canvasID)
+		roleDef, err := a.GetRoleDefinition(roleName, models.DomainTypeCanvas, canvasID)
 		if err != nil {
 			continue
 		}
@@ -552,26 +628,38 @@ func (a *AuthService) GetUserRolesForCanvas(userID string, canvasID string) ([]*
 func (a *AuthService) SetupCanvasRoles(canvasID string) error {
 	domain := fmt.Sprintf("canvas:%s", canvasID)
 
-	for _, policy := range a.canvasPolicyTemplates {
-		if policy[0] == "g" {
-			// g,lower_role,higher_role,canvas:{CANVAS_ID}
-			_, err := a.enforcer.AddGroupingPolicy(policy[1], policy[2], domain)
-			if err != nil {
-				return fmt.Errorf("failed to add grouping policy: %w", err)
-			}
-		} else if policy[0] == "p" {
-			// p,role,canvas:{CANVAS_ID},resource,action
-			_, err := a.enforcer.AddPolicy(policy[1], domain, policy[3], policy[4])
-			if err != nil {
-				return fmt.Errorf("failed to add policy: %w", err)
-			}
-		}
-	}
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
 
-	// Set up metadata for default canvas roles
-	if err := a.setupDefaultCanvasRoleMetadata(canvasID); err != nil {
-		log.Errorf("Error setting up default canvas role metadata: %v", err)
-		// Don't fail the entire setup if metadata fails
+	err := a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			for _, policy := range a.canvasPolicyTemplates {
+				if policy[0] == "g" {
+					// g,lower_role,higher_role,canvas:{CANVAS_ID}
+					_, err := e.AddGroupingPolicy(policy[1], policy[2], domain)
+					if err != nil {
+						return fmt.Errorf("failed to add grouping policy: %w", err)
+					}
+				} else if policy[0] == "p" {
+					// p,role,canvas:{CANVAS_ID},resource,action
+					_, err := e.AddPolicy(policy[1], domain, policy[3], policy[4])
+					if err != nil {
+						return fmt.Errorf("failed to add policy: %w", err)
+					}
+				}
+			}
+
+			if err := a.setupDefaultCanvasRoleMetadataInTransaction(tx, canvasID); err != nil {
+				log.Errorf("Error setting up default canvas role metadata: %v", err)
+				return err
+			}
+
+			return e.SavePolicy()
+		})
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to setup canvas roles: %w", err)
 	}
 
 	return nil
@@ -600,13 +688,12 @@ func (a *AuthService) DestroyCanvasRoles(canvasID string) error {
 }
 
 func (a *AuthService) GetRoleDefinition(roleName string, domainType string, domainID string) (*RoleDefinition, error) {
-	// Validate domain type
-	if domainType != DomainOrg && domainType != DomainCanvas {
-		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -649,7 +736,7 @@ func (a *AuthService) GetRoleDefinition(roleName string, domainType string, doma
 }
 
 func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) ([]*RoleDefinition, error) {
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
+	domain := prefixDomain(domainType, domainID)
 
 	roles, err := a.getRolesFromPolicies(domain)
 	if err != nil {
@@ -669,13 +756,12 @@ func (a *AuthService) GetAllRoleDefinitions(domainType string, domainID string) 
 }
 
 func (a *AuthService) GetRolePermissions(roleName string, domainType string, domainID string) ([]*Permission, error) {
-	// Validate domain type
-	if domainType != DomainOrg && domainType != DomainCanvas {
-		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -696,13 +782,12 @@ func (a *AuthService) GetRolePermissions(roleName string, domainType string, dom
 }
 
 func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domainID string) ([]string, error) {
-	// Validate domain type
-	if domainType != DomainOrg && domainType != DomainCanvas {
-		return nil, fmt.Errorf("invalid domain type: %s", domainType)
+	if err := models.ValidateDomainType(domainType); err != nil {
+		return nil, err
 	}
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// For default roles, check if the domain exists by looking for any policies in that domain
 	if a.IsDefaultRole(roleName, domainType) {
@@ -735,7 +820,7 @@ func (a *AuthService) GetRoleHierarchy(roleName string, domainType string, domai
 }
 
 func (a *AuthService) CreateOrganizationOwner(userID, orgID string) error {
-	return a.AssignRole(userID, RoleOrgOwner, orgID, DomainOrg)
+	return a.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 }
 
 func (a *AuthService) SyncDefaultRoles() error {
@@ -811,14 +896,6 @@ func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
 	}
 
 	return missingPerms, nil
-}
-
-func (a *AuthService) getAllOrganizations() ([]models.Organization, error) {
-	return models.ListOrganizations()
-}
-
-func (a *AuthService) getAllCanvases() ([]models.Canvas, error) {
-	return models.ListCanvases()
 }
 
 // Optimized function to get only organization IDs that have missing permissions
@@ -1067,21 +1144,27 @@ func (a *AuthService) CheckAndSyncMissingPermissions() error {
 	return nil
 }
 
-// CreateCustomRole creates a new custom role for a domain
 func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
-	// Validate that the role name is not a default role
 	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
 		return fmt.Errorf("cannot create custom role with default role name: %s", roleDefinition.Name)
 	}
 
-	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
+	err := a.createCustomRoleWithNestedTransaction(domainID, roleDefinition)
 
-	// Validate inherited role exists if specified
+	if err != nil {
+		return fmt.Errorf("failed to create custom role: %w", err)
+	}
+
+	return nil
+}
+
+func (a *AuthService) createCustomRoleWithNestedTransaction(domainID string, roleDefinition *RoleDefinition) error {
+	domain := prefixDomain(roleDefinition.DomainType, domainID)
+	prefixedRoleName := prefixRoleName(roleDefinition.Name)
+
 	if roleDefinition.InheritsFrom != nil {
-		// For inherited roles, check if it's a default role or if it has policies
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
@@ -1089,46 +1172,63 @@ func (a *AuthService) CreateCustomRole(domainID string, roleDefinition *RoleDefi
 		}
 	}
 
-	// Add policies for each permission
-	for _, permission := range roleDefinition.Permissions {
-		_, err := a.enforcer.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
-		if err != nil {
-			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
-		}
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			err := models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
+
+			if err != nil {
+				return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
+			}
+
+			for _, permission := range roleDefinition.Permissions {
+				_, err := e.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+				if err != nil {
+					return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+				}
+			}
+
+			if roleDefinition.InheritsFrom != nil {
+				prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
+				_, err := e.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+				if err != nil {
+					return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+				}
+			}
+
+			return e.SavePolicy()
+		})
+	})
+}
+
+func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
+	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
+		return fmt.Errorf("cannot update default role: %s", roleDefinition.Name)
 	}
 
-	// Add inheritance if specified
-	if roleDefinition.InheritsFrom != nil {
-		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
-		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
-		if err != nil {
-			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
-		}
+	err := a.updateCustomRoleWithNestedTransaction(domainID, roleDefinition)
+
+	if err != nil {
+		return fmt.Errorf("failed to update custom role: %w", err)
 	}
 
 	return nil
 }
 
-// UpdateCustomRole updates an existing custom role
-func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefinition) error {
-	// Validate that the role name is not a default role
-	if a.IsDefaultRole(roleDefinition.Name, roleDefinition.DomainType) {
-		return fmt.Errorf("cannot update default role: %s", roleDefinition.Name)
-	}
+func (a *AuthService) updateCustomRoleWithNestedTransaction(domainID string, roleDefinition *RoleDefinition) error {
+	domain := prefixDomain(roleDefinition.DomainType, domainID)
+	prefixedRoleName := prefixRoleName(roleDefinition.Name)
 
-	domain := fmt.Sprintf("%s:%s", roleDefinition.DomainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleDefinition.Name)
-
-	// Check if role exists by looking for existing policies
 	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if len(existingPolicies) == 0 {
 		return fmt.Errorf("role %s not found in domain %s", roleDefinition.Name, domain)
 	}
 
-	// Validate inherited role exists if specified
 	if roleDefinition.InheritsFrom != nil {
 		if !a.IsDefaultRole(roleDefinition.InheritsFrom.Name, roleDefinition.DomainType) {
-			prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
+			prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
 			policies, _ := a.enforcer.GetFilteredPolicy(0, prefixedInheritedRole, domain)
 			if len(policies) == 0 {
 				return fmt.Errorf("inherited role not found: %s", roleDefinition.InheritsFrom.Name)
@@ -1136,80 +1236,103 @@ func (a *AuthService) UpdateCustomRole(domainID string, roleDefinition *RoleDefi
 		}
 	}
 
-	// Remove existing policies for this role in this domain
-	_, err := a.enforcer.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			err := models.UpsertRoleMetadataInTransaction(tx, roleDefinition.Name, roleDefinition.DomainType, domainID, roleDefinition.DisplayName, roleDefinition.Description)
+
+			if err != nil {
+				return fmt.Errorf("failed to upsert role metadata for role %s: %w", roleDefinition.Name, err)
+			}
+
+			_, err = e.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
+			}
+
+			_, err = e.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
+			}
+
+			for _, permission := range roleDefinition.Permissions {
+				_, err := e.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
+				if err != nil {
+					return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
+				}
+			}
+
+			if roleDefinition.InheritsFrom != nil {
+				prefixedInheritedRole := prefixRoleName(roleDefinition.InheritsFrom.Name)
+				_, err := e.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
+				if err != nil {
+					return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
+				}
+			}
+
+			return e.SavePolicy()
+		})
+	})
+}
+
+func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleName string) error {
+	if a.IsDefaultRole(roleName, domainType) {
+		return fmt.Errorf("cannot delete default role: %s", roleName)
+	}
+
+	err := a.deleteCustomRoleWithNestedTransaction(domainID, domainType, roleName)
+
 	if err != nil {
-		return fmt.Errorf("failed to remove existing policies for role %s: %w", roleDefinition.Name, err)
-	}
-
-	// Remove existing role inheritance
-	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove existing inheritance for role %s: %w", roleDefinition.Name, err)
-	}
-
-	// Add new policies
-	for _, permission := range roleDefinition.Permissions {
-		_, err := a.enforcer.AddPolicy(prefixedRoleName, domain, permission.Resource, permission.Action)
-		if err != nil {
-			return fmt.Errorf("failed to add policy for role %s: %w", roleDefinition.Name, err)
-		}
-	}
-
-	// Add inheritance if specified
-	if roleDefinition.InheritsFrom != nil {
-		prefixedInheritedRole := fmt.Sprintf("role:%s", roleDefinition.InheritsFrom.Name)
-		_, err := a.enforcer.AddGroupingPolicy(prefixedRoleName, prefixedInheritedRole, domain)
-		if err != nil {
-			return fmt.Errorf("failed to add inheritance for role %s: %w", roleDefinition.Name, err)
-		}
+		return fmt.Errorf("failed to delete custom role: %w", err)
 	}
 
 	return nil
 }
 
-// DeleteCustomRole deletes a custom role
-func (a *AuthService) DeleteCustomRole(domainID string, domainType string, roleName string) error {
-	// Validate that the role name is not a default role
-	if a.IsDefaultRole(roleName, domainType) {
-		return fmt.Errorf("cannot delete default role: %s", roleName)
-	}
+func (a *AuthService) deleteCustomRoleWithNestedTransaction(domainID string, domainType string, roleName string) error {
+	domain := prefixDomain(domainType, domainID)
+	prefixedRoleName := prefixRoleName(roleName)
 
-	domain := fmt.Sprintf("%s:%s", domainType, domainID)
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
-
-	// Check if role exists by looking for existing policies
 	existingPolicies, _ := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if len(existingPolicies) == 0 {
 		return fmt.Errorf("role %s not found in domain %s", roleName, domain)
 	}
 
-	// Remove all policies for this role in this domain
-	_, err := a.enforcer.RemoveFilteredPolicy(0, prefixedRoleName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove policies for role %s: %w", roleName, err)
-	}
+	a.enforcer.EnableAutoSave(false)
+	defer a.enforcer.EnableAutoSave(true)
+	return a.enforcer.GetAdapter().(*gormadapter.Adapter).Transaction(a.enforcer, func(e casbin.IEnforcer) error {
+		return database.Conn().Transaction(func(tx *gorm.DB) error {
+			err := models.DeleteRoleMetadataInTransaction(tx, roleName, domainType, domainID)
+			if err != nil {
+				return fmt.Errorf("failed to delete role metadata for role %s: %w", roleName, err)
+			}
 
-	// Remove role inheritance for this domain
-	_, err = a.enforcer.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
-	}
+			_, err = e.RemoveFilteredPolicy(0, prefixedRoleName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove policies for role %s: %w", roleName, err)
+			}
 
-	// Remove users from this role in this domain
-	_, err = a.enforcer.RemoveFilteredGroupingPolicy(1, prefixedRoleName, domain)
-	if err != nil {
-		return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
-	}
+			_, err = e.RemoveFilteredGroupingPolicy(0, prefixedRoleName, "", domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove inheritance for role %s: %w", roleName, err)
+			}
 
-	return nil
+			_, err = e.RemoveFilteredGroupingPolicy(1, prefixedRoleName, domain)
+			if err != nil {
+				return fmt.Errorf("failed to remove users from role %s: %w", roleName, err)
+			}
+
+			return e.SavePolicy()
+		})
+	})
 }
 
 // IsDefaultRole checks if a role is a default system role
 func (a *AuthService) IsDefaultRole(roleName string, domainType string) bool {
 	defaultRoles := map[string][]string{
-		DomainOrg:    {RoleOrgOwner, RoleOrgAdmin, RoleOrgViewer},
-		DomainCanvas: {RoleCanvasOwner, RoleCanvasAdmin, RoleCanvasViewer},
+		models.DomainTypeOrganization: {models.RoleOrgOwner, models.RoleOrgAdmin, models.RoleOrgViewer},
+		models.DomainTypeCanvas:       {models.RoleCanvasOwner, models.RoleCanvasAdmin, models.RoleCanvasViewer},
 	}
 
 	roles, exists := defaultRoles[domainType]
@@ -1242,7 +1365,7 @@ func parsePoliciesFromCsv(content []byte) ([][5]string, error) {
 }
 
 func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 
 	// Check if role has any policies in this domain
 	policies, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
@@ -1270,7 +1393,7 @@ func (a *AuthService) roleExistsInDomain(roleName, domain string) bool {
 }
 
 func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []*Permission {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	// Get all permissions including inherited ones
 	permissions, err := a.enforcer.GetImplicitPermissionsForUser(prefixedRoleName, domain)
 	if err != nil {
@@ -1292,7 +1415,7 @@ func (a *AuthService) getRolePermissions(roleName, domain, domainType string) []
 }
 
 func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType string) []*Permission {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	// Get only direct permissions for this role, not inherited ones
 	permissions, err := a.enforcer.GetFilteredPolicy(0, prefixedRoleName, domain)
 	if err != nil {
@@ -1314,7 +1437,7 @@ func (a *AuthService) getDirectRolePermissions(roleName, domain, domainType stri
 }
 
 func (a *AuthService) getInheritedRole(roleName, domain, domainType string) *RoleDefinition {
-	prefixedRoleName := fmt.Sprintf("role:%s", roleName)
+	prefixedRoleName := prefixRoleName(roleName)
 	implicitRoles, err := a.enforcer.GetImplicitRolesForUser(prefixedRoleName, domain)
 	if err != nil || len(implicitRoles) == 0 {
 		return nil
@@ -1379,12 +1502,12 @@ func (a *AuthService) getRolesFromPolicies(domain string) ([]string, error) {
 
 func (a *AuthService) getRoleDescription(roleName string) string {
 	descriptions := map[string]string{
-		RoleOrgViewer:    "Read-only access to organization resources",
-		RoleOrgAdmin:     "Full management access to organization resources including canvases and users",
-		RoleOrgOwner:     "Complete control over the organization including settings and deletion",
-		RoleCanvasViewer: "Read-only access to canvas resources",
-		RoleCanvasAdmin:  "Full management access to canvas resources including stages and events",
-		RoleCanvasOwner:  "Complete control over the canvas including member management",
+		models.RoleOrgViewer:    models.DescOrgViewer,
+		models.RoleOrgAdmin:     models.DescOrgAdmin,
+		models.RoleOrgOwner:     models.DescOrgOwner,
+		models.RoleCanvasViewer: models.DescCanvasViewer,
+		models.RoleCanvasAdmin:  models.DescCanvasAdmin,
+		models.RoleCanvasOwner:  models.DescCanvasOwner,
 	}
 
 	if description, exists := descriptions[roleName]; exists {
@@ -1404,39 +1527,38 @@ func contains(slice []string, item string) bool {
 
 func (a *AuthService) getDomainTypeFromDomain(domain string) string {
 	if strings.HasPrefix(domain, "org:") {
-		return DomainOrg
+		return models.DomainTypeOrganization
 	} else if strings.HasPrefix(domain, "canvas:") {
-		return DomainCanvas
+		return models.DomainTypeCanvas
 	}
 	return ""
 }
 
-// setupDefaultOrganizationRoleMetadata creates metadata for default organization roles
-func (a *AuthService) setupDefaultOrganizationRoleMetadata(orgID string) error {
+func (a *AuthService) setupDefaultOrganizationRoleMetadataInTransaction(tx *gorm.DB, orgID string) error {
 	defaultRoles := []struct {
 		name        string
 		displayName string
 		description string
 	}{
 		{
-			name:        RoleOrgOwner,
-			displayName: "Owner",
-			description: "Full control over organization settings, billing, and member management.",
+			name:        models.RoleOrgOwner,
+			displayName: models.DisplayNameOwner,
+			description: models.MetaDescOrgOwner,
 		},
 		{
-			name:        RoleOrgAdmin,
-			displayName: "Admin",
-			description: "Can manage canvases, users, groups, and roles within the organization.",
+			name:        models.RoleOrgAdmin,
+			displayName: models.DisplayNameAdmin,
+			description: models.MetaDescOrgAdmin,
 		},
 		{
-			name:        RoleOrgViewer,
-			displayName: "Viewer",
-			description: "Read-only access to organization resources and information.",
+			name:        models.RoleOrgViewer,
+			displayName: models.DisplayNameViewer,
+			description: models.MetaDescOrgViewer,
 		},
 	}
 
 	for _, role := range defaultRoles {
-		if err := models.UpsertRoleMetadata(role.name, DomainOrg, orgID, role.displayName, role.description); err != nil {
+		if err := models.UpsertRoleMetadataInTransaction(tx, role.name, models.DomainTypeOrganization, orgID, role.displayName, role.description); err != nil {
 			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
 		}
 	}
@@ -1444,35 +1566,50 @@ func (a *AuthService) setupDefaultOrganizationRoleMetadata(orgID string) error {
 	return nil
 }
 
-// setupDefaultCanvasRoleMetadata creates metadata for default canvas roles
-func (a *AuthService) setupDefaultCanvasRoleMetadata(canvasID string) error {
+func (a *AuthService) setupDefaultCanvasRoleMetadataInTransaction(tx *gorm.DB, canvasID string) error {
 	defaultRoles := []struct {
 		name        string
 		displayName string
 		description string
 	}{
 		{
-			name:        RoleCanvasOwner,
-			displayName: "Owner",
-			description: "Full control over canvas settings, members, and deletion.",
+			name:        models.RoleCanvasOwner,
+			displayName: models.DisplayNameOwner,
+			description: models.MetaDescCanvasOwner,
 		},
 		{
-			name:        RoleCanvasAdmin,
-			displayName: "Admin",
-			description: "Can manage stages, events, connections, and secrets within the canvas.",
+			name:        models.RoleCanvasAdmin,
+			displayName: models.DisplayNameAdmin,
+			description: models.MetaDescCanvasAdmin,
 		},
 		{
-			name:        RoleCanvasViewer,
-			displayName: "Viewer",
-			description: "Read-only access to canvas resources and execution information.",
+			name:        models.RoleCanvasViewer,
+			displayName: models.DisplayNameViewer,
+			description: models.MetaDescCanvasViewer,
 		},
 	}
 
 	for _, role := range defaultRoles {
-		if err := models.UpsertRoleMetadata(role.name, DomainCanvas, canvasID, role.displayName, role.description); err != nil {
+		if err := models.UpsertRoleMetadataInTransaction(tx, role.name, models.DomainTypeCanvas, canvasID, role.displayName, role.description); err != nil {
 			return fmt.Errorf("failed to upsert role metadata for %s: %w", role.name, err)
 		}
 	}
 
 	return nil
+}
+
+func prefixRoleName(roleName string) string {
+	return fmt.Sprintf("role:%s", roleName)
+}
+
+func prefixGroupName(groupName string) string {
+	return fmt.Sprintf("group:%s", groupName)
+}
+
+func prefixUserID(userID string) string {
+	return fmt.Sprintf("user:%s", userID)
+}
+
+func prefixDomain(domainType string, domainID string) string {
+	return fmt.Sprintf("%s:%s", domainType, domainID)
 }

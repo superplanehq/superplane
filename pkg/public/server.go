@@ -22,9 +22,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
-	pbSup "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -125,12 +129,32 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbAuth.RegisterAuthorizationHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbGroups.RegisterGroupsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbRoles.RegisterRolesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
 
 	err = pbOrg.RegisterOrganizationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbSecret.RegisterSecretsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -145,9 +169,13 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
 	)
 
-	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 
 	return nil
 }

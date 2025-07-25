@@ -15,7 +15,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
@@ -64,7 +64,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var integration *models.Integration
 	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration.Name)
+		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +113,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(req.Stage.Spec.Secrets)
+	secrets, err := validateSecrets(ctx, encryptor, canvas, req.Stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

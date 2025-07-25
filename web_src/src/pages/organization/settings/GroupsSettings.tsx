@@ -132,7 +132,7 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
       if (search === '') {
         return true
       }
-      return group.name?.toLowerCase().includes(search.toLowerCase())
+      return group.metadata?.name?.toLowerCase().includes(search.toLowerCase())
     })
 
     if (!sortConfig.key) return filtered
@@ -143,20 +143,20 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
 
       switch (sortConfig.key) {
         case 'name':
-          aValue = (a.name || '').toLowerCase()
-          bValue = (b.name || '').toLowerCase()
+          aValue = (a.metadata?.name || '').toLowerCase()
+          bValue = (b.metadata?.name || '').toLowerCase()
           break
         case 'role':
-          aValue = (a.role || '').toLowerCase()
-          bValue = (b.role || '').toLowerCase()
+          aValue = (a.spec?.role || '').toLowerCase()
+          bValue = (b.spec?.role || '').toLowerCase()
           break
         case 'created':
-          aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0
-          bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0
+          aValue = a.metadata?.createdAt ? new Date(a.metadata.createdAt).getTime() : 0
+          bValue = b.metadata?.createdAt ? new Date(b.metadata.createdAt).getTime() : 0
           break
         case 'members':
-          aValue = a.membersCount || 0
-          bValue = b.membersCount || 0
+          aValue = a.status?.membersCount || 0
+          bValue = b.status?.membersCount || 0
           break
         default:
           return 0
@@ -263,28 +263,28 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                           <Avatar
                             className='w-9'
                             square
-                            initials={group.displayName?.charAt(0).toUpperCase() || 'G'}
+                            initials={group.spec?.displayName?.charAt(0).toUpperCase() || 'G'}
                           />
                           <div>
                             <Link
-                              href={`/organization/${organizationId}/settings/groups/${group.name}/members`}
+                              href={`/organization/${organizationId}/settings/groups/${group.metadata?.name}/members`}
                               className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400"
                             >
-                              {group.displayName}
+                              {group.spec?.displayName}
                             </Link>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.description || 'No description available'}</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.spec?.description || 'No description available'}</p>
                           </div>
                         </div>
                       </TableCell>
 
                       <TableCell>
                         <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {formatRelativeTime(group.createdAt)}
+                          {formatRelativeTime(group.metadata?.createdAt)}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {group.membersCount || 0} member{group.membersCount === 1 ? '' : 's'}
+                          {group.status?.membersCount || 0} member{group.status?.membersCount === 1 ? '' : 's'}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -297,19 +297,19 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                             {updateGroupMutation.isPending ? (
                               'Updating...'
                             ) : (
-                              roles.find(r => r.name === group.role)?.displayName || 'Select Role'
+                              roles.find(r => r?.metadata?.name === group.spec?.role)?.spec?.displayName || 'Select Role'
                             )}
                             <MaterialSymbol name="keyboard_arrow_down" />
                           </DropdownButton>
                           <DropdownMenu>
                             {roles.map((role) => (
                               <DropdownItem
-                                key={role.name}
-                                onClick={() => handleRoleUpdate(group.name!, role.name!)}
+                                key={role.metadata?.name}
+                                onClick={() => handleRoleUpdate(group.metadata!.name!, role.metadata!.name!)}
                               >
-                                <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
+                                <DropdownLabel>{role.spec?.displayName || role.metadata!.name}</DropdownLabel>
                                 <DropdownDescription>
-                                  {role.description || 'No description available'}
+                                  {role.spec?.description || 'No description available'}
                                 </DropdownDescription>
                               </DropdownItem>
                             ))}
@@ -326,12 +326,12 @@ export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
                               <MaterialSymbol name="more_vert" size="sm" />
                             </DropdownButton>
                             <DropdownMenu>
-                              <DropdownItem onClick={() => handleViewMembers(group.name!)}>
+                              <DropdownItem onClick={() => handleViewMembers(group.metadata!.name!)}>
                                 <MaterialSymbol name="group" />
                                 View Members
                               </DropdownItem>
                               <DropdownItem
-                                onClick={() => handleDeleteGroup(group.name!)}
+                                onClick={() => handleDeleteGroup(group.metadata!.name!)}
                                 className="text-red-600 dark:text-red-400"
                               >
                                 <MaterialSymbol name="delete" />

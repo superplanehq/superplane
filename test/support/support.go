@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
-	pb "github.com/superplanehq/superplane/pkg/protos/superplane"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
 	"gorm.io/datatypes"
@@ -55,8 +56,24 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	user := &models.User{
+		Name:     "Test User",
+		IsActive: true,
+	}
+	require.NoError(t, user.Create())
+
+	accountProvider := &models.AccountProvider{
+		UserID:     user.ID,
+		Email:      "test@test.com",
+		Username:   "Test",
+		Provider:   "github",
+		ProviderID: "123",
+	}
+
+	require.NoError(t, accountProvider.Create())
+
 	r := ResourceRegistry{
-		User:      uuid.New(),
+		User:      user.ID,
 		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
@@ -77,13 +94,13 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 
 	if options.Integration {
-		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
+		secret, err := CreateCanvasSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
 		integration, err := models.CreateIntegration(&models.Integration{
 			Name:       RandomName("integration"),
 			CreatedBy:  r.User,
 			Type:       models.IntegrationTypeSemaphore,
-			DomainType: "canvas",
+			DomainType: models.DomainTypeCanvas,
 			DomainID:   r.Canvas.ID,
 			URL:        r.SemaphoreAPIMock.Server.URL,
 			AuthType:   models.IntegrationAuthTypeToken,
@@ -91,8 +108,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
+							DomainType: models.DomainTypeCanvas,
+							Name:       secret.Name,
+							Key:        "key",
 						},
 					},
 				},
@@ -244,7 +262,7 @@ func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.R
 func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	return &pb.ExecutorSpec{
 		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
-		Integration: &pb.IntegrationRef{
+		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},
@@ -257,10 +275,18 @@ func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
 	}
 }
 
-func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+func CreateCanvasSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
-	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), r.Canvas.ID, data)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
+	require.NoError(t, err)
+	return secret, nil
+}
+
+func CreateOrganizationSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }

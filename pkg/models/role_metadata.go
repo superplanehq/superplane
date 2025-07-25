@@ -8,11 +8,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// RoleMetadata stores display names and descriptions for roles
 type RoleMetadata struct {
 	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	RoleName    string    `json:"role_name" gorm:"not null;index"`
-	DomainType  string    `json:"domain_type" gorm:"not null;index"` // "organization" or "canvas"
+	DomainType  string    `json:"domain_type" gorm:"not null;index"`
 	DomainID    string    `json:"domain_id" gorm:"not null;index"`
 	DisplayName string    `json:"display_name" gorm:"not null"`
 	Description string    `json:"description"`
@@ -20,11 +19,10 @@ type RoleMetadata struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// GroupMetadata stores display names and descriptions for groups
 type GroupMetadata struct {
 	ID          uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	GroupName   string    `json:"group_name" gorm:"not null;index"`
-	DomainType  string    `json:"domain_type" gorm:"not null;index"` // "organization" or "canvas"
+	DomainType  string    `json:"domain_type" gorm:"not null;index"`
 	DomainID    string    `json:"domain_id" gorm:"not null;index"`
 	DisplayName string    `json:"display_name" gorm:"not null"`
 	Description string    `json:"description"`
@@ -47,22 +45,37 @@ func (gm *GroupMetadata) BeforeCreate(tx *gorm.DB) error {
 }
 
 func (rm *RoleMetadata) Create() error {
-	return database.Conn().Create(rm).Error
+	return rm.CreateInTransaction(database.Conn())
+}
+
+func (rm *RoleMetadata) CreateInTransaction(tx *gorm.DB) error {
+	return tx.Create(rm).Error
 }
 
 func (rm *RoleMetadata) Update() error {
-	return database.Conn().Save(rm).Error
+	return rm.UpdateInTransaction(database.Conn())
+}
+
+func (rm *RoleMetadata) UpdateInTransaction(tx *gorm.DB) error {
+	return tx.Save(rm).Error
 }
 
 func (gm *GroupMetadata) Create() error {
-	return database.Conn().Create(gm).Error
+	return gm.CreateInTransaction(database.Conn())
+}
+
+func (gm *GroupMetadata) CreateInTransaction(tx *gorm.DB) error {
+	return tx.Create(gm).Error
 }
 
 func (gm *GroupMetadata) Update() error {
-	return database.Conn().Save(gm).Error
+	return gm.UpdateInTransaction(database.Conn())
 }
 
-// FindRoleMetadata finds role metadata by role name, domain type, and domain ID
+func (gm *GroupMetadata) UpdateInTransaction(tx *gorm.DB) error {
+	return tx.Save(gm).Error
+}
+
 func FindRoleMetadata(roleName, domainType, domainID string) (*RoleMetadata, error) {
 	var metadata RoleMetadata
 	err := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
@@ -72,7 +85,6 @@ func FindRoleMetadata(roleName, domainType, domainID string) (*RoleMetadata, err
 	return &metadata, nil
 }
 
-// FindGroupMetadata finds group metadata by group name, domain type, and domain ID
 func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, error) {
 	var metadata GroupMetadata
 	err := database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
@@ -82,13 +94,15 @@ func FindGroupMetadata(groupName, domainType, domainID string) (*GroupMetadata, 
 	return &metadata, nil
 }
 
-// UpsertRoleMetadata creates or updates role metadata
 func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description string) error {
+	return UpsertRoleMetadataInTransaction(database.Conn(), roleName, domainType, domainID, displayName, description)
+}
+
+func UpsertRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID, displayName, description string) error {
 	var metadata RoleMetadata
-	err := database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
+	err := tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).First(&metadata).Error
 
 	if err == gorm.ErrRecordNotFound {
-		// Create new metadata
 		metadata = RoleMetadata{
 			RoleName:    roleName,
 			DomainType:  domainType,
@@ -96,24 +110,25 @@ func UpsertRoleMetadata(roleName, domainType, domainID, displayName, description
 			DisplayName: displayName,
 			Description: description,
 		}
-		return metadata.Create()
+		return metadata.CreateInTransaction(tx)
 	} else if err != nil {
 		return err
 	}
 
-	// Update existing metadata
 	metadata.DisplayName = displayName
 	metadata.Description = description
-	return metadata.Update()
+	return metadata.UpdateInTransaction(tx)
 }
 
-// UpsertGroupMetadata creates or updates group metadata
 func UpsertGroupMetadata(groupName, domainType, domainID, displayName, description string) error {
+	return UpsertGroupMetadataInTransaction(database.Conn(), groupName, domainType, domainID, displayName, description)
+}
+
+func UpsertGroupMetadataInTransaction(tx *gorm.DB, groupName, domainType, domainID, displayName, description string) error {
 	var metadata GroupMetadata
-	err := database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
+	err := tx.Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).First(&metadata).Error
 
 	if err == gorm.ErrRecordNotFound {
-		// Create new metadata
 		metadata = GroupMetadata{
 			GroupName:   groupName,
 			DomainType:  domainType,
@@ -121,35 +136,39 @@ func UpsertGroupMetadata(groupName, domainType, domainID, displayName, descripti
 			DisplayName: displayName,
 			Description: description,
 		}
-		return metadata.Create()
+		return metadata.CreateInTransaction(tx)
 	} else if err != nil {
 		return err
 	}
 
-	// Update existing metadata
 	metadata.DisplayName = displayName
 	metadata.Description = description
-	return metadata.Update()
+	return metadata.UpdateInTransaction(tx)
 }
 
-// DeleteRoleMetadata deletes role metadata
 func DeleteRoleMetadata(roleName, domainType, domainID string) error {
-	return database.Conn().Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).Delete(&RoleMetadata{}).Error
+	return DeleteRoleMetadataInTransaction(database.Conn(), roleName, domainType, domainID)
 }
 
-// DeleteGroupMetadata deletes group metadata
+func DeleteRoleMetadataInTransaction(tx *gorm.DB, roleName, domainType, domainID string) error {
+	return tx.Where("role_name = ? AND domain_type = ? AND domain_id = ?", roleName, domainType, domainID).Delete(&RoleMetadata{}).Error
+}
+
 func DeleteGroupMetadata(groupName, domainType, domainID string) error {
-	return database.Conn().Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).Delete(&GroupMetadata{}).Error
+	return DeleteGroupMetadataInTransaction(database.Conn(), groupName, domainType, domainID)
 }
 
-// FindRoleMetadataByNames finds multiple role metadata records by role names, domain type, and domain ID
+func DeleteGroupMetadataInTransaction(tx *gorm.DB, groupName, domainType, domainID string) error {
+	return tx.Where("group_name = ? AND domain_type = ? AND domain_id = ?", groupName, domainType, domainID).Delete(&GroupMetadata{}).Error
+}
+
 func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (map[string]*RoleMetadata, error) {
 	var metadata []RoleMetadata
 	err := database.Conn().Where("role_name IN ? AND domain_type = ? AND domain_id = ?", roleNames, domainType, domainID).Find(&metadata).Error
 	if err != nil {
 		return nil, err
 	}
-	
+
 	result := make(map[string]*RoleMetadata)
 	for i := range metadata {
 		result[metadata[i].RoleName] = &metadata[i]
@@ -157,86 +176,78 @@ func FindRoleMetadataByNames(roleNames []string, domainType, domainID string) (m
 	return result, nil
 }
 
-// GetRoleDisplayNameWithFallback gets the display name for a role, with fallback to default names
 func GetRoleDisplayNameWithFallback(roleName, domainType, domainID string, metadata *RoleMetadata) string {
 	if metadata != nil {
 		return metadata.DisplayName
 	}
-	
-	// For default roles, provide beautiful display names
+
 	if displayName := getDefaultRoleDisplayName(roleName, domainType); displayName != "" {
 		return displayName
 	}
-	
-	return roleName // Fallback to role name
+
+	return roleName
 }
 
-// GetRoleDescriptionWithFallback gets the description for a role, with fallback to default descriptions
 func GetRoleDescriptionWithFallback(roleName, domainType, domainID string, metadata *RoleMetadata) string {
 	if metadata != nil {
 		return metadata.Description
 	}
-	
-	// For default roles, provide beautiful descriptions
+
 	if description := getDefaultRoleDescription(roleName, domainType); description != "" {
 		return description
 	}
-	
-	return "" // No description available
+
+	return ""
 }
 
-// getDefaultRoleDisplayName returns beautiful display names for default roles
 func getDefaultRoleDisplayName(roleName, domainType string) string {
-	// Organization roles
+
 	if domainType == "org" {
 		switch roleName {
 		case "org_owner":
-			return "Owner"
+			return DisplayNameOwner
 		case "org_admin":
-			return "Admin"
+			return DisplayNameAdmin
 		case "org_viewer":
-			return "Viewer"
+			return DisplayNameViewer
 		}
 	}
 
-	// Canvas roles
 	if domainType == "canvas" {
 		switch roleName {
 		case "canvas_owner":
-			return "Owner"
+			return DisplayNameOwner
 		case "canvas_admin":
-			return "Admin"
+			return DisplayNameAdmin
 		case "canvas_viewer":
-			return "Viewer"
+			return DisplayNameViewer
 		}
 	}
 
 	return ""
 }
 
-// getDefaultRoleDescription returns beautiful descriptions for default roles
 func getDefaultRoleDescription(roleName, domainType string) string {
-	// Organization roles
+
 	if domainType == "org" {
 		switch roleName {
 		case "org_owner":
-			return "Full control over organization settings, billing, and member management."
+			return MetaDescOrgOwner
 		case "org_admin":
-			return "Can manage canvases, users, groups, and roles within the organization."
+			return MetaDescOrgAdmin
 		case "org_viewer":
-			return "Read-only access to organization resources and information."
+			return MetaDescOrgViewer
 		}
 	}
 
-	// Canvas roles
 	if domainType == "canvas" {
 		switch roleName {
 		case "canvas_owner":
-			return "Full control over canvas settings, members, and deletion."
+			return MetaDescCanvasOwner
 		case "canvas_admin":
-			return "Can manage stages, events, connections, and secrets within the canvas."
+			return MetaDescCanvasAdmin
 		case "canvas_viewer":
-			return "Read-only access to canvas resources and execution information."
+			return MetaDescCanvasViewer
 		}
 	}
 

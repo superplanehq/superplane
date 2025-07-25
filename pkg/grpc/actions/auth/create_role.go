@@ -5,76 +5,77 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func CreateRole(ctx context.Context, req *pb.CreateRoleRequest, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
+func CreateRole(ctx context.Context, domainType string, domainID string, role *pb.Role, authService authorization.Authorization) (*pb.CreateRoleResponse, error) {
+	if role == nil {
+		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
-	if req.Name == "" {
+	if role.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "role metadata must be specified")
+	}
+
+	if role.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "role spec must be specified")
+	}
+
+	if role.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	domainType := convertDomainType(req.DomainType)
-	if domainType == "" {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain type")
+	if role.Spec.Permissions == nil {
+		return nil, status.Error(codes.InvalidArgument, "role permissions must be specified")
 	}
 
-	// Convert protobuf permissions to authorization permissions
-	permissions := make([]*authorization.Permission, len(req.Permissions))
-	for i, perm := range req.Permissions {
+	permissions := make([]*authorization.Permission, len(role.Spec.Permissions))
+	for i, perm := range role.Spec.Permissions {
 		permissions[i] = &authorization.Permission{
 			Resource:   perm.Resource,
 			Action:     perm.Action,
-			DomainType: convertDomainType(perm.DomainType),
+			DomainType: domainType,
 		}
 	}
 
-	roleDefinition := &authorization.RoleDefinition{
-		Name:        req.Name,
-		DomainType:  domainType,
-		Permissions: permissions,
+	var displayName, description string
+
+	if role.Spec.DisplayName != "" {
+		displayName = role.Spec.DisplayName
+	} else {
+		displayName = role.Metadata.Name
 	}
 
-	// Handle inherited role if specified
-	if req.InheritedRole != "" {
-		inheritedRoleDef, err := authService.GetRoleDefinition(req.InheritedRole, domainType, req.DomainId)
+	if role.Spec.Description != "" {
+		description = role.Spec.Description
+	}
+
+	roleDefinition := &authorization.RoleDefinition{
+		Name:        role.Metadata.Name,
+		DomainType:  domainType,
+		Permissions: permissions,
+		DisplayName: displayName,
+		Description: description,
+	}
+
+	if role.Spec.InheritedRole != nil && role.Spec.InheritedRole.Metadata != nil && role.Spec.InheritedRole.Metadata.Name != "" {
+		inheritedRoleDef, err := authService.GetRoleDefinition(role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
-			log.Errorf("failed to get inherited role %s: %v", req.InheritedRole, err)
+			log.Errorf("failed to get inherited role %s: %v", role.Spec.InheritedRole.Metadata.Name, err)
 			return nil, status.Error(codes.InvalidArgument, "inherited role not found")
 		}
 		roleDefinition.InheritsFrom = inheritedRoleDef
 	}
 
-	err = authService.CreateCustomRole(req.DomainId, roleDefinition)
+	err := authService.CreateCustomRole(domainID, roleDefinition)
 	if err != nil {
-		log.Errorf("failed to create role %s: %v", req.Name, err)
+		log.Errorf("failed to create role %s: %v", role.Metadata.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Create or update role metadata if display name or description is provided
-	if req.DisplayName != "" || req.Description != "" {
-		displayName := req.DisplayName
-
-		if displayName == "" {
-			displayName = req.Name // Fallback to role name
-		}
-
-		err = models.UpsertRoleMetadata(req.Name, domainType, req.DomainId, displayName, req.Description)
-		if err != nil {
-			log.Errorf("failed to create role metadata for %s: %v", req.Name, err)
-			// Don't fail the entire operation for metadata errors
-		}
-	}
-
-	log.Infof("created custom role %s in domain %s (%s)", req.Name, req.DomainId, domainType)
+	log.Infof("created custom role %s in domain %s (%s)", role.Metadata.Name, domainID, domainType)
 
 	return &pb.CreateRoleResponse{}, nil
 }

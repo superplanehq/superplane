@@ -6,61 +6,66 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateGroup(ctx context.Context, req *CreateGroupRequest, authService authorization.Authorization) (*CreateGroupResponse, error) {
-	err := actions.ValidateUUIDs(req.DomainID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
+func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Group, authService authorization.Authorization) (*pb.CreateGroupResponse, error) {
+	if group == nil {
+		return nil, status.Error(codes.InvalidArgument, "group must be specified")
 	}
 
-	err = ValidateCreateGroupRequest(req)
-	if err != nil {
-		return nil, err
+	if group.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "group metadata must be specified")
 	}
 
-	domainType, err := ConvertDomainType(req.DomainType)
-	if err != nil {
-		return nil, err
+	if group.Spec == nil {
+		return nil, status.Error(codes.InvalidArgument, "group spec must be specified")
 	}
 
-	err = authService.CreateGroup(req.DomainID, domainType, req.GroupName, req.Role)
-	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", req.GroupName, req.Role, req.DomainID, err)
-		return nil, status.Error(codes.Internal, "failed to create group")
+	if group.Metadata.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
+	}
+
+	if group.Spec.Role == "" {
+		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
 	var displayName string
 	var description string
-	if req.DisplayName != "" || req.Description != "" {
-		displayName = req.DisplayName
+	if group.Spec.DisplayName != "" || group.Spec.Description != "" {
+		displayName = group.Spec.DisplayName
 		if displayName == "" {
-			displayName = req.GroupName
+			displayName = group.Metadata.Name
 		}
-		description = req.Description
-
-		err = models.UpsertGroupMetadata(req.GroupName, domainType, req.DomainID, displayName, description)
-		if err != nil {
-			log.Errorf("failed to create group metadata for %s: %v", req.GroupName, err)
-		}
+		description = group.Spec.Description
 	}
 
-	log.Infof("created group %s with role %s in domain %s (type: %s)", req.GroupName, req.Role, req.DomainID, req.DomainType.String())
-
-	group := &pb.Group{
-		Name:        req.GroupName,
-		DomainType:  req.DomainType,
-		DomainId:    req.DomainID,
-		Role:        req.Role,
-		DisplayName: displayName,
-		Description: description,
+	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role, displayName, description)
+	if err != nil {
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
+		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
-	return &CreateGroupResponse{
-		Group: group,
+	log.Infof("created group %s with role %s in domain %s (type: %s)", group.Metadata.Name, group.Spec.Role, domainID, domainType)
+
+	groupResponse := &pb.Group{
+		Metadata: &pb.Group_Metadata{
+			Name:       group.Metadata.Name,
+			DomainType: actions.DomainTypeToProto(domainType),
+			DomainId:   domainID,
+			CreatedAt:  timestamppb.Now(),
+			UpdatedAt:  timestamppb.Now(),
+		},
+		Spec: &pb.Group_Spec{
+			DisplayName: displayName,
+			Description: description,
+		},
+	}
+
+	return &pb.CreateGroupResponse{
+		Group: groupResponse,
 	}, nil
 }

@@ -86,68 +86,30 @@ var createCmd = &cobra.Command{
 				Fail("Invalid Secret YAML: metadata section missing")
 			}
 
-			name, ok := metadata["name"].(string)
+			domainId, ok := metadata["domainId"].(string)
 			if !ok {
-				Fail("Invalid Secret YAML: name field missing")
+				Fail("Invalid Secret YAML: domainId field missing")
 			}
 
-			canvasID, ok := metadata["canvasId"].(string)
+			domainTypeFromYaml, ok := metadata["domainType"].(string)
 			if !ok {
-				Fail("Invalid Secret YAML: canvasId field missing")
+				Fail("Invalid Secret YAML: domainType field missing")
 			}
 
-			spec, ok := yamlData["spec"].(map[string]interface{})
-			if !ok {
-				Fail("Invalid Secret YAML: spec section missing")
-			}
+			var secret openapi_client.SecretsSecret
+			err = yaml.Unmarshal(data, &secret)
+			Check(err)
 
-			// Prepare request
+			domainType, err := openapi_client.NewAuthorizationDomainTypeFromValue(domainTypeFromYaml)
+			Check(err)
 
-			// Create the initial request
-			request := openapi_client.NewSuperplaneCreateSecretBody()
-
-			// Create Secret with metadata and spec
-			secret := openapi_client.NewSuperplaneSecret()
-			secretMeta := openapi_client.NewSuperplaneSecretMetadata()
-			secretMeta.SetName(name)
-			secretMeta.SetCanvasId(canvasID)
-			secret.SetMetadata(*secretMeta)
-
-			// Create a proper secret spec from the YAML data
-			secretSpec := openapi_client.NewSuperplaneSecretSpec()
-
-			// Convert provider string to enum if present
-			if providerStr, ok := spec["provider"].(string); ok {
-				var provider openapi_client.SecretProvider
-				switch providerStr {
-				case "PROVIDER_LOCAL":
-					provider = openapi_client.SECRETPROVIDER_PROVIDER_LOCAL
-				}
-				secretSpec.SetProvider(provider)
-			}
-
-			// Handle local data if present
-			if localData, ok := spec["local"].(map[string]interface{}); ok {
-				local := openapi_client.NewSecretLocal()
-				if dataMap, ok := localData["data"].(map[string]interface{}); ok {
-					// Convert to string map
-					stringMap := make(map[string]string)
-					for k, v := range dataMap {
-						if strVal, ok := v.(string); ok {
-							stringMap[k] = strVal
-						}
-					}
-					local.SetData(stringMap)
-				}
-				secretSpec.SetLocal(*local)
-			}
-
-			secret.SetSpec(*secretSpec)
-			request.SetSecret(*secret)
-
-			// Send request
-			response, httpResponse, err := c.SecretAPI.SuperplaneCreateSecret(context.Background(), canvasID).
-				Body(*request).
+			response, httpResponse, err := c.SecretAPI.
+				SecretsCreateSecret(context.Background()).
+				Body(openapi_client.SecretsCreateSecretRequest{
+					Secret:     &secret,
+					DomainId:   &domainId,
+					DomainType: domainType,
+				}).
 				Execute()
 
 			if err != nil {
@@ -254,21 +216,30 @@ var createCmd = &cobra.Command{
 				Fail("Invalid Integration YAML: metadata section missing")
 			}
 
-			canvasID, ok := metadata["canvasId"].(string)
+			domainId, ok := metadata["domainId"].(string)
 			if !ok {
-				Fail("Invalid Integration YAML: canvasId or canvasName field missing")
+				Fail("Invalid Integration YAML: domainId field missing")
 			}
 
-			var integration openapi_client.SuperplaneIntegration
+			domainTypeFromYaml, ok := metadata["domainType"].(string)
+			if !ok {
+				Fail("Invalid Integration YAML: domainType field missing")
+			}
+
+			var integration openapi_client.IntegrationsIntegration
 			err = yaml.Unmarshal(data, &integration)
 			Check(err)
 
-			body := openapi_client.SuperplaneCreateIntegrationBody{
-				Integration: &integration,
-			}
+			domainType, err := openapi_client.NewAuthorizationDomainTypeFromValue(domainTypeFromYaml)
+			Check(err)
 
-			response, httpResponse, err := c.IntegrationAPI.SuperplaneCreateIntegration(context.Background(), canvasID).
-				Body(body).
+			response, httpResponse, err := c.IntegrationAPI.
+				IntegrationsCreateIntegration(context.Background()).
+				Body(openapi_client.IntegrationsCreateIntegrationRequest{
+					Integration: &integration,
+					DomainId:    &domainId,
+					DomainType:  domainType,
+				}).
 				Execute()
 
 			if err != nil {

@@ -37,7 +37,7 @@ func dbPoolSize() int {
 
 	size, err := strconv.Atoi(poolSize)
 	if err != nil {
-		return 1
+		return 5
 	}
 
 	return size

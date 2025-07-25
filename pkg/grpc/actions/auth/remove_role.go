@@ -4,63 +4,22 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
-	if req.RoleAssignment.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
-	var domainTypeStr string
-
-	switch req.RoleAssignment.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		domainTypeStr = authorization.DomainOrg
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		domainTypeStr = authorization.DomainCanvas
-	default:
-		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
-	}
-
-	roleStr := req.RoleAssignment.Role
-	if roleStr == "" {
+func RemoveRole(ctx context.Context, domainType string, domainID string, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
+	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	err := actions.ValidateUUIDs(req.RoleAssignment.DomainId)
+	userId, err := ResolveUserIDWithoutCreation(userID, userEmail)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid domain ID")
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
 	}
 
-	var userID string
-	switch identifier := req.UserIdentifier.(type) {
-	case *pb.RemoveRoleRequest_UserId:
-		err := actions.ValidateUUIDs(identifier.UserId)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid user ID")
-		}
-		userID = identifier.UserId
-	case *pb.RemoveRoleRequest_UserEmail:
-		// Find user by email - first try with account providers
-		user, err := models.FindUserByEmail(identifier.UserEmail)
-		if err != nil {
-			// If not found by account provider, try to find inactive user by email
-			user, err = models.FindInactiveUserByEmail(identifier.UserEmail)
-			if err != nil {
-				return nil, status.Error(codes.NotFound, "user not found")
-			}
-		}
-		userID = user.ID.String()
-	default:
-		return nil, status.Error(codes.InvalidArgument, "user identifier must be specified")
-	}
-
-	err = authService.RemoveRole(userID, roleStr, req.RoleAssignment.DomainId, domainTypeStr)
+	err = authService.RemoveRole(userId, roleName, domainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove role")
 	}
