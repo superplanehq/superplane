@@ -1,32 +1,151 @@
-package integrations
+package semaphore
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const (
 	SemaphorePipelineStateDone    = "done"
 	SemaphorePipelineResultPassed = "passed"
 	SemaphorePipelineResultFailed = "failed"
+
+	ResourceTypeTask         = "task"
+	ResourceTypeTaskTrigger  = "task-trigger"
+	ResourceTypeProject      = "project"
+	ResourceTypeWorkflow     = "workflow"
+	ResourceTypeNotification = "notification"
+	ResourceTypeSecret       = "secret"
+	ResourceTypePipeline     = "pipeline"
 )
 
 type SemaphoreIntegration struct {
-	URL   string
-	Token string
+	Integration         *models.Integration
+	AuthenticationToken string
 }
 
-func NewSemaphoreIntegration(URL, token string) (Integration, error) {
+func init() {
+	integrations.RegisterIntegrationType(models.IntegrationTypeSemaphore, NewSemaphoreIntegration)
+}
+
+func NewSemaphoreIntegration(ctx context.Context, integration *models.Integration, authenticate integrations.AuthenticateFn) (integrations.Integration, error) {
+	token, err := authenticate()
+	if err != nil {
+		return nil, fmt.Errorf("error getting authentication: %v", err)
+	}
+
 	return &SemaphoreIntegration{
-		URL:   URL,
-		Token: token,
+		Integration:         integration,
+		AuthenticationToken: token,
 	}, nil
 }
 
-func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]Resource, error) {
+func (s *SemaphoreIntegration) SetupEventSource(options integrations.EventSourceOptions) ([]integrations.Resource, error) {
+	//
+	// Create Semaphore secret to store the event source key.
+	//
+	resourceName := fmt.Sprintf("superplane-%s-%s", s.Integration.Name, options.Name)
+	secret, err := s.createSemaphoreSecret(resourceName, options.Key)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
+	}
+
+	//
+	// Create a notification resource to receive events from Semaphore
+	//
+	notification, err := s.createSemaphoreNotification(resourceName, options)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
+	}
+
+	return []integrations.Resource{secret, notification}, nil
+}
+
+func (s *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {
+	//
+	// Check if secret already exists.
+	//
+	secret, err := s.Get(ResourceTypeSecret, name)
+	if err == nil {
+		return secret, nil
+	}
+
+	//
+	// Secret does not exist, create it.
+	//
+	secret, err = s.Create(ResourceTypeSecret, &Secret{
+		Metadata: SecretMetadata{
+			Name: name,
+		},
+		Data: SecretSpecData{
+			EnvVars: []SecretSpecDataEnvVar{
+				{
+					Name:  "WEBHOOK_SECRET",
+					Value: string(key),
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating secret: %v", err)
+	}
+
+	return secret, nil
+}
+
+func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options integrations.EventSourceOptions) (integrations.Resource, error) {
+	//
+	// Check if notification already exists.
+	//
+	notification, err := s.Get(ResourceTypeNotification, name)
+	if err == nil {
+		return notification, nil
+	}
+
+	//
+	// Notification does not exist, create it.
+	//
+	notification, err = s.Create(ResourceTypeNotification, &Notification{
+		Metadata: NotificationMetadata{
+			Name: name,
+		},
+		Spec: NotificationSpec{
+			Rules: []NotificationRule{
+				{
+					Name: fmt.Sprintf("webhooks-for-%s", options.Resource.Name()),
+					Filter: NotificationRuleFilter{
+						Branches:  []string{},
+						Pipelines: []string{},
+						Projects:  []string{options.Resource.Name()},
+						Results:   []string{},
+					},
+					Notify: NotificationRuleNotify{
+						Webhook: NotificationNotifyWebhook{
+							Endpoint: fmt.Sprintf("%s/api/v1/sources/%s/semaphore", options.BaseURL, options.ID),
+							Secret:   name,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating notification: %v", err)
+	}
+
+	return notification, nil
+}
+
+func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeTask:
 		return s.listTasks(parentIDs...)
@@ -37,7 +156,7 @@ func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([
 	}
 }
 
-func (s *SemaphoreIntegration) Get(resourceType, id string, parentIDs ...string) (Resource, error) {
+func (s *SemaphoreIntegration) Get(resourceType, id string, parentIDs ...string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		return s.getWorkflow(id)
@@ -67,7 +186,7 @@ type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) Create(resourceType string, params any) (Resource, error) {
+func (s *SemaphoreIntegration) Create(resourceType string, params any) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		return s.runWorkflow(params)
@@ -82,8 +201,33 @@ func (s *SemaphoreIntegration) Create(resourceType string, params any) (Resource
 	}
 }
 
-func (s *SemaphoreIntegration) createSecret(params any) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1beta/secrets", s.URL)
+func (s *SemaphoreIntegration) execRequest(method string, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+s.AuthenticationToken)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
+func (s *SemaphoreIntegration) createSecret(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets", s.Integration.URL)
 
 	secret, ok := params.(*Secret)
 	if !ok {
@@ -97,25 +241,9 @@ func (s *SemaphoreIntegration) createSecret(params any) (Resource, error) {
 		return nil, fmt.Errorf("error marshaling secret: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response Secret
@@ -127,27 +255,11 @@ func (s *SemaphoreIntegration) createSecret(params any) (Resource, error) {
 	return &response, nil
 }
 
-func (s *SemaphoreIntegration) getSecret(id string) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", s.URL, id)
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (s *SemaphoreIntegration) getSecret(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", s.Integration.URL, id)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response Secret
@@ -192,27 +304,11 @@ type SecretSpecDataEnvVar struct {
 	Value string `json:"value"`
 }
 
-func (s *SemaphoreIntegration) getNotification(id string) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", s.URL, id)
-	req, err := http.NewRequest(http.MethodPost, URL, nil)
+func (s *SemaphoreIntegration) getNotification(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", s.Integration.URL, id)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response Notification
@@ -224,8 +320,8 @@ func (s *SemaphoreIntegration) getNotification(id string) (Resource, error) {
 	return &response, nil
 }
 
-func (s *SemaphoreIntegration) createNotification(params any) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/notifications", s.URL)
+func (s *SemaphoreIntegration) createNotification(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications", s.Integration.URL)
 
 	notification, ok := params.(*Notification)
 	if !ok {
@@ -239,25 +335,9 @@ func (s *SemaphoreIntegration) createNotification(params any) (Resource, error) 
 		return nil, fmt.Errorf("error marshaling notification: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response Notification
@@ -342,37 +422,21 @@ type RunTaskResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) runTask(params any) (Resource, error) {
+func (s *SemaphoreIntegration) runTask(params any) (integrations.Resource, error) {
 	p, ok := params.(*RunTaskRequest)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", s.URL, p.TaskID)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", s.Integration.URL, p.TaskID)
 	body, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling task trigger: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response RunTaskResponse
@@ -384,33 +448,17 @@ func (s *SemaphoreIntegration) runTask(params any) (Resource, error) {
 	return &SemaphoreWorkflow{WfID: response.WorkflowID}, nil
 }
 
-func (s *SemaphoreIntegration) runWorkflow(params any) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", s.URL)
+func (s *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", s.Integration.URL)
 
 	body, err := json.Marshal(&params)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling create workflow params: %v", err)
 	}
 
-	req, err := http.NewRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("error building create workflow request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, err
 	}
 
 	var response CreateWorkflowResponse
@@ -422,32 +470,15 @@ func (s *SemaphoreIntegration) runWorkflow(params any) (Resource, error) {
 	return &SemaphoreWorkflow{WfID: response.WorkflowID}, nil
 }
 
-func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]Resource, error) {
+func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks?project_id=%s", s.URL, parentIDs[0])
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks?project_id=%s", s.Integration.URL, parentIDs[0])
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	var tasks []SemaphoreTask
@@ -456,7 +487,7 @@ func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]Resource, error
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	resources := make([]Resource, len(tasks))
+	resources := make([]integrations.Resource, len(tasks))
 	for i := range tasks {
 		resources[i] = &tasks[i]
 	}
@@ -464,28 +495,11 @@ func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]Resource, error
 	return resources, nil
 }
 
-func (s *SemaphoreIntegration) listProjects() ([]Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects", s.URL)
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (s *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects", s.Integration.URL)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	var projects []SemaphoreProject
@@ -494,7 +508,7 @@ func (s *SemaphoreIntegration) listProjects() ([]Resource, error) {
 		return nil, fmt.Errorf("error unmarshaling response: %v", err)
 	}
 
-	resources := make([]Resource, len(projects))
+	resources := make([]integrations.Resource, len(projects))
 	for i := range projects {
 		resources[i] = &projects[i]
 	}
@@ -502,28 +516,11 @@ func (s *SemaphoreIntegration) listProjects() ([]Resource, error) {
 	return resources, nil
 }
 
-func (s *SemaphoreIntegration) getWorkflow(id string) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v2/workflows/%s", s.URL, id)
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (s *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v2/workflows/%s", s.Integration.URL, id)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	var workflow SemaphoreWorkflow
@@ -535,28 +532,11 @@ func (s *SemaphoreIntegration) getWorkflow(id string) (Resource, error) {
 	return &workflow, nil
 }
 
-func (s *SemaphoreIntegration) getPipeline(id string) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", s.URL, id)
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (s *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", s.Integration.URL, id)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	var pipelineResponse SemaphorePipelineResponse
@@ -568,28 +548,11 @@ func (s *SemaphoreIntegration) getPipeline(id string) (Resource, error) {
 	return pipelineResponse.Pipeline, nil
 }
 
-func (s *SemaphoreIntegration) getProject(id string) (Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", s.URL, id)
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+func (s *SemaphoreIntegration) getProject(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", s.Integration.URL, id)
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	var project SemaphoreProject
@@ -601,32 +564,15 @@ func (s *SemaphoreIntegration) getProject(id string) (Resource, error) {
 	return &project, nil
 }
 
-func (s *SemaphoreIntegration) getTask(id string, parentIDs ...string) (Resource, error) {
+func (s *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s?project_id=%s", s.URL, id, parentIDs[0])
-	req, err := http.NewRequest(http.MethodGet, URL, nil)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s?project_id=%s", s.Integration.URL, id, parentIDs[0])
+	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code", res.StatusCode)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
+		return nil, err
 	}
 
 	type SemaphoreTaskDescribeResponse struct {

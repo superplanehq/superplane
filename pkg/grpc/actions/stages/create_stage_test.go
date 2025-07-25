@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -454,7 +454,7 @@ func Test__CreateStage(t *testing.T) {
 		assert.True(t, testconsumer.HasReceivedMessage())
 
 		// Assert internally scoped event source was created
-		resource, err := models.FindResource(r.Integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		resource, err := models.FindResource(r.Integration.ID, semaphore.ResourceTypeProject, executor.Semaphore.Project)
 		require.NoError(t, err)
 		require.NotNil(t, resource)
 		eventSource, err := resource.FindEventSource()
@@ -536,7 +536,7 @@ func Test__CreateStage(t *testing.T) {
 		require.Len(t, res.Stage.Spec.Connections, 1)
 
 		// Assert internally scoped event source was created
-		resource, err := models.FindResource(integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		resource, err := models.FindResource(integration.ID, semaphore.ResourceTypeProject, executor.Semaphore.Project)
 		require.NoError(t, err)
 		require.NotNil(t, resource)
 		eventSource, err := resource.FindEventSource()
@@ -601,7 +601,7 @@ func Test__CreateStage(t *testing.T) {
 
 		// Assert the same integration resource record and
 		// internally scoped event source are re-used by both stages.
-		resources, err := r.Integration.ListResources(integrations.ResourceTypeProject)
+		resources, err := r.Integration.ListResources(semaphore.ResourceTypeProject)
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
 		sources, err := resources[0].ListEventSources()

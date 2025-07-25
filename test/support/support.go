@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	semaphoreIntegration "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -236,7 +237,7 @@ func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.R
 				},
 			},
 		}, &models.Resource{
-			ResourceType:  integrations.ResourceTypeProject,
+			ResourceType:  semaphoreIntegration.ResourceTypeProject,
 			ExternalID:    uuid.NewString(),
 			IntegrationID: r.Integration.ID,
 			ResourceName:  "demo-project",

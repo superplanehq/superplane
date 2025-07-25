@@ -10,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -448,8 +448,8 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 			Pipeline: executors.SemaphoreHookPipeline{
 				ID:     uuid.New().String(),
-				State:  integrations.SemaphorePipelineStateDone,
-				Result: integrations.SemaphorePipelineResultPassed,
+				State:  semaphore.SemaphorePipelineStateDone,
+				Result: semaphore.SemaphorePipelineResultPassed,
 			},
 		}
 
