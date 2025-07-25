@@ -1,39 +1,42 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { 
-  superplaneListIntegrations,
-  superplaneCreateIntegration,
-  superplaneDescribeIntegration,
+  integrationsListIntegrations,
+  integrationsCreateIntegration,
+  integrationsDescribeIntegration,
 } from '../../../api-client/sdk.gen'
-import type { SuperplaneCreateIntegrationData } from '../../../api-client/types.gen'
+import type { IntegrationsCreateIntegrationData } from '../../../api-client/types.gen'
 
 export const integrationKeys = {
   all: ['integrations'] as const,
-  byCanvas: (canvasId: string) => [...integrationKeys.all, 'canvas', canvasId] as const,
-  detail: (canvasId: string, integrationId: string) => [...integrationKeys.byCanvas(canvasId), 'detail', integrationId] as const,
+  byDomain: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => [...integrationKeys.all, 'domain', domainId, domainType] as const,
+  detail: (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => [...integrationKeys.byDomain(domainId, domainType), 'detail', integrationId] as const,
 }
 
-export const useIntegrations = (canvasId: string) => {
+export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
   return useQuery({
-    queryKey: integrationKeys.byCanvas(canvasId),
+    queryKey: integrationKeys.byDomain(domainId, domainType),
     queryFn: async () => {
-      const response = await superplaneListIntegrations({
-        path: { canvasIdOrName: canvasId }
+      const response = await integrationsListIntegrations({
+        query: { domainId: domainId, domainType: domainType }
       })
       return response.data?.integrations || []
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
     gcTime: 5 * 60 * 1000, // 5 minutes
-    enabled: !!canvasId,
+    enabled: !!domainId && !!domainType,
   })
 }
 
-export const useIntegration = (canvasId: string, integrationId: string) => {
+export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => {
   return useQuery({
-    queryKey: integrationKeys.detail(canvasId, integrationId),
+    queryKey: integrationKeys.detail(domainId, domainType, integrationId),
     queryFn: async () => {
-      const response = await superplaneDescribeIntegration({
+      const response = await integrationsDescribeIntegration({
+        query: {
+          domainId: domainId,
+          domainType: domainType,
+        },
         path: { 
-          canvasIdOrName: canvasId,
           idOrName: integrationId 
         }
       })
@@ -41,7 +44,7 @@ export const useIntegration = (canvasId: string, integrationId: string) => {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!canvasId && !!integrationId,
+    enabled: !!domainId && !!domainType && !!integrationId,
   })
 }
 
@@ -51,6 +54,7 @@ export interface CreateIntegrationParams {
   url: string
   authType: 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'
   tokenSecretName?: string
+  tokenSecretKey?: string
   oidcEnabled?: boolean
 }
 
@@ -58,15 +62,19 @@ export interface UpdateIntegrationParams extends CreateIntegrationParams {
   id: string
 }
 
-export const useCreateIntegration = (canvasId: string) => {
+export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION") => {
   const queryClient = useQueryClient()
   
   return useMutation({
     mutationFn: async (params: CreateIntegrationParams) => {
-      const integration: SuperplaneCreateIntegrationData['body'] = {
+      const integration: IntegrationsCreateIntegrationData['body'] = {
+        domainId,
+        domainType,
         integration: {
           metadata: {
-            name: params.name
+            name: params.name,
+            domainId: domainId,
+            domainType: domainType,
           },
           spec: {
             type: params.type,
@@ -78,7 +86,7 @@ export const useCreateIntegration = (canvasId: string) => {
                   valueFrom: {
                     secret: {
                       name: params.tokenSecretName,
-                      key: 'token'
+                      key: params.tokenSecretKey || 'token'
                     }
                   }
                 }
@@ -91,20 +99,19 @@ export const useCreateIntegration = (canvasId: string) => {
         }
       }
 
-      return await superplaneCreateIntegration({
-        path: { canvasIdOrName: canvasId },
+      return await integrationsCreateIntegration({
         body: integration
       })
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byCanvas(canvasId) 
+        queryKey: integrationKeys.byDomain(domainId, domainType) 
       })
     }
   })
 }
 
-export const useUpdateIntegration = (canvasId: string) => {
+export const useUpdateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", _integrationId: string) => {
   const queryClient = useQueryClient()
   
   return useMutation({
@@ -117,20 +124,20 @@ export const useUpdateIntegration = (canvasId: string) => {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byCanvas(canvasId) 
+        queryKey: integrationKeys.byDomain(domainId, domainType) 
       })
       queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.detail(canvasId, data.integrationId) 
+        queryKey: integrationKeys.detail(domainId, domainType, data.integrationId) 
       })
     }
   })
 }
 
-export const useDeleteIntegration = (canvasId: string) => {
+export const useDeleteIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "DOMAIN_TYPE_ORGANIZATION", integrationId: string) => {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async (integrationId: string) => {
+    mutationFn: async () => {
       // Mock delete integration - in real implementation this would call a delete API
       console.log('Deleting integration:', integrationId)
       // Simulate API call delay
@@ -139,7 +146,7 @@ export const useDeleteIntegration = (canvasId: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
-        queryKey: integrationKeys.byCanvas(canvasId) 
+        queryKey: integrationKeys.byDomain(domainId, domainType) 
       })
     }
   })

@@ -1,12 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  authorizationListRoles,
-  authorizationGetCanvasUsers,
-  authorizationAssignRole,
-  authorizationRemoveRole,
-  authorizationGetOrganizationUsers
+  rolesListRoles,
+  usersListUsers,
+  rolesAssignRole,
+  rolesRemoveRole,
 } from '../api-client/sdk.gen'
-import type { AuthorizationRoleAssignment } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -19,8 +17,8 @@ export const useCanvasRoles = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.roles(canvasId),
     queryFn: async () => {
-      const response = await authorizationListRoles({
-        query: { domainType: 'DOMAIN_TYPE_CANVAS', domainId: canvasId }
+      const response = await rolesListRoles({
+        query: { domainId: canvasId, domainType: 'DOMAIN_TYPE_CANVAS' },
       })
       return response.data?.roles || []
     },
@@ -34,8 +32,8 @@ export const useCanvasUsers = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.users(canvasId),
     queryFn: async () => {
-      const response = await authorizationGetCanvasUsers({
-        path: { canvasIdOrName: canvasId },
+      const response = await usersListUsers({
+        query: { domainId: canvasId, domainType: 'DOMAIN_TYPE_CANVAS' },
       })
       return response.data?.users || []
     },
@@ -49,8 +47,8 @@ export const useOrganizationUsersForCanvas = (organizationId: string) => {
   return useQuery({
     queryKey: ['organizationUsers', organizationId],
     queryFn: async () => {
-      const response = await authorizationGetOrganizationUsers({
-        path: { organizationId }
+      const response = await usersListUsers({
+        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' },
       })
       return response.data?.users || []
     },
@@ -66,14 +64,16 @@ export const useAssignCanvasRole = (canvasId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId?: string, 
-      userEmail?: string, 
-      roleAssignment: AuthorizationRoleAssignment 
+      userEmail?: string,
+      role: string,
     }) => {
-      return await authorizationAssignRole({
+      return await rolesAssignRole({
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
-          roleAssignment: params.roleAssignment
+          roleName: params.role,
+          domainId: canvasId,
+          domainType: 'DOMAIN_TYPE_CANVAS'
         }
       })
     },
@@ -90,12 +90,14 @@ export const useRemoveCanvasRole = (canvasId: string) => {
   return useMutation({
     mutationFn: async (params: { 
       userId: string, 
-      roleAssignment: AuthorizationRoleAssignment
+      role: string,
     }) => {
-      return await authorizationRemoveRole({
+      return await rolesRemoveRole({
         body: {
           userId: params.userId,
-          roleAssignment: params.roleAssignment
+          roleName: params.role,
+          domainId: canvasId,
+          domainType: 'DOMAIN_TYPE_CANVAS'
         }
       })
     },

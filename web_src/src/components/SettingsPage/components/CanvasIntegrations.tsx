@@ -5,7 +5,8 @@ import { Button } from '../../Button/button'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Input } from '../../Input/input'
 import { useIntegrations, useCreateIntegration, useUpdateIntegration, type CreateIntegrationParams, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
-import { SuperplaneIntegration, SuperplaneIntegrationType } from '@/api-client'
+import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
+import { IntegrationsIntegration, IntegrationsIntegrationType } from '@/api-client'
 
 interface CanvasIntegrationsProps {
   canvasId: string
@@ -23,50 +24,41 @@ const INTEGRATION_TYPES = [
     color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
     popular: true
   },
-  {
-    value: 'TYPE_GITHUB' as const,
-    label: 'GitHub',
-    description: 'Integrate with GitHub repositories for webhook events, deployments, and actions',
-    icon: 'code',
-    color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
-    popular: true
-  }
 ]
 
 export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
-  const [selectedType, setSelectedType] = useState<SuperplaneIntegrationType>('TYPE_SEMAPHORE')
+  const [selectedType, setSelectedType] = useState<IntegrationsIntegrationType>('TYPE_SEMAPHORE')
   const [integrationName, setIntegrationName] = useState('')
   const [integrationUrl, setIntegrationUrl] = useState('')
   const [authType, setAuthType] = useState<'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'>('AUTH_TYPE_NONE')
-  const [tokenSecretName, setTokenSecretName] = useState('')
+  const [selectedSecretId, setSelectedSecretId] = useState('')
+  const [selectedSecretKey, setSelectedSecretKey] = useState('')
   const [oidcEnabled, setOidcEnabled] = useState(false)
-  const [editingIntegration, setEditingIntegration] = useState<SuperplaneIntegration | null>(null)
+  const [editingIntegration, setEditingIntegration] = useState<IntegrationsIntegration | null>(null)
 
-  const { data: integrations, isLoading, error } = useIntegrations(canvasId)
-  const createIntegrationMutation = useCreateIntegration(canvasId)
-  const updateIntegrationMutation = useUpdateIntegration(canvasId)
+  const { data: integrations, isLoading, error } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS")
+  const createIntegrationMutation = useCreateIntegration(canvasId, "DOMAIN_TYPE_CANVAS")
+  const updateIntegrationMutation = useUpdateIntegration(canvasId, "DOMAIN_TYPE_CANVAS", editingIntegration?.metadata?.id || '')
+  const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS")
+  const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", selectedSecretId)
 
   const handleAddIntegration = () => {
     setSection('choose-type')
   }
 
-  const handleTypeSelection = (type: SuperplaneIntegrationType) => {
+  const handleTypeSelection = (type: IntegrationsIntegrationType) => {
     setSelectedType(type)
     setSection('new')
-    // Set default URL placeholder based on type
-    if (type === 'TYPE_GITHUB') {
-      setIntegrationUrl('')
-    } else {
-      setIntegrationUrl('')
-    }
+    setIntegrationUrl('')
   }
 
   const resetForm = () => {
     setIntegrationName('')
     setIntegrationUrl('')
     setAuthType('AUTH_TYPE_NONE')
-    setTokenSecretName('')
+    setSelectedSecretId('')
+    setSelectedSecretKey('')
     setOidcEnabled(false)
     setEditingIntegration(null)
   }
@@ -76,12 +68,18 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
       return
     }
 
+    // Validate token authentication requirements
+    if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
+      return
+    }
+
     const integrationData: CreateIntegrationParams = {
       name: integrationName.trim(),
-      type: selectedType as 'TYPE_SEMAPHORE' | 'TYPE_GITHUB',
+      type: selectedType as 'TYPE_SEMAPHORE',
       url: integrationUrl.trim(),
       authType,
-      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? tokenSecretName.trim() : undefined,
+      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
+      tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
       oidcEnabled: authType === 'AUTH_TYPE_OIDC' ? oidcEnabled : undefined,
     }
 
@@ -94,13 +92,14 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
     }
   }
 
-  const handleConfigureIntegration = (integration: SuperplaneIntegration) => {
+  const handleConfigureIntegration = (integration: IntegrationsIntegration) => {
     setEditingIntegration(integration)
-    setSelectedType(integration.spec?.type || 'TYPE_SEMAPHORE' as SuperplaneIntegrationType)
+    setSelectedType(integration.spec?.type || 'TYPE_SEMAPHORE' as IntegrationsIntegrationType)
     setIntegrationName(integration.metadata?.name || '')
     setIntegrationUrl(integration.spec?.url || '')
     setAuthType(integration.spec?.auth?.use || 'AUTH_TYPE_NONE' as 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE')
-    setTokenSecretName(integration.spec?.auth?.token?.valueFrom?.secret?.name || '')
+    setSelectedSecretId(integration.spec?.auth?.token?.valueFrom?.secret?.name || '')
+    setSelectedSecretKey(integration.spec?.auth?.token?.valueFrom?.secret?.key || '')
     setOidcEnabled(integration.spec?.oidc?.enabled || false)
     setSection('edit')
   }
@@ -110,13 +109,19 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
       return
     }
 
+    // Validate token authentication requirements
+    if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
+      return
+    }
+
     const updateData: UpdateIntegrationParams = {
       id: editingIntegration.metadata?.id as string,
       name: integrationName.trim(),
-      type: selectedType as 'TYPE_SEMAPHORE' | 'TYPE_GITHUB',
+      type: selectedType as 'TYPE_SEMAPHORE',
       url: integrationUrl.trim(),
       authType,
-      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? tokenSecretName.trim() : undefined,
+      tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
+      tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
       oidcEnabled: authType === 'AUTH_TYPE_OIDC' ? oidcEnabled : undefined,
     }
 
@@ -223,27 +228,24 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_GITHUB' ? 'bg-black' : 'bg-orange-500'} rounded flex items-center justify-center`}>
+                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_SEMAPHORE' ? 'bg-orange-500' : 'bg-orange-500'} rounded flex items-center justify-center`}>
                         <MaterialSymbol
-                          name={integration.spec?.type === 'TYPE_GITHUB' ? 'code' : 'build_circle'}
+                          name={integration.spec?.type === 'TYPE_SEMAPHORE' ? 'build_circle' : 'build_circle'}
                           className="text-white"
                           size="sm"
                         />
                       </div>
                       <Heading level={3}>
-                        {integration.spec?.type === 'TYPE_GITHUB' ? 'GitHub' :
-                          integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' :
-                            integration.metadata?.name}
+                        {integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' :
+                          integration.metadata?.name}
                       </Heading>
                     </div>
 
                   </div>
                   <Text className="text-zinc-600 dark:text-zinc-400 mb-4 text-left">
-                    {integration.spec?.type === 'TYPE_GITHUB'
-                      ? `Connected to ${integration.metadata?.name || 'your GitHub account'} for repository access and webhook triggers.`
-                      : integration.spec?.type === 'TYPE_SEMAPHORE'
-                        ? `Connected to ${integration.metadata?.name || 'Semaphore'} for CI/CD pipeline automation and deployment workflows.`
-                        : `Integration: ${integration.metadata?.name}`}
+                    {integration.spec?.type === 'TYPE_SEMAPHORE'
+                      ? `Connected to ${integration.metadata?.name || 'Semaphore'} for CI/CD pipeline automation and deployment workflows.`
+                      : `Integration: ${integration.metadata?.name}`}
                   </Text>
                   <div className="flex space-x-2 items-center">
                     <Button className="flex items-center gap-2" plain onClick={() => handleConfigureIntegration(integration)}>
@@ -352,9 +354,9 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                   id="integration-url"
                   type="url"
                   placeholder={
-                    selectedType === 'TYPE_GITHUB'
-                      ? 'https://github.com/owner/repo'
-                      : 'https://api.semaphoreci.com'
+                    selectedType === 'TYPE_SEMAPHORE'
+                      ? 'https://api.semaphoreci.com'
+                      : ''
                   }
                   value={integrationUrl}
                   onChange={(e) => setIntegrationUrl(e.target.value)}
@@ -379,23 +381,60 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                 </select>
               </div>
 
-              {/* Token Secret Name (if token auth) */}
+              {/* Secret Selection (if token auth) */}
               {authType === 'AUTH_TYPE_TOKEN' && (
-                <div>
-                  <label htmlFor="token-secret" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
-                    Token Secret Name
-                  </label>
-                  <Input
-                    id="token-secret"
-                    type="text"
-                    placeholder="Name of the secret containing the auth token"
-                    value={tokenSecretName}
-                    onChange={(e) => setTokenSecretName(e.target.value)}
-                    className="w-full"
-                  />
-                  <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-                    Reference a secret that contains the authentication token for this integration.
-                  </Text>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="secret-select" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                      Select Secret
+                    </label>
+                    <select
+                      id="secret-select"
+                      value={selectedSecretId}
+                      onChange={(e) => {
+                        setSelectedSecretId(e.target.value)
+                        setSelectedSecretKey('') // Reset key selection when secret changes
+                      }}
+                      className="mt-2 block w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value="">Choose a secret...</option>
+                      {secrets.map((secret) => (
+                        <option key={secret.metadata?.id} value={secret.metadata?.name}>
+                          {secret.metadata?.name}
+                        </option>
+                      ))}
+                    </select>
+                    {secrets.length === 0 && (
+                      <Text className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                        No secrets available. Create a secret first in the Secrets section.
+                      </Text>
+                    )}
+                  </div>
+
+                  {/* Key Selection (if secret is selected) */}
+                  {selectedSecretId && selectedSecret && (
+                    <div>
+                      <label htmlFor="key-select" className="block text-sm font-medium text-zinc-900 dark:text-zinc-100 mb-2">
+                        Select Key
+                      </label>
+                      <select
+                        id="key-select"
+                        value={selectedSecretKey}
+                        onChange={(e) => setSelectedSecretKey(e.target.value)}
+                        className="mt-2 block w-full rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      >
+                        <option value="">Choose a key...</option>
+                        {selectedSecret.spec?.local?.data && Object.keys(selectedSecret.spec.local.data).map((key) => (
+                          <option key={key} value={key}>
+                            {key}
+                          </option>
+                        ))}
+                      </select>
+                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                        Select which key from the secret to use as the authentication token.
+                      </Text>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -426,7 +465,8 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                   disabled={
                     (section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ||
                     !integrationName.trim() ||
-                    !integrationUrl.trim()
+                    !integrationUrl.trim() ||
+                    (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey))
                   }
                 >
                   {(section === 'edit' ? updateIntegrationMutation.isPending : createIntegrationMutation.isPending) ? (

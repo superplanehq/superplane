@@ -64,22 +64,22 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
   // Transform users to CanvasMember interface format
   const members = useMemo(() => {
     return canvasUsers.map((user) => {
-      const name = user.displayName || user.userId || 'Unknown User'
+      const name = user.spec?.displayName || user.metadata?.id || 'Unknown User'
       const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
       // Get primary role name and display name from role assignments
-      const primaryRoleName = user.roleAssignments?.[0]?.roleName || 'Member'
-      const primaryRoleDisplayName = user.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
+      const primaryRoleName = user.status?.roleAssignments?.[0]?.roleName || 'Member'
+      const primaryRoleDisplayName = user.status?.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
 
       return {
-        id: user.userId || '',
+        id: user.metadata?.id || '',
         name: name,
-        email: user.email || `${user.userId}@email.placeholder`,
+        email: user.metadata?.email || `${user.metadata?.id}@email.placeholder`,
         role: primaryRoleDisplayName,
-        status: user.isActive ? 'Active' as const : 'Pending' as const,
-        lastActive: user.isActive ? 'Recently' : 'Never',
+        status: user.status?.isActive ? 'Active' as const : 'Pending' as const,
+        lastActive: user.status?.isActive ? 'Recently' : 'Never',
         initials: initials,
-        avatar: user.avatarUrl,
+        avatar: user.spec?.avatarUrl,
         roleName: primaryRoleName // Keep track of the actual role name for mutations
       }
     })
@@ -139,11 +139,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
     try {
       await assignRoleMutation.mutateAsync({
         userId: memberId,
-        roleAssignment: {
-          role: newRoleName,
-          domainType: 'DOMAIN_TYPE_CANVAS',
-          domainId: canvasId
-        }
+        role: newRoleName,
       })
     } catch (err) {
       console.error('Error updating role:', err)
@@ -154,11 +150,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
     try {
       await removeRoleMutation.mutateAsync({
         userId,
-        roleAssignment: {
-          role: roleName,
-          domainType: 'DOMAIN_TYPE_CANVAS',
-          domainId: canvasId
-        }
+        role: roleName,
       })
     } catch (err) {
       console.error('Error removing member:', err)
@@ -286,13 +278,13 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
                         <DropdownMenu>
                           {canvasRoles.map((role) => (
                             <DropdownItem
-                              key={role.name}
-                              onClick={() => handleRoleChange(member.id, role.name || '')}
+                              key={role.metadata?.name}
+                              onClick={() => handleRoleChange(member.id, role.metadata?.name || '')}
                               disabled={assignRoleMutation.isPending}
                             >
-                              <DropdownLabel>{role.displayName || role.name}</DropdownLabel>
-                              {role.description && (
-                                <DropdownDescription>{role.description}</DropdownDescription>
+                              <DropdownLabel>{role.spec?.displayName || role?.metadata?.name}</DropdownLabel>
+                              {role.spec?.description && (
+                                <DropdownDescription>{role.spec?.description}</DropdownDescription>
                               )}
                             </DropdownItem>
                           ))}

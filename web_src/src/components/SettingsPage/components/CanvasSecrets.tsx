@@ -36,11 +36,11 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
   ])
 
   // React Query hooks
-  const { data: secrets = [], isLoading: loadingSecrets, error: secretsError } = useSecrets(canvasId)
-  const createSecretMutation = useCreateSecret(canvasId)
-  const deleteSecretMutation = useDeleteSecret(canvasId)
-  const updateSecretMutation = useUpdateSecret(canvasId, editingSecretId || '')
-  const { data: editingSecret, isLoading: loadingSecret } = useSecret(canvasId, editingSecretId || '')
+  const { data: secrets = [], isLoading: loadingSecrets, error: secretsError } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS")
+  const createSecretMutation = useCreateSecret(canvasId, "DOMAIN_TYPE_CANVAS")
+  const deleteSecretMutation = useDeleteSecret(canvasId, "DOMAIN_TYPE_CANVAS")
+  const updateSecretMutation = useUpdateSecret(canvasId, "DOMAIN_TYPE_CANVAS", editingSecretId || '')
+  const { data: editingSecret, isLoading: loadingSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", editingSecretId || '',)
 
   const isCreating = createSecretMutation.isPending
   const isDeleting = deleteSecretMutation.isPending

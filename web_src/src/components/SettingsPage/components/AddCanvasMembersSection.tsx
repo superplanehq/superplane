@@ -45,12 +45,12 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [memberSearchTerm, setMemberSearchTerm] = useState('')
 
-    // React Query hooks
+
     const { data: canvasRoles = [], isLoading: loadingRoles, error: rolesError } = useCanvasRoles(canvasId)
     const { data: canvasUsers = [] } = useCanvasUsers(canvasId)
     const { data: orgUsers = [], isLoading: loadingOrgUsers, error: orgUsersError } = useOrganizationUsersForCanvas(organizationId)
 
-    // Mutations
+
     const assignRoleMutation = useAssignCanvasRole(canvasId)
 
     const isInviting = assignRoleMutation.isPending
@@ -62,28 +62,28 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       { id: 'upload', label: 'By file' }
     ]
 
-    // Calculate available members (org users who aren't in the canvas)
+
     const existingMembers = useMemo(() => {
-      const canvasMemberIds = new Set(canvasUsers.map(user => user.userId))
-      return orgUsers.filter(user => !canvasMemberIds.has(user.userId))
+      const canvasMemberIds = new Set(canvasUsers.map(user => user.metadata?.id))
+      return orgUsers.filter(user => !canvasMemberIds.has(user.metadata?.id))
     }, [orgUsers, canvasUsers])
 
     const loadingMembers = loadingOrgUsers
 
-    // Set default roles when roles are loaded
+
     useEffect(() => {
       if (canvasRoles.length > 0) {
-        const canvasMemberRole = canvasRoles.find(role => role.name?.includes('member'))
-        const defaultRole = canvasMemberRole?.name || canvasRoles[0]?.name || ''
+        const canvasMemberRole = canvasRoles.find(role => role.metadata?.name?.includes('member'))
+        const defaultRole = canvasMemberRole?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
         setEmailRole(defaultRole)
       }
     }, [canvasRoles])
 
-    // Expose refresh function to parent
+
     useImperativeHandle(ref, () => ({
       refreshExistingMembers: () => {
-        // No need to manually refresh - React Query will handle it
+
       }
     }), [])
 
@@ -95,10 +95,20 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
     }
 
     const handleBulkAddSubmit = async () => {
-      if (!uploadFile) return
+      if (!uploadFile) {
+        console.error('No file selected')
+        return
+      }
+
+      if (!bulkUserRole) {
+        console.error('No role selected')
+        return
+      }
+
+      console.log('Starting bulk add with file:', uploadFile.name, 'role:', bulkUserRole)
 
       try {
-        // Parse CSV file
+
         const fileContent = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.onload = (e) => resolve(e.target?.result as string)
@@ -106,22 +116,52 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
           reader.readAsText(uploadFile)
         })
 
-        // Parse CSV content
-        const parseResult = Papa.parse(fileContent, {
+
+
+        let parseResult = Papa.parse(fileContent, {
           header: true,
           skipEmptyLines: true,
+          delimiter: ',',
           transformHeader: (header) => header.toLowerCase().trim()
         })
 
-        if (parseResult.errors.length > 0) {
-          throw new Error(`CSV parsing errors: ${parseResult.errors.map(e => e.message).join(', ')}`)
+        const delimiters = [',', ';', '\t', '|']
+
+        for (const delimiter of delimiters) {
+          const tempResult = Papa.parse(fileContent, {
+            header: true,
+            skipEmptyLines: true,
+            delimiter: delimiter,
+            transformHeader: (header) => header.toLowerCase().trim()
+          })
+
+          if (tempResult.data && tempResult.data.length > 0) {
+            const criticalErrors = tempResult.errors.filter(error =>
+              error.type === 'Delimiter' && error.code === 'UndetectableDelimiter'
+            )
+            if (criticalErrors.length === 0) {
+              parseResult = tempResult
+              break
+            }
+          }
         }
 
-        // Extract emails from CSV data
+
+        const criticalErrors = parseResult?.errors?.filter(error =>
+          error.type !== 'Delimiter' || error.code !== 'UndetectableDelimiter'
+        ) || []
+
+        if (criticalErrors.length > 0) {
+          throw new Error(`CSV parsing errors: ${criticalErrors.map(e => e.message).join(', ')}`)
+        }
+
+
         const csvData = parseResult.data as Array<{ email?: string;[key: string]: string | undefined }>
+
         const emailsToAdd = csvData
           .map(row => row.email || row['email address'] || '')
           .filter(email => email && isEmailValid(email))
+
 
         if (emailsToAdd.length === 0) {
           throw new Error('No valid email addresses found in the CSV file. Please ensure the CSV has an "email" column.')
@@ -129,26 +169,22 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
 
         const roleToAssign = bulkUserRole
 
-        // Process each email
+
         for (const email of emailsToAdd) {
           await assignRoleMutation.mutateAsync({
             userEmail: email,
-            roleAssignment: {
-              domainType: 'DOMAIN_TYPE_CANVAS',
-              domainId: canvasId,
-              role: roleToAssign
-            }
+            role: roleToAssign
           })
         }
 
         setUploadFile(null)
-        const defaultRole = canvasRoles.find(r => r.name?.includes('member'))?.name || canvasRoles[0]?.name || ''
+        const defaultRole = canvasRoles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
         setAddMembersTab('emails')
 
         onMemberAdded?.()
-      } catch {
-        console.error('Failed to add members by file')
+      } catch (error) {
+        alert(`Failed to add members: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
 
@@ -164,25 +200,21 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
         const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
         const roleToAssign = emailRole
 
-        // Process each email
+
         for (const email of emails) {
           await assignRoleMutation.mutateAsync({
             userEmail: email,
-            roleAssignment: {
-              domainType: 'DOMAIN_TYPE_CANVAS',
-              domainId: canvasId,
-              role: roleToAssign
-            }
+            role: roleToAssign
           })
         }
 
         setEmailsInput('')
-        const defaultRole = canvasRoles.find(r => r.name?.includes('member'))?.name || canvasRoles[0]?.name || ''
+        const defaultRole = canvasRoles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
         setEmailRole(defaultRole)
 
         onMemberAdded?.()
       } catch {
-        console.error('Failed to add members by email')
+        alert('Failed to add members by email')
       }
     }
 
@@ -190,31 +222,23 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       if (selectedMembers.size === 0) return
 
       try {
-        const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.userId!))
+        const selectedUsers = existingMembers.filter(member => selectedMembers.has(member.metadata!.id!))
         const roleToAssign = bulkUserRole
 
-        // Process each selected member
+
         for (const member of selectedUsers) {
-          // Add user to canvas with role
+
           try {
             await assignRoleMutation.mutateAsync({
-              userId: member.userId,
-              roleAssignment: {
-                domainType: 'DOMAIN_TYPE_CANVAS',
-                domainId: canvasId,
-                role: roleToAssign
-              }
+              userId: member.metadata?.id,
+              role: roleToAssign
             })
           } catch (err) {
-            // If userId fails, try with email
-            if (member.email) {
+
+            if (member.metadata?.email) {
               await assignRoleMutation.mutateAsync({
-                userEmail: member.email,
-                roleAssignment: {
-                  domainType: 'DOMAIN_TYPE_CANVAS',
-                  domainId: canvasId,
-                  role: roleToAssign
-                }
+                userEmail: member.metadata?.email,
+                role: roleToAssign
               })
             } else {
               throw err
@@ -236,7 +260,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       if (selectedMembers.size === filteredMembers.length) {
         setSelectedMembers(new Set())
       } else {
-        setSelectedMembers(new Set(filteredMembers.map(m => m.userId!)))
+        setSelectedMembers(new Set(filteredMembers.map(m => m.metadata!.id!)))
       }
     }
 
@@ -244,8 +268,8 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       if (!memberSearchTerm) return existingMembers
 
       return existingMembers.filter(member =>
-        member.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
-        member.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
+        member.spec?.displayName?.toLowerCase().includes(memberSearchTerm.toLowerCase()) ||
+        member.metadata?.email?.toLowerCase().includes(memberSearchTerm.toLowerCase())
       )
     }
 
@@ -295,7 +319,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
 
         {/* Tab Content */}
         {!loadingRoles && addMembersTab === 'emails' ? (
-          // Enter emails tab content
+
           <div className="space-y-4">
             <div className="flex items-start gap-3">
               <Textarea
@@ -309,14 +333,14 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
 
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm">
-                  {emailRole ? canvasRoles.find(r => r.name === emailRole)?.displayName || emailRole : 'Select Role'}
+                  {emailRole ? canvasRoles.find(r => r.metadata?.name === emailRole)?.spec?.displayName || emailRole : 'Select Role'}
                   <MaterialSymbol name="keyboard_arrow_down" />
                 </DropdownButton>
                 <DropdownMenu>
                   {canvasRoles.map((role) => (
-                    <DropdownItem key={role.name} onClick={() => setEmailRole(role.name || '')}>
-                      <DropdownLabel>{role.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
+                    <DropdownItem key={role.metadata?.name} onClick={() => setEmailRole(role.metadata?.name || '')}>
+                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
                     </DropdownItem>
                   ))}
                 </DropdownMenu>
@@ -334,7 +358,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
             </div>
           </div>
         ) : !loadingRoles && addMembersTab === 'existing' ? (
-          // Existing members tab content
+
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <InputGroup>
@@ -376,14 +400,14 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
               </Text>
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm">
-                  {bulkUserRole ? canvasRoles.find(r => r.name === bulkUserRole)?.displayName || bulkUserRole : 'Select Role'}
+                  {bulkUserRole ? canvasRoles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
                   <MaterialSymbol name="keyboard_arrow_down" />
                 </DropdownButton>
                 <DropdownMenu>
                   {canvasRoles.map((role) => (
-                    <DropdownItem key={role.name} onClick={() => setBulkUserRole(role.name || '')}>
-                      <DropdownLabel>{role.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
+                    <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
+                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
                     </DropdownItem>
                   ))}
                 </DropdownMenu>
@@ -405,40 +429,40 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                 ) : (
                   <div className="divide-y divide-zinc-200 dark:divide-zinc-700">
                     {getFilteredExistingMembers().map((member) => (
-                      <div key={member.userId} className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
+                      <div key={member.metadata?.id} className="p-3 flex items-center gap-3 hover:bg-zinc-50 dark:hover:bg-zinc-800">
                         <Checkbox
-                          checked={selectedMembers.has(member.userId!)}
+                          checked={selectedMembers.has(member.metadata!.id!)}
                           onChange={(checked) => {
                             setSelectedMembers(prev => {
                               const newSet = new Set(prev)
                               if (checked) {
-                                newSet.add(member.userId!)
+                                newSet.add(member.metadata!.id!)
                               } else {
-                                newSet.delete(member.userId!)
+                                newSet.delete(member.metadata!.id!)
                               }
                               return newSet
                             })
                           }}
                         />
                         <Avatar
-                          src={member.avatarUrl}
-                          initials={member.displayName?.charAt(0) || 'U'}
+                          src={member.spec?.avatarUrl}
+                          initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-zinc-900 dark:text-white truncate">
-                            {member.displayName || member.userId}
+                            {member.spec?.displayName || member.metadata?.id}
                           </div>
                           <div className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
-                            {member.email || `${member.userId}@email.placeholder`}
+                            {member.metadata?.email || "Invalid email"}
                           </div>
                         </div>
                         <div className="flex items-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.isActive
+                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status?.isActive
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                             : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
                             }`}>
-                            {member.isActive ? 'Active' : 'Pending'}
+                            {member.status?.isActive ? 'Active' : 'Pending'}
                           </span>
                         </div>
                       </div>
@@ -449,7 +473,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
             )}
           </div>
         ) : !loadingRoles ? (
-          // Upload file tab content
+
           <div className="space-y-6 text-left">
             {/* File Upload */}
             <Field>
@@ -470,11 +494,12 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                     id="add-canvas-members-upload"
                   />
 
-                  <label htmlFor="add-canvas-members-upload">
-                    <Button outline className='flex items-center text-sm gap-2' type="button">
-                      <MaterialSymbol name="folder_open" size="sm" />
-                      Browse
-                    </Button>
+                  <label
+                    htmlFor="add-canvas-members-upload"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+                  >
+                    <MaterialSymbol name="folder_open" size="sm" />
+                    Browse
                   </label>
                 </div>
               </div>
@@ -490,14 +515,14 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
               </Label>
               <Dropdown>
                 <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                  {bulkUserRole ? canvasRoles.find(r => r.name === bulkUserRole)?.displayName || bulkUserRole : 'Select Role'}
+                  {bulkUserRole ? canvasRoles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
                   <MaterialSymbol name="keyboard_arrow_down" />
                 </DropdownButton>
                 <DropdownMenu>
                   {canvasRoles.map((role) => (
-                    <DropdownItem key={role.name} onClick={() => setBulkUserRole(role.name || '')}>
-                      <DropdownLabel>{role.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.description || 'No description available'}</DropdownDescription>
+                    <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
+                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
                     </DropdownItem>
                   ))}
                 </DropdownMenu>
