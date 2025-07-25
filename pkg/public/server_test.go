@@ -46,7 +46,7 @@ func Test__ReceiveGitHubEvent(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
-	org, err := models.CreateOrganization(uuid.New(), "test", "test")
+	org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
 	require.NoError(t, err)
 
 	userID := uuid.New()
@@ -178,7 +178,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
 	require.NoError(t, err)
 
-	org, err := models.CreateOrganization(uuid.New(), "test", "test")
+	org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
 	require.NoError(t, err)
 
 	userID := uuid.New()

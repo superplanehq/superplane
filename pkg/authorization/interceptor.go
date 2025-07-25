@@ -9,9 +9,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbSuperplane "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrganization "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecrets "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -65,32 +68,35 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbSuperplane.Superplane_ApproveStageEvent_FullMethodName:            {Resource: "stageevent", Action: "approve", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListStageEvents_FullMethodName:              {Resource: "stageevent", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 		pbSuperplane.Superplane_ListConnectionGroupFieldSets_FullMethodName: {Resource: "connectiongroupfieldset", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_CreateCanvasGroup_FullMethodName:               {Resource: "group", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_AddUserToCanvasGroup_FullMethodName:            {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_RemoveUserFromCanvasGroup_FullMethodName:       {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_ListCanvasGroups_FullMethodName:                {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_GetCanvasGroupUsers_FullMethodName:             {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
-		pbAuth.Authorization_GetCanvasGroup_FullMethodName:                  {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeCanvas}},
 
-		// Organization rules
-		pbAuth.Authorization_ListUserPermissions_FullMethodName:             {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_AssignRole_FullMethodName:                      {Resource: "role", Action: "assign", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_RemoveRole_FullMethodName:                      {Resource: "role", Action: "remove", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_ListRoles_FullMethodName:                       {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_DescribeRole_FullMethodName:                    {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_GetUserRoles_FullMethodName:                    {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_CreateRole_FullMethodName:                      {Resource: "role", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_UpdateRole_FullMethodName:                      {Resource: "role", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_DeleteRole_FullMethodName:                      {Resource: "role", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_CreateOrganizationGroup_FullMethodName:         {Resource: "group", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_AddUserToOrganizationGroup_FullMethodName:      {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_RemoveUserFromOrganizationGroup_FullMethodName: {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_ListOrganizationGroups_FullMethodName:          {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_GetOrganizationGroupUsers_FullMethodName:       {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbAuth.Authorization_GetOrganizationGroup_FullMethodName:            {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbOrganization.Organizations_DescribeOrganization_FullMethodName:    {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbOrganization.Organizations_UpdateOrganization_FullMethodName:      {Resource: "org", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
-		pbOrganization.Organizations_DeleteOrganization_FullMethodName:      {Resource: "org", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
+		// Groups rules
+		pbGroups.Groups_CreateGroup_FullMethodName:         {Resource: "group", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_AddUserToGroup_FullMethodName:      {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_RemoveUserFromGroup_FullMethodName: {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_UpdateGroup_FullMethodName:         {Resource: "group", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_ListGroups_FullMethodName:          {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_ListGroupUsers_FullMethodName:      {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_DescribeGroup_FullMethodName:       {Resource: "group", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbGroups.Groups_DeleteGroup_FullMethodName:         {Resource: "group", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+
+		// Users rules
+		pbUsers.Users_ListUserPermissions_FullMethodName: {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbUsers.Users_ListUserRoles_FullMethodName:       {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbUsers.Users_ListUsers_FullMethodName:           {Resource: "user", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+
+		// Roles rules
+		pbRoles.Roles_AssignRole_FullMethodName:   {Resource: "role", Action: "assign", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_RemoveRole_FullMethodName:   {Resource: "role", Action: "remove", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_ListRoles_FullMethodName:    {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_DescribeRole_FullMethodName: {Resource: "role", Action: "read", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_CreateRole_FullMethodName:   {Resource: "role", Action: "create", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_UpdateRole_FullMethodName:   {Resource: "role", Action: "update", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+		pbRoles.Roles_DeleteRole_FullMethodName:   {Resource: "role", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization, models.DomainTypeCanvas}},
+
+		// Organization Rules
+		pbOrganization.Organizations_DescribeOrganization_FullMethodName: {Resource: "org", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_UpdateOrganization_FullMethodName:   {Resource: "org", Action: "update", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbOrganization.Organizations_DeleteOrganization_FullMethodName:   {Resource: "org", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 	}
 
 	return &AuthorizationInterceptor{
@@ -158,6 +164,7 @@ func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTyp
 		return getCanvasIdFromRequest(req)
 	}
 
+	// Handle mixed domain types (multiple domain types supported)
 	return a.getDomainTypeAndIdFromRequest(req)
 }
 
@@ -179,7 +186,12 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType) (string, 
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		_, err := uuid.Parse(domainID)
 		if err != nil {
-			return "", "", fmt.Errorf("invalid organization ID")
+			// Try to find organization by name if not a valid UUID
+			org, err := models.FindOrganizationByName(domainID)
+			if err != nil {
+				return "", "", fmt.Errorf("organization %s not found", domainID)
+			}
+			return models.DomainTypeOrganization, org.ID.String(), nil
 		}
 
 		org, err := models.FindOrganizationByID(domainID)
@@ -191,13 +203,13 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType) (string, 
 
 	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
 		_, err := uuid.Parse(domainID)
-		if err == nil {
-			_, err := models.FindCanvasByID(domainID)
+		if err != nil {
+			// Try to find canvas by name if not a valid UUID
+			canvas, err := models.FindCanvasByName(domainID)
 			if err != nil {
 				return "", "", fmt.Errorf("canvas %s not found", domainID)
 			}
-
-			return models.DomainTypeCanvas, domainID, nil
+			return models.DomainTypeCanvas, canvas.ID.String(), nil
 		}
 
 		canvas, err := models.FindCanvasByName(domainID)
@@ -217,13 +229,20 @@ func getOrganizationIdFromRequest(req interface{}) (string, string, error) {
 	switch r := req.(type) {
 	case interface{ GetOrganizationId() string }:
 		domainID = r.GetOrganizationId()
+	case interface{ GetIdOrName() string }:
+		domainID = r.GetIdOrName()
 	default:
 		return "", "", fmt.Errorf("missing organization ID")
 	}
 
 	_, err := uuid.Parse(domainID)
 	if err != nil {
-		return "", "", fmt.Errorf("invalid organization ID")
+		// Try to find organization by name if not a valid UUID
+		org, err := models.FindOrganizationByName(domainID)
+		if err != nil {
+			return "", "", fmt.Errorf("organization %s not found", domainID)
+		}
+		return models.DomainTypeOrganization, org.ID.String(), nil
 	}
 
 	org, err := models.FindOrganizationByID(domainID)

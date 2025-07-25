@@ -38,13 +38,14 @@ func Test__UpdateOrganization(t *testing.T) {
 	})
 
 	t.Run("update organization by ID -> success", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization")
+		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "Original description")
 		require.NoError(t, err)
 
 		updatedOrg := &protos.Organization{
 			Metadata: &protos.Organization_Metadata{
 				Name:        "updated-org",
 				DisplayName: "Updated Organization",
+				Description: "Updated description",
 			},
 		}
 
@@ -60,13 +61,14 @@ func Test__UpdateOrganization(t *testing.T) {
 		assert.Equal(t, organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, "updated-org", response.Organization.Metadata.Name)
 		assert.Equal(t, "Updated Organization", response.Organization.Metadata.DisplayName)
+		assert.Equal(t, "Updated description", response.Organization.Metadata.Description)
 		assert.Equal(t, organization.CreatedBy.String(), response.Organization.Metadata.CreatedBy)
 		assert.Equal(t, *organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.True(t, response.Organization.Metadata.UpdatedAt.AsTime().After(*organization.UpdatedAt))
 	})
 
 	t.Run("update organization by name -> success", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org-2", "Test Organization 2")
+		organization, err := models.CreateOrganization(userID, "test-org-2", "Test Organization 2", "Original description 2")
 		require.NoError(t, err)
 
 		updatedOrg := &protos.Organization{

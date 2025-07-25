@@ -5,27 +5,25 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	"github.com/superplanehq/superplane/pkg/models"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
+	pb "github.com/superplanehq/superplane/pkg/protos/users"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService authorization.Authorization) (*pb.GetUserRolesResponse, error) {
-	err := actions.ValidateUUIDs(req.UserId, req.DomainId)
+func ListUserRoles(ctx context.Context, domainType, domainID, userID string, authService authorization.Authorization) (*pb.ListUserRolesResponse, error) {
+	err := actions.ValidateUUIDs(userID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
 	}
 
-	if req.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
 	var roles []*authorization.RoleDefinition
-	switch req.DomainType {
-	case pb.DomainType_DOMAIN_TYPE_ORGANIZATION:
-		roles, err = authService.GetUserRolesForOrg(req.UserId, req.DomainId)
-	case pb.DomainType_DOMAIN_TYPE_CANVAS:
-		roles, err = authService.GetUserRolesForCanvas(req.UserId, req.DomainId)
+	switch domainType {
+	case models.DomainTypeOrganization:
+		roles, err = authService.GetUserRolesForOrg(userID, domainID)
+	case models.DomainTypeCanvas:
+		roles, err = authService.GetUserRolesForCanvas(userID, domainID)
 	default:
 		return nil, status.Error(codes.InvalidArgument, "unsupported domain type")
 	}
@@ -34,19 +32,32 @@ func GetUserRoles(ctx context.Context, req *pb.GetUserRolesRequest, authService 
 		return nil, status.Error(codes.Internal, "failed to get user roles")
 	}
 
-	var rolesProto []*pb.Role
+	roleNames := make([]string, len(roles))
+	for i, role := range roles {
+		roleNames[i] = role.Name
+		if role.InheritsFrom != nil {
+			roleNames = append(roleNames, role.InheritsFrom.Name)
+		}
+	}
+
+	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "role metadata not found")
+	}
+
+	var rolesProto []*pbRoles.Role
 	for _, role := range roles {
-		roleProto, err := convertRoleDefinitionToProto(role, authService, req.DomainId)
+		roleProto, err := convertRoleDefinitionToProto(role, domainID, roleMetadataMap)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to convert role definition")
 		}
 		rolesProto = append(rolesProto, roleProto)
 	}
 
-	return &pb.GetUserRolesResponse{
-		UserId:     req.UserId,
-		DomainType: req.DomainType,
-		DomainId:   req.DomainId,
+	return &pb.ListUserRolesResponse{
+		UserId:     userID,
+		DomainType: actions.DomainTypeToProto(domainType),
+		DomainId:   domainID,
 		Roles:      rolesProto,
 	}, nil
 }

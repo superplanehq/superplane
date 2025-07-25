@@ -56,13 +56,29 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	user := &models.User{
+		Name:     "Test User",
+		IsActive: true,
+	}
+	require.NoError(t, user.Create())
+
+	accountProvider := &models.AccountProvider{
+		UserID:     user.ID,
+		Email:      "test@test.com",
+		Username:   "Test",
+		Provider:   "github",
+		ProviderID: "123",
+	}
+
+	require.NoError(t, accountProvider.Create())
+
 	r := ResourceRegistry{
-		User:      uuid.New(),
+		User:      user.ID,
 		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
 	var err error
-	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test")
+	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
 
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")

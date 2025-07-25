@@ -7,9 +7,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 )
 
 func Test_CreateGroup(t *testing.T) {
@@ -21,14 +21,22 @@ func Test_CreateGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful group creation", func(t *testing.T) {
-		req := &CreateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
-			GroupName:  "test-group",
-			Role:       authorization.RoleOrgAdmin,
+		req := &pb.CreateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "test-group",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleOrgAdmin,
+					DisplayName: "test-group",
+					Description: "test-group",
+				},
+			},
 		}
 
-		resp, err := CreateGroup(ctx, req, authService)
+		resp, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -44,30 +52,46 @@ func Test_CreateGroup(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		req := &CreateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainID:   canvasID,
-			GroupName:  "canvas-group",
-			Role:       authorization.RoleCanvasAdmin,
+		req := &pb.CreateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   canvasID,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "canvas-group",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleCanvasAdmin,
+					DisplayName: "canvas-group",
+					Description: "canvas-group",
+				},
+			},
 		}
 
-		resp, err := CreateGroup(ctx, req, authService)
+		resp, err := CreateGroup(ctx, "canvas", canvasID, req.Group, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-		assert.Equal(t, "canvas-group", resp.Group.Name)
-		assert.Equal(t, pb.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.DomainType)
-		assert.Equal(t, canvasID, resp.Group.DomainId)
+		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
+		assert.Equal(t, canvasID, resp.Group.Metadata.DomainId)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		req := &CreateGroupRequest{
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainID:   orgID,
-			GroupName:  "",
-			Role:       authorization.RoleOrgAdmin,
+		req := &pb.CreateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
+			DomainId:   orgID,
+			Group: &pb.Group{
+				Metadata: &pb.Group_Metadata{
+					Name: "",
+				},
+				Spec: &pb.Group_Spec{
+					Role:        models.RoleOrgAdmin,
+					DisplayName: "test-group",
+					Description: "test-group",
+				},
+			},
 		}
 
-		_, err := CreateGroup(ctx, req, authService)
+		_, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
