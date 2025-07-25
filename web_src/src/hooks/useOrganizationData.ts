@@ -19,7 +19,8 @@ import {
   organizationsDescribeOrganization,
   organizationsUpdateOrganization,
   superplaneListCanvases,
-  superplaneCreateCanvas
+  superplaneCreateCanvas,
+  superplaneDeleteCanvas
 } from '../api-client/sdk.gen'
 import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
 
@@ -166,7 +167,6 @@ export const useAssignRole = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch organization users
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
     }
   })
@@ -190,7 +190,6 @@ export const useRemoveRole = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch organization users
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
     }
   })
@@ -225,7 +224,6 @@ export const useCreateGroup = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch groups
       queryClient.invalidateQueries({ queryKey: organizationKeys.groups(organizationId) })
     }
   })
@@ -279,7 +277,6 @@ export const useDeleteGroup = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch groups
       queryClient.invalidateQueries({ queryKey: organizationKeys.groups(organizationId) })
     }
   })
@@ -306,7 +303,6 @@ export const useAddUserToGroup = (organizationId: string) => {
       })
     },
     onSuccess: (_, variables) => {
-      // Invalidate and refetch group users and organization users
       queryClient.invalidateQueries({ queryKey: organizationKeys.groupUsers(organizationId, variables.groupName) })
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
     }
@@ -332,7 +328,6 @@ export const useRemoveUserFromGroup = (organizationId: string) => {
       })
     },
     onSuccess: (_, variables) => {
-      // Invalidate and refetch group users
       queryClient.invalidateQueries({ queryKey: organizationKeys.groupUsers(organizationId, variables.groupName) })
     }
   })
@@ -385,7 +380,6 @@ export const useUpdateRole = (organizationId: string) => {
       })
     },
     onSuccess: (_, variables) => {
-      // Invalidate and refetch roles and specific role data
       queryClient.invalidateQueries({ queryKey: organizationKeys.roles(organizationId) })
       queryClient.invalidateQueries({ queryKey: organizationKeys.role(organizationId, variables.roleName) })
     }
@@ -410,7 +404,6 @@ export const useDeleteRole = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch roles
       queryClient.invalidateQueries({ queryKey: organizationKeys.roles(organizationId) })
     }
   })
@@ -437,7 +430,6 @@ export const useUpdateOrganization = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch organization details
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) })
     }
   })
@@ -474,8 +466,26 @@ export const useCreateCanvas = (organizationId: string) => {
       })
     },
     onSuccess: () => {
-      // Invalidate and refetch canvases
       queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) })
     }
   })
 }
+
+export const useDeleteCanvas = (organizationId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: {
+      canvasId: string
+    }) => {
+      return await superplaneDeleteCanvas({
+        path: { idOrName: params.canvasId },
+        query: { organizationId }
+      })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) })
+    }
+  })
+}
+  

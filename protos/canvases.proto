@@ -50,6 +50,17 @@ service Superplane {
     };
   }
 
+  rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a canvas";
+      description: "Deletes the specified canvas (can be referenced by ID or name)";
+      tags: "Canvas";
+    };
+  }
+
   rpc CreateConnectionGroup(CreateConnectionGroupRequest) returns (CreateConnectionGroupResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
@@ -262,6 +273,13 @@ message CreateCanvasRequest {
 message CreateCanvasResponse {
   Canvas canvas = 1;
 }
+
+message DeleteCanvasRequest {
+  string id_or_name = 1;
+  string organization_id = 2;
+}
+
+message DeleteCanvasResponse {}
 
 message DescribeCanvasRequest {
   string id = 1;

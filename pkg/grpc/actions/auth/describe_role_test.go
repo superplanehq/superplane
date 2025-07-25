@@ -26,7 +26,7 @@ func Test_DescribeRole(t *testing.T) {
 		assert.Equal(t, models.RoleOrgAdmin, resp.Role.Metadata.Name)
 		assert.Equal(t, models.RoleOrgViewer, resp.Role.Spec.InheritedRole.Metadata.Name)
 		assert.Len(t, resp.Role.Spec.Permissions, 25)
-		assert.Len(t, resp.Role.Spec.InheritedRole.Spec.Permissions, 2)
+		assert.Len(t, resp.Role.Spec.InheritedRole.Spec.Permissions, 5)
 
 		// Test beautiful display names and descriptions
 		assert.Equal(t, "Admin", resp.Role.Spec.DisplayName)

@@ -499,6 +499,10 @@ export type SuperplaneDataFilter = {
     expression?: string;
 };
 
+export type SuperplaneDeleteCanvasResponse = {
+    [key: string]: unknown;
+};
+
 export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
 };
@@ -598,6 +602,7 @@ export type SuperplaneIntegrationsValueFrom = {
 };
 
 export type SuperplaneIntegrationsValueFromSecret = {
+    domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
 };
@@ -732,6 +737,7 @@ export type SuperplaneValueFromLastExecution = {
 };
 
 export type SuperplaneValueFromSecret = {
+    domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
 };
@@ -1282,6 +1288,35 @@ export type SuperplaneApproveStageEventResponses = {
 };
 
 export type SuperplaneApproveStageEventResponse2 = SuperplaneApproveStageEventResponses[keyof SuperplaneApproveStageEventResponses];
+
+export type SuperplaneDeleteCanvasData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: {
+        organizationId?: string;
+    };
+    url: '/api/v1/canvases/{idOrName}';
+};
+
+export type SuperplaneDeleteCanvasErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneDeleteCanvasError = SuperplaneDeleteCanvasErrors[keyof SuperplaneDeleteCanvasErrors];
+
+export type SuperplaneDeleteCanvasResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDeleteCanvasResponse;
+};
+
+export type SuperplaneDeleteCanvasResponse2 = SuperplaneDeleteCanvasResponses[keyof SuperplaneDeleteCanvasResponses];
 
 export type SuperplaneDescribeCanvasData = {
     body?: never;

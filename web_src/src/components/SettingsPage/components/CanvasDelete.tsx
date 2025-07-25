@@ -12,7 +12,7 @@ import {
   DialogBody,
   DialogActions
 } from '../../Dialog/dialog'
-import { useMutation } from '@tanstack/react-query'
+import { useDeleteCanvas } from '@/hooks/useOrganizationData'
 
 interface CanvasDeleteProps {
   canvasId: string
@@ -23,23 +23,7 @@ export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [confirmationText, setConfirmationText] = useState('')
   const navigate = useNavigate()
-
-  // Mock delete function - replace with actual API call when available
-  const mockDeleteCanvas = async (): Promise<void> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    console.log('Mock: Deleting canvas', canvasId, 'from organization', organizationId)
-    // In real implementation, this would call the actual API
-    // return await superplaneDeleteCanvas({ path: { id: canvasId }, query: { organizationId } })
-  }
-
-  const deleteCanvasMutation = useMutation({
-    mutationFn: mockDeleteCanvas,
-    onSuccess: () => {
-      // Navigate back to organization page after successful deletion
-      navigate(`/organization/${organizationId}`)
-    }
-  })
+  const deleteCanvasMutation = useDeleteCanvas(organizationId)
 
   const handleDeleteClick = () => {
     setIsDeleteModalOpen(true)
@@ -52,7 +36,8 @@ export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
 
   const handleConfirmDelete = async () => {
     if (confirmationText === 'DELETE') {
-      await deleteCanvasMutation.mutateAsync()
+      await deleteCanvasMutation.mutateAsync({ canvasId })
+      navigate(`/organization/${organizationId}`)
     }
     handleCloseModal()
   }

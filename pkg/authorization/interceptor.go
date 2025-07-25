@@ -53,6 +53,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 
 		// Canvases rules
 		pbSuperplane.Superplane_CreateCanvas_FullMethodName:                 {Resource: "canvas", Action: "create", DomainTypes: []string{models.DomainTypeOrganization}},
+		pbSuperplane.Superplane_DeleteCanvas_FullMethodName:                 {Resource: "canvas", Action: "delete", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_DescribeCanvas_FullMethodName:               {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_ListCanvases_FullMethodName:                 {Resource: "canvas", Action: "read", DomainTypes: []string{models.DomainTypeOrganization}},
 		pbSuperplane.Superplane_CreateEventSource_FullMethodName:            {Resource: "eventsource", Action: "create", DomainTypes: []string{models.DomainTypeCanvas}},

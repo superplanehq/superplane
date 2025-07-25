@@ -66,7 +66,8 @@ CREATE TABLE public.canvases (
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    deleted_at timestamp with time zone
 );
 
 
@@ -734,6 +735,13 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
+-- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
+
+
+--
 -- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1009,7 +1017,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250721193920	f
+20250725093855	f
 \.
 
 

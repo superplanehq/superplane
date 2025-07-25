@@ -20,6 +20,7 @@ type Canvas struct {
 	CreatedAt      *time.Time
 	CreatedBy      uuid.UUID
 	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 	OrganizationID uuid.UUID
 
 	Organization *Organization `gorm:"foreignKey:OrganizationID;references:ID"`
@@ -246,6 +247,13 @@ func (c *Canvas) CreateStageInTransaction(
 	}
 
 	return stage, nil
+}
+
+func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
+	return tx.
+		Where("id = ?", c.ID).
+		Delete(&Canvas{}).
+		Error
 }
 
 func ListCanvases() ([]Canvas, error) {
