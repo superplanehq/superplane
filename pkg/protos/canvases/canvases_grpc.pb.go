@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Superplane_ListCanvases_FullMethodName                 = "/Superplane.Superplane/ListCanvases"
 	Superplane_CreateCanvas_FullMethodName                 = "/Superplane.Superplane/CreateCanvas"
+	Superplane_DeleteCanvas_FullMethodName                 = "/Superplane.Superplane/DeleteCanvas"
 	Superplane_CreateConnectionGroup_FullMethodName        = "/Superplane.Superplane/CreateConnectionGroup"
 	Superplane_CreateEventSource_FullMethodName            = "/Superplane.Superplane/CreateEventSource"
 	Superplane_ResetEventSourceKey_FullMethodName          = "/Superplane.Superplane/ResetEventSourceKey"
@@ -45,6 +46,7 @@ const (
 type SuperplaneClient interface {
 	ListCanvases(ctx context.Context, in *ListCanvasesRequest, opts ...grpc.CallOption) (*ListCanvasesResponse, error)
 	CreateCanvas(ctx context.Context, in *CreateCanvasRequest, opts ...grpc.CallOption) (*CreateCanvasResponse, error)
+	DeleteCanvas(ctx context.Context, in *DeleteCanvasRequest, opts ...grpc.CallOption) (*DeleteCanvasResponse, error)
 	CreateConnectionGroup(ctx context.Context, in *CreateConnectionGroupRequest, opts ...grpc.CallOption) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(ctx context.Context, in *CreateEventSourceRequest, opts ...grpc.CallOption) (*CreateEventSourceResponse, error)
 	ResetEventSourceKey(ctx context.Context, in *ResetEventSourceKeyRequest, opts ...grpc.CallOption) (*ResetEventSourceKeyResponse, error)
@@ -85,6 +87,16 @@ func (c *superplaneClient) CreateCanvas(ctx context.Context, in *CreateCanvasReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateCanvasResponse)
 	err := c.cc.Invoke(ctx, Superplane_CreateCanvas_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *superplaneClient) DeleteCanvas(ctx context.Context, in *DeleteCanvasRequest, opts ...grpc.CallOption) (*DeleteCanvasResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteCanvasResponse)
+	err := c.cc.Invoke(ctx, Superplane_DeleteCanvas_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -257,6 +269,7 @@ func (c *superplaneClient) ApproveStageEvent(ctx context.Context, in *ApproveSta
 type SuperplaneServer interface {
 	ListCanvases(context.Context, *ListCanvasesRequest) (*ListCanvasesResponse, error)
 	CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error)
+	DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error)
 	CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error)
 	CreateEventSource(context.Context, *CreateEventSourceRequest) (*CreateEventSourceResponse, error)
 	ResetEventSourceKey(context.Context, *ResetEventSourceKeyRequest) (*ResetEventSourceKeyResponse, error)
@@ -287,6 +300,9 @@ func (UnimplementedSuperplaneServer) ListCanvases(context.Context, *ListCanvases
 }
 func (UnimplementedSuperplaneServer) CreateCanvas(context.Context, *CreateCanvasRequest) (*CreateCanvasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateCanvas not implemented")
+}
+func (UnimplementedSuperplaneServer) DeleteCanvas(context.Context, *DeleteCanvasRequest) (*DeleteCanvasResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteCanvas not implemented")
 }
 func (UnimplementedSuperplaneServer) CreateConnectionGroup(context.Context, *CreateConnectionGroupRequest) (*CreateConnectionGroupResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateConnectionGroup not implemented")
@@ -388,6 +404,24 @@ func _Superplane_CreateCanvas_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(SuperplaneServer).CreateCanvas(ctx, req.(*CreateCanvasRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Superplane_DeleteCanvas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteCanvasRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SuperplaneServer).DeleteCanvas(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Superplane_DeleteCanvas_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SuperplaneServer).DeleteCanvas(ctx, req.(*DeleteCanvasRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -694,6 +728,10 @@ var Superplane_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateCanvas",
 			Handler:    _Superplane_CreateCanvas_Handler,
+		},
+		{
+			MethodName: "DeleteCanvas",
+			Handler:    _Superplane_DeleteCanvas_Handler,
 		},
 		{
 			MethodName: "CreateConnectionGroup",

@@ -17,9 +17,11 @@ var ErrNameAlreadyUsed = fmt.Errorf("name already used")
 type Canvas struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name           string
+	Description    string
 	CreatedAt      *time.Time
 	CreatedBy      uuid.UUID
 	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 	OrganizationID uuid.UUID
 
 	Organization *Organization `gorm:"foreignKey:OrganizationID;references:ID"`
@@ -248,6 +250,13 @@ func (c *Canvas) CreateStageInTransaction(
 	return stage, nil
 }
 
+func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
+	return tx.
+		Where("id = ?", c.ID).
+		Delete(&Canvas{}).
+		Error
+}
+
 func ListCanvases() ([]Canvas, error) {
 	var canvases []Canvas
 
@@ -324,10 +333,11 @@ func FindCanvasByName(name string) (*Canvas, error) {
 	return &canvas, nil
 }
 
-func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string) (*Canvas, error) {
+func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string, description string) (*Canvas, error) {
 	now := time.Now()
 	canvas := Canvas{
 		Name:           name,
+		Description:    description,
 		OrganizationID: orgID,
 		CreatedAt:      &now,
 		CreatedBy:      requesterID,

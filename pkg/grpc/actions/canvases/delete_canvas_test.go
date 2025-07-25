@@ -7,6 +7,7 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -14,14 +15,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func Test__DescribeCanvas(t *testing.T) {
+func Test__DeleteCanvas(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 	userID := uuid.New()
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DescribeCanvas(context.Background(), &protos.DescribeCanvasRequest{
-			Id: uuid.New().String(),
-		})
+		_, err := DeleteCanvas(context.Background(), &protos.DeleteCanvasRequest{
+			IdOrName: uuid.New().String(),
+		}, authService)
 
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -29,23 +32,23 @@ func Test__DescribeCanvas(t *testing.T) {
 		assert.Equal(t, "canvas not found", s.Message())
 	})
 
-	t.Run("empty canvas", func(t *testing.T) {
+	t.Run("delete canvas successfully", func(t *testing.T) {
 		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "")
 		require.NoError(t, err)
 		canvas, err := models.CreateCanvas(userID, organization.ID, "test", "test")
 		require.NoError(t, err)
+		err = authService.SetupCanvasRoles(canvas.ID.String())
+		require.NoError(t, err)
 
-		response, err := DescribeCanvas(context.Background(), &protos.DescribeCanvasRequest{
-			Id: canvas.ID.String(),
-		})
+		response, err := DeleteCanvas(context.Background(), &protos.DeleteCanvasRequest{
+			IdOrName: canvas.ID.String(),
+		}, authService)
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
-		require.NotNil(t, response.Canvas)
-		require.NotNil(t, response.Canvas.Metadata)
-		assert.Equal(t, canvas.ID.String(), response.Canvas.Metadata.Id)
-		assert.Equal(t, *canvas.CreatedAt, response.Canvas.Metadata.CreatedAt.AsTime())
-		assert.Equal(t, "test", response.Canvas.Metadata.Name)
-		assert.Equal(t, canvas.CreatedBy.String(), response.Canvas.Metadata.CreatedBy)
+
+		roles, err := authService.GetAllRoleDefinitions(models.DomainTypeCanvas, canvas.ID.String())
+		require.NoError(t, err)
+		require.Empty(t, roles)
 	})
 }

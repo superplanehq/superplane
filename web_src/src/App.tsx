@@ -40,7 +40,7 @@ function App() {
         <Routes>
           <Route path="" element={withNavigation(HomePage)} />
           <Route path="organization/:orgId" element={withNavigation(OrganizationPage)} />
-          <Route path="organization/:orgId/canvas/:canvasId" element={withNavigation(Canvas)} />
+          <Route path="organization/:orgId/canvas/:canvasId" element={<Canvas />} />
           <Route path="organization/:orgId/settings/*" element={withNavigation(OrganizationSettings)} />
         </Routes>
       </BrowserRouter>

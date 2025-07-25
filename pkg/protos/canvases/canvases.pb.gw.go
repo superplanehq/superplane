@@ -92,6 +92,57 @@ func local_request_Superplane_CreateCanvas_0(ctx context.Context, marshaler runt
 	return msg, metadata, err
 }
 
+var filter_Superplane_DeleteCanvas_0 = &utilities.DoubleArray{Encoding: map[string]int{"id_or_name": 0}, Base: []int{1, 1, 0}, Check: []int{0, 1, 2}}
+
+func request_Superplane_DeleteCanvas_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DeleteCanvasRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	io.Copy(io.Discard, req.Body)
+	val, ok := pathParams["id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id_or_name")
+	}
+	protoReq.IdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_DeleteCanvas_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := client.DeleteCanvas(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+}
+
+func local_request_Superplane_DeleteCanvas_0(ctx context.Context, marshaler runtime.Marshaler, server SuperplaneServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var (
+		protoReq DeleteCanvasRequest
+		metadata runtime.ServerMetadata
+		err      error
+	)
+	val, ok := pathParams["id_or_name"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "id_or_name")
+	}
+	protoReq.IdOrName, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "id_or_name", err)
+	}
+	if err := req.ParseForm(); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	if err := runtime.PopulateQueryParameters(&protoReq, req.Form, filter_Superplane_DeleteCanvas_0); err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+	msg, err := server.DeleteCanvas(ctx, &protoReq)
+	return msg, metadata, err
+}
+
 func request_Superplane_CreateConnectionGroup_0(ctx context.Context, marshaler runtime.Marshaler, client SuperplaneClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var (
 		protoReq CreateConnectionGroupRequest
@@ -981,6 +1032,26 @@ func RegisterSuperplaneHandlerServer(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_CreateCanvas_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodDelete, pattern_Superplane_DeleteCanvas_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		var stream runtime.ServerTransportStream
+		ctx = grpc.NewContextWithServerTransportStream(ctx, &stream)
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateIncomingContext(ctx, mux, req, "/Superplane.Superplane/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id_or_name}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_Superplane_DeleteCanvas_0(annotatedContext, inboundMarshaler, server, req, pathParams)
+		md.HeaderMD, md.TrailerMD = metadata.Join(md.HeaderMD, stream.Header()), metadata.Join(md.TrailerMD, stream.Trailer())
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_DeleteCanvas_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_Superplane_CreateConnectionGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1375,6 +1446,23 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 		}
 		forward_Superplane_CreateCanvas_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 	})
+	mux.Handle(http.MethodDelete, pattern_Superplane_DeleteCanvas_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		annotatedContext, err := runtime.AnnotateContext(ctx, mux, req, "/Superplane.Superplane/DeleteCanvas", runtime.WithHTTPPathPattern("/api/v1/canvases/{id_or_name}"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Superplane_DeleteCanvas_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		forward_Superplane_DeleteCanvas_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+	})
 	mux.Handle(http.MethodPost, pattern_Superplane_CreateConnectionGroup_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -1653,6 +1741,7 @@ func RegisterSuperplaneHandlerClient(ctx context.Context, mux *runtime.ServeMux,
 var (
 	pattern_Superplane_ListCanvases_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
 	pattern_Superplane_CreateCanvas_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "canvases"}, ""))
+	pattern_Superplane_DeleteCanvas_0                 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "canvases", "id_or_name"}, ""))
 	pattern_Superplane_CreateConnectionGroup_0        = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "connection-groups"}, ""))
 	pattern_Superplane_CreateEventSource_0            = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "canvases", "canvas_id_or_name", "event-sources"}, ""))
 	pattern_Superplane_ResetEventSourceKey_0          = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5, 2, 6}, []string{"api", "v1", "canvases", "canvas_id_or_name", "event-sources", "id_or_name", "reset-key"}, ""))
@@ -1674,6 +1763,7 @@ var (
 var (
 	forward_Superplane_ListCanvases_0                 = runtime.ForwardResponseMessage
 	forward_Superplane_CreateCanvas_0                 = runtime.ForwardResponseMessage
+	forward_Superplane_DeleteCanvas_0                 = runtime.ForwardResponseMessage
 	forward_Superplane_CreateConnectionGroup_0        = runtime.ForwardResponseMessage
 	forward_Superplane_CreateEventSource_0            = runtime.ForwardResponseMessage
 	forward_Superplane_ResetEventSourceKey_0          = runtime.ForwardResponseMessage

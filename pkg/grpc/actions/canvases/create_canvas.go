@@ -41,7 +41,7 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 		return nil, status.Error(codes.InvalidArgument, "invalid user ID")
 	}
 
-	canvas, err := models.CreateCanvas(userIDUUID, orgID, req.Canvas.Metadata.Name)
+	canvas, err := models.CreateCanvas(userIDUUID, orgID, req.Canvas.Metadata.Name, req.Canvas.Metadata.Description)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -54,9 +54,10 @@ func CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest, authorizatio
 	response := &pb.CreateCanvasResponse{
 		Canvas: &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:        canvas.ID.String(),
-				Name:      canvas.Name,
-				CreatedAt: timestamppb.New(*canvas.CreatedAt),
+				Id:          canvas.ID.String(),
+				Name:        canvas.Name,
+				Description: canvas.Description,
+				CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			},
 		},
 	}

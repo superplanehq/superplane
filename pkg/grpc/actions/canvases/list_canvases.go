@@ -41,10 +41,11 @@ func serializeCanvases(in []models.Canvas) []*pb.Canvas {
 	for _, canvas := range in {
 		out = append(out, &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:        canvas.ID.String(),
-				Name:      canvas.Name,
-				CreatedBy: canvas.CreatedBy.String(),
-				CreatedAt: timestamppb.New(*canvas.CreatedAt),
+				Id:          canvas.ID.String(),
+				Name:        canvas.Name,
+				Description: canvas.Description,
+				CreatedBy:   canvas.CreatedBy.String(),
+				CreatedAt:   timestamppb.New(*canvas.CreatedAt),
 			},
 		})
 	}
