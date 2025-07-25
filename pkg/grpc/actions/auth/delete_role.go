@@ -15,7 +15,6 @@ func DeleteRole(ctx context.Context, domainType, domainID, roleName string, auth
 		return nil, status.Error(codes.InvalidArgument, "role name must be specified")
 	}
 
-	// Check if role exists
 	_, err := authService.GetRoleDefinition(roleName, domainType, domainID)
 	if err != nil {
 		log.Errorf("role %s not found: %v", roleName, err)
