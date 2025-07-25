@@ -12,7 +12,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID string, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
+func UpdateSecret(ctx context.Context, encryptor crypto.Encryptor, domainType, domainID, idOrName string, spec *pb.Secret) (*pb.UpdateSecretResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
 	var secret *models.Secret
 	if err != nil {

@@ -147,6 +147,7 @@ message ValueFrom {
 }
 
 message ValueFromSecret {
-  string name = 1;
-  string key = 2;
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+  string key = 3;
 }

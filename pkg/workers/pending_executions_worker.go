@@ -112,24 +112,21 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
 	secretMap := map[string]string{}
-	for _, secretDef := range stage.Secrets {
-		secretName := secretDef.ValueFrom.Secret.Name
-
-		// TODO: it should be possible for organization secrets to be used here too.
-		provider, err := secrets.NewProvider(encryptor, secretName, models.DomainTypeCanvas, stage.CanvasID)
+	for _, def := range stage.Secrets {
+		secretDef := def.ValueFrom.Secret
+		provider, err := secretProvider(encryptor, secretDef, stage)
 		if err != nil {
-			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretName, err)
+			return nil, fmt.Errorf("error initializing secret provider for %s: %v", secretDef.Name, err)
 		}
 
 		values, err := provider.Load(context.TODO())
 		if err != nil {
-			return nil, fmt.Errorf("error loading values for secret %s: %v", secretName, err)
+			return nil, fmt.Errorf("error loading values for secret %s: %v", secretDef.Name, err)
 		}
 
-		key := secretDef.ValueFrom.Secret.Key
-		value, ok := values[key]
+		value, ok := values[secretDef.Key]
 		if !ok {
-			return nil, fmt.Errorf("key %s not found in secret %s", key, secretName)
+			return nil, fmt.Errorf("key %s not found in secret %s", secretDef.Key, secretDef.Name)
 		}
 
 		secretMap[secretDef.Name] = value
@@ -189,4 +186,17 @@ func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, respons
 	logger.Infof("Started execution %s", response.Id())
 
 	return nil
+}
+
+func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitionFromSecret, stage *models.Stage) (secrets.Provider, error) {
+	if secretDef.DomainType == models.DomainTypeCanvas {
+		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, stage.CanvasID)
+	}
+
+	canvas, err := models.FindCanvasByID(stage.CanvasID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error finding canvas %s: %v", stage.CanvasID, err)
+	}
+
+	return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }
