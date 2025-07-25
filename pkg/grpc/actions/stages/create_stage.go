@@ -409,8 +409,9 @@ func serializeValueFrom(in models.ValueDefinitionFrom) *pb.ValueFrom {
 	if in.Secret != nil {
 		return &pb.ValueFrom{
 			Secret: &pb.ValueFromSecret{
-				Name: in.Secret.Name,
-				Key:  in.Secret.Key,
+				DomainType: actions.DomainTypeToProto(in.Secret.DomainType),
+				Name:       in.Secret.Name,
+				Key:        in.Secret.Key,
 			},
 		}
 	}

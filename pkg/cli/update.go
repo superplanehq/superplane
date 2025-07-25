@@ -134,8 +134,8 @@ var updateStageCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
-		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name", true)
 		yamlFile, _ := cmd.Flags().GetString("file")
 
 		if yamlFile == "" {
