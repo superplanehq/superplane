@@ -363,13 +363,13 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
 
-	goodBody, _ := json.Marshal(&OutputsRequest{
+	goodBody, _ := json.Marshal(&ExecutionOutputRequest{
 		ExecutionID: execution.ID.String(),
 		Outputs:     outputs,
 	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: "not-a-uuid",
 			Outputs:     outputs,
 		})
@@ -411,7 +411,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	})
 
 	t.Run("execution that does not exist -> 401", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: uuid.NewString(),
 			Outputs:     outputs,
 		})
@@ -470,7 +470,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	t.Run("output not defined in stage is ignored", func(t *testing.T) {
 		// 'time' output is not defined in the stage
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: execution.ID.String(),
 			Outputs: map[string]any{
 				"sha":     "078fc8755c051",

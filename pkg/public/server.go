@@ -18,6 +18,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/integrations"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -372,7 +373,7 @@ func (s *Server) Close() {
 	}
 }
 
-func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, executionID string) *models.StageExecution {
+func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -386,7 +387,7 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, e
 	}
 
 	token := headerParts[1]
-	ID, err := uuid.Parse(executionID)
+	ID, err := uuid.Parse(req.ExecutionID)
 	if err != nil {
 		http.Error(w, "Execution not found", http.StatusNotFound)
 		return nil
@@ -402,7 +403,7 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, e
 	// Try to authenticate using the token issued by SuperPlane itself.
 	// It the integration does not support OIDC tokens, this is the method of authentication used.
 	//
-	err = s.jwt.Validate(token, executionID)
+	err = s.jwt.Validate(token, req.ExecutionID)
 	if err == nil {
 		return execution
 	}
@@ -411,31 +412,36 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, e
 	// If authenticating with the token issued by SuperPlane itself fails,
 	// try to authenticate expecting an OIDC ID token issued by the integration.
 	//
-	integration, err := execution.GetIntegration()
+	resourceInfo, err := execution.GetResourceInformation(req.ExternalID)
 	if err != nil {
 		http.Error(w, "Integration not found", http.StatusNotFound)
 		return nil
 	}
 
-	//
-	// TODO: for Semaphore integration (the only available right now), the audience in the token
-	// is the same as the integration URL set up in SuperPlane, but that might not always be the case.
-	//
-	_, err = s.oidcVerifier.Verify(r.Context(), integration.URL, integration.URL, headerParts[1])
+	integration, err := integrations.NewIntegrationWithoutAuth(r.Context(), resourceInfo.IntegrationType)
+	if err != nil {
+		http.Error(w, "Error starting integration", http.StatusInternalServerError)
+		return nil
+	}
+
+	idToken, err := s.oidcVerifier.Verify(r.Context(), resourceInfo.IntegrationURL, resourceInfo.IntegrationURL, headerParts[1])
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
 
-	// TODO: check claims
-	// - execution_resources.external_id == claims["wf_id"]
-	// - resources.external_id == claims["prj_id"]
+	err = integration.ValidateOpenIDConnectClaims(idToken, req.ExternalID, req.ExecutionID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
 
 	return execution
 }
 
-type OutputsRequest struct {
+type ExecutionOutputRequest struct {
 	ExecutionID string         `json:"execution_id"`
+	ExternalID  string         `json:"external_id"`
 	Outputs     map[string]any `json:"outputs"`
 }
 
@@ -459,14 +465,14 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req OutputsRequest
+	var req ExecutionOutputRequest
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		http.Error(w, "Error decoding request body", http.StatusBadRequest)
 		return
 	}
 
-	execution := s.authenticateExecution(w, r, req.ExecutionID)
+	execution := s.authenticateExecution(w, r, &req)
 	if execution == nil {
 		return
 	}

@@ -122,15 +122,10 @@ message Integration {
     AUTH_TYPE_OIDC = 2;
   }
 
-  message OIDC {
-    bool supported = 1;
-  }
-
   message Spec {
     Type type = 1;
     string url = 2;
     Auth auth = 3;
-    OIDC oidc = 4;
   }
 
   Metadata metadata = 1;

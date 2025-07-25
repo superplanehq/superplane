@@ -146,23 +146,29 @@ func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 		Error
 }
 
-// TODO: check if this query can be improved
-func (e *StageExecution) GetIntegration() (*Integration, error) {
-	var integration Integration
+type X struct {
+	IntegrationType  string
+	IntegrationURL   string
+	ParentResourceID string
+}
+
+func (e *StageExecution) GetResourceInformation(externalID string) (*X, error) {
+	var x X
 	err := database.Conn().
 		Table("execution_resources").
 		Joins("INNER JOIN resources ON resources.id = execution_resources.parent_resource_id").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
 		Where("execution_resources.execution_id = ?", e.ID).
-		Select("integrations.*").
-		First(&integration).
+		Where("execution_resources.external_id = ?", externalID).
+		Select("integrations.type, integrations.url, resources.parent_resource_id").
+		First(&x).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &integration, nil
+	return &x, nil
 }
 
 func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {

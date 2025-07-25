@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/coreos/go-oidc/v3/oidc"
 )
 
 const (
@@ -24,6 +26,27 @@ func NewSemaphoreIntegration(URL, token string) (Integration, error) {
 		URL:   URL,
 		Token: token,
 	}, nil
+}
+
+func (s *SemaphoreIntegration) ValidateOpenIDConnectClaims(idToken *oidc.IDToken, resourceId, parentId string) error {
+	var claims struct {
+		WorkflowID string `json:"wf_id"`
+		ProjectID  string `json:"prj_id"`
+	}
+
+	if err := idToken.Claims(&claims); err != nil {
+		return fmt.Errorf("error validating claims: %v", err)
+	}
+
+	if claims.WorkflowID != resourceId {
+		return fmt.Errorf("invalid workflow ID")
+	}
+
+	if claims.ProjectID != parentId {
+		return fmt.Errorf("invalid project ID")
+	}
+
+	return nil
 }
 
 func (s *SemaphoreIntegration) HasSupportFor(featureName string) bool {

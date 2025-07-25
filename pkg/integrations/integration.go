@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -27,6 +28,7 @@ type Integration interface {
 	Create(resourceType string, params any) (Resource, error)
 	List(resourceType string, parentIDs ...string) ([]Resource, error)
 	HasSupportFor(string) bool
+	ValidateOpenIDConnectClaims(idToken *oidc.IDToken, resourceId, parentId string) error
 }
 
 type Resource interface {
@@ -57,5 +59,17 @@ func NewIntegration(ctx context.Context, integration *models.Integration, encryp
 		return NewSemaphoreIntegration(integration.URL, token)
 	default:
 		return nil, fmt.Errorf("unsupported integration type %s", integration.Type)
+	}
+}
+
+// TODO: I don't like this.
+// We should come up with a better way to instantiate integrations
+// without requiring a switch statement like this.
+func NewIntegrationWithoutAuth(ctx context.Context, integrationType string) (Integration, error) {
+	switch integrationType {
+	case models.IntegrationTypeSemaphore:
+		return NewSemaphoreIntegration("", "")
+	default:
+		return nil, fmt.Errorf("unsupported integration type %s", integrationType)
 	}
 }

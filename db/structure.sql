@@ -235,8 +235,7 @@ CREATE TABLE public.integrations (
     type character varying(64) NOT NULL,
     url character varying(256) NOT NULL,
     auth_type character varying(64) NOT NULL,
-    auth jsonb DEFAULT '{}'::jsonb NOT NULL,
-    oidc jsonb DEFAULT '{}'::jsonb NOT NULL
+    auth jsonb DEFAULT '{}'::jsonb NOT NULL
 );
 
 
