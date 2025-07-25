@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Text } from '../../Text/text'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Avatar } from '../../Avatar/avatar'
-import { Input, InputGroup } from '../../Input/input'
+import { Input } from '../../Input/input'
 import {
   Dropdown,
   DropdownButton,
@@ -177,21 +177,14 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="max-w-sm">
-                <div className="relative">
-                  <InputGroup>
-                    <MaterialSymbol
-                      name="search"
-                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400"
-                      size="sm"
-                    />
-                    <Input
-                      type="text"
-                      placeholder="Search members..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 w-full"
-                    />
-                  </InputGroup>
+                <div className="relative text-black">
+                  <Input
+                    type="text"
+                    placeholder="Search members..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>

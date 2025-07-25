@@ -7,6 +7,7 @@ import { Input } from '../../Input/input'
 import { useIntegrations, useCreateIntegration, useUpdateIntegration, type CreateIntegrationParams, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
 import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration, IntegrationsIntegrationType } from '@/api-client'
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 
 interface CanvasIntegrationsProps {
   canvasId: string
@@ -20,8 +21,8 @@ const INTEGRATION_TYPES = [
     value: 'TYPE_SEMAPHORE' as const,
     label: 'Semaphore',
     description: 'Connect to Semaphore CI/CD pipelines for automated deployments and testing workflows',
-    icon: 'build_circle',
-    color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
+    icon: SemaphoreLogo,
+    color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
     popular: true
   },
 ]
@@ -228,12 +229,8 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_SEMAPHORE' ? 'bg-orange-500' : 'bg-orange-500'} rounded flex items-center justify-center`}>
-                        <MaterialSymbol
-                          name={integration.spec?.type === 'TYPE_SEMAPHORE' ? 'build_circle' : 'build_circle'}
-                          className="text-white"
-                          size="sm"
-                        />
+                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_SEMAPHORE' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
+                        <img className="w-8 h-8 p-2" src={integration.spec?.type === 'TYPE_SEMAPHORE' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
                       <Heading level={3}>
                         {integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' :
@@ -279,19 +276,15 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                   onClick={() => handleTypeSelection(integrationType.value)}
                   className="relative flex items-start gap-4 p-6 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left group"
                 >
-                  <div className={`p-3 rounded-lg ${integrationType.color}`}>
-                    <MaterialSymbol name={integrationType.icon} size="lg" />
+                  <div className={`p-3 rounded-lg ${integrationType.color} flex items-center justify-center`}>
+                    <img className="w-8 h-8" src={integrationType.icon} alt={integrationType.label} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <Heading level={3} className="text-lg group-hover:text-blue-600 dark:group-hover:text-blue-400">
                         {integrationType.label}
                       </Heading>
-                      {integrationType.popular && (
-                        <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-medium rounded-full">
-                          Popular
-                        </span>
-                      )}
+
                     </div>
                     <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                       {integrationType.description}
