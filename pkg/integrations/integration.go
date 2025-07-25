@@ -6,7 +6,7 @@ type Integration interface {
 	Get(resourceType, id string, parentIDs ...string) (Resource, error)
 	Create(resourceType string, params any) (Resource, error)
 	List(resourceType string, parentIDs ...string) ([]Resource, error)
-	SetupEventSource(options EventSourceOptions) ([]Resource, error)
+	SetupWebhook(options WebhookOptions) ([]Resource, error)
 }
 
 type Resource interface {
@@ -15,10 +15,9 @@ type Resource interface {
 	Type() string
 }
 
-type EventSourceOptions struct {
+type WebhookOptions struct {
 	Resource Resource
-	BaseURL  string
 	ID       string
-	Name     string
+	URL      string
 	Key      []byte
 }

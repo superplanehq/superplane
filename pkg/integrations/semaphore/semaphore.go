@@ -47,11 +47,11 @@ func NewSemaphoreIntegration(ctx context.Context, integration *models.Integratio
 	}, nil
 }
 
-func (s *SemaphoreIntegration) SetupEventSource(options integrations.EventSourceOptions) ([]integrations.Resource, error) {
+func (s *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
 	// Create Semaphore secret to store the event source key.
 	//
-	resourceName := fmt.Sprintf("superplane-%s-%s", s.Integration.Name, options.Name)
+	resourceName := fmt.Sprintf("superplane-webhook-%s", options.ID)
 	secret, err := s.createSemaphoreSecret(resourceName, options.Key)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
@@ -101,7 +101,7 @@ func (s *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (i
 	return secret, nil
 }
 
-func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options integrations.EventSourceOptions) (integrations.Resource, error) {
+func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options integrations.WebhookOptions) (integrations.Resource, error) {
 	//
 	// Check if notification already exists.
 	//
@@ -120,7 +120,7 @@ func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 		Spec: NotificationSpec{
 			Rules: []NotificationRule{
 				{
-					Name: fmt.Sprintf("webhooks-for-%s", options.Resource.Name()),
+					Name: fmt.Sprintf("webhook-for-%s", options.Resource.Name()),
 					Filter: NotificationRuleFilter{
 						Branches:  []string{},
 						Pipelines: []string{},
@@ -129,7 +129,7 @@ func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 					},
 					Notify: NotificationRuleNotify{
 						Webhook: NotificationNotifyWebhook{
-							Endpoint: fmt.Sprintf("%s/api/v1/sources/%s/semaphore", options.BaseURL, options.ID),
+							Endpoint: options.URL,
 							Secret:   name,
 						},
 					},
@@ -335,7 +335,7 @@ func (s *SemaphoreIntegration) createNotification(params any) (integrations.Reso
 		return nil, fmt.Errorf("error marshaling notification: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -434,7 +434,7 @@ func (s *SemaphoreIntegration) runTask(params any) (integrations.Resource, error
 		return nil, fmt.Errorf("error marshaling task trigger: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -456,7 +456,7 @@ func (s *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, e
 		return nil, fmt.Errorf("error marshaling create workflow params: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodGet, URL, bytes.NewReader(body))
+	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

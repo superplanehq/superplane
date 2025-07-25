@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	semaphoremock "github.com/superplanehq/superplane/test/semaphore"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -28,10 +27,6 @@ func Test_Semaphore(t *testing.T) {
 	}
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
-		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
-		semaphoreMock.Init()
-		defer semaphoreMock.Close()
-
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
@@ -52,7 +47,7 @@ func Test_Semaphore(t *testing.T) {
 
 		require.NoError(t, err)
 
-		params := semaphoreMock.LastRunWorkflow
+		params := r.SemaphoreAPIMock.LastRunWorkflow
 		require.NotNil(t, params)
 		assert.Equal(t, "refs/heads/main", params.Reference)
 		assert.Equal(t, ".semaphore/semaphore.yml", params.PipelineFile)
@@ -66,10 +61,6 @@ func Test_Semaphore(t *testing.T) {
 	})
 
 	t.Run("runs task if task ID is not empty", func(t *testing.T) {
-		semaphoreMock := semaphoremock.NewSemaphoreAPIMock()
-		semaphoreMock.Init()
-		defer semaphoreMock.Close()
-
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
@@ -92,7 +83,7 @@ func Test_Semaphore(t *testing.T) {
 
 		require.NoError(t, err)
 
-		runTaskRequest := semaphoreMock.LastRunTask
+		runTaskRequest := r.SemaphoreAPIMock.LastRunTask
 		require.NotNil(t, runTaskRequest)
 		assert.Equal(t, "main", runTaskRequest.Branch)
 		assert.Equal(t, ".semaphore/semaphore.yml", runTaskRequest.PipelineFile)

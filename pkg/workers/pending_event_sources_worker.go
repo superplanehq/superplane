@@ -75,11 +75,10 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error decrypting event source key: %v", err)
 	}
 
-	resources, err := integrationImpl.SetupEventSource(integrations.EventSourceOptions{
+	resources, err := integrationImpl.SetupWebhook(integrations.WebhookOptions{
 		Resource: resource,
-		BaseURL:  w.BaseURL,
+		URL:      fmt.Sprintf("%s/api/v1/sources/%s/semaphore", w.BaseURL, eventSource.ID.String()),
 		ID:       eventSource.ID.String(),
-		Name:     eventSource.Name,
 		Key:      key,
 	})
 
