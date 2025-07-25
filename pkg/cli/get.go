@@ -41,7 +41,7 @@ var getEventSourceCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		id := args[0]
 		name, _ := cmd.Flags().GetString("name")
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneDescribeEventSource(
@@ -66,7 +66,7 @@ var getConnectionGroupCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.ConnectionGroupAPI.SuperplaneDescribeConnectionGroup(
@@ -92,7 +92,7 @@ var getStageCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
 
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneDescribeStage(
@@ -143,6 +143,36 @@ var getSecretCmd = &cobra.Command{
 	},
 }
 
+var getIntegrationCmd = &cobra.Command{
+	Use:     "integration [ID_OR_NAME]",
+	Short:   "Get integration details",
+	Long:    `Get details about a specific integration`,
+	Aliases: []string{"integrations"},
+	Args:    cobra.ExactArgs(1),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		idOrName := args[0]
+		domainType, domainID := getDomainOrExit(cmd)
+
+		c := DefaultClient()
+		response, httpResponse, err := c.IntegrationAPI.
+			IntegrationsDescribeIntegration(context.Background(), idOrName).
+			DomainId(domainID).
+			DomainType(domainType).
+			Execute()
+
+		if err != nil {
+			b, _ := io.ReadAll(httpResponse.Body)
+			fmt.Printf("%s\n", string(b))
+			os.Exit(1)
+		}
+
+		out, err := yaml.Marshal(response.Integration)
+		Check(err)
+		fmt.Printf("%s", string(out))
+	},
+}
+
 // Root describe command
 var getCmd = &cobra.Command{
 	Use:     "get",
@@ -176,6 +206,13 @@ func init() {
 
 	// Secret command
 	getCmd.AddCommand(getSecretCmd)
-	getSecretCmd.Flags().String("domain-type", "DOMAIN_TYPE_ORGANIZATION", "Domain to list secrets from (organization, canvas)")
-	getSecretCmd.Flags().String("domain-id", "", "ID of the domain (organization ID, canvas ID)")
+	getSecretCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level secrets")
+	getSecretCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level secrets")
+	getSecretCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level secrets")
+
+	// Integration command
+	getCmd.AddCommand(getIntegrationCmd)
+	getIntegrationCmd.Flags().String("canvas-id", "", "ID of the canvas, for canvas-level integrations")
+	getIntegrationCmd.Flags().String("canvas-name", "", "Name of the canvas, for canvas-level integrations")
+	getIntegrationCmd.Flags().String("organization-id", "", "ID of the organization, for organization-level integrations")
 }
