@@ -66,7 +66,7 @@ export function CanvasNavigation({
             {canvasesData.map((canvas) => (
               <DropdownItem
                 key={canvas.metadata?.id}
-                href={`/organization/${organizationId}/canvas/${canvas.metadata?.id}`}
+                href={`/organization/${organizationId}/canvas/${canvas.metadata?.id}#${activeView}`}
               >
                 {canvas.metadata?.name}
               </DropdownItem>
