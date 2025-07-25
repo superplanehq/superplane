@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_ListGroups(t *testing.T) {
@@ -21,14 +20,9 @@ func Test_ListGroups(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	err = support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group", authService)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group")
 	require.NoError(t, err)
-	err = support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group", authService)
-	require.NoError(t, err)
-
-	err = models.UpsertGroupMetadata("test-group-1", "org", orgID, "Test Group 1", "A test group")
-	require.NoError(t, err)
-	err = models.UpsertGroupMetadata("test-group-2", "org", orgID, "Test Group 2", "Another test group")
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group")
 	require.NoError(t, err)
 
 	t.Run("successful list groups", func(t *testing.T) {
@@ -62,9 +56,9 @@ func Test_ListGroups(t *testing.T) {
 
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group-1", models.RoleCanvasAdmin, "Canvas Group 1", "A canvas group", authService)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group-1", models.RoleCanvasAdmin, "Canvas Group 1", "A canvas group")
 		require.NoError(t, err)
-		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group-2", models.RoleCanvasViewer, "Canvas Group 2", "Another canvas group", authService)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group-2", models.RoleCanvasViewer, "Canvas Group 2", "Another canvas group")
 		require.NoError(t, err)
 
 		resp, err := ListGroups(ctx, models.DomainTypeCanvas, canvasID, authService)

@@ -20,7 +20,7 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 
 	t.Run("successful group deletion", func(t *testing.T) {
 
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
 		require.NoError(t, err)
 
 		userID := uuid.New().String()
@@ -62,7 +62,7 @@ func Test_DeleteOrganizationGroup(t *testing.T) {
 	})
 
 	t.Run("invalid request - invalid organization ID for group", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test Group")
 		require.NoError(t, err)
 
 		_, err = DeleteGroup(ctx, models.DomainTypeOrg, "invalid-uuid", "test-group", authService)
@@ -81,7 +81,7 @@ func Test_DeleteCanvasGroup(t *testing.T) {
 
 	t.Run("successful canvas group deletion", func(t *testing.T) {
 
-		err := authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin)
+		err := authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas Group")
 		require.NoError(t, err)
 
 		userID := uuid.New().String()

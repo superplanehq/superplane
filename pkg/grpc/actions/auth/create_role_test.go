@@ -26,6 +26,8 @@ func Test_CreateRole(t *testing.T) {
 				Name: "custom-role",
 			},
 			Spec: &pb.Role_Spec{
+				DisplayName: "Custom Role",
+				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
 						Resource:   "canvas",
@@ -45,12 +47,14 @@ func Test_CreateRole(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// Check if role was created by verifying we can get its definition
-		roleDef, err := authService.GetRoleDefinition("custom-role", models.DomainTypeOrg, orgID)
+		response, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, "custom-role", authService)
 		require.NoError(t, err)
-		assert.Equal(t, "custom-role", roleDef.Name)
-		assert.Equal(t, models.DomainTypeOrg, roleDef.DomainType)
-		assert.Len(t, roleDef.Permissions, 2)
+		createdRole := response.GetRole()
+		assert.Equal(t, "custom-role", createdRole.GetMetadata().GetName())
+		assert.Equal(t, "Custom Role", createdRole.GetSpec().GetDisplayName())
+		assert.Equal(t, "Custom Role Description", createdRole.GetSpec().GetDescription())
+		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, createdRole.GetMetadata().GetDomainType())
+		assert.Len(t, createdRole.GetSpec().GetPermissions(), 2)
 	})
 
 	t.Run("successful custom role creation with inheritance", func(t *testing.T) {
@@ -59,6 +63,8 @@ func Test_CreateRole(t *testing.T) {
 				Name: "custom-role-with-inheritance",
 			},
 			Spec: &pb.Role_Spec{
+				DisplayName: "Custom Role With Inheritance",
+				Description: "Custom Role With Inheritance Description",
 				Permissions: []*pbAuth.Permission{
 					{
 						Resource:   "canvas",
@@ -79,11 +85,14 @@ func Test_CreateRole(t *testing.T) {
 		assert.NotNil(t, resp)
 
 		// Check if role was created with inheritance
-		roleDef, err := authService.GetRoleDefinition("custom-role-with-inheritance", models.DomainTypeOrg, orgID)
+		roleResponse, err := DescribeRole(ctx, models.DomainTypeOrg, orgID, "custom-role-with-inheritance", authService)
 		require.NoError(t, err)
-		assert.Equal(t, "custom-role-with-inheritance", roleDef.Name)
-		assert.NotNil(t, roleDef.InheritsFrom)
-		assert.Equal(t, models.RoleOrgViewer, roleDef.InheritsFrom.Name)
+		createdRole := roleResponse.GetRole()
+		assert.Equal(t, "custom-role-with-inheritance", createdRole.GetMetadata().GetName())
+		assert.Equal(t, "Custom Role With Inheritance", createdRole.GetSpec().GetDisplayName())
+		assert.Equal(t, "Custom Role With Inheritance Description", createdRole.GetSpec().GetDescription())
+		assert.NotNil(t, createdRole.GetSpec().GetInheritedRole())
+		assert.Equal(t, models.RoleOrgViewer, createdRole.GetSpec().GetInheritedRole().GetMetadata().GetName())
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {
@@ -92,6 +101,8 @@ func Test_CreateRole(t *testing.T) {
 				Name: "",
 			},
 			Spec: &pb.Role_Spec{
+				DisplayName: "Custom Role",
+				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
 						Resource:   "canvas",
@@ -113,6 +124,8 @@ func Test_CreateRole(t *testing.T) {
 				Name: models.RoleOrgAdmin,
 			},
 			Spec: &pb.Role_Spec{
+				DisplayName: "Custom Role",
+				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
 						Resource:   "canvas",
@@ -134,6 +147,8 @@ func Test_CreateRole(t *testing.T) {
 				Name: "test-role",
 			},
 			Spec: &pb.Role_Spec{
+				DisplayName: "Custom Role",
+				Description: "Custom Role Description",
 				Permissions: []*pbAuth.Permission{
 					{
 						Resource:   "canvas",

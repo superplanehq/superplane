@@ -21,7 +21,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	// Add user to group first
@@ -51,7 +51,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		err = accountProvider.Create()
 		require.NoError(t, err)
 
-		err = authService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin)
+		err = authService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin, "Test Group Email Remove", "Test group email remove description")
 		require.NoError(t, err)
 
 		err = authService.AddUserToGroup(orgID, "org", user.ID.String(), "test-group-email-remove")
@@ -90,7 +90,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description")
 		require.NoError(t, err)
 		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
 		require.NoError(t, err)

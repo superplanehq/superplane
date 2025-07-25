@@ -344,11 +344,9 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	t.Run("create and manage groups", func(t *testing.T) {
 		groupName := "engineering-team"
 
-		// Create group
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgAdmin, "Engineering Team", "Engineering Team")
 		require.NoError(t, err)
 
-		// Add users to group
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 
@@ -357,22 +355,18 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, user2, groupName)
 		require.NoError(t, err)
 
-		// Get group users
 		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrg, groupName)
 		require.NoError(t, err)
 		assert.Contains(t, users, user1)
 		assert.Contains(t, users, user2)
 
-		// Check permissions through group
 		allowed, err := authService.CheckOrganizationPermission(user1, orgID, "canvas", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		// Remove user from group
 		err = authService.RemoveUserFromGroup(orgID, models.DomainTypeOrg, user1, groupName)
 		require.NoError(t, err)
 
-		// Verify removal
 		users, err = authService.GetGroupUsers(orgID, models.DomainTypeOrg, groupName)
 		require.NoError(t, err)
 		assert.NotContains(t, users, user1)
@@ -380,7 +374,7 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	})
 
 	t.Run("create group with invalid role", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", "invalid_role")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", "invalid_role", "Test Group", "Test Group")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
@@ -393,13 +387,11 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	})
 
 	t.Run("get groups and roles", func(t *testing.T) {
-		// Create multiple groups
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "admins", models.RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "admins", models.RoleOrgAdmin, "Admins", "Admins")
 		require.NoError(t, err)
-		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "viewers", models.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "viewers", models.RoleOrgViewer, "Viewers", "Viewers")
 		require.NoError(t, err)
 
-		// Add users to make groups detectable
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, user1, "admins")
@@ -407,13 +399,11 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrg, user2, "viewers")
 		require.NoError(t, err)
 
-		// Get all groups
 		groups, err := authService.GetGroups(orgID, models.DomainTypeOrg)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "admins")
 		assert.Contains(t, groups, "viewers")
 
-		// Get group role
 		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrg, "admins")
 		require.NoError(t, err)
 		assert.Equal(t, role, models.RoleOrgAdmin)
@@ -621,12 +611,10 @@ func Test__AuthService_DuplicateAssignments(t *testing.T) {
 	t.Run("duplicate group creation fails", func(t *testing.T) {
 		groupName := "duplicate-test-group"
 
-		// First creation
-		err := authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgViewer)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgViewer, "Duplicate Test Group", "This is a duplicate test group")
 		require.NoError(t, err)
 
-		// Duplicate creation should fail
-		err = authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrg, groupName, models.RoleOrgViewer, "Duplicate Test Group", "This is a duplicate test group")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 	})

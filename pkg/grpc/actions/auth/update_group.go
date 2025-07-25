@@ -24,7 +24,7 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 	}
 
 	if groupSpec != nil && groupSpec.Role != "" && groupSpec.Role != currentRole {
-		err = authService.UpdateGroupRole(domainID, domainType, groupName, groupSpec.Role)
+		err = authService.UpdateGroup(domainID, domainType, groupName, groupSpec.Role, groupSpec.DisplayName, groupSpec.Description)
 		if err != nil {
 			log.Errorf("failed to update group %s role from %s to %s: %v", groupName, currentRole, groupSpec.Role, err)
 			return nil, status.Error(codes.Internal, "failed to update group role")
@@ -51,11 +51,6 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 			description = groupModelMetadata.Description
 		}
 
-		err = models.UpsertGroupMetadata(groupName, domainType, domainID, displayName, description)
-		if err != nil {
-			log.Errorf("failed to update group metadata for %s: %v", groupName, err)
-			return nil, status.Error(codes.Internal, "failed to update group metadata")
-		}
 	} else {
 		displayName = groupModelMetadata.DisplayName
 		description = groupModelMetadata.Description

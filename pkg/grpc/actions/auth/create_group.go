@@ -6,7 +6,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,12 +33,6 @@ func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Gro
 		return nil, status.Error(codes.InvalidArgument, "role must be specified")
 	}
 
-	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role)
-	if err != nil {
-		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
-		return nil, status.Error(codes.Internal, "failed to create group")
-	}
-
 	var displayName string
 	var description string
 	if group.Spec.DisplayName != "" || group.Spec.Description != "" {
@@ -48,12 +41,12 @@ func CreateGroup(ctx context.Context, domainType, domainID string, group *pb.Gro
 			displayName = group.Metadata.Name
 		}
 		description = group.Spec.Description
+	}
 
-		err = models.UpsertGroupMetadata(group.Metadata.Name, domainType, domainID, displayName, description)
-		if err != nil {
-			log.Errorf("failed to create group metadata for %s: %v", group.Metadata.Name, err)
-			return nil, status.Error(codes.Internal, "failed to create group metadata")
-		}
+	err := authService.CreateGroup(domainID, domainType, group.Metadata.Name, group.Spec.Role, displayName, description)
+	if err != nil {
+		log.Errorf("failed to create group %s with role %s in domain %s: %v", group.Metadata.Name, group.Spec.Role, domainID, err)
+		return nil, status.Error(codes.Internal, "failed to create group")
 	}
 
 	log.Infof("created group %s with role %s in domain %s (type: %s)", group.Metadata.Name, group.Spec.Role, domainID, domainType)

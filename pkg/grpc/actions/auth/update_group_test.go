@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestUpdateGroup(t *testing.T) {
@@ -21,7 +20,7 @@ func TestUpdateGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful role update", func(t *testing.T) {
-		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description", authService)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgViewer, "Test Group", "Test Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -39,7 +38,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("successful metadata update", func(t *testing.T) {
-		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description", authService)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "metadata-group", models.RoleOrgViewer, "Metadata Group", "Metadata Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -55,7 +54,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("successful role and metadata update", func(t *testing.T) {
-		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description", authService)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "full-update-group", models.RoleOrgViewer, "Full Update Group", "Full Update Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{
@@ -73,7 +72,7 @@ func TestUpdateGroup(t *testing.T) {
 	})
 
 	t.Run("update preserves group membership", func(t *testing.T) {
-		err := support.CreateGroupWithMetadata(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description", authService)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrg, "membership-group", models.RoleOrgViewer, "Membership Group", "Membership Description")
 		require.NoError(t, err)
 
 		userID1 := uuid.New().String()
@@ -103,7 +102,7 @@ func TestUpdateGroup(t *testing.T) {
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
 
-		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description", authService)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasViewer, "Canvas Group", "Canvas Description")
 		require.NoError(t, err)
 
 		groupSpec := &pb.Group_Spec{

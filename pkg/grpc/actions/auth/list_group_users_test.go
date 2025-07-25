@@ -22,7 +22,7 @@ func Test_ListGroupUsers(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	// Add user to group
@@ -58,7 +58,7 @@ func Test_ListGroupUsers(t *testing.T) {
 
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description")
 		require.NoError(t, err)
 		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
 		require.NoError(t, err)
@@ -76,7 +76,7 @@ func Test_ListGroupUsers(t *testing.T) {
 	})
 
 	t.Run("empty group - no users", func(t *testing.T) {
-		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "empty-group", models.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "empty-group", models.RoleOrgViewer, "Empty Group", "Empty group description")
 		require.NoError(t, err)
 
 		resp, err := ListGroupUsers(ctx, models.DomainTypeOrg, orgID, "empty-group", authService)

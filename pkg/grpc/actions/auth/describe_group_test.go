@@ -22,7 +22,7 @@ func Test_DescribeGroup(t *testing.T) {
 	err := authService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
-	err = support.CreateGroupWithMetadata(orgID, "org", "test-group", models.RoleOrgAdmin, "Test Group", "Test group description", authService)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	t.Run("successful get organization group", func(t *testing.T) {
@@ -44,7 +44,7 @@ func Test_DescribeGroup(t *testing.T) {
 		// Setup canvas roles and create canvas group with metadata
 		err := authService.SetupCanvasRoles(canvasID)
 		require.NoError(t, err)
-		err = support.CreateGroupWithMetadata(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description", authService)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description")
 		require.NoError(t, err)
 
 		resp, err := DescribeGroup(ctx, models.DomainTypeCanvas, canvasID, "canvas-group", authService)
@@ -83,7 +83,7 @@ func Test_DescribeGroup(t *testing.T) {
 
 	t.Run("get group with viewer role", func(t *testing.T) {
 		// Create a group with viewer role
-		err = authService.CreateGroup(orgID, "org", "viewer-group", models.RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrg, "viewer-group", models.RoleOrgViewer, "Viewer Group", "Viewer group description")
 		require.NoError(t, err)
 
 		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "viewer-group", authService)
@@ -98,7 +98,7 @@ func Test_DescribeGroup(t *testing.T) {
 
 	t.Run("get group with owner role", func(t *testing.T) {
 		// Create a group with owner role
-		err = authService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner)
+		err = authService.CreateGroup(orgID, "org", "owner-group", models.RoleOrgOwner, "Owner Group", "Owner group description")
 		require.NoError(t, err)
 
 		resp, err := DescribeGroup(ctx, models.DomainTypeOrg, orgID, "owner-group", authService)

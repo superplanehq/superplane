@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -32,7 +31,6 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 		return nil, status.Error(codes.InvalidArgument, "role permissions must be specified")
 	}
 
-	// Convert protobuf permissions to authorization permissions
 	permissions := make([]*authorization.Permission, len(role.Spec.Permissions))
 	for i, perm := range role.Spec.Permissions {
 		permissions[i] = &authorization.Permission{
@@ -42,13 +40,26 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 		}
 	}
 
+	var displayName, description string
+
+	if role.Spec.DisplayName != "" {
+		displayName = role.Spec.DisplayName
+	} else {
+		displayName = role.Metadata.Name
+	}
+
+	if role.Spec.Description != "" {
+		description = role.Spec.Description
+	}
+
 	roleDefinition := &authorization.RoleDefinition{
 		Name:        role.Metadata.Name,
 		DomainType:  domainType,
 		Permissions: permissions,
+		DisplayName: displayName,
+		Description: description,
 	}
 
-	// Handle inherited role if specified
 	if role.Spec.InheritedRole != nil && role.Spec.InheritedRole.Metadata != nil && role.Spec.InheritedRole.Metadata.Name != "" {
 		inheritedRoleDef, err := authService.GetRoleDefinition(role.Spec.InheritedRole.Metadata.Name, domainType, domainID)
 		if err != nil {
@@ -62,21 +73,6 @@ func CreateRole(ctx context.Context, domainType string, domainID string, role *p
 	if err != nil {
 		log.Errorf("failed to create role %s: %v", role.Metadata.Name, err)
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// Create or update role metadata if display name or description is provided
-	if role.Spec.DisplayName != "" || role.Spec.Description != "" {
-		displayName := role.Spec.DisplayName
-
-		if displayName == "" {
-			displayName = role.Metadata.Name // Fallback to role name
-		}
-
-		err = models.UpsertRoleMetadata(role.Metadata.Name, domainType, domainID, displayName, role.Spec.Description)
-		if err != nil {
-			log.Errorf("failed to create role metadata for %s: %v", role.Metadata.Name, err)
-			return nil, status.Error(codes.Internal, "failed to create role metadata")
-		}
 	}
 
 	log.Infof("created custom role %s in domain %s (%s)", role.Metadata.Name, domainID, domainType)

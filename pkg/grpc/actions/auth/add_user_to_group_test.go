@@ -21,7 +21,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin)
+	err = authService.CreateGroup(orgID, models.DomainTypeOrg, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
 	require.NoError(t, err)
 
 	t.Run("successful add user to group with user ID", func(t *testing.T) {
@@ -32,7 +32,7 @@ func Test_AddUserToGroup(t *testing.T) {
 	t.Run("successful add user to group with user email", func(t *testing.T) {
 		testEmail := "test-add-group@example.com"
 
-		err = authService.CreateGroup(orgID, "org", "test-group-email", models.RoleOrgAdmin)
+		err = authService.CreateGroup(orgID, "org", "test-group-email", models.RoleOrgAdmin, "Test Group Email", "Test group email description")
 		require.NoError(t, err)
 
 		_, err := AddUserToGroup(ctx, models.DomainTypeOrg, orgID, "", testEmail, "test-group-email", authService)
@@ -78,7 +78,7 @@ func Test_AddUserToGroup(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create a canvas group first
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-test-group", models.RoleCanvasAdmin)
+		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-test-group", models.RoleCanvasAdmin, "Canvas Test Group", "Canvas test group description")
 		require.NoError(t, err)
 
 		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, canvasID, r.User.String(), "", "canvas-test-group", authService)

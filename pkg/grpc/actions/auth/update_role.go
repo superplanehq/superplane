@@ -5,7 +5,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -33,10 +32,21 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 		}
 	}
 
+	var displayName, description string
+	if roleSpec != nil && (roleSpec.DisplayName != "" || roleSpec.Description != "") {
+		displayName = roleSpec.DisplayName
+		if displayName == "" {
+			displayName = roleName
+		}
+		description = roleSpec.Description
+	}
+
 	roleDefinition := &authorization.RoleDefinition{
 		Name:        roleName,
 		DomainType:  domainType,
 		Permissions: permissions,
+		DisplayName: displayName,
+		Description: description,
 	}
 
 	if roleSpec.InheritedRole != nil && roleSpec.InheritedRole.Metadata != nil && roleSpec.InheritedRole.Metadata.Name != "" {
@@ -52,19 +62,6 @@ func UpdateRole(ctx context.Context, domainType string, domainID string, roleNam
 	if err != nil {
 		log.Errorf("failed to update role %s: %v", roleName, err)
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if roleSpec != nil && (roleSpec.DisplayName != "" || roleSpec.Description != "") {
-		displayName := roleSpec.DisplayName
-		if displayName == "" {
-			displayName = roleName
-		}
-
-		err = models.UpsertRoleMetadata(roleName, domainType, domainID, displayName, roleSpec.Description)
-		if err != nil {
-			log.Errorf("failed to update role metadata for %s: %v", roleName, err)
-			return nil, status.Error(codes.Internal, "failed to update role metadata")
-		}
 	}
 
 	log.Infof("updated custom role %s in domain %s (%s)", roleName, domainID, domainType)
