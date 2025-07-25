@@ -81,7 +81,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
 
-	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")
+	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test", "Test Canvas")
 	require.NoError(t, err)
 
 	if options.Source {
