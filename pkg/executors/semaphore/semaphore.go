@@ -1,21 +1,19 @@
-package executors
+package semaphore
 
 import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"time"
 
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type SemaphoreExecutor struct {
-	integration integrations.Integration
-	execution   *models.StageExecution
-	jwtSigner   *jwt.Signer
+	Integration integrations.Integration
+	Resource    integrations.Resource
 }
 
 type SemaphoreResponse struct {
@@ -69,34 +67,33 @@ type SemaphoreHookPipeline struct {
 	Result string `json:"result"`
 }
 
-func NewSemaphoreExecutor(integration integrations.Integration, execution *models.StageExecution, jwtSigner *jwt.Signer) (*SemaphoreExecutor, error) {
+func init() {
+	executors.Register(models.ExecutorSpecTypeSemaphore, NewSemaphoreExecutor)
+}
+
+func NewSemaphoreExecutor(integration integrations.Integration, resource integrations.Resource) (executors.Executor, error) {
 	return &SemaphoreExecutor{
-		integration: integration,
-		execution:   execution,
-		jwtSigner:   jwtSigner,
+		Integration: integration,
+		Resource:    resource,
 	}, nil
 }
 
-func (e *SemaphoreExecutor) Name() string {
-	return models.ExecutorSpecTypeSemaphore
-}
-
-func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, resource integrations.Resource) (Response, error) {
+func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
 	if spec.Semaphore.TaskId != nil {
-		return e.runTask(spec)
+		return e.runTask(spec, parameters)
 	}
 
-	return e.runWorkflow(spec, resource)
+	return e.runWorkflow(spec, parameters)
 }
 
-func (e *SemaphoreExecutor) Check(id string) (Response, error) {
-	resource, err := e.integration.Get(semaphore.ResourceTypeWorkflow, id)
+func (e *SemaphoreExecutor) Check(id string) (executors.Response, error) {
+	resource, err := e.Integration.Get(semaphore.ResourceTypeWorkflow, id)
 	if err != nil {
 		return nil, fmt.Errorf("workflow %s not found", id)
 	}
 
 	workflow := resource.(*semaphore.SemaphoreWorkflow)
-	resource, err = e.integration.Get(semaphore.ResourceTypePipeline, workflow.InitialPplID)
+	resource, err = e.Integration.Get(semaphore.ResourceTypePipeline, workflow.InitialPplID)
 	if err != nil {
 		return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 	}
@@ -105,7 +102,7 @@ func (e *SemaphoreExecutor) Check(id string) (Response, error) {
 	return &SemaphoreResponse{wfID: id, pipeline: pipeline}, nil
 }
 
-func (e *SemaphoreExecutor) HandleWebhook(data []byte) (Response, error) {
+func (e *SemaphoreExecutor) HandleWebhook(data []byte) (executors.Response, error) {
 	var hook SemaphoreHook
 	err := json.Unmarshal(data, &hook)
 	if err != nil {
@@ -122,17 +119,12 @@ func (e *SemaphoreExecutor) HandleWebhook(data []byte) (Response, error) {
 	}, nil
 }
 
-func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, resource integrations.Resource) (Response, error) {
-	parameters, err := e.workflowParameters(spec.Semaphore.Parameters)
-	if err != nil {
-		return nil, fmt.Errorf("error building parameters: %v", err)
-	}
-
-	workflow, err := e.integration.Create(semaphore.ResourceTypeWorkflow, &semaphore.CreateWorkflowRequest{
-		ProjectID:    resource.Id(),
+func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
+	workflow, err := e.Integration.Create(semaphore.ResourceTypeWorkflow, &semaphore.CreateWorkflowRequest{
+		ProjectID:    e.Resource.Id(),
 		Reference:    "refs/heads/" + spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   parameters,
+		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
 	})
 
 	if err != nil {
@@ -142,17 +134,12 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, resource integ
 	return &SemaphoreResponse{wfID: workflow.Id(), pipeline: nil}, nil
 }
 
-func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec) (Response, error) {
-	parameters, err := e.workflowParameters(spec.Semaphore.Parameters)
-	if err != nil {
-		return nil, fmt.Errorf("error building parameters: %v", err)
-	}
-
-	workflow, err := e.integration.Create(semaphore.ResourceTypeTaskTrigger, &semaphore.RunTaskRequest{
+func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
+	workflow, err := e.Integration.Create(semaphore.ResourceTypeTaskTrigger, &semaphore.RunTaskRequest{
 		TaskID:       *spec.Semaphore.TaskId,
 		Branch:       spec.Semaphore.Branch,
 		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   parameters,
+		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
 	})
 
 	if err != nil {
@@ -162,16 +149,14 @@ func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec) (Response, error) 
 	return &SemaphoreResponse{wfID: workflow.Id(), pipeline: nil}, nil
 }
 
-func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string) (map[string]string, error) {
+func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string, fromExecution executors.ExecutionParameters) map[string]string {
 	parameters := maps.Clone(fromSpec)
-	parameters["SEMAPHORE_STAGE_ID"] = e.execution.StageID.String()
-	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = e.execution.ID.String()
+	parameters["SEMAPHORE_STAGE_ID"] = fromExecution.StageID
+	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = fromExecution.ExecutionID
 
-	token, err := e.jwtSigner.Generate(e.execution.ID.String(), 24*time.Hour)
-	if err != nil {
-		return nil, fmt.Errorf("error generating tags token: %v", err)
+	if fromExecution.Token != "" {
+		parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = fromExecution.Token
 	}
 
-	parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = token
-	return parameters, nil
+	return parameters
 }

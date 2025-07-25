@@ -9,7 +9,7 @@ import (
 type StageExecutor struct {
 	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	StageID    uuid.UUID
-	ResourceID uuid.UUID
+	ResourceID *uuid.UUID
 	Type       string
 	Spec       datatypes.JSONType[ExecutorSpec]
 }

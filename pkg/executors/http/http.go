@@ -1,4 +1,4 @@
-package executors
+package http
 
 import (
 	"bytes"
@@ -8,17 +8,14 @@ import (
 	"net/http"
 	"slices"
 
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const MaxHTTPResponseSize = 8 * 1024
 
-type HTTPExecutor struct {
-	execution *models.StageExecution
-	jwtSigner *jwt.Signer
-}
+type HTTPExecutor struct{}
 
 type HTTPResponse struct {
 	statusCode   int
@@ -54,23 +51,24 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	return nil
 }
 
-func NewHTTPExecutor(execution *models.StageExecution, jwtSigner *jwt.Signer) (*HTTPExecutor, error) {
-	return &HTTPExecutor{
-		execution: execution,
-		jwtSigner: jwtSigner,
-	}, nil
+func init() {
+	executors.Register(models.ExecutorSpecTypeHTTP, NewHTTPExecutor)
+}
+
+func NewHTTPExecutor(_ integrations.Integration, _ integrations.Resource) (executors.Executor, error) {
+	return &HTTPExecutor{}, nil
 }
 
 func (e *HTTPExecutor) Name() string {
 	return models.ExecutorSpecTypeHTTP
 }
 
-func (e *HTTPExecutor) HandleWebhook(data []byte) (Response, error) {
+func (e *HTTPExecutor) HandleWebhook(data []byte) (executors.Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, _ integrations.Resource) (Response, error) {
-	payload, err := e.buildPayload(spec.HTTP)
+func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
+	payload, err := e.buildPayload(spec.HTTP, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
@@ -110,14 +108,14 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, _ integrations.Resource
 	}, nil
 }
 
-func (e *HTTPExecutor) Check(id string) (Response, error) {
+func (e *HTTPExecutor) Check(id string) (executors.Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec) (map[string]string, error) {
+func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec, parameters executors.ExecutionParameters) (map[string]string, error) {
 	payload := map[string]string{
-		"stageId":     e.execution.StageID.String(),
-		"executionId": e.execution.ID.String(),
+		"stageId":     parameters.StageID,
+		"executionId": parameters.ExecutionID,
 	}
 
 	for key, value := range spec.Payload {

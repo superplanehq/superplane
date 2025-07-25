@@ -172,7 +172,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		executor := models.StageExecutor{
 			Type:       b.executorType,
 			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: *eventSource.ResourceID,
+			ResourceID: eventSource.ResourceID,
 			StageID:    stage.ID,
 		}
 
@@ -272,7 +272,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		executor := models.StageExecutor{
 			Type:       b.executorType,
 			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: *eventSource.ResourceID,
+			ResourceID: eventSource.ResourceID,
 			StageID:    b.existingStage.ID,
 		}
 

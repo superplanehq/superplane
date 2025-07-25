@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/executors/semaphore"
+	semaphoreintegration "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -442,14 +442,14 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// Create a Semaphore hook event for the source created for the execution,
 		// and trigger the worker.
 		//
-		hook := executors.SemaphoreHook{
-			Workflow: executors.SemaphoreHookWorkflow{
+		hook := semaphore.SemaphoreHook{
+			Workflow: semaphore.SemaphoreHookWorkflow{
 				ID: workflowID,
 			},
-			Pipeline: executors.SemaphoreHookPipeline{
+			Pipeline: semaphore.SemaphoreHookPipeline{
 				ID:     uuid.New().String(),
-				State:  semaphore.SemaphorePipelineStateDone,
-				Result: semaphore.SemaphorePipelineResultPassed,
+				State:  semaphoreintegration.SemaphorePipelineStateDone,
+				Result: semaphoreintegration.SemaphorePipelineResultPassed,
 			},
 		}
 

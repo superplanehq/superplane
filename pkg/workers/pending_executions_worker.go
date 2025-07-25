@@ -72,26 +72,34 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error getting executor for stage: %v", err)
 	}
 
-	resource, err := stageExecutor.GetResource()
-	if err != nil {
-		return fmt.Errorf("error getting resource for stage executor: %v", err)
-	}
-
 	executorSpec := stageExecutor.Spec.Data()
 	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, &execution, w.JwtSigner, w.Encryptor)
+	executor, err := executors.NewExecutor(stageExecutor, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error creating executor: %v", err)
 	}
 
 	//
+	// TODO: we don't need to generate this if the executor is sync.
+	//
+	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
+	if err != nil {
+		return fmt.Errorf("error generating token: %v", err)
+	}
+
+	//
 	// If we get an error calling the executor, we fail the execution.
 	//
-	response, err := executor.Execute(*spec, resource)
+	response, err := executor.Execute(*spec, executors.ExecutionParameters{
+		ExecutionID: execution.ID.String(),
+		StageID:     stage.ID.String(),
+		Token:       token,
+	})
+
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
 		err := execution.Finish(stage, models.ResultFailed)
@@ -168,7 +176,7 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 }
 
 func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, executor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
-	_, err := execution.AddResource(response.Id(), executor.ResourceID)
+	_, err := execution.AddResource(response.Id(), *executor.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
 	}

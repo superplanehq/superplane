@@ -1,4 +1,4 @@
-package executors
+package semaphore
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -17,20 +17,19 @@ func Test_Semaphore(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	signer := jwt.NewSigner("test")
 	executionID := uuid.New()
 	stageID := uuid.New()
 	projectID := uuid.NewString()
-	execution := models.StageExecution{
-		ID:      executionID,
-		StageID: stageID,
-	}
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
+		executor, err := NewSemaphoreExecutor(integration, &models.Resource{
+			ResourceType: semaphore.ResourceTypeProject,
+			ExternalID:   projectID,
+		})
+
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -40,9 +39,10 @@ func Test_Semaphore(t *testing.T) {
 				Branch:       "main",
 				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
-		}, &models.Resource{
-			ResourceType: semaphore.ResourceTypeProject,
-			ExternalID:   projectID,
+		}, executors.ExecutionParameters{
+			StageID:     stageID.String(),
+			ExecutionID: executionID.String(),
+			Token:       "token",
 		})
 
 		require.NoError(t, err)
@@ -64,7 +64,11 @@ func Test_Semaphore(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, &execution, signer)
+		executor, err := NewSemaphoreExecutor(integration, &models.Resource{
+			ResourceType: semaphore.ResourceTypeTask,
+			ExternalID:   projectID,
+		})
+
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
@@ -76,9 +80,10 @@ func Test_Semaphore(t *testing.T) {
 				Branch:       "main",
 				Parameters:   map[string]string{"a": "b", "c": "d"},
 			},
-		}, &models.Resource{
-			ResourceType: semaphore.ResourceTypeTask,
-			ExternalID:   projectID,
+		}, executors.ExecutionParameters{
+			StageID:     stageID.String(),
+			ExecutionID: executionID.String(),
+			Token:       "token",
 		})
 
 		require.NoError(t, err)

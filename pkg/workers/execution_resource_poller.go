@@ -57,7 +57,7 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, nil, nil, w.Encryptor)
+	executor, err := executors.NewExecutor(stageExecutor, w.Encryptor)
 	if err != nil {
 		return err
 	}

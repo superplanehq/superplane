@@ -105,7 +105,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	executor, err := executors.NewExecutor(e, nil, nil, w.Encryptor)
+	executor, err := executors.NewExecutor(e, w.Encryptor)
 	if err != nil {
 		return err
 	}
