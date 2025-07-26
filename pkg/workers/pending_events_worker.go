@@ -105,7 +105,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	executor, err := executors.NewExecutor(e, w.Encryptor)
+	executor, err := w.initExecutor(e)
 	if err != nil {
 		return err
 	}
@@ -142,6 +142,24 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 	logger.Infof("Execution resource %s finished with result %s", executionResource.ExternalID, executionResource.Result)
 
 	return nil
+}
+
+func (w *PendingEventsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
+	if stageExecutor.ResourceID == nil {
+		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+	}
+
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
+	}
+
+	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
 }
 
 func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *models.Event) error {

@@ -30,7 +30,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
 
-	executorType, executorSpec, integrationResource := support.Executor(r)
+	executorType, executorSpec, integrationResource := support.Executor(t, r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
 		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)

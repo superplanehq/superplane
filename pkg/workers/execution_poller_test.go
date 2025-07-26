@@ -30,7 +30,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, integrationResource := support.Executor(r)
+	executorType, executorSpec, integrationResource := support.Executor(t, r)
 	stage, err := builders.NewStageBuilder().
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
@@ -110,7 +110,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		executorType, executorSpec, integrationResource := support.Executor(r)
+		executorType, executorSpec, integrationResource := support.Executor(t, r)
 		stageWithOutput, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).

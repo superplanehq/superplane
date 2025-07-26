@@ -72,20 +72,16 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error getting executor for stage: %v", err)
 	}
 
-	executorSpec := stageExecutor.Spec.Data()
-	spec, err := w.SpecBuilder.Build(executorSpec, inputMap, secrets)
+	spec, err := w.SpecBuilder.Build(stageExecutor.Spec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, w.Encryptor)
+	executor, err := w.initExecutor(stageExecutor)
 	if err != nil {
-		return fmt.Errorf("error creating executor: %v", err)
+		return fmt.Errorf("error initializing executor: %v", err)
 	}
 
-	//
-	// TODO: we don't need to generate this if the executor is sync.
-	//
 	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
 	if err != nil {
 		return fmt.Errorf("error generating token: %v", err)
@@ -94,7 +90,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	//
 	// If we get an error calling the executor, we fail the execution.
 	//
-	response, err := executor.Execute(*spec, executors.ExecutionParameters{
+	response, err := executor.Execute(spec, executors.ExecutionParameters{
 		ExecutionID: execution.ID.String(),
 		StageID:     stage.ID.String(),
 		Token:       token,
@@ -116,6 +112,24 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 	}
 
 	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
+}
+
+func (w *PendingExecutionsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
+	if stageExecutor.ResourceID == nil {
+		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+	}
+
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
+	}
+
+	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
 }
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {

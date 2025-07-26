@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -55,20 +56,55 @@ func init() {
 	executors.Register(models.ExecutorSpecTypeHTTP, NewHTTPExecutor)
 }
 
+type HTTPSpec struct {
+	URL            string              `json:"url"`
+	Payload        map[string]string   `json:"payload"`
+	Headers        map[string]string   `json:"headers"`
+	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
+}
+
+type HTTPResponsePolicy struct {
+	StatusCodes []uint32 `json:"status_codes"`
+}
+
 func NewHTTPExecutor(_ integrations.Integration, _ integrations.Resource) (executors.Executor, error) {
 	return &HTTPExecutor{}, nil
 }
 
-func (e *HTTPExecutor) Name() string {
-	return models.ExecutorSpecTypeHTTP
+func (e *HTTPExecutor) Validate(ctx context.Context, specData []byte) error {
+	var spec HTTPSpec
+	err := json.Unmarshal(specData, &spec)
+	if err != nil {
+		return fmt.Errorf("error unmarshaling spec data: %v", err)
+	}
+
+	if spec.URL == "" {
+		return fmt.Errorf("invalid HTTP spec: missing URL")
+	}
+
+	if spec.ResponsePolicy != nil && len(spec.ResponsePolicy.StatusCodes) > 0 {
+		for _, code := range spec.ResponsePolicy.StatusCodes {
+			if code < http.StatusOK || code > http.StatusNetworkAuthenticationRequired {
+				return fmt.Errorf("invalid HTTP spec: invalid status code: %d", code)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (e *HTTPExecutor) HandleWebhook(data []byte) (executors.Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
-	payload, err := e.buildPayload(spec.HTTP, parameters)
+func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (executors.Response, error) {
+	var spec HTTPSpec
+	err := json.Unmarshal(specData, &spec)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling spec data: %v", err)
+	}
+
+	payload, err := e.buildPayload(spec, parameters)
 	if err != nil {
 		return nil, fmt.Errorf("error building parameters: %v", err)
 	}
@@ -78,12 +114,12 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, parameters executors.Ex
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, spec.HTTP.URL, bytes.NewReader(data))
+	req, err := http.NewRequest(http.MethodPost, spec.URL, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
 
-	for k, v := range spec.HTTP.Headers {
+	for k, v := range spec.Headers {
 		req.Header.Set(k, v)
 	}
 
@@ -103,7 +139,7 @@ func (e *HTTPExecutor) Execute(spec models.ExecutorSpec, parameters executors.Ex
 
 	return &HTTPResponse{
 		statusCode:   res.StatusCode,
-		allowedCodes: spec.HTTP.ResponsePolicy.StatusCodes,
+		allowedCodes: spec.ResponsePolicy.StatusCodes,
 		body:         body,
 	}, nil
 }
@@ -112,7 +148,7 @@ func (e *HTTPExecutor) Check(id string) (executors.Response, error) {
 	return nil, nil
 }
 
-func (e *HTTPExecutor) buildPayload(spec *models.HTTPExecutorSpec, parameters executors.ExecutionParameters) (map[string]string, error) {
+func (e *HTTPExecutor) buildPayload(spec HTTPSpec, parameters executors.ExecutionParameters) (map[string]string, error) {
 	payload := map[string]string{
 		"stageId":     parameters.StageID,
 		"executionId": parameters.ExecutionID,

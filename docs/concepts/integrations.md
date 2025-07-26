@@ -81,8 +81,10 @@ executor:
   type: TYPE_SEMAPHORE
   integration:
     name: semaphore-integration
+  resource:
+    type: project
+    name: semaphore-demo-go
   semaphore:
-    project: semaphore-demo-go
     branch: main
     pipelineFile: .semaphore/semaphore.yml
     parameters: {}
@@ -103,6 +105,7 @@ metadata:
 spec:
   integration:
     name: semaphore-integration
-  semaphore:
-    project: semaphore-demo-go
+  resource:
+    type: project
+    name: semaphore-demo-go
 ```

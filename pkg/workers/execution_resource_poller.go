@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -57,7 +58,7 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, w.Encryptor)
+	executor, err := w.initExecutor(stageExecutor)
 	if err != nil {
 		return err
 	}
@@ -78,4 +79,22 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 	}
 
 	return resource.Finish(result)
+}
+
+func (w *ExecutionResourcePoller) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
+	if stageExecutor.ResourceID == nil {
+		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+	}
+
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
+	}
+
+	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
 }

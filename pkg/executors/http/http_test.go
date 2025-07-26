@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
-func Test_HTTP(t *testing.T) {
+func Test_HTTP__Execute(t *testing.T) {
 	executionID := uuid.New()
 	stageID := uuid.New()
 	execution := models.StageExecution{
@@ -34,14 +35,14 @@ func Test_HTTP(t *testing.T) {
 
 		defer server.Close()
 
-		response, err := executor.Execute(models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL: server.URL,
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200},
-				},
+		spec, err := json.Marshal(HTTPSpec{URL: server.URL,
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200},
 			},
-		}, executors.ExecutionParameters{
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
@@ -62,14 +63,15 @@ func Test_HTTP(t *testing.T) {
 
 		defer server.Close()
 
-		response, err := executor.Execute(models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL: server.URL,
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200},
-				},
+		spec, err := json.Marshal(&HTTPSpec{
+			URL: server.URL,
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200},
 			},
-		}, executors.ExecutionParameters{
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
@@ -93,15 +95,16 @@ func Test_HTTP(t *testing.T) {
 
 		defer server.Close()
 
-		response, err := executor.Execute(models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL:     server.URL,
-				Payload: map[string]string{"foo": "bar"},
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200},
-				},
+		spec, err := json.Marshal(&HTTPSpec{
+			URL:     server.URL,
+			Payload: map[string]string{"foo": "bar"},
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200},
 			},
-		}, executors.ExecutionParameters{
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
@@ -129,15 +132,16 @@ func Test_HTTP(t *testing.T) {
 
 		defer server.Close()
 
-		response, err := executor.Execute(models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL:     server.URL,
-				Headers: map[string]string{"x-foo": "bar"},
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200},
-				},
+		spec, err := json.Marshal(&HTTPSpec{
+			URL:     server.URL,
+			Headers: map[string]string{"x-foo": "bar"},
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200},
 			},
-		}, executors.ExecutionParameters{
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
@@ -159,14 +163,15 @@ func Test_HTTP(t *testing.T) {
 
 		defer server.Close()
 
-		response, err := executor.Execute(models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL: server.URL,
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200},
-				},
+		spec, err := json.Marshal(&HTTPSpec{
+			URL: server.URL,
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200},
 			},
-		}, executors.ExecutionParameters{
+		})
+
+		require.NoError(t, err)
+		response, err := executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 		})
@@ -175,5 +180,53 @@ func Test_HTTP(t *testing.T) {
 		require.NotNil(t, response)
 		assert.True(t, response.Successful())
 		assert.Equal(t, map[string]any{"foo": "bar"}, response.Outputs())
+	})
+}
+
+func Test_HTTP__Validate(t *testing.T) {
+	executor, err := NewHTTPExecutor(nil, nil)
+	require.NoError(t, err)
+
+	t.Run("HTTP spec with empty URL -> error", func(t *testing.T) {
+		spec := HTTPSpec{URL: ""}
+		data, err := json.Marshal(&spec)
+		require.NoError(t, err)
+
+		err = executor.Validate(context.Background(), data)
+		require.ErrorContains(t, err, "missing URL")
+	})
+
+	t.Run("HTTP spec with invalid status code -> error", func(t *testing.T) {
+		spec := HTTPSpec{
+			URL: "https://httpbin.org/get",
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{1000},
+			},
+		}
+
+		data, err := json.Marshal(&spec)
+		require.NoError(t, err)
+
+		err = executor.Validate(context.Background(), data)
+		require.ErrorContains(t, err, "invalid status code: 1000")
+	})
+
+	t.Run("valid HTTP spec -> no error", func(t *testing.T) {
+		spec := HTTPSpec{
+			URL: "https://httpbin.org/get",
+			Payload: map[string]string{
+				"key": "value",
+			},
+			Headers: map[string]string{
+				"x-key": "x-value",
+			},
+			ResponsePolicy: &HTTPResponsePolicy{
+				StatusCodes: []uint32{200, 201},
+			},
+		}
+
+		data, err := json.Marshal(&spec)
+		require.NoError(t, err)
+		require.NoError(t, executor.Validate(context.Background(), data))
 	})
 }

@@ -18,6 +18,7 @@ import (
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
 
@@ -114,7 +115,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		executorType, executorSpec, resource := Executor(&r)
+		executorType, executorSpec, resource := Executor(t, &r)
 		stage, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
@@ -226,36 +227,45 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.Resource) {
-	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				Branch:       "main",
-				PipelineFile: ".semaphore/run.yml",
-				Parameters: map[string]string{
-					"PARAM_1": "VALUE_1",
-					"PARAM_2": "VALUE_2",
-				},
-			},
-		}, &models.Resource{
-			ResourceType:  semaphoreIntegration.ResourceTypeProject,
-			ExternalID:    uuid.NewString(),
-			IntegrationID: r.Integration.ID,
-			ResourceName:  "demo-project",
-		}
+func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.Resource) {
+	spec, err := json.Marshal(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters": map[string]string{
+			"PARAM_1": "VALUE_1",
+			"PARAM_2": "VALUE_2",
+		},
+	})
+
+	require.NoError(t, err)
+
+	return models.ExecutorSpecTypeSemaphore, spec, &models.Resource{
+		ResourceType:  semaphoreIntegration.ResourceTypeProject,
+		ExternalID:    uuid.NewString(),
+		IntegrationID: r.Integration.ID,
+		ResourceName:  "demo-project",
+	}
 }
 
-func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
-	return &pb.ExecutorSpec{
-		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+func ProtoExecutor(t *testing.T, r *ResourceRegistry) *pb.Executor {
+	spec, err := structpb.NewStruct(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters":   map[string]any{},
+	})
+
+	require.NoError(t, err)
+
+	return &pb.Executor{
+		Type: models.ExecutorSpecTypeSemaphore,
+		Spec: spec,
 		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},
-		Semaphore: &pb.ExecutorSpec_Semaphore{
-			Project:      "demo-project",
-			Branch:       "main",
-			PipelineFile: ".semaphore/semaphore.yml",
-			Parameters:   map[string]string{},
+		Resource: &integrationPb.ResourceRef{
+			Type: semaphoreIntegration.ResourceTypeProject,
+			Name: "demo-project",
 		},
 	}
 }

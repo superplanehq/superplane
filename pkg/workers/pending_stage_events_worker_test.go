@@ -27,7 +27,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 	})
 
 	amqpURL, _ := config.RabbitMQURL()
-	executorType, executorSpec, resource := support.Executor(r)
+	executorType, executorSpec, resource := support.Executor(t, r)
 
 	t.Run("stage does not require approval -> creates execution", func(t *testing.T) {
 		//

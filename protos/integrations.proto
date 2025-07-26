@@ -142,6 +142,11 @@ message IntegrationRef {
   string name = 2;
 }
 
+message ResourceRef {
+  string type = 1;
+  string name = 2;
+}
+
 message ValueFrom {
   ValueFromSecret secret = 3;
 }

@@ -1,67 +1,37 @@
 package executors
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 func Test__SpecBuilder_Build(t *testing.T) {
+	builder := SpecBuilder{}
 
-	t.Run("semaphore spec", func(t *testing.T) {
-		builder := SpecBuilder{}
-		spec := models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				Branch:       "main",
-				PipelineFile: ".semaphore/run.yml",
-				Parameters: map[string]string{
-					"PARAM_1": "${{ inputs.VAR_1 }}",
-				},
+	t.Run("fields in spec are resolved", func(t *testing.T) {
+		specData, err := json.Marshal(map[string]any{
+			"branch":       "main",
+			"pipelineFile": ".semaphore/run.yml",
+			"parameters": map[string]any{
+				"PARAM_1": "${{ inputs.VAR_1 }}",
+				"PARAM_2": "${{ secrets.TOKEN }}",
 			},
-		}
-
-		v, err := builder.Build(spec, map[string]any{"VAR_1": "hello"}, map[string]string{"TOKEN": "token"})
-		require.NoError(t, err)
-		assert.Equal(t, v.Semaphore.Branch, "main")
-		assert.Equal(t, v.Semaphore.PipelineFile, ".semaphore/run.yml")
-		assert.Equal(t, map[string]string{"PARAM_1": "hello"}, v.Semaphore.Parameters)
-	})
-
-	t.Run("http spec", func(t *testing.T) {
-		builder := SpecBuilder{}
-		spec := models.ExecutorSpec{
-			HTTP: &models.HTTPExecutorSpec{
-				URL: "http://localhost:8000",
-				Headers: map[string]string{
-					"Content-Type":  "application/json",
-					"X-Param-A":     "${{ inputs.VAR_A }}",
-					"Authorization": "Bearer ${{ secrets.TOKEN }}",
-				},
-				Payload: map[string]string{
-					"b": "${{ inputs.VAR_B }}",
-					"c": "static",
-				},
-				ResponsePolicy: &models.HTTPResponsePolicy{
-					StatusCodes: []uint32{200, 201},
-				},
-			},
-		}
-
-		v, err := builder.Build(spec, map[string]any{"VAR_A": "hello", "VAR_B": "hi"}, map[string]string{"TOKEN": "mytoken"})
-		require.NoError(t, err)
-		assert.Equal(t, v.HTTP.URL, "http://localhost:8000")
-		assert.Equal(t, v.HTTP.Headers, map[string]string{
-			"Content-Type":  "application/json",
-			"X-Param-A":     "hello",
-			"Authorization": "Bearer mytoken",
 		})
-		assert.Equal(t, v.HTTP.Payload, map[string]string{
-			"b": "hi",
-			"c": "static",
-		})
-		assert.Equal(t, v.HTTP.ResponsePolicy.StatusCodes, []uint32{200, 201})
+
+		require.NoError(t, err)
+
+		d, err := builder.Build(specData, map[string]any{"VAR_1": "hello"}, map[string]string{"TOKEN": "token"})
+		require.NoError(t, err)
+
+		var resolvedSpec map[string]any
+		err = json.Unmarshal(d, &resolvedSpec)
+		require.NoError(t, err)
+		assert.Equal(t, resolvedSpec["branch"], "main")
+		assert.Equal(t, resolvedSpec["pipelineFile"], ".semaphore/run.yml")
+		assert.Equal(t, map[string]any{"PARAM_1": "hello", "PARAM_2": "token"}, resolvedSpec["parameters"])
 	})
 }
 

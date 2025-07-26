@@ -1,15 +1,15 @@
 package executors
 
 import (
+	"context"
 	"regexp"
-
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 var expressionRegex = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
 
 type Executor interface {
-	Execute(models.ExecutorSpec, ExecutionParameters) (Response, error)
+	Validate(context.Context, []byte) error
+	Execute([]byte, ExecutionParameters) (Response, error)
 	Check(string) (Response, error)
 	HandleWebhook([]byte) (Response, error)
 }

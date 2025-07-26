@@ -75,7 +75,7 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Nil(t, response.EventSource.Spec.Integration)
-		assert.Nil(t, response.EventSource.Spec.Semaphore)
+		assert.Nil(t, response.EventSource.Spec.Resource)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -126,8 +126,9 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
@@ -146,7 +147,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
-		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -160,8 +162,9 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: "does-not-exist",
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
@@ -216,8 +219,9 @@ func Test__CreateEventSource(t *testing.T) {
 					DomainType: authorization.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					Name:       integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
@@ -237,7 +241,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, integration.Name, response.EventSource.Spec.Integration.Name)
 		assert.Equal(t, authorization.DomainType_DOMAIN_TYPE_ORGANIZATION, response.EventSource.Spec.Integration.DomainType)
-		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -251,8 +256,9 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
@@ -298,8 +304,9 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project-2",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project-2",
 				},
 			},
 		}
@@ -318,7 +325,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, externalName, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
-		assert.Equal(t, "demo-project-2", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project-2", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 
 		//
 		// Verify that internal source was updated to be external

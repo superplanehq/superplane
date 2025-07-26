@@ -12,6 +12,8 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test__ListConnectionGroups(t *testing.T) {

@@ -1,10 +1,12 @@
 package semaphore
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"maps"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -78,8 +80,70 @@ func NewSemaphoreExecutor(integration integrations.Integration, resource integra
 	}, nil
 }
 
-func (e *SemaphoreExecutor) Execute(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
-	if spec.Semaphore.TaskId != nil {
+func (e *SemaphoreExecutor) Validate(ctx context.Context, specData []byte) error {
+	var spec SemaphoreSpec
+	err := json.Unmarshal(specData, &spec)
+	if err != nil {
+		return fmt.Errorf("error unmarshaling spec data: %v", err)
+	}
+
+	if e.Integration == nil {
+		return fmt.Errorf("invalid semaphore spec: missing integration")
+	}
+
+	return e.validateSemaphoreTask(spec)
+}
+
+func (e *SemaphoreExecutor) validateSemaphoreTask(spec SemaphoreSpec) error {
+	if spec.Task == "" {
+		return nil
+	}
+
+	//
+	// If task is a UUID, we describe to validate that it exists.
+	//
+	_, err := uuid.Parse(spec.Task)
+	if err == nil {
+		_, err := e.Integration.Get(semaphore.ResourceTypeTask, spec.Task, e.Resource.Id())
+		if err != nil {
+			return fmt.Errorf("task %s not found: %v", spec.Task, err)
+		}
+
+		return nil
+	}
+
+	//
+	// If task is a string, we have to list tasks and find the one that matches.
+	//
+	tasks, err := e.Integration.List(semaphore.ResourceTypeTask, e.Resource.Id())
+	if err != nil {
+		return fmt.Errorf("error listing tasks: %v", err)
+	}
+
+	for _, task := range tasks {
+		if task.Name() == spec.Task {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("task %s not found", spec.Task)
+}
+
+type SemaphoreSpec struct {
+	Task         string            `json:"task"`
+	Branch       string            `json:"branch"`
+	PipelineFile string            `json:"pipelineFile"`
+	Parameters   map[string]string `json:"parameters"`
+}
+
+func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (executors.Response, error) {
+	var spec SemaphoreSpec
+	err := json.Unmarshal(specData, &spec)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling spec data: %v", err)
+	}
+
+	if spec.Task != "" {
 		return e.runTask(spec, parameters)
 	}
 
@@ -119,12 +183,12 @@ func (e *SemaphoreExecutor) HandleWebhook(data []byte) (executors.Response, erro
 	}, nil
 }
 
-func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
+func (e *SemaphoreExecutor) runWorkflow(spec SemaphoreSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
 	workflow, err := e.Integration.Create(semaphore.ResourceTypeWorkflow, &semaphore.CreateWorkflowRequest{
 		ProjectID:    e.Resource.Id(),
-		Reference:    "refs/heads/" + spec.Semaphore.Branch,
-		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
+		Reference:    "refs/heads/" + spec.Branch,
+		PipelineFile: spec.PipelineFile,
+		Parameters:   e.workflowParameters(spec.Parameters, parameters),
 	})
 
 	if err != nil {
@@ -134,12 +198,12 @@ func (e *SemaphoreExecutor) runWorkflow(spec models.ExecutorSpec, parameters exe
 	return &SemaphoreResponse{wfID: workflow.Id(), pipeline: nil}, nil
 }
 
-func (e *SemaphoreExecutor) runTask(spec models.ExecutorSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
+func (e *SemaphoreExecutor) runTask(spec SemaphoreSpec, parameters executors.ExecutionParameters) (executors.Response, error) {
 	workflow, err := e.Integration.Create(semaphore.ResourceTypeTaskTrigger, &semaphore.RunTaskRequest{
-		TaskID:       *spec.Semaphore.TaskId,
-		Branch:       spec.Semaphore.Branch,
-		PipelineFile: spec.Semaphore.PipelineFile,
-		Parameters:   e.workflowParameters(spec.Semaphore.Parameters, parameters),
+		TaskID:       spec.Task,
+		Branch:       spec.Branch,
+		PipelineFile: spec.PipelineFile,
+		Parameters:   e.workflowParameters(spec.Parameters, parameters),
 	})
 
 	if err != nil {

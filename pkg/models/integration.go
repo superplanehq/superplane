@@ -173,6 +173,7 @@ func ListIntegrations(domainType string, domainID uuid.UUID) ([]*Integration, er
 
 type IntegrationResource struct {
 	Name            string
+	Type            string
 	IntegrationName string
 	DomainType      string
 }

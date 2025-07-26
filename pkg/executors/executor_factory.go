@@ -17,16 +17,16 @@ func Register(name string, builder BuildFn) {
 	executorTypes[name] = builder
 }
 
-func NewExecutor(executor *models.StageExecutor, encryptor crypto.Encryptor) (Executor, error) {
-	builder, ok := executorTypes[executor.Type]
+func NewExecutor(executorType string, integration *models.Integration, resource integrations.Resource, encryptor crypto.Encryptor) (Executor, error) {
+	builder, ok := executorTypes[executorType]
 	if !ok {
-		return nil, fmt.Errorf("executor type %s not registered", executor.Type)
+		return nil, fmt.Errorf("executor type %s not registered", executorType)
 	}
 
 	//
 	// Executor does not require integration
 	//
-	if executor.ResourceID == nil {
+	if integration == nil {
 		return builder(nil, nil)
 	}
 
@@ -34,20 +34,10 @@ func NewExecutor(executor *models.StageExecutor, encryptor crypto.Encryptor) (Ex
 	// Executor requires integration,
 	// so we need to instantiate a new integration for it.
 	//
-	r, err := executor.FindIntegration()
-	if err != nil {
-		return nil, fmt.Errorf("error finding integration: %v", err)
-	}
-
-	integration, err := integrations.NewIntegration(context.Background(), r, encryptor)
+	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, encryptor)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}
 
-	resource, err := executor.GetResource()
-	if err != nil {
-		return nil, fmt.Errorf("error getting resource: %v", err)
-	}
-
-	return builder(integration, resource)
+	return builder(integrationImpl, resource)
 }

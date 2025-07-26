@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
@@ -21,7 +20,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator executors.SpecValidator, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -75,20 +74,10 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resourceName, err := resourceName(req.Stage.Spec.Executor, integration)
+		resource, err = actions.ValidateResource(ctx, encryptor, integration, req.Stage.Spec.Executor.Resource)
 		if err != nil {
 			return nil, err
 		}
-
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	executorType, executorSpec, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor, integration, resource)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	inputValidator := inputs.NewValidator(
@@ -118,6 +107,11 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
+	executorSpec, err := req.Stage.Spec.Executor.Spec.MarshalJSON()
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
+	}
+
 	stage, err = builders.NewStageBuilder().
 		WithContext(ctx).
 		WithExistingStage(stage).
@@ -130,7 +124,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		WithInputMappings(inputValidator.SerializeInputMappings()).
 		WithOutputs(inputValidator.SerializeOutputs()).
 		WithSecrets(secrets).
-		WithExecutorType(executorType).
+		WithExecutorType(req.Stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		ForResource(resource).
 		ForIntegration(integration).

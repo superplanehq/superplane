@@ -8,6 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+
+	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test__InputBuilder(t *testing.T) {
@@ -84,7 +86,7 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Create stage, connected to our two sources
 		//
-		executorType, executorSpec, resource := support.Executor(r)
+		executorType, executorSpec, resource := support.Executor(t, r)
 		stage, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).

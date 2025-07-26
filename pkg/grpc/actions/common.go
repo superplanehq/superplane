@@ -9,7 +9,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
-	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -317,10 +316,13 @@ func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.In
 	return integration, nil
 }
 
-func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integration *models.Integration, name string) (integrations.Resource, error) {
-	resourceType, err := GetResourceType(integration)
-	if err != nil {
-		return nil, err
+func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integration *models.Integration, resourceRef *integrationpb.ResourceRef) (integrations.Resource, error) {
+	if resourceRef == nil {
+		return nil, status.Error(codes.InvalidArgument, "resource reference is required")
+	}
+
+	if resourceRef.Type == "" || resourceRef.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "resource type and name are required")
 	}
 
 	//
@@ -331,22 +333,12 @@ func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integrati
 		return nil, fmt.Errorf("error starting integration implementation: %v", err)
 	}
 
-	resource, err := integrationImpl.Get(resourceType, name)
+	resource, err := integrationImpl.Get(resourceRef.Type, resourceRef.Name)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "%s %s not found: %v", resourceType, name, err)
+		return nil, status.Errorf(codes.InvalidArgument, "%s %s not found: %v", resourceRef.Type, resourceRef.Name, err)
 	}
 
 	return resource, nil
-}
-
-func GetResourceType(integration *models.Integration) (string, error) {
-	switch integration.Type {
-	case models.IntegrationTypeSemaphore:
-		return semaphore.ResourceTypeProject, nil
-
-	default:
-		return "", status.Error(codes.InvalidArgument, "unsupported integration type")
-	}
 }
 
 func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.UUID, domainType pbAuth.DomainType) (string, *uuid.UUID, error) {

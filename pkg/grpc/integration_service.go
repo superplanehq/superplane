@@ -5,21 +5,18 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/integrations"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 )
 
 type IntegrationService struct {
 	encryptor            crypto.Encryptor
-	specValidator        executors.SpecValidator
 	authorizationService authorization.Authorization
 }
 
 func NewIntegrationService(encryptor crypto.Encryptor, authService authorization.Authorization) *IntegrationService {
 	return &IntegrationService{
 		encryptor:            encryptor,
-		specValidator:        executors.SpecValidator{Encryptor: encryptor},
 		authorizationService: authService,
 	}
 }

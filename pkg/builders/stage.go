@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
@@ -26,7 +27,7 @@ type StageBuilder struct {
 	resource      integrations.Resource
 	integration   *models.Integration
 	executorType  string
-	executorSpec  *models.ExecutorSpec
+	executorSpec  []byte
 	connections   []models.Connection
 }
 
@@ -118,12 +119,17 @@ func (b *StageBuilder) ForResource(resource integrations.Resource) *StageBuilder
 	return b
 }
 
-func (b *StageBuilder) WithExecutorSpec(spec *models.ExecutorSpec) *StageBuilder {
+func (b *StageBuilder) WithExecutorSpec(spec []byte) *StageBuilder {
 	b.executorSpec = spec
 	return b
 }
 
 func (b *StageBuilder) Create() (*models.Stage, error) {
+	err := b.validateExecutorSpec()
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	stage := &models.Stage{
 		CanvasID:      b.canvas.ID,
@@ -137,7 +143,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		Secrets:       b.newStage.Secrets,
 	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
 		//
 		// Create the stage record
@@ -164,15 +170,15 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		//
 		// Create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
+		resourceID, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}
 
 		executor := models.StageExecutor{
 			Type:       b.executorType,
-			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: eventSource.ResourceID,
+			Spec:       datatypes.JSON(b.executorSpec),
+			ResourceID: resourceID,
 			StageID:    stage.ID,
 		}
 
@@ -186,7 +192,20 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 	return stage, nil
 }
 
-func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.EventSource, error) {
+func (b *StageBuilder) validateExecutorSpec() error {
+	if b.executorSpec == nil {
+		return fmt.Errorf("missing executor spec")
+	}
+
+	executor, err := executors.NewExecutor(b.executorType, b.integration, b.resource, b.encryptor)
+	if err != nil {
+		return err
+	}
+
+	return executor.Validate(context.Background(), b.executorSpec)
+}
+
+func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UUID, error) {
 	//
 	// If this stage is not using an integration, it does not need an event source.
 	//
@@ -212,7 +231,7 @@ func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*models.
 		return nil, err
 	}
 
-	return eventSource, nil
+	return eventSource.ResourceID, nil
 }
 
 func (b *StageBuilder) Update() (*models.Stage, error) {
@@ -220,7 +239,12 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		return nil, fmt.Errorf("no existing stage specified")
 	}
 
-	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+	err := b.validateExecutorSpec()
+	if err != nil {
+		return nil, err
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
 		//
 		// Delete existing connections and executor
@@ -264,15 +288,15 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		// Re-create the stage executor
 		//
-		eventSource, err := b.findOrCreateEventSourceForExecutor(tx)
+		resourceID, err := b.findOrCreateEventSourceForExecutor(tx)
 		if err != nil {
 			return err
 		}
 
 		executor := models.StageExecutor{
 			Type:       b.executorType,
-			Spec:       datatypes.NewJSONType(*b.executorSpec),
-			ResourceID: eventSource.ResourceID,
+			Spec:       datatypes.JSON(b.executorSpec),
+			ResourceID: resourceID,
 			StageID:    b.existingStage.ID,
 		}
 

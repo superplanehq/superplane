@@ -5,7 +5,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	groups "github.com/superplanehq/superplane/pkg/grpc/actions/connection_groups"
 	eventsources "github.com/superplanehq/superplane/pkg/grpc/actions/event_sources"
@@ -16,14 +15,12 @@ import (
 
 type CanvasService struct {
 	encryptor            crypto.Encryptor
-	specValidator        executors.SpecValidator
 	authorizationService authorization.Authorization
 }
 
 func NewCanvasService(encryptor crypto.Encryptor, authService authorization.Authorization) *CanvasService {
 	return &CanvasService{
 		encryptor:            encryptor,
-		specValidator:        executors.SpecValidator{Encryptor: encryptor},
 		authorizationService: authService,
 	}
 }
@@ -49,7 +46,7 @@ func (s *CanvasService) ResetEventSourceKey(ctx context.Context, req *pb.ResetEv
 }
 
 func (s *CanvasService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return stages.CreateStage(ctx, s.encryptor, s.specValidator, req)
+	return stages.CreateStage(ctx, s.encryptor, req)
 }
 
 func (s *CanvasService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -57,7 +54,7 @@ func (s *CanvasService) DescribeStage(ctx context.Context, req *pb.DescribeStage
 }
 
 func (s *CanvasService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return stages.UpdateStage(ctx, s.encryptor, s.specValidator, req)
+	return stages.UpdateStage(ctx, s.encryptor, req)
 }
 
 func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {

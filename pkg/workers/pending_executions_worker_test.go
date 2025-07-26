@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +40,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executorType, executorSpec, resource := support.Executor(r)
+		executorType, executorSpec, resource := support.Executor(t, r)
 		stage, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
@@ -97,11 +98,16 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executorType, executorSpec, resource := support.Executor(r)
-		executorSpec.Semaphore.Parameters = map[string]string{
-			"REF":      "${{ inputs.REF }}",
-			"REF_TYPE": "${{ inputs.REF_TYPE }}",
-		}
+		executorType, _, resource := support.Executor(t, r)
+		executorSpec, err := json.Marshal(map[string]any{
+			"branch":       "main",
+			"pipelineFile": ".semaphore/run.yml",
+			"parameters": map[string]string{
+				"REF":      "${{ inputs.REF }}",
+				"REF_TYPE": "${{ inputs.REF_TYPE }}",
+			},
+		})
+		require.NoError(t, err)
 
 		stage, err := builders.NewStageBuilder().
 			WithEncryptor(r.Encryptor).

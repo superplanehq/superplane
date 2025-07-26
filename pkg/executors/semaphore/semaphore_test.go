@@ -2,6 +2,7 @@ package semaphore
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/google/uuid"
@@ -13,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 )
 
-func Test_Semaphore(t *testing.T) {
+func Test_Semaphore__Execute(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -33,13 +34,14 @@ func Test_Semaphore(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
-		_, err = executor.Execute(models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				PipelineFile: ".semaphore/semaphore.yml",
-				Branch:       "main",
-				Parameters:   map[string]string{"a": "b", "c": "d"},
-			},
-		}, executors.ExecutionParameters{
+		spec, err := json.Marshal(&SemaphoreSpec{
+			PipelineFile: ".semaphore/semaphore.yml",
+			Branch:       "main",
+			Parameters:   map[string]string{"a": "b", "c": "d"},
+		})
+
+		require.NoError(t, err)
+		_, err = executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 			Token:       "token",
@@ -72,15 +74,16 @@ func Test_Semaphore(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
-		taskID := uuid.NewString()
-		_, err = executor.Execute(models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				TaskId:       &taskID,
-				PipelineFile: ".semaphore/semaphore.yml",
-				Branch:       "main",
-				Parameters:   map[string]string{"a": "b", "c": "d"},
-			},
-		}, executors.ExecutionParameters{
+		task := uuid.NewString()
+		spec, err := json.Marshal(&SemaphoreSpec{
+			Task:         task,
+			PipelineFile: ".semaphore/semaphore.yml",
+			Branch:       "main",
+			Parameters:   map[string]string{"a": "b", "c": "d"},
+		})
+
+		require.NoError(t, err)
+		_, err = executor.Execute(spec, executors.ExecutionParameters{
 			StageID:     stageID.String(),
 			ExecutionID: executionID.String(),
 			Token:       "token",
@@ -101,4 +104,8 @@ func Test_Semaphore(t *testing.T) {
 		assert.Equal(t, "b", runTaskRequest.Parameters["a"])
 		assert.Equal(t, "d", runTaskRequest.Parameters["c"])
 	})
+}
+
+func Test_Semaphore__Validate(t *testing.T) {
+	// TODO
 }

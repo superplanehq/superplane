@@ -30,7 +30,7 @@ func Test__TimeWindowWorker(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, resource := support.Executor(r)
+	executorType, executorSpec, resource := support.Executor(t, r)
 	stage, err := builders.NewStageBuilder().
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
