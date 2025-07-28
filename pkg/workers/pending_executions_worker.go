@@ -79,59 +79,11 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return err
 	}
 
-	executor, err := w.initExecutor(stageExecutor)
-	if err != nil {
-		return fmt.Errorf("error initializing executor: %v", err)
-	}
-
-	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
-	if err != nil {
-		return fmt.Errorf("error generating token: %v", err)
-	}
-
-	//
-	// If we get an error calling the executor, we fail the execution.
-	//
-	response, err := executor.Execute(spec, executors.ExecutionParameters{
-		ExecutionID: execution.ID.String(),
-		StageID:     stage.ID.String(),
-		Token:       token,
-	})
-
-	if err != nil {
-		logger.Errorf("Error calling executor: %v - failing execution", err)
-		err := execution.Finish(stage, models.ResultFailed)
-		if err != nil {
-			return fmt.Errorf("error moving execution to failed state: %v", err)
-		}
-
-		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
-
-	}
-
-	if response.Finished() {
-		return w.handleSyncResource(logger, response, execution, stage)
-	}
-
-	return w.handleAsyncResource(logger, response, stageExecutor, stage, execution)
-}
-
-func (w *PendingExecutionsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
 	if stageExecutor.ResourceID == nil {
-		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
+		return w.handleExecutor(logger, spec, execution, stageExecutor, stage)
 	}
 
-	integration, err := stageExecutor.FindIntegration()
-	if err != nil {
-		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
-	}
-
-	resource, err := stageExecutor.GetResource()
-	if err != nil {
-		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
-	}
-
-	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
+	return w.handleIntegrationExecutor(logger, spec, stageExecutor, stage, execution)
 }
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
@@ -159,7 +111,27 @@ func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor cry
 	return secretMap, nil
 }
 
-func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response executors.Response, execution models.StageExecution, stage *models.Stage) error {
+func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte, execution models.StageExecution, stageExecutor *models.StageExecutor, stage *models.Stage) error {
+	executor, err := w.Registry.NewExecutor(stageExecutor.Type)
+	if err != nil {
+		return err
+	}
+
+	response, err := executor.Execute(spec, executors.ExecutionParameters{
+		ExecutionID: execution.ID.String(),
+		StageID:     stage.ID.String(),
+	})
+
+	if err != nil {
+		logger.Errorf("Error calling executor: %v - failing execution", err)
+		err := execution.Finish(stage, models.ResultFailed)
+		if err != nil {
+			return fmt.Errorf("error moving execution to failed state: %v", err)
+		}
+
+		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+	}
+
 	outputs := response.Outputs()
 	if len(outputs) > 0 {
 		if err := execution.UpdateOutputs(outputs); err != nil {
@@ -181,7 +153,7 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 		result = models.ResultFailed
 	}
 
-	err := execution.Finish(stage, result)
+	err = execution.Finish(stage, result)
 	if err != nil {
 		return err
 	}
@@ -191,8 +163,44 @@ func (w *PendingExecutionsWorker) handleSyncResource(logger *log.Entry, response
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
-func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, response executors.Response, executor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
-	_, err := execution.AddResource(response.Id(), *executor.ResourceID)
+func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, spec []byte, stageExecutor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
+	integration, err := stageExecutor.FindIntegration()
+	if err != nil {
+		return err
+	}
+
+	resource, err := stageExecutor.GetResource()
+	if err != nil {
+		return err
+	}
+
+	integrationExecutor, err := w.Registry.NewIntegrationExecutor(integration, resource)
+	if err != nil {
+		return err
+	}
+
+	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
+	if err != nil {
+		return fmt.Errorf("error generating token: %v", err)
+	}
+
+	statefulResource, err := integrationExecutor.Execute(spec, executors.ExecutionParameters{
+		ExecutionID: execution.ID.String(),
+		StageID:     stage.ID.String(),
+		Token:       token,
+	})
+
+	if err != nil {
+		logger.Errorf("Error calling executor: %v - failing execution", err)
+		err := execution.Finish(stage, models.ResultFailed)
+		if err != nil {
+			return fmt.Errorf("error moving execution to failed state: %v", err)
+		}
+
+		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+	}
+
+	_, err = execution.AddResource(statefulResource.Id(), statefulResource.Type(), *stageExecutor.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
 	}
@@ -207,7 +215,7 @@ func (w *PendingExecutionsWorker) handleAsyncResource(logger *log.Entry, respons
 		return fmt.Errorf("error publishing execution started message: %v", err)
 	}
 
-	logger.Infof("Started execution %s", response.Id())
+	logger.Infof("Created %s %s: %s", integration.Type, statefulResource.Type(), statefulResource.Id())
 
 	return nil
 }

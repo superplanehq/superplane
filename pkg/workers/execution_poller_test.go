@@ -64,7 +64,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
@@ -145,7 +145,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -183,7 +183,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 

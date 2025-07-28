@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/executors/semaphore"
-	semaphoreintegration "github.com/superplanehq/superplane/pkg/integrations/semaphore"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -435,21 +434,21 @@ func Test__PendingEventsWorker(t *testing.T) {
 		execution := support.CreateExecution(t, r.Source, stage)
 		resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, semaphore.ResourceTypeWorkflow, resource.ID)
 		require.NoError(t, err)
 
 		//
 		// Create a Semaphore hook event for the source created for the execution,
 		// and trigger the worker.
 		//
-		hook := semaphore.SemaphoreHook{
-			Workflow: semaphore.SemaphoreHookWorkflow{
+		hook := semaphore.Hook{
+			Workflow: semaphore.HookWorkflow{
 				ID: workflowID,
 			},
-			Pipeline: semaphore.SemaphoreHookPipeline{
+			Pipeline: semaphore.HookPipeline{
 				ID:     uuid.New().String(),
-				State:  semaphoreintegration.SemaphorePipelineStateDone,
-				Result: semaphoreintegration.SemaphorePipelineResultPassed,
+				State:  semaphore.PipelineStateDone,
+				Result: semaphore.PipelineResultPassed,
 			},
 		}
 

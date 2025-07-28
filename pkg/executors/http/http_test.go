@@ -17,6 +17,8 @@ import (
 )
 
 func Test_HTTP__Execute(t *testing.T) {
+	executor := NewHTTPExecutor()
+
 	executionID := uuid.New()
 	stageID := uuid.New()
 	execution := models.StageExecution{
@@ -25,10 +27,6 @@ func Test_HTTP__Execute(t *testing.T) {
 	}
 
 	t.Run("200 response is successful", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}))
@@ -53,10 +51,6 @@ func Test_HTTP__Execute(t *testing.T) {
 	})
 
 	t.Run("400 response is not successful", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 		}))
@@ -82,10 +76,6 @@ func Test_HTTP__Execute(t *testing.T) {
 	})
 
 	t.Run("body contains spec payload", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		var body map[string]string
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			b, _ := io.ReadAll(r.Body)
@@ -118,10 +108,6 @@ func Test_HTTP__Execute(t *testing.T) {
 	})
 
 	t.Run("headers contains spec payload", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		headers := map[string]string{}
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			for k, v := range r.Header {
@@ -153,10 +139,6 @@ func Test_HTTP__Execute(t *testing.T) {
 	})
 
 	t.Run("outputs are returned in the response body", func(t *testing.T) {
-		executor, err := NewHTTPExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(`{"outputs": {"foo": "bar"}}`))
 		}))
@@ -184,8 +166,7 @@ func Test_HTTP__Execute(t *testing.T) {
 }
 
 func Test_HTTP__Validate(t *testing.T) {
-	executor, err := NewHTTPExecutor(nil, nil)
-	require.NoError(t, err)
+	executor := NewHTTPExecutor()
 
 	t.Run("HTTP spec with empty URL -> error", func(t *testing.T) {
 		spec := HTTPSpec{URL: ""}

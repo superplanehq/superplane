@@ -6,57 +6,131 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
 type Registry struct {
-	IntegrationRegistry *IntegrationRegistry
-	ExecutorRegistry    *ExecutorRegistry
+	Encryptor    crypto.Encryptor
+	Integrations map[string]integrations.BuildFn
+	Executors    map[string]executors.Executor
 }
 
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
-		IntegrationRegistry: NewIntegrationRegistry(encryptor),
-		ExecutorRegistry:    NewExecutorRegistry(),
+		Encryptor:    encryptor,
+		Executors:    map[string]executors.Executor{},
+		Integrations: map[string]integrations.BuildFn{},
 	}
 
-	r.IntegrationRegistry.Init()
-	r.ExecutorRegistry.Init()
+	r.Init()
 
 	return r
 }
 
+func (r *Registry) Init() {
+	//
+	// Register the integrations
+	//
+	r.Integrations[models.IntegrationTypeSemaphore] = semaphore.NewSemaphoreIntegration
+
+	//
+	// Register the executors
+	//
+	r.Executors[models.ExecutorTypeHTTP] = http.NewHTTPExecutor()
+}
+
 func (r *Registry) HasIntegrationWithType(integrationType string) bool {
-	_, ok := r.IntegrationRegistry.Integrations[integrationType]
+	_, ok := r.Integrations[integrationType]
 	return ok
 }
 
 func (r *Registry) NewIntegration(ctx context.Context, integration *models.Integration) (integrations.Integration, error) {
-	return r.IntegrationRegistry.New(ctx, integration)
+	builder, ok := r.Integrations[integration.Type]
+	if !ok {
+		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
+	}
+
+	authFn, err := r.getAuthFn(ctx, integration)
+	if err != nil {
+		return nil, fmt.Errorf("error getting authentication function: %v", err)
+	}
+
+	return builder(ctx, integration.URL, authFn)
 }
 
-func (r *Registry) NewExecutor(executorType string, integration *models.Integration, resource integrations.Resource) (executors.Executor, error) {
-	builder, ok := r.ExecutorRegistry.Executors[executorType]
-	if !ok {
-		return nil, fmt.Errorf("executor type %s not registered", executorType)
+func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
+	switch integration.AuthType {
+	case models.IntegrationAuthTypeToken:
+		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
+		provider, err := r.secretProvider(secretInfo, integration)
+		if err != nil {
+			return nil, fmt.Errorf("error creating secret provider: %v", err)
+		}
+
+		values, err := provider.Load(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("error loading values for secret %s: %v", secretInfo.Name, err)
+		}
+
+		token, ok := values[secretInfo.Key]
+		if !ok {
+			return nil, fmt.Errorf("key %s not found in secret %s: %v", secretInfo.Key, secretInfo.Name, err)
+		}
+
+		return func() (string, error) {
+			return token, nil
+		}, nil
+	}
+
+	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
+}
+
+func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
+	//
+	// If the integration is scoped to an organization, the secret must also be scoped there.
+	//
+	if integration.DomainType == models.DomainTypeOrganization {
+		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
-	// Executor does not require integration
+	// Here, we know the integration is on the canvas level.
+	// If the secret is also on the canvas level, we use the same domain type and ID.
 	//
-	if integration == nil {
-		return builder(nil, nil)
+	if secretDef.DomainType == models.DomainTypeCanvas {
+		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
-	// Executor requires integration,
-	// so we need to instantiate a new integration for it.
+	// Otherwise, the integration is on the canvas level, but the secret is on the organization level,
+	// so we need to get the organization ID for the canvas where the integration is.
 	//
-	integrationImpl, err := r.IntegrationRegistry.New(context.Background(), integration)
+	canvas, err := models.FindCanvasByID(integration.DomainID.String())
+	if err != nil {
+		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
+	}
+
+	return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
+}
+
+func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+	integrationImpl, err := r.NewIntegration(context.Background(), integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}
 
-	return builder(integrationImpl, resource)
+	return integrationImpl.Executor(resource)
+}
+
+func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) {
+	executor, ok := r.Executors[executorType]
+	if !ok {
+		return nil, fmt.Errorf("executor type %s not registered", executorType)
+	}
+
+	return executor, nil
 }

@@ -1,12 +1,11 @@
 package workers
 
 import (
-	"fmt"
+	"context"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
@@ -51,53 +50,30 @@ func (w *ExecutionResourcePoller) Tick() error {
 }
 
 func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResource) error {
-	stage, err := models.FindStageByID(resource.StageID.String())
+	integration, err := resource.FindIntegration()
 	if err != nil {
 		return err
 	}
 
-	stageExecutor, err := stage.GetExecutor()
+	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
 	if err != nil {
 		return err
 	}
 
-	executor, err := w.initExecutor(stageExecutor)
+	statefulResource, err := integrationImpl.Check(resource.Type, resource.ExternalID)
 	if err != nil {
 		return err
 	}
 
-	status, err := executor.Check(resource.ExternalID)
-	if err != nil {
-		return err
-	}
-
-	if !status.Finished() {
+	if !statefulResource.Finished() {
 		log.Infof("Execution resource %s is not finished yet", resource.ExternalID)
 		return nil
 	}
 
 	result := models.ResultPassed
-	if !status.Successful() {
+	if !statefulResource.Successful() {
 		result = models.ResultFailed
 	}
 
 	return resource.Finish(result)
-}
-
-func (w *ExecutionResourcePoller) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
-	if stageExecutor.ResourceID == nil {
-		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
-	}
-
-	integration, err := stageExecutor.FindIntegration()
-	if err != nil {
-		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
-	}
-
-	resource, err := stageExecutor.GetResource()
-	if err != nil {
-		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
-	}
-
-	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
 }

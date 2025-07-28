@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/executors"
-	semaphorexec "github.com/superplanehq/superplane/pkg/executors/semaphore"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -24,10 +23,10 @@ func Test_Semaphore__Execute(t *testing.T) {
 	projectID := uuid.NewString()
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
-		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
+		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := semaphorexec.NewSemaphoreExecutor(integration, &models.Resource{
+		executor, err := integration.Executor(&models.Resource{
 			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
@@ -35,7 +34,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
-		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
+		spec, err := json.Marshal(&semaphore.ExecutorSpec{
 			PipelineFile: ".semaphore/semaphore.yml",
 			Branch:       "main",
 			Parameters:   map[string]string{"a": "b", "c": "d"},
@@ -64,11 +63,11 @@ func Test_Semaphore__Execute(t *testing.T) {
 	})
 
 	t.Run("runs task if task ID is not empty", func(t *testing.T) {
-		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
+		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := semaphorexec.NewSemaphoreExecutor(integration, &models.Resource{
-			ResourceType: semaphore.ResourceTypeTask,
+		executor, err := integration.Executor(&models.Resource{
+			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
 
@@ -76,7 +75,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		require.NotNil(t, executor)
 
 		task := uuid.NewString()
-		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
+		spec, err := json.Marshal(&semaphore.ExecutorSpec{
 			Task:         task,
 			PipelineFile: ".semaphore/semaphore.yml",
 			Branch:       "main",
@@ -111,23 +110,19 @@ func Test_Semaphore__Validate(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	t.Run("integration is required", func(t *testing.T) {
-		executor, err := semaphorexec.NewSemaphoreExecutor(nil, nil)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-		require.ErrorContains(t, executor.Validate(context.Background(), []byte(`{}`)), "integration is required")
+	integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
+	require.NoError(t, err)
+
+	executor, err := integration.Executor(&models.Resource{
+		ResourceType: semaphore.ResourceTypeProject,
+		ExternalID:   uuid.NewString(),
 	})
 
+	require.NoError(t, err)
+	require.NotNil(t, executor)
+
 	t.Run("branch is required", func(t *testing.T) {
-		integration, err := r.Registry.NewIntegration(context.Background(), r.Integration)
-		require.NoError(t, err)
-
-		_, _, resource := support.Executor(t, r)
-		executor, err := semaphorexec.NewSemaphoreExecutor(integration, resource)
-		require.NoError(t, err)
-		require.NotNil(t, executor)
-
-		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
+		spec, err := json.Marshal(&semaphore.ExecutorSpec{
 			Branch: "",
 		})
 

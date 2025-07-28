@@ -10,45 +10,14 @@ import (
 	"slices"
 
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
 const MaxHTTPResponseSize = 8 * 1024
 
 type HTTPExecutor struct{}
 
-type HTTPResponse struct {
-	statusCode   int
-	body         []byte
-	allowedCodes []uint32
-}
-
-func (r *HTTPResponse) Finished() bool {
-	return true
-}
-
-func (r *HTTPResponse) Successful() bool {
-	return slices.Contains(r.allowedCodes, uint32(r.statusCode))
-}
-
-func (r *HTTPResponse) Id() string {
-	return ""
-}
-
-func (r *HTTPResponse) Outputs() map[string]any {
-	var response map[string]any
-	err := json.Unmarshal(r.body, &response)
-	if err != nil {
-		return map[string]any{}
-	}
-
-	if v, ok := response["outputs"]; ok {
-		if outputs, ok := v.(map[string]any); ok {
-			return outputs
-		}
-	}
-
-	return nil
+func NewHTTPExecutor() executors.Executor {
+	return &HTTPExecutor{}
 }
 
 type HTTPSpec struct {
@@ -60,10 +29,6 @@ type HTTPSpec struct {
 
 type HTTPResponsePolicy struct {
 	StatusCodes []uint32 `json:"status_codes"`
-}
-
-func NewHTTPExecutor(_ integrations.Integration, _ integrations.Resource) (executors.Executor, error) {
-	return &HTTPExecutor{}, nil
 }
 
 func (e *HTTPExecutor) Validate(ctx context.Context, specData []byte) error {
@@ -139,10 +104,6 @@ func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionPa
 	}, nil
 }
 
-func (e *HTTPExecutor) Check(id string) (executors.Response, error) {
-	return nil, nil
-}
-
 func (e *HTTPExecutor) buildPayload(spec HTTPSpec, parameters executors.ExecutionParameters) (map[string]string, error) {
 	payload := map[string]string{
 		"stageId":     parameters.StageID,
@@ -154,4 +115,38 @@ func (e *HTTPExecutor) buildPayload(spec HTTPSpec, parameters executors.Executio
 	}
 
 	return payload, nil
+}
+
+type HTTPResponse struct {
+	statusCode   int
+	body         []byte
+	allowedCodes []uint32
+}
+
+func (r *HTTPResponse) Finished() bool {
+	return true
+}
+
+func (r *HTTPResponse) Successful() bool {
+	return slices.Contains(r.allowedCodes, uint32(r.statusCode))
+}
+
+func (r *HTTPResponse) Id() string {
+	return ""
+}
+
+func (r *HTTPResponse) Outputs() map[string]any {
+	var response map[string]any
+	err := json.Unmarshal(r.body, &response)
+	if err != nil {
+		return map[string]any{}
+	}
+
+	if v, ok := response["outputs"]; ok {
+		if outputs, ok := v.(map[string]any); ok {
+			return outputs
+		}
+	}
+
+	return nil
 }

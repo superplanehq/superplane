@@ -3,8 +3,11 @@ package executors
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+var expressionRegex = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
 
 type SpecBuilder struct{}
 

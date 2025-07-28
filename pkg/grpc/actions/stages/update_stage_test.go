@@ -247,7 +247,7 @@ func Test__UpdateStage(t *testing.T) {
 		assert.Equal(t, "status == 'active'", res.Stage.Spec.Connections[0].Filters[1].Data.Expression)
 
 		// Executor spec is updated
-		assert.Equal(t, models.ExecutorSpecTypeSemaphore, res.Stage.Spec.Executor.Type)
+		assert.Equal(t, models.IntegrationTypeSemaphore, res.Stage.Spec.Executor.Type)
 		assert.Equal(t, "other", res.Stage.Spec.Executor.Spec.GetFields()["branch"].GetStringValue())
 		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Spec.GetFields()["pipelineFile"].GetStringValue())
 		assert.Equal(t, map[string]any{}, res.Stage.Spec.Executor.Spec.GetFields()["parameters"].GetStructValue().AsMap())

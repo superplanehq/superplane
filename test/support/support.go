@@ -242,7 +242,7 @@ func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.R
 
 	require.NoError(t, err)
 
-	return models.ExecutorSpecTypeSemaphore, spec, &models.Resource{
+	return models.IntegrationTypeSemaphore, spec, &models.Resource{
 		ResourceType:  semaphoreIntegration.ResourceTypeProject,
 		ExternalID:    uuid.NewString(),
 		IntegrationID: r.Integration.ID,
@@ -260,7 +260,7 @@ func ProtoExecutor(t *testing.T, r *ResourceRegistry) *pb.Executor {
 	require.NoError(t, err)
 
 	return &pb.Executor{
-		Type: models.ExecutorSpecTypeSemaphore,
+		Type: models.IntegrationTypeSemaphore,
 		Spec: spec,
 		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,

@@ -64,7 +64,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 
 		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -75,7 +75,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock failed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.SemaphorePipelineResultFailed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultFailed)
 		err = w.Tick()
 		require.NoError(t, err)
 
@@ -107,7 +107,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 
 		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -118,7 +118,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock passed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.SemaphorePipelineResultPassed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
 		err = w.Tick()
 		require.NoError(t, err)
 

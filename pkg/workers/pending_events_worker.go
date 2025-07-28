@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -8,7 +9,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -98,39 +98,39 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return nil
 	}
 
-	e, err := models.FindExecutorForResource(*eventSource.ResourceID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No executor found for event source %s - skipping execution updates", event.SourceID)
-			return nil
-		}
-
-		return err
-	}
-
-	executor, err := w.initExecutor(e)
+	resource, err := models.FindResourceByID(*eventSource.ResourceID)
 	if err != nil {
 		return err
 	}
 
-	status, err := executor.HandleWebhook([]byte(event.Raw))
+	integration, err := models.FindIntegrationByID(resource.IntegrationID)
 	if err != nil {
 		return err
 	}
 
-	if !status.Finished() {
+	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
+	if err != nil {
+		return err
+	}
+
+	statefulResource, err := integrationImpl.HandleWebhook([]byte(event.Raw))
+	if err != nil {
+		return err
+	}
+
+	if !statefulResource.Finished() {
 		return nil
 	}
 
 	result := models.ResultPassed
-	if !status.Successful() {
+	if !statefulResource.Successful() {
 		result = models.ResultFailed
 	}
 
-	executionResource, err := models.FindExecutionResource(status.Id(), *eventSource.ResourceID)
+	executionResource, err := models.FindExecutionResource(statefulResource.Id(), *eventSource.ResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No execution resource %s found for source %s - skipping execution update", status.Id(), eventSource.ID)
+			logger.Infof("No execution resource %s found for source %s - skipping execution update", statefulResource.Id(), eventSource.ID)
 			return nil
 		}
 
@@ -145,24 +145,6 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 	logger.Infof("Execution resource %s finished with result %s", executionResource.ExternalID, executionResource.Result)
 
 	return nil
-}
-
-func (w *PendingEventsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
-	if stageExecutor.ResourceID == nil {
-		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
-	}
-
-	integration, err := stageExecutor.FindIntegration()
-	if err != nil {
-		return nil, fmt.Errorf("error finding integration for stage executor: %v", err)
-	}
-
-	resource, err := stageExecutor.GetResource()
-	if err != nil {
-		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
-	}
-
-	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
 }
 
 func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *models.Event) error {

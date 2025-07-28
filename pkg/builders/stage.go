@@ -199,12 +199,21 @@ func (b *StageBuilder) validateExecutorSpec() error {
 		return fmt.Errorf("missing executor spec")
 	}
 
-	executor, err := b.registry.NewExecutor(b.executorType, b.integration, b.resource)
+	if b.integration == nil {
+		executor, err := b.registry.NewExecutor(b.executorType)
+		if err != nil {
+			return err
+		}
+
+		return executor.Validate(b.ctx, b.executorSpec)
+	}
+
+	executor, err := b.registry.NewIntegrationExecutor(b.integration, b.resource)
 	if err != nil {
 		return err
 	}
 
-	return executor.Validate(context.Background(), b.executorSpec)
+	return executor.Validate(b.ctx, b.executorSpec)
 }
 
 func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UUID, error) {

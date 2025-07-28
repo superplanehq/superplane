@@ -88,7 +88,7 @@ func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	data, _ := json.Marshal(semaphore.SemaphoreWorkflow{InitialPplID: pipeline.ID})
+	data, _ := json.Marshal(semaphore.Workflow{InitialPplID: pipeline.ID})
 	w.Write(data)
 }
 
@@ -101,8 +101,8 @@ func (s *SemaphoreAPIMock) DescribeProject(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	data, _ := json.Marshal(semaphore.SemaphoreProject{
-		Metadata: &semaphore.SemaphoreProjectMetadata{
+	data, _ := json.Marshal(semaphore.Project{
+		Metadata: &semaphore.ProjectMetadata{
 			ProjectName: projectName,
 			ProjectID:   uuid.New().String(),
 		},
@@ -119,11 +119,11 @@ func (s *SemaphoreAPIMock) DescribePipeline(w http.ResponseWriter, r *http.Reque
 
 	for wfID, p := range s.Workflows {
 		if p.ID == pipelineID {
-			data, _ := json.Marshal(semaphore.SemaphorePipelineResponse{
-				Pipeline: &semaphore.SemaphorePipeline{
+			data, _ := json.Marshal(semaphore.PipelineResponse{
+				Pipeline: &semaphore.Pipeline{
 					PipelineID: p.ID,
 					WorkflowID: wfID,
-					State:      semaphore.SemaphorePipelineStateDone,
+					State:      semaphore.PipelineStateDone,
 					Result:     p.Result,
 				},
 			})
