@@ -42,27 +42,27 @@ func NewSemaphoreIntegration(ctx context.Context, URL string, authenticate integ
 	}, nil
 }
 
-func (s *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]integrations.Resource, error) {
+func (i *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeTask:
-		return s.listTasks(parentIDs...)
+		return i.listTasks(parentIDs...)
 	case ResourceTypeProject:
-		return s.listProjects()
+		return i.listProjects()
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s for list", resourceType)
 	}
 }
 
-func (e *SemaphoreIntegration) Check(resourceType, id string) (integrations.StatefulResource, error) {
+func (i *SemaphoreIntegration) Check(resourceType, id string) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
-		resource, err := e.Get(ResourceTypeWorkflow, id)
+		resource, err := i.Get(ResourceTypeWorkflow, id)
 		if err != nil {
 			return nil, fmt.Errorf("workflow %s not found", id)
 		}
 
 		workflow := resource.(*Workflow)
-		resource, err = e.Get(ResourceTypePipeline, workflow.InitialPplID)
+		resource, err = i.Get(ResourceTypePipeline, workflow.InitialPplID)
 		if err != nil {
 			return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 		}
@@ -75,20 +75,20 @@ func (e *SemaphoreIntegration) Check(resourceType, id string) (integrations.Stat
 	}
 }
 
-func (s *SemaphoreIntegration) Get(resourceType, id string, parentIDs ...string) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) Get(resourceType, id string, parentIDs ...string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
-		return s.getWorkflow(id)
+		return i.getWorkflow(id)
 	case ResourceTypePipeline:
-		return s.getPipeline(id)
+		return i.getPipeline(id)
 	case ResourceTypeTask:
-		return s.getTask(id, parentIDs...)
+		return i.getTask(id, parentIDs...)
 	case ResourceTypeProject:
-		return s.getProject(id)
+		return i.getProject(id)
 	case ResourceTypeSecret:
-		return s.getSecret(id)
+		return i.getSecret(id)
 	case ResourceTypeNotification:
-		return s.getNotification(id)
+		return i.getNotification(id)
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s for get", resourceType)
 	}
@@ -105,55 +105,30 @@ type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) Executor(resource integrations.Resource) (integrations.Executor, error) {
+func (i *SemaphoreIntegration) Executor(resource integrations.Resource) (integrations.Executor, error) {
 	return &SemaphoreExecutor{
-		Integration: s,
+		Integration: i,
 		Resource:    resource,
 	}, nil
 }
 
-func (s *SemaphoreIntegration) Create(resourceType string, params any) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) Create(resourceType string, params any) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
-		return s.runWorkflow(params)
+		return i.runWorkflow(params)
 	case ResourceTypeTaskTrigger:
-		return s.runTask(params)
+		return i.runTask(params)
 	case ResourceTypeNotification:
-		return s.createNotification(params)
+		return i.createNotification(params)
 	case ResourceTypeSecret:
-		return s.createSecret(params)
+		return i.createSecret(params)
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s for create", resourceType)
 	}
 }
 
-func (s *SemaphoreIntegration) execRequest(method string, url string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(method, url, body)
-	if err != nil {
-		return nil, fmt.Errorf("error building request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Token "+s.Token)
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %v", err)
-	}
-
-	responseBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("error reading body: %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
-	}
-
-	return responseBody, nil
-}
-
-func (s *SemaphoreIntegration) createSecret(params any) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1beta/secrets", s.URL)
+func (i *SemaphoreIntegration) createSecret(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets", i.URL)
 
 	secret, ok := params.(*Secret)
 	if !ok {
@@ -167,7 +142,7 @@ func (s *SemaphoreIntegration) createSecret(params any) (integrations.Resource, 
 		return nil, fmt.Errorf("error marshaling secret: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -181,9 +156,9 @@ func (s *SemaphoreIntegration) createSecret(params any) (integrations.Resource, 
 	return &response, nil
 }
 
-func (s *SemaphoreIntegration) getSecret(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", s.URL, id)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) getSecret(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, id)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -230,9 +205,9 @@ type SecretSpecDataEnvVar struct {
 	Value string `json:"value"`
 }
 
-func (s *SemaphoreIntegration) getNotification(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", s.URL, id)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) getNotification(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, id)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -246,8 +221,8 @@ func (s *SemaphoreIntegration) getNotification(id string) (integrations.Resource
 	return &response, nil
 }
 
-func (s *SemaphoreIntegration) createNotification(params any) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/notifications", s.URL)
+func (i *SemaphoreIntegration) createNotification(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/notifications", i.URL)
 
 	notification, ok := params.(*Notification)
 	if !ok {
@@ -261,7 +236,7 @@ func (s *SemaphoreIntegration) createNotification(params any) (integrations.Reso
 		return nil, fmt.Errorf("error marshaling notification: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -348,19 +323,19 @@ type RunTaskResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (s *SemaphoreIntegration) runTask(params any) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) runTask(params any) (integrations.Resource, error) {
 	p, ok := params.(*RunTaskRequest)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", s.URL, p.TaskID)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s/run_now", i.URL, p.TaskID)
 	body, err := json.Marshal(p)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling task trigger: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -374,15 +349,15 @@ func (s *SemaphoreIntegration) runTask(params any) (integrations.Resource, error
 	return &Workflow{WfID: response.WorkflowID}, nil
 }
 
-func (s *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", s.URL)
+func (i *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
 
 	body, err := json.Marshal(&params)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling create workflow params: %v", err)
 	}
 
-	responseBody, err := s.execRequest(http.MethodPost, URL, bytes.NewReader(body))
+	responseBody, err := i.execRequest(http.MethodPost, URL, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -396,13 +371,13 @@ func (s *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, e
 	return &Workflow{WfID: response.WorkflowID}, nil
 }
 
-func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
+func (i *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks?project_id=%s", s.URL, parentIDs[0])
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks?project_id=%s", i.URL, parentIDs[0])
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -421,9 +396,9 @@ func (s *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Re
 	return resources, nil
 }
 
-func (s *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects", s.URL)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects", i.URL)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -442,9 +417,9 @@ func (s *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
 	return resources, nil
 }
 
-func (s *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v2/workflows/%s", s.URL, id)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v2/workflows/%s", i.URL, id)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -458,9 +433,9 @@ func (s *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, er
 	return &workflow, nil
 }
 
-func (s *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", s.URL, id)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", i.URL, id)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -474,9 +449,9 @@ func (s *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, er
 	return pipelineResponse.Pipeline, nil
 }
 
-func (s *SemaphoreIntegration) getProject(id string) (integrations.Resource, error) {
-	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", s.URL, id)
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+func (i *SemaphoreIntegration) getProject(id string) (integrations.Resource, error) {
+	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, id)
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -490,13 +465,13 @@ func (s *SemaphoreIntegration) getProject(id string) (integrations.Resource, err
 	return &project, nil
 }
 
-func (s *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
 
-	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s?project_id=%s", s.URL, id, parentIDs[0])
-	responseBody, err := s.execRequest(http.MethodGet, URL, nil)
+	URL := fmt.Sprintf("%s/api/v1alpha/tasks/%s?project_id=%s", i.URL, id, parentIDs[0])
+	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -514,45 +489,70 @@ func (s *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrat
 	return task.Task, nil
 }
 
+func (i *SemaphoreIntegration) execRequest(method string, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Token "+i.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("error executing request: %v", err)
+	}
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+	}
+
+	return responseBody, nil
+}
+
 type Workflow struct {
 	WfID         string    `json:"wf_id"`
 	InitialPplID string    `json:"initial_ppl_id"`
 	Pipeline     *Pipeline `json:"pipeline"`
 }
 
-func (s *Workflow) Id() string {
-	return s.WfID
+func (w *Workflow) Id() string {
+	return w.WfID
 }
 
-func (s *Workflow) Name() string {
+func (w *Workflow) Name() string {
 	return ""
 }
 
-func (s *Workflow) Type() string {
+func (w *Workflow) Type() string {
 	return ResourceTypeWorkflow
 }
 
-func (p *Workflow) Finished() bool {
-	return p.Pipeline != nil && p.Pipeline.Finished()
+func (w *Workflow) Finished() bool {
+	return w.Pipeline != nil && w.Pipeline.Finished()
 }
 
-func (p *Workflow) Successful() bool {
-	return p.Pipeline != nil && p.Pipeline.Successful()
+func (w *Workflow) Successful() bool {
+	return w.Pipeline != nil && w.Pipeline.Successful()
 }
 
 type Project struct {
 	Metadata *ProjectMetadata `json:"metadata"`
 }
 
-func (s *Project) Id() string {
-	return s.Metadata.ProjectID
+func (p *Project) Id() string {
+	return p.Metadata.ProjectID
 }
 
-func (s *Project) Name() string {
-	return s.Metadata.ProjectName
+func (p *Project) Name() string {
+	return p.Metadata.ProjectName
 }
 
-func (s *Project) Type() string {
+func (p *Project) Type() string {
 	return ResourceTypeProject
 }
 

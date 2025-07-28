@@ -22,12 +22,12 @@ type HookPipeline struct {
 	Result string `json:"result"`
 }
 
-func (s *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
+func (i *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
 	// Create Semaphore secret to store the event source key.
 	//
 	resourceName := fmt.Sprintf("superplane-webhook-%s", options.ID)
-	secret, err := s.createSemaphoreSecret(resourceName, options.Key)
+	secret, err := i.createSemaphoreSecret(resourceName, options.Key)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
 	}
@@ -35,7 +35,7 @@ func (s *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions)
 	//
 	// Create a notification resource to receive events from Semaphore
 	//
-	notification, err := s.createSemaphoreNotification(resourceName, options)
+	notification, err := i.createSemaphoreNotification(resourceName, options)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
 	}
@@ -43,11 +43,11 @@ func (s *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions)
 	return []integrations.Resource{secret, notification}, nil
 }
 
-func (s *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {
 	//
 	// Check if secret already exists.
 	//
-	secret, err := s.Get(ResourceTypeSecret, name)
+	secret, err := i.Get(ResourceTypeSecret, name)
 	if err == nil {
 		return secret, nil
 	}
@@ -55,7 +55,7 @@ func (s *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (i
 	//
 	// Secret does not exist, create it.
 	//
-	secret, err = s.Create(ResourceTypeSecret, &Secret{
+	secret, err = i.Create(ResourceTypeSecret, &Secret{
 		Metadata: SecretMetadata{
 			Name: name,
 		},
@@ -76,11 +76,11 @@ func (s *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (i
 	return secret, nil
 }
 
-func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options integrations.WebhookOptions) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) createSemaphoreNotification(name string, options integrations.WebhookOptions) (integrations.Resource, error) {
 	//
 	// Check if notification already exists.
 	//
-	notification, err := s.Get(ResourceTypeNotification, name)
+	notification, err := i.Get(ResourceTypeNotification, name)
 	if err == nil {
 		return notification, nil
 	}
@@ -88,7 +88,7 @@ func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 	//
 	// Notification does not exist, create it.
 	//
-	notification, err = s.Create(ResourceTypeNotification, &Notification{
+	notification, err = i.Create(ResourceTypeNotification, &Notification{
 		Metadata: NotificationMetadata{
 			Name: name,
 		},
@@ -120,7 +120,7 @@ func (s *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 	return notification, nil
 }
 
-func (e *SemaphoreIntegration) HandleWebhook(data []byte) (integrations.StatefulResource, error) {
+func (i *SemaphoreIntegration) HandleWebhook(data []byte) (integrations.StatefulResource, error) {
 	var hook Hook
 	err := json.Unmarshal(data, &hook)
 	if err != nil {

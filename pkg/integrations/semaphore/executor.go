@@ -113,11 +113,11 @@ func (e *SemaphoreExecutor) runTask(spec ExecutorSpec, parameters executors.Exec
 
 func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string, fromExecution executors.ExecutionParameters) map[string]string {
 	parameters := maps.Clone(fromSpec)
-	parameters["SEMAPHORE_STAGE_ID"] = fromExecution.StageID
-	parameters["SEMAPHORE_STAGE_EXECUTION_ID"] = fromExecution.ExecutionID
+	parameters["SUPERPLANE_STAGE_ID"] = fromExecution.StageID
+	parameters["SUPERPLANE_STAGE_EXECUTION_ID"] = fromExecution.ExecutionID
 
 	if fromExecution.Token != "" {
-		parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"] = fromExecution.Token
+		parameters["SUPERPLANE_STAGE_EXECUTION_TOKEN"] = fromExecution.Token
 	}
 
 	return parameters
