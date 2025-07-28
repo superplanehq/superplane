@@ -152,19 +152,19 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                     <div className='text-gray-600 w-1/4 text-left'>Type</div>
                     <div className="block w-full text-left">{selectedStage.spec!.executor!.type?.replace('TYPE_', '') || '—'}</div>
                   </div>
-                  {selectedStage.spec!.executor!.semaphore && (
+                  {selectedStage.spec!.executor!.spec && (
                     <>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 w-1/4 text-left'>Project ID</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.project || '—'}</div>
+                        <div className='text-gray-600 w-1/4 text-left'>Project</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.resource!.name || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Branch</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.branch || '—'}</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.branch as string || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Pipeline file</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.semaphore.pipelineFile || '—'}</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.pipelineFile as string || '—'}</div>
                       </div>
                     </>
                   )}
