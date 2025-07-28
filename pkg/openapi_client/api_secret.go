@@ -1,7 +1,7 @@
 /*
-Superplane Authorization API
+Superplane Organizations API
 
-API for the Superplane Authorization service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -119,7 +119,7 @@ func (a *SecretAPIService) SecretsCreateSecretExecute(r ApiSecretsCreateSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -251,7 +251,7 @@ func (a *SecretAPIService) SecretsDeleteSecretExecute(r ApiSecretsDeleteSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -383,7 +383,7 @@ func (a *SecretAPIService) SecretsDescribeSecretExecute(r ApiSecretsDescribeSecr
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -511,7 +511,7 @@ func (a *SecretAPIService) SecretsListSecretsExecute(r ApiSecretsListSecretsRequ
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()
@@ -633,7 +633,7 @@ func (a *SecretAPIService) SecretsUpdateSecretExecute(r ApiSecretsUpdateSecretRe
 			body:  localVarBody,
 			error: localVarHTTPResponse.Status,
 		}
-			var v RpcStatus
+			var v GooglerpcStatus
 			err = a.client.decode(&v, localVarBody, localVarHTTPResponse.Header.Get("Content-Type"))
 			if err != nil {
 				newErr.error = err.Error()

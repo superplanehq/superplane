@@ -37,7 +37,7 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 	})
 
 	t.Run("canvas owner has all permissions", func(t *testing.T) {
-		err := authService.AssignRole(userID, RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(userID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		roles, err := authService.GetUserRolesForCanvas(userID, canvasID)
@@ -46,9 +46,9 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 		for _, role := range roles {
 			flatRoles[role.Name] = true
 		}
-		require.True(t, flatRoles[RoleCanvasOwner])
-		require.True(t, flatRoles[RoleCanvasAdmin])
-		require.True(t, flatRoles[RoleCanvasViewer])
+		require.True(t, flatRoles[models.RoleCanvasOwner])
+		require.True(t, flatRoles[models.RoleCanvasAdmin])
+		require.True(t, flatRoles[models.RoleCanvasViewer])
 
 		// Test viewer permissions (inherited)
 		allowed, err := authService.CheckCanvasPermission(userID, canvasID, "eventsource", "read")
@@ -91,7 +91,7 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 
 	t.Run("canvas viewer has only read permissions", func(t *testing.T) {
 		viewerID := uuid.New().String()
-		err := authService.AssignRole(viewerID, RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(viewerID, models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Should have read permissions
@@ -124,7 +124,7 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 
 	t.Run("canvas admin has read and write permissions", func(t *testing.T) {
 		adminID := uuid.New().String()
-		err := authService.AssignRole(adminID, RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(adminID, models.RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Should have read permissions (inherited from viewer)
@@ -173,7 +173,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("org owner has all permissions", func(t *testing.T) {
-		err := authService.AssignRole(userID, RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have all canvas permissions (inherited from admin)
@@ -205,7 +205,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 
 	t.Run("org admin has limited permissions", func(t *testing.T) {
 		adminID := uuid.New().String()
-		err := authService.AssignRole(adminID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have canvas management permissions
@@ -237,7 +237,7 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 
 	t.Run("org viewer has only read permissions", func(t *testing.T) {
 		viewerID := uuid.New().String()
-		err := authService.AssignRole(viewerID, RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should have read permission
@@ -278,7 +278,7 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 
 	t.Run("assign and remove roles", func(t *testing.T) {
 		// Assign role
-		err := authService.AssignRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Verify role assignment
@@ -288,20 +288,20 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		for _, role := range roles {
 			flatRoles[role.Name] = true
 		}
-		require.True(t, flatRoles[RoleOrgAdmin])
+		require.True(t, flatRoles[models.RoleOrgAdmin])
 		// Check permissions
 		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
 		// Remove role
-		err = authService.RemoveRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = authService.RemoveRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Verify role removal
 		roles, err = authService.GetUserRolesForOrg(userID, orgID)
 		require.NoError(t, err)
-		assert.NotContains(t, roles, RoleOrgAdmin)
+		assert.NotContains(t, roles, models.RoleOrgAdmin)
 		// Check permissions
 		allowed, err = authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
 		require.NoError(t, err)
@@ -312,12 +312,12 @@ func Test__AuthService_RoleManagement(t *testing.T) {
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 
-		err := authService.AssignRole(user1, RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(user1, models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
-		err = authService.AssignRole(user2, RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(user2, models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
-		users, err := authService.GetCanvasUsersForRole(RoleCanvasViewer, canvasID)
+		users, err := authService.GetCanvasUsersForRole(models.RoleCanvasViewer, canvasID)
 		require.NoError(t, err)
 		assert.Contains(t, users, user1)
 		assert.Contains(t, users, user2)
@@ -344,11 +344,9 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	t.Run("create and manage groups", func(t *testing.T) {
 		groupName := "engineering-team"
 
-		// Create group
-		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, models.RoleOrgAdmin, "Engineering Team", "Engineering Team")
 		require.NoError(t, err)
 
-		// Add users to group
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 
@@ -357,22 +355,18 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, user2, groupName)
 		require.NoError(t, err)
 
-		// Get group users
 		users, err := authService.GetGroupUsers(orgID, models.DomainTypeOrganization, groupName)
 		require.NoError(t, err)
 		assert.Contains(t, users, user1)
 		assert.Contains(t, users, user2)
 
-		// Check permissions through group
 		allowed, err := authService.CheckOrganizationPermission(user1, orgID, "canvas", "create")
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		// Remove user from group
 		err = authService.RemoveUserFromGroup(orgID, models.DomainTypeOrganization, user1, groupName)
 		require.NoError(t, err)
 
-		// Verify removal
 		users, err = authService.GetGroupUsers(orgID, models.DomainTypeOrganization, groupName)
 		require.NoError(t, err)
 		assert.NotContains(t, users, user1)
@@ -380,7 +374,7 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	})
 
 	t.Run("create group with invalid role", func(t *testing.T) {
-		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", "invalid_role")
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", "invalid_role", "Test Group", "Test Group")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
@@ -393,13 +387,11 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 	})
 
 	t.Run("get groups and roles", func(t *testing.T) {
-		// Create multiple groups
-		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "admins", RoleOrgAdmin)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, "admins", models.RoleOrgAdmin, "Admins", "Admins")
 		require.NoError(t, err)
-		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "viewers", RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "viewers", models.RoleOrgViewer, "Viewers", "Viewers")
 		require.NoError(t, err)
 
-		// Add users to make groups detectable
 		user1 := uuid.New().String()
 		user2 := uuid.New().String()
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, user1, "admins")
@@ -407,20 +399,18 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 		err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, user2, "viewers")
 		require.NoError(t, err)
 
-		// Get all groups
 		groups, err := authService.GetGroups(orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "admins")
 		assert.Contains(t, groups, "viewers")
 
-		// Get group role
 		role, err := authService.GetGroupRole(orgID, models.DomainTypeOrganization, "admins")
 		require.NoError(t, err)
-		assert.Equal(t, role, RoleOrgAdmin)
+		assert.Equal(t, role, models.RoleOrgAdmin)
 
 		role, err = authService.GetGroupRole(orgID, models.DomainTypeOrganization, "viewers")
 		require.NoError(t, err)
-		assert.Equal(t, role, RoleOrgViewer)
+		assert.Equal(t, role, models.RoleOrgViewer)
 	})
 }
 
@@ -449,9 +439,9 @@ func Test__AuthService_AccessibleResources(t *testing.T) {
 
 	t.Run("get accessible organizations", func(t *testing.T) {
 		// Assign user to organizations
-		err := authService.AssignRole(userID, RoleOrgViewer, org1, models.DomainTypeOrganization)
+		err := authService.AssignRole(userID, models.RoleOrgViewer, org1, models.DomainTypeOrganization)
 		require.NoError(t, err)
-		err = authService.AssignRole(userID, RoleOrgAdmin, org2, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgAdmin, org2, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Get accessible orgs
@@ -463,9 +453,9 @@ func Test__AuthService_AccessibleResources(t *testing.T) {
 
 	t.Run("get accessible canvases", func(t *testing.T) {
 		// Assign user to canvases
-		err := authService.AssignRole(userID, RoleCanvasViewer, canvas1, models.DomainTypeCanvas)
+		err := authService.AssignRole(userID, models.RoleCanvasViewer, canvas1, models.DomainTypeCanvas)
 		require.NoError(t, err)
-		err = authService.AssignRole(userID, RoleCanvasOwner, canvas2, models.DomainTypeCanvas)
+		err = authService.AssignRole(userID, models.RoleCanvasOwner, canvas2, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Get accessible canvases
@@ -505,7 +495,7 @@ func Test__AuthService_CreateOrganizationOwner(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		require.True(t, flatRoles[RoleOrgOwner])
+		require.True(t, flatRoles[models.RoleOrgOwner])
 	})
 }
 
@@ -526,7 +516,7 @@ func Test__AuthService_RoleHierarchy(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("canvas owner inherits admin and viewer permissions", func(t *testing.T) {
-		err := authService.AssignRole(userID, RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(userID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Get implicit roles (should include inherited roles)
@@ -539,14 +529,14 @@ func Test__AuthService_RoleHierarchy(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		require.True(t, flatRoles[RoleCanvasOwner])
-		require.True(t, flatRoles[RoleCanvasAdmin])
-		require.True(t, flatRoles[RoleCanvasViewer])
+		require.True(t, flatRoles[models.RoleCanvasOwner])
+		require.True(t, flatRoles[models.RoleCanvasAdmin])
+		require.True(t, flatRoles[models.RoleCanvasViewer])
 	})
 
 	t.Run("canvas admin inherits viewer permissions", func(t *testing.T) {
 		adminID := uuid.New().String()
-		err := authService.AssignRole(adminID, RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(adminID, models.RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		roles, err := authService.GetUserRolesForCanvas(adminID, canvasID)
@@ -558,15 +548,15 @@ func Test__AuthService_RoleHierarchy(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		require.True(t, flatRoles[RoleCanvasAdmin])
-		require.True(t, flatRoles[RoleCanvasViewer])
+		require.True(t, flatRoles[models.RoleCanvasAdmin])
+		require.True(t, flatRoles[models.RoleCanvasViewer])
 		// Should not have owner role
-		require.False(t, flatRoles[RoleCanvasOwner])
+		require.False(t, flatRoles[models.RoleCanvasOwner])
 	})
 
 	t.Run("org owner inherits admin and viewer permissions", func(t *testing.T) {
 		ownerID := uuid.New().String()
-		err := authService.AssignRole(ownerID, RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		roles, err := authService.GetUserRolesForOrg(ownerID, orgID)
@@ -578,9 +568,9 @@ func Test__AuthService_RoleHierarchy(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		require.True(t, flatRoles[RoleOrgOwner])
-		require.True(t, flatRoles[RoleOrgAdmin])
-		require.True(t, flatRoles[RoleOrgViewer])
+		require.True(t, flatRoles[models.RoleOrgOwner])
+		require.True(t, flatRoles[models.RoleOrgAdmin])
+		require.True(t, flatRoles[models.RoleOrgViewer])
 	})
 }
 
@@ -599,11 +589,11 @@ func Test__AuthService_DuplicateAssignments(t *testing.T) {
 
 	t.Run("duplicate role assignment is idempotent", func(t *testing.T) {
 		// First assignment
-		err := authService.AssignRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Duplicate assignment should not error
-		err = authService.AssignRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should still have the role only once
@@ -615,18 +605,16 @@ func Test__AuthService_DuplicateAssignments(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		require.True(t, flatRoles[RoleOrgAdmin])
+		require.True(t, flatRoles[models.RoleOrgAdmin])
 	})
 
 	t.Run("duplicate group creation fails", func(t *testing.T) {
 		groupName := "duplicate-test-group"
 
-		// First creation
-		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, RoleOrgViewer)
+		err := authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, models.RoleOrgViewer, "Duplicate Test Group", "This is a duplicate test group")
 		require.NoError(t, err)
 
-		// Duplicate creation should fail
-		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, RoleOrgViewer)
+		err = authService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, models.RoleOrgViewer, "Duplicate Test Group", "This is a duplicate test group")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 	})
@@ -650,7 +638,7 @@ func Test__AuthService_CrossDomainPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign org owner role
-		err = authService.AssignRole(userID, RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Should not have canvas permissions
@@ -670,7 +658,7 @@ func Test__AuthService_CrossDomainPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Assign canvas owner role
-		err = authService.AssignRole(userID, RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(userID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Should not have org permissions
@@ -697,11 +685,11 @@ func Test__AuthService_PermissionBoundaries(t *testing.T) {
 		ownerID := uuid.New().String()
 
 		// Assign roles
-		err := authService.AssignRole(viewerID, RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+		err := authService.AssignRole(viewerID, models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
-		err = authService.AssignRole(adminID, RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(adminID, models.RoleCanvasAdmin, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
-		err = authService.AssignRole(ownerID, RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(ownerID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Viewer should not have member remove permission
@@ -730,11 +718,11 @@ func Test__AuthService_PermissionBoundaries(t *testing.T) {
 		ownerID := uuid.New().String()
 
 		// Assign roles
-		err = authService.AssignRole(viewerID, RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(viewerID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
-		err = authService.AssignRole(adminID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(adminID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
-		err = authService.AssignRole(ownerID, RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(ownerID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Check org update permission
@@ -782,27 +770,27 @@ func Test__AuthService_GetRoleDefinition(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("get organization role definition", func(t *testing.T) {
-		viewerRole, err := authService.GetRoleDefinition(RoleOrgViewer, models.DomainTypeOrganization, orgID)
+		viewerRole, err := authService.GetRoleDefinition(models.RoleOrgViewer, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleOrgViewer, viewerRole.Name)
+		assert.Equal(t, models.RoleOrgViewer, viewerRole.Name)
 		assert.Equal(t, models.DomainTypeOrganization, viewerRole.DomainType)
 		assert.NotEmpty(t, viewerRole.Description)
 		assert.True(t, viewerRole.Readonly)
 		assert.NotEmpty(t, viewerRole.Permissions)
 
 		// Test org admin role
-		adminRole, err := authService.GetRoleDefinition(RoleOrgAdmin, models.DomainTypeOrganization, orgID)
+		adminRole, err := authService.GetRoleDefinition(models.RoleOrgAdmin, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleOrgAdmin, adminRole.Name)
+		assert.Equal(t, models.RoleOrgAdmin, adminRole.Name)
 		assert.Equal(t, models.DomainTypeOrganization, adminRole.DomainType)
 		assert.NotEmpty(t, adminRole.Description)
 		assert.True(t, adminRole.Readonly)
 		assert.NotEmpty(t, adminRole.Permissions)
 
 		// Test org owner role
-		ownerRole, err := authService.GetRoleDefinition(RoleOrgOwner, models.DomainTypeOrganization, orgID)
+		ownerRole, err := authService.GetRoleDefinition(models.RoleOrgOwner, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleOrgOwner, ownerRole.Name)
+		assert.Equal(t, models.RoleOrgOwner, ownerRole.Name)
 		assert.Equal(t, models.DomainTypeOrganization, ownerRole.DomainType)
 		assert.NotEmpty(t, ownerRole.Description)
 		assert.True(t, ownerRole.Readonly)
@@ -811,27 +799,27 @@ func Test__AuthService_GetRoleDefinition(t *testing.T) {
 
 	t.Run("get canvas role definition", func(t *testing.T) {
 		// Test canvas viewer role
-		viewerRole, err := authService.GetRoleDefinition(RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
+		viewerRole, err := authService.GetRoleDefinition(models.RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleCanvasViewer, viewerRole.Name)
+		assert.Equal(t, models.RoleCanvasViewer, viewerRole.Name)
 		assert.Equal(t, models.DomainTypeCanvas, viewerRole.DomainType)
 		assert.NotEmpty(t, viewerRole.Description)
 		assert.True(t, viewerRole.Readonly)
 		assert.NotEmpty(t, viewerRole.Permissions)
 
 		// Test canvas admin role
-		adminRole, err := authService.GetRoleDefinition(RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
+		adminRole, err := authService.GetRoleDefinition(models.RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleCanvasAdmin, adminRole.Name)
+		assert.Equal(t, models.RoleCanvasAdmin, adminRole.Name)
 		assert.Equal(t, models.DomainTypeCanvas, adminRole.DomainType)
 		assert.NotEmpty(t, adminRole.Description)
 		assert.True(t, adminRole.Readonly)
 		assert.NotEmpty(t, adminRole.Permissions)
 
 		// Test canvas owner role
-		ownerRole, err := authService.GetRoleDefinition(RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
+		ownerRole, err := authService.GetRoleDefinition(models.RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Equal(t, RoleCanvasOwner, ownerRole.Name)
+		assert.Equal(t, models.RoleCanvasOwner, ownerRole.Name)
 		assert.Equal(t, models.DomainTypeCanvas, ownerRole.DomainType)
 		assert.NotEmpty(t, ownerRole.Description)
 		assert.True(t, ownerRole.Readonly)
@@ -845,17 +833,17 @@ func Test__AuthService_GetRoleDefinition(t *testing.T) {
 		assert.Contains(t, err.Error(), "not found")
 
 		// Test non-existent domain
-		_, err = authService.GetRoleDefinition(RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
+		_, err = authService.GetRoleDefinition(models.RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 
 		// Test invalid domain type
-		_, err = authService.GetRoleDefinition(RoleOrgViewer, "invalid_domain", orgID)
+		_, err = authService.GetRoleDefinition(models.RoleOrgViewer, "invalid_domain", orgID)
 		assert.Error(t, err)
 	})
 
 	t.Run("permissions are populated", func(t *testing.T) {
-		role, err := authService.GetRoleDefinition(RoleOrgAdmin, models.DomainTypeOrganization, orgID)
+		role, err := authService.GetRoleDefinition(models.RoleOrgAdmin, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 
 		// Check that permissions have all required fields
@@ -895,9 +883,9 @@ func Test__AuthService_GetAllRoleDefinitions(t *testing.T) {
 		}
 
 		// Check that we have the expected roles
-		assert.Contains(t, roleNames, RoleOrgViewer)
-		assert.Contains(t, roleNames, RoleOrgAdmin)
-		assert.Contains(t, roleNames, RoleOrgOwner)
+		assert.Contains(t, roleNames, models.RoleOrgViewer)
+		assert.Contains(t, roleNames, models.RoleOrgAdmin)
+		assert.Contains(t, roleNames, models.RoleOrgOwner)
 
 		// Check that all roles have required fields
 		for _, role := range roles {
@@ -921,9 +909,9 @@ func Test__AuthService_GetAllRoleDefinitions(t *testing.T) {
 		}
 
 		// Check that we have the expected roles
-		assert.Contains(t, roleNames, RoleCanvasViewer)
-		assert.Contains(t, roleNames, RoleCanvasAdmin)
-		assert.Contains(t, roleNames, RoleCanvasOwner)
+		assert.Contains(t, roleNames, models.RoleCanvasViewer)
+		assert.Contains(t, roleNames, models.RoleCanvasAdmin)
+		assert.Contains(t, roleNames, models.RoleCanvasOwner)
 
 		// Check that all roles have required fields
 		for _, role := range roles {
@@ -980,7 +968,7 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 
 	t.Run("get organization role permissions", func(t *testing.T) {
 		// Test org viewer permissions
-		viewerPermissions, err := authService.GetRolePermissions(RoleOrgViewer, models.DomainTypeOrganization, orgID)
+		viewerPermissions, err := authService.GetRolePermissions(models.RoleOrgViewer, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, viewerPermissions)
 
@@ -991,7 +979,7 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		}
 
 		// Test org admin permissions (should include viewer permissions + more)
-		adminPermissions, err := authService.GetRolePermissions(RoleOrgAdmin, models.DomainTypeOrganization, orgID)
+		adminPermissions, err := authService.GetRolePermissions(models.RoleOrgAdmin, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, adminPermissions)
 		assert.GreaterOrEqual(t, len(adminPermissions), len(viewerPermissions))
@@ -1005,7 +993,7 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		assert.True(t, actions["read"], "Admin should have read permissions")
 
 		// Test org owner permissions (should include admin permissions + more)
-		ownerPermissions, err := authService.GetRolePermissions(RoleOrgOwner, models.DomainTypeOrganization, orgID)
+		ownerPermissions, err := authService.GetRolePermissions(models.RoleOrgOwner, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, ownerPermissions)
 		assert.GreaterOrEqual(t, len(ownerPermissions), len(adminPermissions))
@@ -1013,7 +1001,7 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 
 	t.Run("get canvas role permissions", func(t *testing.T) {
 		// Test canvas viewer permissions
-		viewerPermissions, err := authService.GetRolePermissions(RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
+		viewerPermissions, err := authService.GetRolePermissions(models.RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, viewerPermissions)
 
@@ -1024,13 +1012,13 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		}
 
 		// Test canvas admin permissions
-		adminPermissions, err := authService.GetRolePermissions(RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
+		adminPermissions, err := authService.GetRolePermissions(models.RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, adminPermissions)
 		assert.GreaterOrEqual(t, len(adminPermissions), len(viewerPermissions))
 
 		// Test canvas owner permissions
-		ownerPermissions, err := authService.GetRolePermissions(RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
+		ownerPermissions, err := authService.GetRolePermissions(models.RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, ownerPermissions)
 		assert.GreaterOrEqual(t, len(ownerPermissions), len(adminPermissions))
@@ -1038,10 +1026,10 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 
 	t.Run("permissions include inheritance", func(t *testing.T) {
 		// Canvas admin should have all viewer permissions plus admin-specific ones
-		viewerPermissions, err := authService.GetRolePermissions(RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
+		viewerPermissions, err := authService.GetRolePermissions(models.RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 
-		adminPermissions, err := authService.GetRolePermissions(RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
+		adminPermissions, err := authService.GetRolePermissions(models.RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 
 		// Check that admin has at least all viewer permissions
@@ -1069,11 +1057,11 @@ func Test__AuthService_GetRolePermissions(t *testing.T) {
 		assert.Error(t, err)
 
 		// Test non-existent domain
-		_, err = authService.GetRolePermissions(RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
+		_, err = authService.GetRolePermissions(models.RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
 		assert.Error(t, err)
 
 		// Test invalid domain type
-		_, err = authService.GetRolePermissions(RoleOrgViewer, "invalid_domain", orgID)
+		_, err = authService.GetRolePermissions(models.RoleOrgViewer, "invalid_domain", orgID)
 		assert.Error(t, err)
 	})
 }
@@ -1096,59 +1084,59 @@ func Test__AuthService_GetRoleHierarchy(t *testing.T) {
 
 	t.Run("get organization role hierarchy", func(t *testing.T) {
 		// Test org viewer hierarchy (should only include itself)
-		viewerHierarchy, err := authService.GetRoleHierarchy(RoleOrgViewer, models.DomainTypeOrganization, orgID)
+		viewerHierarchy, err := authService.GetRoleHierarchy(models.RoleOrgViewer, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Contains(t, viewerHierarchy, RoleOrgViewer)
+		assert.Contains(t, viewerHierarchy, models.RoleOrgViewer)
 
 		// Test org admin hierarchy (should include itself and inherited roles)
-		adminHierarchy, err := authService.GetRoleHierarchy(RoleOrgAdmin, models.DomainTypeOrganization, orgID)
+		adminHierarchy, err := authService.GetRoleHierarchy(models.RoleOrgAdmin, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Contains(t, adminHierarchy, RoleOrgAdmin)
+		assert.Contains(t, adminHierarchy, models.RoleOrgAdmin)
 		// May also include inherited roles depending on setup
 
 		// Test org owner hierarchy (should include itself and inherited roles)
-		ownerHierarchy, err := authService.GetRoleHierarchy(RoleOrgOwner, models.DomainTypeOrganization, orgID)
+		ownerHierarchy, err := authService.GetRoleHierarchy(models.RoleOrgOwner, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
-		assert.Contains(t, ownerHierarchy, RoleOrgOwner)
+		assert.Contains(t, ownerHierarchy, models.RoleOrgOwner)
 		// Should be the longest hierarchy
 		assert.GreaterOrEqual(t, len(ownerHierarchy), len(adminHierarchy))
 	})
 
 	t.Run("get canvas role hierarchy", func(t *testing.T) {
 		// Test canvas viewer hierarchy
-		viewerHierarchy, err := authService.GetRoleHierarchy(RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
+		viewerHierarchy, err := authService.GetRoleHierarchy(models.RoleCanvasViewer, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Contains(t, viewerHierarchy, RoleCanvasViewer)
+		assert.Contains(t, viewerHierarchy, models.RoleCanvasViewer)
 
 		// Test canvas admin hierarchy
-		adminHierarchy, err := authService.GetRoleHierarchy(RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
+		adminHierarchy, err := authService.GetRoleHierarchy(models.RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Contains(t, adminHierarchy, RoleCanvasAdmin)
+		assert.Contains(t, adminHierarchy, models.RoleCanvasAdmin)
 
 		// Test canvas owner hierarchy
-		ownerHierarchy, err := authService.GetRoleHierarchy(RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
+		ownerHierarchy, err := authService.GetRoleHierarchy(models.RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
-		assert.Contains(t, ownerHierarchy, RoleCanvasOwner)
+		assert.Contains(t, ownerHierarchy, models.RoleCanvasOwner)
 		// Should be the longest hierarchy
 		assert.GreaterOrEqual(t, len(ownerHierarchy), len(adminHierarchy))
 	})
 
 	t.Run("hierarchy includes inheritance", func(t *testing.T) {
 		// Canvas owner should include admin in hierarchy (if inheritance is set up)
-		ownerHierarchy, err := authService.GetRoleHierarchy(RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
+		ownerHierarchy, err := authService.GetRoleHierarchy(models.RoleCanvasOwner, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 
 		// The exact inheritance depends on CSV setup, but owner should have most roles
 		assert.GreaterOrEqual(t, len(ownerHierarchy), 1) // At least includes itself
 
 		// Admin should have fewer or equal roles than owner
-		adminHierarchy, err := authService.GetRoleHierarchy(RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
+		adminHierarchy, err := authService.GetRoleHierarchy(models.RoleCanvasAdmin, models.DomainTypeCanvas, canvasID)
 		require.NoError(t, err)
 		assert.LessOrEqual(t, len(adminHierarchy), len(ownerHierarchy))
 	})
 
 	t.Run("hierarchy is unique", func(t *testing.T) {
-		hierarchy, err := authService.GetRoleHierarchy(RoleOrgOwner, models.DomainTypeOrganization, orgID)
+		hierarchy, err := authService.GetRoleHierarchy(models.RoleOrgOwner, models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 
 		// Check for duplicates
@@ -1165,11 +1153,11 @@ func Test__AuthService_GetRoleHierarchy(t *testing.T) {
 		assert.Error(t, err)
 
 		// Test non-existent domain
-		_, err = authService.GetRoleHierarchy(RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
+		_, err = authService.GetRoleHierarchy(models.RoleOrgViewer, models.DomainTypeOrganization, "non-existent-org")
 		assert.Error(t, err)
 
 		// Test invalid domain type
-		_, err = authService.GetRoleHierarchy(RoleOrgViewer, "invalid_domain", orgID)
+		_, err = authService.GetRoleHierarchy(models.RoleOrgViewer, "invalid_domain", orgID)
 		assert.Error(t, err)
 	})
 }
@@ -1274,7 +1262,7 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 
 		// Test that permissions still work
 		userID := r.User.String()
-		err = authService.AssignRole(userID, RoleOrgViewer, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
@@ -1311,7 +1299,7 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 
 		// Test that roles work properly
 		userID := r.User.String()
-		err = authService.AssignRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		allowed, err := authService.CheckOrganizationPermission(userID, orgID, "canvas", "create")
@@ -1344,7 +1332,7 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test that all expected roles exist
-		expectedRoles := []string{RoleOrgViewer, RoleOrgAdmin, RoleOrgOwner}
+		expectedRoles := []string{models.RoleOrgViewer, models.RoleOrgAdmin, models.RoleOrgOwner}
 		for _, role := range expectedRoles {
 			roleDef, err := authService.GetRoleDefinition(role, models.DomainTypeOrganization, orgID)
 			require.NoError(t, err)
@@ -1354,7 +1342,7 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 
 		// Test role hierarchy
 		userID := r.User.String()
-		err = authService.AssignRole(userID, RoleOrgOwner, orgID, models.DomainTypeOrganization)
+		err = authService.AssignRole(userID, models.RoleOrgOwner, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
 		// Owner should have admin and viewer permissions through inheritance
@@ -1366,9 +1354,9 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		assert.True(t, flatRoles[RoleOrgOwner])
-		assert.True(t, flatRoles[RoleOrgAdmin])
-		assert.True(t, flatRoles[RoleOrgViewer])
+		assert.True(t, flatRoles[models.RoleOrgOwner])
+		assert.True(t, flatRoles[models.RoleOrgAdmin])
+		assert.True(t, flatRoles[models.RoleOrgViewer])
 	})
 
 	t.Run("sync is idempotent for organizations", func(t *testing.T) {
@@ -1404,7 +1392,7 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test that all expected roles exist
-		expectedRoles := []string{RoleCanvasViewer, RoleCanvasAdmin, RoleCanvasOwner}
+		expectedRoles := []string{models.RoleCanvasViewer, models.RoleCanvasAdmin, models.RoleCanvasOwner}
 		for _, role := range expectedRoles {
 			roleDef, err := authService.GetRoleDefinition(role, models.DomainTypeCanvas, canvasID)
 			require.NoError(t, err)
@@ -1414,7 +1402,7 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 
 		// Test role hierarchy
 		userID := r.User.String()
-		err = authService.AssignRole(userID, RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(userID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Owner should have admin and viewer permissions through inheritance
@@ -1426,9 +1414,9 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 			flatRoles[role.Name] = true
 		}
 
-		assert.True(t, flatRoles[RoleCanvasOwner])
-		assert.True(t, flatRoles[RoleCanvasAdmin])
-		assert.True(t, flatRoles[RoleCanvasViewer])
+		assert.True(t, flatRoles[models.RoleCanvasOwner])
+		assert.True(t, flatRoles[models.RoleCanvasAdmin])
+		assert.True(t, flatRoles[models.RoleCanvasViewer])
 	})
 
 	t.Run("sync is idempotent for canvases", func(t *testing.T) {
@@ -1481,10 +1469,10 @@ func Test__AuthService_PermissionSync_Integration(t *testing.T) {
 		canvasID := r.Canvas.ID.String()
 
 		// Assign roles
-		err := authService.AssignRole(userID, RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		err := authService.AssignRole(userID, models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
-		err = authService.AssignRole(userID, RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
+		err = authService.AssignRole(userID, models.RoleCanvasViewer, canvasID, models.DomainTypeCanvas)
 		require.NoError(t, err)
 
 		// Test org permissions

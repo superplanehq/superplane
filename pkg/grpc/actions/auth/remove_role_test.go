@@ -7,9 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -23,36 +21,56 @@ func Test_RemoveRole(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
-	t.Run("successful role removal", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserId: r.User.String(),
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
-
-		resp, err := RemoveRole(ctx, req, authService)
+	t.Run("successful role removal with user ID", func(t *testing.T) {
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
-	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
-		req := &pb.RemoveRoleRequest{
-			UserId: r.User.String(),
-			RoleAssignment: &pb.RoleAssignment{
-				DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-				DomainId:   orgID,
-				Role:       authorization.RoleOrgAdmin,
-			},
-		}
+	t.Run("successful role removal with user email", func(t *testing.T) {
+		testEmail := "test-remove@example.com"
 
-		_, err := RemoveRole(ctx, req, authService)
+		user := &models.User{
+			Name:     testEmail,
+			IsActive: false,
+		}
+		err := user.Create()
+		require.NoError(t, err)
+
+		accountProvider := &models.AccountProvider{
+			Provider: "github",
+			UserID:   user.ID,
+			Email:    testEmail,
+		}
+		err = accountProvider.Create()
+		require.NoError(t, err)
+
+		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+		require.NoError(t, err)
+
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", testEmail, authService)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
+
+	t.Run("user not found by email", func(t *testing.T) {
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "nonexistent@example.com", authService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
+	})
+
+	t.Run("invalid request - missing user identifier", func(t *testing.T) {
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", authService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid user ID or Email")
+	})
+
+	t.Run("invalid request - invalid user ID", func(t *testing.T) {
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", authService)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid user ID")
 	})
 }

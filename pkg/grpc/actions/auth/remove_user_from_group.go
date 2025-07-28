@@ -4,31 +4,25 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func RemoveUserFromGroup(ctx context.Context, req *GroupUserRequest, authService authorization.Authorization) error {
-	err := actions.ValidateUUIDs(req.DomainID, req.UserID)
-	if err != nil {
-		return status.Error(codes.InvalidArgument, "invalid UUIDs")
+func RemoveUserFromGroup(ctx context.Context, domainType, domainID, userID, userEmail, groupName string, authService authorization.Authorization) (*pbGroups.RemoveUserFromGroupResponse, error) {
+	if groupName == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	err = ValidateGroupUserRequest(req)
+	resolvedUserID, err := ResolveUserIDWithoutCreation(userID, userEmail)
 	if err != nil {
-		return err
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	err = authService.RemoveUserFromGroup(domainID, domainType, resolvedUserID, groupName)
 	if err != nil {
-		return err
+		return nil, status.Error(codes.Internal, "failed to remove user from group")
 	}
 
-	err = authService.RemoveUserFromGroup(req.DomainID, domainType, req.UserID, req.GroupName)
-	if err != nil {
-		return status.Error(codes.Internal, "failed to remove user from group")
-	}
-
-	return nil
+	return &pbGroups.RemoveUserFromGroupResponse{}, nil
 }

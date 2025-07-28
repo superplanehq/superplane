@@ -1,7 +1,7 @@
 /*
-Superplane Authorization API
+Superplane Organizations API
 
-API for the Superplane Authorization service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com

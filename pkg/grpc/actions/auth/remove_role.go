@@ -4,33 +4,22 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
-	err := actions.ValidateUUIDs(req.UserId, req.RoleAssignment.DomainId)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid UUIDs")
-	}
-
-	if req.RoleAssignment.DomainType == pb.DomainType_DOMAIN_TYPE_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "domain type must be specified")
-	}
-
-	domainType, err := actions.ProtoToDomainType(req.RoleAssignment.DomainType)
-	if err != nil {
-		return nil, err
-	}
-
-	roleStr := req.RoleAssignment.Role
-	if roleStr == "" {
+func RemoveRole(ctx context.Context, domainType string, domainID string, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
+	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	err = authService.RemoveRole(req.UserId, roleStr, req.RoleAssignment.DomainId, domainType)
+	userId, err := ResolveUserIDWithoutCreation(userID, userEmail)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
+	}
+
+	err = authService.RemoveRole(userId, roleName, domainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove role")
 	}
