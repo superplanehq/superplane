@@ -26,7 +26,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := integration.Executor(&models.Resource{
+		executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
 			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
@@ -66,7 +66,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := integration.Executor(&models.Resource{
+		executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
 			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
@@ -113,7 +113,7 @@ func Test_Semaphore__Validate(t *testing.T) {
 	integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 	require.NoError(t, err)
 
-	executor, err := integration.Executor(&models.Resource{
+	executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
 		ResourceType: semaphore.ResourceTypeProject,
 		ExternalID:   uuid.NewString(),
 	})

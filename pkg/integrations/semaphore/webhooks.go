@@ -47,7 +47,7 @@ func (i *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (i
 	//
 	// Check if secret already exists.
 	//
-	secret, err := i.Get(ResourceTypeSecret, name)
+	secret, err := i.getSecret(name)
 	if err == nil {
 		return secret, nil
 	}
@@ -55,7 +55,7 @@ func (i *SemaphoreIntegration) createSemaphoreSecret(name string, key []byte) (i
 	//
 	// Secret does not exist, create it.
 	//
-	secret, err = i.Create(ResourceTypeSecret, &Secret{
+	secret, err = i.createSecret(&Secret{
 		Metadata: SecretMetadata{
 			Name: name,
 		},
@@ -80,7 +80,7 @@ func (i *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 	//
 	// Check if notification already exists.
 	//
-	notification, err := i.Get(ResourceTypeNotification, name)
+	notification, err := i.getNotification(name)
 	if err == nil {
 		return notification, nil
 	}
@@ -88,7 +88,7 @@ func (i *SemaphoreIntegration) createSemaphoreNotification(name string, options 
 	//
 	// Notification does not exist, create it.
 	//
-	notification, err = i.Create(ResourceTypeNotification, &Notification{
+	notification, err = i.createNotification(&Notification{
 		Metadata: NotificationMetadata{
 			Name: name,
 		},

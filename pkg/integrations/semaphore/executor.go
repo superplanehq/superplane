@@ -16,6 +16,13 @@ type SemaphoreExecutor struct {
 	Resource    integrations.Resource
 }
 
+type ExecutorSpec struct {
+	Task         string            `json:"task"`
+	Branch       string            `json:"branch"`
+	PipelineFile string            `json:"pipelineFile"`
+	Parameters   map[string]string `json:"parameters"`
+}
+
 func NewSemaphoreExecutor(integration integrations.Integration, resource integrations.Resource) (integrations.Executor, error) {
 	return &SemaphoreExecutor{
 		Integration: integration,
@@ -34,20 +41,22 @@ func (e *SemaphoreExecutor) Validate(ctx context.Context, specData []byte) error
 		return fmt.Errorf("branch is required")
 	}
 
-	return e.validateSemaphoreTask(spec)
+	return e.validateTask(spec)
 }
 
-func (e *SemaphoreExecutor) validateSemaphoreTask(spec ExecutorSpec) error {
+func (e *SemaphoreExecutor) validateTask(spec ExecutorSpec) error {
 	if spec.Task == "" {
 		return nil
 	}
+
+	semaphore := e.Integration.(*SemaphoreIntegration)
 
 	//
 	// If task is a UUID, we describe to validate that it exists.
 	//
 	_, err := uuid.Parse(spec.Task)
 	if err == nil {
-		_, err := e.Integration.Get(ResourceTypeTask, spec.Task, e.Resource.Id())
+		_, err := semaphore.getTask(spec.Task, e.Resource.Id())
 		if err != nil {
 			return fmt.Errorf("task %s not found: %v", spec.Task, err)
 		}
@@ -58,7 +67,7 @@ func (e *SemaphoreExecutor) validateSemaphoreTask(spec ExecutorSpec) error {
 	//
 	// If task is a string, we have to list tasks and find the one that matches.
 	//
-	tasks, err := e.Integration.List(ResourceTypeTask, e.Resource.Id())
+	tasks, err := semaphore.listTasks(e.Resource.Id())
 	if err != nil {
 		return fmt.Errorf("error listing tasks: %v", err)
 	}
@@ -70,13 +79,6 @@ func (e *SemaphoreExecutor) validateSemaphoreTask(spec ExecutorSpec) error {
 	}
 
 	return fmt.Errorf("task %s not found", spec.Task)
-}
-
-type ExecutorSpec struct {
-	Task         string            `json:"task"`
-	Branch       string            `json:"branch"`
-	PipelineFile string            `json:"pipelineFile"`
-	Parameters   map[string]string `json:"parameters"`
 }
 
 func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (integrations.Resource, error) {
@@ -94,7 +96,8 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 }
 
 func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.Resource, error) {
-	return e.Integration.Create(ResourceTypeWorkflow, &CreateWorkflowRequest{
+	semaphore := e.Integration.(*SemaphoreIntegration)
+	return semaphore.runWorkflow(CreateWorkflowRequest{
 		ProjectID:    e.Resource.Id(),
 		Reference:    "refs/heads/" + spec.Branch,
 		PipelineFile: spec.PipelineFile,
@@ -103,7 +106,8 @@ func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.
 }
 
 func (e *SemaphoreExecutor) runTask(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.Resource, error) {
-	return e.Integration.Create(ResourceTypeTaskTrigger, &RunTaskRequest{
+	semaphore := e.Integration.(*SemaphoreIntegration)
+	return semaphore.runTask(&RunTaskRequest{
 		TaskID:       spec.Task,
 		Branch:       spec.Branch,
 		PipelineFile: spec.PipelineFile,

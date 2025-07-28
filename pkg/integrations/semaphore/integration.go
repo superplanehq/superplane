@@ -17,7 +17,6 @@ const (
 	PipelineResultFailed = "failed"
 
 	ResourceTypeTask         = "task"
-	ResourceTypeTaskTrigger  = "task-trigger"
 	ResourceTypeProject      = "project"
 	ResourceTypeWorkflow     = "workflow"
 	ResourceTypeNotification = "notification"
@@ -42,27 +41,16 @@ func NewSemaphoreIntegration(ctx context.Context, URL string, authenticate integ
 	}, nil
 }
 
-func (i *SemaphoreIntegration) List(resourceType string, parentIDs ...string) ([]integrations.Resource, error) {
-	switch resourceType {
-	case ResourceTypeTask:
-		return i.listTasks(parentIDs...)
-	case ResourceTypeProject:
-		return i.listProjects()
-	default:
-		return nil, fmt.Errorf("unsupported resource type %s for list", resourceType)
-	}
-}
-
 func (i *SemaphoreIntegration) Check(resourceType, id string) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
-		resource, err := i.Get(ResourceTypeWorkflow, id)
+		resource, err := i.getWorkflow(id)
 		if err != nil {
 			return nil, fmt.Errorf("workflow %s not found", id)
 		}
 
 		workflow := resource.(*Workflow)
-		resource, err = i.Get(ResourceTypePipeline, workflow.InitialPplID)
+		resource, err = i.getPipeline(workflow.InitialPplID)
 		if err != nil {
 			return nil, fmt.Errorf("pipeline %s not found", workflow.InitialPplID)
 		}
@@ -71,26 +59,16 @@ func (i *SemaphoreIntegration) Check(resourceType, id string) (integrations.Stat
 		return pipeline, nil
 
 	default:
-		return nil, fmt.Errorf("unsupported resource type %s for check", resourceType)
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
 	}
 }
 
-func (i *SemaphoreIntegration) Get(resourceType, id string, parentIDs ...string) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) Get(resourceType, id string) (integrations.Resource, error) {
 	switch resourceType {
-	case ResourceTypeWorkflow:
-		return i.getWorkflow(id)
-	case ResourceTypePipeline:
-		return i.getPipeline(id)
-	case ResourceTypeTask:
-		return i.getTask(id, parentIDs...)
 	case ResourceTypeProject:
 		return i.getProject(id)
-	case ResourceTypeSecret:
-		return i.getSecret(id)
-	case ResourceTypeNotification:
-		return i.getNotification(id)
 	default:
-		return nil, fmt.Errorf("unsupported resource type %s for get", resourceType)
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
 	}
 }
 
@@ -110,21 +88,6 @@ func (i *SemaphoreIntegration) Executor(resource integrations.Resource) (integra
 		Integration: i,
 		Resource:    resource,
 	}, nil
-}
-
-func (i *SemaphoreIntegration) Create(resourceType string, params any) (integrations.Resource, error) {
-	switch resourceType {
-	case ResourceTypeWorkflow:
-		return i.runWorkflow(params)
-	case ResourceTypeTaskTrigger:
-		return i.runTask(params)
-	case ResourceTypeNotification:
-		return i.createNotification(params)
-	case ResourceTypeSecret:
-		return i.createSecret(params)
-	default:
-		return nil, fmt.Errorf("unsupported resource type %s for create", resourceType)
-	}
 }
 
 func (i *SemaphoreIntegration) createSecret(params any) (integrations.Resource, error) {

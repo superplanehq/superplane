@@ -13,9 +13,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
+type Integration struct {
+	BuildFn    func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.Integration, error)
+	ExecutorFn func(integrations.Integration, integrations.Resource) (integrations.Executor, error)
+}
+
 type Registry struct {
 	Encryptor    crypto.Encryptor
-	Integrations map[string]integrations.BuildFn
+	Integrations map[string]Integration
 	Executors    map[string]executors.Executor
 }
 
@@ -23,7 +28,7 @@ func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		Encryptor:    encryptor,
 		Executors:    map[string]executors.Executor{},
-		Integrations: map[string]integrations.BuildFn{},
+		Integrations: map[string]Integration{},
 	}
 
 	r.Init()
@@ -35,7 +40,10 @@ func (r *Registry) Init() {
 	//
 	// Register the integrations
 	//
-	r.Integrations[models.IntegrationTypeSemaphore] = semaphore.NewSemaphoreIntegration
+	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
+		BuildFn:    semaphore.NewSemaphoreIntegration,
+		ExecutorFn: semaphore.NewSemaphoreExecutor,
+	}
 
 	//
 	// Register the executors
@@ -49,7 +57,7 @@ func (r *Registry) HasIntegrationWithType(integrationType string) bool {
 }
 
 func (r *Registry) NewIntegration(ctx context.Context, integration *models.Integration) (integrations.Integration, error) {
-	builder, ok := r.Integrations[integration.Type]
+	registration, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
@@ -59,7 +67,7 @@ func (r *Registry) NewIntegration(ctx context.Context, integration *models.Integ
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
 
-	return builder(ctx, integration.URL, authFn)
+	return registration.BuildFn(ctx, integration.URL, authFn)
 }
 
 func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
@@ -123,7 +131,12 @@ func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resou
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}
 
-	return integrationImpl.Executor(resource)
+	registration, ok := r.Integrations[integration.Type]
+	if !ok {
+		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
+	}
+
+	return registration.ExecutorFn(integrationImpl, resource)
 }
 
 func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) {

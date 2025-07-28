@@ -6,21 +6,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 )
 
-type BuildFn func(ctx context.Context, URL string, authenticate AuthenticateFn) (Integration, error)
-
 type AuthenticateFn func() (string, error)
 
 type Integration interface {
-	Get(resourceType, id string, parentIDs ...string) (Resource, error)
-	Create(resourceType string, params any) (Resource, error)
-	List(resourceType string, parentIDs ...string) ([]Resource, error)
-
-	SetupWebhook(options WebhookOptions) ([]Resource, error)
-
+	Get(resourceType, id string) (Resource, error)
 	Check(resourceType, id string) (StatefulResource, error)
+	SetupWebhook(options WebhookOptions) ([]Resource, error)
 	HandleWebhook([]byte) (StatefulResource, error)
-
-	Executor(resource Resource) (Executor, error)
 }
 
 type Executor interface {
