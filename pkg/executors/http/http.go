@@ -24,11 +24,11 @@ type HTTPSpec struct {
 	URL            string              `json:"url"`
 	Payload        map[string]string   `json:"payload"`
 	Headers        map[string]string   `json:"headers"`
-	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
+	ResponsePolicy *HTTPResponsePolicy `json:"responsePolicy"`
 }
 
 type HTTPResponsePolicy struct {
-	StatusCodes []uint32 `json:"status_codes"`
+	StatusCodes []uint32 `json:"statusCodes"`
 }
 
 func (e *HTTPExecutor) Validate(ctx context.Context, specData []byte) error {

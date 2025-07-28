@@ -22,8 +22,9 @@ type PendingEventSourcesWorker struct {
 
 func NewPendingEventSourcesWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) (*PendingEventSourcesWorker, error) {
 	return &PendingEventSourcesWorker{
-		Registry: registry,
-		BaseURL:  baseURL,
+		Encryptor: encryptor,
+		Registry:  registry,
+		BaseURL:   baseURL,
 	}, nil
 }
 

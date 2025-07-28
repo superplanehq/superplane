@@ -1,6 +1,7 @@
 package semaphore
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 
@@ -24,9 +25,14 @@ type HookPipeline struct {
 
 func (i *SemaphoreIntegration) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
+	// Semaphore doesn't let us use UUIDs in secret names,
+	// so we base64 that ID before creating the secret.
+	//
+	resourceName := fmt.Sprintf("superplane-webhook-%s", base64.StdEncoding.EncodeToString([]byte(options.ID)))
+
+	//
 	// Create Semaphore secret to store the event source key.
 	//
-	resourceName := fmt.Sprintf("superplane-webhook-%s", options.ID)
 	secret, err := i.createSemaphoreSecret(resourceName, options.Key)
 	if err != nil {
 		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)

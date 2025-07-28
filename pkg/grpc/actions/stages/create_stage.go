@@ -488,8 +488,8 @@ func serializeExecutor(executor *models.StageExecutor) (*pb.Executor, error) {
 			DomainType: actions.DomainTypeToProto(integrationResource.DomainType),
 		},
 		Resource: &integrationpb.ResourceRef{
-			Type: integrationResource.Name,
-			Name: integrationResource.Type,
+			Type: integrationResource.Type,
+			Name: integrationResource.Name,
 		},
 	}, nil
 }

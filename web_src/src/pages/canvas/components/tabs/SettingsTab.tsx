@@ -150,9 +150,9 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                 <div className="space-y-2">
                   <div className="flex items-start w-full">
                     <div className='text-gray-600 w-1/4 text-left'>Type</div>
-                    <div className="block w-full text-left">{selectedStage.spec!.executor!.type?.replace('TYPE_', '') || '—'}</div>
+                    <div className="block w-full text-left">{selectedStage.spec!.executor!.type}</div>
                   </div>
-                  {selectedStage.spec!.executor!.spec && (
+                  {selectedStage.spec!.executor!.spec && selectedStage.spec!.executor!.type == "semaphore" && (
                     <>
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Project</div>
@@ -165,6 +165,14 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                       <div className="flex items-start w-full">
                         <div className='text-gray-600 w-1/4 text-left'>Pipeline file</div>
                         <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.pipelineFile as string || '—'}</div>
+                      </div>
+                    </>
+                  )}
+                  {selectedStage.spec!.executor!.spec && selectedStage.spec!.executor!.type == "http" && (
+                    <>
+                      <div className="flex items-start w-full">
+                        <div className='text-gray-600 w-1/4 text-left'>URL</div>
+                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.url as string || '—'}</div>
                       </div>
                     </>
                   )}
