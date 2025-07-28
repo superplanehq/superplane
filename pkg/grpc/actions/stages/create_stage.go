@@ -18,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,7 +26,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -98,7 +99,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.Create
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, req.Stage.Spec.Executor.Resource)
+		resource, err = actions.ValidateResource(ctx, registry, integration, req.Stage.Spec.Executor.Resource)
 		if err != nil {
 			return nil, err
 		}
@@ -109,7 +110,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.Create
 		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
 	}
 
-	stage, err := builders.NewStageBuilder().
+	stage, err := builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithEncryptor(encryptor).
 		InCanvas(canvas).

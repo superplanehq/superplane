@@ -31,7 +31,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	}
 
 	executorType, executorSpec, integrationResource := support.Executor(t, r)
-	stage, err := builders.NewStageBuilder().
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").
@@ -111,7 +111,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
 		executorType, executorSpec, integrationResource := support.Executor(t, r)
-		stageWithOutput, err := builders.NewStageBuilder().
+		stageWithOutput, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-output").

@@ -1,5 +1,12 @@
 package integrations
 
+import (
+	"context"
+
+	"github.com/superplanehq/superplane/pkg/models"
+)
+
+type BuildFn func(ctx context.Context, integration *models.Integration, authenticate AuthenticateFn) (Integration, error)
 type AuthenticateFn func() (string, error)
 
 type Integration interface {

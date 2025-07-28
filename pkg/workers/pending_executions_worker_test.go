@@ -32,6 +32,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		JwtSigner:   jwt.NewSigner("test"),
 		Encryptor:   &crypto.NoOpEncryptor{},
 		SpecBuilder: executors.SpecBuilder{},
+		Registry:    r.Registry,
 	}
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -41,7 +42,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		// Create stage that runs Semaphore workflow.
 		//
 		executorType, executorSpec, resource := support.Executor(t, r)
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -109,7 +110,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-2").

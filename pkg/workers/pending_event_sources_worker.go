@@ -10,16 +10,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
 type PendingEventSourcesWorker struct {
 	Encryptor crypto.Encryptor
+	Registry  *registry.Registry
 	BaseURL   string
 }
 
-func NewPendingEventSourcesWorker(encryptor crypto.Encryptor, baseURL string) (*PendingEventSourcesWorker, error) {
-	return &PendingEventSourcesWorker{Encryptor: encryptor, BaseURL: baseURL}, nil
+func NewPendingEventSourcesWorker(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) (*PendingEventSourcesWorker, error) {
+	return &PendingEventSourcesWorker{
+		Registry: registry,
+		BaseURL:  baseURL,
+	}, nil
 }
 
 func (w *PendingEventSourcesWorker) Start() {
@@ -65,7 +70,7 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error finding integration: %v", err)
 	}
 
-	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
+	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
 	if err != nil {
 		return fmt.Errorf("error creating integration: %v", err)
 	}

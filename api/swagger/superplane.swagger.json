@@ -2631,7 +2631,7 @@
       "type": "object",
       "properties": {
         "type": {
-          "$ref": "#/definitions/IntegrationsIntegrationType"
+          "type": "string"
         },
         "url": {
           "type": "string"
@@ -2643,15 +2643,6 @@
           "$ref": "#/definitions/IntegrationOIDC"
         }
       }
-    },
-    "IntegrationsIntegrationType": {
-      "type": "string",
-      "enum": [
-        "TYPE_NONE",
-        "TYPE_SEMAPHORE",
-        "TYPE_GITHUB"
-      ],
-      "default": "TYPE_NONE"
     },
     "IntegrationsListIntegrationsResponse": {
       "type": "object",

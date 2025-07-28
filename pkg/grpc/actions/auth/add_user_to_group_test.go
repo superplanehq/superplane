@@ -11,8 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
-
-	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test_AddUserToGroup(t *testing.T) {

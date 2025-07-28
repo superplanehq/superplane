@@ -15,12 +15,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
 	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -58,7 +59,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, req.EventSource.Spec.Resource)
+		resource, err = actions.ValidateResource(ctx, registry, integration, req.EventSource.Spec.Resource)
 		if err != nil {
 			return nil, err
 		}

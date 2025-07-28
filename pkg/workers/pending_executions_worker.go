@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
@@ -19,6 +20,7 @@ type PendingExecutionsWorker struct {
 	JwtSigner   *jwt.Signer
 	Encryptor   crypto.Encryptor
 	SpecBuilder executors.SpecBuilder
+	Registry    *registry.Registry
 }
 
 func (w *PendingExecutionsWorker) Start() {
@@ -116,7 +118,7 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 
 func (w *PendingExecutionsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
 	if stageExecutor.ResourceID == nil {
-		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
 	}
 
 	integration, err := stageExecutor.FindIntegration()
@@ -129,7 +131,7 @@ func (w *PendingExecutionsWorker) initExecutor(stageExecutor *models.StageExecut
 		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
 	}
 
-	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
+	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
 }
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {

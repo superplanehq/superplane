@@ -43,10 +43,7 @@ docs/AuthorizationUpdateRoleBody.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventSourceAPI.md
-docs/EventSourceSpecSemaphore.md
 docs/ExecutionResult.md
-docs/ExecutorSpecHTTP.md
-docs/ExecutorSpecHTTPResponsePolicy.md
 docs/GroupByField.md
 docs/InputMappingWhen.md
 docs/InputMappingWhenTriggeredBy.md
@@ -61,8 +58,8 @@ docs/IntegrationsIntegration.md
 docs/IntegrationsIntegrationMetadata.md
 docs/IntegrationsIntegrationRef.md
 docs/IntegrationsIntegrationSpec.md
-docs/IntegrationsIntegrationType.md
 docs/IntegrationsListIntegrationsResponse.md
+docs/IntegrationsResourceRef.md
 docs/OrganizationAPI.md
 docs/OrganizationsCreateOrganizationRequest.md
 docs/OrganizationsCreateOrganizationResponse.md
@@ -73,6 +70,7 @@ docs/OrganizationsOrganizationMetadata.md
 docs/OrganizationsUpdateOrganizationBody.md
 docs/OrganizationsUpdateOrganizationResponse.md
 docs/ProtobufAny.md
+docs/ProtobufNullValue.md
 docs/RpcStatus.md
 docs/SecretAPI.md
 docs/SecretLocal.md
@@ -124,9 +122,7 @@ docs/SuperplaneEventSourceSpec.md
 docs/SuperplaneExecution.md
 docs/SuperplaneExecutionResource.md
 docs/SuperplaneExecutionState.md
-docs/SuperplaneExecutorSpec.md
-docs/SuperplaneExecutorSpecSemaphore.md
-docs/SuperplaneExecutorSpecType.md
+docs/SuperplaneExecutor.md
 docs/SuperplaneFilter.md
 docs/SuperplaneFilterOperator.md
 docs/SuperplaneFilterType.md
@@ -188,10 +184,7 @@ model_authorization_remove_role_request.go
 model_authorization_role.go
 model_authorization_role_assignment.go
 model_authorization_update_role_body.go
-model_event_source_spec_semaphore.go
 model_execution_result.go
-model_executor_spec_http.go
-model_executor_spec_http_response_policy.go
 model_group_by_field.go
 model_input_mapping_when.go
 model_input_mapping_when_triggered_by.go
@@ -205,8 +198,8 @@ model_integrations_integration.go
 model_integrations_integration_metadata.go
 model_integrations_integration_ref.go
 model_integrations_integration_spec.go
-model_integrations_integration_type.go
 model_integrations_list_integrations_response.go
+model_integrations_resource_ref.go
 model_organizations_create_organization_request.go
 model_organizations_create_organization_response.go
 model_organizations_describe_organization_response.go
@@ -216,6 +209,7 @@ model_organizations_organization_metadata.go
 model_organizations_update_organization_body.go
 model_organizations_update_organization_response.go
 model_protobuf_any.go
+model_protobuf_null_value.go
 model_rpc_status.go
 model_secret_local.go
 model_secret_provider.go
@@ -265,9 +259,7 @@ model_superplane_event_source_spec.go
 model_superplane_execution.go
 model_superplane_execution_resource.go
 model_superplane_execution_state.go
-model_superplane_executor_spec.go
-model_superplane_executor_spec_semaphore.go
-model_superplane_executor_spec_type.go
+model_superplane_executor.go
 model_superplane_filter.go
 model_superplane_filter_operator.go
 model_superplane_filter_type.go

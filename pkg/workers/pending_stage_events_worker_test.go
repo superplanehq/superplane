@@ -33,7 +33,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not require approval.
 		//
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-no-approval-1").
@@ -89,7 +89,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-approval-1").
@@ -134,7 +134,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			{Type: models.StageConditionTypeApproval, Approval: &models.ApprovalCondition{Count: 1}},
 		}
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-approval-2").
@@ -199,7 +199,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-time-window").
@@ -260,7 +260,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-time-window-2").
@@ -314,7 +314,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		// Create stage that does not requires approval.
 		//
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-no-approval-3").

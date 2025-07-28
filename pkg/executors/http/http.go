@@ -11,7 +11,6 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 const MaxHTTPResponseSize = 8 * 1024
@@ -50,10 +49,6 @@ func (r *HTTPResponse) Outputs() map[string]any {
 	}
 
 	return nil
-}
-
-func init() {
-	executors.Register(models.ExecutorSpecTypeHTTP, NewHTTPExecutor)
 }
 
 type HTTPSpec struct {

@@ -15,12 +15,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -74,7 +75,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.Update
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, req.Stage.Spec.Executor.Resource)
+		resource, err = actions.ValidateResource(ctx, registry, integration, req.Stage.Spec.Executor.Resource)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +113,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, req *pb.Update
 		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
 	}
 
-	stage, err = builders.NewStageBuilder().
+	stage, err = builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithExistingStage(stage).
 		WithEncryptor(encryptor).

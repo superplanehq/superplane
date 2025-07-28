@@ -19,8 +19,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
-
-	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 const StageCreatedRoutingKey = "stage-created"
@@ -35,7 +33,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -54,7 +52,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -74,7 +72,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -103,7 +101,7 @@ func Test__CreateStage(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		_, err = CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -129,7 +127,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -158,7 +156,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -190,7 +188,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -224,7 +222,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -258,7 +256,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -293,7 +291,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -335,7 +333,7 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{Name: name},
@@ -370,7 +368,7 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -484,7 +482,7 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{Name: name},
@@ -547,7 +545,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create first stage using the demo-project Semaphore project integration resource.
 		//
-		res, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -572,7 +570,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create second stage using the demo-project Semaphore project integration resource.
 		//
-		res, err = CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		res, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -613,7 +611,7 @@ func Test__CreateStage(t *testing.T) {
 		// First stage works
 		//
 		name := support.RandomName("test")
-		res, err := CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -637,7 +635,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Second stage with the same name fails
 		//
-		_, err = CreateStage(ctx, r.Encryptor, &pb.CreateStageRequest{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{

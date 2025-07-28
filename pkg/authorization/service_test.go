@@ -9,8 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-
-	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test__AuthService_BasicPermissions(t *testing.T) {

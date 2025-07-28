@@ -221,7 +221,7 @@ var listIntegrationsCmd = &cobra.Command{
 			fmt.Printf("%d. %s (ID: %s)\n", i+1, *metadata.Name, *metadata.Id)
 			fmt.Printf("   Domain Type: %s\n", *metadata.DomainType)
 			fmt.Printf("   Domain ID: %s\n", *metadata.DomainId)
-			fmt.Printf("   Type: %s\n", string(*spec.Type))
+			fmt.Printf("   Type: %s\n", *spec.Type)
 			fmt.Printf("   URL: %s\n", spec.GetUrl())
 
 			if i < len(response.Integrations)-1 {

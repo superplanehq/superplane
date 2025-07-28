@@ -11,17 +11,20 @@ import (
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/stages"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type CanvasService struct {
 	encryptor            crypto.Encryptor
+	registry             *registry.Registry
 	authorizationService authorization.Authorization
 }
 
-func NewCanvasService(encryptor crypto.Encryptor, authService authorization.Authorization) *CanvasService {
+func NewCanvasService(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) *CanvasService {
 	return &CanvasService{
 		encryptor:            encryptor,
 		authorizationService: authService,
+		registry:             registry,
 	}
 }
 
@@ -34,7 +37,7 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 }
 
 func (s *CanvasService) CreateEventSource(ctx context.Context, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	return eventsources.CreateEventSource(ctx, s.encryptor, req)
+	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, req)
 }
 
 func (s *CanvasService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
@@ -46,7 +49,7 @@ func (s *CanvasService) ResetEventSourceKey(ctx context.Context, req *pb.ResetEv
 }
 
 func (s *CanvasService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return stages.CreateStage(ctx, s.encryptor, req)
+	return stages.CreateStage(ctx, s.encryptor, s.registry, req)
 }
 
 func (s *CanvasService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
@@ -54,7 +57,7 @@ func (s *CanvasService) DescribeStage(ctx context.Context, req *pb.DescribeStage
 }
 
 func (s *CanvasService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return stages.UpdateStage(ctx, s.encryptor, req)
+	return stages.UpdateStage(ctx, s.encryptor, s.registry, req)
 }
 
 func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {

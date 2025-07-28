@@ -31,10 +31,6 @@ type SemaphoreIntegration struct {
 	AuthenticationToken string
 }
 
-func init() {
-	integrations.RegisterIntegrationType(models.IntegrationTypeSemaphore, NewSemaphoreIntegration)
-}
-
 func NewSemaphoreIntegration(ctx context.Context, integration *models.Integration, authenticate integrations.AuthenticateFn) (integrations.Integration, error) {
 	token, err := authenticate()
 	if err != nil {

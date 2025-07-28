@@ -13,8 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-
-	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test__ListCanvases(t *testing.T) {

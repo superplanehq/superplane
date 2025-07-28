@@ -13,16 +13,19 @@ import (
 	"github.com/superplanehq/superplane/pkg/inputs"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
 type PendingEventsWorker struct {
 	Encryptor crypto.Encryptor
+	Registry  *registry.Registry
 }
 
-func NewPendingEventsWorker(encryptor crypto.Encryptor) *PendingEventsWorker {
+func NewPendingEventsWorker(encryptor crypto.Encryptor, registry *registry.Registry) *PendingEventsWorker {
 	return &PendingEventsWorker{
 		Encryptor: encryptor,
+		Registry:  registry,
 	}
 }
 
@@ -146,7 +149,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 
 func (w *PendingEventsWorker) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
 	if stageExecutor.ResourceID == nil {
-		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
 	}
 
 	integration, err := stageExecutor.FindIntegration()
@@ -159,7 +162,7 @@ func (w *PendingEventsWorker) initExecutor(stageExecutor *models.StageExecutor) 
 		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
 	}
 
-	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
+	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
 }
 
 func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *models.Event) error {

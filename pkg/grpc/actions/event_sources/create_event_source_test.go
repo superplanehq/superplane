@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -27,7 +26,6 @@ const EventSourceCreatedRoutingKey = "event-source-created"
 
 func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
-	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		eventSource := &protos.EventSource{
@@ -41,7 +39,7 @@ func Test__CreateEventSource(t *testing.T) {
 			EventSource:    eventSource,
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, req)
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -61,7 +59,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -90,7 +88,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// First one is created.
 		//
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -100,7 +98,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Second one fails.
 		//
-		_, err = CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -133,7 +131,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -169,7 +167,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -226,7 +224,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -263,7 +261,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -311,7 +309,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})

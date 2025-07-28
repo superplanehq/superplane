@@ -7,12 +7,12 @@ import (
 	"sort"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -316,7 +316,7 @@ func ValidateIntegration(canvas *models.Canvas, integrationRef *integrationpb.In
 	return integration, nil
 }
 
-func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integration *models.Integration, resourceRef *integrationpb.ResourceRef) (integrations.Resource, error) {
+func ValidateResource(ctx context.Context, registry *registry.Registry, integration *models.Integration, resourceRef *integrationpb.ResourceRef) (integrations.Resource, error) {
 	if resourceRef == nil {
 		return nil, status.Error(codes.InvalidArgument, "resource reference is required")
 	}
@@ -328,7 +328,7 @@ func ValidateResource(ctx context.Context, encryptor crypto.Encryptor, integrati
 	//
 	// If resource record does not exist yet, we need to go to the integration to find it.
 	//
-	integrationImpl, err := integrations.NewIntegration(ctx, integration, encryptor)
+	integrationImpl, err := registry.NewIntegration(ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error starting integration implementation: %v", err)
 	}

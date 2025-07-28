@@ -8,15 +8,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type ExecutionResourcePoller struct {
 	Encryptor crypto.Encryptor
+	Registry  *registry.Registry
 }
 
-func NewExecutionResourcePoller(encryptor crypto.Encryptor) *ExecutionResourcePoller {
+func NewExecutionResourcePoller(encryptor crypto.Encryptor, registry *registry.Registry) *ExecutionResourcePoller {
 	return &ExecutionResourcePoller{
 		Encryptor: encryptor,
+		Registry:  registry,
 	}
 }
 
@@ -83,7 +86,7 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 
 func (w *ExecutionResourcePoller) initExecutor(stageExecutor *models.StageExecutor) (executors.Executor, error) {
 	if stageExecutor.ResourceID == nil {
-		return executors.NewExecutor(stageExecutor.Type, nil, nil, w.Encryptor)
+		return w.Registry.NewExecutor(stageExecutor.Type, nil, nil)
 	}
 
 	integration, err := stageExecutor.FindIntegration()
@@ -96,5 +99,5 @@ func (w *ExecutionResourcePoller) initExecutor(stageExecutor *models.StageExecut
 		return nil, fmt.Errorf("error finding resource for stage executor: %v", err)
 	}
 
-	return executors.NewExecutor(stageExecutor.Type, integration, resource, w.Encryptor)
+	return w.Registry.NewExecutor(stageExecutor.Type, integration, resource)
 }

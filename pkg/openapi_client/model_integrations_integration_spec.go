@@ -20,7 +20,7 @@ var _ MappedNullable = &IntegrationsIntegrationSpec{}
 
 // IntegrationsIntegrationSpec struct for IntegrationsIntegrationSpec
 type IntegrationsIntegrationSpec struct {
-	Type *IntegrationsIntegrationType `json:"type,omitempty"`
+	Type *string `json:"type,omitempty"`
 	Url *string `json:"url,omitempty"`
 	Auth *IntegrationAuth `json:"auth,omitempty"`
 	Oidc *IntegrationOIDC `json:"oidc,omitempty"`
@@ -32,8 +32,6 @@ type IntegrationsIntegrationSpec struct {
 // will change when the set of required properties is changed
 func NewIntegrationsIntegrationSpec() *IntegrationsIntegrationSpec {
 	this := IntegrationsIntegrationSpec{}
-	var type_ IntegrationsIntegrationType = INTEGRATIONSINTEGRATIONTYPE_TYPE_NONE
-	this.Type = &type_
 	return &this
 }
 
@@ -42,15 +40,13 @@ func NewIntegrationsIntegrationSpec() *IntegrationsIntegrationSpec {
 // but it doesn't guarantee that properties required by API are set
 func NewIntegrationsIntegrationSpecWithDefaults() *IntegrationsIntegrationSpec {
 	this := IntegrationsIntegrationSpec{}
-	var type_ IntegrationsIntegrationType = INTEGRATIONSINTEGRATIONTYPE_TYPE_NONE
-	this.Type = &type_
 	return &this
 }
 
 // GetType returns the Type field value if set, zero value otherwise.
-func (o *IntegrationsIntegrationSpec) GetType() IntegrationsIntegrationType {
+func (o *IntegrationsIntegrationSpec) GetType() string {
 	if o == nil || IsNil(o.Type) {
-		var ret IntegrationsIntegrationType
+		var ret string
 		return ret
 	}
 	return *o.Type
@@ -58,7 +54,7 @@ func (o *IntegrationsIntegrationSpec) GetType() IntegrationsIntegrationType {
 
 // GetTypeOk returns a tuple with the Type field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *IntegrationsIntegrationSpec) GetTypeOk() (*IntegrationsIntegrationType, bool) {
+func (o *IntegrationsIntegrationSpec) GetTypeOk() (*string, bool) {
 	if o == nil || IsNil(o.Type) {
 		return nil, false
 	}
@@ -74,8 +70,8 @@ func (o *IntegrationsIntegrationSpec) HasType() bool {
 	return false
 }
 
-// SetType gets a reference to the given IntegrationsIntegrationType and assigns it to the Type field.
-func (o *IntegrationsIntegrationSpec) SetType(v IntegrationsIntegrationType) {
+// SetType gets a reference to the given string and assigns it to the Type field.
+func (o *IntegrationsIntegrationSpec) SetType(v string) {
 	o.Type = &v
 }
 

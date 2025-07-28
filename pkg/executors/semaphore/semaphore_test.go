@@ -1,4 +1,4 @@
-package semaphore
+package semaphore_test
 
 import (
 	"context"
@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/executors"
+	semaphorexec "github.com/superplanehq/superplane/pkg/executors/semaphore"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -26,7 +27,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, &models.Resource{
+		executor, err := semaphorexec.NewSemaphoreExecutor(integration, &models.Resource{
 			ResourceType: semaphore.ResourceTypeProject,
 			ExternalID:   projectID,
 		})
@@ -34,7 +35,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, executor)
 
-		spec, err := json.Marshal(&SemaphoreSpec{
+		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
 			PipelineFile: ".semaphore/semaphore.yml",
 			Branch:       "main",
 			Parameters:   map[string]string{"a": "b", "c": "d"},
@@ -66,7 +67,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
-		executor, err := NewSemaphoreExecutor(integration, &models.Resource{
+		executor, err := semaphorexec.NewSemaphoreExecutor(integration, &models.Resource{
 			ResourceType: semaphore.ResourceTypeTask,
 			ExternalID:   projectID,
 		})
@@ -75,7 +76,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 		require.NotNil(t, executor)
 
 		task := uuid.NewString()
-		spec, err := json.Marshal(&SemaphoreSpec{
+		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
 			Task:         task,
 			PipelineFile: ".semaphore/semaphore.yml",
 			Branch:       "main",

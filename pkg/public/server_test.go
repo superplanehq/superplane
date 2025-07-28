@@ -24,8 +24,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-
-	_ "github.com/superplanehq/superplane/pkg/executors/semaphore"
 )
 
 func Test__HealthCheckEndpoint(t *testing.T) {
@@ -326,7 +324,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	})
 
 	executorType, executorSpec, resource := support.Executor(t, r)
-	stage, err := builders.NewStageBuilder().
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").

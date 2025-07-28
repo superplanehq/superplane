@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -20,6 +20,7 @@ import (
 type StageBuilder struct {
 	ctx           context.Context
 	encryptor     crypto.Encryptor
+	registry      *registry.Registry
 	canvas        *models.Canvas
 	requesterID   uuid.UUID
 	existingStage *models.Stage
@@ -31,9 +32,10 @@ type StageBuilder struct {
 	connections   []models.Connection
 }
 
-func NewStageBuilder() *StageBuilder {
+func NewStageBuilder(registry *registry.Registry) *StageBuilder {
 	return &StageBuilder{
-		ctx: context.Background(),
+		ctx:      context.Background(),
+		registry: registry,
 		newStage: &models.Stage{
 			Conditions:    datatypes.NewJSONSlice([]models.StageCondition{}),
 			Inputs:        datatypes.NewJSONSlice([]models.InputDefinition{}),
@@ -197,7 +199,7 @@ func (b *StageBuilder) validateExecutorSpec() error {
 		return fmt.Errorf("missing executor spec")
 	}
 
-	executor, err := executors.NewExecutor(b.executorType, b.integration, b.resource, b.encryptor)
+	executor, err := b.registry.NewExecutor(b.executorType, b.integration, b.resource)
 	if err != nil {
 		return err
 	}

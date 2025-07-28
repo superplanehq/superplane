@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
-	"github.com/superplanehq/superplane/pkg/models"
 )
 
 type SemaphoreExecutor struct {
@@ -67,10 +66,6 @@ type SemaphoreHookPipeline struct {
 	ID     string `json:"id"`
 	State  string `json:"state"`
 	Result string `json:"result"`
-}
-
-func init() {
-	executors.Register(models.ExecutorSpecTypeSemaphore, NewSemaphoreExecutor)
 }
 
 func NewSemaphoreExecutor(integration integrations.Integration, resource integrations.Resource) (executors.Executor, error) {

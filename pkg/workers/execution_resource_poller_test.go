@@ -32,7 +32,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 	}
 
 	executorType, executorSpec, resource := support.Executor(t, r)
-	stage, err := builders.NewStageBuilder().
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").
@@ -47,7 +47,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionResourcePoller(r.Encryptor)
+	w := NewExecutionResourcePoller(r.Encryptor, r.Registry)
 
 	t.Run("failed pipeline -> execution resource fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)

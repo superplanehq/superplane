@@ -1,29 +1,42 @@
-package integrations
+package registry
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
-type BuildFn func(ctx context.Context, integration *models.Integration, authenticate AuthenticateFn) (Integration, error)
-
-var integrationTypes = map[string]BuildFn{}
-
-func RegisterIntegrationType(name string, builder BuildFn) {
-	integrationTypes[name] = builder
+type IntegrationRegistry struct {
+	Integrations map[string]integrations.BuildFn
+	Encryptor    crypto.Encryptor
 }
 
-func NewIntegration(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (Integration, error) {
-	builder, ok := integrationTypes[integration.Type]
+func NewIntegrationRegistry(encryptor crypto.Encryptor) *IntegrationRegistry {
+	r := &IntegrationRegistry{
+		Encryptor:    encryptor,
+		Integrations: map[string]integrations.BuildFn{},
+	}
+
+	r.Init()
+	return r
+}
+
+func (r *IntegrationRegistry) Init() {
+	r.Integrations[models.IntegrationTypeSemaphore] = semaphore.NewSemaphoreIntegration
+}
+
+func (r *IntegrationRegistry) New(ctx context.Context, integration *models.Integration) (integrations.Integration, error) {
+	builder, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
 
-	authFn, err := getAuthFn(ctx, integration, encryptor)
+	authFn, err := r.getAuthFn(ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
@@ -31,11 +44,11 @@ func NewIntegration(ctx context.Context, integration *models.Integration, encryp
 	return builder(ctx, integration, authFn)
 }
 
-func getAuthFn(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (AuthenticateFn, error) {
+func (r *IntegrationRegistry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
 	switch integration.AuthType {
 	case models.IntegrationAuthTypeToken:
 		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := secretProvider(encryptor, secretInfo, integration)
+		provider, err := r.secretProvider(secretInfo, integration)
 		if err != nil {
 			return nil, fmt.Errorf("error creating secret provider: %v", err)
 		}
@@ -58,12 +71,12 @@ func getAuthFn(ctx context.Context, integration *models.Integration, encryptor c
 	return nil, fmt.Errorf("integration auth type %s not supported", integration.AuthType)
 }
 
-func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
+func (r *IntegrationRegistry) secretProvider(secretDef *models.ValueDefinitionFromSecret, integration *models.Integration) (secrets.Provider, error) {
 	//
 	// If the integration is scoped to an organization, the secret must also be scoped there.
 	//
 	if integration.DomainType == models.DomainTypeOrganization {
-		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -71,7 +84,7 @@ func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitio
 	// If the secret is also on the canvas level, we use the same domain type and ID.
 	//
 	if secretDef.DomainType == models.DomainTypeCanvas {
-		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
+		return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, integration.DomainID)
 	}
 
 	//
@@ -83,5 +96,5 @@ func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitio
 		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
 	}
 
-	return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
+	return secrets.NewProvider(r.Encryptor, secretDef.Name, secretDef.DomainType, canvas.OrganizationID)
 }

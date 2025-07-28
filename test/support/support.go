@@ -16,6 +16,7 @@ import (
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -30,6 +31,7 @@ type ResourceRegistry struct {
 	Organization     *models.Organization
 	Integration      *models.Integration
 	Encryptor        crypto.Encryptor
+	Registry         *registry.Registry
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -75,6 +77,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		require.NoError(t, err)
 	}
 
+	r.Registry = registry.NewRegistry(r.Encryptor)
 	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
 	r.SemaphoreAPIMock.Init()
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
@@ -116,7 +119,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		}
 
 		executorType, executorSpec, resource := Executor(t, &r)
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").

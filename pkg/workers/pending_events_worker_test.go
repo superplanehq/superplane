@@ -25,7 +25,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	defer r.Close()
-	w := NewPendingEventsWorker(r.Encryptor)
+	w := NewPendingEventsWorker(r.Encryptor, r.Registry)
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
@@ -66,7 +66,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage1, err := builders.NewStageBuilder().
+		stage1, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -87,7 +87,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		stage2, err := builders.NewStageBuilder().
+		stage2, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-2").
@@ -215,7 +215,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		firstStage, err := builders.NewStageBuilder().
+		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-3").
@@ -256,7 +256,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		secondStage, err := builders.NewStageBuilder().
+		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-4").
@@ -325,7 +325,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		firstStage, err := builders.NewStageBuilder().
+		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-5").
@@ -353,7 +353,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		secondStage, err := builders.NewStageBuilder().
+		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-6").
@@ -414,7 +414,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// Create pending execution resource
 		//
 		workflowID := uuid.New().String()
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-7").
