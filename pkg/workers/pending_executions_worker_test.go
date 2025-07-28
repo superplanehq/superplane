@@ -201,8 +201,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 func assertParameters(t *testing.T, req *semaphore.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
-		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
-		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
+		"SUPERPLANE_STAGE_ID":           execution.StageID.String(),
+		"SUPERPLANE_STAGE_EXECUTION_ID": execution.ID.String(),
 	}
 
 	for k, v := range parameters {
@@ -216,7 +216,7 @@ func assertParameters(t *testing.T, req *semaphore.CreateWorkflowRequest, execut
 		assert.Equal(t, value, v)
 	}
 
-	v, ok := req.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"]
+	v, ok := req.Parameters["SUPERPLANE_STAGE_EXECUTION_TOKEN"]
 	assert.True(t, ok)
 	assert.NotEmpty(t, v)
 }
