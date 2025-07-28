@@ -83,7 +83,11 @@ func (e *SemaphoreExecutor) Validate(ctx context.Context, specData []byte) error
 	}
 
 	if e.Integration == nil {
-		return fmt.Errorf("invalid semaphore spec: missing integration")
+		return fmt.Errorf("integration is required")
+	}
+
+	if spec.Branch == "" {
+		return fmt.Errorf("branch is required")
 	}
 
 	return e.validateSemaphoreTask(spec)

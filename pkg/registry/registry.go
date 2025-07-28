@@ -18,7 +18,7 @@ type Registry struct {
 func NewRegistry(encryptor crypto.Encryptor) *Registry {
 	r := &Registry{
 		IntegrationRegistry: NewIntegrationRegistry(encryptor),
-		ExecutorRegistry:    NewExecutorRegistry(encryptor),
+		ExecutorRegistry:    NewExecutorRegistry(),
 	}
 
 	r.IntegrationRegistry.Init()

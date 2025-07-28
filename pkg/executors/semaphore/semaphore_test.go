@@ -108,5 +108,30 @@ func Test_Semaphore__Execute(t *testing.T) {
 }
 
 func Test_Semaphore__Validate(t *testing.T) {
-	// TODO
+	r := support.Setup(t)
+	defer r.Close()
+
+	t.Run("integration is required", func(t *testing.T) {
+		executor, err := semaphorexec.NewSemaphoreExecutor(nil, nil)
+		require.NoError(t, err)
+		require.NotNil(t, executor)
+		require.ErrorContains(t, executor.Validate(context.Background(), []byte(`{}`)), "integration is required")
+	})
+
+	t.Run("branch is required", func(t *testing.T) {
+		integration, err := r.Registry.NewIntegration(context.Background(), r.Integration)
+		require.NoError(t, err)
+
+		_, _, resource := support.Executor(t, r)
+		executor, err := semaphorexec.NewSemaphoreExecutor(integration, resource)
+		require.NoError(t, err)
+		require.NotNil(t, executor)
+
+		spec, err := json.Marshal(&semaphorexec.SemaphoreSpec{
+			Branch: "",
+		})
+
+		require.NoError(t, err)
+		require.ErrorContains(t, executor.Validate(context.Background(), spec), "branch is required")
+	})
 }
