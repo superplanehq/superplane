@@ -286,7 +286,7 @@ type RunTaskResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (i *SemaphoreIntegration) runTask(params any) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) runTask(params any) (integrations.StatefulResource, error) {
 	p, ok := params.(*RunTaskRequest)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
@@ -312,7 +312,7 @@ func (i *SemaphoreIntegration) runTask(params any) (integrations.Resource, error
 	return &Workflow{WfID: response.WorkflowID}, nil
 }
 
-func (i *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, error) {
+func (i *SemaphoreIntegration) runWorkflow(params any) (integrations.StatefulResource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
 
 	body, err := json.Marshal(&params)

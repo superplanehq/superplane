@@ -83,7 +83,7 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 
 	resources, err := integrationImpl.SetupWebhook(integrations.WebhookOptions{
 		Resource: resource,
-		URL:      fmt.Sprintf("%s/api/v1/sources/%s/semaphore", w.BaseURL, eventSource.ID.String()),
+		URL:      fmt.Sprintf("%s/api/v1/sources/%s/%s", w.BaseURL, eventSource.ID.String(), integration.Type),
 		ID:       eventSource.ID.String(),
 		Key:      key,
 	})
@@ -91,6 +91,8 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 	if err != nil {
 		return fmt.Errorf("error setting up event source for %s integration: %v", integration.Type, err)
 	}
+
+	log.Infof("Event source %s for %s integration set up successfully", eventSource.ID, integration.Type)
 
 	//
 	// Save resources and update integration state

@@ -26,7 +26,7 @@ spec:
   # This field would determine what SuperPlane
   # actually does when an integration of this type is created.
   #
-  # For example, when a Semaphore integration is created,
+  # For example, when a Semaphore integration is created,  
   # SuperPlane needs to create a Semaphore notification to monitor the result of executions.
   # For a GitHub integration, SuperPlane would create the webhook, ...
   #
@@ -54,22 +54,6 @@ spec:
         secret:
           name: semaphore
           key: token
-
-    #
-    # The integration accepts OIDC Connect ID tokens issued by SuperPlane.
-    # For example, we can use this for AWS.
-    #
-    # use: oidc
-
-  #
-  # Specifies whether or not the integration supports OIDC ID tokens,
-  # and can use them to authenticate requests sent to SuperPlane.
-  #
-  # If it does, the integration can also specify which claims it accepts.
-  #
-  oidc:
-    enabled: true
-    claims: {}
 ```
 
 ### Using an integration in a stage executor
@@ -108,4 +92,66 @@ spec:
   resource:
     type: project
     name: semaphore-demo-go
+```
+
+## Supported Integration Types
+
+### Semaphore
+
+The Semaphore integration allows you to connect to Semaphore CI/CD and trigger workflows or tasks.
+
+**Authentication**: Uses a personal API token or service account token.
+
+**Supported Resources**:
+- `project`: Semaphore projects that can be used as event sources or executor targets
+
+**Event Sources**: Creates notifications in Semaphore to receive pipeline status updates.
+
+**Executors**: Can trigger workflows or specific tasks within a Semaphore project.
+
+### GitHub
+
+The GitHub integration allows you to connect to GitHub repositories and trigger GitHub Actions workflows.
+
+**Authentication**: Uses a GitHub personal access token (PAT) with appropriate permissions.
+
+**Supported Resources**:
+- `repository`: GitHub repositories that can be used as event sources or executor targets
+
+**Event Sources**: Creates webhooks in GitHub repositories to receive events for push, pull requests, and workflow runs.
+
+**Executors**: Can trigger GitHub Actions workflows via workflow dispatch events.
+
+#### Example GitHub Integration
+
+```yaml
+kind: Integration
+metadata:
+  name: github-integration
+  canvasId: canvas-123
+spec:
+  type: github
+  auth:
+    use: AUTH_TYPE_TOKEN
+    token:
+      valueFrom:
+        secret:
+          name: github-token
+          key: token
+```
+
+#### Example GitHub Event Source
+
+```yaml
+apiVersion: v1
+kind: EventSource
+metadata:
+  name: my-repo
+  canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
+spec:
+  integration:
+    name: github-integration
+  resource:
+    type: repository
+    name: owner/repository-name
 ```

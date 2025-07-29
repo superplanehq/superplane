@@ -5,6 +5,11 @@ Most executors are intended for use with integrations. See [integrations](integr
 The available executor types are:
 - [HTTP Executor](#http-executor)
 - [Semaphore Executor](#semaphore-executor)
+  - [Automatic Parameters](#automatic-parameters)
+- [GitHub Executor](#github-executor)
+  - [Example](#example)
+  - [Specification](#specification)
+  - [Automatic Inputs](#automatic-inputs)
 
 ### HTTP Executor
 
@@ -55,3 +60,47 @@ executor:
 ```
 
 If the `task` is not specified, the executor will use the [workflows API](https://docs.semaphoreci.com/reference/api#run-workflow) to run a workflow. If the `task` is specified, the executor will use the [tasks API](https://docs.semaphoreci.com/reference/api#run-task) to run the task.
+
+#### Automatic Parameters
+
+The executor automatically adds these parameters:
+- `SUPERPLANE_STAGE_ID`: Current stage identifier
+- `SUPERPLANE_STAGE_EXECUTION_ID`: Current execution identifier
+- `SUPERPLANE_STAGE_EXECUTION_TOKEN`: Execution token (if available)
+
+### GitHub Executor
+
+The GitHub executor can trigger GitHub Actions workflows via workflow dispatch events.
+
+#### Example
+
+```yaml
+executor:
+  type: github
+  integration:
+    name: github-integration
+  resource:
+    type: repository
+    name: owner/repository
+  spec:
+    workflow: .github/workflows/deploy.yml
+    ref: main
+    inputs:
+      environment: production
+      version: ${{ inputs.VERSION }}
+```
+
+#### Specification
+
+- `workflow` (required): Workflow file name (e.g., "deploy.yml") or workflow name to trigger
+- `ref` (required): Git branch, tag, or commit SHA to run the workflow against
+- `inputs` (optional): Input parameters to pass to the workflow
+
+#### Automatic Inputs
+
+The executor automatically adds these workflow inputs:
+- `superplane_stage_id`: Current stage identifier
+- `superplane_execution_id`: Current execution identifier
+- `superplane_execution_token`: Execution token (if available)
+
+Note: they must be defined in your workflow file.

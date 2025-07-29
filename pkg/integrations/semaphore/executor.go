@@ -81,7 +81,7 @@ func (e *SemaphoreExecutor) validateTask(spec ExecutorSpec) error {
 	return fmt.Errorf("task %s not found", spec.Task)
 }
 
-func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (integrations.Resource, error) {
+func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
 	var spec ExecutorSpec
 	err := json.Unmarshal(specData, &spec)
 	if err != nil {
@@ -95,7 +95,7 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 	return e.runWorkflow(spec, parameters)
 }
 
-func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.Resource, error) {
+func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
 	semaphore := e.Integration.(*SemaphoreIntegration)
 	return semaphore.runWorkflow(CreateWorkflowRequest{
 		ProjectID:    e.Resource.Id(),
@@ -105,7 +105,7 @@ func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.
 	})
 }
 
-func (e *SemaphoreExecutor) runTask(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.Resource, error) {
+func (e *SemaphoreExecutor) runTask(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
 	semaphore := e.Integration.(*SemaphoreIntegration)
 	return semaphore.runTask(&RunTaskRequest{
 		TaskID:       spec.Task,

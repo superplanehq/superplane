@@ -17,7 +17,7 @@ type Integration interface {
 
 type Executor interface {
 	Validate(context.Context, []byte) error
-	Execute([]byte, executors.ExecutionParameters) (Resource, error)
+	Execute([]byte, executors.ExecutionParameters) (StatefulResource, error)
 }
 
 type Resource interface {

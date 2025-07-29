@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -43,6 +44,11 @@ func (r *Registry) Init() {
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
 		BuildFn:    semaphore.NewSemaphoreIntegration,
 		ExecutorFn: semaphore.NewSemaphoreExecutor,
+	}
+
+	r.Integrations[models.IntegrationTypeGithub] = Integration{
+		BuildFn:    github.NewGitHubIntegration,
+		ExecutorFn: github.NewGitHubExecutor,
 	}
 
 	//
