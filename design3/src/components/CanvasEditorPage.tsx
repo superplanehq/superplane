@@ -56,6 +56,7 @@ import { Link } from './lib/Link/link';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { SettingsPage } from './SettingsPage';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
+import { NodeDetailsSidebar } from './lib/NodeDetailsSidebar/node-details-sidebar';
 
 
 // Node types for React Flow
@@ -437,6 +438,7 @@ export function CanvasEditorPage({
   const [showSecretsModal, setShowSecretsModal] = useState(false);
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNodeDetails, setShowNodeDetails] = useState(false);
   
   // Connection modal state
   const [connectionType, setConnectionType] = useState('stage');
@@ -581,13 +583,15 @@ export function CanvasEditorPage({
   const onNodeClick = useCallback(
     (event: React.MouseEvent, node: WorkflowNode) => {
       event.preventDefault();
-      setSelectedNode(selectedNode === node.id ? null : node.id);
+      const isSelecting = selectedNode !== node.id;
+      setSelectedNode(isSelecting ? node.id : null);
+      setShowNodeDetails(isSelecting);
       
       // Update node selection state
       setNodes((nds) =>
         nds.map((n) => ({
           ...n,
-          selected: n.id === node.id && selectedNode !== node.id,
+          selected: n.id === node.id && isSelecting,
         }))
       );
     },
@@ -861,7 +865,7 @@ export function CanvasEditorPage({
       {/* Conditional Content Based on Active View */}
       {activeView === 'preview' ? (
         /* React Flow Canvas */
-        <div className="flex-1 flex">
+        <div className="flex-1 flex relative">
           {/* Component Sidebar */}
           <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
             <ComponentSidebar
@@ -900,6 +904,26 @@ export function CanvasEditorPage({
               </ReactFlow>
             </ReactFlowProvider>
           </div>
+            {/* Node Details Sidebar */}
+            {selectedNode && (
+              <NodeDetailsSidebar
+                nodeId={selectedNode}
+                nodeTitle={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.title || 'Node Details'}
+                nodeIcon={nodes.find(n => n.id === selectedNode)?.data?.workflowNodeData?.type === 'stage' ? 'sync' : 'account_tree'}
+                isOpen={showNodeDetails}
+                onClose={() => {
+                  setShowNodeDetails(false);
+                  setSelectedNode(null);
+                  // Clear selection from all nodes
+                  setNodes((nds) =>
+                    nds.map((n) => ({
+                      ...n,
+                      selected: false,
+                    }))
+                  );
+                }}
+              />
+            )}
         </div>
       ) : (
         /* Settings Page */
@@ -1371,20 +1395,20 @@ export function CanvasEditorPage({
               )}      
 
               {connectionFilters.length === 0 && (
-  <div className="flex flex-col items-center justify-center h-full space-y-4">
-    <Text className="text-zinc-500 dark:text-zinc-400">
-      DEBUG: This is the zero state for connections modal.
-    </Text>
-    <Button
-      onClick={handleAddFilter}
-      className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
-      plain
-    >
-      <MaterialSymbol name="add" size="sm" />
-      Add Connection
-    </Button>
-  </div>
-)}
+                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                  <Text className="text-zinc-500 dark:text-zinc-400">
+                    DEBUG: This is the zero state for connections modal.
+                  </Text>
+                  <Button
+                    onClick={handleAddFilter}
+                    className="text-blue-600 hover:text-blue-700 flex items-center !text-xs"
+                    plain
+                  >
+                    <MaterialSymbol name="add" size="sm" />
+                    Add Connection
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </DialogBody>
@@ -1474,6 +1498,8 @@ export function CanvasEditorPage({
           </Button>
         </DialogActions>
       </Dialog>
+
+      
 
     </div>
   );
