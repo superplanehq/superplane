@@ -9,11 +9,13 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	authPb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	canvasPb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	organizationPb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	secretPb "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc"
 	health "google.golang.org/grpc/health/grpc_health_v1"
@@ -68,8 +70,14 @@ func RunServer(encryptor crypto.Encryptor, authService authorization.Authorizati
 	organizationService := NewOrganizationService(authService)
 	organizationPb.RegisterOrganizationsServer(grpcServer, organizationService)
 
-	server := NewAuthorizationServer(authService)
-	authPb.RegisterAuthorizationServer(grpcServer, server)
+	userService := NewUsersService(authService)
+	pbUsers.RegisterUsersServer(grpcServer, userService)
+
+	groupService := NewGroupsService(authService)
+	pbGroups.RegisterGroupsServer(grpcServer, groupService)
+
+	roleService := NewRoleService(authService)
+	pbRoles.RegisterRolesServer(grpcServer, roleService)
 
 	secretsService := NewSecretService(encryptor, authService)
 	secretPb.RegisterSecretsServer(grpcServer, secretsService)

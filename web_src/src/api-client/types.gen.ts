@@ -4,123 +4,7 @@ export type AuthToken = {
     valueFrom?: SuperplaneIntegrationsValueFrom;
 };
 
-export type AuthorizationAddUserToCanvasGroupBody = {
-    userId?: string;
-};
-
-export type AuthorizationAddUserToCanvasGroupResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationAddUserToOrganizationGroupBody = {
-    organizationId?: string;
-    userId?: string;
-};
-
-export type AuthorizationAddUserToOrganizationGroupResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationAssignRoleRequest = {
-    userId?: string;
-    roleAssignment?: AuthorizationRoleAssignment;
-};
-
-export type AuthorizationAssignRoleResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationCreateCanvasGroupBody = {
-    groupName?: string;
-    role?: string;
-};
-
-export type AuthorizationCreateCanvasGroupResponse = {
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationCreateOrganizationGroupRequest = {
-    organizationId?: string;
-    groupName?: string;
-    role?: string;
-};
-
-export type AuthorizationCreateOrganizationGroupResponse = {
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationCreateRoleRequest = {
-    name?: string;
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    permissions?: Array<AuthorizationPermission>;
-    inheritedRole?: string;
-};
-
-export type AuthorizationCreateRoleResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationDeleteRoleResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationDescribeRoleResponse = {
-    role?: AuthorizationRole;
-};
-
 export type AuthorizationDomainType = 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-
-export type AuthorizationGetCanvasGroupResponse = {
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationGetCanvasGroupUsersResponse = {
-    userIds?: Array<string>;
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationGetOrganizationGroupResponse = {
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationGetOrganizationGroupUsersResponse = {
-    userIds?: Array<string>;
-    group?: AuthorizationGroup;
-};
-
-export type AuthorizationGetUserRolesResponse = {
-    userId?: string;
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    roles?: Array<AuthorizationRole>;
-};
-
-export type AuthorizationGroup = {
-    name?: string;
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    role?: string;
-};
-
-export type AuthorizationListCanvasGroupsResponse = {
-    groups?: Array<AuthorizationGroup>;
-};
-
-export type AuthorizationListOrganizationGroupsResponse = {
-    groups?: Array<AuthorizationGroup>;
-};
-
-export type AuthorizationListRolesResponse = {
-    roles?: Array<AuthorizationRole>;
-};
-
-export type AuthorizationListUserPermissionsResponse = {
-    userId?: string;
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    permissions?: Array<AuthorizationPermission>;
-};
 
 export type AuthorizationPermission = {
     resource?: string;
@@ -128,52 +12,94 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
-export type AuthorizationRemoveRoleRequest = {
-    userId?: string;
-    roleAssignment?: AuthorizationRoleAssignment;
-};
-
-export type AuthorizationRemoveRoleResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationRemoveUserFromCanvasGroupResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationRemoveUserFromOrganizationGroupResponse = {
-    [key: string]: unknown;
-};
-
-export type AuthorizationRole = {
-    name?: string;
-    domainType?: AuthorizationDomainType;
-    permissions?: Array<AuthorizationPermission>;
-    inheritedRole?: AuthorizationRole;
-};
-
-export type AuthorizationRoleAssignment = {
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    role?: string;
-};
-
-export type AuthorizationUpdateRoleBody = {
-    domainType?: AuthorizationDomainType;
-    domainId?: string;
-    permissions?: Array<AuthorizationPermission>;
-    inheritedRole?: string;
-};
-
-export type AuthorizationUpdateRoleResponse = {
-    [key: string]: unknown;
-};
-
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type GroupByField = {
     name?: string;
     expression?: string;
+};
+
+export type GroupsAddUserToGroupBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    userId?: string;
+    userEmail?: string;
+};
+
+export type GroupsAddUserToGroupResponse = {
+    [key: string]: unknown;
+};
+
+export type GroupsCreateGroupRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    group?: GroupsGroup;
+};
+
+export type GroupsCreateGroupResponse = {
+    group?: GroupsGroup;
+};
+
+export type GroupsDeleteGroupResponse = {
+    [key: string]: unknown;
+};
+
+export type GroupsDescribeGroupResponse = {
+    group?: GroupsGroup;
+};
+
+export type GroupsGroup = {
+    metadata?: GroupsGroupMetadata;
+    spec?: GroupsGroupSpec;
+    status?: GroupsGroupStatus;
+};
+
+export type GroupsGroupMetadata = {
+    name?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type GroupsGroupSpec = {
+    role?: string;
+    displayName?: string;
+    description?: string;
+};
+
+export type GroupsGroupStatus = {
+    membersCount?: number;
+};
+
+export type GroupsListGroupUsersResponse = {
+    users?: Array<UsersUser>;
+    group?: GroupsGroup;
+};
+
+export type GroupsListGroupsResponse = {
+    groups?: Array<GroupsGroup>;
+};
+
+export type GroupsRemoveUserFromGroupBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    userId?: string;
+    userEmail?: string;
+};
+
+export type GroupsRemoveUserFromGroupResponse = {
+    [key: string]: unknown;
+};
+
+export type GroupsUpdateGroupBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    group?: GroupsGroup;
+};
+
+export type GroupsUpdateGroupResponse = {
+    group?: GroupsGroup;
 };
 
 export type InputMappingWhen = {
@@ -272,6 +198,7 @@ export type OrganizationsOrganizationMetadata = {
     id?: string;
     name?: string;
     displayName?: string;
+    description?: string;
     createdBy?: string;
     createdAt?: string;
     updatedAt?: string;
@@ -283,6 +210,82 @@ export type OrganizationsUpdateOrganizationBody = {
 
 export type OrganizationsUpdateOrganizationResponse = {
     organization?: OrganizationsOrganization;
+};
+
+export type RolesAssignRoleRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roleName?: string;
+    userId?: string;
+    userEmail?: string;
+};
+
+export type RolesAssignRoleResponse = {
+    [key: string]: unknown;
+};
+
+export type RolesCreateRoleRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    role?: RolesRole;
+};
+
+export type RolesCreateRoleResponse = {
+    role?: RolesRole;
+};
+
+export type RolesDeleteRoleResponse = {
+    [key: string]: unknown;
+};
+
+export type RolesDescribeRoleResponse = {
+    role?: RolesRole;
+};
+
+export type RolesListRolesResponse = {
+    roles?: Array<RolesRole>;
+};
+
+export type RolesRemoveRoleRequest = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roleName?: string;
+    userId?: string;
+    userEmail?: string;
+};
+
+export type RolesRemoveRoleResponse = {
+    [key: string]: unknown;
+};
+
+export type RolesRole = {
+    metadata?: RolesRoleMetadata;
+    spec?: RolesRoleSpec;
+};
+
+export type RolesRoleMetadata = {
+    name?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type RolesRoleSpec = {
+    displayName?: string;
+    description?: string;
+    permissions?: Array<AuthorizationPermission>;
+    inheritedRole?: RolesRole;
+};
+
+export type RolesUpdateRoleBody = {
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    role?: RolesRole;
+};
+
+export type RolesUpdateRoleResponse = {
+    role?: RolesRole;
 };
 
 /**
@@ -709,6 +712,74 @@ export type SuperplaneValueFromSecret = {
     key?: string;
 };
 
+export type UsersAccountProvider = {
+    providerType?: string;
+    providerId?: string;
+    email?: string;
+    displayName?: string;
+    avatarUrl?: string;
+    isPrimary?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type UsersListUserPermissionsResponse = {
+    userId?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    permissions?: Array<AuthorizationPermission>;
+};
+
+export type UsersListUserRolesResponse = {
+    userId?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    roles?: Array<RolesRole>;
+};
+
+export type UsersListUsersResponse = {
+    users?: Array<UsersUser>;
+};
+
+export type UsersUser = {
+    metadata?: UsersUserMetadata;
+    spec?: UsersUserSpec;
+    status?: UsersUserStatus;
+};
+
+export type UsersUserMetadata = {
+    id?: string;
+    email?: string;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type UsersUserRoleAssignment = {
+    roleName?: string;
+    roleDisplayName?: string;
+    roleDescription?: string;
+    domainType?: AuthorizationDomainType;
+    domainId?: string;
+    assignedAt?: string;
+};
+
+export type UsersUserSpec = {
+    displayName?: string;
+    avatarUrl?: string;
+    accountProviders?: Array<UsersAccountProvider>;
+};
+
+export type UsersUserStatus = {
+    isActive?: boolean;
+    roleAssignments?: Array<UsersUserRoleAssignment>;
+};
+
+export type GooglerpcStatus = {
+    code?: number;
+    message?: string;
+    details?: Array<ProtobufAny>;
+};
+
 export type ProtobufAny = {
     '@type'?: string;
     [key: string]: unknown | string | undefined;
@@ -724,261 +795,6 @@ export type ProtobufAny = {
  */
 export type ProtobufNullValue = 'NULL_VALUE';
 
-export type RpcStatus = {
-    code?: number;
-    message?: string;
-    details?: Array<ProtobufAny>;
-};
-
-export type AuthorizationListRolesData = {
-    body?: never;
-    path?: never;
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-    };
-    url: '/api/v1/authorization/roles';
-};
-
-export type AuthorizationListRolesErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationListRolesError = AuthorizationListRolesErrors[keyof AuthorizationListRolesErrors];
-
-export type AuthorizationListRolesResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationListRolesResponse;
-};
-
-export type AuthorizationListRolesResponse2 = AuthorizationListRolesResponses[keyof AuthorizationListRolesResponses];
-
-export type AuthorizationCreateRoleData = {
-    body: AuthorizationCreateRoleRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/authorization/roles';
-};
-
-export type AuthorizationCreateRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationCreateRoleError = AuthorizationCreateRoleErrors[keyof AuthorizationCreateRoleErrors];
-
-export type AuthorizationCreateRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationCreateRoleResponse;
-};
-
-export type AuthorizationCreateRoleResponse2 = AuthorizationCreateRoleResponses[keyof AuthorizationCreateRoleResponses];
-
-export type AuthorizationAssignRoleData = {
-    body: AuthorizationAssignRoleRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/authorization/roles/assign';
-};
-
-export type AuthorizationAssignRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationAssignRoleError = AuthorizationAssignRoleErrors[keyof AuthorizationAssignRoleErrors];
-
-export type AuthorizationAssignRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationAssignRoleResponse;
-};
-
-export type AuthorizationAssignRoleResponse2 = AuthorizationAssignRoleResponses[keyof AuthorizationAssignRoleResponses];
-
-export type AuthorizationDescribeRoleData = {
-    body?: never;
-    path?: never;
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-        role?: string;
-    };
-    url: '/api/v1/authorization/roles/describe';
-};
-
-export type AuthorizationDescribeRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationDescribeRoleError = AuthorizationDescribeRoleErrors[keyof AuthorizationDescribeRoleErrors];
-
-export type AuthorizationDescribeRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationDescribeRoleResponse;
-};
-
-export type AuthorizationDescribeRoleResponse2 = AuthorizationDescribeRoleResponses[keyof AuthorizationDescribeRoleResponses];
-
-export type AuthorizationRemoveRoleData = {
-    body: AuthorizationRemoveRoleRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/authorization/roles/remove';
-};
-
-export type AuthorizationRemoveRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationRemoveRoleError = AuthorizationRemoveRoleErrors[keyof AuthorizationRemoveRoleErrors];
-
-export type AuthorizationRemoveRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationRemoveRoleResponse;
-};
-
-export type AuthorizationRemoveRoleResponse2 = AuthorizationRemoveRoleResponses[keyof AuthorizationRemoveRoleResponses];
-
-export type AuthorizationDeleteRoleData = {
-    body?: never;
-    path: {
-        roleName: string;
-    };
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-    };
-    url: '/api/v1/authorization/roles/{roleName}';
-};
-
-export type AuthorizationDeleteRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationDeleteRoleError = AuthorizationDeleteRoleErrors[keyof AuthorizationDeleteRoleErrors];
-
-export type AuthorizationDeleteRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationDeleteRoleResponse;
-};
-
-export type AuthorizationDeleteRoleResponse2 = AuthorizationDeleteRoleResponses[keyof AuthorizationDeleteRoleResponses];
-
-export type AuthorizationUpdateRoleData = {
-    body: AuthorizationUpdateRoleBody;
-    path: {
-        roleName: string;
-    };
-    query?: never;
-    url: '/api/v1/authorization/roles/{roleName}';
-};
-
-export type AuthorizationUpdateRoleErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationUpdateRoleError = AuthorizationUpdateRoleErrors[keyof AuthorizationUpdateRoleErrors];
-
-export type AuthorizationUpdateRoleResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationUpdateRoleResponse;
-};
-
-export type AuthorizationUpdateRoleResponse2 = AuthorizationUpdateRoleResponses[keyof AuthorizationUpdateRoleResponses];
-
-export type AuthorizationListUserPermissionsData = {
-    body?: never;
-    path: {
-        userId: string;
-    };
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-    };
-    url: '/api/v1/authorization/users/{userId}/permissions';
-};
-
-export type AuthorizationListUserPermissionsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationListUserPermissionsError = AuthorizationListUserPermissionsErrors[keyof AuthorizationListUserPermissionsErrors];
-
-export type AuthorizationListUserPermissionsResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationListUserPermissionsResponse;
-};
-
-export type AuthorizationListUserPermissionsResponse2 = AuthorizationListUserPermissionsResponses[keyof AuthorizationListUserPermissionsResponses];
-
-export type AuthorizationGetUserRolesData = {
-    body?: never;
-    path: {
-        userId: string;
-    };
-    query?: {
-        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
-        domainId?: string;
-    };
-    url: '/api/v1/authorization/users/{userId}/roles';
-};
-
-export type AuthorizationGetUserRolesErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationGetUserRolesError = AuthorizationGetUserRolesErrors[keyof AuthorizationGetUserRolesErrors];
-
-export type AuthorizationGetUserRolesResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationGetUserRolesResponse;
-};
-
-export type AuthorizationGetUserRolesResponse2 = AuthorizationGetUserRolesResponses[keyof AuthorizationGetUserRolesResponses];
-
 export type SuperplaneListCanvasesData = {
     body?: never;
     path?: never;
@@ -992,7 +808,7 @@ export type SuperplaneListCanvasesErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListCanvasesError = SuperplaneListCanvasesErrors[keyof SuperplaneListCanvasesErrors];
@@ -1017,7 +833,7 @@ export type SuperplaneCreateCanvasErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneCreateCanvasError = SuperplaneCreateCanvasErrors[keyof SuperplaneCreateCanvasErrors];
@@ -1044,7 +860,7 @@ export type SuperplaneListConnectionGroupsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListConnectionGroupsError = SuperplaneListConnectionGroupsErrors[keyof SuperplaneListConnectionGroupsErrors];
@@ -1071,7 +887,7 @@ export type SuperplaneCreateConnectionGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneCreateConnectionGroupError = SuperplaneCreateConnectionGroupErrors[keyof SuperplaneCreateConnectionGroupErrors];
@@ -1099,7 +915,7 @@ export type SuperplaneDescribeConnectionGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneDescribeConnectionGroupError = SuperplaneDescribeConnectionGroupErrors[keyof SuperplaneDescribeConnectionGroupErrors];
@@ -1127,7 +943,7 @@ export type SuperplaneUpdateConnectionGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneUpdateConnectionGroupError = SuperplaneUpdateConnectionGroupErrors[keyof SuperplaneUpdateConnectionGroupErrors];
@@ -1155,7 +971,7 @@ export type SuperplaneListConnectionGroupFieldSetsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListConnectionGroupFieldSetsError = SuperplaneListConnectionGroupFieldSetsErrors[keyof SuperplaneListConnectionGroupFieldSetsErrors];
@@ -1182,7 +998,7 @@ export type SuperplaneListEventSourcesErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListEventSourcesError = SuperplaneListEventSourcesErrors[keyof SuperplaneListEventSourcesErrors];
@@ -1209,7 +1025,7 @@ export type SuperplaneCreateEventSourceErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneCreateEventSourceError = SuperplaneCreateEventSourceErrors[keyof SuperplaneCreateEventSourceErrors];
@@ -1237,7 +1053,7 @@ export type SuperplaneResetEventSourceKeyErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneResetEventSourceKeyError = SuperplaneResetEventSourceKeyErrors[keyof SuperplaneResetEventSourceKeyErrors];
@@ -1267,7 +1083,7 @@ export type SuperplaneDescribeEventSourceErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneDescribeEventSourceError = SuperplaneDescribeEventSourceErrors[keyof SuperplaneDescribeEventSourceErrors];
@@ -1280,173 +1096,6 @@ export type SuperplaneDescribeEventSourceResponses = {
 };
 
 export type SuperplaneDescribeEventSourceResponse2 = SuperplaneDescribeEventSourceResponses[keyof SuperplaneDescribeEventSourceResponses];
-
-export type AuthorizationListCanvasGroupsData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups';
-};
-
-export type AuthorizationListCanvasGroupsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationListCanvasGroupsError = AuthorizationListCanvasGroupsErrors[keyof AuthorizationListCanvasGroupsErrors];
-
-export type AuthorizationListCanvasGroupsResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationListCanvasGroupsResponse;
-};
-
-export type AuthorizationListCanvasGroupsResponse2 = AuthorizationListCanvasGroupsResponses[keyof AuthorizationListCanvasGroupsResponses];
-
-export type AuthorizationCreateCanvasGroupData = {
-    body: AuthorizationCreateCanvasGroupBody;
-    path: {
-        canvasIdOrName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups';
-};
-
-export type AuthorizationCreateCanvasGroupErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationCreateCanvasGroupError = AuthorizationCreateCanvasGroupErrors[keyof AuthorizationCreateCanvasGroupErrors];
-
-export type AuthorizationCreateCanvasGroupResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationCreateCanvasGroupResponse;
-};
-
-export type AuthorizationCreateCanvasGroupResponse2 = AuthorizationCreateCanvasGroupResponses[keyof AuthorizationCreateCanvasGroupResponses];
-
-export type AuthorizationGetCanvasGroupData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        groupName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups/{groupName}';
-};
-
-export type AuthorizationGetCanvasGroupErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationGetCanvasGroupError = AuthorizationGetCanvasGroupErrors[keyof AuthorizationGetCanvasGroupErrors];
-
-export type AuthorizationGetCanvasGroupResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationGetCanvasGroupResponse;
-};
-
-export type AuthorizationGetCanvasGroupResponse2 = AuthorizationGetCanvasGroupResponses[keyof AuthorizationGetCanvasGroupResponses];
-
-export type AuthorizationGetCanvasGroupUsersData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        groupName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users';
-};
-
-export type AuthorizationGetCanvasGroupUsersErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationGetCanvasGroupUsersError = AuthorizationGetCanvasGroupUsersErrors[keyof AuthorizationGetCanvasGroupUsersErrors];
-
-export type AuthorizationGetCanvasGroupUsersResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationGetCanvasGroupUsersResponse;
-};
-
-export type AuthorizationGetCanvasGroupUsersResponse2 = AuthorizationGetCanvasGroupUsersResponses[keyof AuthorizationGetCanvasGroupUsersResponses];
-
-export type AuthorizationAddUserToCanvasGroupData = {
-    body: AuthorizationAddUserToCanvasGroupBody;
-    path: {
-        canvasIdOrName: string;
-        groupName: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users';
-};
-
-export type AuthorizationAddUserToCanvasGroupErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationAddUserToCanvasGroupError = AuthorizationAddUserToCanvasGroupErrors[keyof AuthorizationAddUserToCanvasGroupErrors];
-
-export type AuthorizationAddUserToCanvasGroupResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationAddUserToCanvasGroupResponse;
-};
-
-export type AuthorizationAddUserToCanvasGroupResponse2 = AuthorizationAddUserToCanvasGroupResponses[keyof AuthorizationAddUserToCanvasGroupResponses];
-
-export type AuthorizationRemoveUserFromCanvasGroupData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        groupName: string;
-        userId: string;
-    };
-    query?: never;
-    url: '/api/v1/canvases/{canvasIdOrName}/groups/{groupName}/users/{userId}';
-};
-
-export type AuthorizationRemoveUserFromCanvasGroupErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: RpcStatus;
-};
-
-export type AuthorizationRemoveUserFromCanvasGroupError = AuthorizationRemoveUserFromCanvasGroupErrors[keyof AuthorizationRemoveUserFromCanvasGroupErrors];
-
-export type AuthorizationRemoveUserFromCanvasGroupResponses = {
-    /**
-     * A successful response.
-     */
-    200: AuthorizationRemoveUserFromCanvasGroupResponse;
-};
-
-export type AuthorizationRemoveUserFromCanvasGroupResponse2 = AuthorizationRemoveUserFromCanvasGroupResponses[keyof AuthorizationRemoveUserFromCanvasGroupResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;
@@ -1461,7 +1110,7 @@ export type SuperplaneListStagesErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListStagesError = SuperplaneListStagesErrors[keyof SuperplaneListStagesErrors];
@@ -1488,7 +1137,7 @@ export type SuperplaneCreateStageErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneCreateStageError = SuperplaneCreateStageErrors[keyof SuperplaneCreateStageErrors];
@@ -1516,7 +1165,7 @@ export type SuperplaneUpdateStageErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneUpdateStageError = SuperplaneUpdateStageErrors[keyof SuperplaneUpdateStageErrors];
@@ -1546,7 +1195,7 @@ export type SuperplaneDescribeStageErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneDescribeStageError = SuperplaneDescribeStageErrors[keyof SuperplaneDescribeStageErrors];
@@ -1577,7 +1226,7 @@ export type SuperplaneListStageEventsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneListStageEventsError = SuperplaneListStageEventsErrors[keyof SuperplaneListStageEventsErrors];
@@ -1606,7 +1255,7 @@ export type SuperplaneApproveStageEventErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneApproveStageEventError = SuperplaneApproveStageEventErrors[keyof SuperplaneApproveStageEventErrors];
@@ -1636,7 +1285,7 @@ export type SuperplaneDescribeCanvasErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SuperplaneDescribeCanvasError = SuperplaneDescribeCanvasErrors[keyof SuperplaneDescribeCanvasErrors];
@@ -1650,118 +1299,178 @@ export type SuperplaneDescribeCanvasResponses = {
 
 export type SuperplaneDescribeCanvasResponse2 = SuperplaneDescribeCanvasResponses[keyof SuperplaneDescribeCanvasResponses];
 
-export type AuthorizationListOrganizationGroupsData = {
+export type GroupsListGroupsData = {
     body?: never;
     path?: never;
     query?: {
-        organizationId?: string;
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
     };
     url: '/api/v1/groups';
 };
 
-export type AuthorizationListOrganizationGroupsErrors = {
+export type GroupsListGroupsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationListOrganizationGroupsError = AuthorizationListOrganizationGroupsErrors[keyof AuthorizationListOrganizationGroupsErrors];
+export type GroupsListGroupsError = GroupsListGroupsErrors[keyof GroupsListGroupsErrors];
 
-export type AuthorizationListOrganizationGroupsResponses = {
+export type GroupsListGroupsResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationListOrganizationGroupsResponse;
+    200: GroupsListGroupsResponse;
 };
 
-export type AuthorizationListOrganizationGroupsResponse2 = AuthorizationListOrganizationGroupsResponses[keyof AuthorizationListOrganizationGroupsResponses];
+export type GroupsListGroupsResponse2 = GroupsListGroupsResponses[keyof GroupsListGroupsResponses];
 
-export type AuthorizationCreateOrganizationGroupData = {
-    body: AuthorizationCreateOrganizationGroupRequest;
+export type GroupsCreateGroupData = {
+    body: GroupsCreateGroupRequest;
     path?: never;
     query?: never;
     url: '/api/v1/groups';
 };
 
-export type AuthorizationCreateOrganizationGroupErrors = {
+export type GroupsCreateGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationCreateOrganizationGroupError = AuthorizationCreateOrganizationGroupErrors[keyof AuthorizationCreateOrganizationGroupErrors];
+export type GroupsCreateGroupError = GroupsCreateGroupErrors[keyof GroupsCreateGroupErrors];
 
-export type AuthorizationCreateOrganizationGroupResponses = {
+export type GroupsCreateGroupResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationCreateOrganizationGroupResponse;
+    200: GroupsCreateGroupResponse;
 };
 
-export type AuthorizationCreateOrganizationGroupResponse2 = AuthorizationCreateOrganizationGroupResponses[keyof AuthorizationCreateOrganizationGroupResponses];
+export type GroupsCreateGroupResponse2 = GroupsCreateGroupResponses[keyof GroupsCreateGroupResponses];
 
-export type AuthorizationGetOrganizationGroupData = {
+export type GroupsDeleteGroupData = {
     body?: never;
     path: {
         groupName: string;
     };
     query?: {
-        organizationId?: string;
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
     };
     url: '/api/v1/groups/{groupName}';
 };
 
-export type AuthorizationGetOrganizationGroupErrors = {
+export type GroupsDeleteGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationGetOrganizationGroupError = AuthorizationGetOrganizationGroupErrors[keyof AuthorizationGetOrganizationGroupErrors];
+export type GroupsDeleteGroupError = GroupsDeleteGroupErrors[keyof GroupsDeleteGroupErrors];
 
-export type AuthorizationGetOrganizationGroupResponses = {
+export type GroupsDeleteGroupResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationGetOrganizationGroupResponse;
+    200: GroupsDeleteGroupResponse;
 };
 
-export type AuthorizationGetOrganizationGroupResponse2 = AuthorizationGetOrganizationGroupResponses[keyof AuthorizationGetOrganizationGroupResponses];
+export type GroupsDeleteGroupResponse2 = GroupsDeleteGroupResponses[keyof GroupsDeleteGroupResponses];
 
-export type AuthorizationGetOrganizationGroupUsersData = {
+export type GroupsDescribeGroupData = {
     body?: never;
     path: {
         groupName: string;
     };
     query?: {
-        organizationId?: string;
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/groups/{groupName}';
+};
+
+export type GroupsDescribeGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type GroupsDescribeGroupError = GroupsDescribeGroupErrors[keyof GroupsDescribeGroupErrors];
+
+export type GroupsDescribeGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: GroupsDescribeGroupResponse;
+};
+
+export type GroupsDescribeGroupResponse2 = GroupsDescribeGroupResponses[keyof GroupsDescribeGroupResponses];
+
+export type GroupsUpdateGroupData = {
+    body: GroupsUpdateGroupBody;
+    path: {
+        groupName: string;
+    };
+    query?: never;
+    url: '/api/v1/groups/{groupName}';
+};
+
+export type GroupsUpdateGroupErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type GroupsUpdateGroupError = GroupsUpdateGroupErrors[keyof GroupsUpdateGroupErrors];
+
+export type GroupsUpdateGroupResponses = {
+    /**
+     * A successful response.
+     */
+    200: GroupsUpdateGroupResponse;
+};
+
+export type GroupsUpdateGroupResponse2 = GroupsUpdateGroupResponses[keyof GroupsUpdateGroupResponses];
+
+export type GroupsListGroupUsersData = {
+    body?: never;
+    path: {
+        groupName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
     };
     url: '/api/v1/groups/{groupName}/users';
 };
 
-export type AuthorizationGetOrganizationGroupUsersErrors = {
+export type GroupsListGroupUsersErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationGetOrganizationGroupUsersError = AuthorizationGetOrganizationGroupUsersErrors[keyof AuthorizationGetOrganizationGroupUsersErrors];
+export type GroupsListGroupUsersError = GroupsListGroupUsersErrors[keyof GroupsListGroupUsersErrors];
 
-export type AuthorizationGetOrganizationGroupUsersResponses = {
+export type GroupsListGroupUsersResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationGetOrganizationGroupUsersResponse;
+    200: GroupsListGroupUsersResponse;
 };
 
-export type AuthorizationGetOrganizationGroupUsersResponse2 = AuthorizationGetOrganizationGroupUsersResponses[keyof AuthorizationGetOrganizationGroupUsersResponses];
+export type GroupsListGroupUsersResponse2 = GroupsListGroupUsersResponses[keyof GroupsListGroupUsersResponses];
 
-export type AuthorizationAddUserToOrganizationGroupData = {
-    body: AuthorizationAddUserToOrganizationGroupBody;
+export type GroupsAddUserToGroupData = {
+    body: GroupsAddUserToGroupBody;
     path: {
         groupName: string;
     };
@@ -1769,53 +1478,50 @@ export type AuthorizationAddUserToOrganizationGroupData = {
     url: '/api/v1/groups/{groupName}/users';
 };
 
-export type AuthorizationAddUserToOrganizationGroupErrors = {
+export type GroupsAddUserToGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationAddUserToOrganizationGroupError = AuthorizationAddUserToOrganizationGroupErrors[keyof AuthorizationAddUserToOrganizationGroupErrors];
+export type GroupsAddUserToGroupError = GroupsAddUserToGroupErrors[keyof GroupsAddUserToGroupErrors];
 
-export type AuthorizationAddUserToOrganizationGroupResponses = {
+export type GroupsAddUserToGroupResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationAddUserToOrganizationGroupResponse;
+    200: GroupsAddUserToGroupResponse;
 };
 
-export type AuthorizationAddUserToOrganizationGroupResponse2 = AuthorizationAddUserToOrganizationGroupResponses[keyof AuthorizationAddUserToOrganizationGroupResponses];
+export type GroupsAddUserToGroupResponse2 = GroupsAddUserToGroupResponses[keyof GroupsAddUserToGroupResponses];
 
-export type AuthorizationRemoveUserFromOrganizationGroupData = {
-    body?: never;
+export type GroupsRemoveUserFromGroupData = {
+    body: GroupsRemoveUserFromGroupBody;
     path: {
         groupName: string;
-        userId: string;
     };
-    query?: {
-        organizationId?: string;
-    };
-    url: '/api/v1/groups/{groupName}/users/{userId}';
+    query?: never;
+    url: '/api/v1/groups/{groupName}/users/remove';
 };
 
-export type AuthorizationRemoveUserFromOrganizationGroupErrors = {
+export type GroupsRemoveUserFromGroupErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
-export type AuthorizationRemoveUserFromOrganizationGroupError = AuthorizationRemoveUserFromOrganizationGroupErrors[keyof AuthorizationRemoveUserFromOrganizationGroupErrors];
+export type GroupsRemoveUserFromGroupError = GroupsRemoveUserFromGroupErrors[keyof GroupsRemoveUserFromGroupErrors];
 
-export type AuthorizationRemoveUserFromOrganizationGroupResponses = {
+export type GroupsRemoveUserFromGroupResponses = {
     /**
      * A successful response.
      */
-    200: AuthorizationRemoveUserFromOrganizationGroupResponse;
+    200: GroupsRemoveUserFromGroupResponse;
 };
 
-export type AuthorizationRemoveUserFromOrganizationGroupResponse2 = AuthorizationRemoveUserFromOrganizationGroupResponses[keyof AuthorizationRemoveUserFromOrganizationGroupResponses];
+export type GroupsRemoveUserFromGroupResponse2 = GroupsRemoveUserFromGroupResponses[keyof GroupsRemoveUserFromGroupResponses];
 
 export type IntegrationsListIntegrationsData = {
     body?: never;
@@ -1831,7 +1537,7 @@ export type IntegrationsListIntegrationsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type IntegrationsListIntegrationsError = IntegrationsListIntegrationsErrors[keyof IntegrationsListIntegrationsErrors];
@@ -1856,7 +1562,7 @@ export type IntegrationsCreateIntegrationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type IntegrationsCreateIntegrationError = IntegrationsCreateIntegrationErrors[keyof IntegrationsCreateIntegrationErrors];
@@ -1886,7 +1592,7 @@ export type IntegrationsDescribeIntegrationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type IntegrationsDescribeIntegrationError = IntegrationsDescribeIntegrationErrors[keyof IntegrationsDescribeIntegrationErrors];
@@ -1911,7 +1617,7 @@ export type OrganizationsListOrganizationsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type OrganizationsListOrganizationsError = OrganizationsListOrganizationsErrors[keyof OrganizationsListOrganizationsErrors];
@@ -1936,7 +1642,7 @@ export type OrganizationsCreateOrganizationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type OrganizationsCreateOrganizationError = OrganizationsCreateOrganizationErrors[keyof OrganizationsCreateOrganizationErrors];
@@ -1963,7 +1669,7 @@ export type OrganizationsDeleteOrganizationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type OrganizationsDeleteOrganizationError = OrganizationsDeleteOrganizationErrors[keyof OrganizationsDeleteOrganizationErrors];
@@ -1990,7 +1696,7 @@ export type OrganizationsDescribeOrganizationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type OrganizationsDescribeOrganizationError = OrganizationsDescribeOrganizationErrors[keyof OrganizationsDescribeOrganizationErrors];
@@ -2017,7 +1723,7 @@ export type OrganizationsUpdateOrganizationErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type OrganizationsUpdateOrganizationError = OrganizationsUpdateOrganizationErrors[keyof OrganizationsUpdateOrganizationErrors];
@@ -2030,6 +1736,195 @@ export type OrganizationsUpdateOrganizationResponses = {
 };
 
 export type OrganizationsUpdateOrganizationResponse2 = OrganizationsUpdateOrganizationResponses[keyof OrganizationsUpdateOrganizationResponses];
+
+export type RolesListRolesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/roles';
+};
+
+export type RolesListRolesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesListRolesError = RolesListRolesErrors[keyof RolesListRolesErrors];
+
+export type RolesListRolesResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesListRolesResponse;
+};
+
+export type RolesListRolesResponse2 = RolesListRolesResponses[keyof RolesListRolesResponses];
+
+export type RolesCreateRoleData = {
+    body: RolesCreateRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/roles';
+};
+
+export type RolesCreateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesCreateRoleError = RolesCreateRoleErrors[keyof RolesCreateRoleErrors];
+
+export type RolesCreateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesCreateRoleResponse;
+};
+
+export type RolesCreateRoleResponse2 = RolesCreateRoleResponses[keyof RolesCreateRoleResponses];
+
+export type RolesAssignRoleData = {
+    body: RolesAssignRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/roles/assign';
+};
+
+export type RolesAssignRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesAssignRoleError = RolesAssignRoleErrors[keyof RolesAssignRoleErrors];
+
+export type RolesAssignRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesAssignRoleResponse;
+};
+
+export type RolesAssignRoleResponse2 = RolesAssignRoleResponses[keyof RolesAssignRoleResponses];
+
+export type RolesDescribeRoleData = {
+    body?: never;
+    path?: never;
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+        role?: string;
+    };
+    url: '/api/v1/roles/describe';
+};
+
+export type RolesDescribeRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesDescribeRoleError = RolesDescribeRoleErrors[keyof RolesDescribeRoleErrors];
+
+export type RolesDescribeRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesDescribeRoleResponse;
+};
+
+export type RolesDescribeRoleResponse2 = RolesDescribeRoleResponses[keyof RolesDescribeRoleResponses];
+
+export type RolesRemoveRoleData = {
+    body: RolesRemoveRoleRequest;
+    path?: never;
+    query?: never;
+    url: '/api/v1/roles/remove';
+};
+
+export type RolesRemoveRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesRemoveRoleError = RolesRemoveRoleErrors[keyof RolesRemoveRoleErrors];
+
+export type RolesRemoveRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesRemoveRoleResponse;
+};
+
+export type RolesRemoveRoleResponse2 = RolesRemoveRoleResponses[keyof RolesRemoveRoleResponses];
+
+export type RolesDeleteRoleData = {
+    body?: never;
+    path: {
+        roleName: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/roles/{roleName}';
+};
+
+export type RolesDeleteRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesDeleteRoleError = RolesDeleteRoleErrors[keyof RolesDeleteRoleErrors];
+
+export type RolesDeleteRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesDeleteRoleResponse;
+};
+
+export type RolesDeleteRoleResponse2 = RolesDeleteRoleResponses[keyof RolesDeleteRoleResponses];
+
+export type RolesUpdateRoleData = {
+    body: RolesUpdateRoleBody;
+    path: {
+        roleName: string;
+    };
+    query?: never;
+    url: '/api/v1/roles/{roleName}';
+};
+
+export type RolesUpdateRoleErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type RolesUpdateRoleError = RolesUpdateRoleErrors[keyof RolesUpdateRoleErrors];
+
+export type RolesUpdateRoleResponses = {
+    /**
+     * A successful response.
+     */
+    200: RolesUpdateRoleResponse;
+};
+
+export type RolesUpdateRoleResponse2 = RolesUpdateRoleResponses[keyof RolesUpdateRoleResponses];
 
 export type SecretsListSecretsData = {
     body?: never;
@@ -2045,7 +1940,7 @@ export type SecretsListSecretsErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SecretsListSecretsError = SecretsListSecretsErrors[keyof SecretsListSecretsErrors];
@@ -2070,7 +1965,7 @@ export type SecretsCreateSecretErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SecretsCreateSecretError = SecretsCreateSecretErrors[keyof SecretsCreateSecretErrors];
@@ -2100,7 +1995,7 @@ export type SecretsDeleteSecretErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SecretsDeleteSecretError = SecretsDeleteSecretErrors[keyof SecretsDeleteSecretErrors];
@@ -2130,7 +2025,7 @@ export type SecretsDescribeSecretErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SecretsDescribeSecretError = SecretsDescribeSecretErrors[keyof SecretsDescribeSecretErrors];
@@ -2157,7 +2052,7 @@ export type SecretsUpdateSecretErrors = {
     /**
      * An unexpected error response.
      */
-    default: RpcStatus;
+    default: GooglerpcStatus;
 };
 
 export type SecretsUpdateSecretError = SecretsUpdateSecretErrors[keyof SecretsUpdateSecretErrors];
@@ -2170,6 +2065,94 @@ export type SecretsUpdateSecretResponses = {
 };
 
 export type SecretsUpdateSecretResponse2 = SecretsUpdateSecretResponses[keyof SecretsUpdateSecretResponses];
+
+export type UsersListUsersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/users';
+};
+
+export type UsersListUsersErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type UsersListUsersError = UsersListUsersErrors[keyof UsersListUsersErrors];
+
+export type UsersListUsersResponses = {
+    /**
+     * A successful response.
+     */
+    200: UsersListUsersResponse;
+};
+
+export type UsersListUsersResponse2 = UsersListUsersResponses[keyof UsersListUsersResponses];
+
+export type UsersListUserPermissionsData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/users/{userId}/permissions';
+};
+
+export type UsersListUserPermissionsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type UsersListUserPermissionsError = UsersListUserPermissionsErrors[keyof UsersListUserPermissionsErrors];
+
+export type UsersListUserPermissionsResponses = {
+    /**
+     * A successful response.
+     */
+    200: UsersListUserPermissionsResponse;
+};
+
+export type UsersListUserPermissionsResponse2 = UsersListUserPermissionsResponses[keyof UsersListUserPermissionsResponses];
+
+export type UsersListUserRolesData = {
+    body?: never;
+    path: {
+        userId: string;
+    };
+    query?: {
+        domainType?: 'DOMAIN_TYPE_UNSPECIFIED' | 'DOMAIN_TYPE_ORGANIZATION' | 'DOMAIN_TYPE_CANVAS';
+        domainId?: string;
+    };
+    url: '/api/v1/users/{userId}/roles';
+};
+
+export type UsersListUserRolesErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type UsersListUserRolesError = UsersListUserRolesErrors[keyof UsersListUserRolesErrors];
+
+export type UsersListUserRolesResponses = {
+    /**
+     * A successful response.
+     */
+    200: UsersListUserRolesResponse;
+};
+
+export type UsersListUserRolesResponse2 = UsersListUserRolesResponses[keyof UsersListUserRolesResponses];
 
 export type ClientOptions = {
     baseUrl: `http://${string}` | `https://${string}` | (string & {});

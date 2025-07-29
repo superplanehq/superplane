@@ -7,9 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -23,21 +21,14 @@ func Test_ListUserPermissions(t *testing.T) {
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), authorization.RoleOrgViewer, orgID, models.DomainTypeOrganization)
+	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful list user permissions", func(t *testing.T) {
-		req := &pb.ListUserPermissionsRequest{
-			UserId:     r.User.String(),
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-		}
-
-		resp, err := ListUserPermissions(ctx, req, authService)
+		resp, err := ListUserPermissions(ctx, models.DomainTypeOrganization, orgID, r.User.String(), authService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Permissions)
 
-		// Should have only read permissions
 		hasReadPermission := false
 		hasWritePermission := false
 		for _, perm := range resp.Permissions {
@@ -51,17 +42,5 @@ func Test_ListUserPermissions(t *testing.T) {
 		}
 		assert.True(t, hasReadPermission)
 		assert.False(t, hasWritePermission)
-	})
-
-	t.Run("invalid request - unspecified domain type", func(t *testing.T) {
-		req := &pb.ListUserPermissionsRequest{
-			UserId:     r.User.String(),
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-		}
-
-		_, err := ListUserPermissions(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "domain type must be specified")
 	})
 }

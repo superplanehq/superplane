@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
-	pb "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	pb "github.com/superplanehq/superplane/pkg/protos/roles"
 )
 
 func Test_UpdateRole(t *testing.T) {
@@ -36,34 +37,30 @@ func Test_UpdateRole(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("successful custom role update", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "test-custom-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 				{
 					Resource:   "canvas",
 					Action:     "write",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 				{
 					Resource:   "secret",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		resp, err := UpdateRole(ctx, req, authService)
+		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// Check if role was updated by verifying permissions
 		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
@@ -71,144 +68,98 @@ func Test_UpdateRole(t *testing.T) {
 	})
 
 	t.Run("successful custom role update with inheritance", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:      "test-custom-role",
-			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:      orgID,
-			InheritedRole: authorization.RoleOrgViewer,
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			InheritedRole: &pb.Role{
+				Metadata: &pb.Role_Metadata{
+					Name: models.RoleOrgViewer,
+				},
+			},
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "create",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		resp, err := UpdateRole(ctx, req, authService)
+		resp, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
-		// Check if role was updated with inheritance
 		roleDef, err := authService.GetRoleDefinition("test-custom-role", models.DomainTypeOrganization, orgID)
 		require.NoError(t, err)
 		assert.Equal(t, "test-custom-role", roleDef.Name)
 		assert.NotNil(t, roleDef.InheritsFrom)
-		assert.Equal(t, authorization.RoleOrgViewer, roleDef.InheritsFrom.Name)
+		assert.Equal(t, models.RoleOrgViewer, roleDef.InheritsFrom.Name)
 		assert.Len(t, roleDef.Permissions, 1)
 	})
 
 	t.Run("invalid request - missing role name", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role name must be specified")
 	})
 
-	t.Run("invalid request - invalid domain type", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "test-custom-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_UNSPECIFIED,
-			DomainId:   orgID,
-			Permissions: []*pb.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				},
-			},
-		}
-
-		_, err := UpdateRole(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid domain type")
-	})
-
 	t.Run("invalid request - default role name", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   authorization.RoleOrgAdmin,
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot update default role")
 	})
 
 	t.Run("invalid request - nonexistent role", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "nonexistent-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "nonexistent-role", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "role not found")
 	})
 
-	t.Run("invalid request - invalid UUID", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:   "test-custom-role",
-			DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   "invalid-uuid",
-			Permissions: []*pb.Permission{
-				{
-					Resource:   "canvas",
-					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-				},
-			},
-		}
-
-		_, err := UpdateRole(ctx, req, authService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid UUIDs")
-	})
-
 	t.Run("invalid request - nonexistent inherited role", func(t *testing.T) {
-		req := &pb.UpdateRoleRequest{
-			RoleName:      "test-custom-role",
-			DomainType:    pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:      orgID,
-			InheritedRole: "nonexistent-role",
-			Permissions: []*pb.Permission{
+		req := &pb.Role_Spec{
+			InheritedRole: &pb.Role{
+				Metadata: &pb.Role_Metadata{
+					Name: "nonexistent-role",
+				},
+			},
+			Permissions: []*pbAuth.Permission{
 				{
 					Resource:   "canvas",
 					Action:     "read",
-					DomainType: pb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 				},
 			},
 		}
 
-		_, err := UpdateRole(ctx, req, authService)
+		_, err := UpdateRole(ctx, models.DomainTypeOrganization, orgID, "test-custom-role", req, authService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "inherited role not found")
 	})

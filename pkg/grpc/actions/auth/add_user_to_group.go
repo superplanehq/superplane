@@ -4,31 +4,25 @@ import (
 	"context"
 
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func AddUserToGroup(ctx context.Context, req *GroupUserRequest, authService authorization.Authorization) error {
-	err := actions.ValidateUUIDs(req.DomainID, req.UserID)
-	if err != nil {
-		return status.Error(codes.InvalidArgument, "invalid UUIDs")
+func AddUserToGroup(ctx context.Context, domainType, domainID, userID, userEmail, groupName string, authService authorization.Authorization) (*pbGroups.AddUserToGroupResponse, error) {
+	if groupName == "" {
+		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	err = ValidateGroupUserRequest(req)
+	userID, err := ResolveUserID(userID, userEmail)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	domainType, err := actions.ProtoToDomainType(req.DomainType)
+	err = authService.AddUserToGroup(domainID, domainType, userID, groupName)
 	if err != nil {
-		return err
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = authService.AddUserToGroup(req.DomainID, domainType, req.UserID, req.GroupName)
-	if err != nil {
-		return status.Error(codes.Internal, err.Error())
-	}
-
-	return nil
+	return &pbGroups.AddUserToGroupResponse{}, nil
 }

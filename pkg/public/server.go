@@ -22,11 +22,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbIntegration "github.com/superplanehq/superplane/pkg/protos/integrations"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -127,7 +129,17 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbAuth.RegisterAuthorizationHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbGroups.RegisterGroupsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbRoles.RegisterRolesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -137,7 +149,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbIntegration.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -157,7 +169,9 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
 	)
 
-	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
@@ -321,8 +335,39 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountProviders, err := user.GetAccountProviders()
+	if err != nil {
+		log.Errorf("Error getting account providers: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var email, avatarURL string
+	if len(accountProviders) > 0 {
+		email = accountProviders[0].Email
+		avatarURL = accountProviders[0].AvatarURL
+
+		// Fallback to user name if no email from provider
+		if email == "" && user.Name != "" {
+			email = user.Name
+		}
+	} else {
+		if user.Name != "" {
+			email = user.Name
+		}
+	}
+
+	safeUser := UserProfileResponse{
+		ID:               user.ID.String(),
+		Email:            email,
+		Name:             user.Name,
+		AvatarURL:        avatarURL,
+		CreatedAt:        user.CreatedAt,
+		AccountProviders: accountProviders,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(safeUser)
 }
 
 func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
@@ -374,6 +419,15 @@ func (s *Server) Close() {
 type OutputsRequest struct {
 	ExecutionID string         `json:"execution_id"`
 	Outputs     map[string]any `json:"outputs"`
+}
+
+type UserProfileResponse struct {
+	ID               string                   `json:"id"`
+	Email            string                   `json:"email"`
+	Name             string                   `json:"name"`
+	AvatarURL        string                   `json:"avatar_url"`
+	CreatedAt        time.Time                `json:"created_at"`
+	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
 }
 
 func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {

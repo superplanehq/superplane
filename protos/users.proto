@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package Superplane.Users;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "authorization.proto";
+import "roles.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/users";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "Superplane Users API";
+    version: "1.0";
+    description: "API for Superplane Users";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTP;
+  schemes: HTTPS;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Users {
+  //
+  // Endpoint for listing all user permissions within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListUserPermissions(ListUserPermissionsRequest) returns (ListUserPermissionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/permissions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List user permissions";
+      description: "Returns all permissions a user has within a specific domain";
+      tags: "Users";
+    };
+  }
+
+  //
+  // Endpoint for getting user roles within a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListUserRoles(ListUserRolesRequest) returns (ListUserRolesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users/{user_id}/roles"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get user roles";
+      description: "Returns the roles a user has within a specific domain";
+      tags: "Users";
+    };
+  }
+
+  //
+  // Endpoint for getting all users in a domain
+  // Operation is synchronous and idempotent.
+  //
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/users"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List users";
+      description: "Returns all users that have roles within a domain";
+      tags: "Users";
+    };
+  }
+}
+
+message ListUserPermissionsRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+  string user_id = 3;
+}
+
+message ListUserPermissionsResponse {
+  string user_id = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Authorization.Permission permissions = 4;
+}
+
+message ListUserRolesRequest {
+  string user_id = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+}
+
+message ListUserRolesResponse {
+  string user_id = 1;
+  Authorization.DomainType domain_type = 2;
+  string domain_id = 3;
+  repeated Roles.Role roles = 4;
+}
+
+message ListUsersRequest {
+  Authorization.DomainType domain_type = 1;
+  string domain_id = 2;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+}
+
+// User data structure
+message User {
+  message Metadata {
+    string id = 1;
+    string email = 2;
+    google.protobuf.Timestamp created_at = 3;
+    google.protobuf.Timestamp updated_at = 4;
+  }
+
+  message Spec {
+    string display_name = 1;
+    string avatar_url = 2;
+    repeated AccountProvider account_providers = 3;
+  }
+
+  message Status {
+    bool is_active = 1;
+    repeated UserRoleAssignment role_assignments = 2;
+  }
+
+  Metadata metadata = 1;
+  Spec spec = 2;
+  Status status = 3;
+}
+
+message UserRoleAssignment {
+  string role_name = 1;
+  string role_display_name = 2;
+  string role_description = 3;
+  Authorization.DomainType domain_type = 4;
+  string domain_id = 5;
+  google.protobuf.Timestamp assigned_at = 6;
+}
+
+message AccountProvider {
+  string provider_type = 1; // e.g., "google", "github", "email"
+  string provider_id = 2;   // unique ID from the provider
+  string email = 3;
+  string display_name = 4;
+  string avatar_url = 5;
+  bool is_primary = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}

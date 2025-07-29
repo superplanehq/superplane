@@ -26,7 +26,7 @@ func Test__ListStages(t *testing.T) {
 	})
 
 	t.Run("no stages -> empty list", func(t *testing.T) {
-		org, err := models.CreateOrganization(uuid.New(), "test", "test")
+		org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
 		require.NoError(t, err)
 
 		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas")

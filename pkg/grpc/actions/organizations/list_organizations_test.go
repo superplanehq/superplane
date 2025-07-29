@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -24,10 +23,10 @@ func Test__ListOrganizations(t *testing.T) {
 		ctx := context.Background()
 		ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
 
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization")
+		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "This is a test organization")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(userID.String(), authorization.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
 
 		res, err := ListOrganizations(ctx, &protos.ListOrganizationsRequest{}, authService)
 		require.NoError(t, err)
@@ -37,6 +36,7 @@ func Test__ListOrganizations(t *testing.T) {
 		assert.Equal(t, organization.ID.String(), res.Organizations[0].Metadata.Id)
 		assert.Equal(t, organization.Name, res.Organizations[0].Metadata.Name)
 		assert.Equal(t, organization.DisplayName, res.Organizations[0].Metadata.DisplayName)
+		assert.Equal(t, organization.Description, res.Organizations[0].Metadata.Description)
 		assert.Equal(t, organization.CreatedBy.String(), res.Organizations[0].Metadata.CreatedBy)
 		assert.NotNil(t, res.Organizations[0].Metadata.CreatedAt)
 		assert.NotNil(t, res.Organizations[0].Metadata.UpdatedAt)
@@ -46,18 +46,18 @@ func Test__ListOrganizations(t *testing.T) {
 		user1ID := uuid.New()
 		user2ID := uuid.New()
 
-		org1, err := models.CreateOrganization(user1ID, "user1-org", "User 1 Organization")
+		org1, err := models.CreateOrganization(user1ID, "user1-org", "User 1 Organization", "Organization for user 1")
 		require.NoError(t, err)
 
-		org2, err := models.CreateOrganization(user2ID, "user2-org", "User 2 Organization")
+		org2, err := models.CreateOrganization(user2ID, "user2-org", "User 2 Organization", "Organization for user 2")
 		require.NoError(t, err)
 
 		authService.SetupOrganizationRoles(org1.ID.String())
 		authService.SetupOrganizationRoles(org2.ID.String())
 
-		authService.AssignRole(user1ID.String(), authorization.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(user1ID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(user2ID.String(), authorization.RoleOrgOwner, org2.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(user2ID.String(), models.RoleOrgOwner, org2.ID.String(), models.DomainTypeOrganization)
 
 		// User1 should only see org1
 		ctx1 := context.Background()
@@ -87,10 +87,10 @@ func Test__ListOrganizations(t *testing.T) {
 		userID := uuid.New()
 
 		otherUserID := uuid.New()
-		organization, err := models.CreateOrganization(otherUserID, "other-org", "Other User Organization")
+		organization, err := models.CreateOrganization(otherUserID, "other-org", "Other User Organization", "Organization for other user")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
-		authService.AssignRole(otherUserID.String(), authorization.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
 
 		ctx := context.Background()
 		ctx = authentication.SetUserIdInMetadata(ctx, userID.String())
@@ -105,24 +105,24 @@ func Test__ListOrganizations(t *testing.T) {
 		userID := uuid.New()
 		otherUserID := uuid.New()
 
-		org1, err := models.CreateOrganization(userID, "owned-org", "User Owned Organization")
+		org1, err := models.CreateOrganization(userID, "owned-org", "User Owned Organization", "Organization owned by user")
 		require.NoError(t, err)
 
-		org2, err := models.CreateOrganization(otherUserID, "member-org", "User Member Organization")
+		org2, err := models.CreateOrganization(otherUserID, "member-org", "User Member Organization", "Organization where user is member")
 		require.NoError(t, err)
 
-		org3, err := models.CreateOrganization(otherUserID, "no-access-org", "No Access Organization")
+		org3, err := models.CreateOrganization(otherUserID, "no-access-org", "No Access Organization", "Organization with no access")
 		require.NoError(t, err)
 
 		authService.SetupOrganizationRoles(org1.ID.String())
 		authService.SetupOrganizationRoles(org2.ID.String())
 		authService.SetupOrganizationRoles(org3.ID.String())
 
-		authService.AssignRole(userID.String(), authorization.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(userID.String(), models.RoleOrgOwner, org1.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(userID.String(), authorization.RoleOrgViewer, org2.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(userID.String(), models.RoleOrgViewer, org2.ID.String(), models.DomainTypeOrganization)
 
-		authService.AssignRole(otherUserID.String(), authorization.RoleOrgOwner, org3.ID.String(), models.DomainTypeOrganization)
+		authService.AssignRole(otherUserID.String(), models.RoleOrgOwner, org3.ID.String(), models.DomainTypeOrganization)
 
 		// user should see org1 and org2, but not org3
 		ctx := context.Background()
