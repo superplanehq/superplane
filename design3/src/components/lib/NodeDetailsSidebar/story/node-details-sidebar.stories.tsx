@@ -93,3 +93,20 @@ export const CustomStyling: Story = {
     className: 'border-l-4 border-l-blue-500',
   },
 };
+
+export const WithNewInputsOutputsStyle: Story = {
+  args: {
+    nodeId: 'inputs-outputs-demo',
+    nodeTitle: 'Inputs/Outputs Demo',
+    nodeIcon: 'data_object',
+    isOpen: true,
+    onClose: () => console.log('Sidebar closed'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'This story demonstrates the new renderInputsOutputs2 function that displays inputs and outputs in separate bordered boxes with improved styling and copy buttons.',
+      },
+    },
+  },
+};

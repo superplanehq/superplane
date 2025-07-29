@@ -82,7 +82,44 @@ const mockRuns: RunData[] = [
     }
   }
 ];
-
+const mockRuns2: RunData[] = [
+  {
+    id: 'run-22',
+    name: 'Run #2',
+    status: 'running',
+    timestamp: 'Jan 16, 2022 10:23:45',
+    duration: '00h 00m 25s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '1045a77',
+      Image: 'v.1.2.1',
+      Terraform: '32.32',
+      Something: 'adsfasdf'
+    }
+  },
+  {
+    id: 'run-12',
+    name: 'Run #1',
+    status: 'success',
+    timestamp: 'Jan 16, 2022 10:23:45',
+    duration: '00h 00m 25s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '1045a77',
+      Image: 'v.1.2.0',
+      Terraform: '32.32',
+      Something: 'adsfasdf'
+    },
+    outputs: {
+      Code: '1045a77',
+      Image: 'v.1.2.0',
+      Terraform: '32.32',
+      Something: 'adsfasdf'
+    }
+  }
+];
 const mockQueue: QueueItem[] = [
   {
     id: 'msg-1',
@@ -258,6 +295,66 @@ export function NodeDetailsSidebar({
     </div>
   );
 
+  const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
+    <div className="mt-3 space-y-3">
+      {inputs && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+              <MaterialSymbol name="input" size="sm" className="text-gray-600 dark:text-gray-400" />
+            </div>
+            <div className="flex-1">
+              <Text className="text-sm font-semibold mb-1 mt-1">
+                Inputs
+              </Text>
+              <div className="space-y-2">
+                {Object.entries(inputs).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">{key}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge>
+                        {value}
+                      </Badge>
+                    
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {outputs && (
+        <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+              <MaterialSymbol name="output" size="sm" className="text-gray-600 dark:text-gray-400" />
+            </div>
+            <div className="flex-1">
+              <Text className="text-sm font-semibold mb-1 mt-1">
+                Outputs
+              </Text>
+              <div className="space-y-2">
+                {Object.entries(outputs).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">{key}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge>
+                        {value}
+                      </Badge>
+                    
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    
+    </div>
+  );
+
   if (!isOpen) return null;
 
   return (
@@ -373,7 +470,102 @@ export function NodeDetailsSidebar({
                     </div>
                   );
                 })}
-                <Divider />
+                 {mockRuns2.map((run) => {
+                  const statusConfig = getStatusIcon(run.status);
+                  const statusConfig2 = getStatusConfig(run.status);
+                  const isExpanded = expandedRuns.has(run.id);
+                  
+                  return (
+                    <div key={run.id} className={statusConfig2.bgColor + " " + statusConfig2.borderColor } >
+                      <div 
+                        className="p-3"
+                        
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                              
+                              <MaterialSymbol 
+                                name={statusConfig.icon} 
+                                size="md" 
+                                className={statusConfig.color}
+                              />
+                            <Text className="font-bold">{run.name}</Text>
+                            <Dropdown>
+                              <DropdownButton plain>
+                                <MaterialSymbol name="more_vert" size="sm" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>View details</DropdownItem>
+                                <DropdownItem>Restart run</DropdownItem>
+                                <DropdownItem>Download logs</DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                          <Button plain onClick={() => toggleRunExpansion(run.id)}>
+                          <MaterialSymbol 
+                              name={isExpanded ? 'expand_less' : 'expand_more'} 
+                              size="lg" 
+                              className="text-gray-400" 
+                            />
+                          </Button>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="mt-3 space-y-3">
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+                                  <MaterialSymbol name="automation" size="sm" className="text-gray-600 dark:text-gray-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <Text className="text-xs font-semibold mb-1 mt-1">
+                                    Executor
+                                  </Text>
+                                  <div className="space-y-2">
+                                  <Link href="#" className="text-xs text-blue-600 hover:text-blue-700">
+                                  {run.project}/{run.pipeline}
+                                  </Link>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+                                  <MaterialSymbol name="schedule" size="sm" className="text-gray-600 dark:text-gray-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <Text className="text-xs font-semibold mb-1 mt-1">
+                                    Started on
+                                  </Text>
+                                  <div className="space-y-2">
+                                  <span className='text-xs'>{run.timestamp}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+                                  <MaterialSymbol name="timer" size="sm" className="text-gray-600 dark:text-gray-400" />
+                                </div>
+                                <div className="flex-1">
+                                  <Text className="text-sm font-semibold mb-1 mt-1">
+                                    Run Duration
+                                  </Text>
+                                  <div className="space-y-2">
+                                  <span className='text-xs'>{run.duration}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            {renderInputsOutputs2(run.inputs, run.outputs)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -390,6 +582,70 @@ export function NodeDetailsSidebar({
               
               <div className="space-y-3">
                 {mockQueue.map((item) => {
+                  const isExpanded = expandedQueue.has(item.id);
+                  
+                  return (
+                    <div key={item.id} className="border border-gray-200 rounded-lg">
+                      <div 
+                        className="p-3 cursor-pointer hover:bg-gray-50"
+                        onClick={() => toggleQueueExpansion(item.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <MaterialSymbol 
+                              name={isExpanded ? 'expand_less' : 'expand_more'} 
+                              size="sm" 
+                              className="text-gray-400" 
+                            />
+                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
+                              <MaterialSymbol name="schedule" size="sm" className="text-orange-500" />
+                            </div>
+                            <Text className="font-medium text-gray-900">{item.name}</Text>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Text className="text-xs text-gray-500">{item.timestamp}</Text>
+                            <Dropdown>
+                              <DropdownButton plain>
+                                <MaterialSymbol name="more_vert" size="sm" />
+                              </DropdownButton>
+                              <DropdownMenu>
+                                <DropdownItem>Approve</DropdownItem>
+                                <DropdownItem>Reject</DropdownItem>
+                                <DropdownItem>View details</DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
+                          </div>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="mt-3 pl-9">
+                            {renderInputsOutputs2(item.inputs)}
+                            
+                            {item.scheduledFor && (
+                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                                <MaterialSymbol name="schedule" size="sm" />
+                                <span>{item.scheduledFor}</span>
+                              </div>
+                            )}
+                            
+                            {item.approvalInfo && (
+                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+                                <MaterialSymbol name="check_circle" size="sm" className="text-green-500" />
+                                <span>
+                                  approved by <Link href="#" className="text-blue-600">1 person</Link>, waiting for {item.approvalInfo.waitingFor} more
+                                </span>
+                                <Button plain className="ml-2">
+                                  <MaterialSymbol name="check" size="sm" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                 {mockQueue.map((item) => {
                   const isExpanded = expandedQueue.has(item.id);
                   
                   return (
