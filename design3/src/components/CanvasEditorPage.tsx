@@ -94,13 +94,13 @@ export function CanvasEditorPage({
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [showMiniMap, setShowMiniMap] = useState(true)
-  const [activeView, setActiveView] = useState<'editor' | 'settings'>('editor')
+  const [activeView, setActiveView] = useState<'preview' | 'settings'>('preview')
   
   // Define tabs for navigation
   const navigationTabs: Tab[] = [
     {
-      id: 'editor',
-      label: 'Editor',
+      id: 'preview',
+      label: 'Preview',
     },
     {
       id: 'settings',
@@ -602,7 +602,7 @@ export function CanvasEditorPage({
             tabs={navigationTabs}
             activeTab={activeView}
             variant='default'
-            onTabChange={(tabId) => setActiveView(tabId as 'editor' | 'settings')}
+            onTabChange={(tabId) => setActiveView(tabId as 'preview' | 'settings')}
           />
         </div>
       </nav>
@@ -615,7 +615,7 @@ export function CanvasEditorPage({
       {renderNavigation()}
 
       {/* Conditional Content Based on Active View */}
-      {activeView === 'editor' ? (
+      {activeView === 'preview' ? (
         /* React Flow Canvas */
         <div className="flex-1 flex">
           {/* Component Sidebar */}

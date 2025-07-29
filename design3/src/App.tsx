@@ -6,6 +6,7 @@ import { SettingsPage } from './components/SettingsPage'
 import { MainLandingPage } from './components/MainLandingPage'
 import { CanvasesPage } from './components/CanvasesPage'
 import { CanvasEditorPage } from './components/CanvasEditorPage'
+import { WorkflowEditor } from './components/WorkflowEditor'
 import { CanvasEditorPage2 } from './components/CanvasEditorPage2'
 import { CanvasEditorPage3 } from './components/CanvasEditorPage3'
 import { CanvasEditorPage4 } from './components/CanvasEditorPage4'
@@ -232,8 +233,9 @@ function App() {
   if (currentPath.startsWith('/canvas2/')) {
     const canvasId = currentPath.split('/canvas2/')[1]
     return (
-      <CanvasEditorPage2 
-        canvasId={canvasId}
+      <WorkflowEditor 
+        workflowId={canvasId}
+        workflowName={getCanvasName(canvasId)}
         onBack={() => {
           window.history.pushState(null, '', '/canvases')
           setCurrentPath('/canvases')
