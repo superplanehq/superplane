@@ -16,6 +16,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/secrets"
 )
 
+const (
+	ExecutionTokenDuration = 24 * time.Hour
+)
+
 type PendingExecutionsWorker struct {
 	JwtSigner   *jwt.Signer
 	Encryptor   crypto.Encryptor
@@ -179,7 +183,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 		return err
 	}
 
-	token, err := w.JwtSigner.Generate(execution.ID.String(), 24*time.Hour)
+	token, err := w.JwtSigner.Generate(execution.ID.String(), ExecutionTokenDuration)
 	if err != nil {
 		return fmt.Errorf("error generating token: %v", err)
 	}

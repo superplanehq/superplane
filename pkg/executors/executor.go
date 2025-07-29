@@ -16,8 +16,6 @@ type ExecutionParameters struct {
 }
 
 type Response interface {
-	Finished() bool
 	Successful() bool
 	Outputs() map[string]any
-	Id() string
 }

@@ -53,10 +53,6 @@ func (e *HTTPExecutor) Validate(ctx context.Context, specData []byte) error {
 	return nil
 }
 
-func (e *HTTPExecutor) HandleWebhook(data []byte) (executors.Response, error) {
-	return nil, nil
-}
-
 func (e *HTTPExecutor) Execute(specData []byte, parameters executors.ExecutionParameters) (executors.Response, error) {
 	var spec HTTPSpec
 	err := json.Unmarshal(specData, &spec)
@@ -123,16 +119,8 @@ type HTTPResponse struct {
 	allowedCodes []uint32
 }
 
-func (r *HTTPResponse) Finished() bool {
-	return true
-}
-
 func (r *HTTPResponse) Successful() bool {
 	return slices.Contains(r.allowedCodes, uint32(r.statusCode))
-}
-
-func (r *HTTPResponse) Id() string {
-	return ""
 }
 
 func (r *HTTPResponse) Outputs() map[string]any {
