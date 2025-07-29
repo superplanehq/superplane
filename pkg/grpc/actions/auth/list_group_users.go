@@ -30,7 +30,7 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames([]string{role}, domainType, domainID)
 	if err != nil {
-		roleMetadataMap = make(map[string]*models.RoleMetadata)
+		return nil, status.Error(codes.NotFound, "role metadata not found")
 	}
 
 	roleMetadata := roleMetadataMap[role]
@@ -39,8 +39,8 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 	for _, userID := range userIDs {
 		roleAssignment := &pbUsers.UserRoleAssignment{
 			RoleName:        role,
-			RoleDisplayName: models.GetRoleDisplayNameWithFallback(role, domainType, domainID, roleMetadata),
-			RoleDescription: models.GetRoleDescriptionWithFallback(role, domainType, domainID, roleMetadata),
+			RoleDisplayName: roleMetadata.DisplayName,
+			RoleDescription: roleMetadata.Description,
 			DomainType:      actions.DomainTypeToProto(domainType),
 			DomainId:        domainID,
 			AssignedAt:      timestamppb.Now(),
@@ -54,17 +54,15 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 	}
 
 	groupMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
-	var displayName, description string
-	var createdAt, updatedAt *timestamppb.Timestamp
-	if err == nil {
-		displayName = groupMetadata.DisplayName
-		description = groupMetadata.Description
-		createdAt = timestamppb.New(groupMetadata.CreatedAt)
-		updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
-	} else {
-		displayName = groupName
-		description = ""
+
+	if err != nil {
+		return nil, status.Error(codes.NotFound, "group not found")
 	}
+
+	displayName := groupMetadata.DisplayName
+	description := groupMetadata.Description
+	createdAt := timestamppb.New(groupMetadata.CreatedAt)
+	updatedAt := timestamppb.New(groupMetadata.UpdatedAt)
 
 	group := &pb.Group{
 		Metadata: &pb.Group_Metadata{

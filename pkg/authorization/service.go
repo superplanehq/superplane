@@ -32,7 +32,6 @@ var _ Authorization = (*AuthService)(nil)
 
 type AuthService struct {
 	enforcer              *casbin.CachedEnforcer
-	db                    *gorm.DB
 	orgPolicyTemplates    [][5]string
 	canvasPolicyTemplates [][5]string
 }
@@ -79,7 +78,6 @@ func NewAuthService() (*AuthService, error) {
 
 	service := &AuthService{
 		enforcer:              enforcer,
-		db:                    adapter.GetDb(),
 		orgPolicyTemplates:    orgPolicyTemplates,
 		canvasPolicyTemplates: canvasPolicyTemplates,
 	}
@@ -102,12 +100,7 @@ func (a *AuthService) checkPermission(userID, domainID, domainType, resource, ac
 }
 
 func (a *AuthService) CreateGroup(domainID string, domainType string, groupName string, role string, displayName string, description string) error {
-	var err error
-	if err := models.ValidateDomainType(domainType); err != nil {
-		return err
-	}
-
-	err = a.CreateGroupWithNestedTransaction(domainID, domainType, groupName, role, displayName, description)
+	err := a.CreateGroupWithNestedTransaction(domainID, domainType, groupName, role, displayName, description)
 	if err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}

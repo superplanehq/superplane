@@ -23,16 +23,6 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
-	if groupSpec != nil && groupSpec.Role != "" && groupSpec.Role != currentRole {
-		err = authService.UpdateGroup(domainID, domainType, groupName, groupSpec.Role, groupSpec.DisplayName, groupSpec.Description)
-		if err != nil {
-			log.Errorf("failed to update group %s role from %s to %s: %v", groupName, currentRole, groupSpec.Role, err)
-			return nil, status.Error(codes.Internal, "failed to update group role")
-		}
-
-		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", groupName, currentRole, groupSpec.Role, domainID, domainType)
-	}
-
 	var displayName string
 	var description string
 	groupModelMetadata, err := models.FindGroupMetadata(groupName, domainType, domainID)
@@ -56,9 +46,19 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 		description = groupModelMetadata.Description
 	}
 
-	updatedRole := groupSpec.Role
-	if updatedRole == "" {
-		updatedRole = currentRole
+	updatingRole := groupSpec.Role
+	if updatingRole == "" {
+		updatingRole = currentRole
+	}
+
+	if groupSpec != nil {
+		err = authService.UpdateGroup(domainID, domainType, groupName, updatingRole, displayName, description)
+		if err != nil {
+			log.Errorf("failed to update group %s role from %s to %s: %v", groupName, currentRole, groupSpec.Role, err)
+			return nil, status.Error(codes.Internal, "failed to update group role")
+		}
+
+		log.Infof("updated group %s role from %s to %s in domain %s (type: %s)", groupName, currentRole, groupSpec.Role, domainID, domainType)
 	}
 
 	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)
@@ -71,11 +71,11 @@ func UpdateGroup(ctx context.Context, domainType string, domainID string, groupN
 			Name:       groupName,
 			DomainType: actions.DomainTypeToProto(domainType),
 			DomainId:   domainID,
-			CreatedAt:  timestamppb.Now(),
+			CreatedAt:  timestamppb.New(groupModelMetadata.CreatedAt),
 			UpdatedAt:  timestamppb.Now(),
 		},
 		Spec: &pb.Group_Spec{
-			Role:        updatedRole,
+			Role:        updatingRole,
 			DisplayName: displayName,
 			Description: description,
 		},

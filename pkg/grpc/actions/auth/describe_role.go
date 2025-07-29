@@ -27,10 +27,10 @@ func DescribeRole(ctx context.Context, domainType, domainID, roleName string, au
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
-		roleMetadataMap = make(map[string]*models.RoleMetadata)
+		return nil, status.Error(codes.NotFound, "role metadata not found")
 	}
 
-	role, err := convertRoleDefinitionToProto(roleDefinition, authService, domainID, roleMetadataMap)
+	role, err := convertRoleDefinitionToProto(roleDefinition, domainID, roleMetadataMap)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to convert role definition")
 	}

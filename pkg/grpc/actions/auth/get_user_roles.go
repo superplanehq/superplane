@@ -42,12 +42,12 @@ func ListUserRoles(ctx context.Context, domainType, domainID, userID string, aut
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames(roleNames, domainType, domainID)
 	if err != nil {
-		roleMetadataMap = make(map[string]*models.RoleMetadata)
+		return nil, status.Error(codes.NotFound, "role metadata not found")
 	}
 
 	var rolesProto []*pbRoles.Role
 	for _, role := range roles {
-		roleProto, err := convertRoleDefinitionToProto(role, authService, domainID, roleMetadataMap)
+		roleProto, err := convertRoleDefinitionToProto(role, domainID, roleMetadataMap)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to convert role definition")
 		}

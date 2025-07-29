@@ -31,8 +31,7 @@ func DescribeGroup(ctx context.Context, domainType, domainID, groupName string, 
 		createdAt = timestamppb.New(groupMetadata.CreatedAt)
 		updatedAt = timestamppb.New(groupMetadata.UpdatedAt)
 	} else {
-		displayName = groupName
-		description = ""
+		return nil, status.Error(codes.NotFound, "group not found")
 	}
 
 	groupUsers, err := authService.GetGroupUsers(domainID, domainType, groupName)

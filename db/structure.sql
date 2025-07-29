@@ -736,13 +736,6 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
--- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
 -- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
 --
 

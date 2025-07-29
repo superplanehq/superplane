@@ -47,7 +47,6 @@ export function Tabs({
 
   const handleTabClick = useCallback((tabId: string) => {
     if (tabs.find(tab => tab.id === tabId)?.disabled) return
-
     setActiveTab(tabId)
     onTabChange?.(tabId)
   }, [tabs, onTabChange])
@@ -147,7 +146,6 @@ function TabItem({
           {tab.count > 99 ? '99+' : tab.count}
         </span>
       )}
-
       {variant === 'underline' && (
         <div className={clsx(
           'absolute inset-x-0 bottom-0 h-0.5 bg-blue-500 transition-all duration-200 ease-in-out',
