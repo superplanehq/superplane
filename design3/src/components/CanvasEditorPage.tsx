@@ -70,13 +70,151 @@ interface CanvasEditorPageProps {
   onBack?: () => void
 }
 
-// Initial workflow data
-const initialNodes: WorkflowNode[] = [
- 
+// Initial workflow data (will be enhanced with handlers in the component)
+const initialNodesData = [
+  {
+    id: 'stage-1',
+    position: { x: 100, y: 100 },
+    workflowNodeData: {
+      id: 'stage-1',
+      title: 'Build & Test',
+      description: 'Run tests and build the application',
+      type: 'stage',
+      status: 'success',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'build-test',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [],
+          connections: [{
+            name: 'GitHub Repository',
+            type: 'github',
+            config: { repo: 'main-app', branch: 'main' }
+          }],
+          inputs: [
+            { name: 'branch', type: 'string', required: true, defaultValue: 'main' }
+          ],
+          inputMappings: {},
+          outputs: [
+            { name: 'build_artifact', type: 'string', value: 'dist/' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'node:18', resources: { cpu: '1', memory: '2Gi' } }
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'stage-2',
+    position: { x: 500, y: 100 },
+    workflowNodeData: {
+      id: 'stage-2',
+      title: 'Deploy to Staging',
+      description: 'edb5df5c-bc8a-4f42-b99c-fe454e12f112',
+      type: 'stage',
+      status: 'running',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'deploy-staging',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [
+            { name: 'STAGING_API_KEY', key: 'api_key', value: '***' }
+          ],
+          connections: [{
+            name: 'Staging Environment',
+            type: 'kubernetes',
+            config: { cluster: 'staging-cluster', namespace: 'app-staging' }
+          }],
+          inputs: [
+            { name: 'artifact_path', type: 'string', required: true }
+          ],
+          inputMappings: { artifact_path: '${build.outputs.build_artifact}' },
+          outputs: [
+            { name: 'deployment_url', type: 'string', value: 'https://staging.app.com' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'kubectl:latest', serviceAccount: 'deployer' }
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'stage-3',
+    position: { x: 900, y: 100 },
+    workflowNodeData: {
+      id: 'stage-3',
+      title: 'Deploy to Production',
+      description: 'Deploy application to production environment',
+      type: 'stage',
+      status: 'failed',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'deploy-production',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [
+            { name: 'PROD_API_KEY', key: 'api_key', value: '***' },
+            { name: 'DATABASE_URL', key: 'db_url', value: '***' }
+          ],
+          connections: [{
+            name: 'Production Environment',
+            type: 'kubernetes',
+            config: { cluster: 'prod-cluster', namespace: 'app-prod' }
+          }],
+          inputs: [
+            { name: 'artifact_path', type: 'string', required: true },
+            { name: 'approval_required', type: 'boolean', required: false, defaultValue: true }
+          ],
+          inputMappings: { artifact_path: '${staging.outputs.deployment_url}' },
+          outputs: [
+            { name: 'production_url', type: 'string', value: 'https://app.com' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'kubectl:latest', serviceAccount: 'prod-deployer' }
+          }
+        }
+      }
+    },
+  },
 ];
 
 const initialEdges: WorkflowEdge[] = [
-
+  {
+    id: 'e1-2',
+    source: 'stage-1',
+    target: 'stage-2',
+    type: 'smoothstep',
+    animated: true,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
+  {
+    id: 'e2-3',
+    source: 'stage-2',
+    target: 'stage-3',
+    type: 'smoothstep',
+    animated: true,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
 ];
 
 /**
@@ -91,8 +229,114 @@ export function CanvasEditorPage({
   canvasId, 
   onBack
 }: CanvasEditorPageProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  // Create initial nodes with proper handlers
+  const createInitialNodes = (): WorkflowNode[] => {
+    return initialNodesData.map(nodeData => ({
+      id: nodeData.id,
+      type: 'workflowNodeAccordion',
+      position: nodeData.position,
+      data: {
+        workflowNodeData: nodeData.workflowNodeData,
+        variant: 'read',
+        multiple: true,
+        className: 'max-w-xs',
+        partialSave: false,
+        saveGranular: true,
+        modalEdit: false,
+        savedConnectionIndices: [0]
+      }
+    }))
+  }
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(createInitialNodes())
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+  
+  // Add handlers to nodes after initialization
+  useEffect(() => {
+    setNodes(currentNodes => 
+      currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          onUpdate: (updates: Partial<any>) => {
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        workflowNodeData: {
+                          ...n.data.workflowNodeData,
+                          ...updates
+                        }
+                      }
+                    }
+                  : n
+              )
+            );
+          },
+          onSave: () => {
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        variant: 'read'
+                      }
+                    }
+                  : n
+              )
+            );
+          },
+          onCancel: () => {
+            setNodes((nds) => nds.filter((n) => n.id !== node.id));
+          },
+          onEdit: () => {
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        variant: 'edit'
+                      }
+                    }
+                  : n
+              )
+            );
+          },
+          onDelete: () => {
+            setNodes((nds) => {
+              const filteredNodes = nds.filter((n) => n.id !== node.id);
+              return filteredNodes.map((n) => ({
+                ...n,
+                data: {
+                  ...n.data,
+                  nodes: filteredNodes,
+                  totalNodesCount: filteredNodes.length
+                }
+              }));
+            });
+            setEdges((eds) => eds.filter((edge) => edge.source !== node.id && edge.target !== node.id));
+          },
+          onSelect: () => {
+            setNodes((nds) =>
+              nds.map((n) => ({
+                ...n,
+                selected: n.id === node.id,
+              }))
+            );
+          },
+          nodes: currentNodes,
+          totalNodesCount: currentNodes.length
+        }
+      }))
+    )
+  }, [setNodes, setEdges])
   const [showMiniMap, setShowMiniMap] = useState(true)
   const [activeView, setActiveView] = useState<'preview' | 'settings'>('preview')
   
@@ -365,7 +609,7 @@ export function CanvasEditorPage({
       
       const newNode: WorkflowNode = {
         id: nodeId,
-        type: useAccordion ? 'workflowNodeAccordion' : 'workflowNode',
+        type: 'workflowNodeAccordion',
         position: { x: 300, y: 300 },
         data: {
           workflowNodeData: {

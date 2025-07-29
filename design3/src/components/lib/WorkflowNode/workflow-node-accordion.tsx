@@ -685,6 +685,54 @@ export function WorkflowNodeAccordion({
     }
   }
 
+  const getStatusConfig = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'success':
+      case 'passed':
+        return {
+          bgColor: 'bg-green-50',
+          borderColor: 'border-t border-t-green-400',
+          textColor: 'text-green-700',
+          icon: 'check_circle',
+          iconColor: 'text-green-500',
+        };
+      case 'error':
+      case 'failed':
+        return {
+          bgColor: 'bg-red-50',
+          borderColor: 'border-t border-t-red-400',
+          textColor: 'text-red-700',
+          icon: 'cancel',
+          iconColor: 'text-red-500',
+        };
+      case 'running':
+        return {
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-t border-t-blue-400',
+          textColor: 'text-blue-700',
+          icon: 'sync',
+          iconColor: 'text-blue-500 animate-spin',
+        };
+      case 'pending':
+      case 'queued':
+        return {
+          bgColor: 'bg-yellow-50',
+          borderColor: 'border-t border-t-yellow-400',
+          textColor: 'text-yellow-700',
+          icon: 'schedule',
+          iconColor: 'text-yellow-500',
+        };
+      default:
+        return {
+          bgColor: 'bg-gray-50',
+          borderColor: 'border-t border-t-gray-400',
+          textColor: 'text-gray-700',
+          icon: 'help',
+          iconColor: 'text-gray-500',
+        };
+    }
+  }
+
   // Default accordion sections
   const defaultSections: AccordionItem[] = [
     {
@@ -2235,19 +2283,34 @@ export function WorkflowNodeAccordion({
     )
   }
 
-  // Read variant (same as original)
+  // Read variant - StageCard style
+  const statusConfig = getStatusConfig(data.status || 'pending')
+  
   return (
-    <div className={clsx(
-      'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg p-4 shadow-sm min-w-[250px] cursor-pointer transition-all hover:shadow-md hover:border-zinc-300 dark:hover:border-zinc-600',
-      className
-    )}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+    <div 
+      className={clsx(
+        'bg-white rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
+        selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200',
+        className
+      )}
+      style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
+      role="article"
+      aria-label={`Workflow stage: ${data.title}`}
+      onClick={onSelect}
+    >
+      {/* Action buttons when selected */}
+     
+
+      {/* Header section */}
+      <div className="p-4 flex justify-between items-center border-b border-gray-200">
+        <div className="flex items-center">
           <MaterialSymbol 
             name={getTypeIcon(data.type)} 
-            className={clsx('text-lg', getStatusColor(data.status))}
+            className="mr-2 text-gray-600"
           />
+          <h3 className="font-semibold text-gray-900">{data.title}</h3>
+        </div>
+        <div className="flex items-center gap-2">
           <span className={clsx(
             'px-2 py-1 text-xs font-medium rounded-full',
             getTypeColor(data.type)
@@ -2255,98 +2318,98 @@ export function WorkflowNodeAccordion({
             {data.type}
           </span>
         </div>
-        <div className="flex items-center gap-1">
-          {onEdit && (
-            <Button 
-              plain 
-              onClick={onEdit}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300"
-            >
-              <MaterialSymbol name="edit" size="sm" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button 
-              plain 
-              onClick={onDelete}
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400"
-            >
-              <MaterialSymbol name="delete" size="sm" />
-            </Button>
-          )}
+        <Dropdown>
+          <DropdownButton plain>
+            <MaterialSymbol name="more_vert" size="md"/>
+          </DropdownButton>
+          <DropdownMenu anchor="bottom start">
+            <DropdownItem className='flex items-center gap-2' onClick={onEdit}>
+              <MaterialSymbol name="edit" size="md"/>
+              <DropdownLabel>Edit</DropdownLabel>
+            </DropdownItem>
+            <DropdownItem className='flex items-center gap-2'>
+            <MaterialSymbol name="info" size="md"/>
+              <DropdownLabel>
+              Something else?</DropdownLabel></DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
+      </div>
+
+      {/* Status section */}
+      <div className={clsx('p-4 border-b border-gray-200', statusConfig.borderColor, statusConfig.bgColor)}>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Last Run
+          </span>
+          <span className="text-xs text-gray-500">2 hours ago</span>
         </div>
-      </div>
 
-      {/* Content */}
-      <div>
-        {/* Inline editable title */}
-        {editingField === 'title' ? (
-          <div className="mb-1">
-            <Input
-              value={tempTitle}
-              onChange={(e) => setTempTitle(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, 'title')}
-              onBlur={() => handleSaveInlineEdit('title')}
-              className="font-semibold text-zinc-900 dark:text-white"
-              autoFocus
-            />
-          </div>
-        ) : (
-          <div className="flex items-center mb-1">
-            <h3 
-              className="font-semibold text-zinc-900 dark:text-white cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors"
-              onClick={() => handleStartEdit('title')}
-              title="Click to edit title"
-            >
-              {data.title}
-            </h3>
-            <FieldModificationIndicator field="title" />
-          </div>
-        )}
-        
-        {/* Inline editable description */}
-        {editingField === 'description' ? (
-          <div className="mb-1">
-            <Textarea
-              value={tempDescription}
-              onChange={(e) => setTempDescription(e.target.value)}
-              onKeyDown={(e) => handleKeyDown(e, 'description')}
-              onBlur={() => handleSaveInlineEdit('description')}
-              className="text-sm text-zinc-600 dark:text-zinc-400"
-              rows={2}
-              autoFocus
-            />
-          </div>
-        ) : (
-          <div className="flex items-center">
-            <p 
-              className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors"
-              onClick={() => handleStartEdit('description')}
-              title="Click to edit description"
-            >
-              {data.description || 'Click to add description'}
-            </p>
-            <FieldModificationIndicator field="description" />
-          </div>
-        )}
-      </div>
-
-      {/* Status indicator */}
-      {data.status && data.status !== 'pending' && (
-        <div className="mt-3 flex items-center gap-2">
-          <div className={clsx(
-            'w-2 h-2 rounded-full',
-            data.status === 'running' && 'bg-blue-500 animate-pulse',
-            data.status === 'success' && 'bg-green-500',
-            data.status === 'error' && 'bg-red-500',
-            data.status === 'disabled' && 'bg-zinc-400'
-          )} />
-          <span className={clsx('text-xs font-medium capitalize', getStatusColor(data.status))}>
-            {data.status}
+        <div className="flex items-center mb-3">
+          <MaterialSymbol 
+            name={statusConfig.icon} 
+            size='lg'
+            className={clsx('mr-2', statusConfig.iconColor)}
+          />
+          <span className="font-medium text-sm text-gray-900 truncate">
+            {data.description || 'No description available'}
           </span>
         </div>
-      )}
-      
+
+        {/* Executor and connection info */}
+        <div className="flex flex-wrap gap-2">
+         
+          {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
+            <Badge className="text-xs">
+              {yamlConfig.spec.inputs?.length} input{yamlConfig.spec.inputs?.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
+            <Badge className="text-xs">
+              {yamlConfig.spec.outputs?.length} output {yamlConfig.spec.outputs?.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Summary section */}
+      <div className="p-4">
+        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+          QUEUE
+        </h4>
+        <div className="space-y-2">
+          {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
+            <div className="flex items-center p-2 bg-gray-50 rounded-md">
+              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-2">
+                <MaterialSymbol name="input" size="sm" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">
+                {yamlConfig.spec.inputs.length} input{yamlConfig.spec.inputs.length !== 1 ? 's' : ''} configured
+              </span>
+            </div>
+          )}
+          {yamlConfig.spec.outputs && yamlConfig.spec.outputs.length > 0 && (
+            <div className="flex items-center p-2 bg-gray-50 rounded-md">
+              <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-2">
+                <MaterialSymbol name="output" size="sm" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">
+                {yamlConfig.spec.outputs.length} output{yamlConfig.spec.outputs.length !== 1 ? 's' : ''} configured
+              </span>
+            </div>
+          )}
+          {(!yamlConfig.spec.inputs || yamlConfig.spec.inputs.length === 0) && 
+           (!yamlConfig.spec.outputs || yamlConfig.spec.outputs.length === 0) && (
+            <div className="flex items-center p-2 bg-gray-50 rounded-md">
+              <div className="w-6 h-6 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center mr-2">
+                <MaterialSymbol name="settings" size="sm" />
+              </div>
+              <span className="text-sm text-gray-700 font-medium">
+                Ready to configure
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
