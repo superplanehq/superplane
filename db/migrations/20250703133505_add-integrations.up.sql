@@ -42,7 +42,7 @@ ALTER TABLE stages DROP COLUMN executor_spec;
 CREATE TABLE stage_executors (
   id          uuid NOT NULL DEFAULT uuid_generate_v4(),
   stage_id    uuid NOT NULL,
-  resource_id uuid NOT NULL,
+  resource_id uuid,
   type        CHARACTER VARYING(64) NOT NULL,
   spec        jsonb NOT NULL DEFAULT '{}',
 
@@ -57,6 +57,7 @@ ALTER TABLE stage_executions
 CREATE TABLE execution_resources (
   id                 uuid NOT NULL DEFAULT uuid_generate_v4(),
   external_id        CHARACTER VARYING(128) NOT NULL,
+  type               CHARACTER VARYING(64) NOT NULL,
   stage_id           uuid NOT NULL,
   execution_id       uuid NOT NULL,
   parent_resource_id uuid NOT NULL,

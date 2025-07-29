@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +23,7 @@ import (
 func CreateIntegration(
 	ctx context.Context,
 	encryptor crypto.Encryptor,
+	registry *registry.Registry,
 	domainType, domainID string,
 	spec *pb.Integration,
 ) (*pb.CreateIntegrationResponse, error) {
@@ -37,7 +39,7 @@ func CreateIntegration(
 		return nil, status.Error(codes.InvalidArgument, "integration name is required")
 	}
 
-	integration, err := buildIntegration(ctx, encryptor, domainType, uuid.MustParse(domainID), spec)
+	integration, err := buildIntegration(ctx, encryptor, registry, domainType, uuid.MustParse(domainID), spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -60,10 +62,13 @@ func CreateIntegration(
 	return response, nil
 }
 
-func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, domainType string, domainID uuid.UUID, integration *pb.Integration) (*models.Integration, error) {
-	t, err := validateType(integration.Spec.Type)
-	if err != nil {
-		return nil, err
+func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, domainType string, domainID uuid.UUID, integration *pb.Integration) (*models.Integration, error) {
+	if integration.Spec.Type == "" {
+		return nil, fmt.Errorf("integration type is required")
+	}
+
+	if !registry.HasIntegrationWithType(integration.Spec.Type) {
+		return nil, fmt.Errorf("integration type %s not available", integration.Spec.Type)
 	}
 
 	if integration.Spec.Auth == nil {
@@ -85,23 +90,12 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, domainTyp
 		Name:       integration.Metadata.Name,
 		DomainType: domainType,
 		DomainID:   domainID,
-		Type:       t,
+		Type:       integration.Spec.Type,
 		URL:        integration.Spec.Url,
 		AuthType:   authType,
 		Auth:       datatypes.NewJSONType(*auth),
 		OIDC:       datatypes.NewJSONType(models.IntegrationOIDC{Enabled: integration.Spec.Oidc.Enabled}),
 	}, nil
-}
-
-func validateType(t pb.Integration_Type) (string, error) {
-	switch t {
-	case pb.Integration_TYPE_SEMAPHORE:
-		return models.IntegrationTypeSemaphore, nil
-	case pb.Integration_TYPE_GITHUB:
-		return models.IntegrationTypeGithub, nil
-	default:
-		return "", fmt.Errorf("invalid integration type")
-	}
 }
 
 func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDomainType string, integrationDomainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {
@@ -164,7 +158,7 @@ func serializeIntegration(integration models.Integration) *pb.Integration {
 			CreatedBy:  integration.CreatedBy.String(),
 		},
 		Spec: &pb.Integration_Spec{
-			Type: integrationTypeToProto(integration.Type),
+			Type: integration.Type,
 			Url:  integration.URL,
 			Auth: serializeIntegrationAuth(integration.AuthType, integration.Auth.Data()),
 			Oidc: &pb.Integration_OIDC{
@@ -195,17 +189,6 @@ func serializeIntegrationAuth(authType string, auth models.IntegrationAuth) *pb.
 		}
 	default:
 		return nil
-	}
-}
-
-func integrationTypeToProto(integrationType string) pb.Integration_Type {
-	switch integrationType {
-	case models.IntegrationTypeSemaphore:
-		return pb.Integration_TYPE_SEMAPHORE
-	case models.IntegrationTypeGithub:
-		return pb.Integration_TYPE_GITHUB
-	default:
-		return pb.Integration_TYPE_NONE
 	}
 }
 

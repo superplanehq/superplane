@@ -210,6 +210,7 @@ CREATE TABLE public.events (
 CREATE TABLE public.execution_resources (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     external_id character varying(128) NOT NULL,
+    type character varying(64) NOT NULL,
     stage_id uuid NOT NULL,
     execution_id uuid NOT NULL,
     parent_resource_id uuid NOT NULL,
@@ -385,7 +386,7 @@ CREATE TABLE public.stage_executions (
 CREATE TABLE public.stage_executors (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     stage_id uuid NOT NULL,
-    resource_id uuid NOT NULL,
+    resource_id uuid,
     type character varying(64) NOT NULL,
     spec jsonb DEFAULT '{}'::jsonb NOT NULL
 );

@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -31,6 +32,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		JwtSigner:   jwt.NewSigner("test"),
 		Encryptor:   &crypto.NoOpEncryptor{},
 		SpecBuilder: executors.SpecBuilder{},
+		Registry:    r.Registry,
 	}
 
 	amqpURL, _ := config.RabbitMQURL()
@@ -39,8 +41,8 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executorType, executorSpec, resource := support.Executor(r)
-		stage, err := builders.NewStageBuilder().
+		executorType, executorSpec, resource := support.Executor(t, r)
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -97,13 +99,18 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		//
 		// Create stage that runs Semaphore workflow.
 		//
-		executorType, executorSpec, resource := support.Executor(r)
-		executorSpec.Semaphore.Parameters = map[string]string{
-			"REF":      "${{ inputs.REF }}",
-			"REF_TYPE": "${{ inputs.REF_TYPE }}",
-		}
+		executorType, _, resource := support.Executor(t, r)
+		executorSpec, err := json.Marshal(map[string]any{
+			"branch":       "main",
+			"pipelineFile": ".semaphore/run.yml",
+			"parameters": map[string]string{
+				"REF":      "${{ inputs.REF }}",
+				"REF_TYPE": "${{ inputs.REF_TYPE }}",
+			},
+		})
+		require.NoError(t, err)
 
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-2").
@@ -192,10 +199,10 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 	})
 }
 
-func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
+func assertParameters(t *testing.T, req *semaphore.CreateWorkflowRequest, execution *models.StageExecution, parameters map[string]string) {
 	all := map[string]string{
-		"SEMAPHORE_STAGE_ID":           execution.StageID.String(),
-		"SEMAPHORE_STAGE_EXECUTION_ID": execution.ID.String(),
+		"SUPERPLANE_STAGE_ID":           execution.StageID.String(),
+		"SUPERPLANE_STAGE_EXECUTION_ID": execution.ID.String(),
 	}
 
 	for k, v := range parameters {
@@ -209,7 +216,7 @@ func assertParameters(t *testing.T, req *integrations.CreateWorkflowRequest, exe
 		assert.Equal(t, value, v)
 	}
 
-	v, ok := req.Parameters["SEMAPHORE_STAGE_EXECUTION_TOKEN"]
+	v, ok := req.Parameters["SUPERPLANE_STAGE_EXECUTION_TOKEN"]
 	assert.True(t, ok)
 	assert.NotEmpty(t, v)
 }

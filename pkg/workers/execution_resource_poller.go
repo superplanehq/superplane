@@ -1,21 +1,24 @@
 package workers
 
 import (
+	"context"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type ExecutionResourcePoller struct {
 	Encryptor crypto.Encryptor
+	Registry  *registry.Registry
 }
 
-func NewExecutionResourcePoller(encryptor crypto.Encryptor) *ExecutionResourcePoller {
+func NewExecutionResourcePoller(encryptor crypto.Encryptor, registry *registry.Registry) *ExecutionResourcePoller {
 	return &ExecutionResourcePoller{
 		Encryptor: encryptor,
+		Registry:  registry,
 	}
 }
 
@@ -47,33 +50,28 @@ func (w *ExecutionResourcePoller) Tick() error {
 }
 
 func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResource) error {
-	stage, err := models.FindStageByID(resource.StageID.String())
+	integration, err := resource.FindIntegration()
 	if err != nil {
 		return err
 	}
 
-	stageExecutor, err := stage.GetExecutor()
+	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
 	if err != nil {
 		return err
 	}
 
-	executor, err := executors.NewExecutor(stageExecutor, nil, nil, w.Encryptor)
+	statefulResource, err := integrationImpl.Check(resource.Type, resource.ExternalID)
 	if err != nil {
 		return err
 	}
 
-	status, err := executor.Check(resource.ExternalID)
-	if err != nil {
-		return err
-	}
-
-	if !status.Finished() {
+	if !statefulResource.Finished() {
 		log.Infof("Execution resource %s is not finished yet", resource.ExternalID)
 		return nil
 	}
 
 	result := models.ResultPassed
-	if !status.Successful() {
+	if !statefulResource.Successful() {
 		result = models.ResultFailed
 	}
 

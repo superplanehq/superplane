@@ -5,29 +5,29 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/integrations"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 type IntegrationService struct {
 	encryptor            crypto.Encryptor
-	specValidator        executors.SpecValidator
 	authorizationService authorization.Authorization
+	registry             *registry.Registry
 }
 
-func NewIntegrationService(encryptor crypto.Encryptor, authService authorization.Authorization) *IntegrationService {
+func NewIntegrationService(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) *IntegrationService {
 	return &IntegrationService{
 		encryptor:            encryptor,
-		specValidator:        executors.SpecValidator{Encryptor: encryptor},
 		authorizationService: authService,
+		registry:             registry,
 	}
 }
 
 func (s *IntegrationService) CreateIntegration(ctx context.Context, req *pb.CreateIntegrationRequest) (*pb.CreateIntegrationResponse, error) {
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return integrations.CreateIntegration(ctx, s.encryptor, domainType, domainID, req.Integration)
+	return integrations.CreateIntegration(ctx, s.encryptor, s.registry, domainType, domainID, req.Integration)
 }
 
 func (s *IntegrationService) DescribeIntegration(ctx context.Context, req *pb.DescribeIntegrationRequest) (*pb.DescribeIntegrationResponse, error) {

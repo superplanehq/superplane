@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
@@ -27,7 +26,6 @@ const EventSourceCreatedRoutingKey = "event-source-created"
 
 func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
-	encryptor := &crypto.NoOpEncryptor{}
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		eventSource := &protos.EventSource{
@@ -41,7 +39,7 @@ func Test__CreateEventSource(t *testing.T) {
 			EventSource:    eventSource,
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, req)
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -61,7 +59,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -75,7 +73,7 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Nil(t, response.EventSource.Spec.Integration)
-		assert.Nil(t, response.EventSource.Spec.Semaphore)
+		assert.Nil(t, response.EventSource.Spec.Resource)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -90,7 +88,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// First one is created.
 		//
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -100,7 +98,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Second one fails.
 		//
-		_, err = CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -126,13 +124,14 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -146,7 +145,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
-		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -160,13 +160,14 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: "does-not-exist",
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -216,13 +217,14 @@ func Test__CreateEventSource(t *testing.T) {
 					DomainType: authorization.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					Name:       integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -237,7 +239,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, integration.Name, response.EventSource.Spec.Integration.Name)
 		assert.Equal(t, authorization.DomainType_DOMAIN_TYPE_ORGANIZATION, response.EventSource.Spec.Integration.DomainType)
-		assert.Equal(t, "demo-project", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 
@@ -251,13 +254,14 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -298,13 +302,14 @@ func Test__CreateEventSource(t *testing.T) {
 				Integration: &integrationPb.IntegrationRef{
 					Name: r.Integration.Name,
 				},
-				Semaphore: &protos.EventSource_Spec_Semaphore{
-					Project: "demo-project-2",
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project-2",
 				},
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), encryptor, &protos.CreateEventSourceRequest{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -318,7 +323,8 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, externalName, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
-		assert.Equal(t, "demo-project-2", response.EventSource.Spec.Semaphore.Project)
+		assert.Equal(t, "demo-project-2", response.EventSource.Spec.Resource.Name)
+		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 
 		//
 		// Verify that internal source was updated to be external

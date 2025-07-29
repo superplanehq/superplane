@@ -21,7 +21,7 @@ var _ MappedNullable = &SuperplaneEventSourceSpec{}
 // SuperplaneEventSourceSpec struct for SuperplaneEventSourceSpec
 type SuperplaneEventSourceSpec struct {
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
-	Semaphore *EventSourceSpecSemaphore `json:"semaphore,omitempty"`
+	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
 }
 
 // NewSuperplaneEventSourceSpec instantiates a new SuperplaneEventSourceSpec object
@@ -73,36 +73,36 @@ func (o *SuperplaneEventSourceSpec) SetIntegration(v IntegrationsIntegrationRef)
 	o.Integration = &v
 }
 
-// GetSemaphore returns the Semaphore field value if set, zero value otherwise.
-func (o *SuperplaneEventSourceSpec) GetSemaphore() EventSourceSpecSemaphore {
-	if o == nil || IsNil(o.Semaphore) {
-		var ret EventSourceSpecSemaphore
+// GetResource returns the Resource field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceSpec) GetResource() IntegrationsResourceRef {
+	if o == nil || IsNil(o.Resource) {
+		var ret IntegrationsResourceRef
 		return ret
 	}
-	return *o.Semaphore
+	return *o.Resource
 }
 
-// GetSemaphoreOk returns a tuple with the Semaphore field value if set, nil otherwise
+// GetResourceOk returns a tuple with the Resource field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneEventSourceSpec) GetSemaphoreOk() (*EventSourceSpecSemaphore, bool) {
-	if o == nil || IsNil(o.Semaphore) {
+func (o *SuperplaneEventSourceSpec) GetResourceOk() (*IntegrationsResourceRef, bool) {
+	if o == nil || IsNil(o.Resource) {
 		return nil, false
 	}
-	return o.Semaphore, true
+	return o.Resource, true
 }
 
-// HasSemaphore returns a boolean if a field has been set.
-func (o *SuperplaneEventSourceSpec) HasSemaphore() bool {
-	if o != nil && !IsNil(o.Semaphore) {
+// HasResource returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceSpec) HasResource() bool {
+	if o != nil && !IsNil(o.Resource) {
 		return true
 	}
 
 	return false
 }
 
-// SetSemaphore gets a reference to the given EventSourceSpecSemaphore and assigns it to the Semaphore field.
-func (o *SuperplaneEventSourceSpec) SetSemaphore(v EventSourceSpecSemaphore) {
-	o.Semaphore = &v
+// SetResource gets a reference to the given IntegrationsResourceRef and assigns it to the Resource field.
+func (o *SuperplaneEventSourceSpec) SetResource(v IntegrationsResourceRef) {
+	o.Resource = &v
 }
 
 func (o SuperplaneEventSourceSpec) MarshalJSON() ([]byte, error) {
@@ -118,8 +118,8 @@ func (o SuperplaneEventSourceSpec) ToMap() (map[string]interface{}, error) {
 	if !IsNil(o.Integration) {
 		toSerialize["integration"] = o.Integration
 	}
-	if !IsNil(o.Semaphore) {
-		toSerialize["semaphore"] = o.Semaphore
+	if !IsNil(o.Resource) {
+		toSerialize["resource"] = o.Resource
 	}
 	return toSerialize, nil
 }

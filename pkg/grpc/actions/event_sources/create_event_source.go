@@ -15,12 +15,13 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
 	err := actions.ValidateUUIDs(req.CanvasIdOrName)
 	var canvas *models.Canvas
 	if err != nil {
@@ -58,12 +59,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, req *pb.
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resourceName, err := resourceName(req.EventSource.Spec, integration)
-		if err != nil {
-			return nil, err
-		}
-
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		resource, err = actions.ValidateResource(ctx, registry, integration, req.EventSource.Spec.Resource)
 		if err != nil {
 			return nil, err
 		}
@@ -132,11 +128,9 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 			DomainType: actions.DomainTypeToProto(integration.DomainType),
 		}
 
-		switch integration.Type {
-		case models.IntegrationTypeSemaphore:
-			spec.Semaphore = &pb.EventSource_Spec_Semaphore{
-				Project: resource.ResourceName,
-			}
+		spec.Resource = &integrationPb.ResourceRef{
+			Type: resource.Type(),
+			Name: resource.Name(),
 		}
 	}
 
@@ -150,17 +144,4 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 		},
 		Spec: spec,
 	}, nil
-}
-
-func resourceName(spec *pb.EventSource_Spec, integration *models.Integration) (string, error) {
-	switch integration.Type {
-	case models.IntegrationTypeSemaphore:
-		if spec.Semaphore == nil || spec.Semaphore.Project == "" {
-			return "", fmt.Errorf("semaphore project is required")
-		}
-
-		return spec.Semaphore.Project, nil
-	default:
-		return "", fmt.Errorf("integration type %s is not supported", integration.Type)
-	}
 }

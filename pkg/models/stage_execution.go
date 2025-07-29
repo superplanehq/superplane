@@ -235,10 +235,11 @@ func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.U
 
 type ExecutionResource struct {
 	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	ExternalID       string
 	ExecutionID      uuid.UUID
 	StageID          uuid.UUID
 	ParentResourceID uuid.UUID
+	ExternalID       string
+	Type             string
 	State            string
 	Result           string
 	CreatedAt        *time.Time
@@ -285,6 +286,24 @@ func (e *StageExecution) Resources() ([]ExecutionResource, error) {
 	return resources, nil
 }
 
+func (e *ExecutionResource) FindIntegration() (*Integration, error) {
+	var integration Integration
+
+	err := database.Conn().
+		Table("resources").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Where("resources.id = ?", e.ParentResourceID).
+		Select("integrations.*").
+		First(&integration).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &integration, nil
+}
+
 func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	var resource ExecutionResource
 
@@ -301,12 +320,13 @@ func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*Exec
 	return &resource, nil
 }
 
-func (e *StageExecution) AddResource(externalID string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
+func (e *StageExecution) AddResource(externalID string, externalType string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	r := &ExecutionResource{
 		ExecutionID:      e.ID,
 		StageID:          e.StageID,
-		ExternalID:       externalID,
 		ParentResourceID: parentResourceID,
+		ExternalID:       externalID,
+		Type:             externalType,
 		State:            ExecutionResourcePending,
 	}
 

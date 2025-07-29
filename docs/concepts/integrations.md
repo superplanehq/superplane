@@ -30,7 +30,7 @@ spec:
   # SuperPlane needs to create a Semaphore notification to monitor the result of executions.
   # For a GitHub integration, SuperPlane would create the webhook, ...
   #
-  type: TYPE_SEMAPHORE
+  type: semaphore
 
   #
   # URL where the integration lives.
@@ -78,11 +78,13 @@ When creating stages, you must specify the stage executor, and in the executor, 
 
 ```yaml
 executor:
-  type: TYPE_SEMAPHORE
+  type: semaphore
   integration:
     name: semaphore-integration
-  semaphore:
-    project: semaphore-demo-go
+  resource:
+    type: project
+    name: semaphore-demo-go
+  spec:
     branch: main
     pipelineFile: .semaphore/semaphore.yml
     parameters: {}
@@ -103,6 +105,7 @@ metadata:
 spec:
   integration:
     name: semaphore-integration
-  semaphore:
-    project: semaphore-demo-go
+  resource:
+    type: project
+    name: semaphore-demo-go
 ```

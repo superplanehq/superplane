@@ -12,26 +12,7 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
-export type EventSourceSpecSemaphore = {
-    project?: string;
-};
-
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
-
-export type ExecutorSpecHttp = {
-    url?: string;
-    headers?: {
-        [key: string]: string;
-    };
-    payload?: {
-        [key: string]: string;
-    };
-    responsePolicy?: ExecutorSpecHttpResponsePolicy;
-};
-
-export type ExecutorSpecHttpResponsePolicy = {
-    statusCodes?: Array<number>;
-};
 
 export type GroupByField = {
     name?: string;
@@ -174,16 +155,19 @@ export type IntegrationsIntegrationRef = {
 };
 
 export type IntegrationsIntegrationSpec = {
-    type?: IntegrationsIntegrationType;
+    type?: string;
     url?: string;
     auth?: IntegrationAuth;
     oidc?: IntegrationOidc;
 };
 
-export type IntegrationsIntegrationType = 'TYPE_NONE' | 'TYPE_SEMAPHORE' | 'TYPE_GITHUB';
-
 export type IntegrationsListIntegrationsResponse = {
     integrations?: Array<IntegrationsIntegration>;
+};
+
+export type IntegrationsResourceRef = {
+    type?: string;
+    name?: string;
 };
 
 export type OrganizationsCreateOrganizationRequest = {
@@ -530,7 +514,7 @@ export type SuperplaneEventSourceMetadata = {
 
 export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
-    semaphore?: EventSourceSpecSemaphore;
+    resource?: IntegrationsResourceRef;
 };
 
 export type SuperplaneExecution = {
@@ -550,24 +534,14 @@ export type SuperplaneExecutionResource = {
 
 export type SuperplaneExecutionState = 'STATE_UNKNOWN' | 'STATE_PENDING' | 'STATE_STARTED' | 'STATE_FINISHED';
 
-export type SuperplaneExecutorSpec = {
-    type?: SuperplaneExecutorSpecType;
+export type SuperplaneExecutor = {
+    type?: string;
     integration?: IntegrationsIntegrationRef;
-    semaphore?: SuperplaneExecutorSpecSemaphore;
-    http?: ExecutorSpecHttp;
-};
-
-export type SuperplaneExecutorSpecSemaphore = {
-    project?: string;
-    task?: string;
-    branch?: string;
-    pipelineFile?: string;
-    parameters?: {
-        [key: string]: string;
+    resource?: IntegrationsResourceRef;
+    spec?: {
+        [key: string]: unknown;
     };
 };
-
-export type SuperplaneExecutorSpecType = 'TYPE_UNKNOWN' | 'TYPE_SEMAPHORE' | 'TYPE_HTTP';
 
 export type SuperplaneFilter = {
     type?: SuperplaneFilterType;
@@ -598,6 +572,7 @@ export type SuperplaneIntegrationsValueFrom = {
 };
 
 export type SuperplaneIntegrationsValueFromSecret = {
+    domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
 };
@@ -687,7 +662,7 @@ export type SuperplaneStageMetadata = {
 export type SuperplaneStageSpec = {
     connections?: Array<SuperplaneConnection>;
     conditions?: Array<SuperplaneCondition>;
-    executor?: SuperplaneExecutorSpec;
+    executor?: SuperplaneExecutor;
     inputs?: Array<SuperplaneInputDefinition>;
     inputMappings?: Array<SuperplaneInputMapping>;
     outputs?: Array<SuperplaneOutputDefinition>;
@@ -732,6 +707,7 @@ export type SuperplaneValueFromLastExecution = {
 };
 
 export type SuperplaneValueFromSecret = {
+    domainType?: AuthorizationDomainType;
     name?: string;
     key?: string;
 };
@@ -808,6 +784,16 @@ export type ProtobufAny = {
     '@type'?: string;
     [key: string]: unknown | string | undefined;
 };
+
+/**
+ * `NullValue` is a singleton enumeration to represent the null value for the
+ * `Value` type union.
+ *
+ * The JSON representation for `NullValue` is JSON `null`.
+ *
+ * - NULL_VALUE: Null value.
+ */
+export type ProtobufNullValue = 'NULL_VALUE';
 
 export type SuperplaneListCanvasesData = {
     body?: never;

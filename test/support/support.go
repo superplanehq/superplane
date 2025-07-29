@@ -11,12 +11,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	semaphoreIntegration "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
 
@@ -28,6 +31,7 @@ type ResourceRegistry struct {
 	Organization     *models.Organization
 	Integration      *models.Integration
 	Encryptor        crypto.Encryptor
+	Registry         *registry.Registry
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -89,6 +93,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		require.NoError(t, err)
 	}
 
+	r.Registry = registry.NewRegistry(r.Encryptor)
 	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
 	r.SemaphoreAPIMock.Init()
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
@@ -129,8 +134,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		executorType, executorSpec, resource := Executor(&r)
-		stage, err := builders.NewStageBuilder().
+		executorType, executorSpec, resource := Executor(t, &r)
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -241,36 +246,45 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.Resource) {
-	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				Branch:       "main",
-				PipelineFile: ".semaphore/run.yml",
-				Parameters: map[string]string{
-					"PARAM_1": "VALUE_1",
-					"PARAM_2": "VALUE_2",
-				},
-			},
-		}, &models.Resource{
-			ResourceType:  integrations.ResourceTypeProject,
-			ExternalID:    uuid.NewString(),
-			IntegrationID: r.Integration.ID,
-			ResourceName:  "demo-project",
-		}
+func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.Resource) {
+	spec, err := json.Marshal(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters": map[string]string{
+			"PARAM_1": "VALUE_1",
+			"PARAM_2": "VALUE_2",
+		},
+	})
+
+	require.NoError(t, err)
+
+	return models.IntegrationTypeSemaphore, spec, &models.Resource{
+		ResourceType:  semaphoreIntegration.ResourceTypeProject,
+		ExternalID:    uuid.NewString(),
+		IntegrationID: r.Integration.ID,
+		ResourceName:  "demo-project",
+	}
 }
 
-func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
-	return &pb.ExecutorSpec{
-		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+func ProtoExecutor(t *testing.T, r *ResourceRegistry) *pb.Executor {
+	spec, err := structpb.NewStruct(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters":   map[string]any{},
+	})
+
+	require.NoError(t, err)
+
+	return &pb.Executor{
+		Type: models.IntegrationTypeSemaphore,
+		Spec: spec,
 		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},
-		Semaphore: &pb.ExecutorSpec_Semaphore{
-			Project:      "demo-project",
-			Branch:       "main",
-			PipelineFile: ".semaphore/semaphore.yml",
-			Parameters:   map[string]string{},
+		Resource: &integrationPb.ResourceRef{
+			Type: semaphoreIntegration.ResourceTypeProject,
+			Name: "demo-project",
 		},
 	}
 }

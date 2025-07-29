@@ -27,7 +27,7 @@ func Test__ListIntegrations(t *testing.T) {
 		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_CANVAS, res.Integrations[0].Metadata.DomainType)
 		assert.NotEmpty(t, res.Integrations[0].Metadata.CreatedAt)
 		assert.Equal(t, r.Integration.CreatedBy.String(), res.Integrations[0].Metadata.CreatedBy)
-		assert.Equal(t, protos.Integration_TYPE_SEMAPHORE, res.Integrations[0].Spec.Type)
+		assert.Equal(t, models.IntegrationTypeSemaphore, res.Integrations[0].Spec.Type)
 		assert.Equal(t, r.Integration.URL, res.Integrations[0].Spec.Url)
 		assert.Equal(t, protos.Integration_AUTH_TYPE_TOKEN, res.Integrations[0].Spec.Auth.Use)
 		assert.NotNil(t, res.Integrations[0].Spec.Auth.Token)

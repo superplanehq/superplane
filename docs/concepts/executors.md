@@ -14,8 +14,8 @@ The HTTP Executor allows you to make HTTP POST requests to external services whe
 
 ```yaml
 executor:
-  type: TYPE_HTTP
-  http:
+  type: http
+  spec:
     url: https://api.example.com/endpoint
     payload:
       key1: value1
@@ -39,11 +39,13 @@ The Semaphore Executor allows you to trigger Semaphore pipelines when a stage is
 
 ```yaml
 executor:
-  type: TYPE_SEMAPHORE
+  type: semaphore
   integration:
     name: semaphore
-  semaphore:
-    project: my-semaphore-project
+  resource:
+    type: project
+    name: my-semaphore-project
+  spec:
     task: my-task
     branch: sxmoon
     pipelineFile: .semaphore/pipeline_3.yml
