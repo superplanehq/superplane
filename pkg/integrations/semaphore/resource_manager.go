@@ -3,6 +3,7 @@ package semaphore
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,37 +12,24 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 )
 
-const (
-	PipelineStateDone    = "done"
-	PipelineResultPassed = "passed"
-	PipelineResultFailed = "failed"
-
-	ResourceTypeTask         = "task"
-	ResourceTypeProject      = "project"
-	ResourceTypeWorkflow     = "workflow"
-	ResourceTypeNotification = "notification"
-	ResourceTypeSecret       = "secret"
-	ResourceTypePipeline     = "pipeline"
-)
-
-type SemaphoreIntegration struct {
+type SemaphoreResourceManager struct {
 	URL   string
 	Token string
 }
 
-func NewSemaphoreIntegration(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.Integration, error) {
+func NewSemaphoreResourceManager(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error) {
 	token, err := authenticate()
 	if err != nil {
 		return nil, fmt.Errorf("error getting authentication: %v", err)
 	}
 
-	return &SemaphoreIntegration{
+	return &SemaphoreResourceManager{
 		URL:   URL,
 		Token: token,
 	}, nil
 }
 
-func (i *SemaphoreIntegration) Check(resourceType, id string) (integrations.StatefulResource, error) {
+func (i *SemaphoreResourceManager) Status(resourceType, id string) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		resource, err := i.getWorkflow(id)
@@ -63,7 +51,7 @@ func (i *SemaphoreIntegration) Check(resourceType, id string) (integrations.Stat
 	}
 }
 
-func (i *SemaphoreIntegration) Get(resourceType, id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) Get(resourceType, id string) (integrations.Resource, error) {
 	switch resourceType {
 	case ResourceTypeProject:
 		return i.getProject(id)
@@ -83,14 +71,7 @@ type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (i *SemaphoreIntegration) Executor(resource integrations.Resource) (integrations.Executor, error) {
-	return &SemaphoreExecutor{
-		Integration: i,
-		Resource:    resource,
-	}, nil
-}
-
-func (i *SemaphoreIntegration) createSecret(params any) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) createSecret(params any) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1beta/secrets", i.URL)
 
 	secret, ok := params.(*Secret)
@@ -119,7 +100,7 @@ func (i *SemaphoreIntegration) createSecret(params any) (integrations.Resource, 
 	return &response, nil
 }
 
-func (i *SemaphoreIntegration) getSecret(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getSecret(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1beta/secrets/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -168,7 +149,7 @@ type SecretSpecDataEnvVar struct {
 	Value string `json:"value"`
 }
 
-func (i *SemaphoreIntegration) getNotification(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getNotification(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -184,7 +165,7 @@ func (i *SemaphoreIntegration) getNotification(id string) (integrations.Resource
 	return &response, nil
 }
 
-func (i *SemaphoreIntegration) createNotification(params any) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) createNotification(params any) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/notifications", i.URL)
 
 	notification, ok := params.(*Notification)
@@ -286,7 +267,7 @@ type RunTaskResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (i *SemaphoreIntegration) runTask(params any) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) runTask(params any) (integrations.StatefulResource, error) {
 	p, ok := params.(*RunTaskRequest)
 	if !ok {
 		return nil, fmt.Errorf("invalid params type %T", params)
@@ -312,7 +293,7 @@ func (i *SemaphoreIntegration) runTask(params any) (integrations.Resource, error
 	return &Workflow{WfID: response.WorkflowID}, nil
 }
 
-func (i *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) runWorkflow(params any) (integrations.StatefulResource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/plumber-workflows", i.URL)
 
 	body, err := json.Marshal(&params)
@@ -334,7 +315,7 @@ func (i *SemaphoreIntegration) runWorkflow(params any) (integrations.Resource, e
 	return &Workflow{WfID: response.WorkflowID}, nil
 }
 
-func (i *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
+func (i *SemaphoreResourceManager) listTasks(parentIDs ...string) ([]integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
@@ -359,7 +340,7 @@ func (i *SemaphoreIntegration) listTasks(parentIDs ...string) ([]integrations.Re
 	return resources, nil
 }
 
-func (i *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
+func (i *SemaphoreResourceManager) listProjects() ([]integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/projects", i.URL)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -380,7 +361,7 @@ func (i *SemaphoreIntegration) listProjects() ([]integrations.Resource, error) {
 	return resources, nil
 }
 
-func (i *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getWorkflow(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v2/workflows/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -396,7 +377,7 @@ func (i *SemaphoreIntegration) getWorkflow(id string) (integrations.Resource, er
 	return &workflow, nil
 }
 
-func (i *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getPipeline(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/pipelines/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -412,7 +393,7 @@ func (i *SemaphoreIntegration) getPipeline(id string) (integrations.Resource, er
 	return pipelineResponse.Pipeline, nil
 }
 
-func (i *SemaphoreIntegration) getProject(id string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getProject(id string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1alpha/projects/%s", i.URL, id)
 	responseBody, err := i.execRequest(http.MethodGet, URL, nil)
 	if err != nil {
@@ -428,7 +409,7 @@ func (i *SemaphoreIntegration) getProject(id string) (integrations.Resource, err
 	return &project, nil
 }
 
-func (i *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) getTask(id string, parentIDs ...string) (integrations.Resource, error) {
 	if len(parentIDs) != 1 {
 		return nil, fmt.Errorf("expected 1 parent ID, got %d: %v", len(parentIDs), parentIDs)
 	}
@@ -452,7 +433,7 @@ func (i *SemaphoreIntegration) getTask(id string, parentIDs ...string) (integrat
 	return task.Task, nil
 }
 
-func (i *SemaphoreIntegration) execRequest(method string, url string, body io.Reader) ([]byte, error) {
+func (i *SemaphoreResourceManager) execRequest(method string, url string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
@@ -571,4 +552,107 @@ func (p *Pipeline) Finished() bool {
 
 func (p *Pipeline) Successful() bool {
 	return p.Result == PipelineResultPassed
+}
+
+func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
+	//
+	// Semaphore doesn't let us use UUIDs in secret names,
+	// so we base64 that ID before creating the secret.
+	//
+	resourceName := fmt.Sprintf("superplane-webhook-%s", base64.StdEncoding.EncodeToString([]byte(options.ID)))
+
+	//
+	// Create Semaphore secret to store the event source key.
+	//
+	secret, err := i.createSemaphoreSecret(resourceName, options.Key)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore secret: %v", err)
+	}
+
+	//
+	// Create a notification resource to receive events from Semaphore
+	//
+	notification, err := i.createSemaphoreNotification(resourceName, options)
+	if err != nil {
+		return nil, fmt.Errorf("error creating Semaphore notification: %v", err)
+	}
+
+	return []integrations.Resource{secret, notification}, nil
+}
+
+func (i *SemaphoreResourceManager) createSemaphoreSecret(name string, key []byte) (integrations.Resource, error) {
+	//
+	// Check if secret already exists.
+	//
+	secret, err := i.getSecret(name)
+	if err == nil {
+		return secret, nil
+	}
+
+	//
+	// Secret does not exist, create it.
+	//
+	secret, err = i.createSecret(&Secret{
+		Metadata: SecretMetadata{
+			Name: name,
+		},
+		Data: SecretSpecData{
+			EnvVars: []SecretSpecDataEnvVar{
+				{
+					Name:  "WEBHOOK_SECRET",
+					Value: string(key),
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating secret: %v", err)
+	}
+
+	return secret, nil
+}
+
+func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, options integrations.WebhookOptions) (integrations.Resource, error) {
+	//
+	// Check if notification already exists.
+	//
+	notification, err := i.getNotification(name)
+	if err == nil {
+		return notification, nil
+	}
+
+	//
+	// Notification does not exist, create it.
+	//
+	notification, err = i.createNotification(&Notification{
+		Metadata: NotificationMetadata{
+			Name: name,
+		},
+		Spec: NotificationSpec{
+			Rules: []NotificationRule{
+				{
+					Name: fmt.Sprintf("webhook-for-%s", options.Resource.Name()),
+					Filter: NotificationRuleFilter{
+						Branches:  []string{},
+						Pipelines: []string{},
+						Projects:  []string{options.Resource.Name()},
+						Results:   []string{},
+					},
+					Notify: NotificationRuleNotify{
+						Webhook: NotificationNotifyWebhook{
+							Endpoint: options.URL,
+							Secret:   name,
+						},
+					},
+				},
+			},
+		},
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("error creating notification: %v", err)
+	}
+
+	return notification, nil
 }

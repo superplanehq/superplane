@@ -199,7 +199,8 @@ CREATE TABLE public.events (
     received_at timestamp without time zone NOT NULL,
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
-    headers jsonb DEFAULT '{}'::jsonb NOT NULL
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    type character varying(128) NOT NULL
 );
 
 
@@ -735,13 +736,6 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
-
-
---
 -- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1010,7 +1004,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250721193920	f
+20250730175331	f
 \.
 
 

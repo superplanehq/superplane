@@ -36,6 +36,7 @@ type Event struct {
 	SourceID   uuid.UUID
 	SourceName string
 	SourceType string
+	Type       string
 	State      string
 	ReceivedAt *time.Time
 	Raw        datatypes.JSON
@@ -193,17 +194,18 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 	return v, nil
 }
 
-func CreateEvent(sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte) (*Event, error) {
-	return CreateEventInTransaction(database.Conn(), sourceID, sourceName, sourceType, raw, headers)
+func CreateEvent(sourceID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
+	return CreateEventInTransaction(database.Conn(), sourceID, sourceName, sourceType, eventType, raw, headers)
 }
 
-func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourceType string, raw []byte, headers []byte) (*Event, error) {
+func CreateEventInTransaction(tx *gorm.DB, sourceID uuid.UUID, sourceName, sourceType string, eventType string, raw []byte, headers []byte) (*Event, error) {
 	now := time.Now()
 
 	event := Event{
 		SourceID:   sourceID,
 		SourceName: sourceName,
 		SourceType: sourceType,
+		Type:       eventType,
 		State:      EventStatePending,
 		ReceivedAt: &now,
 		Raw:        datatypes.JSON(raw),

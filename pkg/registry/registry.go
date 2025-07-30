@@ -14,8 +14,9 @@ import (
 )
 
 type Integration struct {
-	BuildFn    func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.Integration, error)
-	ExecutorFn func(integrations.Integration, integrations.Resource) (integrations.Executor, error)
+	EventHandler       integrations.EventHandler
+	NewResourceManager func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error)
+	NewExecutor        func(integrations.ResourceManager, integrations.Resource) (integrations.Executor, error)
 }
 
 type Registry struct {
@@ -41,8 +42,9 @@ func (r *Registry) Init() {
 	// Register the integrations
 	//
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
-		BuildFn:    semaphore.NewSemaphoreIntegration,
-		ExecutorFn: semaphore.NewSemaphoreExecutor,
+		EventHandler:       &semaphore.SemaphoreEventHandler{},
+		NewResourceManager: semaphore.NewSemaphoreResourceManager,
+		NewExecutor:        semaphore.NewSemaphoreExecutor,
 	}
 
 	//
@@ -56,7 +58,16 @@ func (r *Registry) HasIntegrationWithType(integrationType string) bool {
 	return ok
 }
 
-func (r *Registry) NewIntegration(ctx context.Context, integration *models.Integration) (integrations.Integration, error) {
+func (r *Registry) GetEventHandlerForIntegration(integrationType string) (integrations.EventHandler, error) {
+	registration, ok := r.Integrations[integrationType]
+	if !ok {
+		return nil, fmt.Errorf("integration type %s not registered", integrationType)
+	}
+
+	return registration.EventHandler, nil
+}
+
+func (r *Registry) NewResourceManager(ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {
 	registration, ok := r.Integrations[integration.Type]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
@@ -67,7 +78,7 @@ func (r *Registry) NewIntegration(ctx context.Context, integration *models.Integ
 		return nil, fmt.Errorf("error getting authentication function: %v", err)
 	}
 
-	return registration.BuildFn(ctx, integration.URL, authFn)
+	return registration.NewResourceManager(ctx, integration.URL, authFn)
 }
 
 func (r *Registry) getAuthFn(ctx context.Context, integration *models.Integration) (integrations.AuthenticateFn, error) {
@@ -126,7 +137,7 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 }
 
 func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
-	integrationImpl, err := r.NewIntegration(context.Background(), integration)
+	resourceManager, err := r.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
 	}
@@ -136,7 +147,7 @@ func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resou
 		return nil, fmt.Errorf("integration type %s not registered", integration.Type)
 	}
 
-	return registration.ExecutorFn(integrationImpl, resource)
+	return registration.NewExecutor(resourceManager, resource)
 }
 
 func (r *Registry) NewExecutor(executorType string) (executors.Executor, error) {

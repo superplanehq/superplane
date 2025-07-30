@@ -130,7 +130,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		return fmt.Errorf("error marshaling event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, raw, []byte(`{}`))
+	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, StageExecutionCompletionType, raw, []byte(`{}`))
 	if err != nil {
 		return fmt.Errorf("error creating event: %v", err)
 	}

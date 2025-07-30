@@ -71,7 +71,7 @@ func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGro
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, eventData, []byte(`{}`))
+	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, "connection_group", eventData, []byte(`{}`))
 	if err != nil {
 		return err
 	}

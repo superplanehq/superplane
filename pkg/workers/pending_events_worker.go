@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -108,12 +107,12 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
+	eventHandler, err := w.Registry.GetEventHandlerForIntegration(integration.Type)
 	if err != nil {
 		return err
 	}
 
-	statefulResource, err := integrationImpl.HandleWebhook([]byte(event.Raw))
+	statefulResource, err := eventHandler.Status([]byte(event.Raw))
 	if err != nil {
 		return err
 	}

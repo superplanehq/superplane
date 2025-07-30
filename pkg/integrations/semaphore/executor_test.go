@@ -23,7 +23,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 	projectID := uuid.NewString()
 
 	t.Run("runs workflow if task ID is empty", func(t *testing.T) {
-		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
+		integration, err := semaphore.NewSemaphoreResourceManager(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
 		executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
@@ -63,7 +63,7 @@ func Test_Semaphore__Execute(t *testing.T) {
 	})
 
 	t.Run("runs task if task ID is not empty", func(t *testing.T) {
-		integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
+		integration, err := semaphore.NewSemaphoreResourceManager(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 		require.NoError(t, err)
 
 		executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
@@ -110,7 +110,7 @@ func Test_Semaphore__Validate(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
-	integration, err := semaphore.NewSemaphoreIntegration(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
+	integration, err := semaphore.NewSemaphoreResourceManager(context.Background(), r.Integration.URL, func() (string, error) { return "test", nil })
 	require.NoError(t, err)
 
 	executor, err := semaphore.NewSemaphoreExecutor(integration, &models.Resource{
