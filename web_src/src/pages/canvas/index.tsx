@@ -17,7 +17,7 @@ export function Canvas() {
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, stages, approveStageEvent } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, addStage } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -170,6 +170,28 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
+  const handleAddNode = (nodeType: string) => {
+    if (nodeType === 'stage') {
+      addStage({
+        metadata: {
+          canvasId: canvasId!,
+          name: 'New Stage',
+          id: Date.now().toString(),
+        },
+        spec: {
+          conditions: [],
+          inputs: [],
+          outputs: [],
+          executor: {
+          },
+          connections: [],
+          inputMappings: [],
+          secrets: []
+        },
+      }, true);
+    }
+  };
+
 
   return (
     <StrictMode>
@@ -189,7 +211,10 @@ export function Canvas() {
           <div className="relative" style={{ height: "calc(100vh - 3rem)", overflow: "hidden" }}>
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
-              onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)}
+              onClose={() => setIsComponentSidebarOpen(false)}
+              onNodeAdd={(nodeType: string) => {
+                handleAddNode(nodeType);
+              }}
             />
 
             {/* Toggle Button for ComponentSidebar - Only show when closed */}
@@ -205,7 +230,7 @@ export function Canvas() {
             )}
 
             <FlowRenderer />
-            {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)]" >

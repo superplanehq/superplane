@@ -12,11 +12,12 @@ export interface CanvasState {
   connectionGroups: SuperplaneConnectionGroup[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
+  editingStageId: string | null;
   webSocketConnectionStatus: ReadyState;
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: SuperplaneStage) => void;
+  addStage: (stage: SuperplaneStage, draft?: boolean) => void;
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   updateStage: (stage: SuperplaneStage) => void;
   addEventSource: (eventSource: EventSourceWithEvents) => void;
@@ -26,6 +27,7 @@ export interface CanvasState {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
+  setEditingStage: (stageId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
 
@@ -63,6 +65,6 @@ export interface CanvasState {
   ) => void;
 }
 
-export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>}
+export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
 export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>}
 export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

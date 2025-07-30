@@ -31,7 +31,7 @@ export const transformEventSourcesToNodes = (
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
-        events: lastEvents
+        events: lastEvents,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
       draggable: true
@@ -60,7 +60,8 @@ export const transformStagesToNodes = (
       executor: st.spec?.executor,
       approveStageEvent: (event: SuperplaneStageEvent) => {
         approveStageEvent(event.id!, st.metadata?.id || '');
-      }
+      },
+      isDraft: st.isDraft || false
     },
     position: nodePositions[st.metadata?.id || ''] || {
       x: 600 * ((st.spec?.connections?.length || 1)),
@@ -96,7 +97,7 @@ export const transformToEdges = (
   connectionGroups: SuperplaneConnectionGroup[],
   eventSources: SuperplaneEventSource[]
 ): EdgeType[] => {
-  let stageEdges = stages.flatMap((st) =>
+  const stageEdges = stages.flatMap((st) =>
     (st.spec?.connections || []).map((conn) => {
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||
@@ -117,7 +118,7 @@ export const transformToEdges = (
     })
   );
 
-  let connectionGroupEdges = connectionGroups.flatMap((g) =>
+  const connectionGroupEdges = connectionGroups.flatMap((g) =>
     (g.spec?.connections || []).map((conn) => {
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||

@@ -49,6 +49,7 @@ export type StageData = {
   outputs: SuperplaneOutputDefinition[];
   executorSpec: SuperplaneExecutorSpec;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
+  isDraft?: boolean;
 }
 
 export type StageNodeType = Node<StageData, 'stage'>;

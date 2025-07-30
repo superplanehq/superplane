@@ -17,6 +17,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   connectionGroups: [],
   nodePositions: {},
   selectedStageId: null,
+  editingStageId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
 
   // reactflow state
@@ -37,11 +38,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage) => {
+  addStage: (stage: SuperplaneStage, draft = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
-        queue: []
+        queue: [],
+        isDraft: draft
       }]
     }));
     get().syncToReactFlow();
@@ -115,6 +117,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   cleanSelectedStageId: () => {
     set({ selectedStageId: null });
+  },
+
+  setEditingStage: (stageId: string | null) => {
+    set({ editingStageId: stageId });
   },
 
   updateWebSocketConnectionStatus: (status) => {
