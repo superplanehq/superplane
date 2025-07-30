@@ -88,10 +88,8 @@ func NewFieldSetCompletedEvent(fields map[string]string, events []ConnectionGrou
 	// Include the missing field, if any.
 	//
 	e.Missing = []string{}
-	if len(missingConnections) > 0 {
-		for _, connection := range missingConnections {
-			e.Missing = append(e.Missing, connection.SourceName)
-		}
+	for _, connection := range missingConnections {
+		e.Missing = append(e.Missing, connection.SourceName)
 	}
 
 	return &e, nil
