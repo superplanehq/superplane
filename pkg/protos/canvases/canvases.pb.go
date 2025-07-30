@@ -4818,9 +4818,10 @@ type EventSource_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasId      string                 `protobuf:"bytes,3,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,4,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4865,6 +4866,13 @@ func (x *EventSource_Metadata) GetId() string {
 func (x *EventSource_Metadata) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *EventSource_Metadata) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -4946,11 +4954,12 @@ type ConnectionGroup_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasId      string                 `protobuf:"bytes,3,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	CreatedBy     string                 `protobuf:"bytes,5,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	UpdatedBy     string                 `protobuf:"bytes,7,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,4,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedBy     string                 `protobuf:"bytes,6,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	UpdatedBy     string                 `protobuf:"bytes,8,opt,name=updated_by,json=updatedBy,proto3" json:"updated_by,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4995,6 +5004,13 @@ func (x *ConnectionGroup_Metadata) GetId() string {
 func (x *ConnectionGroup_Metadata) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *ConnectionGroup_Metadata) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -5202,8 +5218,9 @@ type Stage_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasId      string                 `protobuf:"bytes,3,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	Description   string                 `protobuf:"bytes,3,opt,name=description,proto3" json:"description,omitempty"`
+	CanvasId      string                 `protobuf:"bytes,4,opt,name=canvas_id,json=canvasId,proto3" json:"canvas_id,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5248,6 +5265,13 @@ func (x *Stage_Metadata) GetId() string {
 func (x *Stage_Metadata) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *Stage_Metadata) GetDescription() string {
+	if x != nil {
+		return x.Description
 	}
 	return ""
 }
@@ -5481,18 +5505,19 @@ const file_canvases_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
 	"\x0forganization_id\x18\x03 \x01(\tR\x0eorganizationId\"D\n" +
 	"\x16DescribeCanvasResponse\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xd7\x03\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xf9\x03\n" +
 	"\vEventSource\x12<\n" +
 	"\bmetadata\x18\x01 \x01(\v2 .Superplane.EventSource.MetadataR\bmetadata\x120\n" +
-	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.EventSource.SpecR\x04spec\x1a\xc1\x01\n" +
+	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.EventSource.SpecR\x04spec\x1a\xe3\x01\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
-	"\tcanvas_id\x18\x03 \x01(\tR\bcanvasId\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
+	"\tcanvas_id\x18\x04 \x01(\tR\bcanvasId\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\x93\x01\n" +
+	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\x93\x01\n" +
 	"\x04Spec\x12I\n" +
 	"\vintegration\x18\x01 \x01(\v2'.Superplane.Integrations.IntegrationRefR\vintegration\x12@\n" +
 	"\bresource\x18\x02 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\"e\n" +
@@ -5542,22 +5567,23 @@ const file_canvases_proto_rawDesc = "" +
 	"\x1bListConnectionGroupsRequest\x12)\n" +
 	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\"h\n" +
 	"\x1cListConnectionGroupsResponse\x12H\n" +
-	"\x11connection_groups\x18\x01 \x03(\v2\x1b.Superplane.ConnectionGroupR\x10connectionGroups\"\xff\x06\n" +
+	"\x11connection_groups\x18\x01 \x03(\v2\x1b.Superplane.ConnectionGroupR\x10connectionGroups\"\xa1\a\n" +
 	"\x0fConnectionGroup\x12@\n" +
 	"\bmetadata\x18\x01 \x01(\v2$.Superplane.ConnectionGroup.MetadataR\bmetadata\x124\n" +
-	"\x04spec\x18\x02 \x01(\v2 .Superplane.ConnectionGroup.SpecR\x04spec\x1a\xff\x01\n" +
+	"\x04spec\x18\x02 \x01(\v2 .Superplane.ConnectionGroup.SpecR\x04spec\x1a\xa1\x02\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
-	"\tcanvas_id\x18\x03 \x01(\tR\bcanvasId\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
+	"\tcanvas_id\x18\x04 \x01(\tR\bcanvasId\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12\x1d\n" +
 	"\n" +
-	"created_by\x18\x05 \x01(\tR\tcreatedBy\x129\n" +
+	"created_by\x18\x06 \x01(\tR\tcreatedBy\x129\n" +
 	"\n" +
-	"updated_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1d\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1d\n" +
 	"\n" +
-	"updated_by\x18\a \x01(\tR\tupdatedBy\x1a\xf1\x03\n" +
+	"updated_by\x18\b \x01(\tR\tupdatedBy\x1a\xf1\x03\n" +
 	"\x04Spec\x128\n" +
 	"\vconnections\x18\x01 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x12C\n" +
 	"\bgroup_by\x18\x02 \x01(\v2(.Superplane.ConnectionGroup.Spec.GroupByR\agroupBy\x12\x18\n" +
@@ -5598,16 +5624,17 @@ const file_canvases_proto_rawDesc = "" +
 	"\x11TYPE_EVENT_SOURCE\x10\x01\x12\x0e\n" +
 	"\n" +
 	"TYPE_STAGE\x10\x02\x12\x19\n" +
-	"\x15TYPE_CONNECTION_GROUP\x10\x03\"\x85\x05\n" +
+	"\x15TYPE_CONNECTION_GROUP\x10\x03\"\xa7\x05\n" +
 	"\x05Stage\x126\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1a.Superplane.Stage.MetadataR\bmetadata\x12*\n" +
-	"\x04spec\x18\x02 \x01(\v2\x16.Superplane.Stage.SpecR\x04spec\x1a\x86\x01\n" +
+	"\x04spec\x18\x02 \x01(\v2\x16.Superplane.Stage.SpecR\x04spec\x1a\xa8\x01\n" +
 	"\bMetadata\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
-	"\tcanvas_id\x18\x03 \x01(\tR\bcanvasId\x129\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
+	"\vdescription\x18\x03 \x01(\tR\vdescription\x12\x1b\n" +
+	"\tcanvas_id\x18\x04 \x01(\tR\bcanvasId\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a\x8e\x03\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x1a\x8e\x03\n" +
 	"\x04Spec\x128\n" +
 	"\vconnections\x18\x01 \x03(\v2\x16.Superplane.ConnectionR\vconnections\x125\n" +
 	"\n" +

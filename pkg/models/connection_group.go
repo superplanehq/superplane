@@ -30,14 +30,15 @@ const (
 )
 
 type ConnectionGroup struct {
-	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name      string
-	CanvasID  uuid.UUID
-	Spec      datatypes.JSONType[ConnectionGroupSpec]
-	CreatedAt *time.Time
-	CreatedBy uuid.UUID
-	UpdatedAt *time.Time
-	UpdatedBy uuid.UUID
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string
+	Description string
+	CanvasID    uuid.UUID
+	Spec        datatypes.JSONType[ConnectionGroupSpec]
+	CreatedAt   *time.Time
+	CreatedBy   uuid.UUID
+	UpdatedAt   *time.Time
+	UpdatedBy   uuid.UUID
 }
 
 func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, string, error) {
@@ -178,7 +179,7 @@ type ConnectionGroupByField struct {
 }
 
 func (c *Canvas) CreateConnectionGroup(
-	name, createdBy string,
+	name, description, createdBy string,
 	connections []Connection,
 	spec ConnectionGroupSpec,
 ) (*ConnectionGroup, error) {
@@ -189,12 +190,13 @@ func (c *Canvas) CreateConnectionGroup(
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		connectionGroup = &ConnectionGroup{
-			ID:        ID,
-			CanvasID:  c.ID,
-			Name:      name,
-			CreatedAt: &now,
-			CreatedBy: uuid.Must(uuid.Parse(createdBy)),
-			Spec:      datatypes.NewJSONType(spec),
+			ID:          ID,
+			CanvasID:    c.ID,
+			Name:        name,
+			Description: description,
+			CreatedAt:   &now,
+			CreatedBy:   uuid.Must(uuid.Parse(createdBy)),
+			Spec:        datatypes.NewJSONType(spec),
 		}
 
 		err := tx.Clauses(clause.Returning{}).Create(&connectionGroup).Error
@@ -226,7 +228,7 @@ func (c *Canvas) CreateConnectionGroup(
 	return connectionGroup, nil
 }
 
-func (c *Canvas) UpdateConnectionGroup(id, requesterID string, connections []Connection, spec ConnectionGroupSpec) error {
+func (c *Canvas) UpdateConnectionGroup(id, name, description, requesterID string, connections []Connection, spec ConnectionGroupSpec) error {
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("target_id = ?", id).Delete(&Connection{}).Error; err != nil {
 			return fmt.Errorf("failed to delete existing connections: %v", err)
@@ -243,6 +245,8 @@ func (c *Canvas) UpdateConnectionGroup(id, requesterID string, connections []Con
 		now := time.Now()
 		err := tx.Model(&ConnectionGroup{}).
 			Where("id = ?", id).
+			Update("name", name).
+			Update("description", description).
 			Update("updated_at", now).
 			Update("updated_by", requesterID).
 			Update("spec", datatypes.NewJSONType(spec)).

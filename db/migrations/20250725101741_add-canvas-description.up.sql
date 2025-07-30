@@ -1,5 +1,0 @@
-BEGIN;
-
-ALTER TABLE canvases ADD COLUMN description TEXT;
-
-COMMIT;

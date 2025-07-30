@@ -3095,6 +3095,9 @@
         "name": {
           "type": "string"
         },
+        "description": {
+          "type": "string"
+        },
         "canvasId": {
           "type": "string"
         },
@@ -3277,6 +3280,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         },
         "canvasId": {
@@ -3682,6 +3688,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         },
         "canvasId": {

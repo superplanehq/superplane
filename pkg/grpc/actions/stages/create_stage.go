@@ -115,6 +115,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithEncryptor(encryptor).
 		InCanvas(canvas).
 		WithName(req.Stage.Metadata.Name).
+		WithDescription(req.Stage.Metadata.Description).
 		WithRequester(uuid.MustParse(userID)).
 		WithConditions(conditions).
 		WithConnections(connections).
@@ -297,10 +298,11 @@ func serializeStage(
 
 	return &pb.Stage{
 		Metadata: &pb.Stage_Metadata{
-			Id:        stage.ID.String(),
-			Name:      stage.Name,
-			CanvasId:  stage.CanvasID.String(),
-			CreatedAt: timestamppb.New(*stage.CreatedAt),
+			Id:          stage.ID.String(),
+			Name:        stage.Name,
+			Description: stage.Description,
+			CanvasId:    stage.CanvasID.String(),
+			CreatedAt:   timestamppb.New(*stage.CreatedAt),
 		},
 		Spec: &pb.Stage_Spec{
 			Conditions:    conditions,

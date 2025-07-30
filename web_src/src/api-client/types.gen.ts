@@ -430,6 +430,7 @@ export type SuperplaneConnectionGroupFieldSetStateReason = 'STATE_REASON_NONE' |
 export type SuperplaneConnectionGroupMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
     createdBy?: string;
@@ -512,6 +513,7 @@ export type SuperplaneEventSource = {
 export type SuperplaneEventSourceMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
     updatedAt?: string;
@@ -660,6 +662,7 @@ export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_RE
 export type SuperplaneStageMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
 };

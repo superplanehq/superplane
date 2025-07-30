@@ -18,14 +18,15 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"single-field-group",
+			"description",
 			uuid.NewString(),
 			[]Connection{
 				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
@@ -54,6 +55,7 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	t.Run("multiple fields", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"multiple-fields-group",
+			"description",
 			uuid.NewString(),
 			[]Connection{
 				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
@@ -89,14 +91,15 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"single-field-group",
+			"description",
 			uuid.NewString(),
 			[]Connection{
 				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
@@ -171,6 +174,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	t.Run("new field set with same hash", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"group1",
+			"description",
 			uuid.NewString(),
 			[]Connection{
 				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
@@ -233,6 +237,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	t.Run("multiple fields", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
 			"multiple-fields-group",
+			"description",
 			uuid.NewString(),
 			[]Connection{
 				{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},
@@ -330,13 +335,14 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
 	require.NoError(t, err)
 
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		"group1",
+		"description",
 		uuid.NewString(),
 		[]Connection{
 			{SourceID: source1.ID, SourceName: source1.Name, SourceType: SourceTypeEventSource},

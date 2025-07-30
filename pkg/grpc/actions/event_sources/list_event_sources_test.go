@@ -35,10 +35,10 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("lists only external event sources", func(t *testing.T) {
-		external, err := r.Canvas.CreateEventSource("external", []byte("key"), models.EventSourceScopeExternal, nil)
+		external, err := r.Canvas.CreateEventSource("external", "external", []byte("key"), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 
-		_, err = r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		_, err = r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, nil)
 		require.NoError(t, err)
 
 		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{

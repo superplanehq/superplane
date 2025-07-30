@@ -20,13 +20,14 @@ const (
 )
 
 type Stage struct {
-	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID  uuid.UUID
-	Name      string
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
-	CreatedBy uuid.UUID
-	UpdatedBy uuid.UUID
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID    uuid.UUID
+	Name        string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	CreatedBy   uuid.UUID
+	UpdatedBy   uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]
 	Inputs        datatypes.JSONSlice[InputDefinition]

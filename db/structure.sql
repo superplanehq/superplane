@@ -152,7 +152,8 @@ CREATE TABLE public.connection_groups (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone,
     updated_by uuid,
-    spec jsonb DEFAULT '{}'::jsonb NOT NULL
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    description text
 );
 
 
@@ -185,7 +186,8 @@ CREATE TABLE public.event_sources (
     key bytea NOT NULL,
     resource_id uuid,
     state character varying(64) NOT NULL,
-    scope character varying(64) NOT NULL
+    scope character varying(64) NOT NULL,
+    description text
 );
 
 
@@ -410,7 +412,8 @@ CREATE TABLE public.stages (
     inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     outputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL,
-    secrets jsonb DEFAULT '[]'::jsonb NOT NULL
+    secrets jsonb DEFAULT '[]'::jsonb NOT NULL,
+    description text
 );
 
 
@@ -741,13 +744,6 @@ CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btr
 --
 
 CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
-
-
---
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --

@@ -53,7 +53,19 @@ func UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err = canvas.UpdateConnectionGroup(connectionGroup.ID.String(), userID, connections, *spec)
+	if req.ConnectionGroup.Metadata.Name != "" {
+		if req.ConnectionGroup.Metadata.Name == connectionGroup.Name {
+			return nil, status.Error(codes.InvalidArgument, "connection group name already used")
+		}
+
+		connectionGroup.Name = req.ConnectionGroup.Metadata.Name
+	}
+
+	if req.ConnectionGroup.Metadata.Description != "" {
+		connectionGroup.Description = req.ConnectionGroup.Metadata.Description
+	}
+
+	err = canvas.UpdateConnectionGroup(connectionGroup.ID.String(), connectionGroup.Name, connectionGroup.Description, userID, connections, *spec)
 	if err != nil {
 		log.Errorf("Error updating connection group. Request: %v. Error: %v", req, err)
 		return nil, err

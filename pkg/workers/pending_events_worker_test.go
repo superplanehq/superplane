@@ -144,7 +144,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), models.EventSourceScopeExternal, nil)
+		source2, err := r.Canvas.CreateEventSource("source-2", "source-2", []byte(`key`), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 
 		//
@@ -152,6 +152,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		connectionGroup, err := r.Canvas.CreateConnectionGroup(
 			"connection-group-1",
+			"test",
 			r.User.String(),
 			[]models.Connection{
 				{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},

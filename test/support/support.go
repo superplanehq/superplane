@@ -89,7 +89,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, err)
 
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
+		r.Source, err = r.Canvas.CreateEventSource("gh", "gh-description", []byte("my-key"), models.EventSourceScopeExternal, nil)
 		require.NoError(t, err)
 	}
 
@@ -179,6 +179,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 func CreateConnectionGroup(t *testing.T, name string, canvas *models.Canvas, source *models.EventSource, timeout uint32, timeoutBehavior string) *models.ConnectionGroup {
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		name,
+		"description",
 		uuid.NewString(),
 		[]models.Connection{
 			{SourceID: source.ID, SourceName: source.Name, SourceType: models.SourceTypeEventSource},
