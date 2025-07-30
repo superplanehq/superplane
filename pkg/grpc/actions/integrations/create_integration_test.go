@@ -29,7 +29,7 @@ func Test__CreateIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
-		_, err := CreateIntegration(context.Background(), r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), &protos.Integration{})
+		_, err := CreateIntegration(context.Background(), r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), &protos.Integration{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -43,14 +43,14 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 		assert.Equal(t, "integration name is required", s.Message())
 	})
 
-	t.Run("invalid integration type", func(t *testing.T) {
+	t.Run("missing integration type", func(t *testing.T) {
 		integration := &protos.Integration{
 			Metadata: &protos.Integration_Metadata{
 				Name: "test",
@@ -58,11 +58,28 @@ func Test__CreateIntegration(t *testing.T) {
 			Spec: &protos.Integration_Spec{},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "invalid integration type", s.Message())
+		assert.Equal(t, "integration type is required", s.Message())
+	})
+
+	t.Run("integration type not available", func(t *testing.T) {
+		integration := &protos.Integration{
+			Metadata: &protos.Integration_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.Integration_Spec{
+				Type: "does-not-exist",
+			},
+		}
+
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "integration type does-not-exist not available", s.Message())
 	})
 
 	t.Run("invalid secret", func(t *testing.T) {
@@ -71,7 +88,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: "test",
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -86,7 +103,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -99,7 +116,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: "test",
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -114,7 +131,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err = CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -128,7 +145,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -143,7 +160,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		response, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, name, response.Integration.Metadata.Name)
@@ -160,7 +177,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -176,7 +193,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		response, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, name, response.Integration.Metadata.Name)
@@ -192,7 +209,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: support.RandomName("integration"),
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -208,7 +225,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -221,7 +238,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: support.RandomName("integration"),
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -236,7 +253,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -250,7 +267,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -265,7 +282,7 @@ func Test__CreateIntegration(t *testing.T) {
 			},
 		}
 
-		response, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
+		response, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		assert.Equal(t, name, response.Integration.Metadata.Name)
@@ -282,7 +299,7 @@ func Test__CreateIntegration(t *testing.T) {
 				Name: name,
 			},
 			Spec: &protos.Integration_Spec{
-				Type: protos.Integration_TYPE_SEMAPHORE,
+				Type: models.IntegrationTypeSemaphore,
 				Auth: &protos.Integration_Auth{
 					Use: protos.Integration_AUTH_TYPE_TOKEN,
 					Token: &protos.Integration_Auth_Token{
@@ -300,21 +317,21 @@ func Test__CreateIntegration(t *testing.T) {
 		//
 		// No canvas integration with this name yet, so this works.
 		//
-		_, err := CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err := CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		require.NoError(t, err)
 
 		//
 		// No organization integration with this name yet, so this works.
 		//
 		integration.Spec.Auth.Token.ValueFrom.Secret.Name = orgSecret.Name
-		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
+		_, err = CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
 		require.NoError(t, err)
 
 		//
 		// Name already taken, so canvas integration with this name fails now.
 		//
 		integration.Spec.Auth.Token.ValueFrom.Secret.Name = canvasSecret.Name
-		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
+		_, err = CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeCanvas, r.Canvas.ID.String(), integration)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -324,7 +341,7 @@ func Test__CreateIntegration(t *testing.T) {
 		// Same thing on the organization level.
 		//
 		integration.Spec.Auth.Token.ValueFrom.Secret.Name = orgSecret.Name
-		_, err = CreateIntegration(ctx, r.Encryptor, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
+		_, err = CreateIntegration(ctx, r.Encryptor, r.Registry, models.DomainTypeOrganization, r.Organization.ID.String(), integration)
 		s, ok = status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

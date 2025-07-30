@@ -2119,14 +2119,6 @@
       },
       "title": "Common data structures"
     },
-    "EventSourceSpecSemaphore": {
-      "type": "object",
-      "properties": {
-        "project": {
-          "type": "string"
-        }
-      }
-    },
     "ExecutionResult": {
       "type": "string",
       "enum": [
@@ -2135,41 +2127,6 @@
         "RESULT_FAILED"
       ],
       "default": "RESULT_UNKNOWN"
-    },
-    "ExecutorSpecHTTP": {
-      "type": "object",
-      "properties": {
-        "url": {
-          "type": "string"
-        },
-        "headers": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "payload": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        },
-        "responsePolicy": {
-          "$ref": "#/definitions/ExecutorSpecHTTPResponsePolicy"
-        }
-      }
-    },
-    "ExecutorSpecHTTPResponsePolicy": {
-      "type": "object",
-      "properties": {
-        "statusCodes": {
-          "type": "array",
-          "items": {
-            "type": "integer",
-            "format": "int64"
-          }
-        }
-      }
     },
     "GroupByField": {
       "type": "object",
@@ -2487,7 +2444,7 @@
       "type": "object",
       "properties": {
         "type": {
-          "$ref": "#/definitions/IntegrationsIntegrationType"
+          "type": "string"
         },
         "url": {
           "type": "string"
@@ -2500,15 +2457,6 @@
         }
       }
     },
-    "IntegrationsIntegrationType": {
-      "type": "string",
-      "enum": [
-        "TYPE_NONE",
-        "TYPE_SEMAPHORE",
-        "TYPE_GITHUB"
-      ],
-      "default": "TYPE_NONE"
-    },
     "IntegrationsListIntegrationsResponse": {
       "type": "object",
       "properties": {
@@ -2518,6 +2466,17 @@
             "type": "object",
             "$ref": "#/definitions/IntegrationsIntegration"
           }
+        }
+      }
+    },
+    "IntegrationsResourceRef": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
         }
       }
     },
@@ -3339,8 +3298,8 @@
         "integration": {
           "$ref": "#/definitions/IntegrationsIntegrationRef"
         },
-        "semaphore": {
-          "$ref": "#/definitions/EventSourceSpecSemaphore"
+        "resource": {
+          "$ref": "#/definitions/IntegrationsResourceRef"
         }
       }
     },
@@ -3402,54 +3361,22 @@
       ],
       "default": "STATE_UNKNOWN"
     },
-    "SuperplaneExecutorSpec": {
+    "SuperplaneExecutor": {
       "type": "object",
       "properties": {
         "type": {
-          "$ref": "#/definitions/SuperplaneExecutorSpecType"
+          "type": "string"
         },
         "integration": {
           "$ref": "#/definitions/IntegrationsIntegrationRef"
         },
-        "semaphore": {
-          "$ref": "#/definitions/SuperplaneExecutorSpecSemaphore"
+        "resource": {
+          "$ref": "#/definitions/IntegrationsResourceRef"
         },
-        "http": {
-          "$ref": "#/definitions/ExecutorSpecHTTP"
+        "spec": {
+          "type": "object"
         }
       }
-    },
-    "SuperplaneExecutorSpecSemaphore": {
-      "type": "object",
-      "properties": {
-        "project": {
-          "type": "string"
-        },
-        "task": {
-          "type": "string"
-        },
-        "branch": {
-          "type": "string"
-        },
-        "pipelineFile": {
-          "type": "string"
-        },
-        "parameters": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
-    },
-    "SuperplaneExecutorSpecType": {
-      "type": "string",
-      "enum": [
-        "TYPE_UNKNOWN",
-        "TYPE_SEMAPHORE",
-        "TYPE_HTTP"
-      ],
-      "default": "TYPE_UNKNOWN"
     },
     "SuperplaneFilter": {
       "type": "object",
@@ -3784,7 +3711,7 @@
           }
         },
         "executor": {
-          "$ref": "#/definitions/SuperplaneExecutorSpec"
+          "$ref": "#/definitions/SuperplaneExecutor"
         },
         "inputs": {
           "type": "array",
@@ -4117,6 +4044,14 @@
         }
       },
       "additionalProperties": {}
+    },
+    "protobufNullValue": {
+      "type": "string",
+      "enum": [
+        "NULL_VALUE"
+      ],
+      "default": "NULL_VALUE",
+      "description": "`NullValue` is a singleton enumeration to represent the null value for the\n`Value` type union.\n\n The JSON representation for `NullValue` is JSON `null`.\n\n - NULL_VALUE: Null value."
     }
   }
 }

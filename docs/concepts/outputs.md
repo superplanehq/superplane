@@ -43,11 +43,13 @@ spec:
               connection: stage-1
               expression: outputs.VERSION
   executor:
-    type: TYPE_SEMAPHORE
+    type: semaphore
     integration:
       name: semaphore
-    semaphore:
-      project: my-semaphore-project
+    resource:
+      type: project
+      name: my-semaphore-project
+    spec:
       branch: main
       pipelineFile: .semaphore/stage-2.yml
       parameters:

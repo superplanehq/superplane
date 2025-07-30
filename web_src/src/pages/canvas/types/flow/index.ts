@@ -2,8 +2,6 @@ import { Node, Edge } from "@xyflow/react";
 import { 
   SuperplaneStageEvent,
   SuperplaneStageEventState,
-  SuperplaneExecutorSpec,
-  SuperplaneExecutorSpecType,
   SuperplaneConnection,
   SuperplaneFilterOperator,
   SuperplaneCondition,
@@ -47,7 +45,7 @@ export type StageData = {
   conditions: SuperplaneCondition[];
   inputs: SuperplaneInputDefinition[];
   outputs: SuperplaneOutputDefinition[];
-  executorSpec: SuperplaneExecutorSpec;
+  spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
   isDraft?: boolean;
 }
@@ -65,8 +63,7 @@ export type HandleProps = {
 export {
   SuperplaneStageEventState as QueueState,
   SuperplaneFilterOperator,
-  SuperplaneConditionType as ConditionType,
-  SuperplaneExecutorSpecType as ExecutorSpecType
+  SuperplaneConditionType as ConditionType
 };
 
 export interface FlowEdge extends Edge {

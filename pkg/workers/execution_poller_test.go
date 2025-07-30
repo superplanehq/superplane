@@ -30,8 +30,8 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, integrationResource := support.Executor(r)
-	stage, err := builders.NewStageBuilder().
+	executorType, executorSpec, integrationResource := support.Executor(t, r)
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").
@@ -64,7 +64,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
@@ -110,8 +110,8 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		executorType, executorSpec, integrationResource := support.Executor(r)
-		stageWithOutput, err := builders.NewStageBuilder().
+		executorType, executorSpec, integrationResource := support.Executor(t, r)
+		stageWithOutput, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-output").
@@ -145,7 +145,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -183,7 +183,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 

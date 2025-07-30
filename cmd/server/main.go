@@ -12,10 +12,11 @@ import (
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/public"
+	registry "github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers"
 )
 
-func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL string) {
+func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *registry.Registry, baseURL string) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -25,7 +26,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 
 	if os.Getenv("START_PENDING_EVENTS_WORKER") == "yes" {
 		log.Println("Starting Pending Events Worker")
-		w := workers.NewPendingEventsWorker(encryptor)
+		w := workers.NewPendingEventsWorker(encryptor, registry)
 		go w.Start()
 	}
 
@@ -69,6 +70,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 			JwtSigner:   jwtSigner,
 			Encryptor:   encryptor,
 			SpecBuilder: executors.SpecBuilder{},
+			Registry:    registry,
 		}
 
 		go w.Start()
@@ -88,7 +90,7 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 	if os.Getenv("START_PENDING_EVENT_SOURCES_WORKER") == "yes" {
 		log.Println("Starting Pending Event Sources Worker")
 
-		w, err := workers.NewPendingEventSourcesWorker(encryptor, baseURL)
+		w, err := workers.NewPendingEventSourcesWorker(encryptor, registry, baseURL)
 		if err != nil {
 			panic(err)
 		}
@@ -97,9 +99,9 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, baseURL str
 	}
 }
 
-func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization) {
+func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Authorization, registry *registry.Registry) {
 	log.Println("Starting Internal API")
-	grpc.RunServer(encryptor, authService, 50051)
+	grpc.RunServer(encryptor, authService, registry, 50051)
 }
 
 func startPublicAPI(encryptor crypto.Encryptor, jwtSigner *jwt.Signer) {
@@ -204,16 +206,17 @@ func main() {
 	}
 
 	jwtSigner := jwt.NewSigner(jwtSecret)
+	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(encryptorInstance, jwtSigner)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(encryptorInstance, authService)
+		go startInternalAPI(encryptorInstance, authService, registry)
 	}
 
-	startWorkers(jwtSigner, encryptorInstance, baseURL)
+	startWorkers(jwtSigner, encryptorInstance, registry, baseURL)
 
 	log.Println("Superplane is UP.")
 

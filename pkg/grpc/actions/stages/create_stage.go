@@ -2,6 +2,7 @@ package stages
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
@@ -17,14 +17,16 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator executors.SpecValidator, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
@@ -97,23 +99,18 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resourceName, err := resourceName(req.Stage.Spec.Executor, integration)
-		if err != nil {
-			return nil, err
-		}
-
-		resource, err = actions.ValidateResource(ctx, encryptor, integration, resourceName)
+		resource, err = actions.ValidateResource(ctx, registry, integration, req.Stage.Spec.Executor.Resource)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	executorType, executorSpec, err := specValidator.Validate(ctx, canvas, req.Stage.Spec.Executor, integration, resource)
+	executorSpec, err := req.Stage.Spec.Executor.Spec.MarshalJSON()
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, err.Error())
+		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
 	}
 
-	stage, err := builders.NewStageBuilder().
+	stage, err := builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithEncryptor(encryptor).
 		InCanvas(canvas).
@@ -125,7 +122,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, specValidator 
 		WithInputMappings(inputValidator.SerializeInputMappings()).
 		WithOutputs(inputValidator.SerializeOutputs()).
 		WithSecrets(secrets).
-		WithExecutorType(executorType).
+		WithExecutorType(req.Stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		ForIntegration(integration).
 		ForResource(resource).
@@ -459,51 +456,42 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	}
 }
 
-func serializeExecutor(executor *models.StageExecutor) (*pb.ExecutorSpec, error) {
-	executorSpec := executor.Spec.Data()
-
-	switch executor.Type {
-	case models.ExecutorSpecTypeHTTP:
-		return &pb.ExecutorSpec{
-			Type: pb.ExecutorSpec_TYPE_HTTP,
-			Http: &pb.ExecutorSpec_HTTP{
-				Url:     executorSpec.HTTP.URL,
-				Headers: executorSpec.HTTP.Headers,
-				Payload: executorSpec.HTTP.Payload,
-				ResponsePolicy: &pb.ExecutorSpec_HTTPResponsePolicy{
-					StatusCodes: executorSpec.HTTP.ResponsePolicy.StatusCodes,
-				},
-			},
-		}, nil
-	case models.ExecutorSpecTypeSemaphore:
-		resource, err := executor.GetIntegrationResource()
-		if err != nil {
-			return nil, err
-		}
-
-		spec := &pb.ExecutorSpec_Semaphore{
-			Project:      resource.Name,
-			Branch:       executorSpec.Semaphore.Branch,
-			PipelineFile: executorSpec.Semaphore.PipelineFile,
-			Parameters:   executorSpec.Semaphore.Parameters,
-		}
-
-		if executorSpec.Semaphore.TaskId != nil {
-			spec.Task = *executorSpec.Semaphore.TaskId
-		}
-
-		return &pb.ExecutorSpec{
-			Type:      pb.ExecutorSpec_TYPE_SEMAPHORE,
-			Semaphore: spec,
-			Integration: &integrationPb.IntegrationRef{
-				Name:       resource.IntegrationName,
-				DomainType: actions.DomainTypeToProto(resource.DomainType),
-			},
-		}, nil
-
-	default:
-		return nil, fmt.Errorf("invalid executor spec type: %s", executor.Type)
+func serializeExecutor(executor *models.StageExecutor) (*pb.Executor, error) {
+	var specMap map[string]any
+	err := json.Unmarshal(executor.Spec, &specMap)
+	if err != nil {
+		return nil, err
 	}
+
+	spec, err := structpb.NewStruct(specMap)
+	if err != nil {
+		return nil, err
+	}
+
+	if executor.ResourceID == nil {
+		return &pb.Executor{
+			Type: executor.Type,
+			Spec: spec,
+		}, nil
+	}
+
+	integrationResource, err := executor.GetIntegrationResource()
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.Executor{
+		Type: executor.Type,
+		Spec: spec,
+		Integration: &integrationpb.IntegrationRef{
+			Name:       integrationResource.IntegrationName,
+			DomainType: actions.DomainTypeToProto(integrationResource.DomainType),
+		},
+		Resource: &integrationpb.ResourceRef{
+			Type: integrationResource.Type,
+			Name: integrationResource.Name,
+		},
+	}, nil
 }
 
 func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
@@ -535,21 +523,4 @@ func serializeStages(stages []models.Stage) ([]*pb.Stage, error) {
 	}
 
 	return s, nil
-}
-
-func resourceName(spec *pb.ExecutorSpec, integration *models.Integration) (string, error) {
-	switch integration.Type {
-	case models.IntegrationTypeSemaphore:
-		if spec.Type != pb.ExecutorSpec_TYPE_SEMAPHORE {
-			return "", fmt.Errorf("invalid semaphore executor spec: integration is not of type semaphore")
-		}
-
-		if spec.Semaphore == nil || spec.Semaphore.Project == "" {
-			return "", fmt.Errorf("semaphore project is required")
-		}
-
-		return spec.Semaphore.Project, nil
-	default:
-		return "", fmt.Errorf("integration type %s is not supported", integration.Type)
-	}
 }

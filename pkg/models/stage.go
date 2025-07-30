@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	ExecutorSpecTypeSemaphore = "semaphore"
-	ExecutorSpecTypeHTTP      = "http"
+	ExecutorTypeSemaphore = "semaphore"
+	ExecutorTypeHTTP      = "http"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"

@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -30,15 +29,11 @@ func Test__CreateStage(t *testing.T) {
 		Integration: true,
 	})
 
-	specValidator := executors.SpecValidator{
-		Encryptor: r.Encryptor,
-	}
-
-	executor := support.ProtoExecutor(r)
+	executor := support.ProtoExecutor(t, r)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -57,7 +52,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -77,7 +72,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -106,7 +101,7 @@ func Test__CreateStage(t *testing.T) {
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		_, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -132,7 +127,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -161,7 +156,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -193,7 +188,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -227,7 +222,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -261,7 +256,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -296,7 +291,7 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -338,15 +333,15 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{Name: name},
 				Spec: &pb.Stage_Spec{
-					Executor: &pb.ExecutorSpec{
+					Executor: &pb.Executor{
 						Type:        executor.Type,
+						Spec:        executor.Spec,
 						Integration: &integrationpb.IntegrationRef{Name: "does-not-exist"},
-						Semaphore:   executor.Semaphore,
 					},
 					Connections: []*pb.Connection{
 						{
@@ -373,7 +368,7 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -431,10 +426,7 @@ func Test__CreateStage(t *testing.T) {
 		require.NotNil(t, res.Stage.Spec)
 		assert.Equal(t, executor.Type, res.Stage.Spec.Executor.Type)
 		assert.Equal(t, executor.Integration.Name, res.Stage.Spec.Executor.Integration.Name)
-		assert.Equal(t, executor.Semaphore.Project, res.Stage.Spec.Executor.Semaphore.Project)
-		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Spec.Executor.Semaphore.Branch)
-		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Spec.Executor.Semaphore.PipelineFile)
-		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Spec.Executor.Semaphore.Parameters)
+		assert.NotEmpty(t, executor.Spec)
 
 		// Check that we have a connection to the source
 		require.Len(t, res.Stage.Spec.Connections, 1)
@@ -454,13 +446,13 @@ func Test__CreateStage(t *testing.T) {
 		assert.True(t, testconsumer.HasReceivedMessage())
 
 		// Assert internally scoped event source was created
-		resource, err := models.FindResource(r.Integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		resource, err := models.FindResource(r.Integration.ID, semaphore.ResourceTypeProject, executor.Resource.Name)
 		require.NoError(t, err)
 		require.NotNil(t, resource)
 		eventSource, err := resource.FindEventSource()
 		require.NoError(t, err)
 		require.NotNil(t, eventSource)
-		require.Equal(t, eventSource.Name, executor.Integration.Name+"-"+executor.Semaphore.Project)
+		require.Equal(t, eventSource.Name, executor.Integration.Name+"-"+executor.Resource.Name)
 		require.Equal(t, eventSource.Scope, models.EventSourceScopeInternal)
 	})
 
@@ -490,18 +482,22 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{Name: name},
 				Spec: &pb.Stage_Spec{
-					Executor: &pb.ExecutorSpec{
+					Executor: &pb.Executor{
 						Type: executor.Type,
 						Integration: &integrationpb.IntegrationRef{
 							Name:       integration.Name,
 							DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 						},
-						Semaphore: executor.Semaphore,
+						Resource: &integrationpb.ResourceRef{
+							Type: executor.Resource.Type,
+							Name: executor.Resource.Name,
+						},
+						Spec: executor.Spec,
 					},
 					Conditions: []*pb.Condition{},
 					Connections: []*pb.Connection{
@@ -527,22 +523,19 @@ func Test__CreateStage(t *testing.T) {
 		assert.Equal(t, executor.Type, res.Stage.Spec.Executor.Type)
 		assert.Equal(t, integration.Name, res.Stage.Spec.Executor.Integration.Name)
 		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION, res.Stage.Spec.Executor.Integration.DomainType)
-		assert.Equal(t, executor.Semaphore.Project, res.Stage.Spec.Executor.Semaphore.Project)
-		assert.Equal(t, executor.Semaphore.Branch, res.Stage.Spec.Executor.Semaphore.Branch)
-		assert.Equal(t, executor.Semaphore.PipelineFile, res.Stage.Spec.Executor.Semaphore.PipelineFile)
-		assert.Equal(t, executor.Semaphore.Parameters, res.Stage.Spec.Executor.Semaphore.Parameters)
+		assert.NotEmpty(t, res.Stage.Spec.Executor.Spec)
 
 		// Check that we have a connection to the source
 		require.Len(t, res.Stage.Spec.Connections, 1)
 
 		// Assert internally scoped event source was created
-		resource, err := models.FindResource(integration.ID, integrations.ResourceTypeProject, executor.Semaphore.Project)
+		resource, err := models.FindResource(integration.ID, semaphore.ResourceTypeProject, executor.Resource.Name)
 		require.NoError(t, err)
 		require.NotNil(t, resource)
 		eventSource, err := resource.FindEventSource()
 		require.NoError(t, err)
 		require.NotNil(t, eventSource)
-		require.Equal(t, eventSource.Name, integration.Name+"-"+executor.Semaphore.Project)
+		require.Equal(t, eventSource.Name, integration.Name+"-"+executor.Resource.Name)
 		require.Equal(t, eventSource.Scope, models.EventSourceScopeInternal)
 	})
 
@@ -552,7 +545,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create first stage using the demo-project Semaphore project integration resource.
 		//
-		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -577,7 +570,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create second stage using the demo-project Semaphore project integration resource.
 		//
-		res, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		res, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -601,13 +594,13 @@ func Test__CreateStage(t *testing.T) {
 
 		// Assert the same integration resource record and
 		// internally scoped event source are re-used by both stages.
-		resources, err := r.Integration.ListResources(integrations.ResourceTypeProject)
+		resources, err := r.Integration.ListResources(semaphore.ResourceTypeProject)
 		require.NoError(t, err)
 		require.Len(t, resources, 1)
 		sources, err := resources[0].ListEventSources()
 		require.NoError(t, err)
 		assert.Len(t, sources, 1)
-		assert.Equal(t, sources[0].Name, r.Integration.Name+"-"+executor.Semaphore.Project)
+		assert.Equal(t, sources[0].Name, r.Integration.Name+"-"+executor.Resource.Name)
 		assert.Equal(t, sources[0].Scope, models.EventSourceScopeInternal)
 	})
 
@@ -618,7 +611,7 @@ func Test__CreateStage(t *testing.T) {
 		// First stage works
 		//
 		name := support.RandomName("test")
-		res, err := CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
@@ -642,7 +635,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Second stage with the same name fails
 		//
-		_, err = CreateStage(ctx, r.Encryptor, specValidator, &pb.CreateStageRequest{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{

@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -31,8 +31,8 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, resource := support.Executor(r)
-	stage, err := builders.NewStageBuilder().
+	executorType, executorSpec, resource := support.Executor(t, r)
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").
@@ -47,7 +47,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 	require.NoError(t, err)
 
 	amqpURL := "amqp://guest:guest@rabbitmq:5672"
-	w := NewExecutionResourcePoller(r.Encryptor)
+	w := NewExecutionResourcePoller(r.Encryptor, r.Registry)
 
 	t.Run("failed pipeline -> execution resource fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
@@ -64,7 +64,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 
 		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -75,7 +75,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock failed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, integrations.SemaphorePipelineResultFailed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultFailed)
 		err = w.Tick()
 		require.NoError(t, err)
 
@@ -107,7 +107,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 
 		resource, err := models.FindResource(r.Integration.ID, resource.Type(), resource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 
 		testconsumer := testconsumer.New(amqpURL, ExecutionFinishedRoutingKey)
@@ -118,7 +118,7 @@ func Test__ExecutionResourcePoller(t *testing.T) {
 		// Mock passed result and tick worker
 		//
 		pipelineID := uuid.New().String()
-		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, integrations.SemaphorePipelineResultPassed)
+		r.SemaphoreAPIMock.AddPipeline(pipelineID, workflowID, semaphore.PipelineResultPassed)
 		err = w.Tick()
 		require.NoError(t, err)
 
