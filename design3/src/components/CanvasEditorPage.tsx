@@ -293,7 +293,19 @@ export function CanvasEditorPage({
             );
           },
           onCancel: () => {
-            setNodes((nds) => nds.filter((n) => n.id !== node.id));
+            setNodes((nds) =>
+              nds.map((n) =>
+                n.id === node.id
+                  ? {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        variant: 'read'
+                      }
+                    }
+                  : n
+              )
+            );
           },
           onEdit: () => {
             setNodes((nds) =>
@@ -701,6 +713,7 @@ export function CanvasEditorPage({
             );
           },
           onCancel: () => {
+            // For new nodes created in edit mode, delete them when canceling
             setNodes((nds) => nds.filter((node) => node.id !== nodeId));
           },
           onEdit: () => {

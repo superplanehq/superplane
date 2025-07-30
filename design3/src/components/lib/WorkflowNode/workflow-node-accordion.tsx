@@ -26,7 +26,7 @@ import { Divider } from '../Divider/divider'
 import { Text } from '../Text/text'
 import { Link } from '../Link/link'
 import Tippy from '@tippyjs/react'
-import { Badge } from '../Badge/badge'
+import { Badge, BadgeButton } from '../Badge/badge'
 
 export type { WorkflowNodeData } from './workflow-node'
 
@@ -732,6 +732,43 @@ export function WorkflowNodeAccordion({
         };
     }
   }
+
+  // Helper function to render inputs in tooltip format
+  const renderInputsTooltip = (inputs: Array<{name: string, type: string, required?: boolean, defaultValue?: any}>) => {
+    if (!inputs || inputs.length === 0) return null;
+    
+    const inputsRecord: Record<string, string> = {};
+    inputs.forEach(input => {
+      inputsRecord[input.name] = input.defaultValue || `${input.type}${input.required ? ' (required)' : ''}`;
+    });
+
+    return (
+      <div className="min-w-[200px] max-w-xs">
+        <div className="border border-gray-200 rounded-lg p-3 bg-white">
+          <div className="flex items-start gap-3">
+        
+            <div className="flex-1">
+              <span className="text-sm font-semibold mb-2 block">
+                Inputs
+              </span>
+              <div className="space-y-1">
+                {Object.entries(inputsRecord).map(([key, value]) => (
+                  <div key={key} className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">{key}</span>
+                    <div className="flex items-center gap-2">
+                      <Badge className='font-mono !text-xs'>
+                        12313123
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Default accordion sections
   const defaultSections: AccordionItem[] = [
@@ -2082,9 +2119,9 @@ export function WorkflowNodeAccordion({
         'bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-sm min-w-sm max-w-sm relative',
         className
       )}>
-          {selected && (
+      {selected && (
         <div 
-          className="action-buttons absolute -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-1 border border-gray-200 z-50"
+          className="action-buttons absolute -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-xs rounded-lg px-2 py-1 border border-gray-200 z-50"
           onClick={(e) => e.stopPropagation()}
         >
          
@@ -2102,8 +2139,8 @@ export function WorkflowNodeAccordion({
               plain
               className="flex items-center gap-2"
             >
-              <MaterialSymbol name="play_arrow" size="md"/>
-              Run
+              <MaterialSymbol name="tune" size="md"/>
+              Advanced
             </Button>
           
             
@@ -2117,19 +2154,23 @@ export function WorkflowNodeAccordion({
               <DropdownMenu anchor="bottom start">
                 <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
                 <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2' onClick={onCancel}><DropdownLabel>Cancel edit</DropdownLabel></DropdownItem>
               </DropdownMenu>
             </Dropdown>
-          <Tippy content="" placement="top">
+            <Tippy content="More options" placement="top">
             <Dropdown>
               <DropdownButton plain>
                 <MaterialSymbol name="more_vert" size="md"/>
               </DropdownButton>
               <DropdownMenu anchor="bottom start">
-                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="play_arrow" size="md"/><DropdownLabel>Run</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2' onClick={onCancel}><MaterialSymbol name="close" size="md"/><DropdownLabel>Cancel edit</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
+
               </DropdownMenu>
             </Dropdown>
           </Tippy>
+         
           
           
         </div>
@@ -2299,7 +2340,57 @@ export function WorkflowNodeAccordion({
       onClick={onSelect}
     >
       {/* Action buttons when selected */}
-     
+      {selected && (
+        <div 
+          className="action-buttons absolute -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-xs rounded-lg px-2 py-1 border border-gray-200 z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+         
+
+            <Button
+              type="button"
+              plain
+              className="flex items-center gap-2"
+            >
+              <MaterialSymbol name="play_arrow" size="md"/>
+              Run
+            </Button>
+            <Button
+              type="button"
+              plain
+              className="flex items-center gap-2"
+              onClick={onEdit}
+            >
+              <MaterialSymbol name="edit" size="md"/>
+              Edit
+            </Button>
+            <Button
+              type="button"
+              plain
+              className="flex items-center gap-2"
+            >
+              <MaterialSymbol name="pause" size="md"/>
+              Freeze
+            </Button>
+            
+            
+            <Tippy content="More options" placement="top">
+            <Dropdown>
+              <DropdownButton plain>
+                <MaterialSymbol name="more_vert" size="md"/>
+              </DropdownButton>
+              <DropdownMenu anchor="bottom start">
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="content_copy" size="md"/><DropdownLabel>Duplicate</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
+
+              </DropdownMenu>
+            </Dropdown>
+          </Tippy>
+         
+          
+          
+        </div>
+      )}
 
       {/* Header section */}
       <div className="p-4 flex justify-between items-center border-b border-gray-200">
@@ -2318,21 +2409,7 @@ export function WorkflowNodeAccordion({
             {data.type}
           </span>
         </div>
-        <Dropdown>
-          <DropdownButton plain>
-            <MaterialSymbol name="more_vert" size="md"/>
-          </DropdownButton>
-          <DropdownMenu anchor="bottom start">
-            <DropdownItem className='flex items-center gap-2' onClick={onEdit}>
-              <MaterialSymbol name="edit" size="md"/>
-              <DropdownLabel>Edit</DropdownLabel>
-            </DropdownItem>
-            <DropdownItem className='flex items-center gap-2'>
-            <MaterialSymbol name="info" size="md"/>
-              <DropdownLabel>
-              Something else?</DropdownLabel></DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
+       
       </div>
 
       {/* Status section */}
@@ -2358,15 +2435,17 @@ export function WorkflowNodeAccordion({
         {/* Executor and connection info */}
         <div className="flex flex-wrap gap-2">
          
-          {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
-            <Badge className="text-xs">
-              {yamlConfig.spec.inputs?.length} input{yamlConfig.spec.inputs?.length !== 1 ? 's' : ''}
-            </Badge>
+          {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
+            <Tippy content={renderInputsTooltip(yamlConfig.spec.inputs)} placement='top' interactive={true}>
+              <BadgeButton className="text-xs" href="#">
+                {yamlConfig.spec.inputs?.length} input{yamlConfig.spec.inputs?.length !== 1 ? 's' : ''}
+              </BadgeButton>
+            </Tippy>
           )}
           {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
-            <Badge className="text-xs">
+            <BadgeButton className="text-xs" href="#">
               {yamlConfig.spec.outputs?.length} output {yamlConfig.spec.outputs?.length !== 1 ? 's' : ''}
-            </Badge>
+            </BadgeButton>
           )}
         </div>
       </div>
@@ -2378,16 +2457,21 @@ export function WorkflowNodeAccordion({
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className="flex items-center p-2 border border-gray-200 dark:border-gray-700 rounded-md">
-              <div className="w-8 h-8 bg-orange-100 text-orange-600 dark:bg-orange-800 dark:text-orange-400 rounded-lg flex items-center justify-center mr-2">
-                <MaterialSymbol name="how_to_reg" size="md" />
+            <div className="flex items-center p-2 border border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
+              <div className="flex items-center gap-2 truncate pr-2">
+                <MaterialSymbol name="input" size="lg" className='text-orange-600 dark:text-orange-400' />
+                <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">
+                  Msg 2dlsf32fwasdfd-asdfsdf-adsfasdf
+                </span>
               </div>
-              <strong className="text-sm text-gray-700 dark:text-gray-200">
-                Msg #2dlsf32fw
-              </strong>
+              <Tippy content="Need manual approval" placement='top'>
+                <Button plain>
+                <MaterialSymbol name="how_to_reg" size="lg" className='text-zinc-600 dark:text-zinc-400' />
+                </Button>
+              </Tippy>
             </div>
           )}
-         
+          
          
         </div>
       </div>

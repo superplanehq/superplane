@@ -147,6 +147,84 @@ const mockQueue: QueueItem[] = [
       code: '1045a77',
       image: 'v.1.2.4'
     }
+  },
+  {
+    id: 'msg-3',
+    name: 'Deploy #f8a9b3c',
+    timestamp: '1 hour ago',
+    status: 'waiting',
+    scheduledFor: 'Run at 3:00 PM',
+    approvalInfo: {
+      approvedBy: 2,
+      waitingFor: 1
+    },
+    inputs: {
+      Environment: 'staging',
+      Branch: 'feature/new-ui',
+      Version: '2.1.0'
+    }
+  },
+  {
+    id: 'msg-4',
+    name: 'Test #x7y2z9w',
+    timestamp: '3 hours ago',
+    status: 'approved',
+    scheduledFor: 'Run immediately',
+    inputs: {
+      TestSuite: 'integration',
+      Coverage: '85%',
+      Browser: 'chrome'
+    }
+  },
+  {
+    id: 'msg-5',
+    name: 'Build #k4m8n2p',
+    timestamp: '5 hours ago',
+    status: 'pending',
+    inputs: {
+      Docker: 'node:18-alpine',
+      Memory: '2GB',
+      CPU: '1 core'
+    }
+  },
+  {
+    id: 'msg-6',
+    name: 'Release #q1w2e3r',
+    timestamp: 'Yesterday 4:30 PM',
+    status: 'approved',
+    scheduledFor: 'Run tomorrow 9:00 AM',
+    approvalInfo: {
+      approvedBy: 3,
+      waitingFor: 0
+    },
+    inputs: {
+      Tag: 'v3.0.0',
+      Changelog: 'Major release',
+      Distribution: 'all-regions'
+    }
+  },
+  {
+    id: 'msg-7',
+    name: 'Migrate #a5s6d7f',
+    timestamp: '2 days ago',
+    status: 'waiting',
+    inputs: {
+      Database: 'postgresql-14',
+      Backup: 'enabled',
+      Downtime: '15 minutes'
+    }
+  },
+  {
+    id: 'msg-8',
+    name: 'Config #z9x8c7v',
+    timestamp: '3 days ago',
+    status: 'pending',
+    scheduledFor: 'Manual trigger required',
+    inputs: {
+      Environment: 'production',
+      ConfigFile: 'app.config.json',
+      Restart: 'required'
+    }
   }
 ];
 
@@ -325,11 +403,11 @@ export function NodeDetailsSidebar({
       {outputs && (
         <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
               <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-gray-400" />
             </div>
             <div className="flex-1">
-              <span className="text-sm font-semibold mb-2 mt-2 block">
+              <span className="text-sm font-semibold mb-2 block">
                 Outputs
               </span>
               <div className="space-y-1">
@@ -399,66 +477,7 @@ export function NodeDetailsSidebar({
               </div>
               
               <div className="space-y-3">
-                {mockRuns.map((run) => {
-                  const statusConfig = getStatusIcon(run.status);
-                  const statusConfig2 = getStatusConfig(run.status);
-                  const isExpanded = expandedRuns.has(run.id);
-                  
-                  return (
-                    <div key={run.id} className={statusConfig2.bgColor + " " + statusConfig2.borderColor } >
-                      <div 
-                        className="border-l border-b border-r border-zinc-200 dark:border-zinc-700 p-2"
-                        onClick={() => toggleRunExpansion(run.id)}
-                      >
-                        <div className="flex items-center justify-between p-1">
-                          <div className="flex items-center gap-2">
-                              
-                              <MaterialSymbol 
-                                name={statusConfig.icon} 
-                                size="lg" 
-                                className={statusConfig.color}
-                              />
-                            <span className="font-bold text-sm truncate">{run.name}</span>
-                   
-                          </div>
-                         
-                          <MaterialSymbol 
-                              name={isExpanded ? 'expand_less' : 'expand_more'} 
-                              size="lg" 
-                              className="text-gray-600" 
-                            />
-                          
-                        </div>
-                        
-                        {isExpanded && (
-                          <div className="p-3 bg-white dark:bg-zinc-800 mt-3">
-                            {run.project && (
-                              <div className="flex items-center gap-2 mb-2">
-                                <MaterialSymbol name="automation" size="sm" className="text-blue-500" />
-                                <Link href="#" className="text-sm text-blue-600 hover:text-blue-700">
-                                  {run.project}/{run.pipeline}
-                                </Link>
-                              </div>
-                            )}
-                            
-                            <div className="flex items-center gap-4 text-xs text-gray-500 mb-3">
-                              <div className="flex items-center gap-1">
-                                <MaterialSymbol name="schedule" size="sm" />
-                                <span>{run.timestamp}</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <MaterialSymbol name="timer" size="sm" />
-                                <span>{run.duration}</span>
-                              </div>
-                            </div>
-                            
-                            {renderInputsOutputs(run.inputs, run.outputs)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+               
                  {mockRuns2.map((run) => {
                   const statusConfig = getStatusIcon(run.status);
                   const statusConfig2 = getStatusConfig(run.status);
@@ -556,130 +575,48 @@ export function NodeDetailsSidebar({
                   const isExpanded = expandedQueue.has(item.id);
                   
                   return (
-                    <div key={item.id} className="border border-gray-200 rounded-lg">
+                    <div key={item.id} className="" >
                       <div 
-                        className="p-3 cursor-pointer hover:bg-gray-50"
+                        className="p-3 bg-zinc-50 border border-zinc-200 dark:border-zinc-700"
                         onClick={() => toggleQueueExpansion(item.id)}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <MaterialSymbol 
-                              name={isExpanded ? 'expand_less' : 'expand_more'} 
-                              size="sm" 
-                              className="text-gray-400" 
-                            />
-                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
-                              <MaterialSymbol name="schedule" size="sm" className="text-orange-500" />
-                            </div>
-                            <Text className="font-medium text-gray-900">{item.name}</Text>
+                          <div className="flex items-center gap-2">
+                              
+                              <MaterialSymbol 
+                                name="input" 
+                                size="lg" 
+                                className="text-orange-600 dark:text-orange-400"
+                              />
+                            <span className="font-medium truncate text-sm">{item.name}</span>
+                         
                           </div>
                           <div className="flex items-center gap-2">
-                            <Text className="text-xs text-gray-500">{item.timestamp}</Text>
-                            <Dropdown>
-                              <DropdownButton plain>
-                                <MaterialSymbol name="more_vert" size="sm" />
-                              </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>Approve</DropdownItem>
-                                <DropdownItem>Reject</DropdownItem>
-                                <DropdownItem>View details</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
+                            {!isExpanded && (
+                              <span className="text-xs text-gray-500">2 minutes ago</span>
+                            )}
+                            <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600" 
+                              />
                           </div>
                         </div>
                         
                         {isExpanded && (
-                          <div className="mt-3 pl-9">
+                          <div className="mt-3 space-y-3">
+                            
                             {renderInputsOutputs2(item.inputs)}
-                            
-                            {item.scheduledFor && (
-                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                                <MaterialSymbol name="schedule" size="sm" />
-                                <span>{item.scheduledFor}</span>
-                              </div>
-                            )}
-                            
-                            {item.approvalInfo && (
-                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
-                                <MaterialSymbol name="check_circle" size="sm" className="text-green-500" />
-                                <span>
-                                  approved by <Link href="#" className="text-blue-600">1 person</Link>, waiting for {item.approvalInfo.waitingFor} more
-                                </span>
-                                <Button plain className="ml-2">
-                                  <MaterialSymbol name="check" size="sm" />
-                                </Button>
-                              </div>
-                            )}
+                          
+                           
                           </div>
                         )}
                       </div>
                     </div>
+                
                   );
                 })}
-                 {mockQueue.map((item) => {
-                  const isExpanded = expandedQueue.has(item.id);
-                  
-                  return (
-                    <div key={item.id} className="border border-gray-200 rounded-lg">
-                      <div 
-                        className="p-3 cursor-pointer hover:bg-gray-50"
-                        onClick={() => toggleQueueExpansion(item.id)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <MaterialSymbol 
-                              name={isExpanded ? 'expand_less' : 'expand_more'} 
-                              size="sm" 
-                              className="text-gray-400" 
-                            />
-                            <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center">
-                              <MaterialSymbol name="schedule" size="sm" className="text-orange-500" />
-                            </div>
-                            <Text className="font-medium text-gray-900">{item.name}</Text>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Text className="text-xs text-gray-500">{item.timestamp}</Text>
-                            <Dropdown>
-                              <DropdownButton plain>
-                                <MaterialSymbol name="more_vert" size="sm" />
-                              </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>Approve</DropdownItem>
-                                <DropdownItem>Reject</DropdownItem>
-                                <DropdownItem>View details</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
-                          </div>
-                        </div>
-                        
-                        {isExpanded && (
-                          <div className="mt-3 pl-9">
-                            {renderInputsOutputs(item.inputs)}
-                            
-                            {item.scheduledFor && (
-                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                                <MaterialSymbol name="schedule" size="sm" />
-                                <span>{item.scheduledFor}</span>
-                              </div>
-                            )}
-                            
-                            {item.approvalInfo && (
-                              <div className="mt-3 flex items-center gap-2 text-xs text-gray-600">
-                                <MaterialSymbol name="check_circle" size="sm" className="text-green-500" />
-                                <span>
-                                  approved by <Link href="#" className="text-blue-600">1 person</Link>, waiting for {item.approvalInfo.waitingFor} more
-                                </span>
-                                <Button plain className="ml-2">
-                                  <MaterialSymbol name="check" size="sm" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              
               </div>
             </div>
           </div>
