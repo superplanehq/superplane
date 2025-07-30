@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/executors"
 )
 
@@ -63,6 +64,16 @@ type Executor interface {
 	// Triggers a new execution.
 	//
 	Execute([]byte, executors.ExecutionParameters) (StatefulResource, error)
+}
+
+type OIDCVerifier interface {
+	Verify(ctx context.Context, verifier *crypto.OIDCVerifier, token string, options VerifyTokenOptions) error
+}
+
+type VerifyTokenOptions struct {
+	IntegrationURL        string
+	IntegrationResourceID string
+	ExecutionResourceID   string
 }
 
 // A generic interface for representing integration resources.

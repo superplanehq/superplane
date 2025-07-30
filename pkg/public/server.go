@@ -67,7 +67,15 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
+func NewServer(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcVerifier *crypto.OIDCVerifier,
+	basePath string,
+	appEnv string,
+	middlewares ...mux.MiddlewareFunc,
+) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
 	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
@@ -480,23 +488,22 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, r
 	//
 	resourceInfo, err := execution.GetResourceInformation(req.ExternalID)
 	if err != nil {
-		http.Error(w, "Integration not found", http.StatusNotFound)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
 
-	integration, err := integrations.NewIntegrationWithoutAuth(r.Context(), resourceInfo.IntegrationType)
-	if err != nil {
-		http.Error(w, "Error starting integration", http.StatusInternalServerError)
-		return nil
-	}
-
-	idToken, err := s.oidcVerifier.Verify(r.Context(), resourceInfo.IntegrationURL, resourceInfo.IntegrationURL, headerParts[1])
+	verifier, err := s.registry.GetOIDCVerifier(resourceInfo.IntegrationType)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
 
-	err = integration.ValidateOpenIDConnectClaims(idToken, req.ExternalID, req.ExecutionID)
+	err = verifier.Verify(r.Context(), s.oidcVerifier, token, integrations.VerifyTokenOptions{
+		IntegrationURL:        resourceInfo.IntegrationURL,
+		IntegrationResourceID: resourceInfo.ParentResourceID,
+		ExecutionResourceID:   req.ExternalID,
+	})
+
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
@@ -657,7 +664,7 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 	}
 
 	integrationName := vars["integrationName"]
-	eventHandler, err := s.registry.GetEventHandlerForIntegration(integrationName)
+	eventHandler, err := s.registry.GetEventHandler(integrationName)
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return

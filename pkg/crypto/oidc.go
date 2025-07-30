@@ -30,7 +30,7 @@ func (v *OIDCVerifier) Verify(ctx context.Context, issuer, audience, token strin
 		return nil, err
 	}
 
-	verifier = provider.Verifier(&oidc.Config{ClientID: audience})
+	verifier = provider.VerifierContext(ctx, &oidc.Config{ClientID: audience})
 	v.verifiers[issuer] = verifier
 	return verifier.Verify(ctx, token)
 }
