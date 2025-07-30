@@ -10,9 +10,13 @@ import {
   superplaneDescribeStage,
   superplaneCreateEventSource,
   superplaneDescribeEventSource,
+  superplaneListConnectionGroups,
+  superplaneCreateConnectionGroup,
+  superplaneUpdateConnectionGroup,
+  superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
 } from '../api-client/sdk.gen'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -23,6 +27,8 @@ export const canvasKeys = {
   stage: (canvasId: string, stageId: string) => [...canvasKeys.all, 'stage', canvasId, stageId] as const,
   eventSources: (canvasId: string) => [...canvasKeys.all, 'eventSources', canvasId] as const,
   eventSource: (canvasId: string, eventSourceId: string) => [...canvasKeys.all, 'eventSource', canvasId, eventSourceId] as const,
+  connectionGroups: (canvasId: string) => [...canvasKeys.all, 'connectionGroups', canvasId] as const,
+  connectionGroup: (canvasId: string, connectionGroupId: string) => [...canvasKeys.all, 'connectionGroup', canvasId, connectionGroupId] as const,
   integrations: (canvasId?: string) => canvasId ? [...canvasKeys.all, 'integrations', canvasId] as const : ['integrations'] as const,
 }
 
@@ -326,6 +332,119 @@ export const useCreateEventSource = (canvasId: string) => {
     onSuccess: () => {
       // Invalidate and refetch canvas event sources
       queryClient.invalidateQueries({ queryKey: canvasKeys.eventSources(canvasId) })
+    }
+  })
+}
+
+// Connection Group-related hooks
+export const useCanvasConnectionGroups = (canvasId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.connectionGroups(canvasId),
+    queryFn: async () => {
+      const response = await superplaneListConnectionGroups({
+        path: { canvasIdOrName: canvasId }
+      })
+      return response.data?.connectionGroups || []
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId
+  })
+}
+
+export const useConnectionGroupDetails = (canvasId: string, connectionGroupId: string) => {
+  return useQuery({
+    queryKey: canvasKeys.connectionGroup(canvasId, connectionGroupId),
+    queryFn: async () => {
+      const response = await superplaneDescribeConnectionGroup({
+        path: { canvasIdOrName: canvasId, idOrName: connectionGroupId }
+      })
+      return response.data?.connectionGroup
+    },
+    staleTime: 30 * 1000, // 30 seconds
+    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: !!canvasId && !!connectionGroupId
+  })
+}
+
+export const useCreateConnectionGroup = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (connectionGroupData: {
+      name: string;
+      description?: string;
+      connections: SuperplaneConnection[];
+      groupByFields: GroupByField[];
+      timeout?: number;
+      timeoutBehavior?: SpecTimeoutBehavior;
+    }) => {
+      return await superplaneCreateConnectionGroup({
+        path: { canvasIdOrName: canvasId },
+        body: {
+          connectionGroup: {
+            metadata: {
+              name: connectionGroupData.name,
+              description: connectionGroupData.description,
+              canvasId: canvasId
+            },
+            spec: {
+              connections: connectionGroupData.connections,
+              groupBy: {
+                fields: connectionGroupData.groupByFields
+              },
+              timeout: connectionGroupData.timeout,
+              timeoutBehavior: connectionGroupData.timeoutBehavior
+            }
+          }
+        }
+      })
+    },
+    onSuccess: () => {
+      // Invalidate and refetch canvas connection groups
+      queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroups(canvasId) })
+    }
+  })
+}
+
+export const useUpdateConnectionGroup = (canvasId: string) => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (params: {
+      connectionGroupId: string;
+      name: string;
+      description?: string;
+      connections: SuperplaneConnection[];
+      groupByFields: GroupByField[];
+      timeout?: number;
+      timeoutBehavior?: SpecTimeoutBehavior;
+    }) => {
+      return await superplaneUpdateConnectionGroup({
+        path: { canvasIdOrName: canvasId, idOrName: params.connectionGroupId },
+        body: {
+          connectionGroup: {
+            metadata: {
+              name: params.name,
+              description: params.description,
+              canvasId: canvasId
+            },
+            spec: {
+              connections: params.connections,
+              groupBy: {
+                fields: params.groupByFields
+              },
+              timeout: params.timeout,
+              timeoutBehavior: params.timeoutBehavior
+            }
+          }
+        }
+      })
+    },
+    onSuccess: (_, variables) => {
+      // Invalidate and refetch canvas connection groups and specific connection group
+      queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroups(canvasId) })
+      queryClient.invalidateQueries({ queryKey: canvasKeys.connectionGroup(canvasId, variables.connectionGroupId) })
     }
   })
 }

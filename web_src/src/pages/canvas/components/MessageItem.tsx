@@ -11,13 +11,13 @@ interface MessageItemProps {
   executionRunning?: boolean;
 }
 
-const MessageItem = React.memo(({ 
-  event, 
+const MessageItem = React.memo(({
+  event,
   selectedStage,
-  onApprove, 
-  onRemove, 
-  approved = false, 
-  executionRunning = false 
+  onApprove,
+  onRemove,
+  approved = false,
+  executionRunning = false
 }: MessageItemProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -40,7 +40,8 @@ const MessageItem = React.memo(({
   };
 
   const handleApprove = () => {
-    if (onApprove && event.id && !executionRunning) {
+    if (onApprove && event.id) {
+      console.log("Approving event", event.id);
       onApprove(event.id);
     }
   };
@@ -71,7 +72,7 @@ const MessageItem = React.memo(({
 
       map[input.name!] = eventInputs?.[input.name!] || "-";
     });
-    
+
     return map;
   }, [event, selectedStage]);
 
@@ -80,7 +81,7 @@ const MessageItem = React.memo(({
   return (
     <div className="mb-2 bg-white border border-gray-200 overflow-hidden">
       <div className={`flex w-full items-start p-2 bg-white`}>
-        <button 
+        <button
           className='pb-[3px]'
           onClick={toggleExpand}
           title={isExpanded ? "Hide details" : "Show details"}
@@ -90,7 +91,7 @@ const MessageItem = React.memo(({
         <div className='w-full'>
           <div className="flex justify-between items-center mb-2">
             <div className="flex items-center min-w-0 flex-1">
-              <span 
+              <span
                 className="material-icons text-orange-500 mr-2"
                 style={{ fontSize: '25px' }}
               >
@@ -106,7 +107,7 @@ const MessageItem = React.memo(({
               </div>
             </div>
           </div>
-          
+
           {!isExpanded && Object.keys(inputsRecord).length > 0 ? (
             <div className="flex flex-wrap gap-1 mt-2 align-center justify-left mb-1">
               {Object.entries(inputsRecord).slice(0, 3).map(([key, value]) => (
@@ -119,7 +120,7 @@ const MessageItem = React.memo(({
               )}
             </div>
           ) : <div className="text-[12px] text-black ml-2 mb-1 text-left w-full">No associated inputs</div>}
-           
+
           {isExpanded && (
             <div className="mt-4 space-y-4">
               <div className="flex items-center space-x-4 text-sm text-gray-600">
@@ -128,7 +129,7 @@ const MessageItem = React.memo(({
                   {event.createdAt ? new Date(event.createdAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Unknown date'}
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3">
                 {Object.keys(inputsRecord).length > 0 && (
                   <div>
@@ -158,7 +159,7 @@ const MessageItem = React.memo(({
                 </span>
                 Waiting for approval
               </div>
-              
+
               {event.approvals && event.approvals.length > 0 && (
                 <div className="flex items-center text-xs">
                   <span className="material-symbols-outlined text-gray-600" style={{ fontSize: '14px' }}>
@@ -174,20 +175,20 @@ const MessageItem = React.memo(({
                   </div>
                 </div>
               )}
-              
-              
+
+
               <div className="flex items-center">
                 {onApprove && (
-                  <button 
+                  <button
                     onClick={handleApprove}
-                    disabled={executionRunning || approved}
+                    disabled={approved}
                     className={"px-3 py-[7px] shadow-sm border rounded-[7px] flex items-center justify-center " + (approved ? "text-green-800 border border-green-800 bg-green-100" : "text-gray-800 border border-gray-200")}
                   >
                     <span style={{ fontSize: '15px' }} className="material-symbols-outlined">check</span>
                   </button>
                 )}
 
-                <button 
+                <button
                   className="p-1 hover:bg-gray-100 rounded text-gray-500"
                   onClick={handleDropdownClick}
                 >
@@ -198,16 +199,16 @@ const MessageItem = React.memo(({
           )}
         </div>
       </div>
-      
-      
+
+
       {isDropdownOpen && (
-        <div 
+        <div
           className="absolute right-0 bg-white shadow-lg rounded-lg w-32 z-10"
           style={{ marginTop: '4px' }}
           ref={dropdownRef}
         >
           <div className="py-1">
-            <button 
+            <button
               onClick={handleRemove}
               className="block w-full text-left px-4 py-2 hover:bg-gray-100"
             >

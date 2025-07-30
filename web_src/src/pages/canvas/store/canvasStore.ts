@@ -20,6 +20,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   selectedStageId: null,
   editingStageId: null,
   editingEventSourceId: null,
+  editingConnectionGroupId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
 
   // reactflow state
@@ -81,6 +82,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   removeConnectionGroup: (connectionGroupId: string) => {
     set((state) => ({
       connectionGroups: state.connectionGroups.filter(cg => cg.metadata?.id !== connectionGroupId)
+    }));
+    get().syncToReactFlow();
+  },
+
+  updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
+    set((state) => ({
+      connectionGroups: state.connectionGroups.map(cg => cg.metadata?.id === connectionGroup.metadata?.id ? connectionGroup : cg)
     }));
     get().syncToReactFlow();
   },
@@ -153,6 +161,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setEditingEventSource: (eventSourceId: string | null) => {
     set({ editingEventSourceId: eventSourceId });
+  },
+
+  setEditingConnectionGroup: (connectionGroupId: string | null) => {
+    set({ editingConnectionGroupId: connectionGroupId });
   },
 
   updateWebSocketConnectionStatus: (status) => {
