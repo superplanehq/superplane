@@ -293,7 +293,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Simulating a stage completion event coming in for the first stage.
 		//
-		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, models.StageExecutionCompletionType, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
+		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, models.ExecutionFinishedEventType, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)

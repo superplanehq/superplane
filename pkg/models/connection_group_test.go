@@ -374,6 +374,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
+		"type": FieldSetCompletedEventType,
 		"fields": map[string]any{
 			"app":     "auth",
 			"version": "v1",

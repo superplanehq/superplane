@@ -11,17 +11,6 @@ import (
 
 const (
 	PipelineDoneEvent = "pipeline_done"
-
-	PipelineStateDone    = "done"
-	PipelineResultPassed = "passed"
-	PipelineResultFailed = "failed"
-
-	ResourceTypeTask         = "task"
-	ResourceTypeProject      = "project"
-	ResourceTypeWorkflow     = "workflow"
-	ResourceTypeNotification = "notification"
-	ResourceTypeSecret       = "secret"
-	ResourceTypePipeline     = "pipeline"
 )
 
 type SemaphoreEventHandler struct{}

@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -66,12 +67,17 @@ func (g *ConnectionGroup) Emit(fieldSet *ConnectionGroupFieldSet, stateReason st
 }
 
 func (g *ConnectionGroup) EmitInTransaction(tx *gorm.DB, fieldSet *ConnectionGroupFieldSet, stateReason string, missingConnections []Connection) error {
-	eventData, err := fieldSet.BuildEvent(tx, stateReason, missingConnections)
+	event, err := fieldSet.BuildEvent(tx, stateReason, missingConnections)
 	if err != nil {
 		return fmt.Errorf("error building connection group event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, "connection_group", eventData, []byte(`{}`))
+	eventData, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("error marshaling connection group event: %v", err)
+	}
+
+	_, err = CreateEventInTransaction(tx, g.ID, g.Name, SourceTypeConnectionGroup, event.Type, eventData, []byte(`{}`))
 	if err != nil {
 		return err
 	}

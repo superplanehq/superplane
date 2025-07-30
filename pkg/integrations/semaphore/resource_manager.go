@@ -3,13 +3,26 @@ package semaphore
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/integrations"
+)
+
+const (
+	PipelineStateDone    = "done"
+	PipelineResultPassed = "passed"
+	PipelineResultFailed = "failed"
+
+	ResourceTypeTask         = "task"
+	ResourceTypeProject      = "project"
+	ResourceTypeWorkflow     = "workflow"
+	ResourceTypeNotification = "notification"
+	ResourceTypeSecret       = "secret"
+	ResourceTypePipeline     = "pipeline"
 )
 
 type SemaphoreResourceManager struct {
@@ -557,9 +570,12 @@ func (p *Pipeline) Successful() bool {
 func (i *SemaphoreResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
 	// Semaphore doesn't let us use UUIDs in secret names,
-	// so we base64 that ID before creating the secret.
+	// so we sha256 the ID before creating the secret.
 	//
-	resourceName := fmt.Sprintf("superplane-webhook-%s", base64.StdEncoding.EncodeToString([]byte(options.ID)))
+	hash := sha256.New()
+	hash.Write([]byte(options.ID))
+	suffix := fmt.Sprintf("%x", hash.Sum(nil))
+	resourceName := fmt.Sprintf("superplane-webhook-%x", suffix[:16])
 
 	//
 	// Create Semaphore secret to store the event source key.

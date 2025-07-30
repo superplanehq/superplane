@@ -137,6 +137,10 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 }
 
 func (r *Registry) NewIntegrationExecutor(integration *models.Integration, resource integrations.Resource) (integrations.Executor, error) {
+	if integration == nil {
+		return nil, fmt.Errorf("integration is required")
+	}
+
 	resourceManager, err := r.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return nil, fmt.Errorf("error creating integration: %v", err)
