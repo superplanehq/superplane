@@ -11,12 +11,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	semaphoreIntegration "github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
 	"github.com/superplanehq/superplane/test/semaphore"
+	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/datatypes"
 )
 
@@ -28,6 +31,7 @@ type ResourceRegistry struct {
 	Organization     *models.Organization
 	Integration      *models.Integration
 	Encryptor        crypto.Encryptor
+	Registry         *registry.Registry
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -56,29 +60,44 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
+	user := &models.User{
+		Name:     "Test User",
+		IsActive: true,
+	}
+	require.NoError(t, user.Create())
+
+	accountProvider := &models.AccountProvider{
+		UserID:     user.ID,
+		Email:      "test@test.com",
+		Username:   "Test",
+		Provider:   "github",
+		ProviderID: "123",
+	}
+
+	require.NoError(t, accountProvider.Create())
+
 	r := ResourceRegistry{
-		User:      uuid.New(),
+		User:      user.ID,
 		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
+	r.Registry = registry.NewRegistry(r.Encryptor)
+	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
+	r.SemaphoreAPIMock.Init()
+	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+
 	var err error
-	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test")
+	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
 
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")
 	require.NoError(t, err)
 
-	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
-		require.NoError(t, err)
-	}
-
-	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-	r.SemaphoreAPIMock.Init()
-	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
-
+	//
+	// Create integration
+	//
 	if options.Integration {
-		secret, err := CreateSecret(t, &r, map[string]string{"key": "test"})
+		secret, err := CreateCanvasSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
 		integration, err := models.CreateIntegration(&models.Integration{
 			Name:       RandomName("integration"),
@@ -92,8 +111,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 				Token: &models.IntegrationAuthToken{
 					ValueFrom: models.ValueDefinitionFrom{
 						Secret: &models.ValueDefinitionFromSecret{
-							Name: secret.Name,
-							Key:  "key",
+							DomainType: models.DomainTypeCanvas,
+							Name:       secret.Name,
+							Key:        "key",
 						},
 					},
 				},
@@ -104,6 +124,14 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		r.Integration = integration
 	}
 
+	//
+	// Create source
+	//
+	if options.Source {
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
+		require.NoError(t, err)
+	}
+
 	if options.Stage {
 		conditions := []models.StageCondition{
 			{
@@ -112,8 +140,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 			},
 		}
 
-		executorType, executorSpec, resource := Executor(&r)
-		stage, err := builders.NewStageBuilder().
+		executorType, executorSpec, resource := Executor(t, &r)
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -183,7 +211,7 @@ func CreateFieldSet(t *testing.T, fields map[string]string, connectionGroup *mod
 	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
 	require.NoError(t, err)
 
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`))
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
 	require.NoError(t, err)
 	fieldSet.AttachEvent(database.Conn(), event)
 	return fieldSet
@@ -200,7 +228,7 @@ func CreateStageEventWithData(t *testing.T,
 	headers []byte,
 	inputs map[string]any,
 ) *models.StageEvent {
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", data, headers)
 	require.NoError(t, err)
 	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)
@@ -224,44 +252,61 @@ func CreateExecutionWithData(t *testing.T,
 	return execution
 }
 
-func Executor(r *ResourceRegistry) (string, *models.ExecutorSpec, integrations.Resource) {
-	return models.ExecutorSpecTypeSemaphore, &models.ExecutorSpec{
-			Semaphore: &models.SemaphoreExecutorSpec{
-				Branch:       "main",
-				PipelineFile: ".semaphore/run.yml",
-				Parameters: map[string]string{
-					"PARAM_1": "VALUE_1",
-					"PARAM_2": "VALUE_2",
-				},
-			},
-		}, &models.Resource{
-			ResourceType:  integrations.ResourceTypeProject,
-			ExternalID:    uuid.NewString(),
-			IntegrationID: r.Integration.ID,
-			ResourceName:  "demo-project",
-		}
+func Executor(t *testing.T, r *ResourceRegistry) (string, []byte, integrations.Resource) {
+	spec, err := json.Marshal(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters": map[string]string{
+			"PARAM_1": "VALUE_1",
+			"PARAM_2": "VALUE_2",
+		},
+	})
+
+	require.NoError(t, err)
+
+	return models.IntegrationTypeSemaphore, spec, &models.Resource{
+		ResourceType:  semaphoreIntegration.ResourceTypeProject,
+		ExternalID:    uuid.NewString(),
+		IntegrationID: r.Integration.ID,
+		ResourceName:  "demo-project",
+	}
 }
 
-func ProtoExecutor(r *ResourceRegistry) *pb.ExecutorSpec {
-	return &pb.ExecutorSpec{
-		Type: pb.ExecutorSpec_TYPE_SEMAPHORE,
+func ProtoExecutor(t *testing.T, r *ResourceRegistry) *pb.Executor {
+	spec, err := structpb.NewStruct(map[string]any{
+		"branch":       "main",
+		"pipelineFile": ".semaphore/run.yml",
+		"parameters":   map[string]any{},
+	})
+
+	require.NoError(t, err)
+
+	return &pb.Executor{
+		Type: models.IntegrationTypeSemaphore,
+		Spec: spec,
 		Integration: &integrationPb.IntegrationRef{
 			DomainType: authpb.DomainType_DOMAIN_TYPE_CANVAS,
 			Name:       r.Integration.Name,
 		},
-		Semaphore: &pb.ExecutorSpec_Semaphore{
-			Project:      "demo-project",
-			Branch:       "main",
-			PipelineFile: ".semaphore/semaphore.yml",
-			Parameters:   map[string]string{},
+		Resource: &integrationPb.ResourceRef{
+			Type: semaphoreIntegration.ResourceTypeProject,
+			Name: "demo-project",
 		},
 	}
 }
 
-func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+func CreateCanvasSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
 	data, err := json.Marshal(secretData)
 	require.NoError(t, err)
 	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeCanvas, r.Canvas.ID, data)
+	require.NoError(t, err)
+	return secret, nil
+}
+
+func CreateOrganizationSecret(t *testing.T, r *ResourceRegistry, secretData map[string]string) (*models.Secret, error) {
+	data, err := json.Marshal(secretData)
+	require.NoError(t, err)
+	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 	return secret, nil
 }

@@ -1,62 +1,32 @@
 package executors
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
-
-	"github.com/go-viper/mapstructure/v2"
-	"github.com/superplanehq/superplane/pkg/models"
 )
+
+var expressionRegex = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
 
 type SpecBuilder struct{}
 
-func (b *SpecBuilder) Build(spec models.ExecutorSpec, inputs map[string]any, secrets map[string]string) (*models.ExecutorSpec, error) {
-	m, err := b.specToMap(spec)
+func (b *SpecBuilder) Build(specData []byte, inputs map[string]any, secrets map[string]string) ([]byte, error) {
+	var spec map[string]any
+	err := json.Unmarshal(specData, &spec)
 	if err != nil {
 		return nil, err
 	}
 
-	resolved, err := b.resolveMap(m, inputs, secrets)
+	resolved, err := b.resolve(spec, inputs, secrets)
 	if err != nil {
 		return nil, err
 	}
 
-	return b.mapToSpec(resolved)
+	return json.Marshal(resolved)
 }
 
-func (b *SpecBuilder) specToMap(spec models.ExecutorSpec) (map[string]any, error) {
-	var result map[string]any
-
-	config := &mapstructure.DecoderConfig{TagName: "json", Result: &result}
-	decoder, err := mapstructure.NewDecoder(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create decoder: %w", err)
-	}
-
-	if err := decoder.Decode(spec); err != nil {
-		return nil, fmt.Errorf("failed to decode spec: %w", err)
-	}
-
-	return result, nil
-}
-
-func (b *SpecBuilder) mapToSpec(data map[string]any) (*models.ExecutorSpec, error) {
-	var spec models.ExecutorSpec
-
-	config := &mapstructure.DecoderConfig{TagName: "json", Result: &spec}
-	decoder, err := mapstructure.NewDecoder(config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create decoder: %w", err)
-	}
-
-	if err := decoder.Decode(data); err != nil {
-		return nil, fmt.Errorf("failed to decode spec: %w", err)
-	}
-
-	return &spec, nil
-}
-
-func (b *SpecBuilder) resolveMap(m map[string]any, inputs map[string]any, secrets map[string]string) (map[string]any, error) {
+func (b *SpecBuilder) resolve(m map[string]any, inputs map[string]any, secrets map[string]string) (map[string]any, error) {
 	result := make(map[string]any, len(m))
 
 	for k, v := range m {
@@ -76,7 +46,7 @@ func (b *SpecBuilder) resolveValue(value any, inputs map[string]any, secrets map
 		return b.ResolveExpression(v, inputs, secrets)
 
 	case map[string]any:
-		return b.resolveMap(v, inputs, secrets)
+		return b.resolve(v, inputs, secrets)
 
 	case map[string]string:
 		anyMap := make(map[string]any, len(v))
@@ -84,7 +54,7 @@ func (b *SpecBuilder) resolveValue(value any, inputs map[string]any, secrets map
 			anyMap[key] = value
 		}
 
-		return b.resolveMap(anyMap, inputs, secrets)
+		return b.resolve(anyMap, inputs, secrets)
 	case []any:
 		result := make([]any, len(v))
 		for i, item := range v {

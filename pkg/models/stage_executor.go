@@ -11,34 +11,7 @@ type StageExecutor struct {
 	StageID    uuid.UUID
 	ResourceID *uuid.UUID
 	Type       string
-	Spec       datatypes.JSONType[ExecutorSpec]
-}
-
-type ExecutorSpec struct {
-	Semaphore *SemaphoreExecutorSpec `json:"semaphore,omitempty"`
-	HTTP      *HTTPExecutorSpec      `json:"http,omitempty"`
-}
-
-type SemaphoreExecutorSpec struct {
-	// TODO: not exactly sure we should store this here
-	// or if we should have the resource referenced by this executor
-	// be a task instead of a project.
-	TaskId *string `json:"task_id,omitempty"`
-
-	Branch       string            `json:"branch"`
-	PipelineFile string            `json:"pipeline_file"`
-	Parameters   map[string]string `json:"parameters"`
-}
-
-type HTTPExecutorSpec struct {
-	URL            string              `json:"url"`
-	Payload        map[string]string   `json:"payload"`
-	Headers        map[string]string   `json:"headers"`
-	ResponsePolicy *HTTPResponsePolicy `json:"success_policy"`
-}
-
-type HTTPResponsePolicy struct {
-	StatusCodes []uint32 `json:"status_codes"`
+	Spec       datatypes.JSON
 }
 
 func (e *StageExecutor) GetResource() (*Resource, error) {
@@ -62,7 +35,7 @@ func (e *StageExecutor) GetIntegrationResource() (*IntegrationResource, error) {
 	err := database.Conn().
 		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
-		Select("resources.name as name, integrations.name as integration_name").
+		Select("resources.name as name, resources.type as type, integrations.name as integration_name, integrations.domain_type as domain_type").
 		Where("resources.id = ?", e.ResourceID).
 		First(&r).
 		Error

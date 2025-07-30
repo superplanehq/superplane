@@ -84,8 +84,8 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Create stage, connected to our two sources
 		//
-		executorType, executorSpec, resource := support.Executor(r)
-		stage, err := builders.NewStageBuilder().
+		executorType, executorSpec, resource := support.Executor(t, r)
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").

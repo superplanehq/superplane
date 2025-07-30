@@ -30,8 +30,8 @@ func Test__ExecutionPoller(t *testing.T) {
 		},
 	}
 
-	executorType, executorSpec, integrationResource := support.Executor(r)
-	stage, err := builders.NewStageBuilder().
+	executorType, executorSpec, integrationResource := support.Executor(t, r)
+	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
 		InCanvas(r.Canvas).
 		WithName("stage-1").
@@ -64,7 +64,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultFailed))
 
@@ -97,7 +97,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
 		e, err := unmarshalCompletionEvent(list[0].Raw)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
+		assert.Equal(t, models.ExecutionFinishedEventType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.ResultFailed, e.Execution.Result)
@@ -110,8 +110,8 @@ func Test__ExecutionPoller(t *testing.T) {
 	t.Run("missing required output -> execution fails", func(t *testing.T) {
 		require.NoError(t, database.Conn().Exec(`truncate table events`).Error)
 
-		executorType, executorSpec, integrationResource := support.Executor(r)
-		stageWithOutput, err := builders.NewStageBuilder().
+		executorType, executorSpec, integrationResource := support.Executor(t, r)
+		stageWithOutput, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-with-output").
@@ -145,7 +145,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -183,7 +183,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		)
 
 		require.NoError(t, execution.Start())
-		executionResource, err := execution.AddResource(workflowID, resource.ID)
+		executionResource, err := execution.AddResource(workflowID, "workflow", resource.ID)
 		require.NoError(t, err)
 		require.NoError(t, executionResource.Finish(models.ResultPassed))
 
@@ -217,7 +217,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		assert.Equal(t, list[0].SourceType, models.SourceTypeStage)
 		e, err := unmarshalCompletionEvent(list[0].Raw)
 		require.NoError(t, err)
-		assert.Equal(t, models.StageExecutionCompletionType, e.Type)
+		assert.Equal(t, models.ExecutionFinishedEventType, e.Type)
 		assert.Equal(t, stage.ID.String(), e.Stage.ID)
 		assert.Equal(t, execution.ID.String(), e.Execution.ID)
 		assert.Equal(t, models.ResultPassed, e.Execution.Result)
@@ -228,8 +228,8 @@ func Test__ExecutionPoller(t *testing.T) {
 	})
 }
 
-func unmarshalCompletionEvent(raw []byte) (*models.StageExecutionCompletion, error) {
-	e := models.StageExecutionCompletion{}
+func unmarshalCompletionEvent(raw []byte) (*models.ExecutionFinishedEvent, error) {
+	e := models.ExecutionFinishedEvent{}
 	err := json.Unmarshal(raw, &e)
 	if err != nil {
 		return nil, err

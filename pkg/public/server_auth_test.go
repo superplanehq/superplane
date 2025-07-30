@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 )
 
 func setupTestServer(t *testing.T) (*Server, *models.User, string) {
@@ -27,7 +28,8 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, crypto.NewOIDCVerifier(), "", "")
+	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	// Create test user

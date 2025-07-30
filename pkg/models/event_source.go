@@ -62,6 +62,24 @@ func (s *EventSource) UpdateStateInTransaction(tx *gorm.DB, state string) error 
 	return tx.Save(s).Error
 }
 
+func (s *EventSource) FindIntegration() (*Integration, error) {
+	var integration Integration
+
+	err := database.Conn().
+		Table("resources").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Where("resources.id = ?", s.ResourceID).
+		Select("integrations.*").
+		First(&integration).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &integration, nil
+}
+
 func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource
 	err := database.Conn().
@@ -122,22 +140,4 @@ func ListPendingEventSources() ([]EventSource, error) {
 	}
 
 	return eventSources, nil
-}
-
-func FindExecutorForResource(resourceID uuid.UUID) (*StageExecutor, error) {
-	var executor StageExecutor
-
-	err := database.Conn().
-		Table("resources").
-		Select("stage_executors.*").
-		Joins("INNER JOIN stage_executors ON stage_executors.resource_id = resources.id").
-		Where("resources.id = ?", resourceID).
-		First(&executor).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &executor, nil
 }

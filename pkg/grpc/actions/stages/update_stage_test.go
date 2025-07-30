@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/executors"
+	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func Test__UpdateStage(t *testing.T) {
@@ -20,14 +21,11 @@ func Test__UpdateStage(t *testing.T) {
 		Source:      true,
 		Integration: true,
 	})
-	specValidator := executors.SpecValidator{
-		Encryptor: r.Encryptor,
-	}
 
 	// Create a stage first that we'll update in tests
-	executor := support.ProtoExecutor(r)
+	executor := support.ProtoExecutor(t, r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	stage, err := CreateStage(ctx, r.Encryptor, specValidator, &protos.CreateStageRequest{
+	stage, err := CreateStage(ctx, r.Encryptor, r.Registry, &protos.CreateStageRequest{
 		CanvasIdOrName: r.Canvas.ID.String(),
 		Stage: &protos.Stage{
 			Metadata: &protos.Stage_Metadata{
@@ -72,7 +70,7 @@ func Test__UpdateStage(t *testing.T) {
 	stageID := stage.Stage.Metadata.Id
 
 	t.Run("invalid stage ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       "invalid-uuid",
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -84,7 +82,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       uuid.NewString(),
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -96,7 +94,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
@@ -108,7 +106,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -131,7 +129,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -162,7 +160,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
@@ -188,19 +186,25 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("stage is updated", func(t *testing.T) {
-		executor.Semaphore = &protos.ExecutorSpec_Semaphore{
-			Project:      "demo-project-2",
-			Branch:       "other",
-			PipelineFile: ".semaphore/other.yml",
-			Parameters:   map[string]string{},
-		}
+		newSpec, err := structpb.NewStruct(map[string]any{
+			"branch":       "other",
+			"pipelineFile": ".semaphore/other.yml",
+			"parameters":   map[string]any{},
+		})
 
-		res, err := UpdateStage(ctx, r.Encryptor, specValidator, &protos.UpdateStageRequest{
+		require.NoError(t, err)
+
+		res, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
 			IdOrName:       stageID,
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &protos.Stage{
 				Spec: &protos.Stage_Spec{
-					Executor:   executor,
+					Executor: &protos.Executor{
+						Type:        executor.Type,
+						Integration: executor.Integration,
+						Resource:    executor.Resource,
+						Spec:        newSpec,
+					},
 					Conditions: []*protos.Condition{},
 					Connections: []*protos.Connection{
 						{
@@ -243,10 +247,10 @@ func Test__UpdateStage(t *testing.T) {
 		assert.Equal(t, "status == 'active'", res.Stage.Spec.Connections[0].Filters[1].Data.Expression)
 
 		// Executor spec is updated
-		assert.Equal(t, protos.ExecutorSpec_TYPE_SEMAPHORE, res.Stage.Spec.Executor.Type)
-		assert.Equal(t, "demo-project-2", res.Stage.Spec.Executor.Semaphore.Project)
-		assert.Equal(t, "other", res.Stage.Spec.Executor.Semaphore.Branch)
-		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Semaphore.PipelineFile)
+		assert.Equal(t, models.IntegrationTypeSemaphore, res.Stage.Spec.Executor.Type)
+		assert.Equal(t, "other", res.Stage.Spec.Executor.Spec.GetFields()["branch"].GetStringValue())
+		assert.Equal(t, ".semaphore/other.yml", res.Stage.Spec.Executor.Spec.GetFields()["pipelineFile"].GetStringValue())
+		assert.Equal(t, map[string]any{}, res.Stage.Spec.Executor.Spec.GetFields()["parameters"].GetStructValue().AsMap())
 
 		// Conditions are updated
 		require.Empty(t, res.Stage.Spec.Conditions)

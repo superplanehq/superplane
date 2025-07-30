@@ -199,7 +199,8 @@ CREATE TABLE public.events (
     received_at timestamp without time zone NOT NULL,
     raw jsonb NOT NULL,
     state character varying(64) NOT NULL,
-    headers jsonb DEFAULT '{}'::jsonb NOT NULL
+    headers jsonb DEFAULT '{}'::jsonb NOT NULL,
+    type character varying(128) NOT NULL
 );
 
 
@@ -210,6 +211,7 @@ CREATE TABLE public.events (
 CREATE TABLE public.execution_resources (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     external_id character varying(128) NOT NULL,
+    type character varying(64) NOT NULL,
     stage_id uuid NOT NULL,
     execution_id uuid NOT NULL,
     parent_resource_id uuid NOT NULL,
@@ -217,6 +219,22 @@ CREATE TABLE public.execution_resources (
     result character varying(64) NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL
+);
+
+
+--
+-- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.group_metadata (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    group_name character varying(255) NOT NULL,
+    domain_type character varying(50) NOT NULL,
+    domain_id character varying(255) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -250,7 +268,8 @@ CREATE TABLE public.organizations (
     created_by uuid NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    deleted_at timestamp without time zone
+    deleted_at timestamp without time zone,
+    description text DEFAULT ''::text
 );
 
 
@@ -266,6 +285,22 @@ CREATE TABLE public.resources (
     integration_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone
+);
+
+
+--
+-- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.role_metadata (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    role_name character varying(255) NOT NULL,
+    domain_type character varying(50) NOT NULL,
+    domain_id character varying(255) NOT NULL,
+    display_name character varying(255) NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -385,7 +420,8 @@ CREATE TABLE public.users (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255),
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    is_active boolean DEFAULT false
 );
 
 
@@ -525,6 +561,14 @@ ALTER TABLE ONLY public.execution_resources
 
 
 --
+-- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.group_metadata
+    ADD CONSTRAINT group_metadata_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: integrations integrations_domain_type_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -562,6 +606,14 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.resources
     ADD CONSTRAINT resources_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_metadata
+    ADD CONSTRAINT role_metadata_pkey PRIMARY KEY (id);
 
 
 --
@@ -645,6 +697,22 @@ ALTER TABLE ONLY public.stages
 
 
 --
+-- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.group_metadata
+    ADD CONSTRAINT uq_group_metadata_key UNIQUE (group_name, domain_type, domain_id);
+
+
+--
+-- Name: role_metadata uq_role_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_metadata
+    ADD CONSTRAINT uq_role_metadata_key UNIQUE (role_name, domain_type, domain_id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -695,10 +763,24 @@ CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
+-- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
+
+
+--
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
+
+
+--
+-- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
 
 
 --
@@ -921,7 +1003,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250721193920	f
+20250730175331	f
 \.
 
 

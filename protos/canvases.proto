@@ -2,7 +2,9 @@ syntax = "proto3";
 
 package Superplane;
 
+import "authorization.proto";
 import "integrations.proto";
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
@@ -282,12 +284,8 @@ message EventSource {
   }
 
   message Spec {
-    message Semaphore {
-      string project = 1;
-    }
-
     Integrations.IntegrationRef integration = 1;
-    Semaphore semaphore = 2;
+    Integrations.ResourceRef resource = 2;
   }
 
   Metadata metadata = 1;
@@ -462,7 +460,7 @@ message Stage {
   message Spec {
     repeated Connection connections = 1;
     repeated Condition conditions = 2;
-    ExecutorSpec executor = 3;
+    Executor executor = 3;
     repeated InputDefinition inputs = 4;
     repeated InputMapping input_mappings = 5;
     repeated OutputDefinition outputs = 6;
@@ -519,8 +517,9 @@ message ValueFromLastExecution {
 }
 
 message ValueFromSecret {
-  string name = 1;
-  string key = 2;
+  Authorization.DomainType domain_type = 1;
+  string name = 2;
+  string key = 3;
 }
 
 message Condition {
@@ -550,36 +549,11 @@ message CreateStageRequest {
   string canvas_id_or_name = 2;
 }
 
-message ExecutorSpec {
-  enum Type {
-    TYPE_UNKNOWN = 0;
-    TYPE_SEMAPHORE = 1;
-    TYPE_HTTP = 2;
-  }
-
-  message Semaphore {
-    string project = 1;
-    string task = 2;
-    string branch = 3;
-    string pipeline_file = 4;
-    map<string, string> parameters = 5;
-  }
-
-  message HTTP {
-    string url = 1;
-    map<string, string> headers = 2;
-    map<string, string> payload = 3;
-    HTTPResponsePolicy response_policy = 4;
-  }
-
-  message HTTPResponsePolicy {
-    repeated uint32 status_codes = 1;
-  }
-
-  Type type = 1;
+message Executor {
+  string type = 1;
   Integrations.IntegrationRef integration = 2;
-  Semaphore semaphore = 3;
-  HTTP http = 4;
+  Integrations.ResourceRef resource = 3;
+  google.protobuf.Struct spec = 4;
 }
 
 message CreateStageResponse {

@@ -19,7 +19,7 @@ var listCanvasesCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		c := DefaultClient()
-		organizationId := getOneOrAnotherFlag(cmd, "organization-id", "organization-name")
+		organizationId := getOneOrAnotherFlag(cmd, "organization-id", "organization-name", true)
 		response, _, err := c.CanvasAPI.SuperplaneListCanvases(context.Background()).OrganizationId(organizationId).Execute()
 		Check(err)
 
@@ -48,7 +48,7 @@ var listEventSourcesCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneListEventSources(context.Background(), canvasIDOrName).Execute()
@@ -80,7 +80,7 @@ var listStagesCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.StageAPI.SuperplaneListStages(context.Background(), canvasIDOrName).Execute()
@@ -112,7 +112,7 @@ var listConnectionGroupsCmd = &cobra.Command{
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.ConnectionGroupAPI.SuperplaneListConnectionGroups(context.Background(), canvasIDOrName).Execute()
@@ -138,18 +138,13 @@ var listConnectionGroupsCmd = &cobra.Command{
 
 var listSecretsCmd = &cobra.Command{
 	Use:     "secrets",
-	Short:   "List all secrets for a canvas",
-	Long:    `Retrieve a list of all secrets for the specified canvas`,
-	Aliases: []string{"secrets"},
+	Short:   "List secrets for an organization or canvas",
+	Long:    `Retrieve a list of all secrets for the specified organization or canvas`,
+	Aliases: []string{"secret"},
 	Args:    cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		domainType, _ := cmd.Flags().GetString("domain-type")
-		domainID, _ := cmd.Flags().GetString("domain-id")
-		if domainID == "" {
-			fmt.Println("Domain ID not provided")
-			os.Exit(1)
-		}
+		domainType, domainID := getDomainOrExit(cmd)
 
 		c := DefaultClient()
 		response, httpResponse, err := c.SecretAPI.
@@ -191,6 +186,51 @@ var listSecretsCmd = &cobra.Command{
 	},
 }
 
+var listIntegrationsCmd = &cobra.Command{
+	Use:     "integrations",
+	Short:   "List all integrations for an organization or canvas",
+	Long:    `Retrieve a list of integrations for the specified organization or canvas`,
+	Aliases: []string{"integration"},
+	Args:    cobra.ExactArgs(0),
+
+	Run: func(cmd *cobra.Command, args []string) {
+		domainType, domainID := getDomainOrExit(cmd)
+
+		c := DefaultClient()
+		response, httpResponse, err := c.IntegrationAPI.
+			IntegrationsListIntegrations(context.Background()).
+			DomainId(domainID).
+			DomainType(domainType).
+			Execute()
+
+		if err != nil {
+			b, _ := io.ReadAll(httpResponse.Body)
+			fmt.Printf("%s\n", string(b))
+			os.Exit(1)
+		}
+
+		if len(response.Integrations) == 0 {
+			fmt.Println("No integrations found.")
+			return
+		}
+
+		fmt.Printf("Found %d integrations:\n\n", len(response.Integrations))
+		for i, integration := range response.Integrations {
+			metadata := integration.GetMetadata()
+			spec := integration.GetSpec()
+			fmt.Printf("%d. %s (ID: %s)\n", i+1, *metadata.Name, *metadata.Id)
+			fmt.Printf("   Domain Type: %s\n", *metadata.DomainType)
+			fmt.Printf("   Domain ID: %s\n", *metadata.DomainId)
+			fmt.Printf("   Type: %s\n", *spec.Type)
+			fmt.Printf("   URL: %s\n", spec.GetUrl())
+
+			if i < len(response.Integrations)-1 {
+				fmt.Println()
+			}
+		}
+	},
+}
+
 var listStageEventsCmd = &cobra.Command{
 	Use:   "stage-events",
 	Short: "List stage events",
@@ -198,8 +238,8 @@ var listStageEventsCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
-		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		stageIDOrName := getOneOrAnotherFlag(cmd, "stage-id", "stage-name", true)
 
 		states, _ := cmd.Flags().GetStringSlice("states")
 		stateReasons, _ := cmd.Flags().GetStringSlice("state-reasons")
@@ -281,8 +321,8 @@ var listConnectionGroupFieldSetsCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(0),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name")
-		connGroupIdOrName := getOneOrAnotherFlag(cmd, "connection-group-id", "connection-group-name")
+		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
+		connGroupIdOrName := getOneOrAnotherFlag(cmd, "connection-group-id", "connection-group-name", true)
 
 		c := DefaultClient()
 		listRequest := c.ConnectionGroupAPI.SuperplaneListConnectionGroupFieldSets(context.Background(), canvasIDOrName, connGroupIdOrName)
@@ -352,8 +392,15 @@ func init() {
 
 	// Secrets command
 	listCmd.AddCommand(listSecretsCmd)
-	listSecretsCmd.Flags().String("domain-type", "DOMAIN_TYPE_ORGANIZATION", "Domain to list secrets from (organization, canvas)")
-	listSecretsCmd.Flags().String("domain-id", "", "ID of the domain (organization ID, canvas ID)")
+	listSecretsCmd.Flags().String("organization-id", "", "Organization ID")
+	listSecretsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listSecretsCmd.Flags().String("canvas-name", "", "Canvas name")
+
+	// Integrations command
+	listCmd.AddCommand(listIntegrationsCmd)
+	listIntegrationsCmd.Flags().String("organization-id", "", "Organization ID")
+	listIntegrationsCmd.Flags().String("canvas-id", "", "Canvas ID")
+	listIntegrationsCmd.Flags().String("canvas-name", "", "Canvas name")
 
 	// Stage events command
 	listCmd.AddCommand(listStageEventsCmd)

@@ -14,6 +14,7 @@ type Organization struct {
 	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name        string    `gorm:"uniqueIndex"`
 	DisplayName string
+	Description string
 	CreatedAt   *time.Time
 	CreatedBy   uuid.UUID
 	UpdatedAt   *time.Time
@@ -85,11 +86,12 @@ func FindOrganizationByName(name string) (*Organization, error) {
 	return &organization, nil
 }
 
-func CreateOrganization(requesterID uuid.UUID, name, displayName string) (*Organization, error) {
+func CreateOrganization(requesterID uuid.UUID, name, displayName, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
 		Name:        name,
 		DisplayName: displayName,
+		Description: description,
 		CreatedAt:   &now,
 		CreatedBy:   requesterID,
 		UpdatedAt:   &now,

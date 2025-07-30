@@ -77,8 +77,8 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 		}
 
 		switch providerName {
-		case "github":
-			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL))
+		case models.ProviderGitHub:
+			gothProviders = append(gothProviders, github.New(config.Key, config.Secret, config.CallbackURL, models.ScopeUser))
 			log.Infof("GitHub OAuth provider initialized")
 		default:
 			log.Warnf("Unknown provider: %s", providerName)
@@ -134,22 +134,11 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountProvider, err := models.FindAccountProviderByProviderID("github", fmt.Sprintf("%d", githubUser.ID))
+	accountProvider, err := a.findOrCreateAccountProvider(githubUser)
 	if err != nil {
-		// If not found by provider ID, try to find by email
-		user, err := models.FindUserByEmail(githubUser.Email)
-		if err != nil {
-			log.Errorf("No existing account found for GitHub user %s (%s)", githubUser.Login, githubUser.Email)
-			http.Error(w, "No existing account found. Please sign up through the web interface first.", http.StatusNotFound)
-			return
-		}
-
-		accountProvider, err = user.GetAccountProvider("github")
-		if err != nil {
-			log.Errorf("User %s exists but has no GitHub account provider", githubUser.Email)
-			http.Error(w, "Account exists but GitHub provider not connected. Please connect GitHub through the web interface.", http.StatusNotFound)
-			return
-		}
+		log.Errorf("Failed to find or create account provider: %v", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 
 	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte(githubUser.Email))
@@ -179,6 +168,7 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbUser.Name = githubUser.Name
+	dbUser.IsActive = true // Activate user on login
 
 	if err := dbUser.Update(); err != nil {
 		log.Warnf("Failed to update user info: %v", err)
@@ -191,10 +181,19 @@ func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountProviders, _ := dbUser.GetAccountProviders()
+	accountProviders, err := dbUser.GetAccountProviders()
+
+	if err != nil {
+		log.Errorf("Failed to get account providers for user %s: %v", dbUser.ID.String(), err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	authUser := User{
 		ID:               dbUser.ID.String(),
 		Name:             dbUser.Name,
+		Email:            getPrimaryEmail(accountProviders),
+		AvatarURL:        getPrimaryAvatar(accountProviders),
 		CreatedAt:        dbUser.CreatedAt,
 		AccountProviders: accountProviders,
 	}
@@ -280,10 +279,19 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 	})
 
 	if r.Header.Get("Accept") == "application/json" {
-		accountProviders, _ := dbUser.GetAccountProviders()
+		accountProviders, err := dbUser.GetAccountProviders()
+
+		if err != nil {
+			log.Errorf("Error getting account providers for user %s: %v", dbUser.ID.String(), err)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		authUser := User{
 			ID:               dbUser.ID.String(),
 			Name:             dbUser.Name,
+			Email:            getPrimaryEmail(accountProviders),
+			AvatarURL:        getPrimaryAvatar(accountProviders),
 			AccessToken:      token,
 			CreatedAt:        dbUser.CreatedAt,
 			AccountProviders: accountProviders,
@@ -364,6 +372,8 @@ func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
 	authUser := User{
 		ID:               user.ID.String(),
 		Name:             user.Name,
+		Email:            getPrimaryEmail(accountProviders),
+		AvatarURL:        getPrimaryAvatar(accountProviders),
 		CreatedAt:        user.CreatedAt,
 		AccountProviders: accountProviders,
 	}
@@ -423,23 +433,15 @@ func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, 
 		}
 
 		user.Name = gothUser.Name
+		user.IsActive = true
 		user.Update()
 
 		return user, accountProvider, nil
 	}
 
-	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
+	user, err := a.findOrCreateUser(gothUser)
 	if err != nil {
-		user = &models.User{
-			Name: gothUser.Name,
-		}
-
-		if err := user.Create(); err != nil {
-			return nil, nil, err
-		}
-	} else {
-		user.Name = gothUser.Name
-		user.Update()
+		return nil, nil, err
 	}
 
 	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
@@ -503,6 +505,20 @@ func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	return user, nil
 }
 
+func getPrimaryEmail(accountProviders []models.AccountProvider) string {
+	if len(accountProviders) > 0 {
+		return accountProviders[0].Email
+	}
+	return ""
+}
+
+func getPrimaryAvatar(accountProviders []models.AccountProvider) string {
+	if len(accountProviders) > 0 {
+		return accountProviders[0].AvatarURL
+	}
+	return ""
+}
+
 func (a *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := a.getUserFromRequest(r)
@@ -546,6 +562,78 @@ func (a *Handler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
 	var user GitHubUserInfo
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	return &user, err
+}
+
+func (a *Handler) findOrCreateAccountProvider(githubUser *GitHubUserInfo) (*models.AccountProvider, error) {
+	accountProvider, err := models.FindAccountProviderByProviderID(models.ProviderGitHub, fmt.Sprintf("%d", githubUser.ID))
+	if err == nil {
+		return accountProvider, nil
+	}
+
+	user, err := models.FindUserByEmail(githubUser.Email)
+	if err != nil {
+		user, err = models.FindInactiveUserByEmail(githubUser.Email)
+		if err != nil {
+			return nil, fmt.Errorf("No existing account found. Please sign up through the web interface first")
+		}
+
+		accountProvider = &models.AccountProvider{
+			UserID:     user.ID,
+			Provider:   models.ProviderGitHub,
+			ProviderID: fmt.Sprintf("%d", githubUser.ID),
+			Username:   githubUser.Login,
+			Email:      githubUser.Email,
+			Name:       githubUser.Name,
+			AvatarURL:  githubUser.AvatarURL,
+		}
+
+		if err := accountProvider.Create(); err != nil {
+			return nil, fmt.Errorf("Internal server error")
+		}
+		return accountProvider, nil
+	}
+
+	accountProvider, err = user.GetAccountProvider(models.ProviderGitHub)
+	if err != nil {
+		return nil, fmt.Errorf("Account exists but GitHub provider not connected. Please connect GitHub through the web interface")
+	}
+
+	return accountProvider, nil
+}
+
+func (a *Handler) findOrCreateUser(gothUser goth.User) (*models.User, error) {
+	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
+	if err == nil {
+		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
+			return nil, err
+		}
+		return user, nil
+	}
+
+	user, err = models.FindInactiveUserByEmail(gothUser.Email)
+	if err == nil {
+		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
+			return nil, err
+		}
+		return user, nil
+	}
+
+	user = &models.User{
+		Name:     gothUser.Name,
+		IsActive: true,
+	}
+
+	if err := user.Create(); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+func (a *Handler) updateUserInfo(user *models.User, name string) error {
+	user.Name = name
+	user.IsActive = true
+	return user.Update()
 }
 
 const loginTemplate = `

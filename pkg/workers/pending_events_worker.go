@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -9,22 +8,23 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/inputs"
-	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/gorm"
 )
 
 type PendingEventsWorker struct {
 	Encryptor crypto.Encryptor
+	Registry  *registry.Registry
 }
 
-func NewPendingEventsWorker(encryptor crypto.Encryptor) *PendingEventsWorker {
+func NewPendingEventsWorker(encryptor crypto.Encryptor, registry *registry.Registry) *PendingEventsWorker {
 	return &PendingEventsWorker{
 		Encryptor: encryptor,
+		Registry:  registry,
 	}
 }
 
@@ -97,54 +97,39 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return nil
 	}
 
-	e, err := models.FindExecutorForResource(*eventSource.ResourceID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No executor found for event source %s - skipping execution updates", event.SourceID)
-			return nil
-		}
-
-		return err
-	}
-
-	integration, err := e.FindIntegration()
+	resource, err := models.FindResourceByID(*eventSource.ResourceID)
 	if err != nil {
 		return err
 	}
 
-	integrationResource, err := e.GetResource()
+	integration, err := models.FindIntegrationByID(resource.IntegrationID)
 	if err != nil {
 		return err
 	}
 
-	integrationImpl, err := integrations.NewIntegration(context.Background(), integration, w.Encryptor)
-	if err != nil {
-		return fmt.Errorf("error creating integration: %v", err)
-	}
-
-	executor, err := executors.NewExecutorWithIntegration(integrationImpl, integrationResource, e)
+	eventHandler, err := w.Registry.GetEventHandlerForIntegration(integration.Type)
 	if err != nil {
 		return err
 	}
 
-	status, err := executor.HandleWebhook([]byte(event.Raw))
+	statefulResource, err := eventHandler.Status([]byte(event.Raw))
 	if err != nil {
 		return err
 	}
 
-	if !status.Finished() {
+	if !statefulResource.Finished() {
 		return nil
 	}
 
 	result := models.ResultPassed
-	if !status.Successful() {
+	if !statefulResource.Successful() {
 		result = models.ResultFailed
 	}
 
-	executionResource, err := models.FindExecutionResource(status.Id(), *eventSource.ResourceID)
+	executionResource, err := models.FindExecutionResource(statefulResource.Id(), *eventSource.ResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No execution resource %s found for source %s - skipping execution update", status.Id(), eventSource.ID)
+			logger.Infof("No execution resource %s found for source %s - skipping execution update", statefulResource.Id(), eventSource.ID)
 			return nil
 		}
 

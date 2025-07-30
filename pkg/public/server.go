@@ -19,15 +19,18 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/registry"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pbSup "github.com/superplanehq/superplane/pkg/protos/canvases"
-	pbIntegration "github.com/superplanehq/superplane/pkg/protos/integrations"
+	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
+	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
 	pbOrg "github.com/superplanehq/superplane/pkg/protos/organizations"
+	pbRoles "github.com/superplanehq/superplane/pkg/protos/roles"
 	pbSecret "github.com/superplanehq/superplane/pkg/protos/secrets"
+	pbUsers "github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/public/ws"
 	"github.com/superplanehq/superplane/pkg/web"
@@ -47,6 +50,7 @@ const (
 type Server struct {
 	httpServer            *http.Server
 	encryptor             crypto.Encryptor
+	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcVerifier          *crypto.OIDCVerifier
 	timeoutHandlerTimeout time.Duration
@@ -63,20 +67,23 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
-	wsHub := ws.NewHub()
-
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
+func NewServer(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
 	server := &Server{
+		BasePath:              basePath,
+		wsHub:                 ws.NewHub(),
+		authHandler:           authHandler,
+		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
 		oidcVerifier:          oidcVerifier,
+		registry:              registry,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
@@ -86,10 +93,6 @@ func NewServer(encryptor crypto.Encryptor, jwtSigner *jwt.Signer, oidcVerifier *
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		BasePath:    basePath,
-		wsHub:       wsHub,
-		authHandler: authHandler,
-		isDev:       appEnv == "development",
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -130,7 +133,17 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbAuth.RegisterAuthorizationHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbGroups.RegisterGroupsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
+	err = pbRoles.RegisterRolesHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -140,7 +153,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
-	err = pbIntegration.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbIntegrations.RegisterIntegrationsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -160,7 +173,9 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
 	)
 
-	s.Router.PathPrefix("/api/v1/authorization").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
@@ -276,22 +291,28 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/", s.HealthCheck).Methods("GET")
 
 	//
-	// Webhook endpoints (they have their own authentication)
+	// Webhook endpoints for integrations (they have their own authentication).
 	//
 	// Any verification that happens here must be quick
 	// so we always respond with a 200 OK to the event origin.
 	// All the event processing happen on the workers.
 	//
 	publicRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/github", s.HandleGithubWebhook).
+		HandleFunc(s.BasePath+"/sources/{sourceID}/{integrationName}", s.HandleIntegrationWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
+	//
+	// Webhook endpoint for custom event sources that do not use integration.
+	//
 	publicRoute.
-		HandleFunc(s.BasePath+"/sources/{sourceID}/semaphore", s.HandleSemaphoreWebhook).
+		HandleFunc(s.BasePath+"/sources/{sourceID}", s.HandleCustomWebhook).
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
+	//
+	// Endpoint for receiving execution outputs from execution resources.
+	//
 	publicRoute.
 		HandleFunc(s.BasePath+"/outputs", s.HandleExecutionOutputs).
 		Headers("Content-Type", "application/json").
@@ -323,8 +344,39 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	accountProviders, err := user.GetAccountProviders()
+	if err != nil {
+		log.Errorf("Error getting account providers: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	var email, avatarURL string
+	if len(accountProviders) > 0 {
+		email = accountProviders[0].Email
+		avatarURL = accountProviders[0].AvatarURL
+
+		// Fallback to user name if no email from provider
+		if email == "" && user.Name != "" {
+			email = user.Name
+		}
+	} else {
+		if user.Name != "" {
+			email = user.Name
+		}
+	}
+
+	safeUser := UserProfileResponse{
+		ID:               user.ID.String(),
+		Email:            email,
+		Name:             user.Name,
+		AvatarURL:        avatarURL,
+		CreatedAt:        user.CreatedAt,
+		AccountProviders: accountProviders,
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(user)
+	json.NewEncoder(w).Encode(safeUser)
 }
 
 func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
@@ -371,6 +423,20 @@ func (s *Server) Close() {
 	if err := s.httpServer.Close(); err != nil {
 		log.Errorf("Error closing server: %v", err)
 	}
+}
+
+type OutputsRequest struct {
+	ExecutionID string         `json:"execution_id"`
+	Outputs     map[string]any `json:"outputs"`
+}
+
+type UserProfileResponse struct {
+	ID               string                   `json:"id"`
+	Email            string                   `json:"email"`
+	Name             string                   `json:"name"`
+	AvatarURL        string                   `json:"avatar_url"`
+	CreatedAt        time.Time                `json:"created_at"`
+	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
 }
 
 func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {
@@ -511,58 +577,28 @@ func (s *Server) parseExecutionOutputs(stage *models.Stage, outputs map[string]a
 	return outputs, nil
 }
 
-func (s *Server) HandleGithubWebhook(w http.ResponseWriter, r *http.Request) {
+func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	sourceIDFromRequest := vars["sourceID"]
 	sourceID, err := uuid.Parse(sourceIDFromRequest)
 	if err != nil {
-		http.Error(w, "source ID not found", http.StatusNotFound)
+		http.Error(w, "source not found", http.StatusNotFound)
 		return
 	}
 
-	signature := r.Header.Get("X-Hub-Signature-256")
+	signature := r.Header.Get("X-Signature-256")
 	if signature == "" {
-		http.Error(w, "Missing X-Hub-Signature-256 header", http.StatusBadRequest)
+		http.Error(w, "Invalid signature", http.StatusForbidden)
 		return
 	}
 
-	// TODO: we don't have the canvas ID here.
-	// We could put it in the path, but then the path will become quite big.
-	// For now, just organization/source IDs are enough for us.
+	signature = strings.TrimPrefix(signature, "sha256=")
 	source, err := models.FindEventSource(sourceID)
 	if err != nil {
-		http.Error(w, "source ID not found", http.StatusNotFound)
+		http.Error(w, "source not found", http.StatusNotFound)
 		return
 	}
 
-	s.handleWebhook(w, r, source, signature)
-}
-
-func (s *Server) HandleSemaphoreWebhook(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	sourceIDFromRequest := vars["sourceID"]
-	sourceID, err := uuid.Parse(sourceIDFromRequest)
-	if err != nil {
-		http.Error(w, "source ID not found", http.StatusNotFound)
-		return
-	}
-
-	signature := r.Header.Get("X-Semaphore-Signature-256")
-	if signature == "" {
-		http.Error(w, "Missing X-Semaphore-Signature-256 header", http.StatusBadRequest)
-		return
-	}
-
-	source, err := models.FindEventSource(sourceID)
-	if err != nil {
-		http.Error(w, "source ID not found", http.StatusNotFound)
-		return
-	}
-
-	s.handleWebhook(w, r, source, signature)
-}
-
-func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, source *models.EventSource, signature string) {
 	//
 	// Only read up to the maximum event size we allow,
 	// and only proceed if payload is below that.
@@ -586,9 +622,99 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, source *m
 		return
 	}
 
+	key, err := source.GetDecryptedKey(r.Context(), s.encryptor)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := crypto.VerifySignature(key, body, signature); err != nil {
+		http.Error(w, "Invalid signature", http.StatusForbidden)
+		return
+	}
+
 	headers, err := parseHeaders(&r.Header)
 	if err != nil {
-		http.Error(w, "Error parsing headers", http.StatusBadRequest)
+		http.Error(w, "Error parsing headers", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "custom", body, headers); err != nil {
+		http.Error(w, "Error receiving event", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	sourceIDFromRequest := vars["sourceID"]
+	sourceID, err := uuid.Parse(sourceIDFromRequest)
+	if err != nil {
+		http.Error(w, "source not found", http.StatusNotFound)
+		return
+	}
+
+	integrationName := vars["integrationName"]
+	eventHandler, err := s.registry.GetEventHandlerForIntegration(integrationName)
+	if err != nil {
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	source, err := models.FindEventSource(sourceID)
+	if err != nil {
+		http.Error(w, "source not found", http.StatusNotFound)
+		return
+	}
+
+	integration, err := source.FindIntegration()
+	if err != nil {
+		http.Error(w, "integration not found", http.StatusNotFound)
+		return
+	}
+
+	if integration.Type != integrationName {
+		http.Error(w, "integration type mismatch", http.StatusNotFound)
+		return
+	}
+
+	//
+	// Only read up to the maximum event size we allow,
+	// and only proceed if payload is below that.
+	//
+	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	defer r.Body.Close()
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		if _, ok := err.(*http.MaxBytesError); ok {
+			http.Error(
+				w,
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
+				http.StatusRequestEntityTooLarge,
+			)
+
+			return
+		}
+
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+
+	//
+	// Use integration event handler to convert request into an event.
+	//
+	event, err := eventHandler.Handle(body, r.Header)
+	if err != nil {
+		if err == integrations.ErrInvalidSignature {
+			http.Error(w, "Invalid signature", http.StatusForbidden)
+			return
+		}
+
+		log.Errorf("Error handling event for %s: %v", integrationName, err)
+		http.Error(w, "error handling webhook", http.StatusInternalServerError)
 		return
 	}
 
@@ -598,20 +724,22 @@ func (s *Server) handleWebhook(w http.ResponseWriter, r *http.Request, source *m
 		return
 	}
 
-	signature = strings.Replace(signature, "sha256=", "", 1)
-
-	if err := crypto.VerifySignature(key, body, signature); err != nil {
-		log.Errorf("Invalid signature: %v", err)
+	if err := crypto.VerifySignature(key, body, event.Signature()); err != nil {
 		http.Error(w, "Invalid signature", http.StatusForbidden)
 		return
 	}
 
 	//
-	// Here, we know the event is for a valid organization/source,
-	// and comes from Semaphore, so we just want to save it and give a response back.
+	// Store event in database.
 	//
-	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, body, headers); err != nil {
-		http.Error(w, "Error receiving event", http.StatusInternalServerError)
+	headers, err := parseHeaders(&r.Header)
+	if err != nil {
+		http.Error(w, "Error parsing headers", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, event.Type(), body, headers); err != nil {
+		http.Error(w, "error creating event", http.StatusInternalServerError)
 		return
 	}
 

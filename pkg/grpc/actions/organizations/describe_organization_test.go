@@ -30,7 +30,7 @@ func Test__DescribeOrganization(t *testing.T) {
 	})
 
 	t.Run("describe organization by ID", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization")
+		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "This is a test organization for describe")
 		require.NoError(t, err)
 
 		response, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
@@ -44,13 +44,14 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, organization.Name, response.Organization.Metadata.Name)
 		assert.Equal(t, organization.DisplayName, response.Organization.Metadata.DisplayName)
+		assert.Equal(t, organization.Description, response.Organization.Metadata.Description)
 		assert.Equal(t, organization.CreatedBy.String(), response.Organization.Metadata.CreatedBy)
 		assert.Equal(t, *organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, *organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
 	})
 
 	t.Run("describe organization by name", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org-by-name", "Test Organization By Name")
+		organization, err := models.CreateOrganization(userID, "test-org-by-name", "Test Organization By Name", "This is a test organization for describe by name")
 		require.NoError(t, err)
 
 		response, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
@@ -64,6 +65,7 @@ func Test__DescribeOrganization(t *testing.T) {
 		assert.Equal(t, organization.ID.String(), response.Organization.Metadata.Id)
 		assert.Equal(t, organization.Name, response.Organization.Metadata.Name)
 		assert.Equal(t, organization.DisplayName, response.Organization.Metadata.DisplayName)
+		assert.Equal(t, organization.Description, response.Organization.Metadata.Description)
 		assert.Equal(t, organization.CreatedBy.String(), response.Organization.Metadata.CreatedBy)
 	})
 

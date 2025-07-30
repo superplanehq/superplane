@@ -44,6 +44,7 @@ func serializeOrganizations(in []models.Organization) []*pb.Organization {
 				Id:          organization.ID.String(),
 				Name:        organization.Name,
 				DisplayName: organization.DisplayName,
+				Description: organization.Description,
 				CreatedBy:   organization.CreatedBy.String(),
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),

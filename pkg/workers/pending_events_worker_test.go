@@ -9,8 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
-	"github.com/superplanehq/superplane/pkg/executors"
-	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
@@ -25,15 +24,15 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	defer r.Close()
-	w := NewPendingEventsWorker(r.Encryptor)
+	w := NewPendingEventsWorker(r.Encryptor, r.Registry)
 
 	eventData := []byte(`{"ref":"v1"}`)
 	eventHeaders := []byte(`{"ref":"v1"}`)
 
-	executorType, executorSpec, integrationResource := support.Executor(r)
+	executorType, executorSpec, integrationResource := support.Executor(t, r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 
 		err = w.Tick()
@@ -66,7 +65,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			},
 		}
 
-		stage1, err := builders.NewStageBuilder().
+		stage1, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-1").
@@ -87,7 +86,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		stage2, err := builders.NewStageBuilder().
+		stage2, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-2").
@@ -115,7 +114,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -172,7 +171,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the first source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -191,7 +190,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the second source, and trigger the worker.
 		//
-		event, err = models.CreateEvent(source2.ID, source2.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err = models.CreateEvent(source2.ID, source2.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -215,7 +214,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage is connected to event source.
 		// Second stage is connected fo first stage.
 		//
-		firstStage, err := builders.NewStageBuilder().
+		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-3").
@@ -256,7 +255,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		secondStage, err := builders.NewStageBuilder().
+		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-4").
@@ -294,7 +293,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Simulating a stage completion event coming in for the first stage.
 		//
-		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
+		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, models.ExecutionFinishedEventType, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -325,7 +324,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// First stage has a filter that should pass our event,
 		// but the second stage has a filter that should not pass.
 		//
-		firstStage, err := builders.NewStageBuilder().
+		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-5").
@@ -353,7 +352,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		require.NoError(t, err)
 
-		secondStage, err := builders.NewStageBuilder().
+		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-6").
@@ -384,7 +383,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -414,7 +413,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		// Create pending execution resource
 		//
 		workflowID := uuid.New().String()
-		stage, err := builders.NewStageBuilder().
+		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
 			WithName("stage-7").
@@ -435,21 +434,21 @@ func Test__PendingEventsWorker(t *testing.T) {
 		execution := support.CreateExecution(t, r.Source, stage)
 		resource, err := models.FindResource(r.Integration.ID, integrationResource.Type(), integrationResource.Name())
 		require.NoError(t, err)
-		_, err = execution.AddResource(workflowID, resource.ID)
+		_, err = execution.AddResource(workflowID, semaphore.ResourceTypeWorkflow, resource.ID)
 		require.NoError(t, err)
 
 		//
 		// Create a Semaphore hook event for the source created for the execution,
 		// and trigger the worker.
 		//
-		hook := executors.SemaphoreHook{
-			Workflow: executors.SemaphoreHookWorkflow{
+		hook := semaphore.Hook{
+			Workflow: semaphore.HookWorkflow{
 				ID: workflowID,
 			},
-			Pipeline: executors.SemaphoreHookPipeline{
+			Pipeline: semaphore.HookPipeline{
 				ID:     uuid.New().String(),
-				State:  integrations.SemaphorePipelineStateDone,
-				Result: integrations.SemaphorePipelineResultPassed,
+				State:  semaphore.PipelineStateDone,
+				Result: semaphore.PipelineResultPassed,
 			},
 		}
 
@@ -457,7 +456,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		source, err := resource.FindEventSource()
 		require.NoError(t, err)
-		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
+		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", eventData, []byte(`{}`))
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)

@@ -2,74 +2,103 @@ package integrations
 
 import (
 	"context"
-	"fmt"
+	"errors"
+	"net/http"
 
-	"github.com/coreos/go-oidc/v3/oidc"
-	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/secrets"
+	"github.com/superplanehq/superplane/pkg/executors"
 )
 
-const (
-	ResourceTypeTask         = "task"
-	ResourceTypeTaskTrigger  = "task-trigger"
-	ResourceTypeProject      = "project"
-	ResourceTypeWorkflow     = "workflow"
-	ResourceTypeNotification = "notification"
-	ResourceTypeSecret       = "secret"
-	ResourceTypePipeline     = "pipeline"
-	ResourceTypeRepository   = "repository"
+var ErrInvalidSignature = errors.New("invalid signature")
 
-	FeatureOpenIdConnectToken = "oidc"
-)
+type AuthenticateFn func() (string, error)
 
-type Integration interface {
-	Get(resourceType, id string, parentIDs ...string) (Resource, error)
-	Create(resourceType string, params any) (Resource, error)
-	List(resourceType string, parentIDs ...string) ([]Resource, error)
-	HasSupportFor(string) bool
-	ValidateOpenIDConnectClaims(idToken *oidc.IDToken, resourceId, parentId string) error
+type EventHandler interface {
+
+	//
+	// Convert the webhook data into a stateful resource.
+	// Used by the pending events worker to update execution resources.
+	// Used in conjunction with Status() to update the status of an execution resource.
+	//
+	Status([]byte) (StatefulResource, error)
+
+	//
+	// Convert the webhook data into an event.
+	// Used by the HTTP server when receiving events
+	// for a resource from the integration.
+	//
+	Handle(data []byte, header http.Header) (Event, error)
 }
 
+type ResourceManager interface {
+	//
+	// Describe a resource by its type and name.
+	// Used when creating event sources or stage executors,
+	// to validate that the resource reference in the event source
+	// or executor really exists.
+	//
+	Get(resourceType, id string) (Resource, error)
+
+	//
+	// Get the status of a resource created by the executor.
+	// Used by the execution resource poller. Ideally, not needed at all, since the status
+	// should be received in a webhook, through WebhookStatus().
+	//
+	Status(resourceType, id string) (StatefulResource, error)
+
+	//
+	// Configure the webhook for a integration resource.
+	//
+	SetupWebhook(options WebhookOptions) ([]Resource, error)
+}
+
+type Executor interface {
+
+	//
+	// Validates the executor spec.
+	// Used during stage creation to validate that the executor spec is valid.
+	//
+	Validate(context.Context, []byte) error
+
+	//
+	// Triggers a new execution.
+	//
+	Execute([]byte, executors.ExecutionParameters) (StatefulResource, error)
+}
+
+// A generic interface for representing integration resources.
 type Resource interface {
 	Id() string
 	Name() string
 	Type() string
 }
 
-func NewIntegration(ctx context.Context, integration *models.Integration, encryptor crypto.Encryptor) (Integration, error) {
-	switch integration.Type {
-	case models.IntegrationTypeSemaphore:
-		secretInfo := integration.Auth.Data().Token.ValueFrom.Secret
-		provider, err := secrets.NewProvider(encryptor, secretInfo.Name, integration.DomainType, integration.DomainID)
-		if err != nil {
-			return nil, fmt.Errorf("error creating secret provider: %v", err)
-		}
-
-		values, err := provider.Load(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error loading values for secret %s: %v", secretInfo.Name, err)
-		}
-
-		token, ok := values[secretInfo.Key]
-		if !ok {
-			return nil, fmt.Errorf("key %s not found in secret %s: %v", secretInfo.Key, secretInfo.Name, err)
-		}
-
-		return NewSemaphoreIntegration(integration.URL, token)
-	default:
-		return nil, fmt.Errorf("unsupported integration type %s", integration.Type)
-	}
+// Similar to Resource, but with additional state information.
+type StatefulResource interface {
+	Id() string
+	Type() string
+	Finished() bool
+	Successful() bool
 }
 
-// TODO: I don't like this.
-// We should come up with a better way to instantiate integrations
-// without requiring a switch statement like this.
-func NewIntegrationWithoutAuth(ctx context.Context, integrationType string) (Integration, error) {
-	switch integrationType {
-	case models.IntegrationTypeSemaphore:
-		return NewSemaphoreIntegration("", "")
-	default:
-		return nil, fmt.Errorf("unsupported integration type %s", integrationType)
-	}
+// Used to represent events received from the integration.
+// Returned by HandleWebhook().
+type Event interface {
+	Type() string
+
+	//
+	// The signature for the event payload.
+	// The value returned here is used by the HTTP server
+	// to verify the integrity of the event payload.
+	//
+	// Usually, this value is what is present in the
+	// X-*-Signature-256 HTTP header on the webhook request.
+	//
+	Signature() string
+}
+
+type WebhookOptions struct {
+	Resource Resource
+	ID       string
+	URL      string
+	Key      []byte
 }

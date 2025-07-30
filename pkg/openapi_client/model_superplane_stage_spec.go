@@ -1,7 +1,7 @@
 /*
-Superplane Authorization API
+Superplane Organizations API
 
-API for the Superplane Authorization service
+API for managing organizations in the Superplane service
 
 API version: 1.0
 Contact: support@superplane.com
@@ -22,7 +22,7 @@ var _ MappedNullable = &SuperplaneStageSpec{}
 type SuperplaneStageSpec struct {
 	Connections []SuperplaneConnection `json:"connections,omitempty"`
 	Conditions []SuperplaneCondition `json:"conditions,omitempty"`
-	Executor *SuperplaneExecutorSpec `json:"executor,omitempty"`
+	Executor *SuperplaneExecutor `json:"executor,omitempty"`
 	Inputs []SuperplaneInputDefinition `json:"inputs,omitempty"`
 	InputMappings []SuperplaneInputMapping `json:"inputMappings,omitempty"`
 	Outputs []SuperplaneOutputDefinition `json:"outputs,omitempty"`
@@ -111,9 +111,9 @@ func (o *SuperplaneStageSpec) SetConditions(v []SuperplaneCondition) {
 }
 
 // GetExecutor returns the Executor field value if set, zero value otherwise.
-func (o *SuperplaneStageSpec) GetExecutor() SuperplaneExecutorSpec {
+func (o *SuperplaneStageSpec) GetExecutor() SuperplaneExecutor {
 	if o == nil || IsNil(o.Executor) {
-		var ret SuperplaneExecutorSpec
+		var ret SuperplaneExecutor
 		return ret
 	}
 	return *o.Executor
@@ -121,7 +121,7 @@ func (o *SuperplaneStageSpec) GetExecutor() SuperplaneExecutorSpec {
 
 // GetExecutorOk returns a tuple with the Executor field value if set, nil otherwise
 // and a boolean to check if the value has been set.
-func (o *SuperplaneStageSpec) GetExecutorOk() (*SuperplaneExecutorSpec, bool) {
+func (o *SuperplaneStageSpec) GetExecutorOk() (*SuperplaneExecutor, bool) {
 	if o == nil || IsNil(o.Executor) {
 		return nil, false
 	}
@@ -137,8 +137,8 @@ func (o *SuperplaneStageSpec) HasExecutor() bool {
 	return false
 }
 
-// SetExecutor gets a reference to the given SuperplaneExecutorSpec and assigns it to the Executor field.
-func (o *SuperplaneStageSpec) SetExecutor(v SuperplaneExecutorSpec) {
+// SetExecutor gets a reference to the given SuperplaneExecutor and assigns it to the Executor field.
+func (o *SuperplaneStageSpec) SetExecutor(v SuperplaneExecutor) {
 	o.Executor = &v
 }
 

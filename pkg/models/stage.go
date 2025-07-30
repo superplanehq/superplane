@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	ExecutorSpecTypeSemaphore = "semaphore"
-	ExecutorSpecTypeHTTP      = "http"
+	ExecutorTypeSemaphore = "semaphore"
+	ExecutorTypeHTTP      = "http"
 
 	StageConditionTypeApproval   = "approval"
 	StageConditionTypeTimeWindow = "time-window"
@@ -81,8 +81,9 @@ type ValueDefinitionFromLastExecution struct {
 }
 
 type ValueDefinitionFromSecret struct {
-	Name string `json:"name"`
-	Key  string `json:"key"`
+	DomainType string `json:"domain_type"`
+	Name       string `json:"name"`
+	Key        string `json:"key"`
 }
 
 type StageCondition struct {
