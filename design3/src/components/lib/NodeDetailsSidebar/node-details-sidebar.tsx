@@ -172,7 +172,7 @@ export function NodeDetailsSidebar({
       case 'success':
       case 'passed':
         return {
-          bgColor: 'bg-green-50',
+          bgColor: 'bg-green-50 dark:bg-green-800',
           borderColor: 'border-t border-t-green-400',
           textColor: 'text-green-700',
           icon: 'check_circle',
@@ -181,7 +181,7 @@ export function NodeDetailsSidebar({
       case 'error':
       case 'failed':
         return {
-          bgColor: 'bg-red-50',
+          bgColor: 'bg-red-50 dark:bg-red-800',
           borderColor: 'border-t border-t-red-400',
           textColor: 'text-red-700',
           icon: 'cancel',
@@ -189,8 +189,8 @@ export function NodeDetailsSidebar({
         };
       case 'running':
         return {
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-t border-t-blue-400',
+          bgColor: 'bg-sky-50 dark:bg-sky-800',
+          borderColor: 'border-t border-t-sky-400',
           textColor: 'text-blue-700',
           icon: 'sync',
           iconColor: 'text-blue-500 animate-spin',
@@ -198,7 +198,7 @@ export function NodeDetailsSidebar({
       case 'pending':
       case 'queued':
         return {
-          bgColor: 'bg-yellow-50',
+          bgColor: 'bg-yellow-50 dark:bg-yellow-800',
           borderColor: 'border-t border-t-yellow-400',
           textColor: 'text-yellow-700',
           icon: 'schedule',
@@ -206,7 +206,7 @@ export function NodeDetailsSidebar({
         };
       default:
         return {
-          bgColor: 'bg-gray-50',
+          bgColor: 'bg-gray-50 dark:bg-gray-800',
           borderColor: 'border-t border-t-gray-400',
           textColor: 'text-gray-700',
           icon: 'help',
@@ -258,16 +258,15 @@ export function NodeDetailsSidebar({
       {inputs && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <MaterialSymbol name="input" size="sm" className="text-gray-500" />
-            <Text className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+            <span  className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
               INPUTS
-            </Text>
+            </span>
           </div>
-          <div className="space-y-1 text-xs font-mono">
+          <div className="space-y-1 text-xs">
             {Object.entries(inputs).map(([key, value]) => (
               <div key={key} className="flex justify-between">
                 <span className="text-gray-600">{key}</span>
-                <span className="text-gray-900">{value}</span>
+                <Badge className="text-gray-900 font-mono !text-xs">{value}</Badge>
               </div>
             ))}
           </div>
@@ -277,16 +276,15 @@ export function NodeDetailsSidebar({
       {outputs && (
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <MaterialSymbol name="output" size="sm" className="text-gray-500" />
-            <Text className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+            <span  className="text-xs font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide">
               OUTPUTS
-            </Text>
+            </span>
           </div>
           <div className="space-y-1 text-xs font-mono">
             {Object.entries(outputs).map(([key, value]) => (
               <div key={key} className="flex justify-between">
                 <span className="text-gray-600">{key}</span>
-                <span className="text-gray-900">{value}</span>
+                <Badge className="text-gray-900 font-mono !text-xs">{value}</Badge>
               </div>
             ))}
           </div>
@@ -298,48 +296,48 @@ export function NodeDetailsSidebar({
   const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
     <div className="mt-3 space-y-3">
       {inputs && (
-        <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
-          <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
-              <MaterialSymbol name="input" size="sm" className="text-gray-600 dark:text-gray-400" />
-            </div>
-            <div className="flex-1">
-              <Text className="text-sm font-semibold mb-1 mt-1">
-                Inputs
-              </Text>
-              <div className="space-y-2">
-                {Object.entries(inputs).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 font-medium">{key}</span>
-                    <div className="flex items-center gap-2">
-                      <Badge>
-                        {value}
-                      </Badge>
-                    
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+       <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+       <div className="flex items-start gap-3">
+         <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
+           <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-gray-400" />
+         </div>
+         <div className="flex-1">
+           <span className="text-sm font-semibold mb-2 block">
+             Inputs
+           </span>
+           <div className="space-y-1">
+             {Object.entries(inputs || {}).map(([key, value]) => (
+               <div key={key} className="flex items-center justify-between">
+                 <span className="text-xs text-gray-600 font-medium">{key}</span>
+                 <div className="flex items-center gap-2">
+                   <Badge className='font-mono !text-xs'>
+                     {value}
+                   </Badge>
+                 
+                 </div>
+               </div>
+             ))}
+           </div>
+         </div>
+       </div>
+     </div>
       )}
       {outputs && (
         <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
-              <MaterialSymbol name="output" size="sm" className="text-gray-600 dark:text-gray-400" />
+              <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-gray-400" />
             </div>
             <div className="flex-1">
-              <Text className="text-sm font-semibold mb-1 mt-1">
+              <span className="text-sm font-semibold mb-2 mt-2 block">
                 Outputs
-              </Text>
-              <div className="space-y-2">
+              </span>
+              <div className="space-y-1">
                 {Object.entries(outputs).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
                     <span className="text-xs text-gray-600 font-medium">{key}</span>
                     <div className="flex items-center gap-2">
-                      <Badge>
+                      <Badge className='font-mono !text-xs'>
                         {value}
                       </Badge>
                     
@@ -409,43 +407,34 @@ export function NodeDetailsSidebar({
                   return (
                     <div key={run.id} className={statusConfig2.bgColor + " " + statusConfig2.borderColor } >
                       <div 
-                        className="p-3"
-                        
+                        className="border-l border-b border-r border-zinc-200 dark:border-zinc-700 p-2"
+                        onClick={() => toggleRunExpansion(run.id)}
                       >
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between p-1">
                           <div className="flex items-center gap-2">
                               
                               <MaterialSymbol 
                                 name={statusConfig.icon} 
-                                size="md" 
+                                size="lg" 
                                 className={statusConfig.color}
                               />
-                            <Text className="font-bold">{run.name}</Text>
-                            <Dropdown>
-                              <DropdownButton plain>
-                                <MaterialSymbol name="more_vert" size="sm" />
-                              </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>View details</DropdownItem>
-                                <DropdownItem>Restart run</DropdownItem>
-                                <DropdownItem>Download logs</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
+                            <span className="font-bold text-sm truncate">{run.name}</span>
+                   
                           </div>
-                          <Button plain onClick={() => toggleRunExpansion(run.id)}>
+                         
                           <MaterialSymbol 
                               name={isExpanded ? 'expand_less' : 'expand_more'} 
                               size="lg" 
-                              className="text-gray-400" 
+                              className="text-gray-600" 
                             />
-                          </Button>
+                          
                         </div>
                         
                         {isExpanded && (
-                          <div className="mt-3 px-6">
+                          <div className="p-3 bg-white dark:bg-zinc-800 mt-3">
                             {run.project && (
                               <div className="flex items-center gap-2 mb-2">
-                                <MaterialSymbol name="folder" size="sm" className="text-blue-500" />
+                                <MaterialSymbol name="automation" size="sm" className="text-blue-500" />
                                 <Link href="#" className="text-sm text-blue-600 hover:text-blue-700">
                                   {run.project}/{run.pipeline}
                                 </Link>
@@ -479,86 +468,68 @@ export function NodeDetailsSidebar({
                     <div key={run.id} className={statusConfig2.bgColor + " " + statusConfig2.borderColor } >
                       <div 
                         className="p-3"
-                        
+                        onClick={() => toggleRunExpansion(run.id)}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                               
                               <MaterialSymbol 
                                 name={statusConfig.icon} 
-                                size="md" 
+                                size="lg" 
                                 className={statusConfig.color}
                               />
-                            <Text className="font-bold">{run.name}</Text>
-                            <Dropdown>
-                              <DropdownButton plain>
-                                <MaterialSymbol name="more_vert" size="sm" />
-                              </DropdownButton>
-                              <DropdownMenu>
-                                <DropdownItem>View details</DropdownItem>
-                                <DropdownItem>Restart run</DropdownItem>
-                                <DropdownItem>Download logs</DropdownItem>
-                              </DropdownMenu>
-                            </Dropdown>
+                            <span className="font-bold truncate text-sm">{run.name}</span>
+                         
                           </div>
-                          <Button plain onClick={() => toggleRunExpansion(run.id)}>
-                          <MaterialSymbol 
-                              name={isExpanded ? 'expand_less' : 'expand_more'} 
-                              size="lg" 
-                              className="text-gray-400" 
-                            />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            {!isExpanded && (
+                              <span className="text-xs text-gray-500">2 minutes ago</span>
+                            )}
+                            <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600" 
+                              />
+                          </div>
                         </div>
                         
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
+                            
                             <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
                               <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
-                                  <MaterialSymbol name="automation" size="sm" className="text-gray-600 dark:text-gray-400" />
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
+                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-gray-400" />
                                 </div>
                                 <div className="flex-1">
-                                  <Text className="text-xs font-semibold mb-1 mt-1">
-                                    Executor
-                                  </Text>
-                                  <div className="space-y-2">
-                                  <Link href="#" className="text-xs text-blue-600 hover:text-blue-700">
-                                  {run.project}/{run.pipeline}
-                                  </Link>
+                                  <span className="text-sm font-semibold mb-2 block">
+                                    Execution details
+                                  </span>
+                                  <div className="space-y-1 flex flex-col text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 font-medium">Project</span>
+                                    <div className="flex items-center gap-2 font-mono">
+                                      Semaphore/project
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 font-medium">Started on</span>
+                                    <div className="flex items-center gap-2 font-mono">
+                                      {run.timestamp}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 font-medium">Duration</span>
+                                    <div className="flex items-center gap-2 font-mono">
+                                      {run.duration}
+                                    </div>
+                                  </div>
                                   </div>
                                 </div>
                               </div>
                             </div>
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
-                                  <MaterialSymbol name="schedule" size="sm" className="text-gray-600 dark:text-gray-400" />
-                                </div>
-                                <div className="flex-1">
-                                  <Text className="text-xs font-semibold mb-1 mt-1">
-                                    Started on
-                                  </Text>
-                                  <div className="space-y-2">
-                                  <span className='text-xs'>{run.timestamp}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center">
-                                  <MaterialSymbol name="timer" size="sm" className="text-gray-600 dark:text-gray-400" />
-                                </div>
-                                <div className="flex-1">
-                                  <Text className="text-sm font-semibold mb-1 mt-1">
-                                    Run Duration
-                                  </Text>
-                                  <div className="space-y-2">
-                                  <span className='text-xs'>{run.duration}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
+                          
                             {renderInputsOutputs2(run.inputs, run.outputs)}
                           </div>
                         )}

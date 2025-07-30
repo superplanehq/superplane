@@ -2374,40 +2374,21 @@ export function WorkflowNodeAccordion({
       {/* Summary section */}
       <div className="p-4">
         <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-          QUEUE
+          NEXT IN QUEUE
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className="flex items-center p-2 bg-gray-50 rounded-md">
-              <div className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-2">
-                <MaterialSymbol name="input" size="sm" />
+            <div className="flex items-center p-2 border border-gray-200 dark:border-gray-700 rounded-md">
+              <div className="w-8 h-8 bg-orange-100 text-orange-600 dark:bg-orange-800 dark:text-orange-400 rounded-lg flex items-center justify-center mr-2">
+                <MaterialSymbol name="how_to_reg" size="md" />
               </div>
-              <span className="text-sm text-gray-700 font-medium">
-                {yamlConfig.spec.inputs.length} input{yamlConfig.spec.inputs.length !== 1 ? 's' : ''} configured
-              </span>
+              <strong className="text-sm text-gray-700 dark:text-gray-200">
+                Msg #2dlsf32fw
+              </strong>
             </div>
           )}
-          {yamlConfig.spec.outputs && yamlConfig.spec.outputs.length > 0 && (
-            <div className="flex items-center p-2 bg-gray-50 rounded-md">
-              <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-2">
-                <MaterialSymbol name="output" size="sm" />
-              </div>
-              <span className="text-sm text-gray-700 font-medium">
-                {yamlConfig.spec.outputs.length} output{yamlConfig.spec.outputs.length !== 1 ? 's' : ''} configured
-              </span>
-            </div>
-          )}
-          {(!yamlConfig.spec.inputs || yamlConfig.spec.inputs.length === 0) && 
-           (!yamlConfig.spec.outputs || yamlConfig.spec.outputs.length === 0) && (
-            <div className="flex items-center p-2 bg-gray-50 rounded-md">
-              <div className="w-6 h-6 bg-gray-100 text-gray-600 rounded-full flex items-center justify-center mr-2">
-                <MaterialSymbol name="settings" size="sm" />
-              </div>
-              <span className="text-sm text-gray-700 font-medium">
-                Ready to configure
-              </span>
-            </div>
-          )}
+         
+         
         </div>
       </div>
     </div>
