@@ -5,7 +5,7 @@ import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor } from '@/api-client';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition } from '@/api-client';
 import { EditModeContent } from '../EditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -18,7 +18,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [stageName, setStageName] = useState(props.data.label);
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
@@ -113,7 +113,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
 
   // Edit mode handlers
-  const handleEditClick = () => {
+  const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
     setIsEditMode(true);
     setEditingStage(props.id);
     // Initialize the editable values from current data
@@ -145,12 +146,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         // Create new stage (commit to backend)
         const result = await createStageMutation.mutateAsync({
           name: stageName,
+          description: stageDescription,
           inputs: currentFormData.inputs,
           outputs: currentFormData.outputs,
           connections: currentFormData.connections,
           executor: currentFormData.executor,
+          secrets: currentFormData.secrets,
           conditions: currentStage.spec?.conditions || []
         });
+        console.log(result);
         removeStage(props.id);
 
 
@@ -178,10 +182,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         await updateStageMutation.mutateAsync({
           stageId: currentStage.metadata.id,
           name: stageName,
+          description: stageDescription,
           inputs: currentFormData.inputs,
           outputs: currentFormData.outputs,
           connections: currentFormData.connections,
           executor: currentFormData.executor,
+          secrets: currentFormData.secrets,
           conditions: currentStage.spec?.conditions || []
         });
 
@@ -197,7 +203,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             inputs: currentFormData.inputs,
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
-            executor: currentFormData.executor
+            executor: currentFormData.executor,
+            secrets: currentFormData.secrets
           }
         });
         // Update props.data to reflect the changes
@@ -226,9 +233,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         props.data.description = stageDescription;
       }
     } catch (error) {
-      console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, error);
+      const apiError = error as Error;
+      console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, apiError);
       // Set API error and stay in edit mode
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred while saving the stage';
+      const errorMessage = apiError.message || 'An error occurred while saving the stage';
       setApiError(errorMessage);
       return; // Don't exit edit mode
     }
@@ -335,10 +343,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <MaterialSymbol name="expand_more" size="md" />
             </DropdownButton>
             <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveStage(false)}>
+              <DropdownItem className='flex items-center gap-2' onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleSaveStage(false) }}>
                 <DropdownLabel>Save & Commit</DropdownLabel>
               </DropdownItem>
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveStage(true)}>
+              <DropdownItem className='flex items-center gap-2' onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleSaveStage(true) }}>
                 <DropdownLabel>Save as Draft</DropdownLabel>
               </DropdownItem>
             </DropdownMenu>
@@ -366,25 +374,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         </div>
       )}
 
-      {/* API Error Display */}
-      {isEditMode && apiError && (
-        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-40 bg-red-50 border border-red-200 rounded-md p-3 shadow-lg max-w-md">
-          <div className="flex items-start gap-2">
-            <MaterialSymbol name="error" size="sm" className="text-red-600 mt-0.5" />
-            <div className="flex-1">
-              <p className="text-sm text-red-800 font-medium">Save Error</p>
-              <p className="text-sm text-red-700 mt-1">{apiError}</p>
-            </div>
-            <button
-              onClick={() => setApiError(null)}
-              className="text-red-400 hover:text-red-600"
-            >
-              <MaterialSymbol name="close" size="sm" />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header Section */}
       <div className="px-4 py-4 flex justify-between items-start">
         <div className="flex items-start flex-1 min-w-0">
@@ -408,6 +397,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 isEditMode={isEditMode}
               />
             </div>
+            {/* API Error Display */}
+            {isEditMode && apiError && (
+              <p className="text-left text-sm text-red-700 mt-1">{apiError}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 ml-2">
@@ -417,7 +410,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
               title="Edit stage"
             >
-              <span className="material-symbols-outlined text-base">edit</span>
+              <MaterialSymbol name="edit" size="md" />
             </button>
           )}
           {props.data.isDraft && (

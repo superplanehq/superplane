@@ -9,6 +9,7 @@ import {
   SuperplaneInputDefinition,
   SuperplaneOutputDefinition,
   SuperplaneExecutor,
+  SuperplaneValueDefinition,
   SpecGroupBy
 } from "@/api-client/types.gen";
 
@@ -47,6 +48,7 @@ export type StageData = {
   conditions: SuperplaneCondition[];
   inputs: SuperplaneInputDefinition[];
   outputs: SuperplaneOutputDefinition[];
+  secrets: SuperplaneValueDefinition[];
   executor?: SuperplaneExecutor;
   spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;

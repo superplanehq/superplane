@@ -12,7 +12,7 @@ import {
   superplaneDescribeEventSource,
   integrationsListIntegrations,
 } from '../api-client/sdk.gen'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -158,10 +158,12 @@ export const useCreateStage = (canvasId: string) => {
   return useMutation({
     mutationFn: async (stageData: {
       name: string;
+      description?: string;
       inputs?: SuperplaneInputDefinition[];
       outputs?: SuperplaneOutputDefinition[];
       connections?: SuperplaneConnection[];
       executor?: SuperplaneExecutor;
+      secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
     }) => {
       return await superplaneCreateStage({
@@ -170,13 +172,15 @@ export const useCreateStage = (canvasId: string) => {
           stage: {
             metadata: {
               name: stageData.name,
-              canvasId: canvasId
+              canvasId: canvasId,
+              // description: stageData.description,
             },
             spec: {
               inputs: stageData.inputs || [],
               outputs: stageData.outputs || [],
               connections: stageData.connections || [],
               executor: stageData.executor,
+              secrets: stageData.secrets || [],
               conditions: stageData.conditions || []
             }
           }
@@ -243,10 +247,12 @@ export const useUpdateStage = (canvasId: string) => {
     mutationFn: async (params: {
       stageId: string;
       name: string;
+      description?: string;
       inputs?: SuperplaneInputDefinition[];
       outputs?: SuperplaneOutputDefinition[];
       connections?: SuperplaneConnection[];
       executor?: SuperplaneExecutor;
+      secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
     }) => {
       return await superplaneUpdateStage({
@@ -255,13 +261,15 @@ export const useUpdateStage = (canvasId: string) => {
           stage: {
             metadata: {
               name: params.name,
-              canvasId: canvasId
+              canvasId: canvasId,
+              // description: params.description,
             },
             spec: {
               inputs: params.inputs || [],
               outputs: params.outputs || [],
               connections: params.connections || [],
               executor: params.executor,
+              secrets: params.secrets || [],
               conditions: params.conditions || []
             }
           }

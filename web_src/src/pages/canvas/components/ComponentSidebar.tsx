@@ -28,7 +28,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   const components: ComponentDefinition[] = [
     {
       id: 'stage',
-      name: 'SEMAPHORE Stage',
+      name: 'Semaphore Stage',
       description: 'Add a Semaphore-based stage to your canvas',
       icon: 'rocket_launch',
       category: 'Stages',

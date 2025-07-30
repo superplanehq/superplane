@@ -7,20 +7,21 @@ import { Field } from './Field';
 import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { useCanvasStore } from '../store/canvasStore';
+import { useSecrets } from '../hooks/useSecrets';
+import { useParams } from 'react-router-dom';
 
 interface EditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
-  onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; isValid: boolean }) => void;
+  onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; isValid: boolean }) => void;
 }
 
 export function EditModeContent({ data, currentStageId, onDataChange }: EditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general']);
-  const [description, setDescription] = useState<string>(data.description || '');
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
-  const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>([]);
+  const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
   const [executorJsonString, setExecutorJsonString] = useState<string>('');
   const [editingInputIndex, setEditingInputIndex] = useState<number | null>(null);
@@ -33,50 +34,72 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Get available connection sources from canvas store
-  const { stages, eventSources, connectionGroups } = useCanvasStore();
+  const { stages, eventSources, connectionGroups, canvas } = useCanvasStore();
 
-  // Executor templates
-  const getExecutorTemplate = (type: string) => {
-    switch (type) {
-      case 'semaphore':
-        return {
-          type: 'semaphore',
-          spec: {
-            // Semaphore executor configuration
-            // Note: To use integrations, configure them in canvas settings first,
-            // then add integration and resource fields here
-            branch: 'main',
-            pipelineFile: '.semaphore/pipeline.yml',
-            parameters: {
-              VERSION: '${{ inputs.VERSION }}',
-              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
-            }
-          }
-        };
-      case 'http':
-        return {
-          type: 'http',
-          spec: {
-            url: 'https://api.example.com/endpoint',
-            payload: {
-              key1: 'value1',
-              key2: '${{ inputs.KEY2 }}'
-            },
-            headers: {
-              'Authorization': 'Bearer ${{ secrets.API_TOKEN }}',
-              'Content-Type': 'application/json'
-            },
-            responsePolicy: {
-              statusCodes: [200, 201, 202]
-            }
-          }
-        };
-      default:
-        return {
-          type: '',
-          spec: {}
-        };
+  // Get organization ID from URL params
+  const { orgId } = useParams<{ orgId: string }>();
+
+  // Get canvas ID and organization ID for secrets
+  const canvasId = canvas?.metadata?.id || '';
+  const organizationId = orgId || '';
+
+  // Fetch secrets from both canvas and organization levels
+  const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS");
+  const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(
+    organizationId, 
+    "DOMAIN_TYPE_ORGANIZATION"
+  );
+
+  // Helper function to get all available secrets (canvas + organization)
+  const getAllSecrets = (): Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> => {
+    const allSecrets: Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> = [];
+    
+    // Add canvas secrets
+    canvasSecrets.forEach(secret => {
+      if (secret.metadata?.name) {
+        allSecrets.push({
+          name: secret.metadata.name,
+          source: 'Canvas',
+          data: secret.spec?.local?.data || {}
+        });
+      }
+    });
+    
+    // Add organization secrets
+    organizationSecrets.forEach(secret => {
+      if (secret.metadata?.name) {
+        allSecrets.push({
+          name: secret.metadata.name,
+          source: 'Organization',
+          data: secret.spec?.local?.data || {}
+        });
+      }
+    });
+    
+    return allSecrets;
+  };
+
+  // Helper function to get available keys for a selected secret
+  const getSecretKeys = (secretName: string) => {
+    const allSecrets = getAllSecrets();
+    const selectedSecret = allSecrets.find(secret => secret.name === secretName);
+    return selectedSecret ? Object.keys(selectedSecret.data) : [];
+  };
+
+  // Helper function to get outputs from a selected connection
+  const getOutputsFromConnection = (connectionName: string) => {
+    if (!connectionName) return [];
+    
+    // Find the stage that matches the connection name
+    const connectedStage = stages.find(stage => stage.metadata?.name === connectionName);
+    
+    if (connectedStage && connectedStage.spec?.outputs) {
+      return connectedStage.spec.outputs;
     }
+    
+    // For event sources and connection groups, they typically don't have outputs
+    // but if they do, we can add logic here later
+    return [];
   };
 
   // Initialize executor JSON string based on current executor
@@ -238,23 +261,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     }
   };
 
-  const validateConnectionField = (index: number) => {
-    const connection = connections[index];
-    const errors = validateConnection(connection);
-    if (errors.length > 0) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [`connection_${index}`]: errors.join(', ')
-      }));
-    } else {
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[`connection_${index}`];
-        return newErrors;
-      });
-    }
-  };
-
   const validateSecretField = (index: number) => {
     const secret = secrets[index];
     const errors = validateSecret(secret, index);
@@ -363,8 +369,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       }
       return conn;
     }));
-    // Validate the connection field after update
-    setTimeout(() => validateConnectionField(index), 0);
   };
 
   const removeConnection = (index: number) => {
@@ -460,13 +464,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     setEditingSecretIndex(null);
   };
 
-  // Executor management
-  const handleExecutorTypeChange = (type: string) => {
-    const template = getExecutorTemplate(type);
-    setExecutor(template);
-    setExecutorJsonString(JSON.stringify(template, null, 2));
-  };
-
   const handleExecutorJsonChange = (jsonString: string) => {
     setExecutorJsonString(jsonString);
     try {
@@ -516,17 +513,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     const duplicateIndex = outputs.findIndex((out, i) => i !== index && out.name === output.name);
     if (duplicateIndex !== -1) {
       errors.push('Output name must be unique');
-    }
-    return errors;
-  };
-
-  const validateConnection = (connection: SuperplaneConnection): string[] => {
-    const errors: string[] = [];
-    if (!connection.name || connection.name.trim() === '') {
-      errors.push('Connection name is required');
-    }
-    if (!connection.type) {
-      errors.push('Connection type is required');
     }
     return errors;
   };
@@ -725,15 +711,16 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       const isValid = validateAllFields();
       onDataChange({
         label: data.label,
-        description,
+        description: data.description,
         inputs,
         outputs,
         connections,
         executor,
+        secrets,
         isValid
       });
     }
-  }, [data.label, description, inputs, outputs, connections, executor, onDataChange, validateAllFields]);
+  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, onDataChange, validateAllFields]);
 
   // Notify parent of data changes with validation
   useEffect(() => {
@@ -1053,8 +1040,8 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                               className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             >
                               <option value="">Select output value</option>
-                              {data.outputs.map((output, outputIndex) => (
-                                <option key={outputIndex} value={output.name}>{output.name}</option>
+                              {getOutputsFromConnection(mapping.name || '').map((output, outputIndex) => (
+                                <option key={outputIndex} value={output.name || ''}>{output.name || 'Unnamed Output'}</option>
                               ))}
                             </select>
                             <button
@@ -1296,32 +1283,113 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                         />
                       ) : (
                         <div className="space-y-2">
-                          <input
-                            type="text"
-                            value={secret.valueFrom?.secret?.name || ''}
-                            onChange={(e) => updateSecret(index, 'valueFrom', {
-                              ...secret.valueFrom,
-                              secret: { ...secret.valueFrom?.secret, name: e.target.value }
-                            })}
-                            placeholder="Secret name"
-                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
-                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                              }`}
-                          />
-                          <input
-                            type="text"
-                            value={secret.valueFrom?.secret?.key || ''}
-                            onChange={(e) => updateSecret(index, 'valueFrom', {
-                              ...secret.valueFrom,
-                              secret: { ...secret.valueFrom?.secret, key: e.target.value }
-                            })}
-                            placeholder="Secret key"
-                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
-                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                              }`}
-                          />
+                          <div>
+                            <Label className="text-xs mb-1">Secret Name</Label>
+                            <select
+                              value={secret.valueFrom?.secret?.name || ''}
+                              onChange={(e) => {
+                                const selectedSecretName = e.target.value;
+                                updateSecret(index, 'valueFrom', {
+                                  ...secret.valueFrom,
+                                  secret: { 
+                                    ...secret.valueFrom?.secret, 
+                                    name: selectedSecretName,
+                                    key: '' // Reset key when secret changes
+                                  }
+                                });
+                              }}
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                              disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
+                            >
+                              <option value="">
+                                {loadingCanvasSecrets || loadingOrganizationSecrets 
+                                  ? 'Loading secrets...' 
+                                  : 'Select a secret...'}
+                              </option>
+                              {(() => {
+                                if (loadingCanvasSecrets || loadingOrganizationSecrets) {
+                                  return null;
+                                }
+
+                                const allSecrets = getAllSecrets();
+                                
+                                if (allSecrets.length === 0) {
+                                  return (
+                                    <option value="" disabled>
+                                      No secrets available
+                                    </option>
+                                  );
+                                }
+
+                                const canvasSecretsFiltered = allSecrets.filter(s => s.source === 'Canvas');
+                                const orgSecretsFiltered = allSecrets.filter(s => s.source === 'Organization');
+
+                                return (
+                                  <>
+                                    {canvasSecretsFiltered.length > 0 && (
+                                      <optgroup label="Canvas Secrets">
+                                        {canvasSecretsFiltered.map(secretItem => (
+                                          <option key={`canvas-${secretItem.name}`} value={secretItem.name}>
+                                            {secretItem.name}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                    {orgSecretsFiltered.length > 0 && (
+                                      <optgroup label="Organization Secrets">
+                                        {orgSecretsFiltered.map(secretItem => (
+                                          <option key={`org-${secretItem.name}`} value={secretItem.name}>
+                                            {secretItem.name}
+                                          </option>
+                                        ))}
+                                      </optgroup>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-xs mb-1">Secret Key</Label>
+                            <select
+                              value={secret.valueFrom?.secret?.key || ''}
+                              onChange={(e) => updateSecret(index, 'valueFrom', {
+                                ...secret.valueFrom,
+                                secret: { ...secret.valueFrom?.secret, key: e.target.value }
+                              })}
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                              disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
+                            >
+                              <option value="">
+                                {!secret.valueFrom?.secret?.name 
+                                  ? 'Select a secret first...'
+                                  : 'Select a key...'}
+                              </option>
+                              {secret.valueFrom?.secret?.name && (() => {
+                                const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
+                                
+                                if (availableKeys.length === 0) {
+                                  return (
+                                    <option value="" disabled>
+                                      No keys available in this secret
+                                    </option>
+                                  );
+                                }
+
+                                return availableKeys.map(key => (
+                                  <option key={key} value={key}>
+                                    {key}
+                                  </option>
+                                ));
+                              })()}
+                            </select>
+                          </div>
                         </div>
                       )}
                     </Field>
@@ -1384,20 +1452,21 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           <div className="space-y-3">
             {executor.type && (
               <Field>
-                <Label>Executor Configuration (JSON)</Label>
                 <div className="text-xs text-zinc-500 mb-2">
                   Configure your executor using JSON. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
-                <textarea
-                  value={executorJsonString}
-                  onChange={(e) => handleExecutorJsonChange(e.target.value)}
-                  placeholder="Enter executor configuration as JSON..."
-                  rows={12}
-                  className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 font-mono ${validationErrors.executorJson
-                    ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                    }`}
-                />
+                <div className="nodrag">
+                  <textarea
+                    value={executorJsonString}
+                    onChange={(e) => handleExecutorJsonChange(e.target.value)}
+                    placeholder="Enter executor configuration as JSON..."
+                    rows={12}
+                    className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 font-mono ${validationErrors.executorJson
+                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                      : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                      }`}
+                  />
+                </div>
                 {validationErrors.executorJson && (
                   <div className="text-xs text-red-600 mt-1">
                     {validationErrors.executorJson}
