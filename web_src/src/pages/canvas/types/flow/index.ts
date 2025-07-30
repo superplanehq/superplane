@@ -10,7 +10,9 @@ import {
   SuperplaneOutputDefinition,
   SuperplaneExecutor,
   SuperplaneValueDefinition,
-  SpecGroupBy
+  SpecGroupBy,
+  IntegrationsIntegrationRef,
+  IntegrationsResourceRef
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
@@ -31,6 +33,8 @@ export type EventSourceNodeData = {
   id: string;
   name: string;
   events: SuperplaneStageEvent[];
+  integration: IntegrationsIntegrationRef | null;
+  resource: IntegrationsResourceRef | null;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;

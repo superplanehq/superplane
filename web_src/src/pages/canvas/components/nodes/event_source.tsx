@@ -52,11 +52,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         // Update local store with the new event source data from API response
         const newEventSource = result.data?.eventSource;
         if (newEventSource) {
-          const eventSourceWithEvents: EventSourceWithEvents = {
-            ...newEventSource,
-            events: currentEventSource.events || []
-          };
-          updateEventSource(eventSourceWithEvents);
+          removeEventSource(props.id);
         }
       } else if (saveAsDraft) {
         // Save as draft (only update local store, don't commit to backend)
@@ -70,13 +66,12 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         };
         updateEventSource(draftEventSource);
       }
+      setIsEditMode(false);
+      setEditingEventSource(null);
+      setCurrentFormData(null);
     } catch (error) {
       console.error(`Failed to ${isNewEventSource ? 'create' : 'update'} event source:`, error);
     }
-
-    setIsEditMode(false);
-    setEditingEventSource(null);
-    setCurrentFormData(null);
   };
 
   const handleCancelEdit = () => {

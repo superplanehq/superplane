@@ -32,6 +32,8 @@ export const transformEventSourcesToNodes = (
         id: es.metadata?.id || '',
         name: es.metadata?.name,
         events: lastEvents,
+        integration: es.spec?.integration,
+        resource: es.spec?.resource,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
       draggable: true,

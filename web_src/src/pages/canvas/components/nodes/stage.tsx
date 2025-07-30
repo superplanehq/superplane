@@ -5,7 +5,7 @@ import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition } from '@/api-client';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition } from '@/api-client';
 import { EditModeContent } from '../EditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -18,7 +18,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [stageName, setStageName] = useState(props.data.label);
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
@@ -152,27 +152,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentStage.spec?.conditions || []
+          conditions: currentFormData.conditions
         });
         console.log(result);
         removeStage(props.id);
-
-
-        // Update local store with the new stage data from API response
-        const newStage = result.data?.stage;
-        if (newStage) {
-          // If this was a temporary stage, we need to replace it entirely
-          // The React Flow node will need to be updated with the new ID
-          const stageWithQueue: StageWithEventQueue = {
-            ...newStage,
-            queue: currentStage.queue || [],
-            isDraft: false // No longer a draft after creation
-          };
-          updateStage(stageWithQueue);
-          // Update props.data to reflect the changes
-          props.data.label = stageName;
-          props.data.description = stageDescription;
-        }
       } else if (!isNewStage && !saveAsDraft) {
         // Update existing stage (commit to backend)
         if (!currentStage.metadata?.id) {
@@ -188,7 +171,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentStage.spec?.conditions || []
+          conditions: currentFormData.conditions
         });
 
         // Update local store as well

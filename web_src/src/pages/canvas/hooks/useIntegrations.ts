@@ -50,7 +50,7 @@ export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS
 
 export interface CreateIntegrationParams {
   name: string
-  type: 'semaphore'
+  type: string
   url: string
   authType: 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'
   tokenSecretName?: string

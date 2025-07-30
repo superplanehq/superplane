@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom, SuperplaneExecutor } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneConditionApproval, SuperplaneConditionTimeWindow } from '@/api-client/types.gen';
 import { AccordionItem } from './AccordionItem';
 import { Label } from './Label';
 import { Field } from './Field';
@@ -13,7 +13,7 @@ import { useParams } from 'react-router-dom';
 interface EditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
-  onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; isValid: boolean }) => void;
+  onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean }) => void;
 }
 
 export function EditModeContent({ data, currentStageId, onDataChange }: EditModeContentProps) {
@@ -22,12 +22,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
+  const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
   const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
   const [executorJsonString, setExecutorJsonString] = useState<string>('');
   const [editingInputIndex, setEditingInputIndex] = useState<number | null>(null);
   const [editingOutputIndex, setEditingOutputIndex] = useState<number | null>(null);
   const [editingConnectionIndex, setEditingConnectionIndex] = useState<number | null>(null);
   const [editingSecretIndex, setEditingSecretIndex] = useState<number | null>(null);
+  const [editingConditionIndex, setEditingConditionIndex] = useState<number | null>(null);
   const [inputMappings, setInputMappings] = useState<Record<number, SuperplaneValueDefinition[]>>({});
 
   // Validation states
@@ -46,14 +48,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   // Fetch secrets from both canvas and organization levels
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS");
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(
-    organizationId, 
+    organizationId,
     "DOMAIN_TYPE_ORGANIZATION"
   );
 
   // Helper function to get all available secrets (canvas + organization)
   const getAllSecrets = (): Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> => {
     const allSecrets: Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> = [];
-    
+
     // Add canvas secrets
     canvasSecrets.forEach(secret => {
       if (secret.metadata?.name) {
@@ -64,7 +66,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
         });
       }
     });
-    
+
     // Add organization secrets
     organizationSecrets.forEach(secret => {
       if (secret.metadata?.name) {
@@ -75,7 +77,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
         });
       }
     });
-    
+
     return allSecrets;
   };
 
@@ -89,14 +91,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   // Helper function to get outputs from a selected connection
   const getOutputsFromConnection = (connectionName: string) => {
     if (!connectionName) return [];
-    
+
     // Find the stage that matches the connection name
     const connectedStage = stages.find(stage => stage.metadata?.name === connectionName);
-    
+
     if (connectedStage && connectedStage.spec?.outputs) {
       return connectedStage.spec.outputs;
     }
-    
+
     // For event sources and connection groups, they typically don't have outputs
     // but if they do, we can add logic here later
     return [];
@@ -464,6 +466,59 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     setEditingSecretIndex(null);
   };
 
+  // Conditions management
+  const addCondition = () => {
+    const newCondition: SuperplaneCondition = {
+      type: 'CONDITION_TYPE_APPROVAL',
+      approval: { count: 1 }
+    };
+    const newIndex = conditions.length;
+    setConditions(prev => [...prev, newCondition]);
+    setEditingConditionIndex(newIndex);
+  };
+
+  const updateCondition = (index: number, field: keyof SuperplaneCondition, value: any) => {
+    setConditions(prev => prev.map((condition, i) =>
+      i === index ? { ...condition, [field]: value } : condition
+    ));
+    // Validate the condition field after update
+    setTimeout(() => validateConditionField(index), 0);
+  };
+
+  const updateConditionType = (index: number, type: SuperplaneConditionType) => {
+    setConditions(prev => prev.map((condition, i) => {
+      if (i === index) {
+        const newCondition: SuperplaneCondition = { type };
+        if (type === 'CONDITION_TYPE_APPROVAL') {
+          newCondition.approval = { count: 1 };
+          newCondition.timeWindow = undefined;
+        } else if (type === 'CONDITION_TYPE_TIME_WINDOW') {
+          newCondition.timeWindow = { start: '', end: '', weekDays: [] };
+          newCondition.approval = undefined;
+        }
+        return newCondition;
+      }
+      return condition;
+    }));
+    // Validate the condition field after update
+    setTimeout(() => validateConditionField(index), 0);
+  };
+
+  const removeCondition = (index: number) => {
+    setConditions(prev => prev.filter((_, i) => i !== index));
+    setEditingConditionIndex(null);
+  };
+
+  const cancelEditCondition = (index: number) => {
+    const condition = conditions[index];
+    // If this is a newly added condition with no valid type, remove it
+    if (!condition.type || condition.type === 'CONDITION_TYPE_UNKNOWN') {
+      removeCondition(index);
+    } else {
+      setEditingConditionIndex(null);
+    }
+  };
+
   const handleExecutorJsonChange = (jsonString: string) => {
     setExecutorJsonString(jsonString);
     try {
@@ -547,6 +602,51 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     return errors;
   };
 
+  const validateCondition = (condition: SuperplaneCondition, index: number): string[] => {
+    const errors: string[] = [];
+    if (!condition.type || condition.type === 'CONDITION_TYPE_UNKNOWN') {
+      errors.push('Condition type is required');
+    }
+
+    if (condition.type === 'CONDITION_TYPE_APPROVAL') {
+      if (!condition.approval || condition.approval.count === undefined || condition.approval.count < 1) {
+        errors.push('Approval condition requires a count of at least 1');
+      }
+    } else if (condition.type === 'CONDITION_TYPE_TIME_WINDOW') {
+      if (!condition.timeWindow) {
+        errors.push('Time window condition requires time window configuration');
+      } else {
+        if (!condition.timeWindow.start || condition.timeWindow.start.trim() === '') {
+          errors.push('Time window start time is required');
+        }
+        if (!condition.timeWindow.end || condition.timeWindow.end.trim() === '') {
+          errors.push('Time window end time is required');
+        }
+        if (!condition.timeWindow.weekDays || condition.timeWindow.weekDays.length === 0) {
+          errors.push('At least one weekday must be selected');
+        }
+      }
+    }
+
+    return errors;
+  };
+
+  const validateConditionField = (index: number) => {
+    const condition = conditions[index];
+    const errors = validateCondition(condition, index);
+    if (errors.length > 0) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [`condition_${index}`]: errors.join(', ')
+      }));
+    } else {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`condition_${index}`];
+        return newErrors;
+      });
+    }
+  };
 
   const validateAllFields = React.useCallback((): boolean => {
     const errors: Record<string, string> = {};
@@ -625,6 +725,35 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       return validationErrors;
     };
 
+    const validateConditionItem = (condition: SuperplaneCondition, index: number): string[] => {
+      const validationErrors: string[] = [];
+      if (!condition.type || condition.type === 'CONDITION_TYPE_UNKNOWN') {
+        validationErrors.push('Condition type is required');
+      }
+
+      if (condition.type === 'CONDITION_TYPE_APPROVAL') {
+        if (!condition.approval || condition.approval.count === undefined || condition.approval.count < 1) {
+          validationErrors.push('Approval condition requires a count of at least 1');
+        }
+      } else if (condition.type === 'CONDITION_TYPE_TIME_WINDOW') {
+        if (!condition.timeWindow) {
+          validationErrors.push('Time window condition requires time window configuration');
+        } else {
+          if (!condition.timeWindow.start || condition.timeWindow.start.trim() === '') {
+            validationErrors.push('Time window start time is required');
+          }
+          if (!condition.timeWindow.end || condition.timeWindow.end.trim() === '') {
+            validationErrors.push('Time window end time is required');
+          }
+          if (!condition.timeWindow.weekDays || condition.timeWindow.weekDays.length === 0) {
+            validationErrors.push('At least one weekday must be selected');
+          }
+        }
+      }
+
+      return validationErrors;
+    };
+
     const validateExecutorItem = (executor: SuperplaneExecutor): string[] => {
       const validationErrors: string[] = [];
       if (executor.type && executor.type !== '') {
@@ -684,6 +813,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       }
     });
 
+    // Validate conditions
+    conditions.forEach((condition, index) => {
+      const conditionErrors = validateConditionItem(condition, index);
+      if (conditionErrors.length > 0) {
+        errors[`condition_${index}`] = conditionErrors.join(', ');
+      }
+    });
+
     // Validate executor
     const executorErrors = validateExecutorItem(executor);
     if (executorErrors.length > 0) {
@@ -702,7 +839,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     setValidationErrors(errors);
 
     return Object.keys(errors).length === 0;
-  }, [inputs, outputs, connections, secrets, executor, executorJsonString]);
+  }, [inputs, outputs, connections, secrets, conditions, executor, executorJsonString]);
 
 
   // Update the onDataChange to include validation
@@ -717,10 +854,11 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
         connections,
         executor,
         secrets,
+        conditions,
         isValid
       });
     }
-  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, onDataChange, validateAllFields]);
+  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, onDataChange, validateAllFields]);
 
   // Notify parent of data changes with validation
   useEffect(() => {
@@ -1205,6 +1343,181 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           </div>
         </AccordionItem>
 
+        {/* Conditions Section */}
+        <AccordionItem
+          id="conditions"
+          title={
+            <div className="flex items-center justify-between w-full">
+              <span>Conditions</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-500">{conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>
+                <MaterialSymbol name="expand_more" />
+              </div>
+            </div>
+          }
+          isOpen={openSections.includes('conditions')}
+          onToggle={handleAccordionToggle}
+        >
+          <div className="space-y-3">
+            {conditions.map((condition, index) => (
+              <div key={index} className="p-3 border border-zinc-200 dark:border-zinc-700 rounded-md bg-zinc-50 dark:bg-zinc-800">
+                {editingConditionIndex === index ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs mb-1">Condition Type</Label>
+                      <select
+                        value={condition.type || 'CONDITION_TYPE_APPROVAL'}
+                        onChange={(e) => updateConditionType(index, e.target.value as SuperplaneConditionType)}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
+                      >
+                        <option value="CONDITION_TYPE_APPROVAL">Approval</option>
+                        <option value="CONDITION_TYPE_TIME_WINDOW">Time Window</option>
+                      </select>
+                      {validationErrors[`condition_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`condition_${index}`]}
+                        </div>
+                      )}
+                    </div>
+
+                    {condition.type === 'CONDITION_TYPE_APPROVAL' && (
+                      <div>
+                        <Label className="text-xs mb-1">Required Approvals</Label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={condition.approval?.count || 1}
+                          onChange={(e) => updateCondition(index, 'approval', { count: parseInt(e.target.value) || 1 })}
+                          placeholder="Number of required approvals"
+                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                            }`}
+                        />
+                      </div>
+                    )}
+
+                    {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label className="text-xs mb-1">Start Time</Label>
+                            <input
+                              type="time"
+                              value={condition.timeWindow?.start || ''}
+                              onChange={(e) => updateCondition(index, 'timeWindow', {
+                                ...condition.timeWindow,
+                                start: e.target.value
+                              })}
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs mb-1">End Time</Label>
+                            <input
+                              type="time"
+                              value={condition.timeWindow?.end || ''}
+                              onChange={(e) => updateCondition(index, 'timeWindow', {
+                                ...condition.timeWindow,
+                                end: e.target.value
+                              })}
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs mb-1">Days of Week</Label>
+                          <div className="grid grid-cols-7 gap-1">
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                              <label key={day} className="flex flex-col items-center gap-1 p-2 border rounded text-xs">
+                                <input
+                                  type="checkbox"
+                                  checked={condition.timeWindow?.weekDays?.includes(day) || false}
+                                  onChange={(e) => {
+                                    const currentDays = condition.timeWindow?.weekDays || [];
+                                    const newDays = e.target.checked
+                                      ? [...currentDays, day]
+                                      : currentDays.filter(d => d !== day);
+                                    updateCondition(index, 'timeWindow', {
+                                      ...condition.timeWindow,
+                                      weekDays: newDays
+                                    });
+                                  }}
+                                  className="w-3 h-3"
+                                />
+                                <span>{day.slice(0, 3)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2">
+                      <button
+                        onClick={() => cancelEditCondition(index)}
+                        className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        <span className="material-symbols-outlined text-sm">check</span>
+                      </button>
+                      <button
+                        onClick={() => removeCondition(index)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">
+                        {condition.type === 'CONDITION_TYPE_APPROVAL' && `Approval (${condition.approval?.count || 1} required)`}
+                        {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`}
+                      </div>
+                      {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
+                        <div className="text-xs text-zinc-500 mt-1">
+                          {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setEditingConditionIndex(index)}
+                        className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                      </button>
+                      <button
+                        onClick={() => removeCondition(index)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={addCondition}
+              className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Add Condition
+            </button>
+          </div>
+        </AccordionItem>
+
         {/* Secrets Section */}
         <AccordionItem
           id="secrets"
@@ -1291,8 +1604,8 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                                 const selectedSecretName = e.target.value;
                                 updateSecret(index, 'valueFrom', {
                                   ...secret.valueFrom,
-                                  secret: { 
-                                    ...secret.valueFrom?.secret, 
+                                  secret: {
+                                    ...secret.valueFrom?.secret,
                                     name: selectedSecretName,
                                     key: '' // Reset key when secret changes
                                   }
@@ -1305,8 +1618,8 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                               disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
                             >
                               <option value="">
-                                {loadingCanvasSecrets || loadingOrganizationSecrets 
-                                  ? 'Loading secrets...' 
+                                {loadingCanvasSecrets || loadingOrganizationSecrets
+                                  ? 'Loading secrets...'
                                   : 'Select a secret...'}
                               </option>
                               {(() => {
@@ -1315,7 +1628,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                                 }
 
                                 const allSecrets = getAllSecrets();
-                                
+
                                 if (allSecrets.length === 0) {
                                   return (
                                     <option value="" disabled>
@@ -1367,13 +1680,13 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                               disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
                             >
                               <option value="">
-                                {!secret.valueFrom?.secret?.name 
+                                {!secret.valueFrom?.secret?.name
                                   ? 'Select a secret first...'
                                   : 'Select a key...'}
                               </option>
                               {secret.valueFrom?.secret?.name && (() => {
                                 const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
-                                
+
                                 if (availableKeys.length === 0) {
                                   return (
                                     <option value="" disabled>

@@ -233,8 +233,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                         <img className="w-8 h-8 p-2" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
                       <Heading level={3}>
-                        {integration.spec?.type === 'semaphore' ? 'Semaphore' :
-                          integration.metadata?.name}
+                        {integration.metadata?.name}
                       </Heading>
                     </div>
 

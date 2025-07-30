@@ -24,10 +24,10 @@ export function EventSourceEditModeContent({
 }: EventSourceEditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general']);
   const [name, setName] = useState(data.name || '');
-  const [hasIntegration, setHasIntegration] = useState(false);
-  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(null);
-  const [resourceType, setResourceType] = useState('');
-  const [resourceName, setResourceName] = useState('');
+  const [hasIntegration, setHasIntegration] = useState(data.integration !== null);
+  const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
+  const [resourceType, setResourceType] = useState(data.resource?.type || '');
+  const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [integrationConfig, setIntegrationConfig] = useState<Record<string, string | boolean>>({});
 
   // Fetch available integrations
@@ -195,9 +195,6 @@ export function EventSourceEditModeContent({
           title={
             <div className="flex items-center justify-between w-full">
               <span>Integration</span>
-              <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
-                {hasIntegration ? 'Enabled' : 'Disabled'}
-              </span>
             </div>
           }
           isOpen={openSections.includes('integration')}
@@ -296,48 +293,6 @@ export function EventSourceEditModeContent({
             )}
           </div>
         </AccordionItem>
-
-        {/* Webhook Configuration Section (when no integration) */}
-        {!hasIntegration && (
-          <AccordionItem
-            id="webhook"
-            title="Webhook Configuration"
-            isOpen={openSections.includes('webhook')}
-            onToggle={handleAccordionToggle}
-          >
-            <div className="space-y-3">
-              <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-3">
-                When saved, this event source will generate a unique webhook URL that external services can use to send events.
-              </div>
-
-              <Field>
-                <Label>Expected Content Type</Label>
-                <select
-                  value={String(integrationConfig.contentType || 'application/json')}
-                  onChange={(e) => updateIntegrationConfig('contentType', e.target.value)}
-                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="application/json">application/json</option>
-                  <option value="application/x-www-form-urlencoded">application/x-www-form-urlencoded</option>
-                  <option value="text/plain">text/plain</option>
-                </select>
-              </Field>
-
-              <Field>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="requireAuth"
-                    checked={Boolean(integrationConfig.requireAuth) || false}
-                    onChange={(e) => updateIntegrationConfig('requireAuth', e.target.checked)}
-                    className="w-4 h-4 text-blue-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-blue-500"
-                  />
-                  <Label htmlFor="requireAuth">Require Authentication</Label>
-                </div>
-              </Field>
-            </div>
-          </AccordionItem>
-        )}
       </div>
     </div>
   );
