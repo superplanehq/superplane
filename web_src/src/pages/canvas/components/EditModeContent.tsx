@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneConditionApproval, SuperplaneConditionTimeWindow } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType } from '@/api-client/types.gen';
 import { AccordionItem } from './AccordionItem';
 import { Label } from './Label';
 import { Field } from './Field';
@@ -211,7 +211,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       i === index ? { ...input, [field]: value } : input
     ));
     // Validate the input field after update
-    setTimeout(() => validateInputField(index), 0);
+    setTimeout(() => validateInputField(index), 200);
   };
 
   const removeInput = (index: number) => {
@@ -602,7 +602,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     return errors;
   };
 
-  const validateCondition = (condition: SuperplaneCondition, index: number): string[] => {
+  const validateCondition = (condition: SuperplaneCondition): string[] => {
     const errors: string[] = [];
     if (!condition.type || condition.type === 'CONDITION_TYPE_UNKNOWN') {
       errors.push('Condition type is required');
@@ -633,7 +633,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
 
   const validateConditionField = (index: number) => {
     const condition = conditions[index];
-    const errors = validateCondition(condition, index);
+    const errors = validateCondition(condition);
     if (errors.length > 0) {
       setValidationErrors(prev => ({
         ...prev,
@@ -725,7 +725,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       return validationErrors;
     };
 
-    const validateConditionItem = (condition: SuperplaneCondition, index: number): string[] => {
+    const validateConditionItem = (condition: SuperplaneCondition): string[] => {
       const validationErrors: string[] = [];
       if (!condition.type || condition.type === 'CONDITION_TYPE_UNKNOWN') {
         validationErrors.push('Condition type is required');
@@ -815,7 +815,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
 
     // Validate conditions
     conditions.forEach((condition, index) => {
-      const conditionErrors = validateConditionItem(condition, index);
+      const conditionErrors = validateConditionItem(condition);
       if (conditionErrors.length > 0) {
         errors[`condition_${index}`] = conditionErrors.join(', ');
       }
@@ -1351,7 +1351,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
               <span>Conditions</span>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-500">{conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>
-                <MaterialSymbol name="expand_more" />
               </div>
             </div>
           }

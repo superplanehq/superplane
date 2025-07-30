@@ -59,7 +59,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	if req.Stage.Metadata != nil && req.Stage.Metadata.Name != "" {
+	if req.Stage.Metadata != nil && req.Stage.Metadata.Name != "" && req.Stage.Metadata.Name != stage.Name {
 		_, err := canvas.FindStageByName(req.Stage.Metadata.Name)
 		if err == nil {
 			return nil, status.Error(codes.InvalidArgument, "stage name already in use")

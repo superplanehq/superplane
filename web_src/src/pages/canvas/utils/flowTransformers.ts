@@ -31,6 +31,7 @@ export const transformEventSourcesToNodes = (
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
+        description: es.metadata?.description,
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,
@@ -54,6 +55,7 @@ export const transformStagesToNodes = (
       label: st.metadata?.name || '',
       labels: [],
       status: "",
+      description: st.metadata?.description || '',
       icon: "storage",
       queues: st.queue || [],
       connections: st.spec?.connections || [],

@@ -179,7 +179,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           ...currentStage,
           metadata: {
             ...currentStage.metadata,
-            name: stageName
+            name: stageName,
+            description: stageDescription
           },
           spec: {
             ...currentStage.spec!,
@@ -199,7 +200,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           ...currentStage,
           metadata: {
             ...currentStage.metadata,
-            name: stageName
+            name: stageName,
+            description: stageDescription
           },
           spec: {
             ...currentStage.spec!,

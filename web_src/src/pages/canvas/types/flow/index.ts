@@ -32,6 +32,7 @@ export type ConnectionGroupNodeType = Node<ConnectionGroupNodeData, 'connection_
 export type EventSourceNodeData = {
   id: string;
   name: string;
+  description?: string;
   events: SuperplaneStageEvent[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;

@@ -173,7 +173,7 @@ export const useCreateStage = (canvasId: string) => {
             metadata: {
               name: stageData.name,
               canvasId: canvasId,
-              // description: stageData.description,
+              description: stageData.description,
             },
             spec: {
               inputs: stageData.inputs || [],
@@ -262,7 +262,7 @@ export const useUpdateStage = (canvasId: string) => {
             metadata: {
               name: params.name,
               canvasId: canvasId,
-              // description: params.description,
+              description: params.description,
             },
             spec: {
               inputs: params.inputs || [],
@@ -306,6 +306,7 @@ export const useCreateEventSource = (canvasId: string) => {
   return useMutation({
     mutationFn: async (eventSourceData: {
       name: string;
+      description?: string;
       spec: SuperplaneEventSourceSpec;
     }) => {
       return await superplaneCreateEventSource({
@@ -314,6 +315,7 @@ export const useCreateEventSource = (canvasId: string) => {
           eventSource: {
             metadata: {
               name: eventSourceData.name,
+              description: eventSourceData.description,
               canvasId: canvasId
             },
             spec: eventSourceData.spec

@@ -8,13 +8,16 @@ import { useCreateEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [isEditMode, setIsEditMode] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ name: string; spec: SuperplaneEventSourceSpec } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>(null);
+  const [eventSourceName, setEventSourceName] = useState(props.data.name);
+  const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const { updateEventSource, setEditingEventSource, removeEventSource } = useCanvasStore();
 
   const currentEventSource = useCanvasStore(state =>
@@ -30,6 +33,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingEventSource(props.id);
+    // Initialize the editable values from current data
+    setEventSourceName(props.data.name);
+    setEventSourceDescription(props.data.description || '');
   };
 
   const handleSaveEventSource = async (saveAsDraft = false) => {
@@ -45,7 +51,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       if (isNewEventSource && !saveAsDraft) {
         // Create new event source (commit to backend)
         const result = await createEventSourceMutation.mutateAsync({
-          name: currentFormData.name,
+          name: eventSourceName,
+          description: eventSourceDescription,
           spec: currentFormData.spec
         });
 
@@ -60,7 +67,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           ...currentEventSource,
           metadata: {
             ...currentEventSource.metadata,
-            name: currentFormData.name
+            name: eventSourceName,
+            description: eventSourceDescription,
           },
           spec: currentFormData.spec
         };
@@ -78,6 +86,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setIsEditMode(false);
     setEditingEventSource(null);
     setCurrentFormData(null);
+    // Reset to original values
+    setEventSourceName(props.data.name);
+    setEventSourceDescription(props.data.description || '');
   };
 
   // Check if this is a draft/new event source that can be discarded
@@ -98,6 +109,26 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       removeEventSource(currentEventSource.metadata.id);
     }
     setShowDiscardConfirm(false);
+  };
+
+  const handleEventSourceNameChange = (newName: string) => {
+    setEventSourceName(newName);
+    if (currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        name: newName
+      });
+    }
+  };
+
+  const handleEventSourceDescriptionChange = (newDescription: string) => {
+    setEventSourceDescription(newDescription);
+    if (currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        description: newDescription
+      });
+    }
   };
 
   return (
@@ -149,19 +180,38 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <span className="material-symbols-outlined mr-2 text-gray-700">bolt</span>
-          <p className="mb-0 font-bold ml-1 text-gray-900">{props.data.name}</p>
+      <div className="px-4 py-4 flex justify-between items-start">
+        <div className="flex items-start flex-1 min-w-0">
+          <span className="material-symbols-outlined mr-2 text-gray-700 mt-1">bolt</span>
+          <div className="flex-1 min-w-0">
+            <div className="mb-1">
+              <InlineEditable
+                value={eventSourceName}
+                onSave={handleEventSourceNameChange}
+                placeholder="Event source name"
+                className="font-bold text-gray-900 text-base text-left px-2 py-1"
+                isEditMode={isEditMode}
+              />
+            </div>
+            <div>
+              <InlineEditable
+                value={eventSourceDescription}
+                onSave={handleEventSourceDescriptionChange}
+                placeholder={isEditMode ? "Add description..." : "No description available"}
+                className="text-gray-600 text-sm text-left px-2 py-1"
+                isEditMode={isEditMode}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-2">
           {!isEditMode && (
             <button
               onClick={handleEditClick}
               className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
               title="Edit event source"
             >
-              <span className="material-symbols-outlined text-base">edit</span>
+              <MaterialSymbol name="edit" size="md" />
             </button>
           )}
         </div>
