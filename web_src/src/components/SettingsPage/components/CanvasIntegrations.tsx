@@ -6,7 +6,7 @@ import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Input } from '../../Input/input'
 import { useIntegrations, useCreateIntegration, useUpdateIntegration, type CreateIntegrationParams, type UpdateIntegrationParams } from '../../../pages/canvas/hooks/useIntegrations'
 import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
-import { IntegrationsIntegration, IntegrationsIntegrationType } from '@/api-client'
+import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 
 interface CanvasIntegrationsProps {
@@ -18,7 +18,7 @@ type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
 
 const INTEGRATION_TYPES = [
   {
-    value: 'TYPE_SEMAPHORE' as const,
+    value: 'semaphore' as const,
     label: 'Semaphore',
     description: 'Connect to Semaphore CI/CD pipelines for automated deployments and testing workflows',
     icon: SemaphoreLogo,
@@ -29,7 +29,7 @@ const INTEGRATION_TYPES = [
 
 export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
-  const [selectedType, setSelectedType] = useState<IntegrationsIntegrationType>('TYPE_SEMAPHORE')
+  const [selectedType, setSelectedType] = useState<string>('semaphore')
   const [integrationName, setIntegrationName] = useState('')
   const [integrationUrl, setIntegrationUrl] = useState('')
   const [authType, setAuthType] = useState<'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'>('AUTH_TYPE_NONE')
@@ -48,7 +48,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
     setSection('choose-type')
   }
 
-  const handleTypeSelection = (type: IntegrationsIntegrationType) => {
+  const handleTypeSelection = (type: string) => {
     setSelectedType(type)
     setSection('new')
     setIntegrationUrl('')
@@ -76,7 +76,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
 
     const integrationData: CreateIntegrationParams = {
       name: integrationName.trim(),
-      type: selectedType as 'TYPE_SEMAPHORE',
+      type: selectedType as 'semaphore',
       url: integrationUrl.trim(),
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
@@ -95,7 +95,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
 
   const handleConfigureIntegration = (integration: IntegrationsIntegration) => {
     setEditingIntegration(integration)
-    setSelectedType(integration.spec?.type || 'TYPE_SEMAPHORE' as IntegrationsIntegrationType)
+    setSelectedType(integration.spec?.type || 'semaphore')
     setIntegrationName(integration.metadata?.name || '')
     setIntegrationUrl(integration.spec?.url || '')
     setAuthType(integration.spec?.auth?.use || 'AUTH_TYPE_NONE' as 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE')
@@ -118,7 +118,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
     const updateData: UpdateIntegrationParams = {
       id: editingIntegration.metadata?.id as string,
       name: integrationName.trim(),
-      type: selectedType as 'TYPE_SEMAPHORE',
+      type: selectedType,
       url: integrationUrl.trim(),
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
@@ -229,18 +229,18 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                 >
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 ${integration.spec?.type === 'TYPE_SEMAPHORE' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
-                        <img className="w-8 h-8 p-2" src={integration.spec?.type === 'TYPE_SEMAPHORE' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
+                      <div className={`w-8 h-8 ${integration.spec?.type === 'semaphore' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
+                        <img className="w-8 h-8 p-2" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
                       <Heading level={3}>
-                        {integration.spec?.type === 'TYPE_SEMAPHORE' ? 'Semaphore' :
+                        {integration.spec?.type === 'semaphore' ? 'Semaphore' :
                           integration.metadata?.name}
                       </Heading>
                     </div>
 
                   </div>
                   <Text className="text-zinc-600 dark:text-zinc-400 mb-4 text-left">
-                    {integration.spec?.type === 'TYPE_SEMAPHORE'
+                    {integration.spec?.type === 'semaphore'
                       ? `Connected to ${integration.metadata?.name || 'Semaphore'} for CI/CD pipeline automation and deployment workflows.`
                       : `Integration: ${integration.metadata?.name}`}
                   </Text>
@@ -347,7 +347,7 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                   id="integration-url"
                   type="url"
                   placeholder={
-                    selectedType === 'TYPE_SEMAPHORE'
+                    selectedType === 'semaphore'
                       ? 'https://api.semaphoreci.com'
                       : ''
                   }

@@ -7,20 +7,25 @@ import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
 // Define the store state type
 export interface CanvasState {
   canvas: SuperplaneCanvas;
+  canvasId: string;
   stages: StageWithEventQueue[];
   eventSources: EventSourceWithEvents[];
   connectionGroups: SuperplaneConnectionGroup[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
   editingStageId: string | null;
+  editingEventSourceId: string | null;
   webSocketConnectionStatus: ReadyState;
   
   // Actions
   initialize: (data: CanvasData) => void;
   addStage: (stage: SuperplaneStage, draft?: boolean) => void;
+  removeStage: (stageId: string) => void;
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
+  removeConnectionGroup: (connectionGroupId: string) => void;
   updateStage: (stage: SuperplaneStage) => void;
   addEventSource: (eventSource: EventSourceWithEvents) => void;
+  removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
@@ -28,6 +33,7 @@ export interface CanvasState {
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
   setEditingStage: (stageId: string | null) => void;
+  setEditingEventSource: (eventSourceId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
 

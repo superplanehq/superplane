@@ -105,8 +105,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
         return
       }
 
-      console.log('Starting bulk add with file:', uploadFile.name, 'role:', bulkUserRole)
-
       try {
 
         const fileContent = await new Promise<string>((resolve, reject) => {

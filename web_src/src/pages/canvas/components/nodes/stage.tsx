@@ -3,9 +3,12 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition } from '@/api-client';
+import type { StageWithEventQueue } from '../../store/types';
+import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor } from '@/api-client';
 import { EditModeContent } from '../EditModeContent';
-import { OverlayModal } from '../OverlayModal';
+import { ConfirmDialog } from '../ConfirmDialog';
+import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
 
@@ -13,12 +16,21 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
-  const [showOverlay, setShowOverlay] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
-  const { selectStageId, updateStage, setEditingStage } = useCanvasStore()
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; isValid: boolean } | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [stageName, setStageName] = useState(props.data.label);
+  const [stageDescription, setStageDescription] = useState(props.data.description || '');
+  const { selectStageId, updateStage, setEditingStage, removeStage } = useCanvasStore()
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
   )
+
+  // Get canvasId from the store or current context
+  const canvasId = useCanvasStore(state => state.canvasId) || '';
+  const updateStageMutation = useUpdateStage(canvasId);
+  const createStageMutation = useCreateStage(canvasId);
 
   // Filter events by their state
   const pendingEvents = useMemo(() =>
@@ -104,31 +116,181 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingStage(props.id);
+    // Initialize the editable values from current data
+    setStageName(props.data.label);
+    setStageDescription(props.data.description || '');
   };
 
-  const handleSaveAndEdit = (editedData: { label: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[] }) => {
-    if (currentStage) {
-      // Save changes using canvas store
-      updateStage({
-        ...currentStage,
-        metadata: {
-          ...currentStage.metadata!,
-          name: editedData.label
-        },
-        spec: {
-          ...currentStage.spec!,
-          inputs: editedData.inputs,
-          outputs: editedData.outputs
-        }
-      });
+  const handleSaveStage = async (saveAsDraft = false) => {
+    if (!currentFormData || !currentStage) {
+      return;
     }
+
+    // Check validation before saving
+    if (!currentFormData.isValid && !saveAsDraft) {
+      setApiError('Please fix validation errors before saving.');
+      return;
+    }
+
+    // Clear any previous API errors
+    setApiError(null);
+
+    // Check if this is a new/draft stage
+    // New stages have temporary IDs (timestamp strings) or are marked as draft
+    const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
+    const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
+
+    try {
+      if (isNewStage && !saveAsDraft) {
+        // Create new stage (commit to backend)
+        const result = await createStageMutation.mutateAsync({
+          name: stageName,
+          inputs: currentFormData.inputs,
+          outputs: currentFormData.outputs,
+          connections: currentFormData.connections,
+          executor: currentFormData.executor,
+          conditions: currentStage.spec?.conditions || []
+        });
+        removeStage(props.id);
+
+
+        // Update local store with the new stage data from API response
+        const newStage = result.data?.stage;
+        if (newStage) {
+          // If this was a temporary stage, we need to replace it entirely
+          // The React Flow node will need to be updated with the new ID
+          const stageWithQueue: StageWithEventQueue = {
+            ...newStage,
+            queue: currentStage.queue || [],
+            isDraft: false // No longer a draft after creation
+          };
+          updateStage(stageWithQueue);
+          // Update props.data to reflect the changes
+          props.data.label = stageName;
+          props.data.description = stageDescription;
+        }
+      } else if (!isNewStage && !saveAsDraft) {
+        // Update existing stage (commit to backend)
+        if (!currentStage.metadata?.id) {
+          throw new Error('Stage ID is required for update');
+        }
+
+        await updateStageMutation.mutateAsync({
+          stageId: currentStage.metadata.id,
+          name: stageName,
+          inputs: currentFormData.inputs,
+          outputs: currentFormData.outputs,
+          connections: currentFormData.connections,
+          executor: currentFormData.executor,
+          conditions: currentStage.spec?.conditions || []
+        });
+
+        // Update local store as well
+        updateStage({
+          ...currentStage,
+          metadata: {
+            ...currentStage.metadata,
+            name: stageName
+          },
+          spec: {
+            ...currentStage.spec!,
+            inputs: currentFormData.inputs,
+            outputs: currentFormData.outputs,
+            connections: currentFormData.connections,
+            executor: currentFormData.executor
+          }
+        });
+        // Update props.data to reflect the changes
+        props.data.label = stageName;
+        props.data.description = stageDescription;
+      } else if (saveAsDraft) {
+        // Save as draft (only update local store, don't commit to backend)
+        const draftStage: StageWithEventQueue = {
+          ...currentStage,
+          metadata: {
+            ...currentStage.metadata,
+            name: stageName
+          },
+          spec: {
+            ...currentStage.spec!,
+            inputs: currentFormData.inputs,
+            outputs: currentFormData.outputs,
+            connections: currentFormData.connections,
+            executor: currentFormData.executor
+          },
+          isDraft: true // Mark as draft
+        };
+        updateStage(draftStage);
+        // Update props.data to reflect the changes
+        props.data.label = stageName;
+        props.data.description = stageDescription;
+      }
+    } catch (error) {
+      console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, error);
+      // Set API error and stay in edit mode
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while saving the stage';
+      setApiError(errorMessage);
+      return; // Don't exit edit mode
+    }
+
+    // Only exit edit mode if save was successful
     setIsEditMode(false);
     setEditingStage(null);
+    setCurrentFormData(null);
+    setApiError(null);
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditingStage(null);
+    setCurrentFormData(null);
+    setApiError(null);
+    // Reset to original values
+    setStageName(props.data.label);
+    setStageDescription(props.data.description || '');
+  };
+
+  // Check if this is a draft/new stage that can be discarded
+  const isDraftStage = () => {
+    if (!currentStage) return false;
+
+    // Check if it's marked as draft
+    if (currentStage.isDraft) return true;
+
+    // Check if it has a temporary ID (timestamp strings)
+    const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
+
+    // Check if it doesn't have an ID yet
+    const hasNoId = !currentStage.metadata?.id;
+
+    return isTemporaryId || hasNoId;
+  };
+
+  const handleDiscardStage = () => {
+    if (currentStage?.metadata?.id) {
+      removeStage(currentStage.metadata.id);
+    }
+    setShowDiscardConfirm(false);
+  };
+
+  const handleStageNameChange = (newName: string) => {
+    setStageName(newName);
+    if (currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        label: newName
+      });
+    }
+  };
+
+  const handleStageDescriptionChange = (newDescription: string) => {
+    setStageDescription(newDescription);
+    if (currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        description: newDescription
+      });
+    }
   };
 
 
@@ -159,7 +321,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative `}
-      style={{ width: isEditMode ? '600px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {isEditMode && (
         <div
@@ -173,29 +335,82 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <MaterialSymbol name="expand_more" size="md" />
             </DropdownButton>
             <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
-              <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
+              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveStage(false)}>
+                <DropdownLabel>Save & Commit</DropdownLabel>
+              </DropdownItem>
+              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveStage(true)}>
+                <DropdownLabel>Save as Draft</DropdownLabel>
+              </DropdownItem>
             </DropdownMenu>
           </Dropdown>
 
+          <button
+            onClick={handleCancelEdit}
+            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
+            title="Cancel changes"
+          >
+            <MaterialSymbol name="close" size="md" />
+            Cancel
+          </button>
+
+          {isDraftStage() && (
+            <button
+              onClick={() => setShowDiscardConfirm(true)}
+              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+              title="Discard this stage"
+            >
+              <MaterialSymbol name="delete" size="md" />
+              Discard
+            </button>
+          )}
         </div>
       )}
-      {/* Modal overlay for View Code */}
-      <OverlayModal open={showOverlay} onClose={() => setShowOverlay(false)}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 16 }}>Stage Code</h2>
-        <div style={{ color: '#444', fontSize: 16, lineHeight: 1.7 }}>
-          Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse et urna fringilla, tincidunt nulla nec, dictum erat. Etiam euismod, justo id facilisis dictum, urna massa dictum erat, eget dictum urna massa id justo. Praesent nec facilisis urna. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
-        </div>
-      </OverlayModal>
 
+      {/* API Error Display */}
+      {isEditMode && apiError && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 z-40 bg-red-50 border border-red-200 rounded-md p-3 shadow-lg max-w-md">
+          <div className="flex items-start gap-2">
+            <MaterialSymbol name="error" size="sm" className="text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-red-800 font-medium">Save Error</p>
+              <p className="text-sm text-red-700 mt-1">{apiError}</p>
+            </div>
+            <button
+              onClick={() => setApiError(null)}
+              className="text-red-400 hover:text-red-600"
+            >
+              <MaterialSymbol name="close" size="sm" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-center">
-        <div className="flex items-center">
-          <span className="material-symbols-outlined mr-2 text-gray-700">rocket_launch</span>
-          <p className="mb-0 font-bold ml-1 text-gray-900">{props.data.label}</p>
+      <div className="px-4 py-4 flex justify-between items-start">
+        <div className="flex items-start flex-1 min-w-0">
+          <span className="material-symbols-outlined mr-2 text-gray-700 mt-1">rocket_launch</span>
+          <div className="flex-1 min-w-0">
+            <div className="mb-1">
+              <InlineEditable
+                value={stageName}
+                onSave={handleStageNameChange}
+                placeholder="Stage name"
+                className="font-bold text-gray-900 text-base text-left px-2 py-1"
+                isEditMode={isEditMode}
+              />
+            </div>
+            <div>
+              <InlineEditable
+                value={stageDescription}
+                onSave={handleStageDescriptionChange}
+                placeholder={isEditMode ? "Add description..." : "No description available"}
+                className="text-gray-600 text-sm text-left px-2 py-1"
+                isEditMode={isEditMode}
+              />
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 ml-2">
           {!isEditMode && (
             <button
               onClick={handleEditClick}
@@ -213,9 +428,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
       {isEditMode ? (
         <EditModeContent
-          data={props.data}
-          onSave={handleSaveAndEdit}
-          onCancel={handleCancelEdit}
+          data={{
+            ...props.data,
+            label: stageName,
+            description: stageDescription
+          }}
+          currentStageId={props.id}
+          onDataChange={setCurrentFormData}
         />
       ) : (
         <>
@@ -305,6 +524,18 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       {/* Custom Handles */}
       <CustomBarHandle type="target" connections={props.data.connections} conditions={props.data.conditions} />
       <CustomBarHandle type="source" />
+
+      {/* Discard Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDiscardConfirm}
+        title="Discard Stage"
+        message="Are you sure you want to discard this stage? This action cannot be undone."
+        confirmText="Discard"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={handleDiscardStage}
+        onCancel={() => setShowDiscardConfirm(false)}
+      />
     </div>
   );
 };

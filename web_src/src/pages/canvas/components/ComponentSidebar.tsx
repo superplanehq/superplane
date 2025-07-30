@@ -4,8 +4,17 @@ import React, { useState } from 'react';
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: string) => void;
+  onNodeAdd: (nodeType: string, executorType?: string) => void;
   className?: string;
+}
+
+interface ComponentDefinition {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  executorType?: string;
 }
 
 export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
@@ -16,13 +25,22 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  const components = [
+  const components: ComponentDefinition[] = [
     {
       id: 'stage',
-      name: 'Stage',
-      description: 'Add a stage to your canvas',
+      name: 'SEMAPHORE Stage',
+      description: 'Add a Semaphore-based stage to your canvas',
       icon: 'rocket_launch',
-      category: 'Deployment',
+      category: 'Stages',
+      executorType: 'semaphore'
+    },
+    {
+      id: 'stage',
+      name: 'HTTP Stage',
+      description: 'Add an HTTP-based stage to your canvas',
+      icon: 'rocket_launch',
+      category: 'Stages',
+      executorType: 'http'
     },
     {
       id: 'connection_group',
@@ -34,17 +52,17 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     {
       id: 'event_source',
       name: 'Event Source',
-      description: 'Run automated tests on your code',
-      icon: 'event',
-      category: 'Event Source',
+      description: 'Add an event source to your canvas',
+      icon: 'bolt',
+      category: 'Event Sources',
     },
 
   ];
 
   const categories = Array.from(new Set(components.map(c => c.category)));
 
-  const handleAddComponent = (componentType: string) => {
-    onNodeAdd(componentType);
+  const handleAddComponent = (componentType: string, executorType?: string) => {
+    onNodeAdd(componentType, executorType);
   };
 
   if (!isOpen) return null;
@@ -110,9 +128,9 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                       .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
                       .map((component) => (
                         <button
-                          key={component.id}
+                          key={`${component.id}-${component.name}`}
                           type="button"
-                          onClick={() => handleAddComponent(component.id)}
+                          onClick={() => handleAddComponent(component.id, component.executorType)}
                           className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors group focus:outline-none focus:ring-2 focus:ring-primary-500"
                           aria-label={`Add ${component.name} component`}
                         >

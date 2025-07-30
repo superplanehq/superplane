@@ -1,32 +1,170 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneFilter, SuperplaneFilterOperator, SuperplaneFilterType, SuperplaneConnectionType, SuperplaneValueFrom, SuperplaneExecutor } from '@/api-client/types.gen';
 import { AccordionItem } from './AccordionItem';
 import { Label } from './Label';
 import { Field } from './Field';
 import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { useCanvasStore } from '../store/canvasStore';
 
 interface EditModeContentProps {
   data: StageNodeType['data'];
-  onSave: (editedData: { label: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[] }) => void;
+  currentStageId?: string;
+  onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; isValid: boolean }) => void;
 }
 
-export function EditModeContent({ data, onSave }: EditModeContentProps) {
+export function EditModeContent({ data, currentStageId, onDataChange }: EditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general']);
+  const [description, setDescription] = useState<string>(data.description || '');
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>([]);
+  const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
+  const [executorJsonString, setExecutorJsonString] = useState<string>('');
   const [editingInputIndex, setEditingInputIndex] = useState<number | null>(null);
   const [editingOutputIndex, setEditingOutputIndex] = useState<number | null>(null);
   const [editingConnectionIndex, setEditingConnectionIndex] = useState<number | null>(null);
   const [editingSecretIndex, setEditingSecretIndex] = useState<number | null>(null);
   const [inputMappings, setInputMappings] = useState<Record<number, SuperplaneValueDefinition[]>>({});
 
+  // Validation states
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+
+  // Get available connection sources from canvas store
+  const { stages, eventSources, connectionGroups } = useCanvasStore();
+
+  // Executor templates
+  const getExecutorTemplate = (type: string) => {
+    switch (type) {
+      case 'semaphore':
+        return {
+          type: 'semaphore',
+          spec: {
+            // Semaphore executor configuration
+            // Note: To use integrations, configure them in canvas settings first,
+            // then add integration and resource fields here
+            branch: 'main',
+            pipelineFile: '.semaphore/pipeline.yml',
+            parameters: {
+              VERSION: '${{ inputs.VERSION }}',
+              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
+            }
+          }
+        };
+      case 'http':
+        return {
+          type: 'http',
+          spec: {
+            url: 'https://api.example.com/endpoint',
+            payload: {
+              key1: 'value1',
+              key2: '${{ inputs.KEY2 }}'
+            },
+            headers: {
+              'Authorization': 'Bearer ${{ secrets.API_TOKEN }}',
+              'Content-Type': 'application/json'
+            },
+            responsePolicy: {
+              statusCodes: [200, 201, 202]
+            }
+          }
+        };
+      default:
+        return {
+          type: '',
+          spec: {}
+        };
+    }
+  };
+
+  // Initialize executor JSON string based on current executor
+  React.useEffect(() => {
+    if (executor && Object.keys(executor).length > 0) {
+      setExecutorJsonString(JSON.stringify(executor, null, 2));
+    } else {
+      setExecutorJsonString('');
+    }
+  }, [executor]);
+
+  // Generate connection options based on connection type
+  const getConnectionOptions = (connectionType: SuperplaneConnectionType | undefined) => {
+    const options: Array<{ value: string; label: string; group: string }> = [];
+
+    switch (connectionType) {
+      case 'TYPE_STAGE':
+        stages.forEach(stage => {
+          if (stage.metadata?.name && stage.metadata?.id !== currentStageId) { // Exclude current stage
+            options.push({
+              value: stage.metadata.name,
+              label: stage.metadata.name,
+              group: 'Stages'
+            });
+          }
+        });
+        break;
+
+      case 'TYPE_EVENT_SOURCE':
+        eventSources.forEach(eventSource => {
+          if (eventSource.metadata?.name) {
+            options.push({
+              value: eventSource.metadata.name,
+              label: eventSource.metadata.name,
+              group: 'Event Sources'
+            });
+          }
+        });
+        break;
+
+      case 'TYPE_CONNECTION_GROUP':
+        connectionGroups.forEach(group => {
+          if (group.metadata?.name) {
+            options.push({
+              value: group.metadata.name,
+              label: group.metadata.name,
+              group: 'Connection Groups'
+            });
+          }
+        });
+        break;
+
+      default:
+        // If no type selected, show all available connections
+        stages.forEach(stage => {
+          if (stage.metadata?.name && stage.metadata?.id !== currentStageId) {
+            options.push({
+              value: stage.metadata.name,
+              label: stage.metadata.name,
+              group: 'Stages'
+            });
+          }
+        });
+        eventSources.forEach(eventSource => {
+          if (eventSource.metadata?.name) {
+            options.push({
+              value: eventSource.metadata.name,
+              label: eventSource.metadata.name,
+              group: 'Event Sources'
+            });
+          }
+        });
+        connectionGroups.forEach(group => {
+          if (group.metadata?.name) {
+            options.push({
+              value: group.metadata.name,
+              label: group.metadata.name,
+              group: 'Connection Groups'
+            });
+          }
+        });
+    }
+
+    return options;
+  };
+
   const handleAccordionToggle = (sectionId: string) => {
     setOpenSections(prev => {
-      console.log(prev)
       return prev.includes(sectionId)
         ? prev.filter(id => id !== sectionId)
         : [...prev, sectionId]
@@ -47,11 +185,91 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
     setInputs(prev => prev.map((input, i) =>
       i === index ? { ...input, [field]: value } : input
     ));
+    // Validate the input field after update
+    setTimeout(() => validateInputField(index), 0);
   };
 
   const removeInput = (index: number) => {
     setInputs(prev => prev.filter((_, i) => i !== index));
     setEditingInputIndex(null);
+  };
+
+  const cancelEditInput = (index: number) => {
+    const input = inputs[index];
+    // If this is a newly added input with no name, remove it
+    if (!input.name || input.name.trim() === '') {
+      removeInput(index);
+    } else {
+      setEditingInputIndex(null);
+    }
+  };
+
+  const validateInputField = (index: number) => {
+    const input = inputs[index];
+    const errors = validateInput(input, index);
+    if (errors.length > 0) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [`input_${index}`]: errors.join(', ')
+      }));
+    } else {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`input_${index}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateOutputField = (index: number) => {
+    const output = outputs[index];
+    const errors = validateOutput(output, index);
+    if (errors.length > 0) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [`output_${index}`]: errors.join(', ')
+      }));
+    } else {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`output_${index}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateConnectionField = (index: number) => {
+    const connection = connections[index];
+    const errors = validateConnection(connection);
+    if (errors.length > 0) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [`connection_${index}`]: errors.join(', ')
+      }));
+    } else {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`connection_${index}`];
+        return newErrors;
+      });
+    }
+  };
+
+  const validateSecretField = (index: number) => {
+    const secret = secrets[index];
+    const errors = validateSecret(secret, index);
+    if (errors.length > 0) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [`secret_${index}`]: errors.join(', ')
+      }));
+    } else {
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[`secret_${index}`];
+        return newErrors;
+      });
+    }
   };
 
   const addOutput = () => {
@@ -69,11 +287,23 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
     setOutputs(prev => prev.map((output, i) =>
       i === index ? { ...output, [field]: value } : output
     ));
+    // Validate the output field after update
+    setTimeout(() => validateOutputField(index), 0);
   };
 
   const removeOutput = (index: number) => {
     setOutputs(prev => prev.filter((_, i) => i !== index));
     setEditingOutputIndex(null);
+  };
+
+  const cancelEditOutput = (index: number) => {
+    const output = outputs[index];
+    // If this is a newly added output with no name, remove it
+    if (!output.name || output.name.trim() === '') {
+      removeOutput(index);
+    } else {
+      setEditingOutputIndex(null);
+    }
   };
 
   const addMapping = (inputIndex: number) => {
@@ -116,14 +346,40 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
   };
 
   const updateConnection = (index: number, field: keyof SuperplaneConnection, value: SuperplaneConnectionType | SuperplaneFilterOperator | string) => {
-    setConnections(prev => prev.map((conn, i) =>
-      i === index ? { ...conn, [field]: value } : conn
-    ));
+    setConnections(prev => prev.map((conn, i) => {
+      if (i === index) {
+        const updatedConnection = { ...conn, [field]: value };
+
+        // If connection type changed, clear the connection name since available options will be different
+        if (field === 'type' && updatedConnection.name) {
+          const newOptions = getConnectionOptions(value as SuperplaneConnectionType);
+          const isCurrentNameValid = newOptions.some(option => option.value === updatedConnection.name);
+          if (!isCurrentNameValid) {
+            updatedConnection.name = '';
+          }
+        }
+
+        return updatedConnection;
+      }
+      return conn;
+    }));
+    // Validate the connection field after update
+    setTimeout(() => validateConnectionField(index), 0);
   };
 
   const removeConnection = (index: number) => {
     setConnections(prev => prev.filter((_, i) => i !== index));
     setEditingConnectionIndex(null);
+  };
+
+  const cancelEditConnection = (index: number) => {
+    const connection = connections[index];
+    // If this is a newly added connection with no name, remove it
+    if (!connection.name || connection.name.trim() === '') {
+      removeConnection(index);
+    } else {
+      setEditingConnectionIndex(null);
+    }
   };
 
   const addFilter = (connectionIndex: number) => {
@@ -183,6 +439,8 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
     setSecrets(prev => prev.map((secret, i) =>
       i === index ? { ...secret, [field]: value } : secret
     ));
+    // Validate the secret field after update
+    setTimeout(() => validateSecretField(index), 0);
   };
 
   const updateSecretMode = (index: number, useValueFrom: boolean) => {
@@ -193,6 +451,8 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
         valueFrom: useValueFrom ? { secret: { name: '', key: '' } } : undefined
       } : secret
     ));
+    // Validate the secret field after update
+    setTimeout(() => validateSecretField(index), 0);
   };
 
   const removeSecret = (index: number) => {
@@ -200,13 +460,296 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
     setEditingSecretIndex(null);
   };
 
-  const handleSave = () => {
-    onSave({
-      label: data.label,
-      inputs,
-      outputs
-    });
+  // Executor management
+  const handleExecutorTypeChange = (type: string) => {
+    const template = getExecutorTemplate(type);
+    setExecutor(template);
+    setExecutorJsonString(JSON.stringify(template, null, 2));
   };
+
+  const handleExecutorJsonChange = (jsonString: string) => {
+    setExecutorJsonString(jsonString);
+    try {
+      const parsedExecutor = JSON.parse(jsonString);
+      setExecutor(parsedExecutor);
+      // Clear executor JSON validation error if JSON is valid
+      setValidationErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.executorJson;
+        return newErrors;
+      });
+    } catch {
+      // Invalid JSON, don't update executor state
+      setValidationErrors(prev => ({
+        ...prev,
+        executorJson: 'Invalid JSON format'
+      }));
+    }
+  };
+
+  // Validation functions
+  const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+    if (!input.name || input.name.trim() === '') {
+      errors.push('Input name is required');
+    }
+    if (input.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(input.name)) {
+      errors.push('Input name must start with a letter and contain only letters, numbers, and underscores');
+    }
+    // Check for duplicate names
+    const duplicateIndex = inputs.findIndex((inp, i) => i !== index && inp.name === input.name);
+    if (duplicateIndex !== -1) {
+      errors.push('Input name must be unique');
+    }
+    return errors;
+  };
+
+  const validateOutput = (output: SuperplaneOutputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+    if (!output.name || output.name.trim() === '') {
+      errors.push('Output name is required');
+    }
+    if (output.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(output.name)) {
+      errors.push('Output name must start with a letter and contain only letters, numbers, and underscores');
+    }
+    // Check for duplicate names
+    const duplicateIndex = outputs.findIndex((out, i) => i !== index && out.name === output.name);
+    if (duplicateIndex !== -1) {
+      errors.push('Output name must be unique');
+    }
+    return errors;
+  };
+
+  const validateConnection = (connection: SuperplaneConnection): string[] => {
+    const errors: string[] = [];
+    if (!connection.name || connection.name.trim() === '') {
+      errors.push('Connection name is required');
+    }
+    if (!connection.type) {
+      errors.push('Connection type is required');
+    }
+    return errors;
+  };
+
+  const validateSecret = (secret: SuperplaneValueDefinition, index: number): string[] => {
+    const errors: string[] = [];
+    if (!secret.name || secret.name.trim() === '') {
+      errors.push('Secret name is required');
+    }
+    if (secret.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(secret.name)) {
+      errors.push('Secret name must start with a letter and contain only letters, numbers, and underscores');
+    }
+    // Check for duplicate names
+    const duplicateIndex = secrets.findIndex((sec, i) => i !== index && sec.name === secret.name);
+    if (duplicateIndex !== -1) {
+      errors.push('Secret name must be unique');
+    }
+
+    if (!secret.valueFrom && (!secret.value || secret.value.trim() === '')) {
+      errors.push('Secret value is required');
+    }
+
+    if (secret.valueFrom && secret.valueFrom.secret) {
+      if (!secret.valueFrom.secret.name || secret.valueFrom.secret.name.trim() === '') {
+        errors.push('Secret reference name is required');
+      }
+      if (!secret.valueFrom.secret.key || secret.valueFrom.secret.key.trim() === '') {
+        errors.push('Secret reference key is required');
+      }
+    }
+
+    return errors;
+  };
+
+
+  const validateAllFields = React.useCallback((): boolean => {
+    const errors: Record<string, string> = {};
+
+    // Helper validation functions
+    const validateInputItem = (input: SuperplaneInputDefinition, index: number): string[] => {
+      const validationErrors: string[] = [];
+      if (!input.name || input.name.trim() === '') {
+        validationErrors.push('Input name is required');
+      }
+      if (input.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(input.name)) {
+        validationErrors.push('Input name must start with a letter and contain only letters, numbers, and underscores');
+      }
+      // Check for duplicate names
+      const duplicateIndex = inputs.findIndex((inp, i) => i !== index && inp.name === input.name);
+      if (duplicateIndex !== -1) {
+        validationErrors.push('Input name must be unique');
+      }
+      return validationErrors;
+    };
+
+    const validateOutputItem = (output: SuperplaneOutputDefinition, index: number): string[] => {
+      const validationErrors: string[] = [];
+      if (!output.name || output.name.trim() === '') {
+        validationErrors.push('Output name is required');
+      }
+      if (output.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(output.name)) {
+        validationErrors.push('Output name must start with a letter and contain only letters, numbers, and underscores');
+      }
+      // Check for duplicate names
+      const duplicateIndex = outputs.findIndex((out, i) => i !== index && out.name === output.name);
+      if (duplicateIndex !== -1) {
+        validationErrors.push('Output name must be unique');
+      }
+      return validationErrors;
+    };
+
+    const validateConnectionItem = (connection: SuperplaneConnection): string[] => {
+      const validationErrors: string[] = [];
+      if (!connection.name || connection.name.trim() === '') {
+        validationErrors.push('Connection name is required');
+      }
+      if (!connection.type) {
+        validationErrors.push('Connection type is required');
+      }
+      return validationErrors;
+    };
+
+    const validateSecretItem = (secret: SuperplaneValueDefinition, index: number): string[] => {
+      const validationErrors: string[] = [];
+      if (!secret.name || secret.name.trim() === '') {
+        validationErrors.push('Secret name is required');
+      }
+      if (secret.name && !/^[a-zA-Z][a-zA-Z0-9_]*$/.test(secret.name)) {
+        validationErrors.push('Secret name must start with a letter and contain only letters, numbers, and underscores');
+      }
+      // Check for duplicate names
+      const duplicateIndex = secrets.findIndex((sec, i) => i !== index && sec.name === secret.name);
+      if (duplicateIndex !== -1) {
+        validationErrors.push('Secret name must be unique');
+      }
+
+      if (!secret.valueFrom && (!secret.value || secret.value.trim() === '')) {
+        validationErrors.push('Secret value is required');
+      }
+
+      if (secret.valueFrom && secret.valueFrom.secret) {
+        if (!secret.valueFrom.secret.name || secret.valueFrom.secret.name.trim() === '') {
+          validationErrors.push('Secret reference name is required');
+        }
+        if (!secret.valueFrom.secret.key || secret.valueFrom.secret.key.trim() === '') {
+          validationErrors.push('Secret reference key is required');
+        }
+      }
+
+      return validationErrors;
+    };
+
+    const validateExecutorItem = (executor: SuperplaneExecutor): string[] => {
+      const validationErrors: string[] = [];
+      if (executor.type && executor.type !== '') {
+        if (!executor.spec || Object.keys(executor.spec).length === 0) {
+          validationErrors.push('Executor specification is required when executor type is set');
+        }
+
+        // Type-specific validations
+        if (executor.type === 'http' && executor.spec) {
+          const spec = executor.spec as Record<string, unknown>;
+          if (!spec.url) {
+            validationErrors.push('HTTP executor requires a URL');
+          } else if (typeof spec.url === 'string' && !/^https?:\/\/.+/.test(spec.url)) {
+            validationErrors.push('HTTP executor URL must be a valid HTTP/HTTPS URL');
+          }
+        }
+
+        if (executor.type === 'semaphore' && executor.spec) {
+          const spec = executor.spec as Record<string, unknown>;
+          if (!spec.pipelineFile) {
+            validationErrors.push('Semaphore executor requires a pipeline file');
+          }
+        }
+      }
+      return validationErrors;
+    };
+
+    // Validate inputs
+    inputs.forEach((input, index) => {
+      const inputErrors = validateInputItem(input, index);
+      if (inputErrors.length > 0) {
+        errors[`input_${index}`] = inputErrors.join(', ');
+      }
+    });
+
+    // Validate outputs
+    outputs.forEach((output, index) => {
+      const outputErrors = validateOutputItem(output, index);
+      if (outputErrors.length > 0) {
+        errors[`output_${index}`] = outputErrors.join(', ');
+      }
+    });
+
+    // Validate connections
+    connections.forEach((connection, index) => {
+      const connectionErrors = validateConnectionItem(connection);
+      if (connectionErrors.length > 0) {
+        errors[`connection_${index}`] = connectionErrors.join(', ');
+      }
+    });
+
+    // Validate secrets
+    secrets.forEach((secret, index) => {
+      const secretErrors = validateSecretItem(secret, index);
+      if (secretErrors.length > 0) {
+        errors[`secret_${index}`] = secretErrors.join(', ');
+      }
+    });
+
+    // Validate executor
+    const executorErrors = validateExecutorItem(executor);
+    if (executorErrors.length > 0) {
+      errors.executor = executorErrors.join(', ');
+    }
+
+    // Validate executor JSON if present
+    if (executorJsonString.trim() !== '') {
+      try {
+        JSON.parse(executorJsonString);
+      } catch {
+        errors.executorJson = 'Invalid JSON format';
+      }
+    }
+
+    setValidationErrors(errors);
+
+    return Object.keys(errors).length === 0;
+  }, [inputs, outputs, connections, secrets, executor, executorJsonString]);
+
+
+  // Update the onDataChange to include validation
+  const handleDataChange = React.useCallback(() => {
+    if (onDataChange) {
+      const isValid = validateAllFields();
+      onDataChange({
+        label: data.label,
+        description,
+        inputs,
+        outputs,
+        connections,
+        executor,
+        isValid
+      });
+    }
+  }, [data.label, description, inputs, outputs, connections, executor, onDataChange, validateAllFields]);
+
+  // Notify parent of data changes with validation
+  useEffect(() => {
+    handleDataChange();
+  }, [handleDataChange]);
+
+  const cancelEditSecret = (index: number) => {
+    const secret = secrets[index];
+    // If this is a newly added secret with no name, remove it
+    if (!secret.name || secret.name.trim() === '') {
+      removeSecret(index);
+    } else {
+      setEditingSecretIndex(null);
+    }
+  };
+
 
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
@@ -237,22 +780,71 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                       <select
                         value={connection.type || 'TYPE_EVENT_SOURCE'}
                         onChange={(e) => updateConnection(index, 'type', e.target.value as SuperplaneConnectionType)}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`connection_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       >
                         <option value="TYPE_EVENT_SOURCE">Event Source</option>
                         <option value="TYPE_STAGE">Stage</option>
                         <option value="TYPE_CONNECTION_GROUP">Connection Group</option>
                       </select>
+                      {validationErrors[`connection_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`connection_${index}`]}
+                        </div>
+                      )}
                     </Field>
                     <Field>
                       <Label>Connection Name</Label>
-                      <input
-                        type="text"
+                      <select
                         value={connection.name || ''}
                         onChange={(e) => updateConnection(index, 'name', e.target.value)}
-                        placeholder="Connection name"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`connection_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
+                      >
+                        <option value="">
+                          {connection.type ? 'Select a connection...' : 'Select connection type first'}
+                        </option>
+                        {(() => {
+                          const options = getConnectionOptions(connection.type);
+
+                          if (options.length === 0 && connection.type) {
+                            return (
+                              <option value="" disabled>
+                                No {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}s available
+                              </option>
+                            );
+                          }
+
+                          const groupedOptions: Record<string, typeof options> = {};
+
+                          // Group options by their group property
+                          options.forEach(option => {
+                            if (!groupedOptions[option.group]) {
+                              groupedOptions[option.group] = [];
+                            }
+                            groupedOptions[option.group].push(option);
+                          });
+
+                          return Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
+                            <optgroup key={groupName} label={groupName}>
+                              {groupOptions.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ));
+                        })()}
+                      </select>
+                      {validationErrors[`connection_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`connection_${index}`]}
+                        </div>
+                      )}
                     </Field>
 
                     {/* Filters Section */}
@@ -333,7 +925,7 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button outline onClick={() => setEditingConnectionIndex(null)}>
+                      <Button outline onClick={() => cancelEditConnection(index)}>
                         Cancel
                       </Button>
                       <Button color="blue" onClick={() => setEditingConnectionIndex(null)}>
@@ -406,8 +998,16 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                         value={input.name || ''}
                         onChange={(e) => updateInput(index, 'name', e.target.value)}
                         placeholder="Input name"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
+                      {validationErrors[`input_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`input_${index}`]}
+                        </div>
+                      )}
                     </Field>
                     <Field>
                       <Label>Description</Label>
@@ -416,7 +1016,10 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                         onChange={(e) => updateInput(index, 'description', e.target.value)}
                         placeholder="Input description"
                         rows={2}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </Field>
 
@@ -466,7 +1069,7 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                     </div>
 
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button outline onClick={() => setEditingInputIndex(null)}>
+                      <Button outline onClick={() => cancelEditInput(index)}>
                         Cancel
                       </Button>
                       <Button color="blue" onClick={() => setEditingInputIndex(null)}>
@@ -532,8 +1135,16 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                         value={output.name || ''}
                         onChange={(e) => updateOutput(index, 'name', e.target.value)}
                         placeholder="Output name"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`output_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
+                      {validationErrors[`output_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`output_${index}`]}
+                        </div>
+                      )}
                     </Field>
                     <Field>
                       <Label>Description</Label>
@@ -542,7 +1153,10 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                         onChange={(e) => updateOutput(index, 'description', e.target.value)}
                         placeholder="Output description"
                         rows={2}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`output_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
                     </Field>
                     <Field>
@@ -559,7 +1173,7 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                     </Field>
 
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button outline onClick={() => setEditingOutputIndex(null)}>
+                      <Button outline onClick={() => cancelEditOutput(index)}>
                         Cancel
                       </Button>
                       <Button color="blue" onClick={() => setEditingOutputIndex(null)}>
@@ -630,8 +1244,16 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                         value={secret.name || ''}
                         onChange={(e) => updateSecret(index, 'name', e.target.value)}
                         placeholder="Secret name"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
                       />
+                      {validationErrors[`secret_${index}`] && (
+                        <div className="text-xs text-red-600 mt-1">
+                          {validationErrors[`secret_${index}`]}
+                        </div>
+                      )}
                     </Field>
 
                     <Field>
@@ -667,7 +1289,10 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                           value={secret.value || ''}
                           onChange={(e) => updateSecret(index, 'value', e.target.value)}
                           placeholder="Secret value"
-                          className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                            }`}
                         />
                       ) : (
                         <div className="space-y-2">
@@ -679,7 +1304,10 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                               secret: { ...secret.valueFrom?.secret, name: e.target.value }
                             })}
                             placeholder="Secret name"
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                              }`}
                           />
                           <input
                             type="text"
@@ -689,14 +1317,17 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
                               secret: { ...secret.valueFrom?.secret, key: e.target.value }
                             })}
                             placeholder="Secret key"
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                              }`}
                           />
                         </div>
                       )}
                     </Field>
 
                     <div className="flex justify-end gap-2 pt-2">
-                      <Button outline onClick={() => setEditingSecretIndex(null)}>
+                      <Button outline onClick={() => cancelEditSecret(index)}>
                         Cancel
                       </Button>
                       <Button color="blue" onClick={() => setEditingSecretIndex(null)}>
@@ -733,6 +1364,53 @@ export function EditModeContent({ data, onSave }: EditModeContentProps) {
               <span className="material-symbols-outlined text-sm">add</span>
               Add Secret
             </button>
+          </div>
+        </AccordionItem>
+
+        {/* Executor Management Section */}
+        <AccordionItem
+          id="executor"
+          title={
+            <div className="flex items-center justify-between w-full">
+              <span>Executor Configuration</span>
+              <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
+                {executor.type || 'Not configured'}
+              </span>
+            </div>
+          }
+          isOpen={openSections.includes('executor')}
+          onToggle={handleAccordionToggle}
+        >
+          <div className="space-y-3">
+            {executor.type && (
+              <Field>
+                <Label>Executor Configuration (JSON)</Label>
+                <div className="text-xs text-zinc-500 mb-2">
+                  Configure your executor using JSON. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
+                </div>
+                <textarea
+                  value={executorJsonString}
+                  onChange={(e) => handleExecutorJsonChange(e.target.value)}
+                  placeholder="Enter executor configuration as JSON..."
+                  rows={12}
+                  className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 font-mono ${validationErrors.executorJson
+                    ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                    : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                    }`}
+                />
+                {validationErrors.executorJson && (
+                  <div className="text-xs text-red-600 mt-1">
+                    {validationErrors.executorJson}
+                  </div>
+                )}
+              </Field>
+            )}
+
+            {!executor.type && (
+              <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+                Select an executor type to configure how this stage will execute when triggered.
+              </div>
+            )}
           </div>
         </AccordionItem>
       </div>

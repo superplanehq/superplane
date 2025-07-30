@@ -24,12 +24,12 @@ const BAR_HEIGHT = 6;
 
 
 export default function CustomBarHandle({ type, conditions, connections }: HandleProps) {
-  
+
   // Positioning for left/right bars
   const isLeft = type === 'target';
   const isRight = type === 'source';
   const isVertical = isLeft || isRight;
-  
+
   // Create handle style
   const handleStyle = {
     borderRadius: 3,
@@ -43,8 +43,8 @@ export default function CustomBarHandle({ type, conditions, connections }: Handl
     zIndex: 2,
     boxShadow: '0 1px 6px 0 rgba(19,198,179,0.15)',
   };
-  
-  switch(type) {
+
+  switch (type) {
     case 'source':
       return <BarHandleRight handleStyle={handleStyle} />;
     case 'target':
@@ -53,58 +53,58 @@ export default function CustomBarHandle({ type, conditions, connections }: Handl
 }
 
 
-function BarHandleRight({handleStyle}: {handleStyle: CSSProperties}) {
-  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500"/>
+function BarHandleRight({ handleStyle }: { handleStyle: CSSProperties }) {
+  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500" />
 }
 
-function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handleStyle: CSSProperties, connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[]}) {
+function BarHandleLeft({ handleStyle, connections = [], conditions = [] }: { handleStyle: CSSProperties, connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[] }) {
   // Access ReactFlow instance to get zoom level
   const { getZoom } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState(1);
   // State for controlling tooltip visibility
   const [isOpen, setIsOpen] = useState(false);
   const arrowRef = useRef(null);
-  
+
   // Setup floating-ui
   const { refs, floatingStyles, context } = useFloating({
     placement: 'left',
     open: isOpen,
     onOpenChange: setIsOpen,
     middleware: [
-      offset(10 * (1 / zoomLevel)), 
-      flip(), 
-      shift({padding: 5}),
-      arrow({element: arrowRef})
+      offset(10 * (1 / zoomLevel)),
+      flip(),
+      shift({ padding: 5 }),
+      arrow({ element: arrowRef })
     ],
     whileElementsMounted: autoUpdate,
     strategy: 'fixed'
   });
-  
+
   // Setup interaction hooks
   const hover = useHover(context, { move: false });
   const focus = useFocus(context);
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: 'tooltip' });
-  
+
   const { getReferenceProps, getFloatingProps } = useInteractions([
     hover,
     focus,
     dismiss,
     role
   ]);
-  
+
   // Update zoom level when it changes
   useEffect(() => {
     const updateZoom = () => {
       setZoomLevel(getZoom());
     };
-    
+
     // Initial update
     updateZoom();
-    
+
     // Listen for viewport changes
     document.addEventListener('reactflow:viewport', updateZoom);
-    
+
     return () => {
       document.removeEventListener('reactflow:viewport', updateZoom);
     };
@@ -127,7 +127,7 @@ function BarHandleLeft({handleStyle, connections = [], conditions = []}: {handle
         className="custom-bar-handle !bg-blue-500"
         {...getReferenceProps()}
       />
-      
+
       {isOpen && (
         <FloatingPortal>
           <div
@@ -167,23 +167,21 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: S
         ))}
       </div>
       {conditions.length > 0 && (
-      <>
-      <div className="text-xs text-gray-600 font-semibold mb-1">Conditions:</div>
-      <div className="flex gap-1 mb-2 flex-wrap">
-        {conditions.map((condition, index) => (
-          <ConditionContent key={index} condition={condition} />
-        ))}
-      </div>
-      </>
+        <>
+          <div className="text-xs text-gray-600 font-semibold mb-1">Conditions:</div>
+          <div className="flex gap-1 mb-2 flex-wrap">
+            {conditions.map((condition, index) => (
+              <ConditionContent key={index} condition={condition} />
+            ))}
+          </div>
+        </>
       )}
-      <div className="bg-white border border-gray-200 rounded p-2 text-xs text-gray-700 shadow-sm">
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Suspendisse et urna fringilla, tincidunt nulla nec, dictum erat.
-      </div>
+
     </div>
   );
 }
 
-  function ConditionContent({ condition }: { condition: SuperplaneCondition }) {
+function ConditionContent({ condition }: { condition: SuperplaneCondition }) {
   switch (condition.type) {
     case 'CONDITION_TYPE_APPROVAL':
       return <ApprovalContent approval={condition.approval!} />;
@@ -198,7 +196,7 @@ function TooltipContent({ connections = [], conditions = [] }: { connections?: S
       <div className="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-1 rounded mr-1 mb-1 border border-emerald-200 flex flex-col">
         <div className="font-bold mb-0.5">Approval Required</div>
         <div className="flex items-center gap-1">
-          <span className="font-medium">Approvers needed:</span> 
+          <span className="font-medium">Approvers needed:</span>
           <span className="bg-emerald-200 px-1.5 py-0.5 rounded-full">{approval.count}</span>
         </div>
       </div>

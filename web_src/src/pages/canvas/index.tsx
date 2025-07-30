@@ -9,6 +9,8 @@ import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
 import { CanvasNavigation } from "../../components/CanvasNavigation";
 import { SettingsPage } from "../../components/SettingsPage";
+import { useNodeHandlers } from "./utils/nodeHandlers";
+import { NodeType } from "./utils/nodeFactories";
 
 // No props needed as we'll get the ID from the URL params
 
@@ -17,7 +19,7 @@ export function Canvas() {
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, addStage } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -37,6 +39,9 @@ export function Canvas() {
 
   // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(canvasId!);
+  
+  // Use the modular node handlers
+  const { handleAddNode } = useNodeHandlers(canvasId || '');
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
@@ -170,25 +175,34 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNode = (nodeType: string) => {
-    if (nodeType === 'stage') {
-      addStage({
-        metadata: {
-          canvasId: canvasId!,
-          name: 'New Stage',
-          id: Date.now().toString(),
-        },
-        spec: {
-          conditions: [],
-          inputs: [],
-          outputs: [],
-          executor: {
-          },
-          connections: [],
-          inputMappings: [],
-          secrets: []
-        },
-      }, true);
+  // Handle adding nodes using the modular system
+  const handleAddNodeByType = (nodeType: string, executorType?: string) => {
+    try {
+      // Map string types to NodeType enum
+      const nodeTypeMap: Record<string, NodeType> = {
+        'stage': 'stage',
+        'event_source': 'event_source',
+        'eventSource': 'event_source', // Support both naming conventions
+        'connection_group': 'connection_group',
+        'connectionGroup': 'connection_group' // Support both naming conventions
+      };
+
+      const mappedNodeType = nodeTypeMap[nodeType];
+      if (!mappedNodeType) {
+        console.error(`Unknown node type: ${nodeType}`);
+        return;
+      }
+
+      // Handle stages with executor types
+      if (mappedNodeType === 'stage' && executorType) {
+        const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' : 
+                         executorType === 'http' ? 'HTTP Stage' : 'New Stage';
+        handleAddNode(mappedNodeType, { name: stageName, executorType });
+      } else {
+        handleAddNode(mappedNodeType);
+      }
+    } catch (error) {
+      console.error(`Failed to add node of type ${nodeType}:`, error);
     }
   };
 
@@ -212,8 +226,8 @@ export function Canvas() {
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: string) => {
-                handleAddNode(nodeType);
+              onNodeAdd={(nodeType: string, executorType?: string) => {
+                handleAddNodeByType(nodeType, executorType);
               }}
             />
 

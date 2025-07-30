@@ -8,6 +8,7 @@ import {
   SuperplaneConditionType,
   SuperplaneInputDefinition,
   SuperplaneOutputDefinition,
+  SuperplaneExecutor,
   SpecGroupBy
 } from "@/api-client/types.gen";
 
@@ -36,6 +37,7 @@ export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
 // Stage node 
 export type StageData = {
   label: string;
+  description?: string;
   labels: string[];
   status?: string;
   timestamp?: string;
@@ -45,6 +47,7 @@ export type StageData = {
   conditions: SuperplaneCondition[];
   inputs: SuperplaneInputDefinition[];
   outputs: SuperplaneOutputDefinition[];
+  executor?: SuperplaneExecutor;
   spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
   isDraft?: boolean;

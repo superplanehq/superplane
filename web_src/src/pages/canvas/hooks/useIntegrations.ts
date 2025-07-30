@@ -50,7 +50,7 @@ export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS
 
 export interface CreateIntegrationParams {
   name: string
-  type: 'TYPE_SEMAPHORE' | 'TYPE_GITHUB'
+  type: 'semaphore'
   url: string
   authType: 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'
   tokenSecretName?: string
@@ -116,8 +116,6 @@ export const useUpdateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
   
   return useMutation({
     mutationFn: async (params: UpdateIntegrationParams) => {
-      // Mock update integration - in real implementation this would call an update API
-      console.log('Updating integration:', params)
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 1000))
       return { success: true, integrationId: params.id }
@@ -138,9 +136,6 @@ export const useDeleteIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
   
   return useMutation({
     mutationFn: async () => {
-      // Mock delete integration - in real implementation this would call a delete API
-      console.log('Deleting integration:', integrationId)
-      // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, 500))
       return { success: true, integrationId }
     },

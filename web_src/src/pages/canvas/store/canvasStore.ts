@@ -12,12 +12,14 @@ import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSource
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Initial state
   canvas: {},
+  canvasId: '',
   stages: [],
   eventSources: [],
   connectionGroups: [],
   nodePositions: {},
   selectedStageId: null,
   editingStageId: null,
+  editingEventSourceId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
 
   // reactflow state
@@ -30,6 +32,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   initialize: (data: CanvasData) => {
     set({
       canvas: data.canvas || {},
+      canvasId: data.canvas?.metadata?.id || '',
       stages: data.stages || [],
       eventSources: data.eventSources || [],
       connectionGroups: data.connectionGroups || [],
@@ -45,6 +48,16 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         queue: [],
         isDraft: draft
       }]
+    }));
+    get().syncToReactFlow();
+  },
+
+  removeStage: (stageId: string) => {
+    set((state) => ({
+      stages: state.stages.filter(s => s.metadata?.id !== stageId),
+      // Also clear selection and editing state if this stage was selected/being edited
+      selectedStageId: state.selectedStageId === stageId ? null : state.selectedStageId,
+      editingStageId: state.editingStageId === stageId ? null : state.editingStageId
     }));
     get().syncToReactFlow();
   },
@@ -65,9 +78,25 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
+  removeConnectionGroup: (connectionGroupId: string) => {
+    set((state) => ({
+      connectionGroups: state.connectionGroups.filter(cg => cg.metadata?.id !== connectionGroupId)
+    }));
+    get().syncToReactFlow();
+  },
+
   addEventSource: (eventSource: EventSourceWithEvents) => {
     set((state) => ({
       eventSources: [...state.eventSources, eventSource]
+    }));
+    get().syncToReactFlow();
+  },
+
+  removeEventSource: (eventSourceId: string) => {
+    set((state) => ({
+      eventSources: state.eventSources.filter(es => es.metadata?.id !== eventSourceId),
+      // Also clear editing state if this event source was being edited
+      editingEventSourceId: state.editingEventSourceId === eventSourceId ? null : state.editingEventSourceId
     }));
     get().syncToReactFlow();
   },
@@ -88,7 +117,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => {
-    // console.log("Updating node position:", nodeId, position);
     set((state) => ({
       nodePositions: {
         ...state.nodePositions,
@@ -121,6 +149,10 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   setEditingStage: (stageId: string | null) => {
     set({ editingStageId: stageId });
+  },
+
+  setEditingEventSource: (eventSourceId: string | null) => {
+    set({ editingEventSourceId: eventSourceId });
   },
 
   updateWebSocketConnectionStatus: (status) => {
