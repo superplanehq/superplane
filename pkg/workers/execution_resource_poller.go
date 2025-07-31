@@ -60,7 +60,12 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 		return err
 	}
 
-	statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID)
+	parentResource, err := resource.FindParentResource()
+	if err != nil {
+		return err
+	}
+
+	statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID, parentResource)
 	if err != nil {
 		return err
 	}

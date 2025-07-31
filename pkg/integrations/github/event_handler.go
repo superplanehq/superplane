@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/google/go-github/v74/github"
@@ -61,14 +60,14 @@ func (i *GitHubEventHandler) Handle(data []byte, header http.Header) (integratio
 }
 
 func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (integrations.StatefulResource, error) {
-	if eventType != "workflow_run" {
-		return nil, fmt.Errorf("unsupported event type %s", eventType)
-	}
-
 	//
 	// TODO: I'm hardcoding event type here, but we also listen to different event types
 	// and we should make sure we filter them out somehow.
 	//
+	if eventType != "workflow_run" {
+		return nil, fmt.Errorf("unsupported event type %s", eventType)
+	}
+
 	event, err := github.ParseWebHook(eventType, eventPayload)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing webhook: %v", err)
@@ -80,7 +79,6 @@ func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (inte
 			ID:         e.GetWorkflowRun().GetID(),
 			Status:     e.GetWorkflowRun().GetStatus(),
 			Conclusion: e.GetWorkflowRun().GetConclusion(),
-			Repository: e.GetRepo().GetFullName(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported event type %T", event)
@@ -94,20 +92,6 @@ func parseRepoName(fullName string) (string, string, error) {
 	}
 
 	return "", "", fmt.Errorf("invalid repository name format: %s", fullName)
-}
-
-func parseWorkflowRunID(id string) (string, int64, error) {
-	parts := strings.Split(id, ":")
-	if len(parts) == 2 {
-		runID, err := strconv.ParseInt(parts[1], 10, 64)
-		if err != nil {
-			return "", -1, fmt.Errorf("invalid run ID: %s", parts[1])
-		}
-
-		return parts[0], runID, nil
-	}
-
-	return "", -1, fmt.Errorf("invalid workflow run ID format: %s (expected format: owner/repo:runID)", id)
 }
 
 type Webhook struct {

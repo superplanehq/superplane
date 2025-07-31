@@ -128,7 +128,6 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 		ID:         workflowRun.GetID(),
 		Status:     workflowRun.GetStatus(),
 		Conclusion: workflowRun.GetConclusion(),
-		Repository: e.Resource.Name(),
 	}, nil
 }
 
@@ -165,17 +164,10 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID
 
 func (e *GitHubExecutor) buildWorkflowInputs(fromSpec map[string]string, fromExecution executors.ExecutionParameters) map[string]interface{} {
 	inputs := make(map[string]any)
-
 	for k, v := range fromSpec {
 		inputs[k] = v
 	}
 
-	inputs["superplane_stage_id"] = fromExecution.StageID
 	inputs["superplane_execution_id"] = fromExecution.ExecutionID
-
-	if fromExecution.Token != "" {
-		inputs["superplane_execution_token"] = fromExecution.Token
-	}
-
 	return inputs
 }

@@ -42,7 +42,7 @@ func NewSemaphoreResourceManager(ctx context.Context, URL string, authenticate i
 	}, nil
 }
 
-func (i *SemaphoreResourceManager) Status(resourceType, id string) (integrations.StatefulResource, error) {
+func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integrations.Resource) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		resource, err := i.getWorkflow(id)

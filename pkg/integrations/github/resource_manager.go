@@ -3,11 +3,22 @@ package github
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"golang.org/x/oauth2"
 )
+
+var eventTypes = []string{
+	"create",
+	"package",
+	"pull_request",
+	"push",
+	"registry_package",
+	"release",
+	"workflow_run",
+}
 
 type GitHubResourceManager struct {
 	client *github.Client
@@ -40,7 +51,7 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 
 	hook := &github.Hook{
 		Active: github.Ptr(true),
-		Events: []string{"push", "workflow_run"},
+		Events: eventTypes,
 		Config: &github.HookConfig{
 			URL:         &options.URL,
 			Secret:      github.Ptr(string(options.Key)),
@@ -70,10 +81,10 @@ func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resou
 	}
 }
 
-func (i *GitHubResourceManager) Status(resourceType, id string) (integrations.StatefulResource, error) {
+func (i *GitHubResourceManager) Status(resourceType, id string, parentResource integrations.Resource) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
-		return i.getWorkflowRun(id)
+		return i.getWorkflowRun(parentResource, id)
 	default:
 		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
 	}
@@ -96,13 +107,13 @@ func (i *GitHubResourceManager) getRepository(fullName string) (integrations.Res
 	}, nil
 }
 
-func (i *GitHubResourceManager) getWorkflowRun(id string) (integrations.StatefulResource, error) {
-	repository, runID, err := parseWorkflowRunID(id)
+func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resource, id string) (integrations.StatefulResource, error) {
+	runID, err := strconv.ParseInt(id, 10, 64)
 	if err != nil {
 		return nil, err
 	}
 
-	owner, repo, err := parseRepoName(repository)
+	owner, repo, err := parseRepoName(parentResource.Name())
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +127,6 @@ func (i *GitHubResourceManager) getWorkflowRun(id string) (integrations.Stateful
 		ID:         workflowRun.GetID(),
 		Status:     workflowRun.GetStatus(),
 		Conclusion: workflowRun.GetConclusion(),
-		Repository: repository,
 	}, nil
 }
 
@@ -141,11 +151,10 @@ type WorkflowRun struct {
 	ID         int64
 	Status     string
 	Conclusion string
-	Repository string
 }
 
 func (w *WorkflowRun) Id() string {
-	return fmt.Sprintf("%s:%d", w.Repository, w.ID)
+	return fmt.Sprintf("%d", w.ID)
 }
 
 func (w *WorkflowRun) Type() string {

@@ -30,10 +30,9 @@ func Test_GitHubEventHandler_Status(t *testing.T) {
 
 		workflowRun, ok := resource.(*github.WorkflowRun)
 		require.True(t, ok)
-		assert.Equal(t, "owner/repo:123456789", workflowRun.Id())
+		assert.Equal(t, "123456789", workflowRun.Id())
 		assert.Equal(t, "completed", workflowRun.Status)
 		assert.Equal(t, "success", workflowRun.Conclusion)
-		assert.Equal(t, "owner/repo", workflowRun.Repository)
 		assert.True(t, workflowRun.Finished())
 		assert.True(t, workflowRun.Successful())
 	})

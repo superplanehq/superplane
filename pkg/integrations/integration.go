@@ -44,7 +44,7 @@ type ResourceManager interface {
 	// Used by the execution resource poller. Ideally, not needed at all, since the status
 	// should be received in a webhook, through WebhookStatus().
 	//
-	Status(resourceType, id string) (StatefulResource, error)
+	Status(resourceType, id string, parentResource Resource) (StatefulResource, error)
 
 	//
 	// Configure the webhook for a integration resource.

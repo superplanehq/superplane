@@ -52,6 +52,7 @@ func (r *Registry) Init() {
 
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
 		EventHandler:       &github.GitHubEventHandler{},
+		OIDCVerifier:       &github.GitHubOIDCVerifier{},
 		NewResourceManager: github.NewGitHubResourceManager,
 		NewExecutor:        github.NewGitHubExecutor,
 	}
