@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Handle, Position } from '@xyflow/react';
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import { getStatusConfig } from '../../../utils/status-config'
 import { Button } from '../Button/button'
@@ -2280,7 +2281,19 @@ export function WorkflowNodeAccordion({
           </DialogBody>
          
         </Dialog>
-      </div>
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white"
+          aria-label="Input connection point"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white"
+          aria-label="Output connection point"
+        />
+      </div>  
     )
   }
 
@@ -2440,6 +2453,18 @@ export function WorkflowNodeAccordion({
          
         </div>
       </div>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white"
+        aria-label="Input connection point"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white"
+        aria-label="Output connection point"
+      />
     </div>
   )
 }

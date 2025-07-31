@@ -244,6 +244,8 @@ export function NodeDetailsSidebar({
   const [activeTab, setActiveTab] = useState<'activity' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedQueue, setExpandedQueue] = useState<Set<string>>(new Set());
+  const [isManagingQueue, setIsManagingQueue] = useState(false);
+  const [queueItems, setQueueItems] = useState(mockQueue);
 
   const tabs: Tab[] = [
     { id: 'activity', label: 'Activity' },
@@ -287,6 +289,24 @@ export function NodeDetailsSidebar({
       }
       return newSet;
     });
+  };
+
+  const handleManageQueue = () => {
+    setIsManagingQueue(true);
+  };
+
+  const handleSaveQueue = () => {
+    setIsManagingQueue(false);
+    // Here you would typically save the queue order to your backend
+  };
+
+  const handleCancelQueue = () => {
+    setIsManagingQueue(false);
+    setQueueItems(mockQueue); // Reset to original order
+  };
+
+  const handleRemoveQueueItem = (id: string) => {
+    setQueueItems(prev => prev.filter(item => item.id !== id));
   };
 
   const renderInputsOutputs = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
@@ -607,27 +627,55 @@ export function NodeDetailsSidebar({
             <div>
               <div className="flex items-center justify-between mb-4">
                 <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
-                  QUEUE ({mockQueue.length})
+                  QUEUE ({queueItems.length})
                 </Text>
-                <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
-                  Manage queue
-                </Link>
+                {!isManagingQueue ? (
+                  <Link 
+                    href="#" 
+                    onClick={(e) => { e.preventDefault(); handleManageQueue(); }}
+                    className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                  >
+                    Manage queue
+                  </Link>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={handleSaveQueue}
+                      plain
+                    >
+                      Save
+                    </Button>
+                    <Button 
+                      onClick={handleCancelQueue}
+                      plain
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                )}
               </div>
               
               <div className="space-y-3">
               
-                {mockQueue.map((item) => {
+                {queueItems.map((item) => {
                   const isExpanded = expandedQueue.has(item.id);
                   
                   return (
                     <div key={item.id} className="queueItem" >
                       <div 
-                        className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer"
-                        onClick={() => toggleQueueExpansion(item.id)}
+                        className={`p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 ${!isManagingQueue ? 'cursor-pointer' : ''}`}
+                        onClick={!isManagingQueue ? () => toggleQueueExpansion(item.id) : undefined}
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 truncate">
-                          { showIcons && (
+                            {isManagingQueue && (
+                              <MaterialSymbol 
+                                name="drag_indicator" 
+                                size="md" 
+                                className="text-gray-400 dark:text-zinc-500 cursor-grab active:cursor-grabbing"
+                              />
+                            )}
+                            { showIcons && (
                               <MaterialSymbol 
                                 name={item.icon} 
                                 size="lg" 
@@ -637,18 +685,39 @@ export function NodeDetailsSidebar({
                             <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
                           </div>
                           <div className="flex items-center gap-3">
-                            {!isExpanded && (
+                            {!isManagingQueue && !isExpanded && (
                               <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
                             )}
-                            <MaterialSymbol 
+                            {isManagingQueue ? (
+                              <div className="flex items-center gap-2">
+                                
+                                <Dropdown>
+                                  <DropdownButton as={Button} plain className="p-2 rounded hover:bg-gray-100 dark:hover:bg-zinc-700">
+                                    <MaterialSymbol 
+                                      name="more_vert" 
+                                      size="md" 
+                                      className="text-gray-600 dark:text-zinc-400"
+                                    />
+                                  </DropdownButton>
+                                  <DropdownMenu className="w-48">
+                                    <DropdownItem onClick={() => handleRemoveQueueItem(item.id)}>
+                                      <MaterialSymbol name="delete" size="sm" className="mr-2" />
+                                      Remove from queue
+                                    </DropdownItem>
+                                  </DropdownMenu>
+                                </Dropdown>
+                              </div>
+                            ) : (
+                              <MaterialSymbol 
                                 name={isExpanded ? 'expand_less' : 'expand_more'} 
                                 size="lg" 
                                 className="text-gray-600 dark:text-zinc-400" 
                               />
+                            )}
                           </div>
                         </div>
                 
-                        {isExpanded && (
+                        {!isManagingQueue && isExpanded && (
                           <div className="mt-3 space-y-3">
                             
                             {renderInputsOutputs2(item.inputs)}
@@ -657,7 +726,7 @@ export function NodeDetailsSidebar({
                           </div>
                         )}
                       </div>
-                      {item.executionMethod != 'queued' && (
+                      {!isManagingQueue && item.executionMethod != 'queued' && (
                           <div className={`px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
                           {item.executionMethod === 'manual' && (
                             <div className='flex justify-between items-center'>
