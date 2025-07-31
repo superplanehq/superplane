@@ -248,7 +248,8 @@ export function WorkflowNodeAccordion({
   const [isGitHubConnected, setIsGitHubConnected] = useState(false)
   const [githubProjects, setGithubProjects] = useState<Array<{id: string, name: string, url: string}>>([])
   const [selectedGitHubProject, setSelectedGitHubProject] = useState<string>('')
-
+  const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
+  
   // Generate YAML preview
   const generateYamlPreview = () => {
     const yamlData = {
@@ -2088,29 +2089,32 @@ export function WorkflowNodeAccordion({
               <MaterialSymbol name="code" size="md"/>
               Code
             </Button>
-            <Button
-              type="button"
-              plain
-              className="flex items-center gap-2"
-            >
-              <MaterialSymbol name="tune" size="md"/>
-              Advanced
-            </Button>
+            
           
             
             
             <Dropdown>
-              <DropdownButton plain className='flex items-center gap-2'>
-                <MaterialSymbol name="save" size="md"/>
+              <DropdownButton plain className='flex items-center gap-2 !pr-1'>
+                <MaterialSymbol name="save" size="md"/> 
                 Save
                 <MaterialSymbol name="expand_more" size="md"/>
               </DropdownButton>
               <DropdownMenu anchor="bottom start">
                 <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
                 <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2' onClick={onCancel}><DropdownLabel>Cancel edit</DropdownLabel></DropdownItem>
+               
               </DropdownMenu>
             </Dropdown>
+           
+            <Button
+              type="button"
+              plain
+              onClick={onCancel}
+              className="flex items-center gap-2"
+            >
+              
+              Cancel
+            </Button>
             <Tippy content="More options" placement="top">
             <Dropdown>
               <DropdownButton plain>
@@ -2118,7 +2122,8 @@ export function WorkflowNodeAccordion({
               </DropdownButton>
               <DropdownMenu anchor="bottom start">
                 <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="play_arrow" size="md"/><DropdownLabel>Run</DropdownLabel></DropdownItem>
-                <DropdownItem className='flex items-center gap-2' onClick={onCancel}><MaterialSymbol name="close" size="md"/><DropdownLabel>Cancel edit</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="menu_book" size="md"/><DropdownLabel>Documentation</DropdownLabel></DropdownItem>
                 <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
 
               </DropdownMenu>
@@ -2131,81 +2136,82 @@ export function WorkflowNodeAccordion({
       )}
         <div className="node-header p-4 flex justify-between border-b border-gray-200 dark:border-zinc-700 align-start items-start">
           <div className="flex flex-col w-full">
-            <div className="flex items-center">
-              <span className="material-symbols-outlined mr-2 text-gray-600 p-2 bg-zinc-100 dark:bg-zinc-700 rounded-xl">
-                {getTypeIcon(data.type)}
-              </span>
-              {/* Inline editable title */}
-              {editingField === 'title' ? (
-                <div className="flex-1">
-                  <Input
-                    value={tempTitle}
-                    onChange={(e) => setTempTitle(e.target.value)}
-                    onKeyDown={(e) => handleKeyDown(e, 'title')}
-                    onBlur={() => handleSaveInlineEdit('title')}
-                    className="font-semibold text-gray-900 dark:text-white"
-                    autoFocus
-                  />
-                </div>
-              ) : (
-                <div className="group relative">
-                  <div className="flex items-center">
-                    <h3 
-                      className="font-semibold text-gray-900 dark:text-white cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors"
-                      onClick={() => handleStartEdit('title')}
-                      title="Click to edit title"
-                    >
-                      {data.title}
-                    </h3>
-                    <FieldModificationIndicator field="title" />
+            <div className="flex items-start gap-2">
+              <div className='w-10 h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
+                <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+              </div>
+              <div className="flex flex-col w-full">
+                {/* Inline editable title */}
+                {editingField === 'title' ? (
+                  <div className="flex-1">
+                    <Input
+                      value={tempTitle}
+                      onChange={(e) => setTempTitle(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, 'title')}
+                      onBlur={() => handleSaveInlineEdit('title')}
+                      className="font-semibold text-gray-900 dark:text-white"
+                      autoFocus
+                    />
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="group relative">
+                    <div className="flex items-center">
+                      <h3 
+                        className="font-semibold text-gray-900 dark:text-white cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors mb-0"
+                        onClick={() => handleStartEdit('title')}
+                        title="Click to edit title"
+                      >
+                        {data.title}
+                      </h3>
+                      <FieldModificationIndicator field="title" />
+                    </div>
+                  </div>
+                )}
+            
+                {/* Inline editable description */}
+                {editingField === 'description' ? (
+                  <div className="mt-2">
+                    <Textarea
+                      value={tempDescription}
+                      onChange={(e) => setTempDescription(e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(e, 'description')}
+                      onBlur={() => handleSaveInlineEdit('description')}
+                      className="text-sm text-gray-600 dark:text-gray-400"
+                      rows={2}
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <div className="group relative w-full">
+                    <div className="flex items-center">
+                      <Subheading 
+                        className='!font-normal cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors'
+                        onClick={() => handleStartEdit('description')}
+                        title="Click to edit description"
+                      >
+                        {data.description || 'Click to add description'}
+                      </Subheading>
+                      <FieldModificationIndicator field="description" />
+                    </div>
+                    <div className="hidden absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <MaterialSymbol 
+                        name="edit" 
+                        size="sm" 
+                        className="absolute top-0 right-0 text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800 rounded p-1 shadow-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            {/* Inline editable description */}
-            {editingField === 'description' ? (
-              <div className="mt-2">
-                <Textarea
-                  value={tempDescription}
-                  onChange={(e) => setTempDescription(e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(e, 'description')}
-                  onBlur={() => handleSaveInlineEdit('description')}
-                  className="text-sm text-gray-600 dark:text-gray-400"
-                  rows={2}
-                  autoFocus
-                />
-              </div>
-            ) : (
-              <div className="group relative mt-2 w-full">
-                <div className="flex items-center">
-                  <Subheading 
-                    className='!font-normal cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-700 px-2 py-1 rounded transition-colors'
-                    onClick={() => handleStartEdit('description')}
-                    title="Click to edit description"
-                  >
-                    {data.description || 'Click to add description'}
-                  </Subheading>
-                  <FieldModificationIndicator field="description" />
-                </div>
-                <div className="hidden absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <MaterialSymbol 
-                    name="edit" 
-                    size="sm" 
-                    className="absolute top-0 right-0 text-zinc-500 dark:text-zinc-400 bg-white dark:bg-zinc-800 rounded p-1 shadow-sm"
-                  />
-                </div>
-              </div>
-            )}
           </div>
           <Badge color="zinc">Draft</Badge>
       </div>
         {/* Header */}
         <div className="hidden p-4 flex justify-between items-center border-b border-zinc-200 dark:border-zinc-700">
           <div className="flex items-center gap-3">
-            <MaterialSymbol 
-              name={getTypeIcon(data.type)} 
-              className={clsx('text-lg', getStatusColor(data.status))}
-            />
+            <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+
             <div>
               <h3 className="font-semibold text-zinc-900 dark:text-white">YAML Configuration</h3>
               <p className="text-sm text-zinc-600 dark:text-zinc-400">Edit workflow stage configuration</p>
@@ -2335,6 +2341,8 @@ export function WorkflowNodeAccordion({
               </DropdownButton>
               <DropdownMenu anchor="bottom start">
                 <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="content_copy" size="md"/><DropdownLabel>Duplicate</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="menu_book" size="md"/><DropdownLabel>Documentation</DropdownLabel></DropdownItem>
+
                 <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
 
               </DropdownMenu>
@@ -2348,12 +2356,15 @@ export function WorkflowNodeAccordion({
 
       {/* Header section */}
       <div className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-zinc-700">
-        <div className="flex items-center">
-          <MaterialSymbol 
-            name={getTypeIcon(data.type)} 
-            className="mr-2 text-gray-600 dark:text-zinc-400"
-          />
-          <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+        <div className="flex items-start gap-2">
+          <div className='w-10 h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
+          <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+          </div>
+          <div className='flex flex-col'> 
+            <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+            <h4 className="text-xs text-gray-500 dark:text-zinc-300">{data.description}</h4>
+            <Link className='text-xs text-blue-500 dark:text-blue-400' href="#">semaphore-project/workflow-name</Link>
+          </div>
         </div>
         
        
@@ -2362,7 +2373,7 @@ export function WorkflowNodeAccordion({
       {/* Status section */}
       <div className={clsx('p-4 border-b border-gray-200 dark:border-zinc-700', statusConfig.borderColor, statusConfig.bgColor)}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+          <span className="text-xs font-bold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
             Last Run
           </span>
           <span className="text-xs text-gray-500 dark:text-zinc-300">2 hours ago</span>
@@ -2401,23 +2412,28 @@ export function WorkflowNodeAccordion({
 
       {/* Summary section */}
       <div className="p-4 dark:bg-zinc-800 rounded-b-lg">
-        <h4 className="text-xs font-medium text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2">
-          NEXT IN QUEUE
+        <h4 className="text-xs text-gray-700 font-bold dark:text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+          NEXT IN QUEUE 
+          <span className="text-xs text-gray-500 dark:text-zinc-300 font-normal normal-case">+7 more</span>
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
             <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
               <div className="flex items-center gap-2 truncate pr-2">
-                <MaterialSymbol name="input" size="lg" className='text-orange-600 dark:text-orange-400' />
+                { showIcons && (
+                  <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
+                )}
                 <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">
-                  Msg 2dlsf32fwasdfd-asdfsdf-adsfasdf
+                  2dlsf32fwasdfd-asdfsdf-adsfasdf
                 </span>
               </div>
-              <Tippy content={<span className='text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-zinc-700 text-gray-500 dark:text-zinc-400 p-2'>Need manual approval</span>} placement='top'>
+              { !showIcons && (
+              <Tippy content={<span className='text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-zinc-700 p-2'>Need manual approval</span>} placement='top'>
                 <Button plain>
-                <MaterialSymbol name="how_to_reg" size="md" className='text-zinc-600 dark:text-zinc-400' />
+                <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700 dark:text-orange-400' />
                 </Button>
               </Tippy>
+              )}
             </div>
           )}
           

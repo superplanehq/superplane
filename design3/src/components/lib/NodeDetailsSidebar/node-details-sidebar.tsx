@@ -27,6 +27,7 @@ interface QueueItem {
   id: string;
   name: string;
   timestamp: string;
+  icon: string;
   status: 'pending' | 'approved' | 'waiting';
   executionMethod: 'manual' | 'timed' | 'queued' | 'blocked';
   approvalInfo?: {
@@ -105,10 +106,11 @@ const mockRuns2: RunData[] = [
 const mockQueue: QueueItem[] = [
   {
     id: 'msg-1',
-    name: 'Manual Approval Task',
+    name: 'laskdjf-a43re423-rfewlkjsdf234r-234234kl',
     timestamp: 'Jan 16, 2022 10:23:45',
     status: 'waiting',
     executionMethod: 'manual',
+    icon: 'how_to_reg',
     scheduledFor: 'Pending approval',
     approvalInfo: {
       approvedBy: 1,
@@ -123,10 +125,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-2',
-    name: 'Delayed Task',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '11 minutes ago',
     status: 'pending',
     executionMethod: 'timed',
+    icon: 'schedule',
     delayTime: '15 minutes',
     scheduledFor: 'Run in 15 minutes',
     inputs: {
@@ -136,10 +139,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-3',
-    name: 'Deploy #f8a9b3c',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '1 hour ago',
     status: 'pending',
     executionMethod: 'queued',
+    icon: 'input',
     scheduledFor: 'Position #2 in queue',
     inputs: {
       Environment: 'staging',
@@ -149,10 +153,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-4',
-    name: 'Blocked Task',
+    name: 'sdfsdfdsf3324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '3 hours ago',
     status: 'waiting',
     executionMethod: 'blocked',
+    icon: 'pause',
     scheduledFor: 'Blocked - dependency failed',
     blockedReason: 'Previous task "Build Infrastructure" failed',
     inputs: {
@@ -163,10 +168,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-5',
-    name: 'Build #k4m8n2p',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '5 hours ago',
     status: 'pending',
     executionMethod: 'queued',
+    icon: 'input',
     scheduledFor: 'Position #5 in queue',
     inputs: {
       Docker: 'node:18-alpine',
@@ -176,10 +182,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-6',
-    name: 'Release #q1w2e3r',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: 'Yesterday 4:30 PM',
     status: 'pending',
     executionMethod: 'timed',
+    icon: 'schedule',
     scheduledFor: 'Run tomorrow 9:00 AM',
     delayTime: 'until 9:00 AM tomorrow',
     inputs: {
@@ -190,10 +197,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-7',
-    name: 'Migrate #a5s6d7f',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '2 days ago',
     status: 'waiting',
     executionMethod: 'blocked',
+    icon: 'pause',
     scheduledFor: 'Blocked - resource unavailable',
     blockedReason: 'Database maintenance window not available',
     inputs: {
@@ -204,10 +212,11 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-8',
-    name: 'Config #z9x8c7v',
+    name: 'asdf324-asdf-rfewlkjsdf234r-sdf3244424',
     timestamp: '3 days ago',
     status: 'waiting',
     executionMethod: 'manual',
+    icon: 'how_to_reg',
     scheduledFor: 'Manual trigger required',
     approvalInfo: {
       approvedBy: 0,
@@ -229,6 +238,9 @@ export function NodeDetailsSidebar({
   onClose,
   className
 }: NodeDetailsSidebarProps) {
+  // Check for showIcons URL parameter
+  const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
+  
   const [activeTab, setActiveTab] = useState<'activity' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedQueue, setExpandedQueue] = useState<Set<string>>(new Set());
@@ -613,20 +625,20 @@ export function NodeDetailsSidebar({
                         className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer"
                         onClick={() => toggleQueueExpansion(item.id)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                              
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 truncate">
+                          { showIcons && (
                               <MaterialSymbol 
-                                name="input" 
+                                name={item.icon} 
                                 size="lg" 
                                 className="text-orange-600 dark:text-orange-400"
                               />
+                            )}
                             <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
-                         
                           </div>
                           <div className="flex items-center gap-3">
                             {!isExpanded && (
-                              <span className="text-xs text-gray-500 dark:text-zinc-400">2 min ago</span>
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
                             )}
                             <MaterialSymbol 
                                 name={isExpanded ? 'expand_less' : 'expand_more'} 
@@ -645,8 +657,43 @@ export function NodeDetailsSidebar({
                           </div>
                         )}
                       </div>
-                      {/* Execution Method Information */}
-                      {renderExecutionMethod(item)}
+                      {item.executionMethod != 'queued' && (
+                          <div className={`px-3 py-2 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
+                          {item.executionMethod === 'manual' && (
+                            <div className='flex justify-between items-center'>
+                              <div className='flex items-center'>
+                              { !showIcons && (
+                                <MaterialSymbol name="how_to_reg" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
+                              )}
+                                <span className="text-xs text-gray-700 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
+                              </div>
+                              <Link href="#" className="text-xs text-gray-700 dark:text-zinc-300  flex items-center">
+                                <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
+                                <span className='underline'>Approve</span>
+                              </Link>
+                            </div>
+                          )}
+                          {item.executionMethod === 'timed' && (
+                            <div className='flex items-center'>
+                              { !showIcons && (
+                                <MaterialSymbol name={item.icon} size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
+                              )}
+                                <span className='text-xs text-gray-700 dark:text-zinc-400'>{item.scheduledFor}</span>
+                            </div>
+                          )}
+                          {item.executionMethod === 'blocked' && (
+                            <div className='flex items-center'>
+                              { !showIcons && (
+                                <MaterialSymbol name="pause" size="md" className="text-orange-700 dark:text-orange-200 mr-2" /> 
+                              )}
+                                <span className='text-xs text-gray-700 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
+                            </div>
+                          )}
+                        
+                          
+                        </div>
+                      )}
+                      
                     </div>
                   );
                 })}
