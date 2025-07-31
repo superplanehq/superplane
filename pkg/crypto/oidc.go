@@ -22,13 +22,13 @@ func NewOIDCVerifier() *OIDCVerifier {
 }
 
 func (v *OIDCVerifier) Verify(ctx context.Context, issuer, audience, token string) (*oidc.IDToken, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	verifier, ok := v.verifiers[issuer]
 	if ok {
 		return verifier.Verify(ctx, token)
 	}
-
-	v.mu.Lock()
-	defer v.mu.Unlock()
 
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
