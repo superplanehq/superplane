@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"context"
+	"sync"
 
 	"github.com/coreos/go-oidc/v3/oidc"
 )
@@ -11,6 +12,7 @@ import (
 // and we keep a map of verifiers in memory for our integrations.
 type OIDCVerifier struct {
 	verifiers map[string]*oidc.IDTokenVerifier
+	mu        sync.Mutex
 }
 
 func NewOIDCVerifier() *OIDCVerifier {
@@ -24,6 +26,9 @@ func (v *OIDCVerifier) Verify(ctx context.Context, issuer, audience, token strin
 	if ok {
 		return verifier.Verify(ctx, token)
 	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
 
 	provider, err := oidc.NewProvider(ctx, issuer)
 	if err != nil {
