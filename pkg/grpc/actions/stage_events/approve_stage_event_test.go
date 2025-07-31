@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/config"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

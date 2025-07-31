@@ -84,6 +84,10 @@ func (r *Registry) GetOIDCVerifier(integrationType string) (integrations.OIDCVer
 		return nil, fmt.Errorf("integration type %s not registered", integrationType)
 	}
 
+	if registration.OIDCVerifier == nil {
+		return nil, fmt.Errorf("integration type %s does not support OIDC verification", integrationType)
+	}
+
 	return registration.OIDCVerifier, nil
 }
 

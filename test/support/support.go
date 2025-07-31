@@ -83,7 +83,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 
 	r.Registry = registry.NewRegistry(r.Encryptor)
 	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-	r.SemaphoreAPIMock.Init()
+	require.NoError(t, r.SemaphoreAPIMock.Init())
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
 
 	var err error

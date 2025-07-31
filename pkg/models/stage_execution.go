@@ -146,29 +146,35 @@ func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 		Error
 }
 
-type X struct {
-	IntegrationType  string
-	IntegrationURL   string
-	ParentResourceID string
+type ExecutionIntegrationResource struct {
+	IntegrationType     string
+	IntegrationURL      string
+	ParentExternalID    string
+	ExecutionExternalID string
 }
 
-func (e *StageExecution) GetResourceInformation(externalID string) (*X, error) {
-	var x X
+func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionIntegrationResource, error) {
+	var r ExecutionIntegrationResource
 	err := database.Conn().
 		Table("execution_resources").
 		Joins("INNER JOIN resources ON resources.id = execution_resources.parent_resource_id").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
 		Where("execution_resources.execution_id = ?", e.ID).
 		Where("execution_resources.external_id = ?", externalID).
-		Select("integrations.type, integrations.url, resources.parent_resource_id").
-		First(&x).
+		Select(`
+			integrations.url as integration_url,
+			integrations.type as integration_type,
+			execution_resources.external_id as execution_external_id,
+			resources.external_id as parent_external_id
+		`).
+		Scan(&r).
 		Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	return &x, nil
+	return &r, nil
 }
 
 func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {

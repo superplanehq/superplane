@@ -350,7 +350,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
-	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	superplaneToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
 
 	workflowID := uuid.NewString()
@@ -360,6 +360,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
 
 	goodBody, _ := json.Marshal(&ExecutionOutputRequest{
+		ExternalID:  workflowID,
 		ExecutionID: execution.ID.String(),
 		Outputs:     outputs,
 	})
@@ -374,7 +375,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -388,7 +389,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
@@ -400,7 +401,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "application/x-www-form-urlencoded",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
@@ -417,7 +418,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        body,
 			contentType: "application/json",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
@@ -449,12 +450,28 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		assert.Equal(t, "Unauthorized\n", response.Body.String())
 	})
 
-	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {
+	t.Run("superplane token is used -> 200 and execution outputs are updated", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        "/outputs",
 			body:        goodBody,
-			authToken:   validToken,
+			authToken:   superplaneToken,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, 200, response.Code)
+		execution, err := models.FindExecutionByID(execution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, outputs, execution.Outputs.Data())
+	})
+
+	t.Run("integration OIDC ID token is used -> 200 and execution outputs are updated", func(t *testing.T) {
+		token := r.SemaphoreAPIMock.GenerateIDToken(resource.Id(), workflowID)
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/outputs",
+			body:        goodBody,
+			authToken:   token,
 			contentType: "application/json",
 		})
 
@@ -479,7 +496,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -494,7 +511,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        generateBigBody(t),
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 

@@ -1,22 +1,29 @@
 package semaphore
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/coreos/go-oidc/v3/oidc/oidctest"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 )
 
 type SemaphoreAPIMock struct {
-	Server    *httptest.Server
-	Workflows map[string]Pipeline
-	Projects  []string
+	Server     *httptest.Server
+	PrivateKey *rsa.PrivateKey
+	Workflows  map[string]Pipeline
+	Projects   []string
 
 	LastRunTask     *semaphore.RunTaskRequest
 	LastRunWorkflow *semaphore.CreateWorkflowRequest
@@ -42,7 +49,23 @@ func (s *SemaphoreAPIMock) AddPipeline(ID, workflowID, result string) {
 	s.Workflows[workflowID] = Pipeline{ID: ID, Result: result}
 }
 
-func (s *SemaphoreAPIMock) Init() {
+func (s *SemaphoreAPIMock) Init() error {
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		return err
+	}
+
+	s.PrivateKey = privateKey
+	oidc := &oidctest.Server{
+		PublicKeys: []oidctest.PublicKey{
+			{
+				PublicKey: privateKey.Public(),
+				KeyID:     "my-key-id",
+				Algorithm: oidc.RS256,
+			},
+		},
+	}
+
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v2/workflows") {
 			s.DescribeWorkflow(w, r)
@@ -69,10 +92,25 @@ func (s *SemaphoreAPIMock) Init() {
 			return
 		}
 
-		w.WriteHeader(http.StatusNotFound)
+		oidc.ServeHTTP(w, r)
 	}))
 
 	s.Server = server
+	oidc.SetIssuer(s.Server.URL)
+	return nil
+}
+
+func (s *SemaphoreAPIMock) GenerateIDToken(project, workflow string) string {
+	now := time.Now()
+	rawClaims := `{
+		"iss": "` + s.Server.URL + `",
+		"aud": "` + s.Server.URL + `",
+		"exp": ` + strconv.FormatInt(now.Add(time.Hour).Unix(), 10) + `,
+		"wf_id": "` + workflow + `",
+		"prj_id": "` + project + `"
+	}`
+
+	return oidctest.SignIDToken(s.PrivateKey, "my-key-id", oidc.RS256, rawClaims)
 }
 
 func (s *SemaphoreAPIMock) DescribeWorkflow(w http.ResponseWriter, r *http.Request) {

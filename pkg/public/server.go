@@ -486,25 +486,26 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, r
 	// If authenticating with the token issued by SuperPlane itself fails,
 	// try to authenticate expecting an OIDC ID token issued by the integration.
 	//
-	resourceInfo, err := execution.GetResourceInformation(req.ExternalID)
+	integrationResource, err := execution.IntegrationResource(req.ExternalID)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
 
-	verifier, err := s.registry.GetOIDCVerifier(resourceInfo.IntegrationType)
+	verifier, err := s.registry.GetOIDCVerifier(integrationResource.IntegrationType)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
 
 	err = verifier.Verify(r.Context(), s.oidcVerifier, token, integrations.VerifyTokenOptions{
-		IntegrationURL:        resourceInfo.IntegrationURL,
-		IntegrationResourceID: resourceInfo.ParentResourceID,
-		ExecutionResourceID:   req.ExternalID,
+		IntegrationURL:        integrationResource.IntegrationURL,
+		IntegrationResourceID: integrationResource.ParentExternalID,
+		ExecutionResourceID:   integrationResource.ExecutionExternalID,
 	})
 
 	if err != nil {
+		log.Warnf("Invalid token for execution %s: %v", req.ExecutionID, err)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return nil
 	}
