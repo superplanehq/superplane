@@ -11,13 +11,13 @@ import (
 )
 
 func Test_GitHubExecutor_Validate(t *testing.T) {
-	integration := &github.GitHubIntegration{}
+	resourceManager := &github.GitHubResourceManager{}
 	resource := &github.Repository{
 		ID:       123456789,
 		FullName: "owner/test-repo",
 	}
 
-	executor, err := github.NewGitHubExecutor(integration, resource)
+	executor, err := github.NewGitHubExecutor(resourceManager, resource)
 	require.NoError(t, err)
 
 	t.Run("workflow is required", func(t *testing.T) {

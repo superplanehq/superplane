@@ -12,8 +12,8 @@ import (
 )
 
 type GitHubExecutor struct {
-	Integration integrations.Integration
-	Resource    integrations.Resource
+	Resource integrations.Resource
+	gh       *GitHubResourceManager
 }
 
 type ExecutorSpec struct {
@@ -22,10 +22,15 @@ type ExecutorSpec struct {
 	Inputs   map[string]string `json:"inputs"`
 }
 
-func NewGitHubExecutor(integration integrations.Integration, resource integrations.Resource) (integrations.Executor, error) {
+func NewGitHubExecutor(resourceManager integrations.ResourceManager, resource integrations.Resource) (integrations.Executor, error) {
+	gh, ok := resourceManager.(*GitHubResourceManager)
+	if !ok {
+		return nil, fmt.Errorf("invalid resource manager")
+	}
+
 	return &GitHubExecutor{
-		Integration: integration,
-		Resource:    resource,
+		gh:       gh,
+		Resource: resource,
 	}, nil
 }
 
@@ -62,8 +67,7 @@ func (e *GitHubExecutor) validateWorkflow(ctx context.Context, spec ExecutorSpec
 }
 
 func (e *GitHubExecutor) findWorkflow(owner, repo string, workflowName string) (*github.Workflow, error) {
-	githubIntegration := e.Integration.(*GitHubIntegration)
-	workflows, _, err := githubIntegration.client.Actions.ListWorkflows(context.Background(), owner, repo, nil)
+	workflows, _, err := e.gh.client.Actions.ListWorkflows(context.Background(), owner, repo, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %v", err)
 	}
@@ -98,8 +102,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 		return nil, err
 	}
 
-	githubIntegration := e.Integration.(*GitHubIntegration)
-	_, err = githubIntegration.client.Actions.CreateWorkflowDispatchEventByID(
+	_, err = e.gh.client.Actions.CreateWorkflowDispatchEventByID(
 		context.Background(),
 		owner,
 		repo,
@@ -130,8 +133,6 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 }
 
 func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID int64, ref string) (*github.WorkflowRun, error) {
-	githubIntegration := e.Integration.(*GitHubIntegration)
-
 	//
 	// TODO: we should add multiple tries here.
 	//
@@ -139,7 +140,7 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID
 	time.Sleep(5 * time.Second)
 
 	// List recent workflow runs for this workflow
-	runs, _, err := githubIntegration.client.Actions.ListWorkflowRunsByID(
+	runs, _, err := e.gh.client.Actions.ListWorkflowRunsByID(
 		context.Background(),
 		owner,
 		repo,

@@ -1,7 +1,6 @@
 package models
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -110,52 +109,13 @@ func (s *ConnectionGroupFieldSet) FindEventsWithData(tx *gorm.DB) ([]ConnectionG
 	return events, nil
 }
 
-func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, stateReason string, missingConnections []Connection) ([]byte, error) {
-	event := map[string]any{}
-
-	//
-	// Include fields from field set.
-	//
-	fieldMap := map[string]string{}
-	for k, v := range s.FieldSet.Data() {
-		fieldMap[k] = v
-	}
-
-	//
-	// Include events from connections.
-	//
+func (s *ConnectionGroupFieldSet) BuildEvent(tx *gorm.DB, stateReason string, missingConnections []Connection) (*FieldSetCompletedEvent, error) {
 	events, err := s.FindEventsWithData(tx)
 	if err != nil {
 		return nil, err
 	}
 
-	eventMap := map[string]any{}
-	for _, e := range events {
-		var obj map[string]any
-		err := json.Unmarshal(e.Raw, &obj)
-		if err != nil {
-			return nil, err
-		}
-
-		eventMap[e.SourceName] = obj
-	}
-
-	event["events"] = eventMap
-	event["fields"] = fieldMap
-
-	//
-	// Include the missing field, if any.
-	//
-	if len(missingConnections) > 0 {
-		missing := []string{}
-		for _, connection := range missingConnections {
-			missing = append(missing, connection.SourceName)
-		}
-
-		event["missing"] = missing
-	}
-
-	return json.Marshal(event)
+	return NewFieldSetCompletedEvent(s.FieldSet.Data(), events, missingConnections)
 }
 
 func (s *ConnectionGroupFieldSet) AttachEvent(tx *gorm.DB, event *Event) (*ConnectionGroupFieldSetEvent, error) {

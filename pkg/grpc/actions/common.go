@@ -328,7 +328,7 @@ func ValidateResource(ctx context.Context, registry *registry.Registry, integrat
 	//
 	// If resource record does not exist yet, we need to go to the integration to find it.
 	//
-	integrationImpl, err := registry.NewIntegration(ctx, integration)
+	integrationImpl, err := registry.NewResourceManager(ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error starting integration implementation: %v", err)
 	}

@@ -12,8 +12,8 @@ import (
 )
 
 type SemaphoreExecutor struct {
-	Integration integrations.Integration
-	Resource    integrations.Resource
+	ResourceManager integrations.ResourceManager
+	Resource        integrations.Resource
 }
 
 type ExecutorSpec struct {
@@ -23,10 +23,10 @@ type ExecutorSpec struct {
 	Parameters   map[string]string `json:"parameters"`
 }
 
-func NewSemaphoreExecutor(integration integrations.Integration, resource integrations.Resource) (integrations.Executor, error) {
+func NewSemaphoreExecutor(resourceManager integrations.ResourceManager, resource integrations.Resource) (integrations.Executor, error) {
 	return &SemaphoreExecutor{
-		Integration: integration,
-		Resource:    resource,
+		ResourceManager: resourceManager,
+		Resource:        resource,
 	}, nil
 }
 
@@ -49,7 +49,7 @@ func (e *SemaphoreExecutor) validateTask(spec ExecutorSpec) error {
 		return nil
 	}
 
-	semaphore := e.Integration.(*SemaphoreIntegration)
+	semaphore := e.ResourceManager.(*SemaphoreResourceManager)
 
 	//
 	// If task is a UUID, we describe to validate that it exists.
@@ -88,28 +88,19 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 		return nil, fmt.Errorf("error unmarshaling spec data: %v", err)
 	}
 
+	semaphore := e.ResourceManager.(*SemaphoreResourceManager)
 	if spec.Task != "" {
-		return e.runTask(spec, parameters)
+		semaphore.runTask(&RunTaskRequest{
+			TaskID:       spec.Task,
+			Branch:       spec.Branch,
+			PipelineFile: spec.PipelineFile,
+			Parameters:   e.workflowParameters(spec.Parameters, parameters),
+		})
 	}
 
-	return e.runWorkflow(spec, parameters)
-}
-
-func (e *SemaphoreExecutor) runWorkflow(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
-	semaphore := e.Integration.(*SemaphoreIntegration)
 	return semaphore.runWorkflow(CreateWorkflowRequest{
 		ProjectID:    e.Resource.Id(),
 		Reference:    "refs/heads/" + spec.Branch,
-		PipelineFile: spec.PipelineFile,
-		Parameters:   e.workflowParameters(spec.Parameters, parameters),
-	})
-}
-
-func (e *SemaphoreExecutor) runTask(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
-	semaphore := e.Integration.(*SemaphoreIntegration)
-	return semaphore.runTask(&RunTaskRequest{
-		TaskID:       spec.Task,
-		Branch:       spec.Branch,
 		PipelineFile: spec.PipelineFile,
 		Parameters:   e.workflowParameters(spec.Parameters, parameters),
 	})

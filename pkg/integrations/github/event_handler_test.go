@@ -8,8 +8,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github"
 )
 
-func Test_GitHubIntegration_HandleWebhook(t *testing.T) {
-	integration := &github.GitHubIntegration{}
+func Test_GitHubEventHandler_HandleWebhook(t *testing.T) {
+	handler := &github.GitHubEventHandler{}
 
 	t.Run("handles workflow run event", func(t *testing.T) {
 		payload := `{
@@ -24,7 +24,7 @@ func Test_GitHubIntegration_HandleWebhook(t *testing.T) {
 			}
 		}`
 
-		resource, err := integration.HandleWebhook([]byte(payload))
+		resource, err := handler.HandleWebhook([]byte(payload))
 		require.NoError(t, err)
 		assert.NotNil(t, resource)
 
@@ -41,7 +41,7 @@ func Test_GitHubIntegration_HandleWebhook(t *testing.T) {
 	t.Run("returns error for invalid payload", func(t *testing.T) {
 		payload := `invalid json`
 
-		resource, err := integration.HandleWebhook([]byte(payload))
+		resource, err := handler.HandleWebhook([]byte(payload))
 		assert.Error(t, err)
 		assert.Nil(t, resource)
 	})

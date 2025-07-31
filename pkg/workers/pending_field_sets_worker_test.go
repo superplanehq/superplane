@@ -112,6 +112,7 @@ func Test__PendingFieldSetsWorkerTest(t *testing.T) {
 		var eventData map[string]any
 		require.NoError(t, json.Unmarshal(event.Raw, &eventData))
 		assert.Equal(t, map[string]any{
+			"type":    models.FieldSetCompletedEventType,
 			"fields":  map[string]any{"version": "v1"},
 			"events":  map[string]any{"gh": map[string]any{}},
 			"missing": []any{source2.Name},

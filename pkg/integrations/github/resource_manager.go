@@ -1,0 +1,161 @@
+package github
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/google/go-github/v74/github"
+	"github.com/superplanehq/superplane/pkg/integrations"
+	"golang.org/x/oauth2"
+)
+
+type GitHubResourceManager struct {
+	client *github.Client
+}
+
+func NewGitHubResourceManager(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error) {
+	//
+	// TODO: figure out if the URL will be important here or not.
+	//
+
+	token, err := authenticate()
+	if err != nil {
+		return nil, fmt.Errorf("error getting authentication: %v", err)
+	}
+
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: token},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	return &GitHubResourceManager{client: client}, nil
+}
+
+func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
+	owner, repo, err := parseRepoName(options.Resource.Name())
+	if err != nil {
+		return nil, err
+	}
+
+	hook := &github.Hook{
+		Active: github.Ptr(true),
+		Events: []string{"push", "workflow_run"},
+		Config: &github.HookConfig{
+			URL:         &options.URL,
+			Secret:      github.Ptr(string(options.Key)),
+			ContentType: github.Ptr("json"),
+		},
+	}
+
+	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), owner, repo, hook)
+	if err != nil {
+		return nil, fmt.Errorf("error creating webhook: %v", err)
+	}
+
+	return []integrations.Resource{
+		&Webhook{
+			ID:          createdHook.GetID(),
+			WebhookName: *createdHook.Name,
+		},
+	}, nil
+}
+
+func (i *GitHubResourceManager) Get(resourceType, id string) (integrations.Resource, error) {
+	switch resourceType {
+	case ResourceTypeRepository:
+		return i.getRepository(id)
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
+func (i *GitHubResourceManager) Status(resourceType, id string) (integrations.StatefulResource, error) {
+	switch resourceType {
+	case ResourceTypeWorkflow:
+		return i.getWorkflowRun(id)
+	default:
+		return nil, fmt.Errorf("unsupported resource type %s", resourceType)
+	}
+}
+
+func (i *GitHubResourceManager) getRepository(fullName string) (integrations.Resource, error) {
+	owner, repo, err := parseRepoName(fullName)
+	if err != nil {
+		return nil, err
+	}
+
+	repository, _, err := i.client.Repositories.Get(context.Background(), owner, repo)
+	if err != nil {
+		return nil, fmt.Errorf("error getting repository: %v", err)
+	}
+
+	return &Repository{
+		ID:       repository.GetID(),
+		FullName: repository.GetFullName(),
+	}, nil
+}
+
+func (i *GitHubResourceManager) getWorkflowRun(id string) (integrations.StatefulResource, error) {
+	repository, runID, err := parseWorkflowRunID(id)
+	if err != nil {
+		return nil, err
+	}
+
+	owner, repo, err := parseRepoName(repository)
+	if err != nil {
+		return nil, err
+	}
+
+	workflowRun, _, err := i.client.Actions.GetWorkflowRunByID(context.Background(), owner, repo, runID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting workflow run: %v", err)
+	}
+
+	return &WorkflowRun{
+		ID:         workflowRun.GetID(),
+		Status:     workflowRun.GetStatus(),
+		Conclusion: workflowRun.GetConclusion(),
+		Repository: repository,
+	}, nil
+}
+
+type Repository struct {
+	ID       int64
+	FullName string
+}
+
+func (r *Repository) Id() string {
+	return fmt.Sprintf("%d", r.ID)
+}
+
+func (r *Repository) Name() string {
+	return r.FullName
+}
+
+func (r *Repository) Type() string {
+	return ResourceTypeRepository
+}
+
+type WorkflowRun struct {
+	ID         int64
+	Status     string
+	Conclusion string
+	Repository string
+}
+
+func (w *WorkflowRun) Id() string {
+	return fmt.Sprintf("%s:%d", w.Repository, w.ID)
+}
+
+func (w *WorkflowRun) Type() string {
+	return ResourceTypeWorkflow
+}
+
+func (w *WorkflowRun) Finished() bool {
+	return w.Status == "completed"
+}
+
+func (w *WorkflowRun) Successful() bool {
+	return w.Conclusion == "success"
+}
