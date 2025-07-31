@@ -59,14 +59,15 @@ spec:
 
 ### Pushing outputs from execution
 
-The `POST /outputs` is available for executions to push outputs.
+The `POST /outputs` endpoint is available for executions to push outputs. If the integration being used supports OpenID Connect ID tokens, you can use them to authenticate the request. For example, when running Semaphore workflows, you can use the `SEMAPHORE_OIDC_TOKEN` and `SEMAPHORE_WORKFLOW_ID` environment variables to authenticate the request:
 
-```
-curl -X POST \
+```bash
+curl \
+  "$SUPERPLANE_URL/api/v1/outputs" \
+  -X POST \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SEMAPHORE_STAGE_EXECUTION_TOKEN" \
-  --data "{\"execution_id\":$SEMAPHORE_STAGE_EXECUTION_ID,\"outputs\":{\"MY_OUTPUT\":\"hello\"}}" \
-  "$SUPERPLANE_URL/api/v1/outputs"
+  -H "Authorization: Bearer $SEMAPHORE_OIDC_TOKEN" \
+  --data "{\"execution_id\": \"$SUPERPLANE_STAGE_EXECUTION_ID\",\"external_id\": \"$SEMAPHORE_WORKFLOW_ID\",\"outputs": {\"output_1\":\"hello\",\"output_2\":\"world\"}}"
 ```
 
-The `SEMAPHORE_STAGE_EXECUTION_ID` and `SEMAPHORE_STAGE_EXECUTION_TOKEN` values are passed by Superplane to the executor. For example, in the case of the Semaphore executor type, those values are passed in the `parameters` field in the Semaphore Task API.
+Note: the `SUPERPLANE_STAGE_EXECUTION_ID` value is passed as a parameter by Superplane to the workflow run request.

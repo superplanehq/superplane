@@ -30,7 +30,7 @@ import (
 func Test__HealthCheckEndpoint(t *testing.T) {
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -59,7 +59,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 		Create()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	validEvent, _ := json.Marshal(semaphore.Hook{
@@ -185,7 +185,7 @@ func Test__ReceiveCustomWebhook(t *testing.T) {
 	defer r.Close()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	key, err := r.Source.GetDecryptedKey(context.Background(), r.Encryptor)
@@ -343,23 +343,30 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
-	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
+	require.NoError(t, err)
+
+	stageExecutor, err := stage.GetExecutor()
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
-	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	superplaneToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	require.NoError(t, err)
+
+	workflowID := uuid.NewString()
+	_, err = execution.AddResource(workflowID, "workflow", *stageExecutor.ResourceID)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
 
-	goodBody, _ := json.Marshal(&OutputsRequest{
+	goodBody, _ := json.Marshal(&ExecutionOutputRequest{
+		ExternalID:  workflowID,
 		ExecutionID: execution.ID.String(),
 		Outputs:     outputs,
 	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: "not-a-uuid",
 			Outputs:     outputs,
 		})
@@ -368,12 +375,12 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
 		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "execution not found\n", response.Body.String())
+		assert.Equal(t, "Execution not found\n", response.Body.String())
 	})
 
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
@@ -382,7 +389,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
@@ -394,14 +401,14 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "application/x-www-form-urlencoded",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
 	})
 
 	t.Run("execution that does not exist -> 401", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: uuid.NewString(),
 			Outputs:     outputs,
 		})
@@ -411,11 +418,10 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        body,
 			contentType: "application/json",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
-		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, 404, response.Code)
 	})
 
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
@@ -429,7 +435,6 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Missing Authorization header\n", response.Body.String())
 	})
 
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
@@ -442,15 +447,31 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, "Unauthorized\n", response.Body.String())
 	})
 
-	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {
+	t.Run("superplane token is used -> 200 and execution outputs are updated", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        "/outputs",
 			body:        goodBody,
-			authToken:   validToken,
+			authToken:   superplaneToken,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, 200, response.Code)
+		execution, err := models.FindExecutionByID(execution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, outputs, execution.Outputs.Data())
+	})
+
+	t.Run("integration OIDC ID token is used -> 200 and execution outputs are updated", func(t *testing.T) {
+		token := r.SemaphoreAPIMock.GenerateIDToken(resource.Id(), workflowID)
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/outputs",
+			body:        goodBody,
+			authToken:   token,
 			contentType: "application/json",
 		})
 
@@ -462,7 +483,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	t.Run("output not defined in stage is ignored", func(t *testing.T) {
 		// 'time' output is not defined in the stage
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: execution.ID.String(),
 			Outputs: map[string]any{
 				"sha":     "078fc8755c051",
@@ -475,7 +496,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -490,7 +511,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        generateBigBody(t),
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -504,7 +525,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -570,7 +591,7 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 func Test__GRPCGatewayRegistration(t *testing.T) {
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

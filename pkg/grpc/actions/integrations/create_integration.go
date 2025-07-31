@@ -80,12 +80,6 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 		return nil, err
 	}
 
-	if integration.Spec.Oidc == nil {
-		integration.Spec.Oidc = &pb.Integration_OIDC{
-			Enabled: false,
-		}
-	}
-
 	return &models.Integration{
 		Name:       integration.Metadata.Name,
 		DomainType: domainType,
@@ -94,7 +88,6 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 		URL:        integration.Spec.Url,
 		AuthType:   authType,
 		Auth:       datatypes.NewJSONType(*auth),
-		OIDC:       datatypes.NewJSONType(models.IntegrationOIDC{Enabled: integration.Spec.Oidc.Enabled}),
 	}, nil
 }
 
@@ -161,9 +154,6 @@ func serializeIntegration(integration models.Integration) *pb.Integration {
 			Type: integration.Type,
 			Url:  integration.URL,
 			Auth: serializeIntegrationAuth(integration.AuthType, integration.Auth.Data()),
-			Oidc: &pb.Integration_OIDC{
-				Enabled: integration.OIDC.Data().Enabled,
-			},
 		},
 	}
 }

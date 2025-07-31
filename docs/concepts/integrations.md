@@ -54,6 +54,12 @@ spec:
         secret:
           name: semaphore
           key: token
+
+    #
+    # The integration accepts OIDC Connect ID tokens issued by SuperPlane.
+    # For example, we can use this for AWS.
+    #
+    # use: oidc
 ```
 
 ### Using an integration in a stage executor

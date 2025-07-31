@@ -12,7 +12,6 @@ CREATE TABLE integrations (
   url         CHARACTER VARYING(256) NOT NULL,
   auth_type   CHARACTER VARYING(64) NOT NULL,
   auth        jsonb NOT NULL DEFAULT '{}',
-  oidc        jsonb NOT NULL DEFAULT '{}',
 
   PRIMARY KEY (id),
   UNIQUE (domain_type, domain_id, name)

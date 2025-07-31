@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
 
 const ExecutionFinishedRoutingKey = "execution-finished"
