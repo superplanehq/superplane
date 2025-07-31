@@ -688,7 +688,7 @@ export function WorkflowNodeAccordion({
 
 
   // Helper function to render inputs in tooltip format
-  const renderInputsTooltip = (inputs: Array<{name: string, type: string, required?: boolean, defaultValue?: any}>) => {
+  const renderInputsTooltip = (outputs = false, inputs: Array<{name: string, type: string, required?: boolean, defaultValue?: any}>) => {
     if (!inputs || inputs.length === 0) return null;
     
     const inputsRecord: Record<string, string> = {};
@@ -698,12 +698,12 @@ export function WorkflowNodeAccordion({
 
     return (
       <div className="min-w-[200px] max-w-xs">
-        <div className="border border-gray-200 rounded-lg p-3 bg-white">
+        <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
           <div className="flex items-start gap-3">
         
             <div className="flex-1">
               <span className="text-sm font-semibold mb-2 block">
-                Inputs
+                { !outputs ? "Inputs" : "Outputs" }
               </span>
               <div className="space-y-1">
                 {Object.entries(inputsRecord).map(([key, value]) => (
@@ -2355,21 +2355,14 @@ export function WorkflowNodeAccordion({
           />
           <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
         </div>
-        <div className="flex items-center gap-2">
-          <span className={clsx(
-            'px-2 py-1 text-xs font-medium rounded-full',
-            getTypeColor(data.type)
-          )}>
-            {data.type}
-          </span>
-        </div>
+        
        
       </div>
 
       {/* Status section */}
       <div className={clsx('p-4 border-b border-gray-200 dark:border-zinc-700', statusConfig.borderColor, statusConfig.bgColor)}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-500 dark:text-zinc-300 uppercase tracking-wide">
+          <span className="text-xs font-medium text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
             Last Run
           </span>
           <span className="text-xs text-gray-500 dark:text-zinc-300">2 hours ago</span>
@@ -2390,23 +2383,25 @@ export function WorkflowNodeAccordion({
         <div className="flex flex-wrap gap-2">
          
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <Tippy content={renderInputsTooltip(yamlConfig.spec.inputs)} placement='top' interactive={true}>
+            <Tippy content={renderInputsTooltip(false, yamlConfig.spec.inputs)} placement='top' interactive={true}>
               <BadgeButton className="text-xs" href="#">
                 {yamlConfig.spec.inputs?.length} input{yamlConfig.spec.inputs?.length !== 1 ? 's' : ''}
               </BadgeButton>
             </Tippy>
           )}
           {yamlConfig.spec.connections && yamlConfig.spec.connections.length > 0 && (
-            <BadgeButton className="text-xs" href="#">
-              {yamlConfig.spec.outputs?.length} output {yamlConfig.spec.outputs?.length !== 1 ? 's' : ''}
-            </BadgeButton>
+            <Tippy content={renderInputsTooltip(true, yamlConfig.spec.outputs || [])} placement='top' interactive={true}>
+              <BadgeButton className="text-xs" href="#">
+                {yamlConfig.spec.outputs?.length} output {yamlConfig.spec.outputs?.length !== 1 ? 's' : ''}
+              </BadgeButton>
+            </Tippy>
           )}
         </div>
       </div>
 
       {/* Summary section */}
       <div className="p-4 dark:bg-zinc-800 rounded-b-lg">
-        <h4 className="text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+        <h4 className="text-xs font-medium text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-2">
           NEXT IN QUEUE
         </h4>
         <div className="space-y-2">
@@ -2418,9 +2413,9 @@ export function WorkflowNodeAccordion({
                   Msg 2dlsf32fwasdfd-asdfsdf-adsfasdf
                 </span>
               </div>
-              <Tippy content="Need manual approval" placement='top'>
+              <Tippy content={<span className='text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-zinc-700 text-gray-500 dark:text-zinc-400 p-2'>Need manual approval</span>} placement='top'>
                 <Button plain>
-                <MaterialSymbol name="how_to_reg" size="lg" className='text-zinc-600 dark:text-zinc-400' />
+                <MaterialSymbol name="how_to_reg" size="md" className='text-zinc-600 dark:text-zinc-400' />
                 </Button>
               </Tippy>
             </div>

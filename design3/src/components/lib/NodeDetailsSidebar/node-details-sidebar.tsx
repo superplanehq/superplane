@@ -431,34 +431,36 @@ export function NodeDetailsSidebar({
     const config = getExecutionMethodConfig(item.executionMethod);
     
     return (
-      <div className={`p-3 border border-t-0 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700`}>
-        {item.executionMethod === 'manual' && (
-          <div className='flex justify-between items-center'>
-            <div className='flex items-center'>
-              <MaterialSymbol name="how_to_reg" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-              <span className="text-xs text-gray-500 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
+      item.executionMethod != 'queued' && (
+        <div className={`p-3 border border-t-0 bg-orange-50 dark:bg-orange-900/20 border-zinc-200 dark:border-zinc-700`}>
+          {item.executionMethod === 'manual' && (
+            <div className='flex justify-between items-center'>
+              <div className='flex items-center'>
+                <MaterialSymbol name="how_to_reg" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+                <span className="text-xs text-gray-700 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
+              </div>
+              <Link href="#" className="text-xs text-gray-700 dark:text-zinc-300  flex items-center">
+                <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
+                <span className='underline'>Approve</span>
+              </Link>
             </div>
-            <Link href="#" className="text-xs text-gray-500 dark:text-zinc-300  flex items-center">
-              <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
-              <span className='underline'>Approve</span>
-            </Link>
-          </div>
-        )}
-        {item.executionMethod === 'timed' && (
-          <div className='flex items-center'>
-              <MaterialSymbol name={config.icon} size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-              <span className='text-xs text-gray-500 dark:text-zinc-400'>{config.description}</span>
-          </div>
-        )}
-        {item.executionMethod === 'blocked' && (
-          <div className='flex items-center'>
-              <MaterialSymbol name="pause" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
-              <span className='text-xs text-gray-500 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
-          </div>
-        )}
-       
+          )}
+          {item.executionMethod === 'timed' && (
+            <div className='flex items-center'>
+                <MaterialSymbol name={config.icon} size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+                <span className='text-xs text-gray-700 dark:text-zinc-400'>{config.description}</span>
+            </div>
+          )}
+          {item.executionMethod === 'blocked' && (
+            <div className='flex items-center'>
+                <MaterialSymbol name="pause" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+                <span className='text-xs text-gray-700 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
+            </div>
+          )}
         
-      </div>
+          
+        </div>
+      )
     );
   };
 
@@ -514,7 +516,7 @@ export function NodeDetailsSidebar({
                   const isExpanded = expandedRuns.has(run.id);
                   
                   return (
-                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 "+statusConfig.bgColor + " " + statusConfig.borderColor } >
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 cursor-pointer "+statusConfig.bgColor + " " + statusConfig.borderColor } >
                       <div 
                         className="p-3"
                         onClick={() => toggleRunExpansion(run.id)}
@@ -608,7 +610,7 @@ export function NodeDetailsSidebar({
                   return (
                     <div key={item.id} className="queueItem" >
                       <div 
-                        className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700"
+                        className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 cursor-pointer"
                         onClick={() => toggleQueueExpansion(item.id)}
                       >
                         <div className="flex items-center justify-between">
