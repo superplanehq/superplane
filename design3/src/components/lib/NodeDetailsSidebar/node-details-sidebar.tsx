@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
+import { getStatusConfig } from '../../../utils/status-config';
 import { Button } from '../Button/button';
 import { ControlledTabs, type Tab } from '../Tabs/tabs';
 import { Text } from '../Text/text';
@@ -44,13 +45,28 @@ interface NodeDetailsSidebarProps {
   className?: string;
 }
 
-const mockRuns: RunData[] = [
+const mockRuns2: RunData[] = [
   {
     id: 'run-2',
     name: 'Run #2',
     status: 'running',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 00m 25s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '1045a77',
+      Image: 'v.1.2.1',
+      Terraform: '32.32',
+      Something: 'adsfasdf'
+    }
+  },
+  {
+    id: 'run-332',
+    name: 'Run #3',
+    status: 'failed',
+    timestamp: 'Jan 16, 2022 10:23:45',
+    duration: '00h 10m 35s',
     project: 'Semaphore project',
     pipeline: 'Pipeline name',
     inputs: {
@@ -82,44 +98,7 @@ const mockRuns: RunData[] = [
     }
   }
 ];
-const mockRuns2: RunData[] = [
-  {
-    id: 'run-22',
-    name: 'Run #2',
-    status: 'running',
-    timestamp: 'Jan 16, 2022 10:23:45',
-    duration: '00h 00m 25s',
-    project: 'Semaphore project',
-    pipeline: 'Pipeline name',
-    inputs: {
-      Code: '1045a77',
-      Image: 'v.1.2.1',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
-    }
-  },
-  {
-    id: 'run-12',
-    name: 'Run #1',
-    status: 'success',
-    timestamp: 'Jan 16, 2022 10:23:45',
-    duration: '00h 00m 25s',
-    project: 'Semaphore project',
-    pipeline: 'Pipeline name',
-    inputs: {
-      Code: '1045a77',
-      Image: 'v.1.2.0',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
-    },
-    outputs: {
-      Code: '1045a77',
-      Image: 'v.1.2.0',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
-    }
-  }
-];
+
 const mockQueue: QueueItem[] = [
   {
     id: 'msg-1',
@@ -245,53 +224,6 @@ export function NodeDetailsSidebar({
     { id: 'history', label: 'History' },
     { id: 'settings', label: 'Settings' }
   ];
-  const getStatusConfig = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'success':
-      case 'passed':
-        return {
-          bgColor: 'bg-green-50 dark:bg-green-800',
-          borderColor: 'border-t border-t-green-400',
-          textColor: 'text-green-700',
-          icon: 'check_circle',
-          iconColor: 'text-green-500',
-        };
-      case 'error':
-      case 'failed':
-        return {
-          bgColor: 'bg-red-50 dark:bg-red-800',
-          borderColor: 'border-t border-t-red-400',
-          textColor: 'text-red-700',
-          icon: 'cancel',
-          iconColor: 'text-red-500',
-        };
-      case 'running':
-        return {
-          bgColor: 'bg-sky-50 dark:bg-sky-800',
-          borderColor: 'border-t border-t-sky-400',
-          textColor: 'text-blue-700',
-          icon: 'sync',
-          iconColor: 'text-blue-500 animate-spin',
-        };
-      case 'pending':
-      case 'queued':
-        return {
-          bgColor: 'bg-yellow-50 dark:bg-yellow-800',
-          borderColor: 'border-t border-t-yellow-400',
-          textColor: 'text-yellow-700',
-          icon: 'schedule',
-          iconColor: 'text-yellow-500',
-        };
-      default:
-        return {
-          bgColor: 'bg-gray-50 dark:bg-gray-800',
-          borderColor: 'border-t border-t-gray-400',
-          textColor: 'text-gray-700',
-          icon: 'help',
-          iconColor: 'text-gray-500',
-        };
-    }
-  }
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'success':
@@ -374,19 +306,19 @@ export function NodeDetailsSidebar({
   const renderInputsOutputs2 = (inputs?: Record<string, string>, outputs?: Record<string, string>) => (
     <div className="mt-3 space-y-3">
       {inputs && (
-       <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+       <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
        <div className="flex items-start gap-3">
          <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-           <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-gray-400" />
+           <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-zinc-400" />
          </div>
          <div className="flex-1">
-           <span className="text-sm font-semibold mb-2 block">
+           <span className="text-sm font-semibold mb-2 block dark:text-white">
              Inputs
            </span>
            <div className="space-y-1">
              {Object.entries(inputs || {}).map(([key, value]) => (
                <div key={key} className="flex items-center justify-between">
-                 <span className="text-xs text-gray-600 font-medium">{key}</span>
+                 <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
                  <div className="flex items-center gap-2">
                    <Badge className='font-mono !text-xs'>
                      {value}
@@ -401,19 +333,19 @@ export function NodeDetailsSidebar({
      </div>
       )}
       {outputs && (
-        <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+        <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
           <div className="flex items-start gap-3">
             <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-              <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-gray-400" />
+              <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-zinc-400" />
             </div>
             <div className="flex-1">
-              <span className="text-sm font-semibold mb-2 block">
+              <span className="text-sm font-semibold mb-2 block dark:text-white">
                 Outputs
               </span>
               <div className="space-y-1">
                 {Object.entries(outputs).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 font-medium">{key}</span>
+                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
                     <div className="flex items-center gap-2">
                       <Badge className='font-mono !text-xs'>
                         {value}
@@ -435,24 +367,24 @@ export function NodeDetailsSidebar({
 
   return (
     <div className={clsx(
-      'absolute right-0 top-0 h-full w-96 bg-white border-l border-gray-200 shadow-lg z-50 flex flex-col',
+      'absolute right-0 top-0 h-full w-96 bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700 shadow-lg z-50 flex flex-col',
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700">
         <div className="flex items-center gap-3">
-          <MaterialSymbol name={nodeIcon} size="lg" className="text-gray-700" />
-          <Subheading level={3} className="text-lg font-semibold text-gray-900">
+          <MaterialSymbol name={nodeIcon} size="lg" className="text-gray-700 dark:text-zinc-300" />
+          <Subheading level={3} className="text-lg font-semibold text-gray-900 dark:text-white">
             {nodeTitle}
           </Subheading>
         </div>
         <Button plain onClick={onClose}>
-          <MaterialSymbol name="close" size="lg" className="text-gray-500" />
+          <MaterialSymbol name="close" size="lg" className="text-gray-500 dark:text-zinc-400" />
         </Button>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-gray-200 dark:border-zinc-700">
         <ControlledTabs
           tabs={tabs}
           activeTab={activeTab}
@@ -468,10 +400,10 @@ export function NodeDetailsSidebar({
             {/* Recent Runs */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <Text className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
                   RECENT RUNS
                 </Text>
-                <Link href="#" className="text-sm text-blue-600 hover:text-blue-700">
+                <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
                   View all
                 </Link>
               </div>
@@ -479,12 +411,11 @@ export function NodeDetailsSidebar({
               <div className="space-y-3">
                
                  {mockRuns2.map((run) => {
-                  const statusConfig = getStatusIcon(run.status);
-                  const statusConfig2 = getStatusConfig(run.status);
+                  const statusConfig = getStatusConfig(run.status);
                   const isExpanded = expandedRuns.has(run.id);
                   
                   return (
-                    <div key={run.id} className={statusConfig2.bgColor + " " + statusConfig2.borderColor } >
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 "+statusConfig.bgColor + " " + statusConfig.borderColor } >
                       <div 
                         className="p-3"
                         onClick={() => toggleRunExpansion(run.id)}
@@ -495,19 +426,19 @@ export function NodeDetailsSidebar({
                               <MaterialSymbol 
                                 name={statusConfig.icon} 
                                 size="lg" 
-                                className={statusConfig.color}
+                                className={statusConfig.iconColor}
                               />
-                            <span className="font-bold truncate text-sm">{run.name}</span>
+                            <span className="font-bold truncate text-sm dark:text-white">{run.name}</span>
                          
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {!isExpanded && (
-                              <span className="text-xs text-gray-500">2 minutes ago</span>
+                              <span className="text-xs text-gray-500 dark:text-zinc-400">2 min ago</span>
                             )}
                             <MaterialSymbol 
                                 name={isExpanded ? 'expand_less' : 'expand_more'} 
                                 size="lg" 
-                                className="text-gray-600" 
+                                className="text-gray-600 dark:text-zinc-400" 
                               />
                           </div>
                         </div>
@@ -515,32 +446,32 @@ export function NodeDetailsSidebar({
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
                             
-                            <div className="border border-gray-200 rounded-lg p-3 bg-white dark:bg-zinc-800">
+                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
                               <div className="flex items-start gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
-                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-gray-400" />
+                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-zinc-400" />
                                 </div>
                                 <div className="flex-1">
-                                  <span className="text-sm font-semibold mb-2 block">
+                                  <span className="text-sm font-semibold mb-2 block dark:text-white">
                                     Execution details
                                   </span>
                                   <div className="space-y-1 flex flex-col text-xs">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 font-medium">Project</span>
-                                    <div className="flex items-center gap-2 font-mono">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Project</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
                                       Semaphore/project
                                     </div>
                                   </div>
                                   
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 font-medium">Started on</span>
-                                    <div className="flex items-center gap-2 font-mono">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Started on</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
                                       {run.timestamp}
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs text-gray-600 font-medium">Duration</span>
-                                    <div className="flex items-center gap-2 font-mono">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Duration</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
                                       {run.duration}
                                     </div>
                                   </div>
@@ -562,10 +493,10 @@ export function NodeDetailsSidebar({
             {/* Queue */}
             <div>
               <div className="flex items-center justify-between mb-4">
-                <Text className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
                   QUEUE ({mockQueue.length})
                 </Text>
-                <Link href="#" className="text-sm text-blue-600 hover:text-blue-700">
+                <Link href="#" className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300">
                   Manage queue
                 </Link>
               </div>
@@ -577,7 +508,7 @@ export function NodeDetailsSidebar({
                   return (
                     <div key={item.id} className="" >
                       <div 
-                        className="p-3 bg-zinc-50 border border-zinc-200 dark:border-zinc-700"
+                        className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700"
                         onClick={() => toggleQueueExpansion(item.id)}
                       >
                         <div className="flex items-center justify-between">
@@ -588,17 +519,17 @@ export function NodeDetailsSidebar({
                                 size="lg" 
                                 className="text-orange-600 dark:text-orange-400"
                               />
-                            <span className="font-medium truncate text-sm">{item.name}</span>
+                            <span className="font-medium truncate text-sm dark:text-white">{item.name}</span>
                          
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
                             {!isExpanded && (
-                              <span className="text-xs text-gray-500">2 minutes ago</span>
+                              <span className="text-xs text-gray-500 dark:text-zinc-400">2 min ago</span>
                             )}
                             <MaterialSymbol 
                                 name={isExpanded ? 'expand_less' : 'expand_more'} 
                                 size="lg" 
-                                className="text-gray-600" 
+                                className="text-gray-600 dark:text-zinc-400" 
                               />
                           </div>
                         </div>
@@ -624,13 +555,13 @@ export function NodeDetailsSidebar({
         
         {activeTab === 'history' && (
           <div className="p-4">
-            <Text className="text-gray-500">History view coming soon...</Text>
+            <Text className="text-gray-500 dark:text-zinc-400">History view coming soon...</Text>
           </div>
         )}
         
         {activeTab === 'settings' && (
           <div className="p-4">
-            <Text className="text-gray-500">Settings view coming soon...</Text>
+            <Text className="text-gray-500 dark:text-zinc-400">Settings view coming soon...</Text>
           </div>
         )}
       </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
+import { getStatusConfig } from '../../../utils/status-config'
 import { Button } from '../Button/button'
 import { Input } from '../Input/input'
 import { Textarea } from '../Textarea/textarea'
@@ -685,53 +686,6 @@ export function WorkflowNodeAccordion({
     }
   }
 
-  const getStatusConfig = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'success':
-      case 'passed':
-        return {
-          bgColor: 'bg-green-50',
-          borderColor: 'border-t border-t-green-400',
-          textColor: 'text-green-700',
-          icon: 'check_circle',
-          iconColor: 'text-green-500',
-        };
-      case 'error':
-      case 'failed':
-        return {
-          bgColor: 'bg-red-50',
-          borderColor: 'border-t border-t-red-400',
-          textColor: 'text-red-700',
-          icon: 'cancel',
-          iconColor: 'text-red-500',
-        };
-      case 'running':
-        return {
-          bgColor: 'bg-blue-50',
-          borderColor: 'border-t border-t-blue-400',
-          textColor: 'text-blue-700',
-          icon: 'sync',
-          iconColor: 'text-blue-500 animate-spin',
-        };
-      case 'pending':
-      case 'queued':
-        return {
-          bgColor: 'bg-yellow-50',
-          borderColor: 'border-t border-t-yellow-400',
-          textColor: 'text-yellow-700',
-          icon: 'schedule',
-          iconColor: 'text-yellow-500',
-        };
-      default:
-        return {
-          bgColor: 'bg-gray-50',
-          borderColor: 'border-t border-t-gray-400',
-          textColor: 'text-gray-700',
-          icon: 'help',
-          iconColor: 'text-gray-500',
-        };
-    }
-  }
 
   // Helper function to render inputs in tooltip format
   const renderInputsTooltip = (inputs: Array<{name: string, type: string, required?: boolean, defaultValue?: any}>) => {
@@ -2121,7 +2075,7 @@ export function WorkflowNodeAccordion({
       )}>
       {selected && (
         <div 
-          className="action-buttons absolute -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-xs rounded-lg px-2 py-1 border border-gray-200 z-50"
+          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
           onClick={(e) => e.stopPropagation()}
         >
          
@@ -2175,7 +2129,7 @@ export function WorkflowNodeAccordion({
           
         </div>
       )}
-        <div className="node-header p-4 flex justify-between border-b border-gray-200 align-start items-start">
+        <div className="node-header p-4 flex justify-between border-b border-gray-200 dark:border-zinc-700 align-start items-start">
           <div className="flex flex-col w-full">
             <div className="flex items-center">
               <span className="material-symbols-outlined mr-2 text-gray-600 p-2 bg-zinc-100 dark:bg-zinc-700 rounded-xl">
@@ -2330,8 +2284,8 @@ export function WorkflowNodeAccordion({
   return (
     <div 
       className={clsx(
-        'bg-white rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
-        selected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200',
+        'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
+        selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700',
         className
       )}
       style={{ width: 320, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
@@ -2342,7 +2296,7 @@ export function WorkflowNodeAccordion({
       {/* Action buttons when selected */}
       {selected && (
         <div 
-          className="action-buttons absolute -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-xs rounded-lg px-2 py-1 border border-gray-200 z-50"
+          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
           onClick={(e) => e.stopPropagation()}
         >
          
@@ -2393,13 +2347,13 @@ export function WorkflowNodeAccordion({
       )}
 
       {/* Header section */}
-      <div className="p-4 flex justify-between items-center border-b border-gray-200">
+      <div className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-zinc-700">
         <div className="flex items-center">
           <MaterialSymbol 
             name={getTypeIcon(data.type)} 
-            className="mr-2 text-gray-600"
+            className="mr-2 text-gray-600 dark:text-zinc-400"
           />
-          <h3 className="font-semibold text-gray-900">{data.title}</h3>
+          <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
         </div>
         <div className="flex items-center gap-2">
           <span className={clsx(
@@ -2413,12 +2367,12 @@ export function WorkflowNodeAccordion({
       </div>
 
       {/* Status section */}
-      <div className={clsx('p-4 border-b border-gray-200', statusConfig.borderColor, statusConfig.bgColor)}>
+      <div className={clsx('p-4 border-b border-gray-200 dark:border-zinc-700', statusConfig.borderColor, statusConfig.bgColor)}>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+          <span className="text-xs font-medium text-gray-500 dark:text-zinc-300 uppercase tracking-wide">
             Last Run
           </span>
-          <span className="text-xs text-gray-500">2 hours ago</span>
+          <span className="text-xs text-gray-500 dark:text-zinc-300">2 hours ago</span>
         </div>
 
         <div className="flex items-center mb-3">
@@ -2427,7 +2381,7 @@ export function WorkflowNodeAccordion({
             size='lg'
             className={clsx('mr-2', statusConfig.iconColor)}
           />
-          <span className="font-medium text-sm text-gray-900 truncate">
+          <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
             {data.description || 'No description available'}
           </span>
         </div>
@@ -2451,13 +2405,13 @@ export function WorkflowNodeAccordion({
       </div>
 
       {/* Summary section */}
-      <div className="p-4">
-        <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+      <div className="p-4 dark:bg-zinc-800 rounded-b-lg">
+        <h4 className="text-xs font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
           NEXT IN QUEUE
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
-            <div className="flex items-center p-2 border border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
+            <div className="flex items-center p-2 border bg-zinc-50 dark:bg-zinc-700 border-gray-200 dark:border-gray-700 rounded-md gap-2 justify-between">
               <div className="flex items-center gap-2 truncate pr-2">
                 <MaterialSymbol name="input" size="lg" className='text-orange-600 dark:text-orange-400' />
                 <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">

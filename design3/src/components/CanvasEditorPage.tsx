@@ -872,7 +872,7 @@ export function CanvasEditorPage({
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-zinc-900">
       {renderNavigation()}
 
       {/* Conditional Content Based on Active View */}
@@ -900,19 +900,20 @@ export function CanvasEditorPage({
                 onNodeClick={onNodeClick}
                 nodeTypes={nodeTypes}
                 connectionLineType={ConnectionLineType.SmoothStep}
+                colorMode="system"
                 defaultViewport={ { x: 0, y: 0, zoom: 1 } }
                 attributionPosition="bottom-left"
-                className="bg-gray-50"
+                className="bg-gray-50 dark:bg-zinc-950"
               >
                 <Controls 
-                  className="bg-white border border-gray-300 rounded-lg shadow-sm"
+                  className="bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 rounded-lg shadow-sm"
                   showInteractive={false}
                 />
                 <Background 
                   variant={BackgroundVariant.Dots} 
                   gap={20} 
                   size={1}
-                  color="#e5e7eb"
+                  color="var(--zinc-800)"
                 />
               </ReactFlow>
             </ReactFlowProvider>
