@@ -67,16 +67,7 @@ curl \
   -X POST \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $SEMAPHORE_OIDC_TOKEN" \
-  --data @- << EOF
-{
-  "execution_id": "$SUPERPLANE_STAGE_EXECUTION_ID",
-  "external_id": "$SEMAPHORE_WORKFLOW_ID",
-  "outputs": {
-    "output_1":"hello",
-    "output_2":"world"
-  }
-}
-EOF
+  --data "{\"execution_id\": \"$SUPERPLANE_STAGE_EXECUTION_ID\",\"external_id\": \"$SEMAPHORE_WORKFLOW_ID\",\"outputs": {\"output_1\":\"hello\",\"output_2\":\"world\"}}"
 ```
 
 Note: the `SUPERPLANE_STAGE_EXECUTION_ID` value is passed as a parameter by Superplane to the workflow run request.

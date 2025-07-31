@@ -31,11 +31,11 @@ func (h *SemaphoreOIDCVerifier) Verify(ctx context.Context, verifier *crypto.OID
 		return fmt.Errorf("error parsing claims: %v", err)
 	}
 
-	if claims.WorkflowID != options.ExecutionResourceID {
+	if claims.WorkflowID != options.ChildResource {
 		return fmt.Errorf("invalid workflow ID: %s", claims.WorkflowID)
 	}
 
-	if claims.ProjectID != options.IntegrationResourceID {
+	if claims.ProjectID != options.ParentResource {
 		return fmt.Errorf("invalid project ID: %s", claims.ProjectID)
 	}
 

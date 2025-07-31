@@ -71,9 +71,9 @@ type OIDCVerifier interface {
 }
 
 type VerifyTokenOptions struct {
-	IntegrationURL        string
-	IntegrationResourceID string
-	ExecutionResourceID   string
+	IntegrationURL string
+	ParentResource string
+	ChildResource  string
 }
 
 // A generic interface for representing integration resources.

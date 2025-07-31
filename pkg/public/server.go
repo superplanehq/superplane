@@ -499,9 +499,9 @@ func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, r
 	}
 
 	err = verifier.Verify(r.Context(), s.oidcVerifier, token, integrations.VerifyTokenOptions{
-		IntegrationURL:        integrationResource.IntegrationURL,
-		IntegrationResourceID: integrationResource.ParentExternalID,
-		ExecutionResourceID:   integrationResource.ExecutionExternalID,
+		IntegrationURL: integrationResource.IntegrationURL,
+		ParentResource: integrationResource.ParentExternalID,
+		ChildResource:  integrationResource.ExecutionExternalID,
 	})
 
 	if err != nil {
