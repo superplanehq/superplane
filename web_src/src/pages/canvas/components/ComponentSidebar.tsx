@@ -44,13 +44,6 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       executorType: 'http'
     },
     {
-      id: 'connection_group',
-      name: 'Connection Group',
-      description: 'Add a connection group to your canvas',
-      icon: 'group',
-      category: 'Deployment',
-    },
-    {
       id: 'event_source',
       name: 'Webhook Event Source',
       description: 'Add a webhook-based event source to your canvas',
@@ -66,7 +59,13 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       category: 'Event Sources',
       eventSourceType: 'semaphore'
     },
-
+    {
+      id: 'connection_group',
+      name: 'Connection Group',
+      description: 'Add a connection group to your canvas',
+      icon: 'group',
+      category: 'Groups',
+    },
   ];
 
   const categories = Array.from(new Set(components.map(c => c.category)));
