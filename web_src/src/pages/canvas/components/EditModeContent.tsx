@@ -31,6 +31,9 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [editingSecretIndex, setEditingSecretIndex] = useState<number | null>(null);
   const [editingConditionIndex, setEditingConditionIndex] = useState<number | null>(null);
   const [inputMappings, setInputMappings] = useState<Record<number, SuperplaneValueDefinition[]>>({});
+  const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
+    ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
+  );
 
   // Validation states
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -1906,26 +1909,26 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                   </div>
                   <div className="space-y-2">
                     {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
-                      <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                      <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                         <input
                           type="text"
                           value={key}
                           onChange={(e) => updateExecutorParameter(key, e.target.value, value)}
                           placeholder="Parameter name"
-                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                         />
                         <input
                           type="text"
                           value={value}
                           onChange={(e) => updateExecutorParameter(key, key, e.target.value)}
                           placeholder="Parameter value"
-                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                         />
                         <button
                           onClick={() => removeExecutorParameter(key)}
                           className="text-red-600 hover:text-red-700"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" className="material-symbols-outlined text-sm" />
                         </button>
                       </div>
                     ))}
@@ -2003,7 +2006,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                             updateExecutorField('headers', updatedHeaders);
                           }}
                           placeholder="Header name"
-                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                         />
                         <input
                           type="text"
@@ -2016,7 +2019,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                             });
                           }}
                           placeholder="Header value"
-                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                         />
                         <button
                           onClick={() => {
@@ -2027,7 +2030,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                           }}
                           className="text-red-600 hover:text-red-700"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" className="material-symbols-outlined text-sm" />
                         </button>
                       </div>
                     ))}
@@ -2038,10 +2041,12 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                   <Label>Response Policy - Success Status Codes</Label>
                   <input
                     type="text"
-                    value={((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')}
+                    value={responsePolicyStatusCodesDisplay}
                     onChange={(e) => {
+                      const endsWithComma = e.target.value.endsWith(',');
                       const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
                       updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
+                      setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
                     }}
                     placeholder="200, 201, 202"
                     className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
