@@ -4,7 +4,7 @@ import CustomBarHandle from './handle';
 import { ConnectionGroupNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import { useCreateConnectionGroup, useUpdateConnectionGroup } from '@/hooks/useCanvasData';
-import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior } from '@/api-client';
+import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConnectionGroup } from '@/api-client';
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -170,6 +170,32 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     }
   };
 
+  const handleYamlApply = (updatedData: unknown) => {
+    // Handle YAML data application for connection group
+    const yamlData = updatedData as SuperplaneConnectionGroup;
+
+    if (yamlData.metadata?.name) {
+      setConnectionGroupName(yamlData.metadata.name);
+    }
+    if (yamlData.metadata?.description) {
+      setConnectionGroupDescription(yamlData.metadata.description);
+    }
+
+    // Update form data if available
+    if (yamlData.spec && currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        name: yamlData.metadata?.name || connectionGroupName,
+        description: yamlData.metadata?.description || connectionGroupDescription,
+        connections: yamlData.spec.connections || currentFormData.connections,
+        groupByFields: yamlData.spec.groupBy?.fields || currentFormData.groupByFields,
+        timeout: yamlData.spec.timeout || currentFormData.timeout,
+        timeoutBehavior: yamlData.spec.timeoutBehavior || currentFormData.timeoutBehavior,
+        isValid: currentFormData.isValid // Keep current validation state
+      });
+    }
+  };
+
   return (
     <div
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
@@ -181,6 +207,34 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           entityType="connection group"
+          entityData={currentFormData ? {
+            metadata: {
+              name: connectionGroupName,
+              description: connectionGroupDescription
+            },
+            spec: {
+              connections: currentFormData.connections,
+              groupBy: {
+                fields: currentFormData.groupByFields
+              },
+              timeout: currentFormData.timeout,
+              timeoutBehavior: currentFormData.timeoutBehavior
+            }
+          } : (currentConnectionGroup ? {
+            metadata: {
+              name: currentConnectionGroup.metadata?.name,
+              description: currentConnectionGroup.metadata?.description
+            },
+            spec: {
+              connections: currentConnectionGroup.spec?.connections || [],
+              groupBy: {
+                fields: currentConnectionGroup.spec?.groupBy?.fields || []
+              },
+              timeout: currentConnectionGroup.spec?.timeout,
+              timeoutBehavior: currentConnectionGroup.spec?.timeoutBehavior || 'TIMEOUT_BEHAVIOR_DROP'
+            }
+          } : null)}
+          onYamlApply={handleYamlApply}
         />
       )}
 
@@ -224,7 +278,17 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
       {isEditMode ? (
         <ConnectionGroupEditModeContent
-          data={props.data}
+          data={{
+            ...props.data,
+            name: connectionGroupName,
+            description: connectionGroupDescription,
+            ...(currentFormData && {
+              connections: currentFormData.connections,
+              groupBy: { fields: currentFormData.groupByFields },
+              timeout: currentFormData.timeout,
+              timeoutBehavior: currentFormData.timeoutBehavior
+            })
+          }}
           currentConnectionGroupId={props.id}
           onDataChange={setCurrentFormData}
         />

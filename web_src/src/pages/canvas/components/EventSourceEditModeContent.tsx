@@ -37,6 +37,18 @@ export function EventSourceEditModeContent({
   const [resourceType, setResourceType] = useState(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [integrationConfig, setIntegrationConfig] = useState<Record<string, string | boolean>>({});
+  const [isInternalUpdate, setIsInternalUpdate] = useState(false);
+
+  // Sync component state with incoming data prop changes (e.g., from YAML editor)
+  // But only when it's not from our own internal updates
+  useEffect(() => {
+    if (!isInternalUpdate) {
+      setSelectedIntegration(data.integration);
+      setResourceType(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+      setResourceName(data.resource?.name || '');
+    }
+    setIsInternalUpdate(false);
+  }, [data, eventSourceType, isInternalUpdate]);
 
   // Fetch available integrations
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
@@ -51,6 +63,7 @@ export function EventSourceEditModeContent({
   // Notify parent of data changes
   useEffect(() => {
     if (onDataChange) {
+      setIsInternalUpdate(true);
       const spec: SuperplaneEventSourceSpec = {};
 
       // For semaphore event sources, integration is required

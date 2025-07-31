@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useCanvasStore } from '../store/canvasStore';
 
 
 export interface ComponentSidebarProps {
@@ -25,6 +26,10 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   className = '',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const { eventSources } = useCanvasStore();
+  
+  // Check if there are any event sources in the canvas
+  const hasEventSources = eventSources.length > 0;
 
   const components: ComponentDefinition[] = [
     {
@@ -69,6 +74,23 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   ];
 
   const categories = Array.from(new Set(components.map(c => c.category)));
+
+  // Function to check if a component should be disabled
+  const isComponentDisabled = (component: ComponentDefinition): boolean => {
+    // Disable stages and connection groups if there are no event sources
+    if ((component.category === 'Stages' || component.category === 'Groups') && !hasEventSources) {
+      return true;
+    }
+    return false;
+  };
+
+  // Function to get the disabled message for a component
+  const getDisabledMessage = (component: ComponentDefinition): string => {
+    if ((component.category === 'Stages' || component.category === 'Groups') && !hasEventSources) {
+      return 'Add an Event Source first to enable this component';
+    }
+    return '';
+  };
 
   const handleAddComponent = (componentType: string, executorType?: string, eventSourceType?: string) => {
     onNodeAdd(componentType, executorType, eventSourceType);
@@ -135,38 +157,66 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                     {components
                       .filter(c => c.category === category)
                       .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((component) => (
-                        <button
-                          key={`${component.id}-${component.name}`}
-                          type="button"
-                          onClick={() => handleAddComponent(component.id, component.executorType, component.eventSourceType)}
-                          className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors group focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          aria-label={`Add ${component.name} component`}
-                        >
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0">
-                              <div className="w-10 h-10 bg-gray-100 group-hover:bg-primary-100 rounded-lg flex items-center justify-center transition-colors">
-                                <span className="material-symbols-outlined text-gray-600 group-hover:text-primary-600 transition-colors">
-                                  {component.icon}
-                                </span>
+                      .map((component) => {
+                        const disabled = isComponentDisabled(component);
+                        const disabledMessage = getDisabledMessage(component);
+                        
+                        return (
+                          <div key={`${component.id}-${component.name}`} className="relative">
+                            <button
+                              type="button"
+                              onClick={() => !disabled && handleAddComponent(component.id, component.executorType, component.eventSourceType)}
+                              disabled={disabled}
+                              className={`w-full text-left p-4 border rounded-lg transition-colors group focus:outline-none ${
+                                disabled
+                                  ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                                  : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50 focus:ring-2 focus:ring-primary-500'
+                              }`}
+                              aria-label={disabled ? disabledMessage : `Add ${component.name} component`}
+                              title={disabled ? disabledMessage : `Add ${component.name} component`}
+                            >
+                              <div className="flex items-start">
+                                <div className="flex-shrink-0">
+                                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+                                    disabled
+                                      ? 'bg-gray-100'
+                                      : 'bg-gray-100 group-hover:bg-primary-100'
+                                  }`}>
+                                    <span className={`material-symbols-outlined transition-colors ${
+                                      disabled
+                                        ? 'text-gray-400'
+                                        : 'text-gray-600 group-hover:text-primary-600'
+                                    }`}>
+                                      {component.icon}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="ml-3 flex-1 min-w-0">
+                                  <h4 className={`text-sm font-medium transition-colors ${
+                                    disabled
+                                      ? 'text-gray-500'
+                                      : 'text-gray-900 group-hover:text-primary-900'
+                                  }`}>
+                                    {component.name}
+                                  </h4>
+                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                    {disabled ? disabledMessage : component.description}
+                                  </p>
+                                </div>
+                                <div className="ml-2 flex-shrink-0">
+                                  <span className={`material-symbols-outlined transition-colors ${
+                                    disabled
+                                      ? 'text-gray-300'
+                                      : 'text-gray-400 group-hover:text-primary-500'
+                                  }`}>
+                                    {disabled ? 'block' : 'add'}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="ml-3 flex-1 min-w-0">
-                              <h4 className="text-sm font-medium text-gray-900 group-hover:text-primary-900 transition-colors">
-                                {component.name}
-                              </h4>
-                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                {component.description}
-                              </p>
-                            </div>
-                            <div className="ml-2 flex-shrink-0">
-                              <span className="material-symbols-outlined text-gray-400 group-hover:text-primary-500 transition-colors">
-                                add
-                              </span>
-                            </div>
+                            </button>
                           </div>
-                        </button>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               ))}

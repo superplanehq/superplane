@@ -5,7 +5,7 @@ import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { EventSourceWithEvents } from '../../store/types';
 import { useCreateEventSource } from '@/hooks/useCanvasData';
-import { SuperplaneEventSourceSpec } from '@/api-client';
+import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -116,6 +116,28 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const handleYamlApply = (updatedData: unknown) => {
+    // Handle YAML data application for event source
+    const yamlData = updatedData as SuperplaneEventSource;
+
+    if (yamlData.metadata?.name) {
+      setEventSourceName(yamlData.metadata.name);
+    }
+    if (yamlData.metadata?.description) {
+      setEventSourceDescription(yamlData.metadata.description);
+    }
+
+    // Update form data if available
+    if (yamlData.spec && currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        name: yamlData.metadata?.name || eventSourceName,
+        description: yamlData.metadata?.description || eventSourceDescription,
+        spec: yamlData.spec
+      });
+    }
+  };
+
   return (
     <div
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
@@ -127,6 +149,20 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           entityType="event source"
+          entityData={currentFormData ? {
+            metadata: {
+              name: eventSourceName,
+              description: eventSourceDescription
+            },
+            spec: currentFormData.spec
+          } : (currentEventSource ? {
+            metadata: {
+              name: currentEventSource.metadata?.name,
+              description: currentEventSource.metadata?.description
+            },
+            spec: currentEventSource.spec || {}
+          } : null)}
+          onYamlApply={handleYamlApply}
         />
       )}
 
@@ -170,7 +206,14 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       {isEditMode ? (
         <EventSourceEditModeContent
-          data={props.data}
+          data={{
+            ...props.data,
+            name: eventSourceName,
+            description: eventSourceDescription,
+            ...(currentFormData && {
+              spec: currentFormData.spec
+            })
+          }}
           canvasId={canvasId}
           organizationId={organizationId}
           eventSourceType={props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook")}

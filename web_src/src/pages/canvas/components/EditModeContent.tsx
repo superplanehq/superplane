@@ -48,6 +48,24 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
 
   // Validation states
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isInternalUpdate, setIsInternalUpdate] = useState(false);
+
+  // Sync component state with incoming data prop changes (e.g., from YAML editor)
+  // But only when it's not from our own internal updates
+  useEffect(() => {
+    if (!isInternalUpdate) {
+      setInputs(data.inputs || []);
+      setOutputs(data.outputs || []);
+      setConnections(data.connections || []);
+      setSecrets(data.secrets || []);
+      setConditions(data.conditions || []);
+      setExecutor(data.executor || { type: '', spec: {} });
+      setResponsePolicyStatusCodesDisplay(
+        ((data.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
+      );
+    }
+    setIsInternalUpdate(false);
+  }, [data, isInternalUpdate]);
 
   // Get available connection sources from canvas store
   const { stages, eventSources, connectionGroups } = useCanvasStore();
@@ -950,6 +968,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   // Update the onDataChange to include validation
   const handleDataChange = React.useCallback(() => {
     if (onDataChange) {
+      setIsInternalUpdate(true);
       const isValid = validateAllFields();
       onDataChange({
         label: data.label,

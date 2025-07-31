@@ -5,7 +5,7 @@ import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition } from '@/api-client';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage } from '@/api-client';
 import { EditModeContent } from '../EditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -249,6 +249,32 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const handleYamlApply = (updatedData: unknown) => {
+    const yamlData = updatedData as SuperplaneStage;
+
+    if (yamlData.metadata?.name) {
+      setStageName(yamlData.metadata.name);
+    }
+    if (yamlData.metadata?.description) {
+      setStageDescription(yamlData.metadata.description);
+    }
+
+    if (yamlData.spec && currentFormData) {
+      setCurrentFormData({
+        ...currentFormData,
+        label: yamlData.metadata?.name || stageName,
+        description: yamlData.metadata?.description || stageDescription,
+        inputs: yamlData.spec.inputs || currentFormData.inputs,
+        outputs: yamlData.spec.outputs || currentFormData.outputs,
+        connections: yamlData.spec.connections || currentFormData.connections,
+        executor: yamlData.spec.executor || currentFormData.executor,
+        secrets: yamlData.spec.secrets || currentFormData.secrets,
+        conditions: yamlData.spec.conditions || currentFormData.conditions,
+        isValid: currentFormData.isValid
+      });
+    }
+  };
+
 
   const getBackgroundColorClass = () => {
     const latestExecution = allExecutions.at(0);
@@ -285,6 +311,34 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
           entityType="stage"
+          entityData={currentFormData ? {
+            metadata: {
+              name: stageName,
+              description: stageDescription
+            },
+            spec: {
+              inputs: currentFormData.inputs,
+              outputs: currentFormData.outputs,
+              connections: currentFormData.connections,
+              executor: currentFormData.executor,
+              secrets: currentFormData.secrets,
+              conditions: currentFormData.conditions
+            }
+          } : (currentStage ? {
+            metadata: {
+              name: currentStage.metadata?.name,
+              description: currentStage.metadata?.description
+            },
+            spec: {
+              inputs: currentStage.spec?.inputs || [],
+              outputs: currentStage.spec?.outputs || [],
+              connections: currentStage.spec?.connections || [],
+              executor: currentStage.spec?.executor || { type: '', spec: {} },
+              secrets: currentStage.spec?.secrets || [],
+              conditions: currentStage.spec?.conditions || []
+            }
+          } : null)}
+          onYamlApply={handleYamlApply}
         />
       )}
 
@@ -338,7 +392,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           data={{
             ...props.data,
             label: stageName,
-            description: stageDescription
+            description: stageDescription,
+            ...(currentFormData && {
+              inputs: currentFormData.inputs,
+              outputs: currentFormData.outputs,
+              connections: currentFormData.connections,
+              executor: currentFormData.executor,
+              secrets: currentFormData.secrets,
+              conditions: currentFormData.conditions
+            })
           }}
           currentStageId={props.id}
           onDataChange={setCurrentFormData}

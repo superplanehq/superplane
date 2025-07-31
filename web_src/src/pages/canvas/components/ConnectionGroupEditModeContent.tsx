@@ -43,6 +43,19 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
 
   // Validation states
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [isInternalUpdate, setIsInternalUpdate] = useState(false);
+
+  // Sync component state with incoming data prop changes (e.g., from YAML editor)
+  // But only when it's not from our own internal updates
+  useEffect(() => {
+    if (!isInternalUpdate) {
+      setConnections(data.connections || []);
+      setGroupByFields(data.groupBy?.fields || []);
+      setTimeout(data.timeout);
+      setTimeoutBehavior(data.timeoutBehavior || 'TIMEOUT_BEHAVIOR_DROP');
+    }
+    setIsInternalUpdate(false);
+  }, [data, isInternalUpdate]);
 
   // Get available connection sources from canvas store
   const { stages, eventSources, connectionGroups } = useCanvasStore();
@@ -305,6 +318,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   // Update the onDataChange to include validation
   const handleDataChange = React.useCallback(() => {
     if (onDataChange) {
+      setIsInternalUpdate(true);
       const isValid = validateAllFields();
       onDataChange({
         name: data.name,
