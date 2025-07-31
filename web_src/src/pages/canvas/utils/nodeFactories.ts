@@ -10,6 +10,7 @@ export interface CreateNodeParams {
   canvasId: string;
   name?: string;
   executorType?: string;
+  eventSourceType?: string;
 }
 
 /**

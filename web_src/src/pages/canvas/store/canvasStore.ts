@@ -17,6 +17,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   eventSources: [],
   connectionGroups: [],
   nodePositions: {},
+  eventSourceKeys: {},
   selectedStageId: null,
   editingStageId: null,
   editingEventSourceId: null,
@@ -38,6 +39,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       eventSources: data.eventSources || [],
       connectionGroups: data.connectionGroups || [],
       nodePositions: {},
+      eventSourceKeys: {},
     });
     get().syncToReactFlow({ autoLayout: true });
   },
@@ -289,4 +291,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   fitViewNode: () => {
     // Will be replaced when setReactFlowInstance is called
   },
+
+  updateEventSourceKey: (eventSourceId: string, key: string) => {
+    set((state) => ({
+      eventSourceKeys: {
+        ...state.eventSourceKeys,
+        [eventSourceId]: key
+      }
+    }));
+  },
+
+  resetEventSourceKey: (eventSourceId: string) => {
+    set((state) => {
+      const updatedEventSourceKeys = { ...state.eventSourceKeys };
+      delete updatedEventSourceKeys[eventSourceId];
+      return { eventSourceKeys: updatedEventSourceKeys };
+    });
+  }
 }));

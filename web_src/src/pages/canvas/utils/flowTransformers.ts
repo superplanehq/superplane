@@ -24,7 +24,6 @@ export const transformEventSourcesToNodes = (
         }).slice(0, 3)
       : [];
     
-    
     return ({
       id: es.metadata?.id || '',
       type: 'githubIntegration',
@@ -35,6 +34,7 @@ export const transformEventSourcesToNodes = (
         events: lastEvents,
         integration: es.spec?.integration,
         resource: es.spec?.resource,
+        eventSourceType: es.eventSourceType,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
       draggable: true,

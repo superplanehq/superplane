@@ -16,7 +16,9 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 // Define the data type for the deployment card
 // Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Check if this is a newly added node (has temporary ID or isDraft flag)
+  const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
+  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -143,8 +145,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
     try {
       if (isNewStage && !saveAsDraft) {
-        // Create new stage (commit to backend)
-        const result = await createStageMutation.mutateAsync({
+        await createStageMutation.mutateAsync({
           name: stageName,
           description: stageDescription,
           inputs: currentFormData.inputs,
@@ -154,7 +155,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           secrets: currentFormData.secrets,
           conditions: currentFormData.conditions
         });
-        console.log(result);
         removeStage(props.id);
       } else if (!isNewStage && !saveAsDraft) {
         // Update existing stage (commit to backend)

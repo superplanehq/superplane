@@ -12,7 +12,9 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
-  const [isEditMode, setIsEditMode] = useState(false);
+  // Check if this is a newly added node (has temporary ID)
+  const isNewNode = props.id && /^\d+$/.test(props.id);
+  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean } | null>(null);
   const [connectionGroupName, setConnectionGroupName] = useState(props.data.name);

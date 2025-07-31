@@ -17,6 +17,7 @@ export interface CanvasState {
   editingEventSourceId: string | null;
   editingConnectionGroupId: string | null;
   webSocketConnectionStatus: ReadyState;
+  eventSourceKeys: Record<string, string>;
   
   // Actions
   initialize: (data: CanvasData) => void;
@@ -72,8 +73,11 @@ export interface CanvasState {
         }
       | undefined,
   ) => void;
+
+  updateEventSourceKey: (eventSourceId: string, key: string) => void;
+  resetEventSourceKey: (eventSourceId: string) => void;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>; eventSourceType?: string}
 export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}

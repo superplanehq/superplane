@@ -39,7 +39,7 @@ export function Canvas() {
 
   // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(canvasId!);
-  
+
   // Use the modular node handlers
   const { handleAddNode } = useNodeHandlers(canvasId || '');
 
@@ -176,7 +176,7 @@ export function Canvas() {
   }
 
   // Handle adding nodes using the modular system
-  const handleAddNodeByType = (nodeType: string, executorType?: string) => {
+  const handleAddNodeByType = (nodeType: string, executorType?: string, eventSourceType?: string) => {
     try {
       // Map string types to NodeType enum
       const nodeTypeMap: Record<string, NodeType> = {
@@ -195,9 +195,13 @@ export function Canvas() {
 
       // Handle stages with executor types
       if (mappedNodeType === 'stage' && executorType) {
-        const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' : 
-                         executorType === 'http' ? 'HTTP Stage' : 'New Stage';
+        const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' :
+          executorType === 'http' ? 'HTTP Stage' : 'New Stage';
         handleAddNode(mappedNodeType, { name: stageName, executorType });
+      } else if (mappedNodeType === 'event_source' && eventSourceType) {
+        const eventName = eventSourceType === 'webhook' ? 'Webhook Event Source' :
+          eventSourceType === 'semaphore' ? 'Semaphore Event Source' : 'New Event Source';
+        handleAddNode(mappedNodeType, { name: eventName, eventSourceType });
       } else {
         handleAddNode(mappedNodeType);
       }
@@ -226,8 +230,8 @@ export function Canvas() {
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: string, executorType?: string) => {
-                handleAddNodeByType(nodeType, executorType);
+              onNodeAdd={(nodeType: string, executorType?: string, eventSourceType?: string) => {
+                handleAddNodeByType(nodeType, executorType, eventSourceType);
               }}
             />
 

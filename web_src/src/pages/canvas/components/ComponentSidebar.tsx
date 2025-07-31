@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: string, executorType?: string) => void;
+  onNodeAdd: (nodeType: string, executorType?: string, eventSourceType?: string) => void;
   className?: string;
 }
 
@@ -15,6 +15,7 @@ interface ComponentDefinition {
   icon: string;
   category: string;
   executorType?: string;
+  eventSourceType?: string;
 }
 
 export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
@@ -51,18 +52,27 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     },
     {
       id: 'event_source',
-      name: 'Event Source',
-      description: 'Add an event source to your canvas',
-      icon: 'bolt',
+      name: 'Webhook Event Source',
+      description: 'Add a webhook-based event source to your canvas',
+      icon: 'webhook',
       category: 'Event Sources',
+      eventSourceType: 'webhook'
+    },
+    {
+      id: 'event_source',
+      name: 'Semaphore Event Source',
+      description: 'Add a Semaphore-based event source to your canvas',
+      icon: 'webhook',
+      category: 'Event Sources',
+      eventSourceType: 'semaphore'
     },
 
   ];
 
   const categories = Array.from(new Set(components.map(c => c.category)));
 
-  const handleAddComponent = (componentType: string, executorType?: string) => {
-    onNodeAdd(componentType, executorType);
+  const handleAddComponent = (componentType: string, executorType?: string, eventSourceType?: string) => {
+    onNodeAdd(componentType, executorType, eventSourceType);
   };
 
   if (!isOpen) return null;
@@ -130,7 +140,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                         <button
                           key={`${component.id}-${component.name}`}
                           type="button"
-                          onClick={() => handleAddComponent(component.id, component.executorType)}
+                          onClick={() => handleAddComponent(component.id, component.executorType, component.eventSourceType)}
                           className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-primary-300 hover:bg-primary-50 transition-colors group focus:outline-none focus:ring-2 focus:ring-primary-500"
                           aria-label={`Add ${component.name} component`}
                         >

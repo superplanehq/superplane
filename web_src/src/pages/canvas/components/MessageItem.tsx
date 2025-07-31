@@ -17,7 +17,6 @@ const MessageItem = React.memo(({
   onApprove,
   onRemove,
   approved = false,
-  executionRunning = false
 }: MessageItemProps) => {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -41,7 +40,6 @@ const MessageItem = React.memo(({
 
   const handleApprove = () => {
     if (onApprove && event.id) {
-      console.log("Approving event", event.id);
       onApprove(event.id);
     }
   };

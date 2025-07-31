@@ -8,6 +8,7 @@ import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { useCanvasStore } from '../store/canvasStore';
 import { useSecrets } from '../hooks/useSecrets';
+import { useIntegrations } from '../hooks/useIntegrations';
 import { useParams } from 'react-router-dom';
 
 interface EditModeContentProps {
@@ -24,7 +25,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
   const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
-  const [executorJsonString, setExecutorJsonString] = useState<string>('');
   const [editingInputIndex, setEditingInputIndex] = useState<number | null>(null);
   const [editingOutputIndex, setEditingOutputIndex] = useState<number | null>(null);
   const [editingConnectionIndex, setEditingConnectionIndex] = useState<number | null>(null);
@@ -36,21 +36,24 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Get available connection sources from canvas store
-  const { stages, eventSources, connectionGroups, canvas } = useCanvasStore();
+  const { stages, eventSources, connectionGroups } = useCanvasStore();
 
   // Get organization ID from URL params
-  const { orgId } = useParams<{ orgId: string }>();
+  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
 
   // Get canvas ID and organization ID for secrets
-  const canvasId = canvas?.metadata?.id || '';
   const organizationId = orgId || '';
 
   // Fetch secrets from both canvas and organization levels
-  const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS");
+  const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(
     organizationId,
     "DOMAIN_TYPE_ORGANIZATION"
   );
+
+  // Fetch integrations from both canvas and organization levels
+  const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
+  const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
   // Helper function to get all available secrets (canvas + organization)
   const getAllSecrets = (): Array<{ name: string; source: 'Canvas' | 'Organization'; data: Record<string, string> }> => {
@@ -81,6 +84,11 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     return allSecrets;
   };
 
+  // Helper function to get all available integrations (canvas + organization)
+  const getAllIntegrations = () => {
+    return [...canvasIntegrations, ...orgIntegrations];
+  };
+
   // Helper function to get available keys for a selected secret
   const getSecretKeys = (secretName: string) => {
     const allSecrets = getAllSecrets();
@@ -104,14 +112,6 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     return [];
   };
 
-  // Initialize executor JSON string based on current executor
-  React.useEffect(() => {
-    if (executor && Object.keys(executor).length > 0) {
-      setExecutorJsonString(JSON.stringify(executor, null, 2));
-    } else {
-      setExecutorJsonString('');
-    }
-  }, [executor]);
 
   // Generate connection options based on connection type
   const getConnectionOptions = (connectionType: SuperplaneConnectionType | undefined) => {
@@ -477,7 +477,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     setEditingConditionIndex(newIndex);
   };
 
-  const updateCondition = (index: number, field: keyof SuperplaneCondition, value: any) => {
+  const updateCondition = (index: number, field: keyof SuperplaneCondition, value: unknown) => {
     setConditions(prev => prev.map((condition, i) =>
       i === index ? { ...condition, [field]: value } : condition
     ));
@@ -519,24 +519,80 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     }
   };
 
-  const handleExecutorJsonChange = (jsonString: string) => {
-    setExecutorJsonString(jsonString);
-    try {
-      const parsedExecutor = JSON.parse(jsonString);
-      setExecutor(parsedExecutor);
-      // Clear executor JSON validation error if JSON is valid
-      setValidationErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors.executorJson;
-        return newErrors;
-      });
-    } catch {
-      // Invalid JSON, don't update executor state
-      setValidationErrors(prev => ({
+  // Helper functions for executor field updates
+  const updateExecutorField = (field: string, value: unknown) => {
+    setExecutor(prev => ({
+      ...prev,
+      spec: {
+        ...prev.spec,
+        [field]: value
+      }
+    }));
+  };
+
+  const updateExecutorNestedField = (parentField: string, field: string, value: unknown) => {
+    setExecutor(prev => ({
+      ...prev,
+      spec: {
+        ...prev.spec,
+        [parentField]: {
+          ...(prev.spec?.[parentField] as Record<string, unknown> || {}),
+          [field]: value
+        }
+      }
+    }));
+  };
+
+  const addExecutorParameter = () => {
+    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
+    const newKey = `PARAM_${Object.keys(currentParams).length + 1}`;
+    updateExecutorField('parameters', {
+      ...currentParams,
+      [newKey]: ''
+    });
+  };
+
+  const updateExecutorParameter = (oldKey: string, newKey: string, value: string) => {
+    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
+    const updatedParams = { ...currentParams };
+
+    if (oldKey !== newKey) {
+      delete updatedParams[oldKey];
+    }
+    updatedParams[newKey] = value;
+
+    updateExecutorField('parameters', updatedParams);
+  };
+
+  const removeExecutorParameter = (key: string) => {
+    const currentParams = (executor.spec?.parameters as Record<string, string>) || {};
+    const updatedParams = { ...currentParams };
+    delete updatedParams[key];
+    updateExecutorField('parameters', updatedParams);
+  };
+
+  const updateExecutorIntegration = (integrationName: string) => {
+    const availableIntegrations = getAllIntegrations();
+    const integration = availableIntegrations.find(int => int.metadata?.name === integrationName);
+    if (integration) {
+      setExecutor(prev => ({
         ...prev,
-        executorJson: 'Invalid JSON format'
+        integration: {
+          name: integration.metadata?.name,
+          domainType: integration.metadata?.domainType
+        }
       }));
     }
+  };
+
+  const updateExecutorResource = (field: 'type' | 'name', value: string) => {
+    setExecutor(prev => ({
+      ...prev,
+      resource: {
+        ...prev.resource,
+        [field]: value
+      }
+    }));
   };
 
   // Validation functions
@@ -827,19 +883,11 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
       errors.executor = executorErrors.join(', ');
     }
 
-    // Validate executor JSON if present
-    if (executorJsonString.trim() !== '') {
-      try {
-        JSON.parse(executorJsonString);
-      } catch {
-        errors.executorJson = 'Invalid JSON format';
-      }
-    }
 
     setValidationErrors(errors);
 
     return Object.keys(errors).length === 0;
-  }, [inputs, outputs, connections, secrets, conditions, executor, executorJsonString]);
+  }, [inputs, outputs, connections, secrets, conditions, executor]);
 
 
   // Update the onDataChange to include validation
@@ -1762,29 +1810,244 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           onToggle={handleAccordionToggle}
         >
           <div className="space-y-3">
-            {executor.type && (
-              <Field>
+            {executor.type === 'semaphore' && (
+              <div className="space-y-4">
                 <div className="text-xs text-zinc-500 mb-2">
-                  Configure your executor using JSON. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
+                  Configure your Semaphore executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
-                <div className="nodrag">
-                  <textarea
-                    value={executorJsonString}
-                    onChange={(e) => handleExecutorJsonChange(e.target.value)}
-                    placeholder="Enter executor configuration as JSON..."
-                    rows={12}
-                    className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 font-mono ${validationErrors.executorJson
-                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                      : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                      }`}
+
+                <Field>
+                  <Label>Integration</Label>
+                  <select
+                    value={executor.integration?.name || ''}
+                    onChange={(e) => updateExecutorIntegration(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  >
+                    <option value="">Select an integration...</option>
+                    {getAllIntegrations()
+                      .filter(integration => integration.spec?.type === 'semaphore')
+                      .map((integration) => (
+                        <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                          {integration.metadata?.name}
+                        </option>
+                      ))}
+                  </select>
+                  {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
+                    <div className="text-xs text-zinc-500 mt-1">
+                      No Semaphore integrations available. Create one in canvas settings.
+                    </div>
+                  )}
+                </Field>
+
+                <Field>
+                  <Label>Resource Type</Label>
+                  <input
+                    type="text"
+                    value={(executor.resource?.type as string) || ''}
+                    onChange={(e) => updateExecutorResource('type', e.target.value)}
+                    placeholder="project"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                   />
-                </div>
-                {validationErrors.executorJson && (
-                  <div className="text-xs text-red-600 mt-1">
-                    {validationErrors.executorJson}
+                </Field>
+
+                <Field>
+                  <Label>Resource Name</Label>
+                  <input
+                    type="text"
+                    value={(executor.resource?.name as string) || ''}
+                    onChange={(e) => updateExecutorResource('name', e.target.value)}
+                    placeholder="my-semaphore-project"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Task</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.task as string) || ''}
+                    onChange={(e) => updateExecutorField('task', e.target.value)}
+                    placeholder="my-task"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Branch</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.branch as string) || ''}
+                    onChange={(e) => updateExecutorField('branch', e.target.value)}
+                    placeholder="main"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Pipeline File</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.pipelineFile as string) || ''}
+                    onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
+                    placeholder=".semaphore/pipeline.yml"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Parameters</Label>
+                    <button
+                      onClick={addExecutorParameter}
+                      className="text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      + Add Parameter
+                    </button>
                   </div>
-                )}
-              </Field>
+                  <div className="space-y-2">
+                    {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
+                      <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                        <input
+                          type="text"
+                          value={key}
+                          onChange={(e) => updateExecutorParameter(key, e.target.value, value)}
+                          placeholder="Parameter name"
+                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => updateExecutorParameter(key, key, e.target.value)}
+                          placeholder="Parameter value"
+                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <button
+                          onClick={() => removeExecutorParameter(key)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            )}
+
+            {executor.type === 'http' && (
+              <div className="space-y-4">
+                <div className="text-xs text-zinc-500 mb-2">
+                  Configure your HTTP executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
+                </div>
+
+                <Field>
+                  <Label>URL</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.url as string) || ''}
+                    onChange={(e) => updateExecutorField('url', e.target.value)}
+                    placeholder="https://api.example.com/endpoint"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Payload (JSON)</Label>
+                  <textarea
+                    value={JSON.stringify(executor.spec?.payload || {}, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        const parsed = JSON.parse(e.target.value);
+                        updateExecutorField('payload', parsed);
+                      } catch {
+                        // Invalid JSON, but still update the field to show user input
+                        updateExecutorField('payload', e.target.value);
+                      }
+                    }}
+                    placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
+                    rows={6}
+                    className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
+                  />
+                </Field>
+
+                <Field>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Headers</Label>
+                    <button
+                      onClick={() => {
+                        const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                        const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
+                        updateExecutorField('headers', {
+                          ...currentHeaders,
+                          [newKey]: ''
+                        });
+                      }}
+                      className="text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      + Add Header
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries((executor.spec?.headers as Record<string, string>) || {}).map(([key, value]) => (
+                      <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                        <input
+                          type="text"
+                          value={key}
+                          onChange={(e) => {
+                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                            const updatedHeaders = { ...currentHeaders };
+                            if (e.target.value !== key) {
+                              delete updatedHeaders[key];
+                              updatedHeaders[e.target.value] = value;
+                            }
+                            updateExecutorField('headers', updatedHeaders);
+                          }}
+                          placeholder="Header name"
+                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => {
+                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                            updateExecutorField('headers', {
+                              ...currentHeaders,
+                              [key]: e.target.value
+                            });
+                          }}
+                          placeholder="Header value"
+                          className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <button
+                          onClick={() => {
+                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                            const updatedHeaders = { ...currentHeaders };
+                            delete updatedHeaders[key];
+                            updateExecutorField('headers', updatedHeaders);
+                          }}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+
+                <Field>
+                  <Label>Response Policy - Success Status Codes</Label>
+                  <input
+                    type="text"
+                    value={((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')}
+                    onChange={(e) => {
+                      const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
+                      updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
+                    }}
+                    placeholder="200, 201, 202"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+              </div>
             )}
 
             {!executor.type && (

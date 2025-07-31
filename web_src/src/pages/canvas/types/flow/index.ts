@@ -36,6 +36,7 @@ export type EventSourceNodeData = {
   events: SuperplaneStageEvent[];
   integration: IntegrationsIntegrationRef | null;
   resource: IntegrationsResourceRef | null;
+  eventSourceType?: string;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;

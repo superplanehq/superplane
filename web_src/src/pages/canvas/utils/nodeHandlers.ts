@@ -30,7 +30,8 @@ export const useNodeHandlers = (canvasId: string) => {
           // addEventSource expects EventSourceWithEvents, so we need to add the events property
           const eventSourceWithEvents: EventSourceWithEvents = {
             ...eventSource,
-            events: []
+            events: [],
+            eventSourceType: params.eventSourceType,
           };
           addEventSource(eventSourceWithEvents);
           break;

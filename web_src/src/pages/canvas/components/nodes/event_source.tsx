@@ -13,16 +13,18 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
-  const [isEditMode, setIsEditMode] = useState(false);
+  const isNewNode = props.id && /^\d+$/.test(props.id);
+  const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>(null);
   const [eventSourceName, setEventSourceName] = useState(props.data.name);
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
-  const { updateEventSource, setEditingEventSource, removeEventSource } = useCanvasStore();
+  const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
 
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+  const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
 
   // Get canvasId and organizationId from the store or current context
   const canvasId = useCanvasStore(state => state.canvasId) || '';
@@ -58,7 +60,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
         // Update local store with the new event source data from API response
         const newEventSource = result.data?.eventSource;
+
         if (newEventSource) {
+          const generatedKey = result.data?.key;
+          updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
           removeEventSource(props.id);
         }
       } else if (saveAsDraft) {
@@ -222,11 +227,24 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           data={props.data}
           canvasId={canvasId}
           organizationId={organizationId}
-          onDataChange={setCurrentFormData}
+          eventSourceType={props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook")}
+          onDataChange={({ spec }) => { if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) setCurrentFormData(prev => ({ ...prev!, spec })) }}
         />
       ) : (
         <>
-          {/* Events Section */}
+          {
+            eventSourceKey && (
+              <div className="px-3 py-3 border-t w-full text-left bg-amber-50">
+                <p className="text-sm text-amber-600">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 rounded bg-white" />
+                  <button className='font-bold bg-gray-100 text-gray-700 p-2 rounded' onClick={() => resetEventSourceKey(props.id)}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
+
           <div className="px-3 py-3 border-t w-full">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Events</div>
