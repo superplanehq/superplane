@@ -16,8 +16,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/protos/authorization"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

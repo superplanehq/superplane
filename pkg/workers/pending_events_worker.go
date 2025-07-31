@@ -107,7 +107,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	eventHandler, err := w.Registry.GetEventHandlerForIntegration(integration.Type)
+	eventHandler, err := w.Registry.GetEventHandler(integration.Type)
 	if err != nil {
 		return err
 	}

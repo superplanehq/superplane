@@ -15,6 +15,7 @@ import (
 
 type Integration struct {
 	EventHandler       integrations.EventHandler
+	OIDCVerifier       integrations.OIDCVerifier
 	NewResourceManager func(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error)
 	NewExecutor        func(integrations.ResourceManager, integrations.Resource) (integrations.Executor, error)
 }
@@ -43,6 +44,7 @@ func (r *Registry) Init() {
 	//
 	r.Integrations[models.IntegrationTypeSemaphore] = Integration{
 		EventHandler:       &semaphore.SemaphoreEventHandler{},
+		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
 		NewExecutor:        semaphore.NewSemaphoreExecutor,
 	}
@@ -58,13 +60,35 @@ func (r *Registry) HasIntegrationWithType(integrationType string) bool {
 	return ok
 }
 
-func (r *Registry) GetEventHandlerForIntegration(integrationType string) (integrations.EventHandler, error) {
+func (r *Registry) GetEventHandler(integrationType string) (integrations.EventHandler, error) {
 	registration, ok := r.Integrations[integrationType]
 	if !ok {
 		return nil, fmt.Errorf("integration type %s not registered", integrationType)
 	}
 
 	return registration.EventHandler, nil
+}
+
+func (r *Registry) HasOIDCVerifier(integrationType string) bool {
+	integration, ok := r.Integrations[integrationType]
+	if !ok {
+		return false
+	}
+
+	return integration.OIDCVerifier != nil
+}
+
+func (r *Registry) GetOIDCVerifier(integrationType string) (integrations.OIDCVerifier, error) {
+	registration, ok := r.Integrations[integrationType]
+	if !ok {
+		return nil, fmt.Errorf("integration type %s not registered", integrationType)
+	}
+
+	if registration.OIDCVerifier == nil {
+		return nil, fmt.Errorf("integration type %s does not support OIDC verification", integrationType)
+	}
+
+	return registration.OIDCVerifier, nil
 }
 
 func (r *Registry) NewResourceManager(ctx context.Context, integration *models.Integration) (integrations.ResourceManager, error) {

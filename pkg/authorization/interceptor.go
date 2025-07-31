@@ -212,7 +212,7 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType) (string, 
 			return models.DomainTypeCanvas, canvas.ID.String(), nil
 		}
 
-		canvas, err := models.FindCanvasByName(domainID)
+		canvas, err := models.FindCanvasByID(domainID)
 		if err != nil {
 			return "", "", fmt.Errorf("canvas %s not found", domainID)
 		}

@@ -52,6 +52,7 @@ type Server struct {
 	encryptor             crypto.Encryptor
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
+	oidcVerifier          *crypto.OIDCVerifier
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
@@ -66,19 +67,30 @@ func (s *Server) WebsocketHub() *ws.Hub {
 	return s.wsHub
 }
 
-func NewServer(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, basePath string, appEnv string, middlewares ...mux.MiddlewareFunc) (*Server, error) { // Create and initialize a new WebSocket hub
-	wsHub := ws.NewHub()
-
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
+func NewServer(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcVerifier *crypto.OIDCVerifier,
+	basePath string,
+	appEnv string,
+	middlewares ...mux.MiddlewareFunc,
+) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
 	server := &Server{
+		BasePath:              basePath,
+		wsHub:                 ws.NewHub(),
+		authHandler:           authHandler,
+		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
 		encryptor:             encryptor,
 		jwt:                   jwtSigner,
+		oidcVerifier:          oidcVerifier,
 		registry:              registry,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
@@ -89,10 +101,6 @@ func NewServer(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigne
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 		},
-		BasePath:    basePath,
-		wsHub:       wsHub,
-		authHandler: authHandler,
-		isDev:       appEnv == "development",
 	}
 
 	server.timeoutHandlerTimeout = 15 * time.Second
@@ -439,19 +447,79 @@ type UserProfileResponse struct {
 	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
 }
 
-func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
+func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
-		http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
-		return
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
 	}
 
 	headerParts := strings.Split(authHeader, "Bearer ")
 	if len(headerParts) != 2 {
-		http.Error(w, "Malformed Authorization header", http.StatusUnauthorized)
-		return
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
 	}
 
+	token := headerParts[1]
+	ID, err := uuid.Parse(req.ExecutionID)
+	if err != nil {
+		http.Error(w, "Execution not found", http.StatusNotFound)
+		return nil
+	}
+
+	execution, err := models.FindExecutionByID(ID)
+	if err != nil {
+		http.Error(w, "Execution not found", http.StatusNotFound)
+		return nil
+	}
+
+	//
+	// Try to authenticate using the token issued by SuperPlane itself.
+	// It the integration does not support OIDC tokens, this is the method of authentication used.
+	//
+	err = s.jwt.Validate(token, req.ExecutionID)
+	if err == nil {
+		return execution
+	}
+
+	//
+	// If authenticating with the token issued by SuperPlane itself fails,
+	// try to authenticate expecting an OIDC ID token issued by the integration.
+	//
+	integrationResource, err := execution.IntegrationResource(req.ExternalID)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	verifier, err := s.registry.GetOIDCVerifier(integrationResource.IntegrationType)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	err = verifier.Verify(r.Context(), s.oidcVerifier, token, integrations.VerifyTokenOptions{
+		IntegrationURL: integrationResource.IntegrationURL,
+		ParentResource: integrationResource.ParentExternalID,
+		ChildResource:  integrationResource.ExecutionExternalID,
+	})
+
+	if err != nil {
+		log.Warnf("Invalid token for execution %s: %v", req.ExecutionID, err)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+
+	return execution
+}
+
+type ExecutionOutputRequest struct {
+	ExecutionID string         `json:"execution_id"`
+	ExternalID  string         `json:"external_id"`
+	Outputs     map[string]any `json:"outputs"`
+}
+
+func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, MaxExecutionOutputsSize)
 	defer r.Body.Close()
 
@@ -471,29 +539,15 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	var req OutputsRequest
+	var req ExecutionOutputRequest
 	err = json.Unmarshal(body, &req)
 	if err != nil {
 		http.Error(w, "Error decoding request body", http.StatusBadRequest)
 		return
 	}
 
-	executionID, err := uuid.Parse(req.ExecutionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
-		return
-	}
-
-	token := headerParts[1]
-	err = s.jwt.Validate(token, req.ExecutionID)
-	if err != nil {
-		http.Error(w, "Invalid token", http.StatusUnauthorized)
-		return
-	}
-
-	execution, err := models.FindExecutionByID(executionID)
-	if err != nil {
-		http.Error(w, "execution not found", http.StatusNotFound)
+	execution := s.authenticateExecution(w, r, &req)
+	if execution == nil {
 		return
 	}
 
@@ -611,7 +665,7 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 	}
 
 	integrationName := vars["integrationName"]
-	eventHandler, err := s.registry.GetEventHandlerForIntegration(integrationName)
+	eventHandler, err := s.registry.GetEventHandler(integrationName)
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
 		return

@@ -29,7 +29,7 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 
 	signer := jwt.NewSigner("test-client-secret")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	// Create test user

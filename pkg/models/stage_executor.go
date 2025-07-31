@@ -51,10 +51,9 @@ func (e *StageExecutor) FindIntegration() (*Integration, error) {
 	var integration Integration
 
 	err := database.Conn().
-		Table("stage_executors").
-		Joins("INNER JOIN resources ON resources.id = stage_executors.resource_id").
+		Table("resources").
 		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
-		Where("stage_executors.id = ?", e.ID).
+		Where("resources.id = ?", e.ResourceID).
 		Select("integrations.*").
 		First(&integration).
 		Error
