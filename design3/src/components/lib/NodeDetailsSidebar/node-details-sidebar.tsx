@@ -28,12 +28,15 @@ interface QueueItem {
   name: string;
   timestamp: string;
   status: 'pending' | 'approved' | 'waiting';
+  executionMethod: 'manual' | 'timed' | 'queued' | 'blocked';
   approvalInfo?: {
     approvedBy?: number;
     waitingFor?: number;
   };
   inputs?: Record<string, string>;
   scheduledFor?: string;
+  delayTime?: string;
+  blockedReason?: string;
 }
 
 interface NodeDetailsSidebarProps {
@@ -102,10 +105,11 @@ const mockRuns2: RunData[] = [
 const mockQueue: QueueItem[] = [
   {
     id: 'msg-1',
-    name: 'Msg #2dlsf32fw',
+    name: 'Manual Approval Task',
     timestamp: 'Jan 16, 2022 10:23:45',
-    status: 'approved',
-    scheduledFor: 'Run next Monday',
+    status: 'waiting',
+    executionMethod: 'manual',
+    scheduledFor: 'Pending approval',
     approvalInfo: {
       approvedBy: 1,
       waitingFor: 2
@@ -119,9 +123,12 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-2',
-    name: 'Msg #2dlsf32fw',
+    name: 'Delayed Task',
     timestamp: '11 minutes ago',
     status: 'pending',
+    executionMethod: 'timed',
+    delayTime: '15 minutes',
+    scheduledFor: 'Run in 15 minutes',
     inputs: {
       code: '1045a77',
       image: 'v.1.2.4'
@@ -131,12 +138,9 @@ const mockQueue: QueueItem[] = [
     id: 'msg-3',
     name: 'Deploy #f8a9b3c',
     timestamp: '1 hour ago',
-    status: 'waiting',
-    scheduledFor: 'Run at 3:00 PM',
-    approvalInfo: {
-      approvedBy: 2,
-      waitingFor: 1
-    },
+    status: 'pending',
+    executionMethod: 'queued',
+    scheduledFor: 'Position #2 in queue',
     inputs: {
       Environment: 'staging',
       Branch: 'feature/new-ui',
@@ -145,10 +149,12 @@ const mockQueue: QueueItem[] = [
   },
   {
     id: 'msg-4',
-    name: 'Test #x7y2z9w',
+    name: 'Blocked Task',
     timestamp: '3 hours ago',
-    status: 'approved',
-    scheduledFor: 'Run immediately',
+    status: 'waiting',
+    executionMethod: 'blocked',
+    scheduledFor: 'Blocked - dependency failed',
+    blockedReason: 'Previous task "Build Infrastructure" failed',
     inputs: {
       TestSuite: 'integration',
       Coverage: '85%',
@@ -160,6 +166,8 @@ const mockQueue: QueueItem[] = [
     name: 'Build #k4m8n2p',
     timestamp: '5 hours ago',
     status: 'pending',
+    executionMethod: 'queued',
+    scheduledFor: 'Position #5 in queue',
     inputs: {
       Docker: 'node:18-alpine',
       Memory: '2GB',
@@ -170,12 +178,10 @@ const mockQueue: QueueItem[] = [
     id: 'msg-6',
     name: 'Release #q1w2e3r',
     timestamp: 'Yesterday 4:30 PM',
-    status: 'approved',
+    status: 'pending',
+    executionMethod: 'timed',
     scheduledFor: 'Run tomorrow 9:00 AM',
-    approvalInfo: {
-      approvedBy: 3,
-      waitingFor: 0
-    },
+    delayTime: 'until 9:00 AM tomorrow',
     inputs: {
       Tag: 'v3.0.0',
       Changelog: 'Major release',
@@ -187,6 +193,9 @@ const mockQueue: QueueItem[] = [
     name: 'Migrate #a5s6d7f',
     timestamp: '2 days ago',
     status: 'waiting',
+    executionMethod: 'blocked',
+    scheduledFor: 'Blocked - resource unavailable',
+    blockedReason: 'Database maintenance window not available',
     inputs: {
       Database: 'postgresql-14',
       Backup: 'enabled',
@@ -197,8 +206,13 @@ const mockQueue: QueueItem[] = [
     id: 'msg-8',
     name: 'Config #z9x8c7v',
     timestamp: '3 days ago',
-    status: 'pending',
+    status: 'waiting',
+    executionMethod: 'manual',
     scheduledFor: 'Manual trigger required',
+    approvalInfo: {
+      approvedBy: 0,
+      waitingFor: 1
+    },
     inputs: {
       Environment: 'production',
       ConfigFile: 'app.config.json',
@@ -363,6 +377,91 @@ export function NodeDetailsSidebar({
     </div>
   );
 
+  const renderExecutionMethod = (item: QueueItem) => {
+    const getExecutionMethodConfig = (method: string) => {
+      switch (method) {
+        case 'manual':
+          return {
+            icon: 'person',
+            title: 'Manual Approval',
+            description: 'Requires manual approval before execution',
+            bgColor: 'bg-orange-50 dark:bg-orange-900/20',
+            iconColor: 'text-orange-600 dark:text-orange-400',
+            textColor: 'text-orange-800 dark:text-orange-300'
+          };
+        case 'timed':
+          return {
+            icon: 'schedule',
+            title: 'Timed Execution',
+            description: `Scheduled to run ${item.delayTime ? `in ${item.delayTime}` : 'at specified time'}`,
+            bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+            iconColor: 'text-blue-600 dark:text-blue-400',
+            textColor: 'text-blue-800 dark:text-blue-300'
+          };
+        case 'queued':
+          return {
+            icon: 'queue',
+            title: 'Queue Execution',
+            description: 'Waiting in queue for execution order',
+            bgColor: 'bg-purple-50 dark:bg-purple-900/20',
+            iconColor: 'text-purple-600 dark:text-purple-400',
+            textColor: 'text-purple-800 dark:text-purple-300'
+          };
+        case 'blocked':
+          return {
+            icon: 'block',
+            title: 'Blocked',
+            description: item.blockedReason || 'Execution is blocked/paused',
+            bgColor: 'bg-red-50 dark:bg-red-900/20',
+            iconColor: 'text-red-600 dark:text-red-400',
+            textColor: 'text-red-800 dark:text-red-300'
+          };
+        default:
+          return {
+            icon: 'help',
+            title: 'Unknown',
+            description: 'Execution method not specified',
+            bgColor: 'bg-gray-50 dark:bg-gray-900/20',
+            iconColor: 'text-gray-600 dark:text-gray-400',
+            textColor: 'text-gray-800 dark:text-gray-300'
+          };
+      }
+    };
+
+    const config = getExecutionMethodConfig(item.executionMethod);
+    
+    return (
+      <div className={`p-3 border border-t-0 bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700`}>
+        {item.executionMethod === 'manual' && (
+          <div className='flex justify-between items-center'>
+            <div className='flex items-center'>
+              <MaterialSymbol name="how_to_reg" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+              <span className="text-xs text-gray-500 dark:text-zinc-400"><a href="#" className="black underline">1 person</a> approved, 2 more needed</span>
+            </div>
+            <Link href="#" className="text-xs text-gray-500 dark:text-zinc-300  flex items-center">
+              <MaterialSymbol name="check" size="sm" className="text-gray-500 dark:text-zinc-400 mr-1" /> 
+              <span className='underline'>Approve</span>
+            </Link>
+          </div>
+        )}
+        {item.executionMethod === 'timed' && (
+          <div className='flex items-center'>
+              <MaterialSymbol name={config.icon} size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+              <span className='text-xs text-gray-500 dark:text-zinc-400'>{config.description}</span>
+          </div>
+        )}
+        {item.executionMethod === 'blocked' && (
+          <div className='flex items-center'>
+              <MaterialSymbol name="pause" size="sm" className="text-gray-500 dark:text-zinc-200 mr-2" /> 
+              <span className='text-xs text-gray-500 dark:text-zinc-400'>Freezed by <Link href="#" className="underline text-zinc-600 dark:text-zinc-400">1 person</Link></span>
+          </div>
+        )}
+       
+        
+      </div>
+    );
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -371,7 +470,7 @@ export function NodeDetailsSidebar({
       className
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700">
+      <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-3">
           <MaterialSymbol name={nodeIcon} size="lg" className="text-gray-700 dark:text-zinc-300" />
           <Subheading level={3} className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -502,11 +601,12 @@ export function NodeDetailsSidebar({
               </div>
               
               <div className="space-y-3">
+              
                 {mockQueue.map((item) => {
                   const isExpanded = expandedQueue.has(item.id);
                   
                   return (
-                    <div key={item.id} className="" >
+                    <div key={item.id} className="queueItem" >
                       <div 
                         className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700"
                         onClick={() => toggleQueueExpansion(item.id)}
@@ -533,7 +633,7 @@ export function NodeDetailsSidebar({
                               />
                           </div>
                         </div>
-                        
+                
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
                             
@@ -543,11 +643,12 @@ export function NodeDetailsSidebar({
                           </div>
                         )}
                       </div>
+                      {/* Execution Method Information */}
+                      {renderExecutionMethod(item)}
                     </div>
-                
                   );
                 })}
-              
+                           
               </div>
             </div>
           </div>
