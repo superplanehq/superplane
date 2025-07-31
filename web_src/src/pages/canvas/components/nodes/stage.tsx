@@ -222,17 +222,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setStageDescription(props.data.description || '');
   };
 
-
-  const isDraftStage = () => {
-    if (!currentStage) return false;
-    if (currentStage.isDraft) return true;
-
-    const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
-    const hasNoId = !currentStage.metadata?.id;
-
-    return isTemporaryId || hasNoId;
-  };
-
   const handleDiscardStage = () => {
     if (currentStage?.metadata?.id) {
       removeStage(currentStage.metadata.id);
@@ -295,7 +284,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           onSave={handleSaveStage}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
-          showDiscard={isDraftStage()}
           entityType="stage"
         />
       )}

@@ -89,16 +89,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setEventSourceDescription(props.data.description || '');
   };
 
-
-  const isDraftEventSource = () => {
-    if (!currentEventSource) return false;
-
-    const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
-    const hasNoId = !currentEventSource.metadata?.id;
-
-    return isTemporaryId || hasNoId;
-  };
-
   const handleDiscardEventSource = () => {
     if (currentEventSource?.metadata?.id) {
       removeEventSource(currentEventSource.metadata.id);
@@ -136,7 +126,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
-          showDiscard={isDraftEventSource()}
           entityType="event source"
         />
       )}

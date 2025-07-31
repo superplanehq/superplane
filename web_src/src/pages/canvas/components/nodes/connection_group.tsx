@@ -143,15 +143,6 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setConnectionGroupDescription(props.data.description || '');
   };
 
-  const isDraftConnectionGroup = () => {
-    if (!currentConnectionGroup) return false;
-
-    const isTemporaryId = currentConnectionGroup.metadata?.id && /^\d+$/.test(currentConnectionGroup.metadata.id);
-    const hasNoId = !currentConnectionGroup.metadata?.id;
-
-    return isTemporaryId || hasNoId;
-  };
-
   const handleDiscardConnectionGroup = () => {
     if (currentConnectionGroup?.metadata?.id) {
       removeConnectionGroup(currentConnectionGroup.metadata.id);
@@ -189,7 +180,6 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           onSave={handleSaveConnectionGroup}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
-          showDiscard={isDraftConnectionGroup()}
           entityType="connection group"
         />
       )}
