@@ -155,17 +155,21 @@ export const autoLayoutNodes = async (
   nodes: AllNodeType[],
   edges: Edge[]
 ) => {
-  const elkNodes: ElkNode[] = nodes.map((node) => ({
+  let elkNodes: ElkNode[] = nodes.map((node) => ({
     id: node.id,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
   }));
 
-  const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
+
+  let elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
     id: edge.id,
     sources: [edge.source],
     targets: [edge.target],
   }));
+
+  elkNodes = Array.from(new Map(elkNodes.map((node) => [node.id, node])).values());
+  elkEdges = Array.from(new Map(elkEdges.map((edge) => [edge.id, edge])).values());
 
   try {
     const layoutedGraph = await elk.layout({
