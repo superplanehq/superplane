@@ -4,6 +4,7 @@ import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef } from '@/api-cli
 import { AccordionItem } from './AccordionItem';
 import { Label } from './Label';
 import { Field } from './Field';
+import { RevertButton } from './RevertButton';
 import { useIntegrations } from '../hooks/useIntegrations';
 
 interface EventSourceEditModeContentProps {
@@ -24,6 +25,14 @@ export function EventSourceEditModeContent({
   onDataChange
 }: EventSourceEditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general', 'integration', 'webhook']);
+  
+  // Original data state for change tracking
+  const [originalData] = useState({
+    integration: data.integration,
+    resource: data.resource,
+    integrationConfig: {} as Record<string, string | boolean>
+  });
+  
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
@@ -62,6 +71,34 @@ export function EventSourceEditModeContent({
       });
     }
   }, [selectedIntegration, resourceType, resourceName, eventSourceType, onDataChange]);
+
+  // Helper function to check if a section has been modified
+  const isSectionModified = (section: string): boolean => {
+    switch (section) {
+      case 'integration':
+        return JSON.stringify(selectedIntegration) !== JSON.stringify(originalData.integration) ||
+               resourceType !== (originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : '')) ||
+               resourceName !== (originalData.resource?.name || '') ||
+               JSON.stringify(integrationConfig) !== JSON.stringify(originalData.integrationConfig);
+      case 'webhook':
+        // Webhook section doesn't have editable fields, so never modified
+        return false;
+      default:
+        return false;
+    }
+  };
+
+  // Revert function for each section
+  const revertSection = (section: string) => {
+    switch (section) {
+      case 'integration':
+        setSelectedIntegration(originalData.integration);
+        setResourceType(originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(originalData.resource?.name || '');
+        setIntegrationConfig({ ...originalData.integrationConfig });
+        break;
+    }
+  };
 
   const handleAccordionToggle = (sectionId: string) => {
     setOpenSections(prev => {
@@ -168,7 +205,14 @@ export function EventSourceEditModeContent({
             id="integration"
             title={
               <div className="flex items-center justify-between w-full">
-                <span>Semaphore Configuration</span>
+                <div className="flex items-center gap-2">
+                  <span>Semaphore Configuration</span>
+                  <RevertButton 
+                    sectionId="integration" 
+                    isModified={isSectionModified('integration')} 
+                    onRevert={revertSection} 
+                  />
+                </div>
                 <span className="text-xs text-blue-600 font-medium">Required</span>
               </div>
             }

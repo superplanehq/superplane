@@ -6,6 +6,7 @@ import { Label } from './Label';
 import { Field } from './Field';
 import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { RevertButton } from './RevertButton';
 import { useCanvasStore } from '../store/canvasStore';
 
 interface ConnectionGroupEditModeContentProps {
@@ -24,6 +25,15 @@ interface ConnectionGroupEditModeContentProps {
 
 export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, onDataChange }: ConnectionGroupEditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general', 'connections', 'groupBy']);
+  
+  // Original data state for change tracking
+  const [originalData] = useState({
+    connections: data.connections || [],
+    groupByFields: data.groupBy?.fields || [],
+    timeout: data.timeout,
+    timeoutBehavior: data.timeoutBehavior || 'TIMEOUT_BEHAVIOR_DROP'
+  });
+  
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [groupByFields, setGroupByFields] = useState<GroupByField[]>(data.groupBy?.fields || []);
   const [timeout, setTimeout] = useState<number | undefined>(data.timeout);
@@ -36,6 +46,38 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
 
   // Get available connection sources from canvas store
   const { stages, eventSources, connectionGroups } = useCanvasStore();
+
+  // Helper function to check if a section has been modified
+  const isSectionModified = (section: string): boolean => {
+    switch (section) {
+      case 'connections':
+        return JSON.stringify(connections) !== JSON.stringify(originalData.connections);
+      case 'groupBy':
+        return JSON.stringify(groupByFields) !== JSON.stringify(originalData.groupByFields);
+      case 'timeout':
+        return timeout !== originalData.timeout || timeoutBehavior !== originalData.timeoutBehavior;
+      default:
+        return false;
+    }
+  };
+
+  // Revert function for each section
+  const revertSection = (section: string) => {
+    switch (section) {
+      case 'connections':
+        setConnections([...originalData.connections]);
+        setEditingConnectionIndex(null);
+        break;
+      case 'groupBy':
+        setGroupByFields([...originalData.groupByFields]);
+        setEditingGroupByIndex(null);
+        break;
+      case 'timeout':
+        setTimeout(originalData.timeout);
+        setTimeoutBehavior(originalData.timeoutBehavior);
+        break;
+    }
+  };
 
   const handleAccordionToggle = (sectionId: string) => {
     setOpenSections(prev => {
@@ -291,7 +333,14 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           id="connections"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Connections</span>
+              <div className="flex items-center gap-2">
+                <span>Connections</span>
+                <RevertButton 
+                  sectionId="connections" 
+                  isModified={isSectionModified('connections')} 
+                  onRevert={revertSection} 
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {connections.length} connections
               </span>
@@ -430,7 +479,14 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           id="groupBy"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Group By Fields</span>
+              <div className="flex items-center gap-2">
+                <span>Group By Fields</span>
+                <RevertButton 
+                  sectionId="groupBy" 
+                  isModified={isSectionModified('groupBy')} 
+                  onRevert={revertSection} 
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {groupByFields.length} fields
               </span>
@@ -534,7 +590,14 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           id="timeout"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Timeout Configuration</span>
+              <div className="flex items-center gap-2">
+                <span>Timeout Configuration</span>
+                <RevertButton 
+                  sectionId="timeout" 
+                  isModified={isSectionModified('timeout')} 
+                  onRevert={revertSection} 
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {timeout ? `${timeout}s` : 'No timeout'}
               </span>

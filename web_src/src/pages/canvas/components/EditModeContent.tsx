@@ -6,6 +6,7 @@ import { Label } from './Label';
 import { Field } from './Field';
 import { Button } from '@/components/Button/button';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { RevertButton } from './RevertButton';
 import { useCanvasStore } from '../store/canvasStore';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
@@ -19,6 +20,16 @@ interface EditModeContentProps {
 
 export function EditModeContent({ data, currentStageId, onDataChange }: EditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general']);
+
+  const [originalData] = useState({
+    inputs: data.inputs || [],
+    outputs: data.outputs || [],
+    connections: data.connections || [],
+    secrets: data.secrets || [],
+    conditions: data.conditions || [],
+    executor: data.executor || { type: '', spec: {} }
+  });
+
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
@@ -189,6 +200,49 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
     }
 
     return options;
+  };
+
+  const isSectionModified = (section: string): boolean => {
+    switch (section) {
+      case 'connections':
+        return JSON.stringify(connections) !== JSON.stringify(originalData.connections);
+      case 'inputs':
+        return JSON.stringify(inputs) !== JSON.stringify(originalData.inputs);
+      case 'outputs':
+        return JSON.stringify(outputs) !== JSON.stringify(originalData.outputs);
+      case 'conditions':
+        return JSON.stringify(conditions) !== JSON.stringify(originalData.conditions);
+      case 'secrets':
+        return JSON.stringify(secrets) !== JSON.stringify(originalData.secrets);
+      case 'executor':
+        return JSON.stringify(executor) !== JSON.stringify(originalData.executor);
+      default:
+        return false;
+    }
+  };
+
+  // Revert function for each section
+  const revertSection = (section: string) => {
+    switch (section) {
+      case 'connections':
+        setConnections([...originalData.connections]);
+        break;
+      case 'inputs':
+        setInputs([...originalData.inputs]);
+        break;
+      case 'outputs':
+        setOutputs([...originalData.outputs]);
+        break;
+      case 'conditions':
+        setConditions([...originalData.conditions]);
+        break;
+      case 'secrets':
+        setSecrets([...originalData.secrets]);
+        break;
+      case 'executor':
+        setExecutor({ ...originalData.executor });
+        break;
+    }
   };
 
   const handleAccordionToggle = (sectionId: string) => {
@@ -937,7 +991,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="connections"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Connections</span>
+              <div className="flex items-center gap-2">
+                <span>Connections</span>
+                <RevertButton
+                  sectionId="connections"
+                  isModified={isSectionModified('connections')}
+                  onRevert={revertSection}
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {connections.length} connections
               </span>
@@ -1153,7 +1214,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="inputs"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Inputs</span>
+              <div className="flex items-center gap-2">
+                <span>Inputs</span>
+                <RevertButton
+                  sectionId="inputs"
+                  isModified={isSectionModified('inputs')}
+                  onRevert={revertSection}
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {inputs.length} inputs
               </span>
@@ -1290,7 +1358,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="outputs"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Outputs</span>
+              <div className="flex items-center gap-2">
+                <span>Outputs</span>
+                <RevertButton
+                  sectionId="outputs"
+                  isModified={isSectionModified('outputs')}
+                  onRevert={revertSection}
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {outputs.length} outputs
               </span>
@@ -1399,7 +1474,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="conditions"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Conditions</span>
+              <div className="flex items-center gap-2">
+                <span>Conditions</span>
+                <RevertButton
+                  sectionId="conditions"
+                  isModified={isSectionModified('conditions')}
+                  onRevert={revertSection}
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-500">{conditions.length} condition{conditions.length !== 1 ? 's' : ''}</span>
               </div>
@@ -1573,7 +1655,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="secrets"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Secrets Management</span>
+              <div className="flex items-center gap-2">
+                <span>Secrets Management</span>
+                <RevertButton
+                  sectionId="secrets"
+                  isModified={isSectionModified('secrets')}
+                  onRevert={revertSection}
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {secrets.length} secrets
               </span>
@@ -1803,7 +1892,14 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
           id="executor"
           title={
             <div className="flex items-center justify-between w-full">
-              <span>Executor Configuration</span>
+              <div className="flex items-center gap-2">
+                <span>Executor Configuration</span>
+                <RevertButton
+                  sectionId="executor"
+                  isModified={isSectionModified('executor')}
+                  onRevert={revertSection}
+                />
+              </div>
               <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
                 {executor.type || 'Not configured'}
               </span>
