@@ -10,13 +10,9 @@ import { EditModeContent } from '../EditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
+import { EditModeActionButtons } from '../EditModeActionButtons';
 
-
-// Define the data type for the deployment card
-// Using Record<string, unknown> to satisfy ReactFlow's Node constraint
 export default function StageNode(props: NodeProps<StageNodeType>) {
-  // Check if this is a newly added node (has temporary ID or isDraft flag)
   const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -28,36 +24,28 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
   )
-
-  // Get canvasId from the store or current context
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
-
-  // Filter events by their state
   const pendingEvents = useMemo(() =>
     props.data.queues?.filter(event => event.state === 'STATE_PENDING') || [],
     [props.data.queues]
   );
-
   const waitingEvents = useMemo(() =>
     props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [],
     [props.data.queues]
   );
-
   const allExecutions = useMemo(() =>
     props.data.queues?.flatMap(event => event.execution as SuperplaneExecution)
       .filter(execution => execution)
       .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [props.data.queues]
   );
-
   const allFinishedExecutions = useMemo(() =>
     allExecutions
       .filter(execution => execution?.finishedAt)
     , [allExecutions]
   );
-
   const executionRunning = useMemo(() =>
     allExecutions.some(execution => execution.state === 'STATE_STARTED'),
     [allExecutions]
@@ -77,7 +65,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       }
     })
   }, [props.data.outputs, allFinishedExecutions])
-
 
   const getStatusIcon = () => {
     const latestExecution = allExecutions.at(0);
@@ -113,13 +100,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   };
 
   const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
-
-  // Edit mode handlers
   const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     setIsEditMode(true);
     setEditingStage(props.id);
-    // Initialize the editable values from current data
+
     setStageName(props.data.label);
     setStageDescription(props.data.description || '');
   };
@@ -129,17 +114,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return;
     }
 
-    // Check validation before saving
     if (!currentFormData.isValid && !saveAsDraft) {
       setApiError('Please fix validation errors before saving.');
       return;
     }
 
-    // Clear any previous API errors
     setApiError(null);
 
-    // Check if this is a new/draft stage
-    // New stages have temporary IDs (timestamp strings) or are marked as draft
     const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
     const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
 
@@ -157,7 +138,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         });
         removeStage(props.id);
       } else if (!isNewStage && !saveAsDraft) {
-        // Update existing stage (commit to backend)
+
         if (!currentStage.metadata?.id) {
           throw new Error('Stage ID is required for update');
         }
@@ -174,7 +155,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           conditions: currentFormData.conditions
         });
 
-        // Update local store as well
         updateStage({
           ...currentStage,
           metadata: {
@@ -191,11 +171,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             secrets: currentFormData.secrets
           }
         });
-        // Update props.data to reflect the changes
+
         props.data.label = stageName;
         props.data.description = stageDescription;
       } else if (saveAsDraft) {
-        // Save as draft (only update local store, don't commit to backend)
+
         const draftStage: StageWithEventQueue = {
           ...currentStage,
           metadata: {
@@ -210,23 +190,22 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             connections: currentFormData.connections,
             executor: currentFormData.executor
           },
-          isDraft: true // Mark as draft
+          isDraft: true
         };
         updateStage(draftStage);
-        // Update props.data to reflect the changes
+
         props.data.label = stageName;
         props.data.description = stageDescription;
       }
     } catch (error) {
       const apiError = error as Error;
       console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, apiError);
-      // Set API error and stay in edit mode
+
       const errorMessage = apiError.message || 'An error occurred while saving the stage';
       setApiError(errorMessage);
-      return; // Don't exit edit mode
+      return;
     }
 
-    // Only exit edit mode if save was successful
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
@@ -238,22 +217,17 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setEditingStage(null);
     setCurrentFormData(null);
     setApiError(null);
-    // Reset to original values
+
     setStageName(props.data.label);
     setStageDescription(props.data.description || '');
   };
 
-  // Check if this is a draft/new stage that can be discarded
+
   const isDraftStage = () => {
     if (!currentStage) return false;
-
-    // Check if it's marked as draft
     if (currentStage.isDraft) return true;
 
-    // Check if it has a temporary ID (timestamp strings)
     const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
-
-    // Check if it doesn't have an ID yet
     const hasNoId = !currentStage.metadata?.id;
 
     return isTemporaryId || hasNoId;
@@ -317,46 +291,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {isEditMode && (
-        <div
-          className="action-buttons absolute z-50 -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-1 border border-gray-200 z-50"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Dropdown>
-            <DropdownButton plain className='flex items-center gap-2'>
-              <MaterialSymbol name="save" size="md" />
-              Save
-              <MaterialSymbol name="expand_more" size="md" />
-            </DropdownButton>
-            <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2' onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleSaveStage(false) }}>
-                <DropdownLabel>Save & Commit</DropdownLabel>
-              </DropdownItem>
-              <DropdownItem className='flex items-center gap-2' onClick={(e: React.MouseEvent<HTMLButtonElement>) => { e.stopPropagation(); handleSaveStage(true) }}>
-                <DropdownLabel>Save as Draft</DropdownLabel>
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-
-          <button
-            onClick={handleCancelEdit}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
-            title="Cancel changes"
-          >
-            <MaterialSymbol name="close" size="md" />
-            Cancel
-          </button>
-
-          {isDraftStage() && (
-            <button
-              onClick={() => setShowDiscardConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-              title="Discard this stage"
-            >
-              <MaterialSymbol name="delete" size="md" />
-              Discard
-            </button>
-          )}
-        </div>
+        <EditModeActionButtons
+          onSave={handleSaveStage}
+          onCancel={handleCancelEdit}
+          onDiscard={() => setShowDiscardConfirm(true)}
+          showDiscard={isDraftStage()}
+          entityType="stage"
+        />
       )}
 
       {/* Header Section */}

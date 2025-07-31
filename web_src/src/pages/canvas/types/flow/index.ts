@@ -22,6 +22,7 @@ export type EdgeType = Edge;
 export type ConnectionGroupNodeData = {
   id: string;
   name: string;
+  description?: string;
   connections: SuperplaneConnection[];
   groupBy: SpecGroupBy;
 }

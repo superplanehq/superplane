@@ -88,6 +88,7 @@ export const transformConnectionGroupsToNodes = (
     data: {
       id: g.metadata?.id || '',
       name: g.metadata?.name || '',
+      description: g.metadata?.description || '',
       connections: g.spec?.connections || [],
       groupBy: g.spec?.groupBy || [],
     },

@@ -9,10 +9,10 @@ import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeConten
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
+import { EditModeActionButtons } from '../EditModeActionButtons';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
-  // Check if this is a newly added node (has temporary ID)
+
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -25,19 +25,19 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     state.connectionGroups.find(cg => cg.metadata?.id === props.id)
   );
 
-  // Get canvasId from the store or current context
+
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
   const updateConnectionGroupMutation = useUpdateConnectionGroup(canvasId);
 
-  // Extract group by fields for display
+
   const groupByFields = props.data.groupBy?.fields || [];
 
-  // Edit mode handlers
+
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingConnectionGroup(props.id);
-    // Initialize the editable values from current data
+
     setConnectionGroupName(props.data.name);
     setConnectionGroupDescription(props.data.description || '');
   };
@@ -47,13 +47,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       return;
     }
 
-    // Check if this is a new/draft connection group
     const isTemporaryId = currentConnectionGroup.metadata?.id && /^\d+$/.test(currentConnectionGroup.metadata.id);
     const isNewConnectionGroup = !currentConnectionGroup.metadata?.id || isTemporaryId;
 
     try {
       if (isNewConnectionGroup && !saveAsDraft) {
-        // Create new connection group (commit to backend)
+
         const result = await createConnectionGroupMutation.mutateAsync({
           name: connectionGroupName,
           description: connectionGroupDescription,
@@ -63,13 +62,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           timeoutBehavior: currentFormData.timeoutBehavior
         });
 
-        // Update local store with the new connection group data from API response
         const newConnectionGroup = result.data?.connectionGroup;
         if (newConnectionGroup) {
           removeConnectionGroup(props.id);
         }
       } else if (!isNewConnectionGroup && !saveAsDraft) {
-        // Update existing connection group (commit to backend)
+
         if (!currentConnectionGroup.metadata?.id) {
           throw new Error('Connection Group ID is required for update');
         }
@@ -84,7 +82,6 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           timeoutBehavior: currentFormData.timeoutBehavior
         });
 
-        // Update local store as well
         updateConnectionGroup({
           ...currentConnectionGroup,
           metadata: {
@@ -102,11 +99,11 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             timeoutBehavior: currentFormData.timeoutBehavior
           }
         });
-        // Update props.data to reflect the changes
+
         props.data.name = connectionGroupName;
         props.data.description = connectionGroupDescription;
       } else if (saveAsDraft) {
-        // Save as draft (only update local store, don't commit to backend)
+
         const draftConnectionGroup = {
           ...currentConnectionGroup,
           metadata: {
@@ -125,7 +122,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           }
         };
         updateConnectionGroup(draftConnectionGroup);
-        // Update props.data to reflect the changes
+
         props.data.name = connectionGroupName;
         props.data.description = connectionGroupDescription;
       }
@@ -141,19 +138,15 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setIsEditMode(false);
     setEditingConnectionGroup(null);
     setCurrentFormData(null);
-    // Reset to original values
+
     setConnectionGroupName(props.data.name);
     setConnectionGroupDescription(props.data.description || '');
   };
 
-  // Check if this is a draft/new connection group that can be discarded
   const isDraftConnectionGroup = () => {
     if (!currentConnectionGroup) return false;
 
-    // Check if it has a temporary ID (timestamp strings)
     const isTemporaryId = currentConnectionGroup.metadata?.id && /^\d+$/.test(currentConnectionGroup.metadata.id);
-
-    // Check if it doesn't have an ID yet
     const hasNoId = !currentConnectionGroup.metadata?.id;
 
     return isTemporaryId || hasNoId;
@@ -192,46 +185,13 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {isEditMode && (
-        <div
-          className="action-buttons absolute z-50 -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-1 border border-gray-200 z-50"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Dropdown>
-            <DropdownButton plain className='flex items-center gap-2'>
-              <MaterialSymbol name="save" size="md" />
-              Save
-              <MaterialSymbol name="expand_more" size="md" />
-            </DropdownButton>
-            <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveConnectionGroup(false)}>
-                <DropdownLabel>Save & Commit</DropdownLabel>
-              </DropdownItem>
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveConnectionGroup(true)}>
-                <DropdownLabel>Save as Draft</DropdownLabel>
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-
-          <button
-            onClick={handleCancelEdit}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
-            title="Cancel changes"
-          >
-            <MaterialSymbol name="close" size="md" />
-            Cancel
-          </button>
-
-          {isDraftConnectionGroup() && (
-            <button
-              onClick={() => setShowDiscardConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-              title="Discard this connection group"
-            >
-              <MaterialSymbol name="delete" size="md" />
-              Discard
-            </button>
-          )}
-        </div>
+        <EditModeActionButtons
+          onSave={handleSaveConnectionGroup}
+          onCancel={handleCancelEdit}
+          onDiscard={() => setShowDiscardConfirm(true)}
+          showDiscard={isDraftConnectionGroup()}
+          entityType="connection group"
+        />
       )}
 
       {/* Header Section */}

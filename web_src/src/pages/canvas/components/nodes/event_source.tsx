@@ -10,7 +10,7 @@ import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
-import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } from '@/components/Dropdown/dropdown';
+import { EditModeActionButtons } from '../EditModeActionButtons';
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -20,45 +20,38 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [eventSourceName, setEventSourceName] = useState(props.data.name);
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
-
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
-
-  // Get canvasId and organizationId from the store or current context
   const canvasId = useCanvasStore(state => state.canvasId) || '';
-  const organizationId = ''; // This should come from context or props
+  const organizationId = '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
 
-  // Edit mode handlers
   const handleEditClick = () => {
     setIsEditMode(true);
     setEditingEventSource(props.id);
-    // Initialize the editable values from current data
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
   };
-
   const handleSaveEventSource = async (saveAsDraft = false) => {
     if (!currentFormData || !currentEventSource) {
       return;
     }
 
-    // Check if this is a new/draft event source
     const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
     const isNewEventSource = !currentEventSource.metadata?.id || isTemporaryId;
 
     try {
       if (isNewEventSource && !saveAsDraft) {
-        // Create new event source (commit to backend)
+
         const result = await createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
 
-        // Update local store with the new event source data from API response
+
         const newEventSource = result.data?.eventSource;
 
         if (newEventSource) {
@@ -67,7 +60,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           removeEventSource(props.id);
         }
       } else if (saveAsDraft) {
-        // Save as draft (only update local store, don't commit to backend)
+
         const draftEventSource: EventSourceWithEvents = {
           ...currentEventSource,
           metadata: {
@@ -91,19 +84,16 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setIsEditMode(false);
     setEditingEventSource(null);
     setCurrentFormData(null);
-    // Reset to original values
+
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
   };
 
-  // Check if this is a draft/new event source that can be discarded
+
   const isDraftEventSource = () => {
     if (!currentEventSource) return false;
 
-    // Check if it has a temporary ID (timestamp strings)
     const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
-
-    // Check if it doesn't have an ID yet
     const hasNoId = !currentEventSource.metadata?.id;
 
     return isTemporaryId || hasNoId;
@@ -142,46 +132,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {isEditMode && (
-        <div
-          className="action-buttons absolute z-50 -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-1 border border-gray-200 z-50"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Dropdown>
-            <DropdownButton plain className='flex items-center gap-2'>
-              <MaterialSymbol name="save" size="md" />
-              Save
-              <MaterialSymbol name="expand_more" size="md" />
-            </DropdownButton>
-            <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveEventSource(false)}>
-                <DropdownLabel>Save & Commit</DropdownLabel>
-              </DropdownItem>
-              <DropdownItem className='flex items-center gap-2' onClick={() => handleSaveEventSource(true)}>
-                <DropdownLabel>Save as Draft</DropdownLabel>
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
-
-          <button
-            onClick={handleCancelEdit}
-            className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors"
-            title="Cancel changes"
-          >
-            <MaterialSymbol name="close" size="md" />
-            Cancel
-          </button>
-
-          {isDraftEventSource() && (
-            <button
-              onClick={() => setShowDiscardConfirm(true)}
-              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-              title="Discard this event source"
-            >
-              <MaterialSymbol name="delete" size="md" />
-              Discard
-            </button>
-          )}
-        </div>
+        <EditModeActionButtons
+          onSave={handleSaveEventSource}
+          onCancel={handleCancelEdit}
+          onDiscard={() => setShowDiscardConfirm(true)}
+          showDiscard={isDraftEventSource()}
+          entityType="event source"
+        />
       )}
 
       {/* Header Section */}
