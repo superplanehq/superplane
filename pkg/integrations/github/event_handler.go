@@ -2,6 +2,8 @@ package github
 
 import (
 	"fmt"
+	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,12 +19,57 @@ const (
 
 type GitHubEventHandler struct{}
 
-func (i *GitHubEventHandler) HandleWebhook(payload []byte) (integrations.StatefulResource, error) {
+type GitHubEvent struct {
+	EventType        string
+	PayloadSignature string
+}
+
+func (e *GitHubEvent) Signature() string {
+	return e.PayloadSignature
+}
+
+func (e *GitHubEvent) Type() string {
+	return e.EventType
+}
+
+func (i *GitHubEventHandler) Handle(data []byte, header http.Header) (integrations.Event, error) {
+	signature := header.Get("X-Hub-Signature-256")
+	if signature == "" {
+		return nil, integrations.ErrInvalidSignature
+	}
+
+	eventType := header.Get("X-GitHub-Event")
+	if eventType == "" {
+		return nil, fmt.Errorf("missing X-GitHub-Event header")
+	}
+
+	if !slices.Contains(github.MessageTypes(), eventType) {
+		return nil, fmt.Errorf("unknown event type %s", eventType)
+	}
+
+	_, err := github.ParseWebHook(eventType, data)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing %s event: %v", eventType, err)
+	}
+
+	event := GitHubEvent{
+		EventType:        eventType,
+		PayloadSignature: signature,
+	}
+
+	return &event, nil
+}
+
+func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (integrations.StatefulResource, error) {
+	if eventType != "workflow_run" {
+		return nil, fmt.Errorf("unsupported event type %s", eventType)
+	}
+
 	//
 	// TODO: I'm hardcoding event type here, but we also listen to different event types
 	// and we should make sure we filter them out somehow.
 	//
-	event, err := github.ParseWebHook("workflow_run", payload)
+	event, err := github.ParseWebHook(eventType, eventPayload)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing webhook: %v", err)
 	}

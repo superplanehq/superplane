@@ -112,7 +112,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	statefulResource, err := eventHandler.Status([]byte(event.Raw))
+	statefulResource, err := eventHandler.Status(event.Type, []byte(event.Raw))
 	if err != nil {
 		return err
 	}

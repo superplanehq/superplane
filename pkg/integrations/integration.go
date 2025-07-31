@@ -19,7 +19,7 @@ type EventHandler interface {
 	// Used by the pending events worker to update execution resources.
 	// Used in conjunction with Status() to update the status of an execution resource.
 	//
-	Status([]byte) (StatefulResource, error)
+	Status(string, []byte) (StatefulResource, error)
 
 	//
 	// Convert the webhook data into an event.

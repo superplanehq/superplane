@@ -30,7 +30,7 @@ type HookPipeline struct {
 	Result string `json:"result"`
 }
 
-func (i *SemaphoreEventHandler) Status(data []byte) (integrations.StatefulResource, error) {
+func (i *SemaphoreEventHandler) Status(_ string, data []byte) (integrations.StatefulResource, error) {
 	var hook Hook
 	err := json.Unmarshal(data, &hook)
 	if err != nil {

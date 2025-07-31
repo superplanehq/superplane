@@ -49,8 +49,9 @@ func (r *Registry) Init() {
 	}
 
 	r.Integrations[models.IntegrationTypeGithub] = Integration{
-		BuildFn:    github.NewGitHubIntegration,
-		ExecutorFn: github.NewGitHubExecutor,
+		EventHandler:       &github.GitHubEventHandler{},
+		NewResourceManager: github.NewGitHubResourceManager,
+		NewExecutor:        github.NewGitHubExecutor,
 	}
 
 	//

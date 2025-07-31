@@ -58,7 +58,7 @@ func (e *GitHubExecutor) validateWorkflow(ctx context.Context, spec ExecutorSpec
 		return fmt.Errorf("error parsing repository name: %v", err)
 	}
 
-	_, err = e.findWorkflow(owner, repo, spec.Workflow)
+	_, err = e.findWorkflow(ctx, owner, repo, spec.Workflow)
 	if err != nil {
 		return err
 	}
@@ -66,8 +66,8 @@ func (e *GitHubExecutor) validateWorkflow(ctx context.Context, spec ExecutorSpec
 	return nil
 }
 
-func (e *GitHubExecutor) findWorkflow(owner, repo string, workflowName string) (*github.Workflow, error) {
-	workflows, _, err := e.gh.client.Actions.ListWorkflows(context.Background(), owner, repo, nil)
+func (e *GitHubExecutor) findWorkflow(ctx context.Context, owner, repo string, workflowName string) (*github.Workflow, error) {
+	workflows, _, err := e.gh.client.Actions.ListWorkflows(ctx, owner, repo, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %v", err)
 	}
@@ -97,7 +97,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 		return nil, fmt.Errorf("error parsing repository name: %v", err)
 	}
 
-	workflow, err := e.findWorkflow(owner, repo, spec.Workflow)
+	workflow, err := e.findWorkflow(context.Background(), owner, repo, spec.Workflow)
 	if err != nil {
 		return nil, err
 	}
