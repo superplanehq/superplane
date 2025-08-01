@@ -27,29 +27,33 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
+
   const pendingEvents = useMemo(() =>
-    props.data.queues?.filter(event => event.state === 'STATE_PENDING') || [],
-    [props.data.queues]
+    currentStage?.queue?.filter(event => event.state === 'STATE_PENDING') || [],
+    [currentStage?.queue]
   );
   const waitingEvents = useMemo(() =>
-    props.data.queues?.filter(event => event.state === 'STATE_WAITING') || [],
-    [props.data.queues]
+    currentStage?.queue?.filter(event => event.state === 'STATE_WAITING') || [],
+    [currentStage?.queue]
   );
   const allExecutions = useMemo(() =>
-    props.data.queues?.flatMap(event => event.execution as SuperplaneExecution)
+    currentStage?.queue?.flatMap(event => event.execution as SuperplaneExecution)
       .filter(execution => execution)
       .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
-    [props.data.queues]
+    [currentStage?.queue]
   );
+
   const allFinishedExecutions = useMemo(() =>
     allExecutions
       .filter(execution => execution?.finishedAt)
     , [allExecutions]
   );
+
   const executionRunning = useMemo(() =>
     allExecutions.some(execution => execution.state === 'STATE_STARTED'),
     [allExecutions]
   );
+
 
   const outputs = useMemo(() => {
     const lastFinishedExecution = allFinishedExecutions.at(0);
@@ -459,21 +463,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                     className="min-w-0 font-semibold text-sm flex items-center hover:underline"
                   >
                     <div className="truncate">Pending ({pendingEvents.length})</div>
-                  </a>
-                </div>
-              )}
-
-              {/* Waiting Events */}
-              {waitingEvents.length > 0 && (
-                <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
-                  <div className="rounded-full bg-[var(--lightest-orange)] text-[var(--dark-orange)] w-6 h-6 mr-2 flex items-center justify-center">
-                    <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>how_to_reg</span>
-                  </div>
-                  <a
-                    href="#"
-                    className="min-w-0 font-semibold text-sm flex items-center hover:underline"
-                  >
-                    <div className="truncate">Waiting Approval ({waitingEvents.length})</div>
                   </a>
                 </div>
               )}
