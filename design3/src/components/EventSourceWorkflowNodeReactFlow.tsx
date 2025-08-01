@@ -154,15 +154,17 @@ export function EventSourceWorkflowNodeReactFlow({
         </div>
 
         {/* React Flow Handles */}
-        <Handle 
-          type="target" 
-          position={Position.Left} 
-          className="w-3 h-3 bg-gray-400 border-2 border-white" 
+        <Handle
+          type="target"
+          position={Position.Left}
+          className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md !hidden"
+          aria-label="Input connection point"
         />
-        <Handle 
-          type="source" 
-          position={Position.Right} 
-          className="w-3 h-3 bg-blue-600 border-2 border-white" 
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
+          aria-label="Output connection point"
         />
       </div>
     );
