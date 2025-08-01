@@ -286,6 +286,13 @@ message EventSource {
   message Spec {
     Integrations.IntegrationRef integration = 1;
     Integrations.ResourceRef resource = 2;
+    repeated EventType events = 3;
+  }
+
+  message EventType {
+    string type = 1;
+    repeated Filter filters = 2;
+    FilterOperator filter_operator = 3;
   }
 
   Metadata metadata = 1;

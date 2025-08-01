@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -14,18 +13,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
+func DescribeEventSource(ctx context.Context, canvasID string, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	logger := logging.ForCanvas(canvas)

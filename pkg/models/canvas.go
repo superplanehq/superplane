@@ -29,12 +29,19 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
-func (c *Canvas) CreateEventSource(name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
-	return c.CreateEventSourceInTransaction(database.Conn(), name, key, scope, resourceId)
+func (c *Canvas) CreateEventSource(name string, key []byte, scope string, eventTypes []EventType, resourceId *uuid.UUID) (*EventSource, error) {
+	return c.CreateEventSourceInTransaction(database.Conn(), name, key, scope, eventTypes, resourceId)
 }
 
 // NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []byte, scope string, resourceId *uuid.UUID) (*EventSource, error) {
+func (c *Canvas) CreateEventSourceInTransaction(
+	tx *gorm.DB,
+	name string,
+	key []byte,
+	scope string,
+	eventTypes []EventType,
+	resourceId *uuid.UUID,
+) (*EventSource, error) {
 	now := time.Now()
 
 	eventSource := EventSource{
@@ -46,6 +53,7 @@ func (c *Canvas) CreateEventSourceInTransaction(tx *gorm.DB, name string, key []
 		ResourceID: resourceId,
 		State:      EventSourceStatePending,
 		Scope:      scope,
+		EventTypes: datatypes.NewJSONSlice(eventTypes),
 	}
 
 	err := tx.

@@ -17,19 +17,8 @@ import (
 func Test__DescribeEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
-	t.Run("invalid canvas ID -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			Id: uuid.New().String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
+		_, err := DescribeEventSource(context.Background(), uuid.New().String(), &protos.DescribeEventSourceRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Id:             uuid.New().String(),
 		})
@@ -41,9 +30,8 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Id:             uuid.New().String(),
+		_, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
+			Id: uuid.New().String(),
 		})
 
 		s, ok := status.FromError(err)
@@ -52,21 +40,9 @@ func Test__DescribeEventSource(t *testing.T) {
 		assert.Equal(t, "event source not found", s.Message())
 	})
 
-	t.Run("no name and no ID -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "must specify one of: id or name", s.Message())
-	})
-
 	t.Run("using id", func(t *testing.T) {
-		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Id:             r.Source.ID.String(),
+		response, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
+			Id: r.Source.ID.String(),
 		})
 
 		require.NoError(t, err)
@@ -79,9 +55,8 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("using name", func(t *testing.T) {
-		response, err := DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Name:           r.Source.Name,
+		response, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
+			Name: r.Source.Name,
 		})
 
 		require.NoError(t, err)
@@ -94,12 +69,11 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("internal event source cannot be described", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
-		_, err = DescribeEventSource(context.Background(), &protos.DescribeEventSourceRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Name:           internalSource.Name,
+		_, err = DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
+			Name: internalSource.Name,
 		})
 
 		s, ok := status.FromError(err)

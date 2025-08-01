@@ -3,25 +3,16 @@ package eventsources
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
+func ListEventSources(ctx context.Context, canvasID string, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	sources, err := canvas.ListEventSources()

@@ -97,7 +97,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for internal event source -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())

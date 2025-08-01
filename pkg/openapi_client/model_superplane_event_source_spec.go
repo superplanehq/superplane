@@ -22,6 +22,7 @@ var _ MappedNullable = &SuperplaneEventSourceSpec{}
 type SuperplaneEventSourceSpec struct {
 	Integration *IntegrationsIntegrationRef `json:"integration,omitempty"`
 	Resource *IntegrationsResourceRef `json:"resource,omitempty"`
+	Events []EventSourceEventType `json:"events,omitempty"`
 }
 
 // NewSuperplaneEventSourceSpec instantiates a new SuperplaneEventSourceSpec object
@@ -105,6 +106,38 @@ func (o *SuperplaneEventSourceSpec) SetResource(v IntegrationsResourceRef) {
 	o.Resource = &v
 }
 
+// GetEvents returns the Events field value if set, zero value otherwise.
+func (o *SuperplaneEventSourceSpec) GetEvents() []EventSourceEventType {
+	if o == nil || IsNil(o.Events) {
+		var ret []EventSourceEventType
+		return ret
+	}
+	return o.Events
+}
+
+// GetEventsOk returns a tuple with the Events field value if set, nil otherwise
+// and a boolean to check if the value has been set.
+func (o *SuperplaneEventSourceSpec) GetEventsOk() ([]EventSourceEventType, bool) {
+	if o == nil || IsNil(o.Events) {
+		return nil, false
+	}
+	return o.Events, true
+}
+
+// HasEvents returns a boolean if a field has been set.
+func (o *SuperplaneEventSourceSpec) HasEvents() bool {
+	if o != nil && !IsNil(o.Events) {
+		return true
+	}
+
+	return false
+}
+
+// SetEvents gets a reference to the given []EventSourceEventType and assigns it to the Events field.
+func (o *SuperplaneEventSourceSpec) SetEvents(v []EventSourceEventType) {
+	o.Events = v
+}
+
 func (o SuperplaneEventSourceSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -120,6 +153,9 @@ func (o SuperplaneEventSourceSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Resource) {
 		toSerialize["resource"] = o.Resource
+	}
+	if !IsNil(o.Events) {
+		toSerialize["events"] = o.Events
 	}
 	return toSerialize, nil
 }
