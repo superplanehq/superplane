@@ -23,6 +23,7 @@ import { DeploymentCardStage } from './DeploymentCardStage';
 import { ComponentSidebar } from './ComponentSidebar';
 import { WorkflowNodeReactFlow, type WorkflowNodeReactFlowData } from './WorkflowNodeReactFlow';
 import { WorkflowNodeAccordionReactFlow, type WorkflowNodeAccordionReactFlowData } from './WorkflowNodeAccordionReactFlow';
+import { EventSourceWorkflowNodeReactFlow, type EventSourceWorkflowNodeReactFlowData } from './EventSourceWorkflowNodeReactFlow';
 import { type WorkflowNodeData } from './lib/WorkflowNode/workflow-node';
 import { Button } from './lib/Button/button';
 import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
@@ -67,6 +68,7 @@ const nodeTypes = {
   deploymentCard: DeploymentCardStage as any,
   workflowNode: WorkflowNodeReactFlow as any,
   workflowNodeAccordion: WorkflowNodeAccordionReactFlow as any,
+  eventSource: EventSourceWorkflowNodeReactFlow as any,
 };
 
 interface CanvasEditorPageProps {
@@ -83,7 +85,7 @@ const initialNodesData = [
       id: 'stage-1',
       title: 'Sync Cluster',
       description: 'Sync cluster with the latest changes',
-      type: 'stage',
+      type: 'eventSource',
       status: 'success',
       yamlConfig: {
         apiVersion: 'v1',
@@ -324,7 +326,72 @@ const initialNodesData = [
   },
 ];
 
-
+const newChainListeners = [];
+// prod-cluster → Sync Cluster (1000 → 1001)
+newChainListeners.push({
+  id: 'e1000-1001',
+  source: '1000',
+  target: '1001',
+  type: 'bezier',
+  animated: true,
+  style: { stroke: '#888', strokeDasharray: '6 4', strokeWidth: 2 },
+  label: 'Promote to Sync Cluster',
+  labelStyle: { fill: '#000', fontWeight: 500 },
+  labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+  markerEnd: { type: MarkerType.ArrowClosed },
+});
+// Sync Cluster → Deploy to US cluster (1001 → 1002)
+newChainListeners.push({
+  id: 'e1001-1002',
+  source: '1001',
+  target: '1002',
+  type: 'bezier',
+  animated: true,
+  style: { stroke: '#888', strokeDasharray: '6 4', strokeWidth: 2 },
+  label: 'Sync → US Cluster',
+  labelStyle: { fill: '#000', fontWeight: 500 },
+  labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+  markerEnd: { type: MarkerType.ArrowClosed },
+});
+// Sync Cluster → Deploy to Asia cluster (1001 → 1003)
+newChainListeners.push({
+  id: 'e1001-1003',
+  source: '1001',
+  target: '1003',
+  type: 'bezier',
+  animated: false,
+  style: { stroke: '#888', strokeWidth: 2 },
+  label: 'Sync → Asia Cluster',
+  labelStyle: { fill: '#000', fontWeight: 500 },
+  labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+  markerEnd: { type: MarkerType.ArrowClosed },
+});
+// US cluster → Health Check & Cleanup (1002 → 1004)
+newChainListeners.push({
+  id: 'e1002-1004',
+  source: '1002',
+  target: '1004',
+  type: 'bezier',
+  animated: false,
+  style: { stroke: '#888', strokeWidth: 2 },
+  label: 'US → Cleanup',
+  labelStyle: { fill: '#000', fontWeight: 500 },
+  labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+  markerEnd: { type: MarkerType.ArrowClosed },
+});
+// Asia cluster → Health Check & Cleanup (1003 → 1004)
+newChainListeners.push({
+  id: 'e1003-1004',
+  source: '1003',
+  target: '1004',
+  type: 'bezier',
+  animated: false,
+  style: { stroke: '#888', strokeWidth: 2 },
+  label: 'Asia → Cleanup',
+  labelStyle: { fill: '#000', fontWeight: 500 },
+  labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+  markerEnd: { type: MarkerType.ArrowClosed },
+});
 
 const initialEdges: WorkflowEdge[] = [
   {
@@ -883,26 +950,37 @@ export function CanvasEditorPage({
   });
   
   const initialStages = [
-    // First workflow - Semaphore
+    // First workflow - Event Source
     {
       id: '0',
-      type: 'githubIntegration',
-      data: { 
-        repoName: 'semaphoreio/semaphore',
-        repoUrl: 'https://github.com/semaphoreio/semaphore',
-        lastEvent: {
-          type: 'push',
-          release: 'main',
-          timestamp: '2025-04-09 09:30 AM'
-        },
-        status: 'Passed',
-        timestamp: 'Deployed 2 hours ago',
-        labels: ['1045a77', 'v.4.1.3', 'v.2.3.1', 'community'],
-        queue: ['Feature: Add user authentication', 'Bugfix: Fix login redirect', 'Feature: Add dark mode'],
-        queueIcon: 'flaky', // default icon
-        queueIconClass: 'purple', // default color class
-      positionAbsolute: { left: Position.Left, right: Position.Right },
-  
+      type: 'eventSource',
+      data: {
+        id: 'sync-cluster-events',
+        title: 'Sync Cluster',
+        cluster: 'prod-cluster',
+        icon: 'sync',
+        events: [
+          {
+            id: 'event-1',
+            url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+            type: 'webhook',
+            enabled: true
+          },
+          {
+            id: 'event-2',
+            url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+            type: 'webhook',
+            enabled: true
+          },
+          {
+            id: 'event-3',
+            url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+            type: 'webhook',
+            enabled: true
+          }
+        ],
+        selected: false,
+        isEditMode: false
       },
       position: { x: -400, y: 159 },
       style: {
