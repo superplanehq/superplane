@@ -110,11 +110,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 }
 
 func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
-	if spec == nil {
-		return []models.EventType{}, nil
-	}
-
-	if spec.Events == nil {
+	if spec == nil || spec.Events == nil {
 		return []models.EventType{}, nil
 	}
 
