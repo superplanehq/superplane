@@ -13,6 +13,8 @@ import {
   ConnectionLineType,
   Connection,
   Edge,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { NavigationOrg, type User, type Organization } from './lib/Navigation/navigation-org';
@@ -57,6 +59,7 @@ import { Field, Label } from './lib/Fieldset/fieldset';
 import { SettingsPage } from './SettingsPage';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import { NodeDetailsSidebar } from './lib/NodeDetailsSidebar/node-details-sidebar';
+import Tippy from '@tippyjs/react';
 
 
 // Node types for React Flow
@@ -75,11 +78,11 @@ interface CanvasEditorPageProps {
 const initialNodesData = [
   {
     id: 'stage-1',
-    position: { x: 100, y: 100 },
+    position: { x: -400, y: 159 },
     workflowNodeData: {
       id: 'stage-1',
-      title: 'Build & Test',
-      description: 'Run tests and build the application',
+      title: 'Sync Cluster',
+      description: 'Sync cluster with the latest changes',
       type: 'stage',
       status: 'success',
       yamlConfig: {
@@ -113,13 +116,13 @@ const initialNodesData = [
   },
   {
     id: 'stage-2',
-    position: { x: 500, y: 100 },
+    position: { x: 100, y: 77 },
     workflowNodeData: {
       id: 'stage-2',
-      title: 'Deploy to Staging',
-      description: 'edb5df5c-bc8a-4f42-b99c-fe454e12f112',
+      title: 'Development Environment',
+      description: 'Deploy application to staging environment',
       type: 'stage',
-      status: 'running',
+      status: 'success',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -153,10 +156,52 @@ const initialNodesData = [
   },
   {
     id: 'stage-3',
-    position: { x: 900, y: 100 },
+    position: { x: 600, y: 122 },
     workflowNodeData: {
       id: 'stage-3',
-      title: 'Deploy to Production',
+      title: 'Staging Environment',
+      description: 'Deploy application to production environment',
+      type: 'stage',
+      status: 'success',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'deploy-production',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [
+            { name: 'PROD_API_KEY', key: 'api_key', value: '***' },
+            { name: 'DATABASE_URL', key: 'db_url', value: '***' }
+          ],
+          connections: [{
+            name: 'Production Environment',
+            type: 'kubernetes',
+            config: { cluster: 'prod-cluster', namespace: 'app-prod' }
+          }],
+          inputs: [
+            { name: 'artifact_path', type: 'string', required: true },
+            { name: 'approval_required', type: 'boolean', required: false, defaultValue: true }
+          ],
+          inputMappings: { artifact_path: '${staging.outputs.deployment_url}' },
+          outputs: [
+            { name: 'production_url', type: 'string', value: 'https://app.com' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'kubectl:latest', serviceAccount: 'prod-deployer' }
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'stage-4',
+    position: { x: 1150, y: -150 },
+    workflowNodeData: {
+      id: 'stage-4',
+      title: 'Production - US',
       description: 'Deploy application to production environment',
       type: 'stage',
       status: 'failed',
@@ -193,7 +238,93 @@ const initialNodesData = [
       }
     },
   },
+  {
+    id: 'stage-5',
+    position: { x: 1750, y: -128 },
+    workflowNodeData: {
+      id: 'stage-5',
+      title: 'Production - JP',
+      description: 'Deploy application to production environment',
+      type: 'stage',
+      status: 'failed',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'deploy-production',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [
+            { name: 'PROD_API_KEY', key: 'api_key', value: '***' },
+            { name: 'DATABASE_URL', key: 'db_url', value: '***' }
+          ],
+          connections: [{
+            name: 'Production Environment',
+            type: 'kubernetes',
+            config: { cluster: 'prod-cluster', namespace: 'app-prod' }
+          }],
+          inputs: [
+            { name: 'artifact_path', type: 'string', required: true },
+            { name: 'approval_required', type: 'boolean', required: false, defaultValue: true }
+          ],
+          inputMappings: { artifact_path: '${staging.outputs.deployment_url}' },
+          outputs: [
+            { name: 'production_url', type: 'string', value: 'https://app.com' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'kubectl:latest', serviceAccount: 'prod-deployer' }
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'stage-5',
+    position: { x: 1150, y: 450 },
+    workflowNodeData: {
+      id: 'stage-5',
+      title: 'Production - EU',
+      description: 'Deploy application to production environment',
+      type: 'stage',
+      status: 'running',
+      yamlConfig: {
+        apiVersion: 'v1',
+        kind: 'Stage',
+        metadata: {
+          name: 'deploy-production',
+          canvasId: ''
+        },
+        spec: {
+          secrets: [
+            { name: 'PROD_API_KEY', key: 'api_key', value: '***' },
+            { name: 'DATABASE_URL', key: 'db_url', value: '***' }
+          ],
+          connections: [{
+            name: 'Production Environment',
+            type: 'kubernetes',
+            config: { cluster: 'prod-cluster', namespace: 'app-prod' }
+          }],
+          inputs: [
+            { name: 'artifact_path', type: 'string', required: true },
+            { name: 'approval_required', type: 'boolean', required: false, defaultValue: true }
+          ],
+          inputMappings: { artifact_path: '${staging.outputs.deployment_url}' },
+          outputs: [
+            { name: 'production_url', type: 'string', value: 'https://app.com' }
+          ],
+          executor: {
+            type: 'kubernetes',
+            config: { image: 'kubectl:latest', serviceAccount: 'prod-deployer' }
+          }
+        }
+      }
+    },
+  },
 ];
+
+
 
 const initialEdges: WorkflowEdge[] = [
   {
@@ -217,6 +348,8 @@ const initialEdges: WorkflowEdge[] = [
     },
   },
 ];
+
+
 
 /**
  * CanvasEditorPage component following SaaS guidelines
@@ -508,7 +641,450 @@ export function CanvasEditorPage({
 
   const [navigationParam, setNavigationParam] = useState<string>('dropdown'); // default to center
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-
+  
+  // Custom integration component for GitHub repository
+  const GitHubIntegration = ({ data, selected }) => {
+    // Select header color and icon based on integrationType
+    const isKubernetes = data.integrationType === 'kubernetes';
+    const isS3 = data.repoName === 'buckets/my-app-data';
+    // Add white shadow style
+    const nodeStyle = {
+      boxShadow: '0 4px 12px rgba(128,128,128,0.20)' // White shadow
+    };
+    
+    return (
+      <div className={`bg-white roundedg border ${selected ? 'ring-2 ring-blue-500' : 'border-gray-200'}`} style={nodeStyle}>
+    
+      <div className='pa3 flex justify-between bb b--lightest-gray'>
+      <div className="flex items-center"><div className="d-inline-block mr-2 w-[24px]">
+      {isKubernetes ? (
+        <img src={kubernetes}/>
+      ) : isS3 ? (
+        <img src={s3}/>
+      ) : (
+        <img src={github}/>
+      )}
+      </div>
+      <p className="mb0 b ml1">Sync Cluster</p>
+      </div>
+      </div>
+      <div className={`flex items-center bg-white black rounded-tg hidden`}>
+      <span className={` font-semibold text-base ${isKubernetes ? 'white' : isS3 ? 'black' : 'white'}`}>
+      {isKubernetes ? 'prod-cluster' : data.repoName}
+      </span>
+      </div>
+      <div className="repo-info">
+      <div className="mb-2">
+      <a href={data.repoUrl} className="link dark-indigo underline-hover flex items-center">
+      {data.repoName}
+      </a>
+      </div>
+      <div className="flex items-center w-full justify-between">
+          <div className="ttu f7">Events</div>
+        </div>
+      </div>
+      <div className="w-full p-3 pt-0">
+      
+      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
+      <Tippy content="Need manual approval" placement="top">
+        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
+      </Tippy>
+      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
+      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
+      </a>
+      </div>
+      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
+      <Tippy content="Need manual approval" placement="top">
+        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
+      </Tippy>
+      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
+      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
+      </a>
+      </div>
+      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
+      <Tippy content="Need manual approval" placement="top">
+        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
+      </Tippy>
+      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
+      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
+      </a>
+      </div>
+     
+      
+      </div>
+      <Handle 
+      type="source" 
+      position={Position.Right} 
+      style={{ background: isKubernetes ? '#2563eb' : '#000', width: 10, height: 10 }} 
+      />
+      </div>
+    );
+  };
+  const newChainStagePositions = [
+    { x: -400, y: -730 }, // prod-cluster (Kubernetes Integration)
+    { x: 100, y: -800 },  // Stage 1 (straight right)
+    { x: 600, y: -1000 },  // Stage 2 (up and right, parallel)
+    { x: 600, y: -600 },  // Stage 3 (down and right, parallel)
+    { x: 1150, y: -800 }, // Stage 4 (centered between 2 and 3, further right)
+  ];
+  const newChainStages = [
+    {
+      id: String(1000),
+      type: 'githubIntegration',
+      data: {
+        repoName: 'prod-cluster',
+        repoUrl: 'europe-west3-a/prod-cluster',
+        lastEvent: {
+          type: 'zebra',
+          release: 'Updated, Endpoints Changed',
+          timestamp: '2025-04-09 09:30 AM',
+        },
+        status: 'Idle',
+        timestamp: 'Never run',
+        labels: ['new123', 'v.0.1.0', 'integration'],
+        queue: [],
+        integrationType: 'kubernetes',
+      },
+      position: newChainStagePositions[0],
+      style: { width: 320 },
+    },
+    {
+      id: String(1001),
+      type: 'deploymentCard',
+      data: {
+        icon: 'storage',
+        label: 'Sync Cluster',
+        status: 'Running',
+        timestamp: 'Built 15 min ago',
+        labels: ['docker', 'build', 'v.1.0.0'],
+        queue: ['Build: Dockerfile', 'Push: Container Registry'],
+        queueIcon: 'pending',
+        queueIconClass: 'indigo',
+      },
+      position: newChainStagePositions[1],
+      style: { width: 320 },
+    },
+    {
+      id: String(1002),
+      type: 'deploymentCard',
+      data: {
+        icon: 'cloud',
+        label: 'Deploy to US cluster',
+        status: 'Running',
+        timestamp: 'Deploying now',
+        labels: ['staging', 'v.1.0.0'],
+        queue: ['Deploy: Helm Chart', 'Scale: Increase replicas'],
+        queueIcon: 'pending',
+        queueIconClass: 'indigo',
+      },
+      position: newChainStagePositions[2],
+      style: { width: 320 },
+    },
+    {
+      id: String(1003),
+      type: 'deploymentCard',
+      data: {
+        icon: 'cloud_done',
+        label: 'Deploy to Asia cluster',
+        status: 'Passed',
+        timestamp: 'Completed 10 min ago',
+        labels: ['tests', 'integration', 'v.1.0.0'],
+        queue: [],
+        queueIcon: 'pending',
+        queueIconClass: 'indigo',
+      },
+      position: newChainStagePositions[3],
+      style: { width: 320 },
+    },
+    {
+      id: String(1004),
+      type: 'deploymentCard',
+      data: {
+        icon: 'cloud_done',
+        label: 'Health Check & Cleanup',
+        status: 'Failed',
+        timestamp: 'Ready for deployment',
+        labels: ['production', 'v.1.0.0'],
+        queue: ['Deploy: Helm Chart'],
+        queueIcon: 'flaky',
+        queueIconClass: 'purple',
+      },
+      position: newChainStagePositions[4],
+      style: { width: 320 },
+    },
+  ];
+  
+  const newChainListeners: any[] = [];
+  
+  // prod-cluster → Sync Cluster (1000 → 1001)
+  newChainListeners.push({
+    id: 'e1000-1001',
+    source: '1000',
+    target: '1001',
+    type: 'bezier',
+    animated: true,
+    style: { stroke: '#888', strokeDasharray: '6 4', strokeWidth: 2 },
+    label: 'Promote to Sync Cluster',
+    labelStyle: { fill: '#000', fontWeight: 500 },
+    labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  });
+  // Sync Cluster → Deploy to US cluster (1001 → 1002)
+  newChainListeners.push({
+    id: 'e1001-1002',
+    source: '1001',
+    target: '1002',
+    type: 'bezier',
+    animated: true,
+    style: { stroke: '#888', strokeDasharray: '6 4', strokeWidth: 2 },
+    label: 'Sync → US Cluster',
+    labelStyle: { fill: '#000', fontWeight: 500 },
+    labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  });
+  // Sync Cluster → Deploy to Asia cluster (1001 → 1003)
+  newChainListeners.push({
+    id: 'e1001-1003',
+    source: '1001',
+    target: '1003',
+    type: 'bezier',
+    animated: false,
+    style: { stroke: '#888', strokeWidth: 2 },
+    label: 'Sync → Asia Cluster',
+    labelStyle: { fill: '#000', fontWeight: 500 },
+    labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  });
+  // US cluster → Health Check & Cleanup (1002 → 1004)
+  newChainListeners.push({
+    id: 'e1002-1004',
+    source: '1002',
+    target: '1004',
+    type: 'bezier',
+    animated: false,
+    style: { stroke: '#888', strokeWidth: 2 },
+    label: 'US → Cleanup',
+    labelStyle: { fill: '#000', fontWeight: 500 },
+    labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  });
+  // Asia cluster → Health Check & Cleanup (1003 → 1004)
+  newChainListeners.push({
+    id: 'e1003-1004',
+    source: '1003',
+    target: '1004',
+    type: 'bezier',
+    animated: false,
+    style: { stroke: '#888', strokeWidth: 2 },
+    label: 'Asia → Cleanup',
+    labelStyle: { fill: '#000', fontWeight: 500 },
+    labelBgStyle: { fill: 'rgba(255, 255, 255, 0.9)', fillOpacity: 0.9 },
+    markerEnd: { type: MarkerType.ArrowClosed },
+  });
+  
+  const initialStages = [
+    // First workflow - Semaphore
+    {
+      id: '0',
+      type: 'githubIntegration',
+      data: { 
+        repoName: 'semaphoreio/semaphore',
+        repoUrl: 'https://github.com/semaphoreio/semaphore',
+        lastEvent: {
+          type: 'push',
+          release: 'main',
+          timestamp: '2025-04-09 09:30 AM'
+        },
+        status: 'Passed',
+        timestamp: 'Deployed 2 hours ago',
+        labels: ['1045a77', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['Feature: Add user authentication', 'Bugfix: Fix login redirect', 'Feature: Add dark mode'],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: -400, y: 159 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '1',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'storage',
+        label: 'Development Environment',
+        status: 'Passed',
+        timestamp: 'Deployed 2 hours ago',
+        labels: ['1045a77', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['Feature: Add user authentication', 'Bugfix: Fix layout on mobile', 'Feature: Add dark mode'],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 100, y: 77 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '2',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'storage',
+        label: 'Staging Environment',
+        status: 'Passed',
+        timestamp: 'Deployed just now',
+        labels: ['7a9b23c', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['FEAT-312: Investigate flaky test'],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 600, y: 122 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '3',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'cloud',
+        label: 'Production - US',
+        status: 'Failed',
+        timestamp: 'Failed just now',
+        labels: ['5e3d12b', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: [
+          'FEAT-400: Flaky test detected',
+          'BUG-512: Flaky network error'
+        ],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 1150, y: -150 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '5',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'cloud',
+        label: 'Production - JP',
+        status: 'Passed',
+        timestamp: 'Deployed just now',
+        labels: ['5e3d12b', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['FEAT-211: Partially rebuild pipeline'],
+        queueIcon: 'timer', // orange timer icon
+        queueIconClass: 'orange', // orange color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 1750, y: -128 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '4',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'cloud',
+        label: 'Production - EU',
+        status: 'Running',
+        timestamp: 'Deploying now',
+        labels: ['5e3d12b', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: [],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 1150, y: 450 },
+      style: {
+        width: 320,
+      },
+    },
+    
+    // Second workflow - Toolbox
+    {
+      id: '6',
+      type: 'githubIntegration',
+      data: { 
+        repoName: 'buckets/my-app-data',
+        repoUrl: 'https://s3.console.aws.amazon.com/s3/buckets/my-app-data',
+        lastEvent: {
+          type: 'push',
+          release: 'main',
+          timestamp: '2025-04-09 09:30 AM'
+        },
+        status: 'Passed',
+        timestamp: 'Deployed 2 hours ago',
+        labels: ['3e7a91d', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['Test: Integration tests', 'Test: Performance benchmarks'],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: -400, y: 888 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '7',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'storage',
+        label: 'Platform Test',
+        status: 'Passed',
+        timestamp: 'Completed 1 hour ago',
+        labels: ['3e7a91d', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: ['Test: Integration tests', 'Test: Performance benchmarks'],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 100, y: 827 },
+      style: {
+        width: 320,
+      },
+    },
+    {
+      id: '8',
+      type: 'deploymentCard',
+      data: { 
+        icon: 'lan',
+        label: 'Infra - Publish',
+        status: 'Running',
+        timestamp: 'Deploying now',
+        labels: ['3e7a91d', 'v.4.1.3', 'v.2.3.1', 'community'],
+        queue: [],
+        queueIcon: 'flaky', // default icon
+        queueIconClass: 'purple', // default color class,
+      positionAbsolute: { left: Position.Left, right: Position.Right },
+  
+      },
+      position: { x: 600, y: 860 },
+      style: {
+        width: 320,
+      },
+    },
+    // New chain stages
+    ...newChainStages,
+  ];
+  
+  // Initial listeners configuration - connecting the stages
+ 
   // Secret management state
   const [secrets, setSecrets] = useState([
     { id: '1', name: 'API_KEY', value: 'sk-...', description: 'OpenAI API Key', createdAt: '2024-01-15', lastUsed: '2024-01-20' },
