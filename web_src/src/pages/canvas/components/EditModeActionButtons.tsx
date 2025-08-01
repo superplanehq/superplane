@@ -58,9 +58,6 @@ export function EditModeActionButtons({
             <DropdownItem className='flex items-center gap-2' onClick={() => onSave(false)}>
               <DropdownLabel>Save & Commit</DropdownLabel>
             </DropdownItem>
-            <DropdownItem className='flex items-center gap-2' onClick={() => onSave(true)}>
-              <DropdownLabel>Save as Draft</DropdownLabel>
-            </DropdownItem>
             <DropdownItem className='flex items-center gap-2' onClick={onCancel}>
               <DropdownLabel>Discard Changes</DropdownLabel>
             </DropdownItem>
