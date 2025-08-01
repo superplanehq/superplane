@@ -52,7 +52,7 @@ func (w *PendingEventsWorker) Tick() error {
 		err := w.ProcessEvent(logger, &e)
 
 		//
-		// If anything goes while processing the event, we discard it, and log the error.
+		// If anything goes wrong while processing the event, we discard it, and log the error.
 		//
 		if err != nil {
 			logger.Errorf("Error processing event: %v", err)
@@ -74,7 +74,7 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 	// we need to do 2 additional things before processing the connections:
 	//
 	//   1. Update the state of execution resources that may be connected to this event source.
-	//   2. Apply the filters
+	//   2. Apply the event source filters
 	//
 	if event.SourceType == models.SourceTypeEventSource {
 		source, err := models.FindEventSource(event.SourceID)

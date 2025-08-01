@@ -25,7 +25,7 @@ const (
 	// Event ends up in this state when:
 	// - Event does not pass event source filters
 	// - Source is not connected to anything
-	// - Source is connected, but filters on the connections reject it.
+	// - Source is connected, but filters on all the connections reject it.
 	//
 	EventStateDiscarded = "discarded"
 

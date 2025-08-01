@@ -114,6 +114,10 @@ func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
 		return []models.EventType{}, nil
 	}
 
+	if spec.Events == nil {
+		return []models.EventType{}, nil
+	}
+
 	out := []models.EventType{}
 	for _, i := range spec.Events {
 		filters, err := actions.ValidateFilters(i.Filters)
