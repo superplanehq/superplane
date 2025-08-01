@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/go-github/v74/github"
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/retry"
 )
 
 type GitHubExecutor struct {
@@ -117,8 +119,9 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 		return nil, fmt.Errorf("error triggering workflow: %v", err)
 	}
 
-	// After triggering, we need to find the actual workflow run that was created
-	// Since GitHub doesn't return the run ID from the dispatch call, we look for the most recent run
+	//
+	// GitHub doesn't expose the run ID from the dispatch call, so we need to find it.
+	//
 	workflowRun, err := e.findTriggeredWorkflowRun(owner, repo, *workflow.ID, spec.Ref)
 	if err != nil {
 		return nil, fmt.Errorf("error finding triggered workflow run: %v", err)
@@ -132,34 +135,63 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 }
 
 func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID int64, ref string) (*github.WorkflowRun, error) {
-	//
-	// TODO: we should add multiple tries here.
-	//
-	// Wait a short time for the workflow to be created
-	time.Sleep(5 * time.Second)
+	var run *github.WorkflowRun
 
-	// List recent workflow runs for this workflow
-	runs, _, err := e.gh.client.Actions.ListWorkflowRunsByID(
-		context.Background(),
-		owner,
-		repo,
-		workflowID,
-		&github.ListWorkflowRunsOptions{
-			Branch: ref,
-			ListOptions: github.ListOptions{
-				PerPage: 1,
-			},
-		},
+	//
+	// We need to use a creation time filter to ensure we only get the run we just triggered.
+	// See: https://docs.github.com/en/search-github/getting-started-with-searching-on-github/understanding-the-search-syntax
+	//
+	creationTimeFilter := fmt.Sprintf(
+		"%s..%s",
+		time.Now().Add(-5*time.Second).Format(time.RFC3339),
+		time.Now().Add(5*time.Second).Format(time.RFC3339),
 	)
+
+	err := retry.WithConstantWait(func() error {
+		runs, _, err := e.gh.client.Actions.ListWorkflowRunsByID(
+			context.Background(),
+			owner,
+			repo,
+			workflowID,
+			&github.ListWorkflowRunsOptions{
+				Branch:  ref,
+				Event:   "workflow_dispatch",
+				Created: creationTimeFilter,
+				ListOptions: github.ListOptions{
+					PerPage: 10,
+				},
+			},
+		)
+
+		if err != nil {
+			return fmt.Errorf("error listing workflow runs: %v", err)
+		}
+
+		if len(runs.WorkflowRuns) == 0 {
+			return fmt.Errorf("no workflow runs found for workflow %d", workflowID)
+		}
+
+		for _, r := range runs.WorkflowRuns {
+			if slices.Contains([]string{"in_progress", "queued", "requested", "waiting", "pending"}, r.GetStatus()) {
+				run = r
+				return nil
+			}
+		}
+
+		return fmt.Errorf("workflow run not found")
+	}, retry.Options{
+		Task:         "Find triggered workflow run",
+		MaxAttempts:  10,
+		Wait:         5 * time.Second,
+		InitialDelay: 5 * time.Second,
+		Verbose:      false,
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("error listing workflow runs: %v", err)
+		return nil, err
 	}
 
-	if len(runs.WorkflowRuns) == 0 {
-		return nil, fmt.Errorf("no workflow runs found for workflow %d", workflowID)
-	}
-
-	return runs.WorkflowRuns[0], nil
+	return run, nil
 }
 
 func (e *GitHubExecutor) buildWorkflowInputs(fromSpec map[string]string, fromExecution executors.ExecutionParameters) map[string]interface{} {

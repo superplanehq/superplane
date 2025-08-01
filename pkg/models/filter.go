@@ -10,9 +10,17 @@ const (
 )
 
 type Filter struct {
-	Type   string
-	Data   *DataFilter
-	Header *HeaderFilter
+	Type   string        `json:"type"`
+	Data   *DataFilter   `json:"data,omitempty"`
+	Header *HeaderFilter `json:"header,omitempty"`
+}
+
+type DataFilter struct {
+	Expression string `json:"expression"`
+}
+
+type HeaderFilter struct {
+	Expression string `json:"expression"`
 }
 
 func ApplyFilters(filters []Filter, operator string, event *Event) (bool, error) {
@@ -83,12 +91,4 @@ func (f *Filter) Evaluate(event *Event) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid filter type: %s", f.Type)
 	}
-}
-
-type DataFilter struct {
-	Expression string
-}
-
-type HeaderFilter struct {
-	Expression string
 }

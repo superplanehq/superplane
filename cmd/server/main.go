@@ -58,9 +58,13 @@ func startWorkers(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, registry *r
 
 	if os.Getenv("START_EXECUTIONS_POLLER") == "yes" {
 		log.Println("Starting Executions Poller")
+		log.Println("Starting Execution Resources Poller")
 
-		w := workers.NewExecutionPoller(encryptor)
-		go w.Start()
+		executionPoller := workers.NewExecutionPoller(encryptor)
+		go executionPoller.Start()
+
+		resourcePoller := workers.NewExecutionResourcePoller(encryptor, registry)
+		go resourcePoller.Start()
 	}
 
 	if os.Getenv("START_PENDING_EXECUTIONS_WORKER") == "yes" {

@@ -37,11 +37,11 @@ func (h *GitHubOIDCVerifier) Verify(ctx context.Context, verifier *crypto.OIDCVe
 	}
 
 	if options.ChildResource != claims.RunID {
-		return fmt.Errorf("invalid run ID: %s", claims.RunID)
+		return fmt.Errorf("invalid run ID: got %s, expected %s", claims.RunID, options.ChildResource)
 	}
 
 	if options.ParentResource != claims.RepositoryID {
-		return fmt.Errorf("invalid repository: %s", claims.RepositoryID)
+		return fmt.Errorf("invalid repository: got %s, expected %s", claims.RepositoryID, options.ParentResource)
 	}
 
 	return nil

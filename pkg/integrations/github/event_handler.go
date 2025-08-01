@@ -53,17 +53,13 @@ func (i *GitHubEventHandler) Handle(data []byte, header http.Header) (integratio
 
 	event := GitHubEvent{
 		EventType:        eventType,
-		PayloadSignature: signature,
+		PayloadSignature: strings.TrimPrefix(signature, "sha256="),
 	}
 
 	return &event, nil
 }
 
 func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (integrations.StatefulResource, error) {
-	//
-	// TODO: I'm hardcoding event type here, but we also listen to different event types
-	// and we should make sure we filter them out somehow.
-	//
 	if eventType != "workflow_run" {
 		return nil, fmt.Errorf("unsupported event type %s", eventType)
 	}

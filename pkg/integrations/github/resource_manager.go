@@ -34,13 +34,12 @@ func NewGitHubResourceManager(ctx context.Context, URL string, authenticate inte
 		return nil, fmt.Errorf("error getting authentication: %v", err)
 	}
 
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: token},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-
-	return &GitHubResourceManager{client: client}, nil
+	return &GitHubResourceManager{
+		client: github.NewClient(
+			oauth2.NewClient(ctx,
+				oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
+			),
+		)}, nil
 }
 
 func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
