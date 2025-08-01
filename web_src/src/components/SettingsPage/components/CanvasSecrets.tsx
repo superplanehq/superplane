@@ -275,7 +275,7 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
                       </div>
                       <div className="flex-1">
                         <Input
-                          type="text"
+                          type="password"
                           placeholder="Variable value"
                           value={env.value}
                           onChange={(e) => {

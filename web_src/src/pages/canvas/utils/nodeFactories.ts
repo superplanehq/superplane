@@ -30,7 +30,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             name: 'my-semaphore-project',
           },
           spec: {
-            task: 'my-task',
+            task: '',
             branch: 'main',
             pipelineFile: '.semaphore/pipeline.yml',
             parameters: {

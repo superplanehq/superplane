@@ -45,6 +45,9 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
   );
+  const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
+    (executor.spec?.task as string) ? 'task' : 'workflow'
+  );
 
   // Validation states
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
@@ -668,6 +671,15 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
         [field]: value
       }
     }));
+  };
+
+  const updateSemaphoreExecutionType = (type: 'workflow' | 'task') => {
+    setSemaphoreExecutionType(type);
+
+    // If switching to workflow, clear the task field
+    if (type === 'workflow') {
+      updateExecutorField('task', '');
+    }
   };
 
   // Validation functions
@@ -1958,18 +1970,7 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                 </Field>
 
                 <Field>
-                  <Label>Resource Type</Label>
-                  <input
-                    type="text"
-                    value={(executor.resource?.type as string) || ''}
-                    onChange={(e) => updateExecutorResource('type', e.target.value)}
-                    placeholder="project"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Resource Name</Label>
+                  <Label>Project Name</Label>
                   <input
                     type="text"
                     value={(executor.resource?.name as string) || ''}
@@ -1980,15 +1981,50 @@ export function EditModeContent({ data, currentStageId, onDataChange }: EditMode
                 </Field>
 
                 <Field>
-                  <Label>Task</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.task as string) || ''}
-                    onChange={(e) => updateExecutorField('task', e.target.value)}
-                    placeholder="my-task"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
+                  <Label>Execution Type</Label>
+                  <div className="flex items-center gap-6 mt-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="semaphore-execution-type"
+                        value="workflow"
+                        checked={semaphoreExecutionType === 'workflow'}
+                        onChange={() => updateSemaphoreExecutionType('workflow')}
+                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">Workflow</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="semaphore-execution-type"
+                        value="task"
+                        checked={semaphoreExecutionType === 'task'}
+                        onChange={() => updateSemaphoreExecutionType('task')}
+                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                      />
+                      <span className="text-sm">Task</span>
+                    </label>
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {semaphoreExecutionType === 'workflow'
+                      ? 'Uses the workflows API to run a workflow'
+                      : 'Uses the tasks API to run a specific task'}
+                  </div>
                 </Field>
+
+                {semaphoreExecutionType === 'task' && (
+                  <Field>
+                    <Label>Task</Label>
+                    <input
+                      type="text"
+                      value={(executor.spec?.task as string) || ''}
+                      onChange={(e) => updateExecutorField('task', e.target.value)}
+                      placeholder="my-task"
+                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    />
+                  </Field>
+                )}
 
                 <Field>
                   <Label>Branch</Label>
