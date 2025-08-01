@@ -259,22 +259,8 @@ export function EventSourceEditModeContent({
 
               {selectedIntegration && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                  <Label className="text-sm font-medium mb-2 block">Project Configuration</Label>
-
                   <Field>
-                    <Label>Resource Type</Label>
-                    <select
-                      value={resourceType}
-                      onChange={(e) => setResourceType(e.target.value)}
-                      className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="">Select resource type...</option>
-                      <option value="project">Project</option>
-                    </select>
-                  </Field>
-
-                  <Field>
-                    <Label>Resource Name</Label>
+                    <Label>Project Name</Label>
                     <input
                       type="text"
                       value={resourceName}
