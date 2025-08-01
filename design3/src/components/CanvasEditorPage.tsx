@@ -78,7 +78,7 @@ interface CanvasEditorPageProps {
 const initialNodesData = [
   {
     id: 'stage-1',
-    position: { x: -400, y: 159 },
+    position: { x: -400, y: 120 },
     workflowNodeData: {
       id: 'stage-1',
       title: 'Sync Cluster',
@@ -116,11 +116,11 @@ const initialNodesData = [
   },
   {
     id: 'stage-2',
-    position: { x: 100, y: 77 },
+    position: { x: 100, y: 120 },
     workflowNodeData: {
       id: 'stage-2',
-      title: 'Development Environment',
-      description: 'Deploy application to staging environment',
+      title: 'AI Agent triage',
+      description: 'Run AI agent to review and triage the cluster changes',
       type: 'stage',
       status: 'success',
       yamlConfig: {
@@ -156,7 +156,7 @@ const initialNodesData = [
   },
   {
     id: 'stage-3',
-    position: { x: 600, y: 122 },
+    position: { x: 600, y: 120 },
     workflowNodeData: {
       id: 'stage-3',
       title: 'Staging Environment',
@@ -243,10 +243,10 @@ const initialNodesData = [
     position: { x: 1750, y: -128 },
     workflowNodeData: {
       id: 'stage-5',
-      title: 'Production - JP',
+      title: 'Production - EU',
       description: 'Deploy application to production environment',
       type: 'stage',
-      status: 'failed',
+      status: 'running',
       yamlConfig: {
         apiVersion: 'v1',
         kind: 'Stage',
@@ -331,7 +331,7 @@ const initialEdges: WorkflowEdge[] = [
     id: 'e1-2',
     source: 'stage-1',
     target: 'stage-2',
-    type: 'smoothstep',
+    type: 'bezier',
     animated: true,
     markerEnd: {
       type: MarkerType.ArrowClosed,
@@ -341,8 +341,40 @@ const initialEdges: WorkflowEdge[] = [
     id: 'e2-3',
     source: 'stage-2',
     target: 'stage-3',
-    type: 'smoothstep',
+    type: 'bezier',
     animated: true,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
+  // New edges from Staging Environment to Production US and EU
+  {
+    id: 'e3-4',
+    source: 'stage-3',
+    target: 'stage-4',
+    type: 'bezier',
+    animated: false,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
+  {
+    id: 'e3-5',
+    source: 'stage-3',
+    target: 'stage-5',
+    type: 'bezier',
+    animated: false,
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+  },
+  // Edge from Production US to Production JP
+  {
+    id: 'e4-6',
+    source: 'stage-4',
+    target: 'stage-6',
+    type: 'bezier',
+    animated: false,
     markerEnd: {
       type: MarkerType.ArrowClosed,
     },
@@ -369,6 +401,8 @@ export function CanvasEditorPage({
       id: nodeData.id,
       type: 'workflowNodeAccordion',
       position: nodeData.position,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
       data: {
         workflowNodeData: nodeData.workflowNodeData,
         variant: 'read',
@@ -384,6 +418,31 @@ export function CanvasEditorPage({
 
   const [nodes, setNodes, onNodesChange] = useNodesState(createInitialNodes())
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+// Map edges to set animation based on target node status
+const computedEdges = edges.map(edge => {
+  // Find the target node for this edge
+  const targetNode = nodes.find(node => node.id === edge.target);
+  let isRunning = false;
+  // Check both possible data structures for status
+  if (targetNode) {
+    if ((targetNode.data as any)?.workflowNodeData?.status) {
+      isRunning = (targetNode.data as any).workflowNodeData.status?.toLowerCase() === 'running';
+    } else if ((targetNode.data as any)?.status) {
+      isRunning = (targetNode.data as any).status?.toLowerCase() === 'running';
+    }
+  }
+  return {
+    ...edge,
+    animated: !!isRunning,
+    style: {
+      ...(edge.style || {}),
+      strokeDasharray: isRunning ? '6 4' : 'none',
+      stroke: '#888',
+      strokeWidth: 2,
+    },
+  };
+});
   
   // Add handlers to nodes after initialization
   useEffect(() => {
@@ -1154,7 +1213,7 @@ export function CanvasEditorPage({
         id: `e${params.source}-${params.target}`,
         source: params.source,
         target: params.target,
-        type: 'smoothstep',
+        type: 'bezier',
         animated: true,
         markerEnd: {
           type: MarkerType.ArrowClosed,
@@ -1469,7 +1528,7 @@ export function CanvasEditorPage({
             <ReactFlowProvider>
               <ReactFlow
                 nodes={nodes}
-                edges={edges}
+                edges={computedEdges}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={onConnect}

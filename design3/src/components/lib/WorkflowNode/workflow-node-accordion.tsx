@@ -2376,7 +2376,7 @@ export function WorkflowNodeAccordion({
           <div className='flex flex-col'> 
             <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
             <h4 className="text-xs text-gray-500 dark:text-zinc-300">{data.description}</h4>
-            <Link className='text-xs text-blue-500 dark:text-blue-400' href="#">semaphore-project/workflow-name</Link>
+            <Link className='text-xs text-blue-500 dark:text-blue-400 hidden' href="#">semaphore-project/workflow-name</Link>
           </div>
         </div>
         
