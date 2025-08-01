@@ -166,13 +166,13 @@ export function EventSourceWorkflowNodeReactFlow({
         <Handle
           type="target"
           position={Position.Left}
-          className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md !hidden"
+          className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md !hidden"
           aria-label="Input connection point"
         />
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
+          className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
           aria-label="Output connection point"
         />
       </div>

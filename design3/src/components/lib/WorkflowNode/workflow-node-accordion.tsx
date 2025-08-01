@@ -700,18 +700,18 @@ export function WorkflowNodeAccordion({
     });
 
     return (
-      <div className="min-w-[200px] max-w-xs">
+      <div className="min-w-[250px] max-w-xs">
         <div className="bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg p-3">
           <div className="flex items-start gap-3">
         
             <div className="flex-1">
-              <span className="text-sm font-semibold mb-2 block">
+              <span className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">
                 { !outputs ? "Inputs" : "Outputs" }
               </span>
               <div className="space-y-1">
                 {Object.entries(inputsRecord).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
-                    <span className="text-xs text-gray-600 font-medium">{key}</span>
+                    <span className="text-xs text-gray-600 dark:text-zinc-300 font-medium">{key}</span>
                     <div className="flex items-center gap-2">
                       <Badge className='font-mono !text-xs'>
                         12313123
@@ -2283,17 +2283,17 @@ export function WorkflowNodeAccordion({
          
         </Dialog>
         <Handle
-        type="target"
-        position={Position.Left}
-        className="!w-2 !h-12 !bg-blue-500 dark:!bg-zinc-600 !border-2 !border-white z-50 !rounded-md"
-        aria-label="Input connection point"
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!w-2 !h-12 !bg-blue-500 dark:!bg-zinc-600 !border-2 !border-white z-50 !rounded-md"
-        aria-label="Output connection point"
-      />
+          type="target"
+          position={Position.Left}
+          className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
+          aria-label="Input connection point"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
+          aria-label="Output connection point"
+        />
       </div>  
     )
   }
@@ -2371,10 +2371,10 @@ export function WorkflowNodeAccordion({
       {!executorInHeader && (
         <div className="p-4 flex flex-col border-b border-gray-200 dark:border-zinc-700">
           <div className="flex items-center gap-3">
-           
+           <div className='rounded-lg dark:bg-white !p-1'>
             {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
             {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
-           
+          </div>
             <div className='flex flex-col'> 
               <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
               <Link className='text-xs text-blue-500 dark:text-blue-400 hidden' href="#">semaphore-project/semaphore.yml</Link>
@@ -2493,16 +2493,16 @@ export function WorkflowNodeAccordion({
           </div>
           </div>
       ))}
-      <Handle
+     <Handle
         type="target"
         position={Position.Left}
-        className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
+        className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
         aria-label="Input connection point"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
+        className="!w-1 !h-12 !bg-blue-500 dark:!bg-zinc-300 !border-none !border-white dark:!border-zinc-50 z-50 !rounded-md"
         aria-label="Output connection point"
       />
     </div>

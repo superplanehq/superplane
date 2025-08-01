@@ -114,7 +114,7 @@ function TabItem({
     {
       // Default variant
       'px-4 py-3 border-b border-b-2 border-width-2 border-transparent border-t-2 !border-t-transparent': variant === 'default',
-      'bg-zinc-600/10 dark:bg-zinc-100/10 !border-blue-500 dark:border-blue-400 border-b-2 border-width-2 !border-t-transparent': variant === 'default' && isActive,
+      'text-blue-600 dark:text-blue-400 bg-zinc-600/10 dark:bg-zinc-100/10 !border-blue-500 dark:border-blue-400 border-b-2 border-width-2 !border-t-transparent': variant === 'default' && isActive,
       
       // Pills variant
       'px-3 py-2 rounded-md': variant === 'pills',
