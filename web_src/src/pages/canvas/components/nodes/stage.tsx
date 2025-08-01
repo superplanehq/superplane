@@ -491,12 +491,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       <CustomBarHandle type="target" connections={props.data.connections} conditions={props.data.conditions} />
       <CustomBarHandle type="source" />
 
-      {/* Discard Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDiscardConfirm}
-        title="Discard Stage"
-        message="Are you sure you want to discard this stage? This action cannot be undone."
-        confirmText="Discard"
+        title="Delete Stage"
+        message="Are you sure you want to delete this stage? This action cannot be undone."
+        confirmText="Delete"
         cancelText="Cancel"
         confirmVariant="danger"
         onConfirm={handleDiscardStage}

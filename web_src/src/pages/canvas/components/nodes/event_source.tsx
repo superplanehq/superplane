@@ -222,7 +222,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       ) : (
         <>
           {
-            eventSourceKey && (
+            eventSourceKey && props.data.eventSourceType === "webhook" && (
               <div className="px-3 py-3 border-t w-full text-left bg-amber-50">
                 <p className="text-sm text-amber-600">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
                 <div className="flex items-center justify-between gap-2 mt-2">
@@ -264,12 +264,11 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
       <CustomBarHandle type="source" />
 
-      {/* Discard Confirmation Dialog */}
       <ConfirmDialog
         isOpen={showDiscardConfirm}
-        title="Discard Event Source"
-        message="Are you sure you want to discard this event source? This action cannot be undone."
-        confirmText="Discard"
+        title="Delete Event Source"
+        message="Are you sure you want to delete this event source? This action cannot be undone."
+        confirmText="Delete"
         cancelText="Cancel"
         confirmVariant="danger"
         onConfirm={handleDiscardEventSource}

@@ -48,36 +48,36 @@ export function EditModeActionButtons({
           Code
         </button>
 
-      <Dropdown>
-        <DropdownButton plain className='flex items-center gap-2'>
-          <MaterialSymbol name="save" size="md" />
-          Save
-          <MaterialSymbol name="expand_more" size="md" />
-        </DropdownButton>
-        <DropdownMenu anchor="bottom start">
-          <DropdownItem className='flex items-center gap-2' onClick={() => onSave(false)}>
-            <DropdownLabel>Save & Commit</DropdownLabel>
-          </DropdownItem>
-          <DropdownItem className='flex items-center gap-2' onClick={() => onSave(true)}>
-            <DropdownLabel>Save as Draft</DropdownLabel>
-          </DropdownItem>
-          <DropdownItem className='flex items-center gap-2' onClick={onCancel}>
-            <DropdownLabel>Discard {entityType}</DropdownLabel>
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
+        <Dropdown>
+          <DropdownButton plain className='flex items-center gap-2'>
+            <MaterialSymbol name="save" size="md" />
+            Save
+            <MaterialSymbol name="expand_more" size="md" />
+          </DropdownButton>
+          <DropdownMenu anchor="bottom start">
+            <DropdownItem className='flex items-center gap-2' onClick={() => onSave(false)}>
+              <DropdownLabel>Save & Commit</DropdownLabel>
+            </DropdownItem>
+            <DropdownItem className='flex items-center gap-2' onClick={() => onSave(true)}>
+              <DropdownLabel>Save as Draft</DropdownLabel>
+            </DropdownItem>
+            <DropdownItem className='flex items-center gap-2' onClick={onCancel}>
+              <DropdownLabel>Discard Changes</DropdownLabel>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
 
-      <Dropdown>
-        <DropdownButton plain className='flex items-center gap-2'>
-          <MaterialSymbol name="more_vert" size="md" />
-        </DropdownButton>
-        <DropdownMenu anchor="bottom start">
-          <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
-            <MaterialSymbol name="delete" size="md" />
-            <DropdownLabel>Delete</DropdownLabel>
-          </DropdownItem>
-        </DropdownMenu>
-      </Dropdown>
+        <Dropdown>
+          <DropdownButton plain className='flex items-center gap-2'>
+            <MaterialSymbol name="more_vert" size="md" />
+          </DropdownButton>
+          <DropdownMenu anchor="bottom start">
+            <DropdownItem className='flex items-center gap-2' onClick={onDiscard}>
+              <MaterialSymbol name="delete" size="md" />
+              <DropdownLabel>Delete</DropdownLabel>
+            </DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
 
       </div>
 

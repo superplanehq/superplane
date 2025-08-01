@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
 
 
 export interface ComponentSidebarProps {
@@ -13,7 +16,8 @@ interface ComponentDefinition {
   id: string;
   name: string;
   description: string;
-  icon: string;
+  icon?: string;
+  image?: string;
   category: string;
   executorType?: string;
   eventSourceType?: string;
@@ -36,7 +40,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       id: 'stage',
       name: 'Semaphore Stage',
       description: 'Add a Semaphore-based stage to your canvas',
-      icon: 'rocket_launch',
+      image: SemaphoreLogo,
       category: 'Stages',
       executorType: 'semaphore'
     },
@@ -60,7 +64,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       id: 'event_source',
       name: 'Semaphore Event Source',
       description: 'Add a Semaphore-based event source to your canvas',
-      icon: 'webhook',
+      image: SemaphoreLogo,
       category: 'Event Sources',
       eventSourceType: 'semaphore'
     },
@@ -161,31 +165,36 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                         const disabled = isComponentDisabled(component);
                         const disabledMessage = getDisabledMessage(component);
 
-                        return (
-                          <div key={`${component.id}-${component.name}`} className="relative">
-                            <button
-                              type="button"
-                              onClick={() => !disabled && handleAddComponent(component.id, component.executorType, component.eventSourceType)}
-                              disabled={disabled}
-                              className={`w-full text-left p-4 border rounded-lg transition-colors group focus:outline-none ${disabled
-                                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
-                                : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50 focus:ring-2 focus:ring-primary-500'
-                                }`}
-                              aria-label={disabled ? disabledMessage : `Add ${component.name} component`}
-                              title={disabled ? disabledMessage : `Add ${component.name} component`}
-                            >
+                        const buttonElement = (
+                          <button
+                            type="button"
+                            onClick={() => !disabled && handleAddComponent(component.id, component.executorType, component.eventSourceType)}
+                            disabled={disabled}
+                            className={`w-full text-left p-4 border rounded-lg transition-colors group focus:outline-none ${disabled
+                              ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                              : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50 focus:ring-2 focus:ring-primary-500'
+                              }`}
+                            aria-label={disabled ? disabledMessage : `Add ${component.name} component`}
+                          >
                               <div className="flex items-start">
                                 <div className="flex-shrink-0">
                                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${disabled
                                     ? 'bg-gray-100'
                                     : 'bg-gray-100 group-hover:bg-primary-100'
                                     }`}>
-                                    <span className={`material-symbols-outlined transition-colors ${disabled
-                                      ? 'text-gray-400'
-                                      : 'text-gray-600 group-hover:text-primary-600'
-                                      }`}>
-                                      {component.icon}
-                                    </span>
+                                    {component.image ? (
+                                      <img
+                                        src={component.image}
+                                        alt={component.name}
+                                        className="w-8 h-8 object-contain"
+                                      />
+                                    ) : (
+                                      <span className={`material-symbols-outlined transition-colors ${disabled
+                                        ? 'text-gray-400'
+                                        : 'text-gray-600 group-hover:text-primary-600'
+                                        }`}>
+                                        {component.icon}
+                                      </span>)}
                                   </div>
                                 </div>
                                 <div className="ml-3 flex-1 min-w-0">
@@ -208,7 +217,18 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                                   </span>
                                 </div>
                               </div>
-                            </button>
+                          </button>
+                        );
+
+                        return (
+                          <div key={`${component.id}-${component.name}`} className="relative">
+                            {disabled ? (
+                              <Tippy content={disabledMessage} placement="top">
+                                <div>{buttonElement}</div>
+                              </Tippy>
+                            ) : (
+                              buttonElement
+                            )}
                           </div>
                         );
                       })}
