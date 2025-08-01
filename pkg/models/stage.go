@@ -230,7 +230,7 @@ func (s *Stage) GetResource() (*Resource, error) {
 	var resource Resource
 
 	err := database.Conn().
-		Where("id = ?", e.ResourceID).
+		Where("id = ?", s.ResourceID).
 		First(&resource).
 		Error
 
