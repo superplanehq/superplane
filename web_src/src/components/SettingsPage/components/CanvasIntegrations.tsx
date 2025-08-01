@@ -8,10 +8,11 @@ import { useIntegrations, useCreateIntegration, useUpdateIntegration, type Creat
 import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
+import { TabType } from '../SettingsPage'
 
 interface CanvasIntegrationsProps {
   canvasId: string
-  organizationId: string
+  updateActiveTab: (tab: TabType) => void
 }
 
 type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
@@ -27,7 +28,7 @@ const INTEGRATION_TYPES = [
   },
 ]
 
-export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
+export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
   const [selectedType, setSelectedType] = useState<string>('semaphore')
   const [integrationName, setIntegrationName] = useState('')
@@ -397,8 +398,9 @@ export function CanvasIntegrations({ canvasId }: CanvasIntegrationsProps) {
                       ))}
                     </select>
                     {secrets.length === 0 && (
-                      <Text className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                        No secrets available. Create a secret first in the Secrets section.
+                      <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                        No secrets available. Create a secret first in the &nbsp;
+                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => updateActiveTab('secrets')}>secrets section</span>.
                       </Text>
                     )}
                   </div>

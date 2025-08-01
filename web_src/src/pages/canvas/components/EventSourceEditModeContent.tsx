@@ -6,6 +6,7 @@ import { Label } from './Label';
 import { Field } from './Field';
 import { RevertButton } from './RevertButton';
 import { useIntegrations } from '../hooks/useIntegrations';
+import { Link } from '@/components/Link/link';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -25,14 +26,14 @@ export function EventSourceEditModeContent({
   onDataChange
 }: EventSourceEditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general', 'integration', 'webhook']);
-  
+
   // Original data state for change tracking
   const [originalData] = useState({
     integration: data.integration,
     resource: data.resource,
     integrationConfig: {} as Record<string, string | boolean>
   });
-  
+
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
@@ -90,9 +91,9 @@ export function EventSourceEditModeContent({
     switch (section) {
       case 'integration':
         return JSON.stringify(selectedIntegration) !== JSON.stringify(originalData.integration) ||
-               resourceType !== (originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : '')) ||
-               resourceName !== (originalData.resource?.name || '') ||
-               JSON.stringify(integrationConfig) !== JSON.stringify(originalData.integrationConfig);
+          resourceType !== (originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : '')) ||
+          resourceName !== (originalData.resource?.name || '') ||
+          JSON.stringify(integrationConfig) !== JSON.stringify(originalData.integrationConfig);
       case 'webhook':
         // Webhook section doesn't have editable fields, so never modified
         return false;
@@ -220,10 +221,10 @@ export function EventSourceEditModeContent({
               <div className="flex items-center justify-between w-full">
                 <div className="flex items-center gap-2">
                   <span>Semaphore Configuration</span>
-                  <RevertButton 
-                    sectionId="integration" 
-                    isModified={isSectionModified('integration')} 
-                    onRevert={revertSection} 
+                  <RevertButton
+                    sectionId="integration"
+                    isModified={isSectionModified('integration')}
+                    onRevert={revertSection}
                   />
                 </div>
                 <span className="text-xs text-blue-600 font-medium">Required</span>
@@ -251,7 +252,8 @@ export function EventSourceEditModeContent({
 
               {availableIntegrations.length === 0 && (
                 <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                  No Semaphore integrations available. Create one first in the canvas settings.
+                  No Semaphore integrations available. Create one first in the &nbsp;
+                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#settings?tab=integrations`}>canvas settings</Link>.
                 </div>
               )}
 

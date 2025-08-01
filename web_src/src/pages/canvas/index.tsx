@@ -26,7 +26,7 @@ export function Canvas() {
   const [canvasName, setCanvasName] = useState<string>('');
 
   // Determine active view from URL hash or default to editor
-  const activeView = location.hash === '#settings' ? 'settings' : 'editor';
+  const activeView = location.hash.startsWith('#settings') ? 'settings' : 'editor';
 
   // Handle view changes by updating URL hash
   const handleViewChange = (view: 'editor' | 'settings') => {

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Sidebar, SidebarBody, SidebarItem, SidebarLabel } from '../Sidebar/sidebar'
 import { CanvasMembers, CanvasSecrets, CanvasIntegrations, CanvasDelete } from './components'
 import { useParams } from 'react-router-dom'
@@ -12,11 +12,39 @@ interface Tab {
   label: string
 }
 
-type TabType = 'members' | 'secrets' | 'integrations' | 'delete';
+export type TabType = 'members' | 'secrets' | 'integrations' | 'delete';
 
 export function SettingsPage({ organizationId }: SettingsPageProps) {
   const { canvasId } = useParams<{ canvasId: string }>()
   const [activeTab, setActiveTab] = useState<TabType>('members')
+
+  const getActiveTabFromUrl = (): TabType => {
+    const hash = window.location.hash
+    const urlParams = new URLSearchParams(hash.split('?')[1] || '')
+    const tab = urlParams.get('tab') as TabType
+    return tab && ['members', 'secrets', 'integrations', 'delete'].includes(tab) ? tab : 'members'
+  }
+
+  const updateActiveTab = (tab: TabType) => {
+    const hash = window.location.hash
+    const [hashPath] = hash.split('?')
+    const newHash = `${hashPath}?tab=${tab}`
+    window.location.hash = newHash
+    setActiveTab(tab)
+  }
+
+  useEffect(() => {
+    const initialTab = getActiveTabFromUrl()
+    setActiveTab(initialTab)
+
+    const handleHashChange = () => {
+      const newTab = getActiveTabFromUrl()
+      setActiveTab(newTab)
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
 
   const tabs: Tab[] = [
     {
@@ -49,7 +77,7 @@ export function SettingsPage({ organizationId }: SettingsPageProps) {
               {tabs.map((tab) => (
                 <SidebarItem
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as TabType)}
+                  onClick={() => updateActiveTab(tab.id as TabType)}
                   className={`${activeTab === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
                 >
                   <div className={`flex items-center gap-3 px-3 ${activeTab === tab.id ? 'font-semibold' : 'font-normal'}`}>
@@ -73,7 +101,7 @@ export function SettingsPage({ organizationId }: SettingsPageProps) {
               )}
 
               {activeTab === 'integrations' && (
-                <CanvasIntegrations canvasId={canvasId!} organizationId={organizationId} />
+                <CanvasIntegrations canvasId={canvasId!} updateActiveTab={updateActiveTab} />
               )}
 
               {activeTab === 'delete' && (

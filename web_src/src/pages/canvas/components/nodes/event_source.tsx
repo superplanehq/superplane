@@ -11,12 +11,18 @@ import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
+import { useParams } from 'react-router-dom';
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
+  const { orgId } = useParams<{ orgId: string }>();
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; spec: SuperplaneEventSourceSpec } | null>({
+    name: props.data.name || '',
+    description: props.data.description || '',
+    spec: {}
+  });
   const [eventSourceName, setEventSourceName] = useState(props.data.name);
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
@@ -25,7 +31,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   );
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
   const canvasId = useCanvasStore(state => state.canvasId) || '';
-  const organizationId = '';
+  const organizationId = orgId || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
 
   const handleEditClick = () => {
@@ -138,6 +144,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
+  const eventSourceType = props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook");
+
   return (
     <div
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
@@ -216,13 +224,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           canvasId={canvasId}
           organizationId={organizationId}
-          eventSourceType={props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook")}
+          eventSourceType={eventSourceType}
           onDataChange={({ spec }) => { if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) setCurrentFormData(prev => ({ ...prev!, spec })) }}
         />
       ) : (
         <>
           {
-            eventSourceKey && props.data.eventSourceType === "webhook" && (
+            eventSourceKey && eventSourceType === "webhook" && (
               <div className="px-3 py-3 border-t w-full text-left bg-amber-50">
                 <p className="text-sm text-amber-600">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
                 <div className="flex items-center justify-between gap-2 mt-2">
