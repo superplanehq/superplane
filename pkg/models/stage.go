@@ -226,7 +226,7 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	return &stage, nil
 }
 
-func (e *Stage) GetResource() (*Resource, error) {
+func (s *Stage) GetResource() (*Resource, error) {
 	var resource Resource
 
 	err := database.Conn().
