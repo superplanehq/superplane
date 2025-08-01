@@ -15,10 +15,10 @@ func Test__InputBuilder(t *testing.T) {
 		Integration: true,
 	})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), models.EventSourceScopeExternal, nil)
+	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"), models.EventSourceScopeExternal, nil)
+	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {
@@ -60,7 +60,7 @@ func Test__InputBuilder(t *testing.T) {
 							ValueFrom: &models.ValueDefinitionFrom{
 								EventData: &models.ValueDefinitionFromEventData{
 									Connection: "github",
-									Expression: "ref",
+									Expression: "$.ref",
 								},
 							},
 						},
@@ -123,7 +123,7 @@ func Test__InputBuilder(t *testing.T) {
 							ValueFrom: &models.ValueDefinitionFrom{
 								EventData: &models.ValueDefinitionFromEventData{
 									Connection: "docs",
-									Expression: "ref",
+									Expression: "$.ref",
 								},
 							},
 						},
@@ -157,7 +157,7 @@ func Test__InputBuilder(t *testing.T) {
 							ValueFrom: &models.ValueDefinitionFrom{
 								EventData: &models.ValueDefinitionFromEventData{
 									Connection: "docs",
-									Expression: "ref",
+									Expression: "$.ref",
 								},
 							},
 						},

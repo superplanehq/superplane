@@ -19,8 +19,20 @@ import (
 )
 
 const (
-	EventStatePending   = "pending"
+	EventStatePending = "pending"
+
+	//
+	// Event ends up in this state when:
+	// - Event does not pass event source filters
+	// - Source is not connected to anything
+	// - Source is connected, but filters on all the connections reject it.
+	//
 	EventStateDiscarded = "discarded"
+
+	//
+	// Event ends up in this state when:
+	// - Source is connected and not rejected by some connection filters.
+	//
 	EventStateProcessed = "processed"
 
 	SourceTypeEventSource     = "event-source"
@@ -65,19 +77,14 @@ func (v *headerVisitor) Visit(node *ast.Node) {
 	}
 }
 
-func (e *Event) Discard() error {
-	return database.Conn().Model(e).
-		Update("state", EventStateDiscarded).
-		Error
+func (e *Event) UpdateState(state string) error {
+	return e.UpdateStateInTransaction(database.Conn(), state)
 }
 
-func (e *Event) MarkAsProcessed() error {
-	return e.MarkAsProcessedInTransaction(database.Conn())
-}
-
-func (e *Event) MarkAsProcessedInTransaction(tx *gorm.DB) error {
+func (e *Event) UpdateStateInTransaction(tx *gorm.DB, state string) error {
 	return tx.Model(e).
-		Update("state", EventStateProcessed).
+		Clauses(clause.Returning{}).
+		Update("state", state).
 		Error
 }
 
@@ -160,9 +167,7 @@ func (e *Event) EvaluateStringExpression(expression string) (string, error) {
 		return "", err
 	}
 
-	for key, value := range data {
-		variables[key] = value
-	}
+	variables["$"] = data
 
 	//
 	// Compile and run our expression.
@@ -289,6 +294,7 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 
 	var content map[string]any
 	headers := map[string]any{}
+	payload := map[string]any{}
 	var err error
 
 	switch filterType {
@@ -312,10 +318,11 @@ func parseExpressionVariables(ctx context.Context, e *Event, filterType string) 
 			key = strings.ToLower(key)
 			headers[key] = value
 		} else {
-			variables[key] = value
+			payload[key] = value
 		}
 	}
 
+	variables["$"] = payload
 	variables["headers"] = headers
 
 	return variables, nil

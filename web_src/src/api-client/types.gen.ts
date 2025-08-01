@@ -12,6 +12,12 @@ export type AuthorizationPermission = {
     domainType?: AuthorizationDomainType;
 };
 
+export type EventSourceEventType = {
+    type?: string;
+    filters?: Array<SuperplaneFilter>;
+    filterOperator?: SuperplaneFilterOperator;
+};
+
 export type ExecutionResult = 'RESULT_UNKNOWN' | 'RESULT_PASSED' | 'RESULT_FAILED';
 
 export type GroupByField = {
@@ -117,10 +123,6 @@ export type IntegrationAuth = {
 
 export type IntegrationAuthType = 'AUTH_TYPE_NONE' | 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC';
 
-export type IntegrationOidc = {
-    enabled?: boolean;
-};
-
 export type IntegrationsCreateIntegrationRequest = {
     domainType?: AuthorizationDomainType;
     domainId?: string;
@@ -158,7 +160,6 @@ export type IntegrationsIntegrationSpec = {
     type?: string;
     url?: string;
     auth?: IntegrationAuth;
-    oidc?: IntegrationOidc;
 };
 
 export type IntegrationsListIntegrationsResponse = {
@@ -515,6 +516,7 @@ export type SuperplaneEventSourceMetadata = {
 export type SuperplaneEventSourceSpec = {
     integration?: IntegrationsIntegrationRef;
     resource?: IntegrationsResourceRef;
+    events?: Array<EventSourceEventType>;
 };
 
 export type SuperplaneExecution = {

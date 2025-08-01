@@ -1,8 +1,6 @@
 package models
 
 import (
-	"fmt"
-
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
@@ -21,50 +19,7 @@ type Connection struct {
 }
 
 func (c *Connection) Accept(event *Event) (bool, error) {
-	if len(c.Filters) == 0 {
-		return true, nil
-	}
-
-	switch c.FilterOperator {
-	case FilterOperatorOr:
-		return c.any(event)
-
-	case FilterOperatorAnd:
-		return c.all(event)
-
-	default:
-		return false, fmt.Errorf("invalid filter operator: %s", c.FilterOperator)
-	}
-}
-
-func (c *Connection) all(event *Event) (bool, error) {
-	for _, filter := range c.Filters {
-		ok, err := filter.Evaluate(event)
-		if err != nil {
-			return false, fmt.Errorf("error evaluating filter: %v", err)
-		}
-
-		if !ok {
-			return false, nil
-		}
-	}
-
-	return true, nil
-}
-
-func (c *Connection) any(event *Event) (bool, error) {
-	for _, filter := range c.Filters {
-		ok, err := filter.Evaluate(event)
-		if err != nil {
-			return false, fmt.Errorf("error evaluating filter: %v", err)
-		}
-
-		if ok {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return ApplyFilters(c.Filters, c.FilterOperator, event)
 }
 
 func ListConnectionsForSource(sourceID uuid.UUID, connectionType string) ([]Connection, error) {
