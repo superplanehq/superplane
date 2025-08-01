@@ -7,7 +7,6 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -17,11 +16,9 @@ import (
 
 func Test__DescribeEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
-	ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, r.Canvas.ID.String())
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, uuid.NewString())
-		_, err := DescribeEventSource(ctx, &protos.DescribeEventSourceRequest{
+		_, err := DescribeEventSource(context.Background(), uuid.New().String(), &protos.DescribeEventSourceRequest{
 			CanvasIdOrName: uuid.New().String(),
 			Id:             uuid.New().String(),
 		})
@@ -33,7 +30,7 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(ctx, &protos.DescribeEventSourceRequest{
+		_, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
 			Id: uuid.New().String(),
 		})
 
@@ -44,7 +41,7 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("using id", func(t *testing.T) {
-		response, err := DescribeEventSource(ctx, &protos.DescribeEventSourceRequest{
+		response, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
 			Id: r.Source.ID.String(),
 		})
 
@@ -58,7 +55,7 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("using name", func(t *testing.T) {
-		response, err := DescribeEventSource(ctx, &protos.DescribeEventSourceRequest{
+		response, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
 			Name: r.Source.Name,
 		})
 
@@ -75,7 +72,7 @@ func Test__DescribeEventSource(t *testing.T) {
 		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
-		_, err = DescribeEventSource(ctx, &protos.DescribeEventSourceRequest{
+		_, err = DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{
 			Name: internalSource.Name,
 		})
 

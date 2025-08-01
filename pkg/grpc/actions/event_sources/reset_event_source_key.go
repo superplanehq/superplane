@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -16,9 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
-	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
-	canvas, err := models.FindCanvasByID(domainId)
+func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvasID string, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}

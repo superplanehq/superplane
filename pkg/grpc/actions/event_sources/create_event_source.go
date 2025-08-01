@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -22,9 +21,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
-	canvas, err := models.FindCanvasByID(domainId)
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
