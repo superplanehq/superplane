@@ -23,7 +23,6 @@ type IntegrationsIntegrationSpec struct {
 	Type *string `json:"type,omitempty"`
 	Url *string `json:"url,omitempty"`
 	Auth *IntegrationAuth `json:"auth,omitempty"`
-	Oidc *IntegrationOIDC `json:"oidc,omitempty"`
 }
 
 // NewIntegrationsIntegrationSpec instantiates a new IntegrationsIntegrationSpec object
@@ -139,38 +138,6 @@ func (o *IntegrationsIntegrationSpec) SetAuth(v IntegrationAuth) {
 	o.Auth = &v
 }
 
-// GetOidc returns the Oidc field value if set, zero value otherwise.
-func (o *IntegrationsIntegrationSpec) GetOidc() IntegrationOIDC {
-	if o == nil || IsNil(o.Oidc) {
-		var ret IntegrationOIDC
-		return ret
-	}
-	return *o.Oidc
-}
-
-// GetOidcOk returns a tuple with the Oidc field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *IntegrationsIntegrationSpec) GetOidcOk() (*IntegrationOIDC, bool) {
-	if o == nil || IsNil(o.Oidc) {
-		return nil, false
-	}
-	return o.Oidc, true
-}
-
-// HasOidc returns a boolean if a field has been set.
-func (o *IntegrationsIntegrationSpec) HasOidc() bool {
-	if o != nil && !IsNil(o.Oidc) {
-		return true
-	}
-
-	return false
-}
-
-// SetOidc gets a reference to the given IntegrationOIDC and assigns it to the Oidc field.
-func (o *IntegrationsIntegrationSpec) SetOidc(v IntegrationOIDC) {
-	o.Oidc = &v
-}
-
 func (o IntegrationsIntegrationSpec) MarshalJSON() ([]byte, error) {
 	toSerialize,err := o.ToMap()
 	if err != nil {
@@ -189,9 +156,6 @@ func (o IntegrationsIntegrationSpec) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.Auth) {
 		toSerialize["auth"] = o.Auth
-	}
-	if !IsNil(o.Oidc) {
-		toSerialize["oidc"] = o.Oidc
 	}
 	return toSerialize, nil
 }

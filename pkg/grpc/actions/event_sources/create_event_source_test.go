@@ -7,13 +7,14 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
-	"github.com/superplanehq/superplane/pkg/protos/authorization"
+	authpb "github.com/superplanehq/superplane/pkg/protos/authorization"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationPb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
@@ -27,7 +28,10 @@ const EventSourceCreatedRoutingKey = "event-source-created"
 func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 
+	ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, r.Canvas.ID.String())
+
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, uuid.NewString())
 		eventSource := &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",
@@ -39,7 +43,7 @@ func Test__CreateEventSource(t *testing.T) {
 			EventSource:    eventSource,
 		}
 
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, req)
+		_, err := CreateEventSource(ctx, r.Encryptor, r.Registry, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -59,9 +63,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		response, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		require.NoError(t, err)
@@ -88,9 +91,8 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// First one is created.
 		//
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		_, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		require.NoError(t, err)
@@ -98,7 +100,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Second one fails.
 		//
-		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+		_, err = CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
 			CanvasIdOrName: r.Canvas.Name,
 			EventSource:    eventSource,
 		})
@@ -131,9 +133,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		response, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		require.NoError(t, err)
@@ -167,9 +168,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		_, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		s, ok := status.FromError(err)
@@ -214,7 +214,7 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 			Spec: &protos.EventSource_Spec{
 				Integration: &integrationPb.IntegrationRef{
-					DomainType: authorization.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					DomainType: authpb.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					Name:       integration.Name,
 				},
 				Resource: &integrationPb.ResourceRef{
@@ -224,9 +224,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		response, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		require.NoError(t, err)
@@ -238,7 +237,7 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, name, response.EventSource.Metadata.Name)
 		assert.Equal(t, r.Canvas.ID.String(), response.EventSource.Metadata.CanvasId)
 		assert.Equal(t, integration.Name, response.EventSource.Spec.Integration.Name)
-		assert.Equal(t, authorization.DomainType_DOMAIN_TYPE_ORGANIZATION, response.EventSource.Spec.Integration.DomainType)
+		assert.Equal(t, authpb.DomainType_DOMAIN_TYPE_ORGANIZATION, response.EventSource.Spec.Integration.DomainType)
 		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
 		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
 		assert.True(t, testconsumer.HasReceivedMessage())
@@ -261,9 +260,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		_, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		s, ok := status.FromError(err)
@@ -309,9 +307,8 @@ func Test__CreateEventSource(t *testing.T) {
 			},
 		}
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			EventSource:    eventSource,
+		response, err := CreateEventSource(ctx, r.Encryptor, r.Registry, &protos.CreateEventSourceRequest{
+			EventSource: eventSource,
 		})
 
 		require.NoError(t, err)

@@ -18,9 +18,9 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
@@ -34,7 +34,7 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
@@ -62,8 +62,8 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
-						{Name: "type", Expression: "type"},
+						{Name: "version", Expression: "$.ref"},
+						{Name: "type", Expression: "$.type"},
 					},
 				},
 			},
@@ -89,9 +89,9 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
@@ -105,7 +105,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
@@ -179,7 +179,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
@@ -241,8 +241,8 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
-						{Name: "app", Expression: "app"},
+						{Name: "version", Expression: "$.ref"},
+						{Name: "app", Expression: "$.app"},
 					},
 				},
 			},
@@ -330,9 +330,9 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	connectionGroup, err := canvas.CreateConnectionGroup(
@@ -345,8 +345,8 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 		ConnectionGroupSpec{
 			GroupBy: &ConnectionGroupBySpec{
 				Fields: []ConnectionGroupByField{
-					{Name: "version", Expression: "ref"},
-					{Name: "app", Expression: "app"},
+					{Name: "version", Expression: "$.ref"},
+					{Name: "app", Expression: "$.app"},
 				},
 			},
 		},

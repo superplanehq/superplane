@@ -50,8 +50,16 @@ func (w *PendingEventsWorker) Tick() error {
 		e := event
 		logger := logging.ForEvent(&event)
 		err := w.ProcessEvent(logger, &e)
+
+		//
+		// If anything goes while processing the event, we discard it, and log the error.
+		//
 		if err != nil {
-			logger.Errorf("Error processing pending event: %v", err)
+			logger.Errorf("Error processing event: %v", err)
+			err = e.UpdateState(models.EventStateDiscarded)
+			if err != nil {
+				logger.Errorf("Error discarding event: %v", err)
+			}
 		}
 	}
 
@@ -62,12 +70,41 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 	logger.Info("Processing")
 
 	//
-	// First, we check if there's an execution resource
-	// to update for this event
+	// For events coming from event sources (not stages or connection groups),
+	// we need to do 2 additional things before processing the connections:
 	//
-	err := w.UpdateExecutionResource(logger, event)
-	if err != nil {
-		return err
+	//   1. Update the state of execution resources that may be connected to this event source.
+	//   2. Apply the filters
+	//
+	if event.SourceType == models.SourceTypeEventSource {
+		source, err := models.FindEventSource(event.SourceID)
+		if err != nil {
+			return err
+		}
+
+		//
+		// If something goes wrong while trying to update execution resources,
+		// we just log the error, but proceed with the event processing.
+		//
+		err = w.UpdateExecutionResource(logger, event, source)
+		if err != nil {
+			logger.Warnf("Failed to update execution resource: %v", err)
+		}
+
+		//
+		// If the event does not pass the event source filters,
+		// or there's an error evaluating the filters, reject it.
+		//
+		accept, err := source.Accept(event)
+		if err != nil {
+			logger.Errorf("Error applying filter: %v", err)
+			return err
+		}
+
+		if !accept {
+			logger.Info("Event does not pass filters - discarding")
+			return event.UpdateState(models.EventStateDiscarded)
+		}
 	}
 
 	//
@@ -76,7 +113,7 @@ func (w *PendingEventsWorker) ProcessEvent(logger *log.Entry, event *models.Even
 	return w.ProcessConnections(logger, event)
 }
 
-func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *models.Event) error {
+func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *models.Event, source *models.EventSource) error {
 	//
 	// If this is an event from a stage or connection group,
 	// there's nothing to do here.
@@ -85,19 +122,14 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return nil
 	}
 
-	eventSource, err := models.FindEventSource(event.SourceID)
-	if err != nil {
-		return err
-	}
-
 	//
 	// If this event source is not tied to a resource, there's nothing to do here.
 	//
-	if eventSource.ResourceID == nil {
+	if source.ResourceID == nil {
 		return nil
 	}
 
-	resource, err := models.FindResourceByID(*eventSource.ResourceID)
+	resource, err := models.FindResourceByID(*source.ResourceID)
 	if err != nil {
 		return err
 	}
@@ -126,10 +158,10 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		result = models.ResultFailed
 	}
 
-	executionResource, err := models.FindExecutionResource(statefulResource.Id(), *eventSource.ResourceID)
+	executionResource, err := models.FindExecutionResource(statefulResource.Id(), *source.ResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No execution resource %s found for source %s - skipping execution update", statefulResource.Id(), eventSource.ID)
+			logger.Infof("No execution resource %s found for source %s - skipping execution update", statefulResource.Id(), source.ID)
 			return nil
 		}
 
@@ -161,12 +193,7 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 	//
 	if len(connections) == 0 {
 		logger.Info("Unconnected source - discarding")
-		err := event.Discard()
-		if err != nil {
-			return fmt.Errorf("error discarding event: %v", err)
-		}
-
-		return nil
+		return event.UpdateState(models.EventStateDiscarded)
 	}
 
 	for _, connection := range connections {
@@ -179,29 +206,29 @@ func (w *PendingEventsWorker) ProcessConnections(logger *log.Entry, event *model
 		if !accept {
 			continue
 		}
-
 	}
 
 	connections = w.filterConnections(logger, event, connections)
 	if len(connections) == 0 {
-		logger.Info("No connections after filtering")
-		err := event.MarkAsProcessed()
-		if err != nil {
-			return fmt.Errorf("error discarding event: %v", err)
-		}
-
-		return nil
+		logger.Info("No connections after applying connection filters - discarding")
+		return event.UpdateState(models.EventStateDiscarded)
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		for _, connection := range connections {
 			err = w.handleEventForConnection(tx, event, connection)
+
+			//
+			// If there is an error handling the event for a single connection,
+			// (error building inputs or any other unknown errors), we just log the error,
+			// but proceed with the rest of the connections, to avoid blocking the other connections.
+			//
 			if err != nil {
-				return err
+				logger.Errorf("Error handling event for connection %s (%s): %v", connection.TargetID, connection.TargetType, err)
 			}
 		}
 
-		return event.MarkAsProcessedInTransaction(tx)
+		return event.UpdateStateInTransaction(tx, models.EventStateProcessed)
 	})
 }
 

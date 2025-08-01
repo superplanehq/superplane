@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	uuid "github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -16,16 +17,10 @@ import (
 )
 
 func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
+	domainId := ctx.Value(authorization.DomainIdContextKey).(string)
+	canvas, err := models.FindCanvasByID(domainId)
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	logger := logging.ForCanvas(canvas)

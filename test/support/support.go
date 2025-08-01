@@ -128,7 +128,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create source
 	//
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, nil)
+		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 	}
 

@@ -4798,6 +4798,7 @@ type EventSource_Spec struct {
 	state         protoimpl.MessageState       `protogen:"open.v1"`
 	Integration   *integrations.IntegrationRef `protobuf:"bytes,1,opt,name=integration,proto3" json:"integration,omitempty"`
 	Resource      *integrations.ResourceRef    `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
+	Events        []*EventSource_EventType     `protobuf:"bytes,3,rep,name=events,proto3" json:"events,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4846,6 +4847,73 @@ func (x *EventSource_Spec) GetResource() *integrations.ResourceRef {
 	return nil
 }
 
+func (x *EventSource_Spec) GetEvents() []*EventSource_EventType {
+	if x != nil {
+		return x.Events
+	}
+	return nil
+}
+
+type EventSource_EventType struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Type           string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Filters        []*Filter              `protobuf:"bytes,2,rep,name=filters,proto3" json:"filters,omitempty"`
+	FilterOperator FilterOperator         `protobuf:"varint,3,opt,name=filter_operator,json=filterOperator,proto3,enum=Superplane.FilterOperator" json:"filter_operator,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EventSource_EventType) Reset() {
+	*x = EventSource_EventType{}
+	mi := &file_canvases_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EventSource_EventType) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EventSource_EventType) ProtoMessage() {}
+
+func (x *EventSource_EventType) ProtoReflect() protoreflect.Message {
+	mi := &file_canvases_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EventSource_EventType.ProtoReflect.Descriptor instead.
+func (*EventSource_EventType) Descriptor() ([]byte, []int) {
+	return file_canvases_proto_rawDescGZIP(), []int{7, 2}
+}
+
+func (x *EventSource_EventType) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *EventSource_EventType) GetFilters() []*Filter {
+	if x != nil {
+		return x.Filters
+	}
+	return nil
+}
+
+func (x *EventSource_EventType) GetFilterOperator() FilterOperator {
+	if x != nil {
+		return x.FilterOperator
+	}
+	return FilterOperator_FILTER_OPERATOR_AND
+}
+
 type ConnectionGroup_Metadata struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -4861,7 +4929,7 @@ type ConnectionGroup_Metadata struct {
 
 func (x *ConnectionGroup_Metadata) Reset() {
 	*x = ConnectionGroup_Metadata{}
-	mi := &file_canvases_proto_msgTypes[76]
+	mi := &file_canvases_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4873,7 +4941,7 @@ func (x *ConnectionGroup_Metadata) String() string {
 func (*ConnectionGroup_Metadata) ProtoMessage() {}
 
 func (x *ConnectionGroup_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[76]
+	mi := &file_canvases_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4950,7 +5018,7 @@ type ConnectionGroup_Spec struct {
 
 func (x *ConnectionGroup_Spec) Reset() {
 	*x = ConnectionGroup_Spec{}
-	mi := &file_canvases_proto_msgTypes[77]
+	mi := &file_canvases_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4962,7 +5030,7 @@ func (x *ConnectionGroup_Spec) String() string {
 func (*ConnectionGroup_Spec) ProtoMessage() {}
 
 func (x *ConnectionGroup_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[77]
+	mi := &file_canvases_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5015,7 +5083,7 @@ type ConnectionGroup_Spec_GroupBy struct {
 
 func (x *ConnectionGroup_Spec_GroupBy) Reset() {
 	*x = ConnectionGroup_Spec_GroupBy{}
-	mi := &file_canvases_proto_msgTypes[78]
+	mi := &file_canvases_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5027,7 +5095,7 @@ func (x *ConnectionGroup_Spec_GroupBy) String() string {
 func (*ConnectionGroup_Spec_GroupBy) ProtoMessage() {}
 
 func (x *ConnectionGroup_Spec_GroupBy) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[78]
+	mi := &file_canvases_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5060,7 +5128,7 @@ type ConnectionGroup_Spec_GroupBy_Field struct {
 
 func (x *ConnectionGroup_Spec_GroupBy_Field) Reset() {
 	*x = ConnectionGroup_Spec_GroupBy_Field{}
-	mi := &file_canvases_proto_msgTypes[79]
+	mi := &file_canvases_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5072,7 +5140,7 @@ func (x *ConnectionGroup_Spec_GroupBy_Field) String() string {
 func (*ConnectionGroup_Spec_GroupBy_Field) ProtoMessage() {}
 
 func (x *ConnectionGroup_Spec_GroupBy_Field) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[79]
+	mi := &file_canvases_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5114,7 +5182,7 @@ type Stage_Metadata struct {
 
 func (x *Stage_Metadata) Reset() {
 	*x = Stage_Metadata{}
-	mi := &file_canvases_proto_msgTypes[80]
+	mi := &file_canvases_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5126,7 +5194,7 @@ func (x *Stage_Metadata) String() string {
 func (*Stage_Metadata) ProtoMessage() {}
 
 func (x *Stage_Metadata) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[80]
+	mi := &file_canvases_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5185,7 +5253,7 @@ type Stage_Spec struct {
 
 func (x *Stage_Spec) Reset() {
 	*x = Stage_Spec{}
-	mi := &file_canvases_proto_msgTypes[81]
+	mi := &file_canvases_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5197,7 +5265,7 @@ func (x *Stage_Spec) String() string {
 func (*Stage_Spec) ProtoMessage() {}
 
 func (x *Stage_Spec) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[81]
+	mi := &file_canvases_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5271,7 +5339,7 @@ type InputMapping_When struct {
 
 func (x *InputMapping_When) Reset() {
 	*x = InputMapping_When{}
-	mi := &file_canvases_proto_msgTypes[82]
+	mi := &file_canvases_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5283,7 +5351,7 @@ func (x *InputMapping_When) String() string {
 func (*InputMapping_When) ProtoMessage() {}
 
 func (x *InputMapping_When) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[82]
+	mi := &file_canvases_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5315,7 +5383,7 @@ type InputMapping_WhenTriggeredBy struct {
 
 func (x *InputMapping_WhenTriggeredBy) Reset() {
 	*x = InputMapping_WhenTriggeredBy{}
-	mi := &file_canvases_proto_msgTypes[83]
+	mi := &file_canvases_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5327,7 +5395,7 @@ func (x *InputMapping_WhenTriggeredBy) String() string {
 func (*InputMapping_WhenTriggeredBy) ProtoMessage() {}
 
 func (x *InputMapping_WhenTriggeredBy) ProtoReflect() protoreflect.Message {
-	mi := &file_canvases_proto_msgTypes[83]
+	mi := &file_canvases_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5379,7 +5447,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
 	"\x0forganization_id\x18\x03 \x01(\tR\x0eorganizationId\"D\n" +
 	"\x16DescribeCanvasResponse\x12*\n" +
-	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xd7\x03\n" +
+	"\x06canvas\x18\x01 \x01(\v2\x12.Superplane.CanvasR\x06canvas\"\xa7\x05\n" +
 	"\vEventSource\x12<\n" +
 	"\bmetadata\x18\x01 \x01(\v2 .Superplane.EventSource.MetadataR\bmetadata\x120\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1c.Superplane.EventSource.SpecR\x04spec\x1a\xc1\x01\n" +
@@ -5390,10 +5458,15 @@ const file_canvases_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\x93\x01\n" +
+	"updated_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\xce\x01\n" +
 	"\x04Spec\x12I\n" +
 	"\vintegration\x18\x01 \x01(\v2'.Superplane.Integrations.IntegrationRefR\vintegration\x12@\n" +
-	"\bresource\x18\x02 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\"e\n" +
+	"\bresource\x18\x02 \x01(\v2$.Superplane.Integrations.ResourceRefR\bresource\x129\n" +
+	"\x06events\x18\x03 \x03(\v2!.Superplane.EventSource.EventTypeR\x06events\x1a\x92\x01\n" +
+	"\tEventType\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12,\n" +
+	"\afilters\x18\x02 \x03(\v2\x12.Superplane.FilterR\afilters\x12C\n" +
+	"\x0ffilter_operator\x18\x03 \x01(\x0e2\x1a.Superplane.FilterOperatorR\x0efilterOperator\"e\n" +
 	"\x14DescribeStageRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
@@ -5812,7 +5885,7 @@ func file_canvases_proto_rawDescGZIP() []byte {
 }
 
 var file_canvases_proto_enumTypes = make([]protoimpl.EnumInfo, 11)
-var file_canvases_proto_msgTypes = make([]protoimpl.MessageInfo, 84)
+var file_canvases_proto_msgTypes = make([]protoimpl.MessageInfo, 85)
 var file_canvases_proto_goTypes = []any{
 	(FilterType)(0),                              // 0: Superplane.FilterType
 	(FilterOperator)(0),                          // 1: Superplane.FilterOperator
@@ -5901,19 +5974,20 @@ var file_canvases_proto_goTypes = []any{
 	(*Canvas_Metadata)(nil),                      // 84: Superplane.Canvas.Metadata
 	(*EventSource_Metadata)(nil),                 // 85: Superplane.EventSource.Metadata
 	(*EventSource_Spec)(nil),                     // 86: Superplane.EventSource.Spec
-	(*ConnectionGroup_Metadata)(nil),             // 87: Superplane.ConnectionGroup.Metadata
-	(*ConnectionGroup_Spec)(nil),                 // 88: Superplane.ConnectionGroup.Spec
-	(*ConnectionGroup_Spec_GroupBy)(nil),         // 89: Superplane.ConnectionGroup.Spec.GroupBy
-	(*ConnectionGroup_Spec_GroupBy_Field)(nil),   // 90: Superplane.ConnectionGroup.Spec.GroupBy.Field
-	(*Stage_Metadata)(nil),                       // 91: Superplane.Stage.Metadata
-	(*Stage_Spec)(nil),                           // 92: Superplane.Stage.Spec
-	(*InputMapping_When)(nil),                    // 93: Superplane.InputMapping.When
-	(*InputMapping_WhenTriggeredBy)(nil),         // 94: Superplane.InputMapping.WhenTriggeredBy
-	(authorization.DomainType)(0),                // 95: Superplane.Authorization.DomainType
-	(*integrations.IntegrationRef)(nil),          // 96: Superplane.Integrations.IntegrationRef
-	(*integrations.ResourceRef)(nil),             // 97: Superplane.Integrations.ResourceRef
-	(*_struct.Struct)(nil),                       // 98: google.protobuf.Struct
-	(*timestamp.Timestamp)(nil),                  // 99: google.protobuf.Timestamp
+	(*EventSource_EventType)(nil),                // 87: Superplane.EventSource.EventType
+	(*ConnectionGroup_Metadata)(nil),             // 88: Superplane.ConnectionGroup.Metadata
+	(*ConnectionGroup_Spec)(nil),                 // 89: Superplane.ConnectionGroup.Spec
+	(*ConnectionGroup_Spec_GroupBy)(nil),         // 90: Superplane.ConnectionGroup.Spec.GroupBy
+	(*ConnectionGroup_Spec_GroupBy_Field)(nil),   // 91: Superplane.ConnectionGroup.Spec.GroupBy.Field
+	(*Stage_Metadata)(nil),                       // 92: Superplane.Stage.Metadata
+	(*Stage_Spec)(nil),                           // 93: Superplane.Stage.Spec
+	(*InputMapping_When)(nil),                    // 94: Superplane.InputMapping.When
+	(*InputMapping_WhenTriggeredBy)(nil),         // 95: Superplane.InputMapping.WhenTriggeredBy
+	(authorization.DomainType)(0),                // 96: Superplane.Authorization.DomainType
+	(*integrations.IntegrationRef)(nil),          // 97: Superplane.Integrations.IntegrationRef
+	(*integrations.ResourceRef)(nil),             // 98: Superplane.Integrations.ResourceRef
+	(*_struct.Struct)(nil),                       // 99: google.protobuf.Struct
+	(*timestamp.Timestamp)(nil),                  // 100: google.protobuf.Timestamp
 }
 var file_canvases_proto_depIdxs = []int32{
 	13,  // 0: Superplane.ListCanvasesResponse.canvases:type_name -> Superplane.Canvas
@@ -5934,31 +6008,31 @@ var file_canvases_proto_depIdxs = []int32{
 	35,  // 15: Superplane.UpdateConnectionGroupResponse.connection_group:type_name -> Superplane.ConnectionGroup
 	35,  // 16: Superplane.DescribeConnectionGroupResponse.connection_group:type_name -> Superplane.ConnectionGroup
 	35,  // 17: Superplane.ListConnectionGroupsResponse.connection_groups:type_name -> Superplane.ConnectionGroup
-	87,  // 18: Superplane.ConnectionGroup.metadata:type_name -> Superplane.ConnectionGroup.Metadata
-	88,  // 19: Superplane.ConnectionGroup.spec:type_name -> Superplane.ConnectionGroup.Spec
+	88,  // 18: Superplane.ConnectionGroup.metadata:type_name -> Superplane.ConnectionGroup.Metadata
+	89,  // 19: Superplane.ConnectionGroup.spec:type_name -> Superplane.ConnectionGroup.Spec
 	0,   // 20: Superplane.Filter.type:type_name -> Superplane.FilterType
 	37,  // 21: Superplane.Filter.data:type_name -> Superplane.DataFilter
 	38,  // 22: Superplane.Filter.header:type_name -> Superplane.HeaderFilter
 	3,   // 23: Superplane.Connection.type:type_name -> Superplane.Connection.Type
 	36,  // 24: Superplane.Connection.filters:type_name -> Superplane.Filter
 	1,   // 25: Superplane.Connection.filter_operator:type_name -> Superplane.FilterOperator
-	91,  // 26: Superplane.Stage.metadata:type_name -> Superplane.Stage.Metadata
-	92,  // 27: Superplane.Stage.spec:type_name -> Superplane.Stage.Spec
+	92,  // 26: Superplane.Stage.metadata:type_name -> Superplane.Stage.Metadata
+	93,  // 27: Superplane.Stage.spec:type_name -> Superplane.Stage.Spec
 	44,  // 28: Superplane.InputMapping.values:type_name -> Superplane.ValueDefinition
-	93,  // 29: Superplane.InputMapping.when:type_name -> Superplane.InputMapping.When
+	94,  // 29: Superplane.InputMapping.when:type_name -> Superplane.InputMapping.When
 	45,  // 30: Superplane.ValueDefinition.value_from:type_name -> Superplane.ValueFrom
 	46,  // 31: Superplane.ValueFrom.event_data:type_name -> Superplane.ValueFromEventData
 	47,  // 32: Superplane.ValueFrom.last_execution:type_name -> Superplane.ValueFromLastExecution
 	48,  // 33: Superplane.ValueFrom.secret:type_name -> Superplane.ValueFromSecret
 	10,  // 34: Superplane.ValueFromLastExecution.results:type_name -> Superplane.Execution.Result
-	95,  // 35: Superplane.ValueFromSecret.domain_type:type_name -> Superplane.Authorization.DomainType
+	96,  // 35: Superplane.ValueFromSecret.domain_type:type_name -> Superplane.Authorization.DomainType
 	4,   // 36: Superplane.Condition.type:type_name -> Superplane.Condition.Type
 	50,  // 37: Superplane.Condition.approval:type_name -> Superplane.ConditionApproval
 	51,  // 38: Superplane.Condition.time_window:type_name -> Superplane.ConditionTimeWindow
 	40,  // 39: Superplane.CreateStageRequest.stage:type_name -> Superplane.Stage
-	96,  // 40: Superplane.Executor.integration:type_name -> Superplane.Integrations.IntegrationRef
-	97,  // 41: Superplane.Executor.resource:type_name -> Superplane.Integrations.ResourceRef
-	98,  // 42: Superplane.Executor.spec:type_name -> google.protobuf.Struct
+	97,  // 40: Superplane.Executor.integration:type_name -> Superplane.Integrations.IntegrationRef
+	98,  // 41: Superplane.Executor.resource:type_name -> Superplane.Integrations.ResourceRef
+	99,  // 42: Superplane.Executor.spec:type_name -> google.protobuf.Struct
 	40,  // 43: Superplane.CreateStageResponse.stage:type_name -> Superplane.Stage
 	40,  // 44: Superplane.UpdateStageRequest.stage:type_name -> Superplane.Stage
 	40,  // 45: Superplane.UpdateStageResponse.stage:type_name -> Superplane.Stage
@@ -5969,98 +6043,101 @@ var file_canvases_proto_depIdxs = []int32{
 	5,   // 50: Superplane.ConnectionGroupFieldSet.state:type_name -> Superplane.ConnectionGroupFieldSet.State
 	6,   // 51: Superplane.ConnectionGroupFieldSet.state_reason:type_name -> Superplane.ConnectionGroupFieldSet.StateReason
 	64,  // 52: Superplane.ConnectionGroupFieldSet.events:type_name -> Superplane.ConnectionGroupEvent
-	99,  // 53: Superplane.ConnectionGroupFieldSet.created_at:type_name -> google.protobuf.Timestamp
+	100, // 53: Superplane.ConnectionGroupFieldSet.created_at:type_name -> google.protobuf.Timestamp
 	3,   // 54: Superplane.ConnectionGroupEvent.source_type:type_name -> Superplane.Connection.Type
-	99,  // 55: Superplane.ConnectionGroupEvent.received_at:type_name -> google.protobuf.Timestamp
+	100, // 55: Superplane.ConnectionGroupEvent.received_at:type_name -> google.protobuf.Timestamp
 	7,   // 56: Superplane.ListStageEventsRequest.states:type_name -> Superplane.StageEvent.State
 	8,   // 57: Superplane.ListStageEventsRequest.state_reasons:type_name -> Superplane.StageEvent.StateReason
 	67,  // 58: Superplane.ListStageEventsResponse.events:type_name -> Superplane.StageEvent
 	3,   // 59: Superplane.StageEvent.source_type:type_name -> Superplane.Connection.Type
 	7,   // 60: Superplane.StageEvent.state:type_name -> Superplane.StageEvent.State
 	8,   // 61: Superplane.StageEvent.state_reason:type_name -> Superplane.StageEvent.StateReason
-	99,  // 62: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
+	100, // 62: Superplane.StageEvent.created_at:type_name -> google.protobuf.Timestamp
 	72,  // 63: Superplane.StageEvent.approvals:type_name -> Superplane.StageEventApproval
 	70,  // 64: Superplane.StageEvent.execution:type_name -> Superplane.Execution
 	68,  // 65: Superplane.StageEvent.inputs:type_name -> Superplane.KeyValuePair
 	9,   // 66: Superplane.Execution.state:type_name -> Superplane.Execution.State
 	10,  // 67: Superplane.Execution.result:type_name -> Superplane.Execution.Result
-	99,  // 68: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
-	99,  // 69: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
-	99,  // 70: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
+	100, // 68: Superplane.Execution.created_at:type_name -> google.protobuf.Timestamp
+	100, // 69: Superplane.Execution.started_at:type_name -> google.protobuf.Timestamp
+	100, // 70: Superplane.Execution.finished_at:type_name -> google.protobuf.Timestamp
 	69,  // 71: Superplane.Execution.outputs:type_name -> Superplane.OutputValue
 	71,  // 72: Superplane.Execution.resources:type_name -> Superplane.ExecutionResource
-	99,  // 73: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
+	100, // 73: Superplane.StageEventApproval.approved_at:type_name -> google.protobuf.Timestamp
 	67,  // 74: Superplane.ApproveStageEventResponse.event:type_name -> Superplane.StageEvent
-	99,  // 75: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 76: Superplane.ConnectionGroupCreated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 77: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 78: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 79: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 80: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 81: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 82: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 83: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
-	99,  // 84: Superplane.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	99,  // 85: Superplane.EventSource.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	99,  // 86: Superplane.EventSource.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	96,  // 87: Superplane.EventSource.Spec.integration:type_name -> Superplane.Integrations.IntegrationRef
-	97,  // 88: Superplane.EventSource.Spec.resource:type_name -> Superplane.Integrations.ResourceRef
-	99,  // 89: Superplane.ConnectionGroup.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	99,  // 90: Superplane.ConnectionGroup.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	39,  // 91: Superplane.ConnectionGroup.Spec.connections:type_name -> Superplane.Connection
-	89,  // 92: Superplane.ConnectionGroup.Spec.group_by:type_name -> Superplane.ConnectionGroup.Spec.GroupBy
-	2,   // 93: Superplane.ConnectionGroup.Spec.timeout_behavior:type_name -> Superplane.ConnectionGroup.Spec.TimeoutBehavior
-	90,  // 94: Superplane.ConnectionGroup.Spec.GroupBy.fields:type_name -> Superplane.ConnectionGroup.Spec.GroupBy.Field
-	99,  // 95: Superplane.Stage.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	39,  // 96: Superplane.Stage.Spec.connections:type_name -> Superplane.Connection
-	49,  // 97: Superplane.Stage.Spec.conditions:type_name -> Superplane.Condition
-	53,  // 98: Superplane.Stage.Spec.executor:type_name -> Superplane.Executor
-	42,  // 99: Superplane.Stage.Spec.inputs:type_name -> Superplane.InputDefinition
-	43,  // 100: Superplane.Stage.Spec.input_mappings:type_name -> Superplane.InputMapping
-	41,  // 101: Superplane.Stage.Spec.outputs:type_name -> Superplane.OutputDefinition
-	44,  // 102: Superplane.Stage.Spec.secrets:type_name -> Superplane.ValueDefinition
-	94,  // 103: Superplane.InputMapping.When.triggered_by:type_name -> Superplane.InputMapping.WhenTriggeredBy
-	11,  // 104: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
-	14,  // 105: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
-	27,  // 106: Superplane.Superplane.CreateConnectionGroup:input_type -> Superplane.CreateConnectionGroupRequest
-	21,  // 107: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
-	23,  // 108: Superplane.Superplane.ResetEventSourceKey:input_type -> Superplane.ResetEventSourceKeyRequest
-	52,  // 109: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
-	16,  // 110: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
-	19,  // 111: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
-	25,  // 112: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
-	31,  // 113: Superplane.Superplane.DescribeConnectionGroup:input_type -> Superplane.DescribeConnectionGroupRequest
-	57,  // 114: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
-	59,  // 115: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
-	33,  // 116: Superplane.Superplane.ListConnectionGroups:input_type -> Superplane.ListConnectionGroupsRequest
-	65,  // 117: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
-	61,  // 118: Superplane.Superplane.ListConnectionGroupFieldSets:input_type -> Superplane.ListConnectionGroupFieldSetsRequest
-	55,  // 119: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
-	29,  // 120: Superplane.Superplane.UpdateConnectionGroup:input_type -> Superplane.UpdateConnectionGroupRequest
-	73,  // 121: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
-	12,  // 122: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
-	15,  // 123: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
-	28,  // 124: Superplane.Superplane.CreateConnectionGroup:output_type -> Superplane.CreateConnectionGroupResponse
-	22,  // 125: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
-	24,  // 126: Superplane.Superplane.ResetEventSourceKey:output_type -> Superplane.ResetEventSourceKeyResponse
-	54,  // 127: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
-	17,  // 128: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
-	20,  // 129: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
-	26,  // 130: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
-	32,  // 131: Superplane.Superplane.DescribeConnectionGroup:output_type -> Superplane.DescribeConnectionGroupResponse
-	58,  // 132: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
-	60,  // 133: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
-	34,  // 134: Superplane.Superplane.ListConnectionGroups:output_type -> Superplane.ListConnectionGroupsResponse
-	66,  // 135: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
-	62,  // 136: Superplane.Superplane.ListConnectionGroupFieldSets:output_type -> Superplane.ListConnectionGroupFieldSetsResponse
-	56,  // 137: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
-	30,  // 138: Superplane.Superplane.UpdateConnectionGroup:output_type -> Superplane.UpdateConnectionGroupResponse
-	74,  // 139: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
-	122, // [122:140] is the sub-list for method output_type
-	104, // [104:122] is the sub-list for method input_type
-	104, // [104:104] is the sub-list for extension type_name
-	104, // [104:104] is the sub-list for extension extendee
-	0,   // [0:104] is the sub-list for field type_name
+	100, // 75: Superplane.StageCreated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 76: Superplane.ConnectionGroupCreated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 77: Superplane.StageUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 78: Superplane.EventSourceCreated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 79: Superplane.StageEventCreated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 80: Superplane.StageEventApproved.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 81: Superplane.StageExecutionCreated.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 82: Superplane.StageExecutionStarted.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 83: Superplane.StageExecutionFinished.timestamp:type_name -> google.protobuf.Timestamp
+	100, // 84: Superplane.Canvas.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	100, // 85: Superplane.EventSource.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	100, // 86: Superplane.EventSource.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	97,  // 87: Superplane.EventSource.Spec.integration:type_name -> Superplane.Integrations.IntegrationRef
+	98,  // 88: Superplane.EventSource.Spec.resource:type_name -> Superplane.Integrations.ResourceRef
+	87,  // 89: Superplane.EventSource.Spec.events:type_name -> Superplane.EventSource.EventType
+	36,  // 90: Superplane.EventSource.EventType.filters:type_name -> Superplane.Filter
+	1,   // 91: Superplane.EventSource.EventType.filter_operator:type_name -> Superplane.FilterOperator
+	100, // 92: Superplane.ConnectionGroup.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	100, // 93: Superplane.ConnectionGroup.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	39,  // 94: Superplane.ConnectionGroup.Spec.connections:type_name -> Superplane.Connection
+	90,  // 95: Superplane.ConnectionGroup.Spec.group_by:type_name -> Superplane.ConnectionGroup.Spec.GroupBy
+	2,   // 96: Superplane.ConnectionGroup.Spec.timeout_behavior:type_name -> Superplane.ConnectionGroup.Spec.TimeoutBehavior
+	91,  // 97: Superplane.ConnectionGroup.Spec.GroupBy.fields:type_name -> Superplane.ConnectionGroup.Spec.GroupBy.Field
+	100, // 98: Superplane.Stage.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	39,  // 99: Superplane.Stage.Spec.connections:type_name -> Superplane.Connection
+	49,  // 100: Superplane.Stage.Spec.conditions:type_name -> Superplane.Condition
+	53,  // 101: Superplane.Stage.Spec.executor:type_name -> Superplane.Executor
+	42,  // 102: Superplane.Stage.Spec.inputs:type_name -> Superplane.InputDefinition
+	43,  // 103: Superplane.Stage.Spec.input_mappings:type_name -> Superplane.InputMapping
+	41,  // 104: Superplane.Stage.Spec.outputs:type_name -> Superplane.OutputDefinition
+	44,  // 105: Superplane.Stage.Spec.secrets:type_name -> Superplane.ValueDefinition
+	95,  // 106: Superplane.InputMapping.When.triggered_by:type_name -> Superplane.InputMapping.WhenTriggeredBy
+	11,  // 107: Superplane.Superplane.ListCanvases:input_type -> Superplane.ListCanvasesRequest
+	14,  // 108: Superplane.Superplane.CreateCanvas:input_type -> Superplane.CreateCanvasRequest
+	27,  // 109: Superplane.Superplane.CreateConnectionGroup:input_type -> Superplane.CreateConnectionGroupRequest
+	21,  // 110: Superplane.Superplane.CreateEventSource:input_type -> Superplane.CreateEventSourceRequest
+	23,  // 111: Superplane.Superplane.ResetEventSourceKey:input_type -> Superplane.ResetEventSourceKeyRequest
+	52,  // 112: Superplane.Superplane.CreateStage:input_type -> Superplane.CreateStageRequest
+	16,  // 113: Superplane.Superplane.DescribeCanvas:input_type -> Superplane.DescribeCanvasRequest
+	19,  // 114: Superplane.Superplane.DescribeStage:input_type -> Superplane.DescribeStageRequest
+	25,  // 115: Superplane.Superplane.DescribeEventSource:input_type -> Superplane.DescribeEventSourceRequest
+	31,  // 116: Superplane.Superplane.DescribeConnectionGroup:input_type -> Superplane.DescribeConnectionGroupRequest
+	57,  // 117: Superplane.Superplane.ListStages:input_type -> Superplane.ListStagesRequest
+	59,  // 118: Superplane.Superplane.ListEventSources:input_type -> Superplane.ListEventSourcesRequest
+	33,  // 119: Superplane.Superplane.ListConnectionGroups:input_type -> Superplane.ListConnectionGroupsRequest
+	65,  // 120: Superplane.Superplane.ListStageEvents:input_type -> Superplane.ListStageEventsRequest
+	61,  // 121: Superplane.Superplane.ListConnectionGroupFieldSets:input_type -> Superplane.ListConnectionGroupFieldSetsRequest
+	55,  // 122: Superplane.Superplane.UpdateStage:input_type -> Superplane.UpdateStageRequest
+	29,  // 123: Superplane.Superplane.UpdateConnectionGroup:input_type -> Superplane.UpdateConnectionGroupRequest
+	73,  // 124: Superplane.Superplane.ApproveStageEvent:input_type -> Superplane.ApproveStageEventRequest
+	12,  // 125: Superplane.Superplane.ListCanvases:output_type -> Superplane.ListCanvasesResponse
+	15,  // 126: Superplane.Superplane.CreateCanvas:output_type -> Superplane.CreateCanvasResponse
+	28,  // 127: Superplane.Superplane.CreateConnectionGroup:output_type -> Superplane.CreateConnectionGroupResponse
+	22,  // 128: Superplane.Superplane.CreateEventSource:output_type -> Superplane.CreateEventSourceResponse
+	24,  // 129: Superplane.Superplane.ResetEventSourceKey:output_type -> Superplane.ResetEventSourceKeyResponse
+	54,  // 130: Superplane.Superplane.CreateStage:output_type -> Superplane.CreateStageResponse
+	17,  // 131: Superplane.Superplane.DescribeCanvas:output_type -> Superplane.DescribeCanvasResponse
+	20,  // 132: Superplane.Superplane.DescribeStage:output_type -> Superplane.DescribeStageResponse
+	26,  // 133: Superplane.Superplane.DescribeEventSource:output_type -> Superplane.DescribeEventSourceResponse
+	32,  // 134: Superplane.Superplane.DescribeConnectionGroup:output_type -> Superplane.DescribeConnectionGroupResponse
+	58,  // 135: Superplane.Superplane.ListStages:output_type -> Superplane.ListStagesResponse
+	60,  // 136: Superplane.Superplane.ListEventSources:output_type -> Superplane.ListEventSourcesResponse
+	34,  // 137: Superplane.Superplane.ListConnectionGroups:output_type -> Superplane.ListConnectionGroupsResponse
+	66,  // 138: Superplane.Superplane.ListStageEvents:output_type -> Superplane.ListStageEventsResponse
+	62,  // 139: Superplane.Superplane.ListConnectionGroupFieldSets:output_type -> Superplane.ListConnectionGroupFieldSetsResponse
+	56,  // 140: Superplane.Superplane.UpdateStage:output_type -> Superplane.UpdateStageResponse
+	30,  // 141: Superplane.Superplane.UpdateConnectionGroup:output_type -> Superplane.UpdateConnectionGroupResponse
+	74,  // 142: Superplane.Superplane.ApproveStageEvent:output_type -> Superplane.ApproveStageEventResponse
+	125, // [125:143] is the sub-list for method output_type
+	107, // [107:125] is the sub-list for method input_type
+	107, // [107:107] is the sub-list for extension type_name
+	107, // [107:107] is the sub-list for extension extendee
+	0,   // [0:107] is the sub-list for field type_name
 }
 
 func init() { file_canvases_proto_init() }
@@ -6074,7 +6151,7 @@ func file_canvases_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_canvases_proto_rawDesc), len(file_canvases_proto_rawDesc)),
 			NumEnums:      11,
-			NumMessages:   84,
+			NumMessages:   85,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

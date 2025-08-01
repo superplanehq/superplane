@@ -2,11 +2,13 @@ package models
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -27,6 +29,14 @@ type EventSource struct {
 	Scope      string
 	CreatedAt  *time.Time
 	UpdatedAt  *time.Time
+
+	EventTypes datatypes.JSONSlice[EventType]
+}
+
+type EventType struct {
+	Type           string   `json:"type"`
+	FilterOperator string   `json:"filter_operator"`
+	Filters        []Filter `json:"filters"`
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {
@@ -78,6 +88,32 @@ func (s *EventSource) FindIntegration() (*Integration, error) {
 	}
 
 	return &integration, nil
+}
+
+func (s *EventSource) Accept(event *Event) (bool, error) {
+	//
+	// If no event types are defined, accept all events.
+	//
+	if len(s.EventTypes) == 0 {
+		return true, nil
+	}
+
+	//
+	// Check if the event type is accepted before applying filters.
+	//
+	i := slices.IndexFunc(s.EventTypes, func(eventType EventType) bool {
+		return eventType.Type == event.Type
+	})
+
+	if i == -1 {
+		return false, nil
+	}
+
+	//
+	// Apply the filters for the event type.
+	//
+	eventType := s.EventTypes[i]
+	return ApplyFilters(eventType.Filters, eventType.FilterOperator, event)
 }
 
 func FindEventSource(id uuid.UUID) (*EventSource, error) {

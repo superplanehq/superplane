@@ -183,7 +183,8 @@ CREATE TABLE public.event_sources (
     key bytea NOT NULL,
     resource_id uuid,
     state character varying(64) NOT NULL,
-    scope character varying(64) NOT NULL
+    scope character varying(64) NOT NULL,
+    event_types jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -1003,7 +1004,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250730175331	f
+20250731205910	f
 \.
 
 

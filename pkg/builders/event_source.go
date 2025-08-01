@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -22,6 +23,7 @@ type EventSourceBuilder struct {
 	canvas      *models.Canvas
 	name        string
 	scope       string
+	eventTypes  []models.EventType
 	integration *models.Integration
 	resource    integrations.Resource
 }
@@ -68,6 +70,11 @@ func (b *EventSourceBuilder) ForResource(resource integrations.Resource) *EventS
 	return b
 }
 
+func (b *EventSourceBuilder) WithEventTypes(eventTypes []models.EventType) *EventSourceBuilder {
+	b.eventTypes = eventTypes
+	return b
+}
+
 func (b *EventSourceBuilder) Create() (*models.EventSource, string, error) {
 	if b.tx != nil {
 		return b.create(b.tx)
@@ -106,7 +113,7 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, nil)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, b.eventTypes, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -144,7 +151,7 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, &resource.ID)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, b.eventTypes, &resource.ID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -189,6 +196,7 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 	now := time.Now()
 	eventSource.Name = b.name
 	eventSource.Scope = b.scope
+	eventSource.EventTypes = datatypes.NewJSONSlice(b.eventTypes)
 	eventSource.UpdatedAt = &now
 	err := tx.Save(eventSource).Error
 	if err != nil {

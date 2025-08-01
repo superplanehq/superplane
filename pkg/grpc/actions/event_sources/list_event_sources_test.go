@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -16,8 +18,11 @@ import (
 func Test__ListEventSources(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
 
+	ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, r.Canvas.ID.String())
+
 	t.Run("no canvas ID -> error", func(t *testing.T) {
-		_, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{})
+		ctx := context.WithValue(context.Background(), authorization.DomainIdContextKey, uuid.NewString())
+		_, err := ListEventSources(ctx, &protos.ListEventSourcesRequest{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -25,7 +30,7 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("no event sources -> empty list", func(t *testing.T) {
-		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
+		res, err := ListEventSources(ctx, &protos.ListEventSourcesRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 		})
 
@@ -35,16 +40,13 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("lists only external event sources", func(t *testing.T) {
-		external, err := r.Canvas.CreateEventSource("external", []byte("key"), models.EventSourceScopeExternal, nil)
+		external, err := r.Canvas.CreateEventSource("external", []byte("key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
-		_, err = r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		_, err = r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
-		res, err := ListEventSources(context.Background(), &protos.ListEventSourcesRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
+		res, err := ListEventSources(ctx, &protos.ListEventSourcesRequest{})
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)
