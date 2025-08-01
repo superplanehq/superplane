@@ -250,6 +250,7 @@ export function WorkflowNodeAccordion({
   const [githubProjects, setGithubProjects] = useState<Array<{id: string, name: string, url: string}>>([])
   const [selectedGitHubProject, setSelectedGitHubProject] = useState<string>('')
   const showIcons = new URLSearchParams(window.location.search).get('showIcons') === 'true';
+  const executorInHeader = new URLSearchParams(window.location.search).get('executorInHeader') === 'true';
   
   // Generate YAML preview
   const generateYamlPreview = () => {
@@ -2282,17 +2283,17 @@ export function WorkflowNodeAccordion({
          
         </Dialog>
         <Handle
-          type="target"
-          position={Position.Left}
-          className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white"
-          aria-label="Input connection point"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!w-4 !h-4 !bg-blue-500 !border-2 !border-white"
-          aria-label="Output connection point"
-        />
+        type="target"
+        position={Position.Left}
+        className="!w-2 !h-12 !bg-blue-500 dark:!bg-zinc-600 !border-2 !border-white z-50 !rounded-md"
+        aria-label="Input connection point"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-2 !h-12 !bg-blue-500 dark:!bg-zinc-600 !border-2 !border-white z-50 !rounded-md"
+        aria-label="Output connection point"
+      />
       </div>  
     )
   }
@@ -2366,23 +2367,54 @@ export function WorkflowNodeAccordion({
           
         </div>
       )}
-
       {/* Header section */}
-      <div className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-zinc-700">
-        <div className="flex items-start gap-2">
-          <div className='w-10 h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
-          {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
-          {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
+      {!executorInHeader && (
+        <div className="p-4 flex flex-col border-b border-gray-200 dark:border-zinc-700">
+          <div className="flex items-center gap-3">
+           
+            {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
+            {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
+           
+            <div className='flex flex-col'> 
+              <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+              <Link className='text-xs text-blue-500 dark:text-blue-400 hidden' href="#">semaphore-project/semaphore.yml</Link>
+              
+              
+            </div>
           </div>
-          <div className='flex flex-col'> 
-            <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
-            <h4 className="text-xs text-gray-500 dark:text-zinc-300">{data.description}</h4>
-            <Link className='text-xs text-blue-500 dark:text-blue-400 hidden' href="#">semaphore-project/workflow-name</Link>
-          </div>
+
+          <h4 className="text-xs text-gray-600 dark:text-zinc-300 mt-4">{data.description}</h4>
+          <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300'>
+            <Link className='text-xs flex items-center gap-2' href="#">
+              <MaterialSymbol name="assignment" size="sm" className="text-gray-600 dark:text-blue-300"/>semaphore-project
+            </Link>
+            <Link className='text-xs flex items-center gap-2' href="#">
+              <MaterialSymbol name="automation" size="sm" className="text-gray-600 dark:text-blue-300"/>.semaphore.yml
+            </Link>
+            </div>
         </div>
-        
-       
-      </div>
+      )}
+      {executorInHeader && (
+        <div>
+          <div className="p-4 flex flex-col border-b border-gray-200 dark:border-zinc-700">
+            <div className="flex items-center gap-3">
+              <div className='w-8 h-8 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
+              {data.icon == 'semaphore' && <img width={20} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
+              {data.icon == 'openAI' && <img width={20} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
+
+              </div>
+              <div className='flex flex-col'> 
+                <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
+                
+              </div>
+            </div>
+            <h4 className="text-xs text-gray-600 dark:text-zinc-300 mt-4">{data.description}</h4>
+            
+          </div>
+          
+        </div>
+      )}
+      
 
       {/* Status section */}
       <div className={clsx('p-4 border-b border-gray-200 dark:border-zinc-700', statusConfig.borderColor, statusConfig.bgColor)}>
@@ -2454,6 +2486,17 @@ export function WorkflowNodeAccordion({
          
         </div>
       </div>
+      {(executorInHeader && (
+          <div className='flex flex-col px-4 py-4 border-t border-gray-200 dark:border-zinc-700'>
+             <h4 className="text-xs text-gray-700 font-bold dark:text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
+                EXECUTOR
+              </h4>
+          <div className='flex items-center gap-2 '>
+          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="assignment" size="md"/> semaphore-project</BadgeButton>
+          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="code" size="md"/> semaphore.yml</BadgeButton>
+          </div>
+          </div>
+      ))}
       <Handle
         type="target"
         position={Position.Left}

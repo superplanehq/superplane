@@ -5,6 +5,7 @@ import { MaterialSymbol } from './lib/MaterialSymbol/material-symbol';
 import { Button } from './lib/Button/button';
 import { Input } from './lib/Input/input';
 import { Field, Label } from './lib/Fieldset/fieldset';
+import { Link } from './lib/Link/link';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
@@ -100,24 +101,30 @@ export function EventSourceWorkflowNodeReactFlow({
         role="article"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700">
+        <div className="flex flex-col p-4 border-b border-gray-200 dark:border-zinc-700">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center">
+           
               {data.icon === 'semaphore' ? (
                 <img width={24} height={24} src='https://semaphoreci.com/favicon.ico' alt="Semaphore" />
               ) : (
                 <img width={24} height={24} src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
               )}
-            </div>
+         
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {data.title}
             </h3>
+            
           </div>
+          <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-4'>
+              <Link className='text-xs flex items-center gap-2' href="#">
+                <MaterialSymbol name="deployed_code" size="sm" className="text-gray-600 dark:text-blue-300"/>{data.cluster}
+              </Link>
+            </div>
         </div>
 
         {/* Cluster Section */}
         {data.cluster && (
-          <div className="px-4 py-3 pb-0">
+          <div className="px-4 py-3 pb-0 hidden">
             <div className="text-blue-600 dark:text-blue-400 font-medium">
               {data.cluster}
             </div>

@@ -225,6 +225,273 @@ const mockQueue: QueueItem[] = [
   }
 ];
 
+const mockHistoryRuns: RunData[] = [
+  {
+    id: 'hist-1',
+    name: 'kj3f9d8s2-wr5e7t1q4-mn6b8h2v',
+    status: 'success',
+    timestamp: 'Aug 1, 2025 14:23:12',
+    duration: '00h 02m 45s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '8f23d91',
+      Image: 'v.2.1.3',
+      Environment: 'production'
+    },
+    outputs: {
+      Code: '8f23d91',
+      Image: 'v.2.1.3',
+      DeploymentId: 'dep-8f23d91',
+      Status: 'deployed'
+    }
+  },
+  {
+    id: 'hist-2',
+    name: 'pl9x4k7m1-qr8t6w3e2-df5g9j1h',
+    status: 'failed',
+    timestamp: 'Aug 1, 2025 13:45:33',
+    duration: '00h 01m 12s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '4d82f17',
+      Image: 'v.1.9.2',
+      TestSuite: 'integration'
+    }
+  },
+  {
+    id: 'hist-3',
+    name: 'gh4j7k2l8-st9u6v3w1-cd2f5n7m',
+    status: 'success',
+    timestamp: 'Aug 1, 2025 12:18:47',
+    duration: '00h 03m 21s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: 'a95c6e8',
+      Image: 'v.2.0.1',
+      Branch: 'feature/auth'
+    },
+    outputs: {
+      Code: 'a95c6e8',
+      Image: 'v.2.0.1',
+      BuildId: 'build-a95c6e8',
+      ArtifactUrl: 'https://artifacts.ex'
+    }
+  },
+  {
+    id: 'hist-4',
+    name: 'xr8s5t2w9-mn4b7g3k6-qj1p8l5h',
+    status: 'failed',
+    timestamp: 'Aug 1, 2025 11:02:15',
+    duration: '00h 00m 58s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '2e71b94',
+      Image: 'v.1.8.5',
+      Database: 'postgresql'
+    }
+  },
+  {
+    id: 'hist-5',
+    name: 'vb3n6m9k2-ht5g8f1j4-pr7s4w6q',
+    status: 'success',
+    timestamp: 'Aug 1, 2025 10:34:28',
+    duration: '00h 04m 17s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: 'f18c542',
+      Image: 'v.2.2.0',
+      Config: 'staging'
+    },
+    outputs: {
+      Code: 'f18c542',
+      Image: 'v.2.2.0',
+      ServiceUrl: 'https://staging.example.com',
+      HealthCheck: 'passed'
+    }
+  },
+  {
+    id: 'hist-6',
+    name: 'fg2j5h8k1-dr4t7w9e3-mk6n3b5l',
+    status: 'success',
+    timestamp: 'Aug 1, 2025 09:56:44',
+    duration: '00h 02m 33s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '6d9a3f7',
+      Image: 'v.1.7.8',
+      Memory: '2GB'
+    },
+    outputs: {
+      Code: '6d9a3f7',
+      Image: 'v.1.7.8',
+      ContainerId: 'cnt-6d9a3f7',
+      Port: '8080'
+    }
+  },
+  {
+    id: 'hist-7',
+    name: 'ql8w1e4r7-zx6c9v2b5-nm3g6j9h',
+    status: 'failed',
+    timestamp: 'Aug 1, 2025 08:41:52',
+    duration: '00h 01m 44s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '9c4e8b1',
+      Image: 'v.1.6.3',
+      Timeout: '30s'
+    }
+  },
+  {
+    id: 'hist-8',
+    name: 'tr5y8u1i4-op2s6d9f3-gh7k4l8m',
+    status: 'success',
+    timestamp: 'Aug 1, 2025 07:29:16',
+    duration: '00h 03m 07s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: 'b8f2d67',
+      Image: 'v.2.3.1',
+      Replicas: '3'
+    },
+    outputs: {
+      Code: 'b8f2d67',
+      Image: 'v.2.3.1',
+      LoadBalancer: 'lb-b8f2d67',
+      Replicas: '3'
+    }
+  },
+  {
+    id: 'hist-9',
+    name: 'bn4m7v2c8-wq9e3r6t1-xz5s8f2j',
+    status: 'failed',
+    timestamp: 'Jul 31, 2025 23:15:39',
+    duration: '00h 02m 23s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '7a3c9e5',
+      Image: 'v.1.5.2',
+      Region: 'us-west-2'
+    }
+  },
+  {
+    id: 'hist-10',
+    name: 'lk6p9o2i5-df3g6h9j4-qw8e1r7t',
+    status: 'success',
+    timestamp: 'Jul 31, 2025 22:47:08',
+    duration: '00h 05m 12s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: 'e5f8c92',
+      Image: 'v.2.4.0',
+      Volume: '10GB'
+    },
+    outputs: {
+      Code: 'e5f8c92',
+      Image: 'v.2.4.0',
+      VolumeId: 'vol-e5f8c92',
+      MountPath: '/data'
+    }
+  },
+  {
+    id: 'hist-11',
+    name: 'mx8z3c6v1-hy4j7k2l9-rt6u3i8o',
+    status: 'success',
+    timestamp: 'Jul 31, 2025 21:33:54',
+    duration: '00h 02m 48s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '3d7b4f8',
+      Image: 'v.1.9.7',
+      Cache: 'enabled'
+    },
+    outputs: {
+      Code: '3d7b4f8',
+      Image: 'v.1.9.7',
+      CacheKey: 'cache-3d7b4f8',
+      Size: '2.3GB'
+    }
+  },
+  {
+    id: 'hist-12',
+    name: 'pq2w5e8r1-sd4f7g9h6-jk3l6m2n',
+    status: 'failed',
+    timestamp: 'Jul 31, 2025 20:19:27',
+    duration: '00h 01m 35s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '1f9e6a4',
+      Image: 'v.1.4.1',
+      Network: 'bridge'
+    }
+  },
+  {
+    id: 'hist-13',
+    name: 'cv7b4n1m8-xl5z2a9s6-qw3e7r1t',
+    status: 'success',
+    timestamp: 'Jul 31, 2025 19:02:43',
+    duration: '00h 03m 56s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '8c2e5d9',
+      Image: 'v.2.1.5',
+      SSL: 'enabled'
+    },
+    outputs: {
+      Code: '8c2e5d9',
+      Image: 'v.2.1.5',
+      Certificate: 'cert-8c2e5d9',
+      Domain: 'api.example.com'
+    }
+  },
+  {
+    id: 'hist-14',
+    name: 'hg9f6d3s2-jk4l7m1n8-po5i2u7y',
+    status: 'failed',
+    timestamp: 'Jul 31, 2025 18:45:19',
+    duration: '00h 00m 42s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '4a1f3c7',
+      Image: 'v.1.3.9',
+      Backup: 'daily'
+    }
+  },
+  {
+    id: 'hist-15',
+    name: 'rt3y6u9i2-as5df8gh1-zx4cv7bn',
+    status: 'success',
+    timestamp: 'Jul 31, 2025 17:38:05',
+    duration: '00h 04m 29s',
+    project: 'Semaphore project',
+    pipeline: 'Pipeline name',
+    inputs: {
+      Code: '6e9b2f5',
+      Image: 'v.2.0.8',
+      Workers: '5'
+    },
+    outputs: {
+      Code: '6e9b2f5',
+      Image: 'v.2.0.8',
+      QueueId: 'queue-6e9b2f5',
+      Workers: '5'
+    }
+  }
+];
+
 export function NodeDetailsSidebar({
   nodeId,
   nodeTitle = 'Sync Cluster',
@@ -239,6 +506,7 @@ export function NodeDetailsSidebar({
   const [activeTab, setActiveTab] = useState<'activity' | 'history' | 'settings'>('activity');
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedQueue, setExpandedQueue] = useState<Set<string>>(new Set());
+  const [expandedHistoryRuns, setExpandedHistoryRuns] = useState<Set<string>>(new Set());
   const [isManagingQueue, setIsManagingQueue] = useState(false);
   const [queueItems, setQueueItems] = useState(mockQueue);
 
@@ -281,6 +549,18 @@ export function NodeDetailsSidebar({
         newSet.delete(queueId);
       } else {
         newSet.add(queueId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleHistoryRunExpansion = (runId: string) => {
+    setExpandedHistoryRuns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(runId)) {
+        newSet.delete(runId);
+      } else {
+        newSet.add(runId);
       }
       return newSet;
     });
@@ -353,15 +633,13 @@ export function NodeDetailsSidebar({
            <MaterialSymbol name="input" size="md" className="text-gray-700 dark:text-zinc-400" />
          </div>
          <div className="flex-1">
-           <span className="text-sm font-semibold mb-2 block dark:text-white">
-             Inputs
-           </span>
+         <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Inputs</div>
            <div className="space-y-1">
              {Object.entries(inputs || {}).map(([key, value]) => (
                <div key={key} className="flex items-center justify-between">
                  <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">{key}</span>
-                 <div className="flex items-center gap-2">
-                   <Badge className='font-mono !text-xs'>
+                 <div className="flex items-center gap-2 truncate">
+                   <Badge className='font-mono !text-xs truncate'>
                      {value}
                    </Badge>
                  
@@ -380,9 +658,7 @@ export function NodeDetailsSidebar({
               <MaterialSymbol name="output" size="md" className="text-gray-700 dark:text-zinc-400" />
             </div>
             <div className="flex-1">
-              <span className="text-sm font-semibold mb-2 block dark:text-white">
-                Outputs
-              </span>
+              <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Outputs</div>
               <div className="space-y-1">
                 {Object.entries(outputs).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between">
@@ -573,16 +849,32 @@ export function NodeDetailsSidebar({
                         
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
-                            
-                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+                            <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                              <div>
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Project</div>
+                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">semaphore-project</Link>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Pipeline</div>
+                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">.semaphore.yml</Link>
+                              </div>
+                              <div>
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Duration</div>
+                                <div className="font-medium text-gray-900 dark:text-zinc-300 font-mono">00h 00m 25s</div>
+                              </div>
+                              <div className="">
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Started on</div>
+                                <div className="font-medium text-gray-900 dark:text-zinc-300">Jan 16 2022 10:23:45</div>
+                              </div>
+                            </div>
+                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900 hidden">
                               <div className="flex items-start gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
                                   <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-zinc-400" />
                                 </div>
+                                
                                 <div className="flex-1">
-                                  <span className="text-sm font-semibold mb-2 block dark:text-white">
-                                    Execution details
-                                  </span>
+                                  <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Execution Details</div>
                                   <div className="space-y-1 flex flex-col text-xs">
                                   <div className="flex items-center justify-between">
                                     <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Project</span>
@@ -768,8 +1060,98 @@ export function NodeDetailsSidebar({
         )}
         
         {activeTab === 'history' && (
-          <div className="p-4">
-            <Text className="text-gray-500 dark:text-zinc-400">History view coming soon...</Text>
+          <div className="p-4 space-y-6">
+            {/* Historical Runs */}
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                  HISTORICAL RUNS ({mockHistoryRuns.length})
+                </Text>
+              </div>
+              
+              <div className="space-y-3">
+                {mockHistoryRuns.map((run) => {
+                  const statusConfig = getStatusConfig(run.status);
+                  const isExpanded = expandedHistoryRuns.has(run.id);
+                  
+                  return (
+                    <div key={run.id} className={"border-b border-l border-r border-gray-200 dark:border-zinc-700 cursor-pointer "+statusConfig.bgColor + " " + statusConfig.borderColor } >
+                      <div 
+                        className="p-3"
+                        onClick={() => toggleHistoryRunExpansion(run.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 truncate pr-2">
+                              
+                              <MaterialSymbol 
+                                name={statusConfig.icon} 
+                                size="lg" 
+                                className={statusConfig.iconColor}
+                              />
+                            <span className="font-medium truncate text-sm dark:text-white">{run.name}</span>
+                         
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {!isExpanded && (
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">
+                                {run.timestamp.includes('Aug 1, 2025') ? 
+                                  run.timestamp.split(' ')[3] : 
+                                  run.timestamp.includes('Jul 31, 2025') ? 'Yesterday' : run.timestamp}
+                              </span>
+                            )}
+                            <MaterialSymbol 
+                                name={isExpanded ? 'expand_less' : 'expand_more'} 
+                                size="lg" 
+                                className="text-gray-600 dark:text-zinc-400" 
+                              />
+                          </div>
+                        </div>
+                        
+                        {isExpanded && (
+                          <div className="mt-3 space-y-3">
+                            
+                            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-zinc-900/10 dark:bg-zinc-700 flex items-center justify-center hidden">
+                                  <MaterialSymbol name="timer" size="md" className="text-gray-700 dark:text-zinc-400" />
+                                </div>
+                                <div className="flex-1">
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Execution Details</div>
+
+                                  <div className="space-y-1 flex flex-col text-xs">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Project</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
+                                      {run.project}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Started on</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
+                                      {run.timestamp}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs text-gray-600 dark:text-zinc-400 font-medium">Duration</span>
+                                    <div className="flex items-center gap-2 font-mono dark:text-zinc-300">
+                                      {run.duration}
+                                    </div>
+                                  </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          
+                            {renderInputsOutputs2(run.inputs, run.outputs)}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
         

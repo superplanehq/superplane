@@ -511,19 +511,19 @@ export function CanvasEditorPage({
             events: [
               {
                 id: 'event-1',
-                url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+                url: 'https://hooks.kubernetes.com/semaphore/semaphore/semaphore',
                 type: 'webhook',
                 enabled: true
               },
               {
                 id: 'event-2',
-                url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+                url: 'https://hooks.kubernetes.com/semaphore/semaphore/semaphore',
                 type: 'webhook',
                 enabled: true
               },
               {
                 id: 'event-3',
-                url: 'https://hooks.semaphoreci.com/semaphore/semaphore/semaphore',
+                url: 'https://hooks.kubernetes.com/semaphore/semaphore/semaphore',
                 type: 'webhook',
                 enabled: true
               }
