@@ -139,7 +139,7 @@ export function YamlCodeEditor({
               minimap: { enabled: false },
               fontSize: 14,
               lineNumbers: 'on',
-              rulers: [80],
+              rulers: [],
               wordWrap: 'on',
               folding: true,
               bracketPairColorization: {

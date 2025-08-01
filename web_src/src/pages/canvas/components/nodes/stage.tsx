@@ -381,9 +381,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               <MaterialSymbol name="edit" size="md" />
             </button>
           )}
-          {props.data.isDraft && (
-            <span className="text-black bg-gray-200 px-2 py-1 rounded-md text-xs">Draft</span>
-          )}
         </div>
       </div>
 
