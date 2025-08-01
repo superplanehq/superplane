@@ -6,6 +6,7 @@ import { Button } from './lib/Button/button';
 import { Input } from './lib/Input/input';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { Link } from './lib/Link/link';
+import { BadgeButton } from './lib/Badge/badge';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
@@ -116,9 +117,10 @@ export function EventSourceWorkflowNodeReactFlow({
             
           </div>
           <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-4'>
-              <Link className='text-xs flex items-center gap-2' href="#">
-                <MaterialSymbol name="deployed_code" size="sm" className="text-gray-600 dark:text-blue-300"/>{data.cluster}
-              </Link>
+              <BadgeButton color='zinc' href='#' className='!text-xs'>
+                <MaterialSymbol name="deployed_code" size="md"/> {data.cluster}
+              </BadgeButton>
+              
             </div>
         </div>
 

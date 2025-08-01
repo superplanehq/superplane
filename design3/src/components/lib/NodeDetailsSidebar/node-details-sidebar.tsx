@@ -495,7 +495,7 @@ const mockHistoryRuns: RunData[] = [
 export function NodeDetailsSidebar({
   nodeId,
   nodeTitle = 'Sync Cluster',
-  nodeIcon = 'sync',
+  nodeIcon = 'semaphore',
   isOpen = false,
   onClose,
   className
@@ -777,10 +777,10 @@ export function NodeDetailsSidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 pb-2">
         <div className="flex items-center gap-3">
-          <MaterialSymbol name={nodeIcon} size="lg" className="text-gray-700 dark:text-zinc-300" />
-          <Subheading level={3} className="text-lg font-semibold text-gray-900 dark:text-white">
-            {nodeTitle}
-          </Subheading>
+        <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+           
+        <h3 className="font-semibold text-gray-900 dark:text-white">{nodeTitle}</h3>
+
         </div>
         <Button plain onClick={onClose}>
           <MaterialSymbol name="close" size="lg" className="text-gray-500 dark:text-zinc-400" />
@@ -849,7 +849,11 @@ export function NodeDetailsSidebar({
                         
                         {isExpanded && (
                           <div className="mt-3 space-y-3">
-                            <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                            <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
+                              <div className="col-span-2">
+                                <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Label</div>
+                                <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">https://semaphoreci.com</Link>
+                              </div>
                               <div>
                                 <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Project</div>
                                 <Link href="#" className="font-medium text-blue-600 dark:text-blue-400">semaphore-project</Link>
@@ -862,7 +866,7 @@ export function NodeDetailsSidebar({
                                 <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Duration</div>
                                 <div className="font-medium text-gray-900 dark:text-zinc-300 font-mono">00h 00m 25s</div>
                               </div>
-                              <div className="">
+                              <div>
                                 <div className="text-xs text-gray-600 dark:text-zinc-400 uppercase tracking-wide mb-1">Started on</div>
                                 <div className="font-medium text-gray-900 dark:text-zinc-300">Jan 16 2022 10:23:45</div>
                               </div>

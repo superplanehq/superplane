@@ -2384,13 +2384,9 @@ export function WorkflowNodeAccordion({
           </div>
 
           <h4 className="text-xs text-gray-600 dark:text-zinc-300 mt-4">{data.description}</h4>
-          <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300'>
-            <Link className='text-xs flex items-center gap-2' href="#">
-              <MaterialSymbol name="assignment" size="sm" className="text-gray-600 dark:text-blue-300"/>semaphore-project
-            </Link>
-            <Link className='text-xs flex items-center gap-2' href="#">
-              <MaterialSymbol name="automation" size="sm" className="text-gray-600 dark:text-blue-300"/>.semaphore.yml
-            </Link>
+          <div className='flex items-center gap-3 mt-1 text-blue-600 dark:text-blue-300 mt-2'>
+          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="assignment" size="md"/> semaphore-project</BadgeButton>
+          <BadgeButton color='zinc' href='#' className='!text-xs'><MaterialSymbol name="code" size="md"/> semaphore.yml</BadgeButton>
             </div>
         </div>
       )}
