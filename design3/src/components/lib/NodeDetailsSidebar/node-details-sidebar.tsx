@@ -52,7 +52,7 @@ interface NodeDetailsSidebarProps {
 const mockRuns2: RunData[] = [
   {
     id: 'run-2',
-    name: 'Run #2',
+    name: 'alsdkfjl43rlkewj-srlfksdj3r-sdlfkjwer',
     status: 'running',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 00m 25s',
@@ -66,7 +66,7 @@ const mockRuns2: RunData[] = [
   },
   {
     id: 'run-332',
-    name: 'Run #3',
+    name: '0234riefkjjsfgd-srlfksdj3r-sdlfkjwer',
     status: 'failed',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 10m 35s',
@@ -80,7 +80,7 @@ const mockRuns2: RunData[] = [
   },
   {
     id: 'run-1',
-    name: 'Run #1',
+    name: '23rsdf322ertf-srlfksdj3r-sdlfkjwer',
     status: 'success',
     timestamp: 'Jan 16, 2022 10:23:45',
     duration: '00h 00m 25s',
@@ -549,19 +549,19 @@ export function NodeDetailsSidebar({
                         onClick={() => toggleRunExpansion(run.id)}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 truncate pr-2">
                               
                               <MaterialSymbol 
                                 name={statusConfig.icon} 
                                 size="lg" 
                                 className={statusConfig.iconColor}
                               />
-                            <span className="font-bold truncate text-sm dark:text-white">{run.name}</span>
+                            <span className="font-medium truncate text-sm dark:text-white">{run.name}</span>
                          
                           </div>
                           <div className="flex items-center gap-3">
                             {!isExpanded && (
-                              <span className="text-xs text-gray-500 dark:text-zinc-400">2 min ago</span>
+                              <span className="text-xs text-gray-500 dark:text-zinc-400 whitespace-nowrap">2 min ago</span>
                             )}
                             <MaterialSymbol 
                                 name={isExpanded ? 'expand_less' : 'expand_more'} 

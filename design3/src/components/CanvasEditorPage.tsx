@@ -837,97 +837,8 @@ const computedEdges = edges.map(edge => {
     ))
   }
 
-  const [navigationParam, setNavigationParam] = useState<string>('dropdown'); // default to center
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   
-  // Custom integration component for GitHub repository
-  const GitHubIntegration = ({ data, selected }) => {
-    // Select header color and icon based on integrationType
-    const isKubernetes = data.integrationType === 'kubernetes';
-    const isS3 = data.repoName === 'buckets/my-app-data';
-    // Add white shadow style
-    const nodeStyle = {
-      boxShadow: '0 4px 12px rgba(128,128,128,0.20)' // White shadow
-    };
-    
-    return (
-      <div className={`bg-white roundedg border ${selected ? 'ring-2 ring-blue-500' : 'border-gray-200'}`} style={nodeStyle}>
-    
-      <div className='pa3 flex justify-between bb b--lightest-gray'>
-      <div className="flex items-center"><div className="d-inline-block mr-2 w-[24px]">
-      {isKubernetes ? (
-        <img src={kubernetes}/>
-      ) : isS3 ? (
-        <img src={s3}/>
-      ) : (
-        <img src={github}/>
-      )}
-      </div>
-      <p className="mb0 b ml1">Sync Cluster</p>
-      </div>
-      </div>
-      <div className={`flex items-center bg-white black rounded-tg hidden`}>
-      <span className={` font-semibold text-base ${isKubernetes ? 'white' : isS3 ? 'black' : 'white'}`}>
-      {isKubernetes ? 'prod-cluster' : data.repoName}
-      </span>
-      </div>
-      <div className="repo-info">
-      <div className="mb-2">
-      <a href={data.repoUrl} className="link dark-indigo underline-hover flex items-center">
-      {data.repoName}
-      </a>
-      </div>
-      <div className="flex items-center w-full justify-between">
-          <div className="ttu f7">Events</div>
-        </div>
-      </div>
-      <div className="w-full p-3 pt-0">
-      
-      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
-      <Tippy content="Need manual approval" placement="top">
-        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
-      </Tippy>
-      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
-      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
-      </a>
-      </div>
-      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
-      <Tippy content="Need manual approval" placement="top">
-        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
-      </Tippy>
-      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
-      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
-      </a>
-      </div>
-      <div className='flex items-center w-full p-2 bg-gray-100 br2 mb1'>
-      <Tippy content="Need manual approval" placement="top">
-        <i className="material-symbols-outlined f3 fill br-100 black bg-washed-green black-60 p2 mr2">bolt</i>
-      </Tippy>
-      <a href="#" className="min-w-0 fw6 text-sm font-normal flex items-center underline-hover">
-      <div className='truncate'>https://hooks.semaphoreci.com/semaphore/semaphore/semaphore</div>
-      </a>
-      </div>
-     
-      
-      </div>
-      <Handle 
-      type="source" 
-      position={Position.Right} 
-      style={{ background: isKubernetes ? '#2563eb' : '#000', width: 10, height: 10 }} 
-      />
-      </div>
-    );
-  };
-  const newChainStagePositions = [
-    { x: -400, y: -730 }, // prod-cluster (Kubernetes Integration)
-    { x: 100, y: -800 },  // Stage 1 (straight right)
-    { x: 600, y: -1000 },  // Stage 2 (up and right, parallel)
-    { x: 600, y: -600 },  // Stage 3 (down and right, parallel)
-    { x: 1150, y: -800 }, // Stage 4 (centered between 2 and 3, further right)
-  ];
- 
-  
-
   
   // Initial listeners configuration - connecting the stages
  
@@ -940,12 +851,6 @@ const computedEdges = edges.map(edge => {
   const [editingSecret, setEditingSecret] = useState<any>(null);
   const [isCreatingSecret, setIsCreatingSecret] = useState(false);
 
-  // Get navigation parameter from URL
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const navParam = urlParams.get('nav') || 'left';
-    setNavigationParam(navParam);
-  }, []);
 
   // Mock data for canvas members
   const canvasMembers = [
@@ -1302,7 +1207,7 @@ const computedEdges = edges.map(edge => {
         /* React Flow Canvas */
         <div className="flex-1 flex relative">
           {/* Component Sidebar */}
-          <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
+          <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 hidden'> 
             <ComponentSidebar
               isOpen={true}
               onClose={() => setSidebarOpen(false)}
