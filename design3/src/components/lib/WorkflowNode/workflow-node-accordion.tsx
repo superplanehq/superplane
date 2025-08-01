@@ -2371,7 +2371,8 @@ export function WorkflowNodeAccordion({
       <div className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-zinc-700">
         <div className="flex items-start gap-2">
           <div className='w-10 h-10 bg-zinc-100 dark:bg-zinc-700 rounded-lg flex items-center justify-center'>
-          <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />
+          {data.icon == 'semaphore' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt="" />}
+          {data.icon == 'openAI' && <img width={24} src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAAAAABXZoBIAAABEElEQVR4AbTJIWyDQACG0d+rWsxENQ6Jwi0YFLIWRTKFxecc6pIzJzF4QTKDT23lSby5BPUt6ZJe2i1ze/aJP/x/+ly5/z2PU7ne1rIYm4/tR9YDsNeaFqP3l9wFx6AJgPLylLN6rrpEcBaiQko6dR/YDq4659po55SL8D1ujI0MLGpbl/K84nr8SWbSCBj5lNrvWewQCy1wU0gZsDV+ABi603nHtI9sJ0KW9d/paCxBjwy6wawyQiwdg2VPiZeBY5S10j3XjJRNoxWMqn20DB4tKeeWTUWhDfqJsX9rSRl0gLUQe20McpCSSwWAUxdBgaek0rQ6lQEwFS/JZ1cNebWFrVaElInLlNmv0TNpYgIAMy6KDbFgKo8AAAAASUVORK5CYII=" alt="" />}
           </div>
           <div className='flex flex-col'> 
             <h3 className="font-semibold text-gray-900 dark:text-white">{data.title}</h3>
@@ -2399,7 +2400,7 @@ export function WorkflowNodeAccordion({
             className={clsx('mr-2', statusConfig.iconColor)}
           />
           <span className="font-medium text-sm text-gray-900 dark:text-white truncate">
-            {data.description || 'No description available'}
+            {data.runName || '2348932urejhwejkhr2304958ru2ioefwjh20389ruie'}
           </span>
         </div>
 
@@ -2427,7 +2428,7 @@ export function WorkflowNodeAccordion({
       <div className="p-4 dark:bg-zinc-800 rounded-b-lg">
         <h4 className="text-xs text-gray-700 font-bold dark:text-zinc-400 uppercase tracking-wide mb-2 flex items-center justify-between">
           NEXT IN QUEUE 
-          <span className="text-xs text-gray-500 dark:text-zinc-300 font-normal normal-case">+7 more</span>
+          <span className="text-xs text-gray-500 dark:text-zinc-300 font-normal normal-case">+{data.nodeNumber} more</span>
         </h4>
         <div className="space-y-2">
           {yamlConfig.spec.inputs && yamlConfig.spec.inputs.length > 0 && (
@@ -2437,13 +2438,13 @@ export function WorkflowNodeAccordion({
                   <MaterialSymbol name="how_to_reg" size="lg" className='text-orange-600 dark:text-orange-400' />
                 )}
                 <span className="text-sm text-gray-700 dark:text-gray-200 truncate font-medium">
-                  2dlsf32fwasdfd-asdfsdf-adsfasdf
+                  {data.queueTitle}
                 </span>
               </div>
               { !showIcons && (
               <Tippy content={<span className='text-sm border border-gray-200 dark:border-gray-700 bg-white dark:bg-zinc-700 p-2'>Need manual approval</span>} placement='top'>
                 <Button plain>
-                <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700 dark:text-orange-400' />
+                <MaterialSymbol name={data.queueIcon || 'pending'} size="md" className='text-orange-700 dark:text-orange-400' />
                 </Button>
               </Tippy>
               )}
@@ -2456,13 +2457,13 @@ export function WorkflowNodeAccordion({
       <Handle
         type="target"
         position={Position.Left}
-        className="!w-3 !h-3 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white"
+        className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
         aria-label="Input connection point"
       />
       <Handle
         type="source"
         position={Position.Right}
-        className="!w-3 !h-3 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white"
+        className="!w-2 !h-12 !bg-blue-500 dark:!bg-blue-600 !border-2 !border-white z-50 !rounded-md"
         aria-label="Output connection point"
       />
     </div>

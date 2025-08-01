@@ -19,9 +19,14 @@ export interface WorkflowNodeData {
   id: string
   title: string
   description?: string
-  type: 'stage' | 'event'
+  type: 'stage' | 'event' | 'eventSource'
   status?: 'pending' | 'running' | 'success' | 'error' | 'disabled'
   config?: Record<string, any>
+  icon?: string
+  nodeNumber?: number
+  queueIcon?: string
+  queueTitle?: string
+  runName?: string
   // YAML configuration properties
   yamlConfig?: {
     apiVersion: string

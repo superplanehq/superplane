@@ -102,33 +102,22 @@ export function EventSourceWorkflowNodeReactFlow({
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-              <MaterialSymbol 
-                name={data.icon || 'sync'} 
-                size="md" 
-                className="text-blue-600 dark:text-blue-400" 
-              />
+            <div className="w-10 h-10 rounded-lg bg-zinc-100 dark:bg-zinc-900 flex items-center justify-center">
+              {data.icon === 'semaphore' ? (
+                <img width={24} height={24} src='https://semaphoreci.com/favicon.ico' alt="Semaphore" />
+              ) : (
+                <img width={24} height={24} src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
+              )}
             </div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
               {data.title}
             </h3>
           </div>
-          <Button
-            plain
-            onClick={handleEditToggle}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
-          >
-            <MaterialSymbol 
-              name="edit" 
-              size="sm" 
-              className="text-gray-500 dark:text-zinc-400" 
-            />
-          </Button>
         </div>
 
         {/* Cluster Section */}
         {data.cluster && (
-          <div className="px-4 py-3 border-b border-gray-200 dark:border-zinc-700">
+          <div className="px-4 py-3 pb-0">
             <div className="text-blue-600 dark:text-blue-400 font-medium">
               {data.cluster}
             </div>
@@ -149,7 +138,7 @@ export function EventSourceWorkflowNodeReactFlow({
                 <MaterialSymbol 
                   name="bolt" 
                   size="sm" 
-                  className="text-green-600 dark:text-green-400 flex-shrink-0" 
+                  className="text-zinc-800 dark:text-zinc-400 flex-shrink-0" 
                 />
                 <span className="text-sm text-gray-800 dark:text-zinc-200 truncate font-mono">
                   {truncateUrl(event.url)}

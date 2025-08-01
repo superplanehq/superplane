@@ -59,10 +59,9 @@ const mockRuns2: RunData[] = [
     project: 'Semaphore project',
     pipeline: 'Pipeline name',
     inputs: {
-      Code: '1045a77',
-      Image: 'v.1.2.1',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
+      Code: '34234234',
+      Image: 'v.1.3.1',
+      Terraform: '32.32'
     }
   },
   {
@@ -74,10 +73,9 @@ const mockRuns2: RunData[] = [
     project: 'Semaphore project',
     pipeline: 'Pipeline name',
     inputs: {
-      Code: '1045a77',
-      Image: 'v.1.2.1',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
+      Code: '34324ew342523re',
+      Image: 'v.2.3.1',
+      Terraform: '32.32'
     }
   },
   {
@@ -91,14 +89,12 @@ const mockRuns2: RunData[] = [
     inputs: {
       Code: '1045a77',
       Image: 'v.1.2.0',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
+      Terraform: '32.32'
     },
     outputs: {
       Code: '1045a77',
       Image: 'v.1.2.0',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
+      Terraform: '32.32'
     }
   }
 ];
@@ -119,8 +115,7 @@ const mockQueue: QueueItem[] = [
     inputs: {
       Code: '1045a77',
       Image: 'v.1.2.3',
-      Terraform: '32.32',
-      Something: 'adsfasdf'
+      Terraform: '32.32'
     }
   },
   {
