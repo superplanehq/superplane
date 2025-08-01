@@ -346,15 +346,12 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
-	stageExecutor, err := stage.GetExecutor()
-	require.NoError(t, err)
-
 	execution := support.CreateExecution(t, r.Source, stage)
 	superplaneToken, err := signer.Generate(execution.ID.String(), time.Hour)
 	require.NoError(t, err)
 
 	workflowID := uuid.NewString()
-	_, err = execution.AddResource(workflowID, "workflow", *stageExecutor.ResourceID)
+	_, err = execution.AddResource(workflowID, "workflow", *stage.ResourceID)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
