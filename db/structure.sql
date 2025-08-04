@@ -285,7 +285,8 @@ CREATE TABLE public.resources (
     name character varying(128) NOT NULL,
     integration_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone
+    updated_at timestamp without time zone,
+    parent_id uuid
 );
 
 
@@ -1004,7 +1005,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250731205910	f
+20250804194751	f
 \.
 
 

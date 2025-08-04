@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -61,12 +62,22 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return eventSource.UpdateState(models.EventSourceStateReady)
 	}
 
-	resource, err := models.FindResourceByID(*eventSource.ResourceID)
+	parent, err := models.FindResourceByID(*eventSource.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error finding integration resource: %v", err)
 	}
 
-	integration, err := models.FindIntegrationByID(resource.IntegrationID)
+	children, err := parent.FindChildren()
+	if err != nil {
+		return fmt.Errorf("error finding child resources: %v", err)
+	}
+
+	childResources := []integrations.Resource{}
+	for _, c := range children {
+		childResources = append(childResources, &c)
+	}
+
+	integration, err := models.FindIntegrationByID(parent.IntegrationID)
 	if err != nil {
 		return fmt.Errorf("error finding integration: %v", err)
 	}
@@ -82,10 +93,13 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 	}
 
 	resources, err := integrationImpl.SetupWebhook(integrations.WebhookOptions{
-		Resource: resource,
-		URL:      fmt.Sprintf("%s/api/v1/sources/%s/%s", w.BaseURL, eventSource.ID.String(), integration.Type),
-		ID:       eventSource.ID.String(),
-		Key:      key,
+		Parent:     parent,
+		Children:   childResources,
+		URL:        fmt.Sprintf("%s/api/v1/sources/%s/%s", w.BaseURL, eventSource.ID.String(), integration.Type),
+		ID:         eventSource.ID.String(),
+		Key:        key,
+		EventTypes: w.getEventTypes(eventSource),
+		Internal:   eventSource.Scope == models.EventSourceScopeInternal,
 	})
 
 	if err != nil {
@@ -99,20 +113,42 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 	//
 	resourceRecords := []models.Resource{}
 	for _, resource := range resources {
+
+		//
+		// If the resource already exists, no need to insert it again.
+		//
+		if slices.ContainsFunc(childResources, func(r integrations.Resource) bool {
+			return r.Id() == resource.Id()
+		}) {
+			continue
+		}
+
 		resourceRecords = append(resourceRecords, models.Resource{
 			ExternalID:    resource.Id(),
 			ResourceName:  resource.Name(),
 			IntegrationID: integration.ID,
 			ResourceType:  resource.Type(),
+			ParentID:      &parent.ID,
 		})
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		err := tx.Create(&resourceRecords).Error
-		if err != nil {
-			return err
+		if len(resourceRecords) > 0 {
+			err := tx.Create(&resourceRecords).Error
+			if err != nil {
+				return err
+			}
 		}
 
 		return eventSource.UpdateStateInTransaction(tx, models.EventSourceStateReady)
 	})
+}
+
+func (w *PendingEventSourcesWorker) getEventTypes(eventSource models.EventSource) []string {
+	eventTypes := []string{}
+	for _, eventType := range eventSource.EventTypes {
+		eventTypes = append(eventTypes, eventType.Type)
+	}
+
+	return eventTypes
 }

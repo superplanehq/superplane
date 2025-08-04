@@ -45,7 +45,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 	defer r.Close()
 
-	source, key, err := builders.NewEventSourceBuilder(r.Encryptor).
+	source, key, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
 		InCanvas(r.Canvas).
 		WithName("demo-project").
 		WithScope(models.EventSourceScopeExternal).

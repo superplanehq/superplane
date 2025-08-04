@@ -258,7 +258,7 @@ func Test__CreateEventSource(t *testing.T) {
 		// Create internal source for integration resource
 		//
 		internalName := support.RandomName("internal")
-		internalSource, _, err := builders.NewEventSourceBuilder(r.Encryptor).
+		internalSource, _, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
 			InCanvas(r.Canvas).
 			WithName(internalName).
 			WithScope(models.EventSourceScopeInternal).

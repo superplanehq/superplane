@@ -31,6 +31,10 @@ func (e *GitHubEvent) Type() string {
 	return e.EventType
 }
 
+func (i *GitHubEventHandler) EventTypes() []string {
+	return github.MessageTypes()
+}
+
 func (i *GitHubEventHandler) Handle(data []byte, header http.Header) (integrations.Event, error) {
 	signature := header.Get("X-Hub-Signature-256")
 	if signature == "" {
