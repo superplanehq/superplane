@@ -24,7 +24,6 @@ export function EventSourceEditModeContent({
   eventSourceType = 'webhook',
   onDataChange
 }: EventSourceEditModeContentProps) {
-  // Component-specific state
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
@@ -46,7 +45,6 @@ export function EventSourceEditModeContent({
     return Object.keys(errors).length === 0;
   };
 
-  // Shared state management
   const {
     openSections,
     setOpenSections,
@@ -97,7 +95,6 @@ export function EventSourceEditModeContent({
     if (onDataChange) {
       const spec: SuperplaneEventSourceSpec = {};
 
-      // For semaphore event sources, integration is required
       if (eventSourceType === 'semaphore' && selectedIntegration) {
         spec.integration = selectedIntegration;
 
@@ -115,7 +112,6 @@ export function EventSourceEditModeContent({
     }
   }, [selectedIntegration, resourceType, resourceName, eventSourceType, onDataChange, handleDataChange]);
 
-  // Revert function for each section
   const revertSection = (section: string) => {
     switch (section) {
       case 'integration':
@@ -135,10 +131,9 @@ export function EventSourceEditModeContent({
         domainType: integration.metadata?.domainType
       });
 
-      // Set default resource type based on integration type
-      if (integration.spec?.type === 'TYPE_SEMAPHORE') {
+      if (integration.spec?.type === 'semaphore') {
         setResourceType('project');
-      } else if (integration.spec?.type === 'TYPE_GITHUB') {
+      } else if (integration.spec?.type === 'github') {
         setResourceType('repository');
       }
     }

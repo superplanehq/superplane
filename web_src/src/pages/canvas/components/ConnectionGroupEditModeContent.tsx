@@ -13,28 +13,25 @@ import { ConnectionSelector } from './shared/ConnectionSelector';
 interface ConnectionGroupEditModeContentProps {
   data: ConnectionGroupNodeType['data'];
   currentConnectionGroupId?: string;
-  onDataChange?: (data: { 
-    name: string; 
-    description?: string; 
-    connections: SuperplaneConnection[]; 
-    groupByFields: GroupByField[]; 
-    timeout?: number; 
+  onDataChange?: (data: {
+    name: string;
+    description?: string;
+    connections: SuperplaneConnection[];
+    groupByFields: GroupByField[];
+    timeout?: number;
     timeoutBehavior?: SpecTimeoutBehavior;
     isValid: boolean;
   }) => void;
 }
 
 export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId, onDataChange }: ConnectionGroupEditModeContentProps) {
-  // Component-specific state
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [groupByFields, setGroupByFields] = useState<GroupByField[]>(data.groupBy?.fields || []);
   const [timeout, setTimeout] = useState<number | undefined>(undefined);
   const [timeoutBehavior, setTimeoutBehavior] = useState<SpecTimeoutBehavior>('TIMEOUT_BEHAVIOR_DROP');
 
-  // Validation (unused destructured variables removed)
   useValidation();
 
-  // Validation functions
   const validateGroupByField = (field: GroupByField): string[] => {
     const errors: string[] = [];
     if (!field.name || field.name.trim() === '') {
@@ -60,7 +57,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   const validateAllFields = () => {
     const errors: Record<string, string> = {};
 
-    // Validate connections
+
     connections.forEach((connection, index) => {
       const connectionErrors = validateConnection(connection);
       if (connectionErrors.length > 0) {
@@ -68,7 +65,6 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
       }
     });
 
-    // Validate group by fields
     groupByFields.forEach((field, index) => {
       const fieldErrors = validateGroupByField(field);
       if (fieldErrors.length > 0) {
@@ -76,17 +72,15 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
       }
     });
 
-    // Validate that we have at least one connection
     if (connections.length === 0) {
       errors.connections = 'At least one connection is required';
     }
 
-    // Validate that we have at least one group by field
+
     if (groupByFields.length === 0) {
       errors.groupByFields = 'At least one group by field is required';
     }
 
-    // Validate timeout if provided
     if (timeout !== undefined && timeout < 0) {
       errors.timeout = 'Timeout must be a positive number';
     }
@@ -94,7 +88,6 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     return Object.keys(errors).length === 0;
   };
 
-  // Shared state management
   const {
     openSections,
     setOpenSections,
@@ -116,19 +109,19 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     validateAllFields
   });
 
-  // Initialize open sections for connection group specific behavior
+
   useEffect(() => {
     setOpenSections(['general', 'connections', 'groupBy']);
   }, [setOpenSections]);
 
-  // Connection management
+
   const connectionManager = useConnectionManager({
     connections,
     setConnections,
     currentEntityId: currentConnectionGroupId
   });
 
-  // Array editors
+
   const connectionsEditor = useArrayEditor({
     items: connections,
     setItems: setConnections,
@@ -154,7 +147,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     errorPrefix: 'groupBy'
   });
 
-  // Sync component state with incoming data prop changes
+
   useEffect(() => {
     syncWithIncomingData(
       {
@@ -172,7 +165,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     );
   }, [data, syncWithIncomingData]);
 
-  // Notify parent of data changes with validation
+
   useEffect(() => {
     if (onDataChange) {
       handleDataChange({
@@ -186,7 +179,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     }
   }, [data.name, data.description, connections, groupByFields, timeout, timeoutBehavior, onDataChange, handleDataChange]);
 
-  // Revert function for each section
+
   const revertSection = (section: string) => {
     switch (section) {
       case 'connections':
@@ -244,7 +237,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                     onFilterOperatorToggle={connectionManager.toggleFilterOperator}
                     currentEntityId={currentConnectionGroupId}
                     validationError={validationErrors[`connection_${index}`]}
-                    showFilters={false} // Connection groups don't show filters
+                    showFilters={false}
                   />
                 }
               />
@@ -287,7 +280,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                 )}
                 editForm={
                   <div className="space-y-3">
-                    <ValidationField 
+                    <ValidationField
                       label="Field Name"
                       error={validationErrors[`groupBy_${index}`]}
                     >
@@ -299,7 +292,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`groupBy_${index}`]
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                           : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
+                          }`}
                       />
                     </ValidationField>
                     <ValidationField label="Expression">
@@ -311,7 +304,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                         className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`groupBy_${index}`]
                           ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                           : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
+                          }`}
                       />
                     </ValidationField>
                   </div>
@@ -338,7 +331,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           onRevert={revertSection}
         >
           <div className="space-y-3">
-            <ValidationField 
+            <ValidationField
               label="Timeout (seconds)"
               error={validationErrors.timeout}
             >
@@ -351,7 +344,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                 className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors.timeout
                   ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
                   : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                }`}
+                  }`}
               />
               <div className="text-xs text-zinc-500 mt-1">
                 How long to wait for all connections to send events with the same grouping fields
