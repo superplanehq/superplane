@@ -66,7 +66,9 @@ CREATE TABLE public.canvases (
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    deleted_at timestamp with time zone,
+    description text
 );
 
 
@@ -150,7 +152,8 @@ CREATE TABLE public.connection_groups (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone,
     updated_by uuid,
-    spec jsonb DEFAULT '{}'::jsonb NOT NULL
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    description text
 );
 
 
@@ -184,6 +187,7 @@ CREATE TABLE public.event_sources (
     resource_id uuid,
     state character varying(64) NOT NULL,
     scope character varying(64) NOT NULL,
+    description text,
     event_types jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
@@ -399,7 +403,8 @@ CREATE TABLE public.stages (
     input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL,
     secrets jsonb DEFAULT '[]'::jsonb NOT NULL,
     executor_type character varying(64) NOT NULL,
-    resource_id uuid
+    resource_id uuid,
+    description text
 );
 
 
@@ -715,6 +720,13 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+
+
+--
+-- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
 
 
 --

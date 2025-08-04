@@ -22,6 +22,7 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 
 	connectionGroup, err := r.Canvas.CreateConnectionGroup(
 		"test",
+		"test",
 		uuid.NewString(),
 		[]models.Connection{
 			{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},
@@ -134,7 +135,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 			IdOrName:       connectionGroup.ID.String(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
+					Name:        "updated-test",
+					Description: "updated-description",
 				},
 				Spec: &protos.ConnectionGroup_Spec{
 					Connections: []*protos.Connection{
@@ -160,6 +162,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 		assert.NotEmpty(t, response.ConnectionGroup.Metadata.UpdatedAt)
 		assert.NotEmpty(t, response.ConnectionGroup.Metadata.UpdatedBy)
 		require.NotNil(t, response.ConnectionGroup.Spec)
+		assert.Equal(t, "updated-test", response.ConnectionGroup.Metadata.Name)
+		assert.Equal(t, "updated-description", response.ConnectionGroup.Metadata.Description)
 		assert.Len(t, response.ConnectionGroup.Spec.Connections, 2)
 		assert.Len(t, response.ConnectionGroup.Spec.GroupBy.Fields, 2)
 	})

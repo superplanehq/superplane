@@ -59,6 +59,7 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 	//
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		req.ConnectionGroup.Metadata.Name,
+		req.ConnectionGroup.Metadata.Description,
 		userID,
 		connections,
 		*spec,
@@ -168,11 +169,12 @@ func serializeConnectionGroup(connectionGroup models.ConnectionGroup, connection
 	}
 
 	metadata := &pb.ConnectionGroup_Metadata{
-		Id:        connectionGroup.ID.String(),
-		Name:      connectionGroup.Name,
-		CanvasId:  connectionGroup.CanvasID.String(),
-		CreatedAt: timestamppb.New(*connectionGroup.CreatedAt),
-		CreatedBy: connectionGroup.CreatedBy.String(),
+		Id:          connectionGroup.ID.String(),
+		Name:        connectionGroup.Name,
+		Description: connectionGroup.Description,
+		CanvasId:    connectionGroup.CanvasID.String(),
+		CreatedAt:   timestamppb.New(*connectionGroup.CreatedAt),
+		CreatedBy:   connectionGroup.CreatedBy.String(),
 	}
 
 	if connectionGroup.UpdatedAt != nil {
