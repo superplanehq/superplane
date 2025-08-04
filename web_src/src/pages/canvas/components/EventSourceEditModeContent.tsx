@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef } from '@/api-client/types.gen';
-import { AccordionItem } from './AccordionItem';
-import { Label } from './Label';
-import { Field } from './Field';
-import { RevertButton } from './RevertButton';
-import { useIntegrations } from '../hooks/useIntegrations';
 import { Link } from '@/components/Link/link';
+import { useIntegrations } from '../hooks/useIntegrations';
+import { useEditModeState } from '../hooks/useEditModeState';
+import { EditableAccordionSection } from './shared/EditableAccordionSection';
+import { ValidationField } from './shared/ValidationField';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -25,46 +24,77 @@ export function EventSourceEditModeContent({
   eventSourceType = 'webhook',
   onDataChange
 }: EventSourceEditModeContentProps) {
-  const [openSections, setOpenSections] = useState<string[]>(['general', 'integration', 'webhook']);
-
-  // Original data state for change tracking
-  const [originalData] = useState({
-    integration: data.integration,
-    resource: data.resource,
-    integrationConfig: {} as Record<string, string | boolean>
-  });
-
+  // Component-specific state
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
   const [integrationConfig, setIntegrationConfig] = useState<Record<string, string | boolean>>({});
-  const [isInternalUpdate, setIsInternalUpdate] = useState(false);
 
-  // Sync component state with incoming data prop changes (e.g., from YAML editor)
-  // But only when it's not from our own internal updates
-  useEffect(() => {
-    if (!isInternalUpdate) {
-      setSelectedIntegration(data.integration);
-      setResourceType(data.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
-      setResourceName(data.resource?.name || '');
+  const validateAllFields = () => {
+    const errors: Record<string, string> = {};
+
+    if (eventSourceType === 'semaphore') {
+      if (!selectedIntegration) {
+        errors.integration = 'Integration is required for semaphore event sources';
+      }
+
+      if (!resourceName || resourceName.trim() === '') {
+        errors.resourceName = 'Project name is required';
+      }
     }
-    setIsInternalUpdate(false);
-  }, [data, eventSourceType, isInternalUpdate]);
 
-  // Fetch available integrations
+    return Object.keys(errors).length === 0;
+  };
+
+  // Shared state management
+  const {
+    openSections,
+    setOpenSections,
+    originalData,
+    validationErrors,
+    handleAccordionToggle,
+    isSectionModified,
+    handleDataChange,
+    syncWithIncomingData
+  } = useEditModeState({
+    initialData: {
+      integration: data.integration,
+      resource: data.resource,
+      integrationConfig: {} as Record<string, string | boolean>
+    },
+    onDataChange,
+    validateAllFields
+  });
+
+  useEffect(() => {
+    setOpenSections(['general', 'integration', 'webhook']);
+  }, [setOpenSections]);
+
+  useEffect(() => {
+    syncWithIncomingData(
+      {
+        integration: data.integration,
+        resource: data.resource,
+        integrationConfig: {}
+      },
+      (incomingData) => {
+        setSelectedIntegration(incomingData.integration);
+        setResourceType(incomingData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(incomingData.resource?.name || '');
+      }
+    );
+  }, [data, eventSourceType, syncWithIncomingData]);
+
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
 
-  // Combine canvas and organization integrations and filter by event source type
   const allIntegrations = [...canvasIntegrations, ...orgIntegrations];
   const availableIntegrations = eventSourceType === 'semaphore'
     ? allIntegrations.filter(int => int.spec?.type === 'semaphore')
     : allIntegrations;
 
-  // Notify parent of data changes
   useEffect(() => {
     if (onDataChange) {
-      setIsInternalUpdate(true);
       const spec: SuperplaneEventSourceSpec = {};
 
       // For semaphore event sources, integration is required
@@ -78,29 +108,12 @@ export function EventSourceEditModeContent({
           };
         }
       }
-      // For webhook event sources, no integration by default
 
-      onDataChange({
+      handleDataChange({
         spec
       });
     }
-  }, [selectedIntegration, resourceType, resourceName, eventSourceType, onDataChange]);
-
-  // Helper function to check if a section has been modified
-  const isSectionModified = (section: string): boolean => {
-    switch (section) {
-      case 'integration':
-        return JSON.stringify(selectedIntegration) !== JSON.stringify(originalData.integration) ||
-          resourceType !== (originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : '')) ||
-          resourceName !== (originalData.resource?.name || '') ||
-          JSON.stringify(integrationConfig) !== JSON.stringify(originalData.integrationConfig);
-      case 'webhook':
-        // Webhook section doesn't have editable fields, so never modified
-        return false;
-      default:
-        return false;
-    }
-  };
+  }, [selectedIntegration, resourceType, resourceName, eventSourceType, onDataChange, handleDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {
@@ -113,15 +126,6 @@ export function EventSourceEditModeContent({
         break;
     }
   };
-
-  const handleAccordionToggle = (sectionId: string) => {
-    setOpenSections(prev => {
-      return prev.includes(sectionId)
-        ? prev.filter(id => id !== sectionId)
-        : [...prev, sectionId];
-    });
-  };
-
 
   const handleIntegrationChange = (integrationName: string) => {
     const integration = availableIntegrations.find(int => int.metadata?.name === integrationName);
@@ -161,8 +165,7 @@ export function EventSourceEditModeContent({
       case 'TYPE_SEMAPHORE':
         return (
           <div className="space-y-3">
-            <Field>
-              <Label>Project Name</Label>
+            <ValidationField label="Project Name">
               <input
                 type="text"
                 value={String(integrationConfig.project || '')}
@@ -170,15 +173,14 @@ export function EventSourceEditModeContent({
                 placeholder="my-semaphore-project"
                 className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </Field>
+            </ValidationField>
           </div>
         );
 
       case 'TYPE_GITHUB':
         return (
           <div className="space-y-3">
-            <Field>
-              <Label>Repository</Label>
+            <ValidationField label="Repository">
               <input
                 type="text"
                 value={String(integrationConfig.repository || '')}
@@ -186,9 +188,8 @@ export function EventSourceEditModeContent({
                 placeholder="owner/repository-name"
                 className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </Field>
-            <Field>
-              <Label>Events</Label>
+            </ValidationField>
+            <ValidationField label="Events">
               <select
                 value={String(integrationConfig.events || 'push')}
                 onChange={(e) => updateIntegrationConfig('events', e.target.value)}
@@ -199,7 +200,7 @@ export function EventSourceEditModeContent({
                 <option value="issues">Issues</option>
                 <option value="release">Release</option>
               </select>
-            </Field>
+            </ValidationField>
           </div>
         );
 
@@ -210,32 +211,23 @@ export function EventSourceEditModeContent({
 
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
-      {/* Accordion Sections */}
       <div className="">
-
         {/* Configuration Section */}
         {eventSourceType === 'semaphore' && (
-          <AccordionItem
+          <EditableAccordionSection
             id="integration"
-            title={
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <span>Semaphore Configuration</span>
-                  <RevertButton
-                    sectionId="integration"
-                    isModified={isSectionModified('integration')}
-                    onRevert={revertSection}
-                  />
-                </div>
-                <span className="text-xs text-blue-600 font-medium">Required</span>
-              </div>
-            }
+            title="Semaphore Configuration"
             isOpen={openSections.includes('integration')}
             onToggle={handleAccordionToggle}
+            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'integration')}
+            onRevert={revertSection}
+            requiredBadge={true}
           >
             <div className="space-y-3">
-              <Field>
-                <Label>Select Integration</Label>
+              <ValidationField
+                label="Select Integration"
+                error={validationErrors.integration}
+              >
                 <select
                   value={selectedIntegration?.name || ''}
                   onChange={(e) => handleIntegrationChange(e.target.value)}
@@ -248,7 +240,7 @@ export function EventSourceEditModeContent({
                     </option>
                   ))}
                 </select>
-              </Field>
+              </ValidationField>
 
               {availableIntegrations.length === 0 && (
                 <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
@@ -259,8 +251,10 @@ export function EventSourceEditModeContent({
 
               {selectedIntegration && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                  <Field>
-                    <Label>Project Name</Label>
+                  <ValidationField
+                    label="Project Name"
+                    error={validationErrors.resourceName}
+                  >
                     <input
                       type="text"
                       value={resourceName}
@@ -268,26 +262,27 @@ export function EventSourceEditModeContent({
                       placeholder="my-semaphore-project"
                       className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
-                  </Field>
+                  </ValidationField>
 
                   {/* Integration-specific configuration fields */}
                   {renderIntegrationSpecificFields()}
                 </div>
               )}
             </div>
-          </AccordionItem>
+          </EditableAccordionSection>
         )}
 
         {/* Webhook Configuration Section */}
         {eventSourceType === 'webhook' && (
-          <AccordionItem
+          <EditableAccordionSection
             id="webhook"
             title="Webhook Configuration"
             isOpen={openSections.includes('webhook')}
             onToggle={handleAccordionToggle}
+            isModified={false}
+            onRevert={revertSection}
           >
             <div className="space-y-3">
-
               {!Number.isNaN(Number(data.id)) ? (
                 <div className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md">
                   Save this event source to generate the webhook endpoint and signing key.
@@ -304,7 +299,7 @@ export function EventSourceEditModeContent({
                 </div>
               )}
             </div>
-          </AccordionItem>
+          </EditableAccordionSection>
         )}
       </div>
     </div>
