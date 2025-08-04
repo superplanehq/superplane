@@ -69,6 +69,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
 		InCanvas(canvas).
 		WithName(req.EventSource.Metadata.Name).
+		WithDescription(req.EventSource.Metadata.Description).
 		WithScope(models.EventSourceScopeExternal).
 		ForIntegration(integration).
 		ForResource(resource).
@@ -179,11 +180,12 @@ func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, erro
 
 	return &pb.EventSource{
 		Metadata: &pb.EventSource_Metadata{
-			Id:        eventSource.ID.String(),
-			Name:      eventSource.Name,
-			CanvasId:  eventSource.CanvasID.String(),
-			CreatedAt: timestamppb.New(*eventSource.CreatedAt),
-			UpdatedAt: timestamppb.New(*eventSource.UpdatedAt),
+			Id:          eventSource.ID.String(),
+			Name:        eventSource.Name,
+			Description: eventSource.Description,
+			CanvasId:    eventSource.CanvasID.String(),
+			CreatedAt:   timestamppb.New(*eventSource.CreatedAt),
+			UpdatedAt:   timestamppb.New(*eventSource.UpdatedAt),
 		},
 		Spec: spec,
 	}, nil

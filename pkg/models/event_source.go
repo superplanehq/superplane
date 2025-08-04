@@ -20,15 +20,16 @@ const (
 )
 
 type EventSource struct {
-	ID         uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID   uuid.UUID
-	ResourceID *uuid.UUID
-	Name       string
-	Key        []byte
-	State      string
-	Scope      string
-	CreatedAt  *time.Time
-	UpdatedAt  *time.Time
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID    uuid.UUID
+	ResourceID  *uuid.UUID
+	Name        string
+	Description string
+	Key         []byte
+	State       string
+	Scope       string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
 
 	EventTypes datatypes.JSONSlice[EventType]
 }

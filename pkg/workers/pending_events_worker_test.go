@@ -46,6 +46,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	t.Run("source has filter for event -> event is discarded", func(t *testing.T) {
 		source, err := r.Canvas.CreateEventSource(
 			support.RandomName("source"),
+			"description",
 			[]byte(`key`),
 			models.EventSourceScopeExternal,
 			[]models.EventType{{Type: "push"}},
@@ -232,7 +233,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", []byte(`key`), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		source2, err := r.Canvas.CreateEventSource("source-2", "description", []byte(`key`), models.EventSourceScopeExternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		//
@@ -240,6 +241,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		connectionGroup, err := r.Canvas.CreateConnectionGroup(
 			support.RandomName("connection-group"),
+			"description",
 			r.User.String(),
 			[]models.Connection{
 				{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},

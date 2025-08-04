@@ -43,6 +43,7 @@ func Test__ListConnectionGroups(t *testing.T) {
 	t.Run("connection group exists", func(t *testing.T) {
 		_, err := r.Canvas.CreateConnectionGroup(
 			"test",
+			"test",
 			uuid.NewString(),
 			[]models.Connection{
 				{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},
