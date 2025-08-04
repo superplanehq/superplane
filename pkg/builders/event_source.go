@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
@@ -114,12 +115,13 @@ func (b *EventSourceBuilder) create(tx *gorm.DB) (*models.EventSource, string, e
 }
 
 func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.EventSource, string, error) {
-	plainKey, encryptedKey, err := b.generateKey()
+	id := uuid.New()
+	plainKey, encryptedKey, err := crypto.NewRandomKey(b.ctx, b.encryptor, id.String())
 	if err != nil {
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, b.description, encryptedKey, b.scope, b.eventTypes, nil)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, id, b.name, b.description, encryptedKey, b.scope, b.eventTypes, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -152,12 +154,13 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 	//
 	// If event source does not exist, create it.
 	//
-	plainKey, encryptedKey, err := b.generateKey()
+	id := uuid.New()
+	plainKey, encryptedKey, err := crypto.NewRandomKey(b.ctx, b.encryptor, id.String())
 	if err != nil {
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, b.description, encryptedKey, b.scope, b.eventTypes, &resource.ID)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, id, b.name, b.description, encryptedKey, b.scope, b.eventTypes, &resource.ID)
 	if err != nil {
 		return nil, "", err
 	}
@@ -209,27 +212,10 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 		return nil, "", err
 	}
 
-	plainKey, err := eventSource.GetDecryptedKeyInTransaction(b.ctx, tx, b.encryptor)
+	plainKey, err := b.encryptor.Decrypt(b.ctx, eventSource.Key, []byte(eventSource.ID.String()))
 	if err != nil {
 		return nil, "", err
 	}
 
 	return eventSource, string(plainKey), nil
-}
-
-func (b *EventSourceBuilder) generateKey() (string, []byte, error) {
-	//
-	// If the event source is not tied to an integration resource,
-	// we can use the event source name to authenticate the key encryption.
-	//
-	if b.resource == nil {
-		return crypto.NewRandomKey(b.ctx, b.encryptor, b.name)
-	}
-
-	//
-	// Otherwise, we use the resource ID to authenticate the key encryption,
-	// to avoid having to update the webhook secret in the integration,
-	// when the event source has its name updated when going from internal->external scope.
-	//
-	return crypto.NewRandomKey(b.ctx, b.encryptor, b.resource.Id())
 }
