@@ -69,7 +69,7 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("internal event source cannot be described", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		_, err = DescribeEventSource(context.Background(), r.Canvas.ID.String(), &protos.DescribeEventSourceRequest{

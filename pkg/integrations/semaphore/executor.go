@@ -107,6 +107,9 @@ func (e *SemaphoreExecutor) Execute(specData []byte, parameters executors.Execut
 }
 
 func (e *SemaphoreExecutor) workflowParameters(fromSpec map[string]string, fromExecution executors.ExecutionParameters) map[string]string {
+	if fromSpec == nil {
+		fromSpec = make(map[string]string)
+	}
 	parameters := maps.Clone(fromSpec)
 	parameters["SUPERPLANE_STAGE_ID"] = fromExecution.StageID
 	parameters["SUPERPLANE_STAGE_EXECUTION_ID"] = fromExecution.ExecutionID

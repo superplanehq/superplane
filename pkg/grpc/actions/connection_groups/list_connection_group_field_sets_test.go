@@ -19,6 +19,7 @@ func Test__ListConnectionGroupFieldSets(t *testing.T) {
 
 	connectionGroup, err := r.Canvas.CreateConnectionGroup(
 		"test",
+		"test",
 		uuid.NewString(),
 		[]models.Connection{
 			{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},

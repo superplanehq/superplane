@@ -17,9 +17,11 @@ var ErrNameAlreadyUsed = fmt.Errorf("name already used")
 type Canvas struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Name           string
+	Description    string
 	CreatedAt      *time.Time
 	CreatedBy      uuid.UUID
 	UpdatedAt      *time.Time
+	DeletedAt      gorm.DeletedAt `gorm:"index"`
 	OrganizationID uuid.UUID
 
 	Organization *Organization `gorm:"foreignKey:OrganizationID;references:ID"`
@@ -29,14 +31,15 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
-func (c *Canvas) CreateEventSource(name string, key []byte, scope string, eventTypes []EventType, resourceId *uuid.UUID) (*EventSource, error) {
-	return c.CreateEventSourceInTransaction(database.Conn(), name, key, scope, eventTypes, resourceId)
+func (c *Canvas) CreateEventSource(name string, description string, key []byte, scope string, eventTypes []EventType, resourceId *uuid.UUID) (*EventSource, error) {
+	return c.CreateEventSourceInTransaction(database.Conn(), name, description, key, scope, eventTypes, resourceId)
 }
 
 // NOTE: caller must encrypt the key before calling this method.
 func (c *Canvas) CreateEventSourceInTransaction(
 	tx *gorm.DB,
 	name string,
+	description string,
 	key []byte,
 	scope string,
 	eventTypes []EventType,
@@ -45,15 +48,16 @@ func (c *Canvas) CreateEventSourceInTransaction(
 	now := time.Now()
 
 	eventSource := EventSource{
-		Name:       name,
-		CanvasID:   c.ID,
-		CreatedAt:  &now,
-		UpdatedAt:  &now,
-		Key:        key,
-		ResourceID: resourceId,
-		State:      EventSourceStatePending,
-		Scope:      scope,
-		EventTypes: datatypes.NewJSONSlice(eventTypes),
+		Name:        name,
+		CanvasID:    c.ID,
+		Description: description,
+		CreatedAt:   &now,
+		UpdatedAt:   &now,
+		Key:         key,
+		ResourceID:  resourceId,
+		State:       EventSourceStatePending,
+		Scope:       scope,
+		EventTypes:  datatypes.NewJSONSlice(eventTypes),
 	}
 
 	err := tx.
@@ -256,6 +260,13 @@ func (c *Canvas) CreateStageInTransaction(
 	return stage, nil
 }
 
+func (c *Canvas) DeleteInTransaction(tx *gorm.DB) error {
+	return tx.
+		Where("id = ?", c.ID).
+		Delete(&Canvas{}).
+		Error
+}
+
 func ListCanvases() ([]Canvas, error) {
 	var canvases []Canvas
 
@@ -332,10 +343,11 @@ func FindCanvasByName(name string) (*Canvas, error) {
 	return &canvas, nil
 }
 
-func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string) (*Canvas, error) {
+func CreateCanvas(requesterID uuid.UUID, orgID uuid.UUID, name string, description string) (*Canvas, error) {
 	now := time.Now()
 	canvas := Canvas{
 		Name:           name,
+		Description:    description,
 		OrganizationID: orgID,
 		CreatedAt:      &now,
 		CreatedBy:      requesterID,

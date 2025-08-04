@@ -105,10 +105,12 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("source")
+		description := support.RandomName("description")
 		req := &protos.CreateEventSourceRequest{
 			EventSource: &protos.EventSource{
 				Metadata: &protos.EventSource_Metadata{
-					Name: name,
+					Name:        name,
+					Description: description,
 				},
 				Spec: &protos.EventSource_Spec{
 					Integration: &integrationPb.IntegrationRef{
@@ -134,6 +136,7 @@ func Test__CreateEventSource(t *testing.T) {
 		assert.Equal(t, r.Integration.Name, response.EventSource.Spec.Integration.Name)
 		assert.Equal(t, "demo-project", response.EventSource.Spec.Resource.Name)
 		assert.Equal(t, "project", response.EventSource.Spec.Resource.Type)
+		assert.Equal(t, description, response.EventSource.Metadata.Description)
 		assert.True(t, testconsumer.HasReceivedMessage())
 	})
 

@@ -40,10 +40,11 @@ func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.Des
 	response := &pb.DescribeCanvasResponse{
 		Canvas: &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
-				Id:        canvas.ID.String(),
-				Name:      canvas.Name,
-				CreatedAt: timestamppb.New(*canvas.CreatedAt),
-				CreatedBy: canvas.CreatedBy.String(),
+				Id:          canvas.ID.String(),
+				Name:        canvas.Name,
+				Description: canvas.Description,
+				CreatedAt:   timestamppb.New(*canvas.CreatedAt),
+				CreatedBy:   canvas.CreatedBy.String(),
 			},
 		},
 	}

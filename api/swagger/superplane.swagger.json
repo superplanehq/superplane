@@ -742,6 +742,44 @@
         ]
       }
     },
+    "/api/v1/canvases/{idOrName}": {
+      "delete": {
+        "summary": "Delete a canvas",
+        "description": "Deletes the specified canvas (can be referenced by ID or name)",
+        "operationId": "Superplane_DeleteCanvas",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDeleteCanvasResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Canvas"
+        ]
+      }
+    },
     "/api/v1/canvases/{id}": {
       "get": {
         "summary": "Get canvas details",
@@ -2887,6 +2925,9 @@
         "name": {
           "type": "string"
         },
+        "description": {
+          "type": "string"
+        },
         "createdBy": {
           "type": "string"
         },
@@ -3061,6 +3102,9 @@
         "name": {
           "type": "string"
         },
+        "description": {
+          "type": "string"
+        },
         "canvasId": {
           "type": "string"
         },
@@ -3190,6 +3234,9 @@
         }
       }
     },
+    "SuperplaneDeleteCanvasResponse": {
+      "type": "object"
+    },
     "SuperplaneDescribeCanvasResponse": {
       "type": "object",
       "properties": {
@@ -3240,6 +3287,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         },
         "canvasId": {
@@ -3652,6 +3702,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "description": {
           "type": "string"
         },
         "canvasId": {

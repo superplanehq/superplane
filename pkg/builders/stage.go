@@ -42,6 +42,7 @@ func NewStageBuilder(registry *registry.Registry) *StageBuilder {
 			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
 			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
 			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+			Description:   "",
 		},
 	}
 }
@@ -68,6 +69,11 @@ func (b *StageBuilder) InCanvas(canvas *models.Canvas) *StageBuilder {
 
 func (b *StageBuilder) WithName(name string) *StageBuilder {
 	b.newStage.Name = name
+	return b
+}
+
+func (b *StageBuilder) WithDescription(description string) *StageBuilder {
+	b.newStage.Description = description
 	return b
 }
 
@@ -136,6 +142,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 	stage := &models.Stage{
 		CanvasID:      b.canvas.ID,
 		Name:          b.newStage.Name,
+		Description:   b.newStage.Description,
 		Conditions:    b.newStage.Conditions,
 		CreatedAt:     &now,
 		CreatedBy:     b.requesterID,
@@ -274,6 +281,8 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		now := time.Now()
 		err = tx.Model(b.existingStage).
+			Update("name", b.newStage.Name).
+			Update("description", b.newStage.Description).
 			Update("updated_at", now).
 			Update("updated_by", b.requesterID).
 			Update("conditions", b.newStage.Conditions).

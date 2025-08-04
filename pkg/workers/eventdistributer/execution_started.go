@@ -7,36 +7,25 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/public/ws"
+	"google.golang.org/protobuf/proto"
 )
 
 // HandleExecutionStarted processes an execution started message and forwards it to websocket clients
 func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 	log.Debugf("Received execution_started event")
 
-	// Parse the message as JSON (we expect it to be a JSON-encoded message)
-	var rawMsg map[string]interface{}
-	if err := json.Unmarshal(messageBody, &rawMsg); err != nil {
-		log.Warnf("Failed to unmarshal ExecutionStarted message as JSON: %v, trying to continue", err)
-		// If we can't parse it, create a minimal event
-		rawMsg = map[string]interface{}{
-			"event": "execution_started",
-		}
+	var executionStarted pb.StageExecutionStarted
+	if err := proto.Unmarshal(messageBody, &executionStarted); err != nil {
+		log.Warnf("Failed to unmarshal ExecutionStarted message as proto: %v, trying to continue, body: %s", err, string(messageBody))
+		executionStarted = pb.StageExecutionStarted{}
 	}
-
-	// Get execution ID if available
-	executionIDStr, _ := rawMsg["execution_id"].(string)
-	if executionIDStr == "" {
-		executionIDStr, _ = rawMsg["id"].(string)
-	}
-
-	// Get canvas ID if available
-	canvasID, _ := rawMsg["canvas_id"].(string)
 
 	// Try to fetch execution from the database if we have an ID
 	var execution *models.StageExecution
-	if executionIDStr != "" {
-		executionID, err := uuid.Parse(executionIDStr)
+	if executionStarted.ExecutionId != "" {
+		executionID, err := uuid.Parse(executionStarted.ExecutionId)
 		if err == nil {
 			execution, err = models.FindExecutionByID(executionID)
 			if err != nil {
@@ -52,7 +41,7 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 		payload = map[string]interface{}{
 			"id":             execution.ID.String(),
 			"stage_id":       execution.StageID.String(),
-			"canvas_id":      canvasID,
+			"canvas_id":      executionStarted.CanvasId,
 			"stage_event_id": execution.StageEventID.String(),
 			"state":          execution.State,
 			"result":         execution.Result,
@@ -61,8 +50,7 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 			"started_at":     execution.StartedAt,
 		}
 	} else {
-		// Use the raw message
-		payload = rawMsg
+		payload = make(map[string]interface{})
 	}
 
 	// Create the websocket event
@@ -78,10 +66,10 @@ func HandleExecutionStarted(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	// Send to clients
-	if canvasID != "" {
+	if executionStarted.CanvasId != "" {
 		// Send to specific canvas
-		wsHub.BroadcastToCanvas(canvasID, wsEventJSON)
-		log.Debugf("Broadcasted execution_started event to canvas %s", canvasID)
+		wsHub.BroadcastToCanvas(executionStarted.CanvasId, wsEventJSON)
+		log.Debugf("Broadcasted execution_started event to canvas %s", executionStarted.CanvasId)
 	} else {
 		// Fall back to broadcasting to all clients
 		wsHub.BroadcastAll(wsEventJSON)

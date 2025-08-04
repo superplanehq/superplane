@@ -86,7 +86,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("cannot use internal event source in connection -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
@@ -201,7 +201,8 @@ func Test__CreateConnectionGroup(t *testing.T) {
 			CanvasIdOrName: r.Canvas.ID.String(),
 			ConnectionGroup: &protos.ConnectionGroup{
 				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
+					Name:        "test",
+					Description: "test-description",
 				},
 				Spec: &protos.ConnectionGroup_Spec{
 					Connections: []*protos.Connection{
@@ -227,6 +228,8 @@ func Test__CreateConnectionGroup(t *testing.T) {
 		require.NotNil(t, response.ConnectionGroup.Spec)
 		assert.Len(t, response.ConnectionGroup.Spec.Connections, 1)
 		assert.Len(t, response.ConnectionGroup.Spec.GroupBy.Fields, 1)
+		assert.Equal(t, "test", response.ConnectionGroup.Metadata.Name)
+		assert.Equal(t, "test-description", response.ConnectionGroup.Metadata.Description)
 		require.NotNil(t, response.ConnectionGroup.Spec.Timeout)
 		assert.Equal(t, models.MaxConnectionGroupTimeout, int(response.ConnectionGroup.Spec.Timeout))
 		assert.Equal(t, protos.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP, response.ConnectionGroup.Spec.TimeoutBehavior)

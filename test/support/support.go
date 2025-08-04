@@ -90,7 +90,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
 
-	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test")
+	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test", "Test Canvas")
 	require.NoError(t, err)
 
 	//
@@ -128,7 +128,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create source
 	//
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		r.Source, err = r.Canvas.CreateEventSource("gh", "description", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 	}
 
@@ -185,6 +185,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 func CreateConnectionGroup(t *testing.T, name string, canvas *models.Canvas, source *models.EventSource, timeout uint32, timeoutBehavior string) *models.ConnectionGroup {
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		name,
+		"description",
 		uuid.NewString(),
 		[]models.Connection{
 			{SourceID: source.ID, SourceName: source.Name, SourceType: models.SourceTypeEventSource},

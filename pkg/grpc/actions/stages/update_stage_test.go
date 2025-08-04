@@ -228,6 +228,10 @@ func Test__UpdateStage(t *testing.T) {
 						},
 					},
 				},
+				Metadata: &protos.Stage_Metadata{
+					Name:        "new-stage-name",
+					Description: "new-stage-description",
+				},
 			},
 		})
 
@@ -235,7 +239,8 @@ func Test__UpdateStage(t *testing.T) {
 		require.NotNil(t, res)
 		assert.Equal(t, stageID, res.Stage.Metadata.Id)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.Metadata.CanvasId)
-		assert.Equal(t, "test-update-stage", res.Stage.Metadata.Name)
+		assert.Equal(t, "new-stage-name", res.Stage.Metadata.Name)
+		assert.Equal(t, "new-stage-description", res.Stage.Metadata.Description)
 
 		// Connections are updated
 		require.Len(t, res.Stage.Spec.Connections, 1)
