@@ -8,7 +8,11 @@ import {
   SuperplaneConditionType,
   SuperplaneInputDefinition,
   SuperplaneOutputDefinition,
-  SpecGroupBy
+  SuperplaneExecutor,
+  SuperplaneValueDefinition,
+  SpecGroupBy,
+  IntegrationsIntegrationRef,
+  IntegrationsResourceRef
 } from "@/api-client/types.gen";
 
 export type AllNodeType = EventSourceNodeType | StageNodeType | ConnectionGroupNodeType;
@@ -18,6 +22,7 @@ export type EdgeType = Edge;
 export type ConnectionGroupNodeData = {
   id: string;
   name: string;
+  description?: string;
   connections: SuperplaneConnection[];
   groupBy: SpecGroupBy;
 }
@@ -28,7 +33,11 @@ export type ConnectionGroupNodeType = Node<ConnectionGroupNodeData, 'connection_
 export type EventSourceNodeData = {
   id: string;
   name: string;
+  description?: string;
   events: SuperplaneStageEvent[];
+  integration: IntegrationsIntegrationRef | null;
+  resource: IntegrationsResourceRef | null;
+  eventSourceType?: string;
 }
 
 export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
@@ -36,6 +45,7 @@ export type EventSourceNodeType = Node<EventSourceNodeData, 'event_source'>;
 // Stage node 
 export type StageData = {
   label: string;
+  description?: string;
   labels: string[];
   status?: string;
   timestamp?: string;
@@ -45,8 +55,11 @@ export type StageData = {
   conditions: SuperplaneCondition[];
   inputs: SuperplaneInputDefinition[];
   outputs: SuperplaneOutputDefinition[];
+  secrets: SuperplaneValueDefinition[];
+  executor?: SuperplaneExecutor;
   spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
+  isDraft?: boolean;
 }
 
 export type StageNodeType = Node<StageData, 'stage'>;

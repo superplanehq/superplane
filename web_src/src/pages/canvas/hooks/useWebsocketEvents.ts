@@ -92,6 +92,7 @@ export function useWebsocketEvents(canvasId: string): void {
           updateEventSource(updatedEventSource);
 
         } else {
+          console.error('Event source with new event not found:', newEventPayload.source_id)
         }
 
         break;

@@ -27,7 +27,7 @@ export const FlowRenderer: React.FC = () => {
 
   const { applyElkAutoLayout } = useAutoLayout();
   const { onNodeDragStop, onInit } = useFlowHandlers();
- 
+
   return (
     <div style={{ width: "100vw", height: "100%", minWidth: 0, minHeight: 0 }}>
       <ReactFlow

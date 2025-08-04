@@ -100,7 +100,17 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     }
 
     const handleBulkAddSubmit = async () => {
-      if (!uploadFile) return
+      if (!uploadFile) {
+        console.error('No file selected')
+        return
+      }
+
+      const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
+
+      if (!groupName && showRoleSelection && !bulkUserRole) {
+        console.error('No role selected')
+        return
+      }
 
       try {
         // Parse CSV file
@@ -111,15 +121,45 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           reader.readAsText(uploadFile)
         })
 
-        // Parse CSV content
-        const parseResult = Papa.parse(fileContent, {
+
+        // Parse CSV content with multiple delimiter attempts
+        let parseResult = Papa.parse(fileContent, {
           header: true,
           skipEmptyLines: true,
+          delimiter: ',', // Default delimiter
           transformHeader: (header) => header.toLowerCase().trim()
         })
 
-        if (parseResult.errors.length > 0) {
-          throw new Error(`CSV parsing errors: ${parseResult.errors.map(e => e.message).join(', ')}`)
+        const delimiters = [',', ';', '\t', '|']
+
+        for (const delimiter of delimiters) {
+          const tempResult = Papa.parse(fileContent, {
+            header: true,
+            skipEmptyLines: true,
+            delimiter: delimiter,
+            transformHeader: (header) => header.toLowerCase().trim()
+          })
+
+          // If we have data and no critical errors, use this result
+          if (tempResult.data && tempResult.data.length > 0) {
+            const criticalErrors = tempResult.errors.filter(error =>
+              error.type === 'Delimiter' && error.code === 'UndetectableDelimiter'
+            )
+            if (criticalErrors.length === 0) {
+              parseResult = tempResult
+              break
+            }
+          }
+        }
+
+        // Only throw error for critical parsing issues, not delimiter detection warnings
+        const criticalErrors = parseResult?.errors?.filter(error =>
+          error.type !== 'Delimiter' || error.code !== 'UndetectableDelimiter'
+        ) || []
+
+        if (criticalErrors.length > 0) {
+          console.error('Critical CSV parsing errors:', criticalErrors)
+          throw new Error(`CSV parsing errors: ${criticalErrors.map(e => e.message).join(', ')}`)
         }
 
         // Extract emails from CSV data
@@ -128,11 +168,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           .map(row => row.email || row['email address'] || '')
           .filter(email => email && isEmailValid(email))
 
+
         if (emailsToAdd.length === 0) {
           throw new Error('No valid email addresses found in the CSV file. Please ensure the CSV has an "email" column.')
         }
-
-        const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
 
         // Process each email
         for (const email of emailsToAdd) {
@@ -152,15 +191,15 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           }
         }
 
-
         setUploadFile(null)
         const defaultRole = roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
         setAddMembersTab('emails')
 
         onMemberAdded?.()
-      } catch {
-        console.error('Failed to add members by file')
+      } catch (error) {
+        console.error('Failed to add members by file:', error)
+        alert(`Failed to add members: ${error instanceof Error ? error.message : 'Unknown error'}`)
       }
     }
 
@@ -464,41 +503,44 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                     id="add-members-upload"
                   />
 
-                  <label htmlFor="add-members-upload">
-                    <Button outline className='flex items-center text-sm gap-2' type="button">
-                      <MaterialSymbol name="folder_open" size="sm" />
-                      Browse
-                    </Button>
+                  <label
+                    htmlFor="add-members-upload"
+                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
+                  >
+                    <MaterialSymbol name="folder_open" size="sm" />
+                    Browse
                   </label>
                 </div>
-              </div>
+              </div >
               <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
                 The CSV file should have an "email" column with email addresses.
               </Text>
-            </Field>
+            </Field >
 
             {/* Role Selection */}
-            {showRoleSelection && !groupName && (
-              <Field>
-                <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Role
-                </Label>
-                <Dropdown>
-                  <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                    {bulkUserRole ? roles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
-                    <MaterialSymbol name="keyboard_arrow_down" />
-                  </DropdownButton>
-                  <DropdownMenu>
-                    {roles.map((role) => (
-                      <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
-                        <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                        <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
-                      </DropdownItem>
-                    ))}
-                  </DropdownMenu>
-                </Dropdown>
-              </Field>
-            )}
+            {
+              showRoleSelection && !groupName && (
+                <Field>
+                  <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Role
+                  </Label>
+                  <Dropdown>
+                    <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
+                      {bulkUserRole ? roles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
+                      <MaterialSymbol name="keyboard_arrow_down" />
+                    </DropdownButton>
+                    <DropdownMenu>
+                      {roles.map((role) => (
+                        <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
+                          <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
+                          <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
+                        </DropdownItem>
+                      ))}
+                    </DropdownMenu>
+                  </Dropdown>
+                </Field>
+              )
+            }
 
             {/* Upload Button */}
             <div className="flex justify-end">
@@ -512,18 +554,20 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 {isInviting ? 'Processing...' : (groupName ? 'Add to Group' : 'Invite')}
               </Button>
             </div>
-          </div>
+          </div >
         ) : null}
 
         {/* Note for existing members tab when not in group context */}
-        {addMembersTab === 'existing' && !groupName && (
-          <div className="text-center py-8">
-            <p className="text-zinc-500 dark:text-zinc-400">
-              This option is only available when adding members to a group.
-            </p>
-          </div>
-        )}
-      </div>
+        {
+          addMembersTab === 'existing' && !groupName && (
+            <div className="text-center py-8">
+              <p className="text-zinc-500 dark:text-zinc-400">
+                This option is only available when adding members to a group.
+              </p>
+            </div>
+          )
+        }
+      </div >
     )
   })
 

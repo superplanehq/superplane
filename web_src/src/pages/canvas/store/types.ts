@@ -7,25 +7,37 @@ import { OnEdgesChange, OnNodesChange, Connection } from "@xyflow/react";
 // Define the store state type
 export interface CanvasState {
   canvas: SuperplaneCanvas;
+  canvasId: string;
   stages: StageWithEventQueue[];
   eventSources: EventSourceWithEvents[];
   connectionGroups: SuperplaneConnectionGroup[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
+  editingStageId: string | null;
+  editingEventSourceId: string | null;
+  editingConnectionGroupId: string | null;
   webSocketConnectionStatus: ReadyState;
+  eventSourceKeys: Record<string, string>;
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: SuperplaneStage) => void;
+  addStage: (stage: SuperplaneStage, draft?: boolean) => void;
+  removeStage: (stageId: string) => void;
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
+  removeConnectionGroup: (connectionGroupId: string) => void;
+  updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   updateStage: (stage: SuperplaneStage) => void;
   addEventSource: (eventSource: EventSourceWithEvents) => void;
+  removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => void;
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
+  setEditingStage: (stageId: string | null) => void;
+  setEditingEventSource: (eventSourceId: string | null) => void;
+  setEditingConnectionGroup: (connectionGroupId: string | null) => void;
   updateWebSocketConnectionStatus: (status: ReadyState) => void;
   syncStageEvents: (canvasId: string, stageId: string) => Promise<void>;
 
@@ -61,8 +73,11 @@ export interface CanvasState {
         }
       | undefined,
   ) => void;
+
+  updateEventSourceKey: (eventSourceId: string, key: string) => void;
+  resetEventSourceKey: (eventSourceId: string) => void;
 }
 
-export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>}
-export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>}
+export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
+export type EventSourceWithEvents = SuperplaneEventSource & {events: Array<SuperplaneStageEvent>; eventSourceType?: string}
 export type ExecutionWithEvent = SuperplaneExecution & {event: SuperplaneStageEvent}
