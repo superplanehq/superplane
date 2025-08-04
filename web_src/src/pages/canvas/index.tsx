@@ -176,34 +176,18 @@ export function Canvas() {
   }
 
   // Handle adding nodes using the modular system
-  const handleAddNodeByType = (nodeType: string, executorType?: string, eventSourceType?: string) => {
+  const handleAddNodeByType = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
     try {
-      // Map string types to NodeType enum
-      const nodeTypeMap: Record<string, NodeType> = {
-        'stage': 'stage',
-        'event_source': 'event_source',
-        'eventSource': 'event_source', // Support both naming conventions
-        'connection_group': 'connection_group',
-        'connectionGroup': 'connection_group' // Support both naming conventions
-      };
-
-      const mappedNodeType = nodeTypeMap[nodeType];
-      if (!mappedNodeType) {
-        console.error(`Unknown node type: ${nodeType}`);
-        return;
-      }
-
-      // Handle stages with executor types
-      if (mappedNodeType === 'stage' && executorType) {
+      if (nodeType === 'stage' && executorType) {
         const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' :
           executorType === 'http' ? 'HTTP Stage' : 'New Stage';
-        handleAddNode(mappedNodeType, { name: stageName, executorType });
-      } else if (mappedNodeType === 'event_source' && eventSourceType) {
+        handleAddNode(nodeType, { name: stageName, executorType });
+      } else if (nodeType === 'event_source' && eventSourceType) {
         const eventName = eventSourceType === 'webhook' ? 'Webhook Event Source' :
           eventSourceType === 'semaphore' ? 'Semaphore Event Source' : 'New Event Source';
-        handleAddNode(mappedNodeType, { name: eventName, eventSourceType });
+        handleAddNode(nodeType, { name: eventName, eventSourceType });
       } else {
-        handleAddNode(mappedNodeType);
+        handleAddNode(nodeType);
       }
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
@@ -230,7 +214,7 @@ export function Canvas() {
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
-              onNodeAdd={(nodeType: string, executorType?: string, eventSourceType?: string) => {
+              onNodeAdd={(nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
                 handleAddNodeByType(nodeType, executorType, eventSourceType);
               }}
             />

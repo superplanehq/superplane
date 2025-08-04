@@ -3,17 +3,17 @@ import { useCanvasStore } from '../store/canvasStore';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
-
+import { NodeType } from '../utils/nodeFactories';
 
 export interface ComponentSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onNodeAdd: (nodeType: string, executorType?: string, eventSourceType?: string) => void;
+  onNodeAdd: (nodeType: NodeType, executorType?: string, eventSourceType?: string) => void;
   className?: string;
 }
 
 interface ComponentDefinition {
-  id: string;
+  id: NodeType;
   name: string;
   description: string;
   icon?: string;
@@ -96,7 +96,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     return '';
   };
 
-  const handleAddComponent = (componentType: string, executorType?: string, eventSourceType?: string) => {
+  const handleAddComponent = (componentType: NodeType, executorType?: string, eventSourceType?: string) => {
     onNodeAdd(componentType, executorType, eventSourceType);
   };
 
@@ -176,47 +176,47 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                               }`}
                             aria-label={disabled ? disabledMessage : `Add ${component.name} component`}
                           >
-                              <div className="flex items-start">
-                                <div className="flex-shrink-0">
-                                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${disabled
-                                    ? 'bg-gray-100'
-                                    : 'bg-gray-100 group-hover:bg-primary-100'
-                                    }`}>
-                                    {component.image ? (
-                                      <img
-                                        src={component.image}
-                                        alt={component.name}
-                                        className="w-8 h-8 object-contain"
-                                      />
-                                    ) : (
-                                      <span className={`material-symbols-outlined transition-colors ${disabled
-                                        ? 'text-gray-400'
-                                        : 'text-gray-600 group-hover:text-primary-600'
-                                        }`}>
-                                        {component.icon}
-                                      </span>)}
-                                  </div>
-                                </div>
-                                <div className="ml-3 flex-1 min-w-0">
-                                  <h4 className={`text-sm font-medium transition-colors ${disabled
-                                    ? 'text-gray-500'
-                                    : 'text-gray-900 group-hover:text-primary-900'
-                                    }`}>
-                                    {component.name}
-                                  </h4>
-                                  <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                    {disabled ? disabledMessage : component.description}
-                                  </p>
-                                </div>
-                                <div className="ml-2 flex-shrink-0">
-                                  <span className={`material-symbols-outlined transition-colors ${disabled
-                                    ? 'text-gray-300'
-                                    : 'text-gray-400 group-hover:text-primary-500'
-                                    }`}>
-                                    {disabled ? 'block' : 'add'}
-                                  </span>
+                            <div className="flex items-start">
+                              <div className="flex-shrink-0">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${disabled
+                                  ? 'bg-gray-100'
+                                  : 'bg-gray-100 group-hover:bg-primary-100'
+                                  }`}>
+                                  {component.image ? (
+                                    <img
+                                      src={component.image}
+                                      alt={component.name}
+                                      className="w-8 h-8 object-contain"
+                                    />
+                                  ) : (
+                                    <span className={`material-symbols-outlined transition-colors ${disabled
+                                      ? 'text-gray-400'
+                                      : 'text-gray-600 group-hover:text-primary-600'
+                                      }`}>
+                                      {component.icon}
+                                    </span>)}
                                 </div>
                               </div>
+                              <div className="ml-3 flex-1 min-w-0">
+                                <h4 className={`text-sm font-medium transition-colors ${disabled
+                                  ? 'text-gray-500'
+                                  : 'text-gray-900 group-hover:text-primary-900'
+                                  }`}>
+                                  {component.name}
+                                </h4>
+                                <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                  {disabled ? disabledMessage : component.description}
+                                </p>
+                              </div>
+                              <div className="ml-2 flex-shrink-0">
+                                <span className={`material-symbols-outlined transition-colors ${disabled
+                                  ? 'text-gray-300'
+                                  : 'text-gray-400 group-hover:text-primary-500'
+                                  }`}>
+                                  {disabled ? 'block' : 'add'}
+                                </span>
+                              </div>
+                            </div>
                           </button>
                         );
 
