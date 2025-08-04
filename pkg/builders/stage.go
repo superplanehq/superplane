@@ -42,6 +42,7 @@ func NewStageBuilder(registry *registry.Registry) *StageBuilder {
 			InputMappings: datatypes.NewJSONSlice([]models.InputMapping{}),
 			Outputs:       datatypes.NewJSONSlice([]models.OutputDefinition{}),
 			Secrets:       datatypes.NewJSONSlice([]models.ValueDefinition{}),
+			Description:   "",
 		},
 	}
 }
@@ -68,6 +69,11 @@ func (b *StageBuilder) InCanvas(canvas *models.Canvas) *StageBuilder {
 
 func (b *StageBuilder) WithName(name string) *StageBuilder {
 	b.newStage.Name = name
+	return b
+}
+
+func (b *StageBuilder) WithDescription(description string) *StageBuilder {
+	b.newStage.Description = description
 	return b
 }
 
@@ -136,6 +142,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 	stage := &models.Stage{
 		CanvasID:      b.canvas.ID,
 		Name:          b.newStage.Name,
+		Description:   b.newStage.Description,
 		Conditions:    b.newStage.Conditions,
 		CreatedAt:     &now,
 		CreatedBy:     b.requesterID,
@@ -143,14 +150,26 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		InputMappings: b.newStage.InputMappings,
 		Outputs:       b.newStage.Outputs,
 		Secrets:       b.newStage.Secrets,
+		ExecutorType:  b.executorType,
+		ExecutorSpec:  datatypes.JSON(b.executorSpec),
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
 		//
+		// Find or create the event source for the executor
+		//
+		resourceID, err := b.findOrCreateEventSource(tx)
+		if err != nil {
+			return err
+		}
+
+		stage.ResourceID = resourceID
+
+		//
 		// Create the stage record
 		//
-		err := tx.Clauses(clause.Returning{}).Create(&stage).Error
+		err = tx.Clauses(clause.Returning{}).Create(&stage).Error
 		if err != nil {
 			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 				return models.ErrNameAlreadyUsed
@@ -169,22 +188,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 			}
 		}
 
-		//
-		// Create the stage executor
-		//
-		resourceID, err := b.findOrCreateEventSource(tx)
-		if err != nil {
-			return err
-		}
-
-		executor := models.StageExecutor{
-			Type:       b.executorType,
-			Spec:       datatypes.JSON(b.executorSpec),
-			ResourceID: resourceID,
-			StageID:    stage.ID,
-		}
-
-		return tx.Create(&executor).Error
+		return nil
 	})
 
 	if err != nil {
@@ -258,21 +262,27 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 
 		//
-		// Delete existing connections and executor
+		// Delete existing connections
 		//
 		if err := tx.Where("target_id = ?", b.existingStage.ID).Delete(&models.Connection{}).Error; err != nil {
 			return fmt.Errorf("failed to delete existing connections: %v", err)
 		}
 
-		if err := tx.Where("stage_id = ?", b.existingStage.ID).Delete(&models.StageExecutor{}).Error; err != nil {
-			return fmt.Errorf("failed to delete existing executor: %v", err)
+		//
+		// Find or create the event source for the executor
+		//
+		resourceID, err := b.findOrCreateEventSource(tx)
+		if err != nil {
+			return err
 		}
 
 		//
 		// Update the stage record.
 		//
 		now := time.Now()
-		err := tx.Model(b.existingStage).
+		err = tx.Model(b.existingStage).
+			Update("name", b.newStage.Name).
+			Update("description", b.newStage.Description).
 			Update("updated_at", now).
 			Update("updated_by", b.requesterID).
 			Update("conditions", b.newStage.Conditions).
@@ -280,6 +290,9 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 			Update("input_mappings", b.newStage.InputMappings).
 			Update("outputs", b.newStage.Outputs).
 			Update("secrets", b.newStage.Secrets).
+			Update("executor_type", b.executorType).
+			Update("executor_spec", datatypes.JSON(b.executorSpec)).
+			Update("resource_id", resourceID).
 			Error
 
 		if err != nil {
@@ -296,22 +309,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 			}
 		}
 
-		//
-		// Re-create the stage executor
-		//
-		resourceID, err := b.findOrCreateEventSource(tx)
-		if err != nil {
-			return err
-		}
-
-		executor := models.StageExecutor{
-			Type:       b.executorType,
-			Spec:       datatypes.JSON(b.executorSpec),
-			ResourceID: resourceID,
-			StageID:    b.existingStage.ID,
-		}
-
-		return tx.Create(&executor).Error
+		return nil
 	})
 
 	if err != nil {

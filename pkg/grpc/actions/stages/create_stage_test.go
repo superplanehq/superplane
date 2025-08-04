@@ -97,7 +97,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for internal event source -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", "internal-description", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
@@ -367,12 +367,14 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("test")
+		description := support.RandomName("description")
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
 			CanvasIdOrName: r.Canvas.ID.String(),
 			Stage: &pb.Stage{
 				Metadata: &pb.Stage_Metadata{
-					Name: name,
+					Name:        name,
+					Description: description,
 				},
 				Spec: &pb.Stage_Spec{
 					Executor: executor,
@@ -421,6 +423,7 @@ func Test__CreateStage(t *testing.T) {
 		assert.NotNil(t, res.Stage.Metadata.CreatedAt)
 		assert.Equal(t, r.Canvas.ID.String(), res.Stage.Metadata.CanvasId)
 		assert.Equal(t, name, res.Stage.Metadata.Name)
+		assert.Equal(t, description, res.Stage.Metadata.Description)
 
 		// Assert executor is correct
 		require.NotNil(t, res.Stage.Spec)

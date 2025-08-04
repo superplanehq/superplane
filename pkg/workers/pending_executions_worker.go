@@ -68,26 +68,21 @@ func (w *PendingExecutionsWorker) ProcessExecution(logger *log.Entry, stage *mod
 		return fmt.Errorf("error finding inputs for execution: %v", err)
 	}
 
-	stageExecutor, err := stage.GetExecutor()
-	if err != nil {
-		return fmt.Errorf("error getting executor for stage: %v", err)
-	}
-
 	secrets, err := w.FindSecrets(stage, w.Encryptor)
 	if err != nil {
 		return fmt.Errorf("error finding secrets for execution: %v", err)
 	}
 
-	spec, err := w.SpecBuilder.Build(stageExecutor.Spec, inputMap, secrets)
+	spec, err := w.SpecBuilder.Build(stage.ExecutorSpec, inputMap, secrets)
 	if err != nil {
 		return err
 	}
 
-	if stageExecutor.ResourceID == nil {
-		return w.handleExecutor(logger, spec, execution, stageExecutor, stage)
+	if stage.ResourceID == nil {
+		return w.handleExecutor(logger, spec, execution, stage)
 	}
 
-	return w.handleIntegrationExecutor(logger, spec, stageExecutor, stage, execution)
+	return w.handleIntegrationExecutor(logger, spec, stage, execution)
 }
 
 func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor crypto.Encryptor) (map[string]string, error) {
@@ -115,8 +110,8 @@ func (w *PendingExecutionsWorker) FindSecrets(stage *models.Stage, encryptor cry
 	return secretMap, nil
 }
 
-func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte, execution models.StageExecution, stageExecutor *models.StageExecutor, stage *models.Stage) error {
-	executor, err := w.Registry.NewExecutor(stageExecutor.Type)
+func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte, execution models.StageExecution, stage *models.Stage) error {
+	executor, err := w.Registry.NewExecutor(stage.ExecutorType)
 	if err != nil {
 		return err
 	}
@@ -167,13 +162,13 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 }
 
-func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, spec []byte, stageExecutor *models.StageExecutor, stage *models.Stage, execution models.StageExecution) error {
-	integration, err := stageExecutor.FindIntegration()
+func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, spec []byte, stage *models.Stage, execution models.StageExecution) error {
+	integration, err := stage.FindIntegration()
 	if err != nil {
 		return err
 	}
 
-	resource, err := stageExecutor.GetResource()
+	resource, err := stage.GetResource()
 	if err != nil {
 		return err
 	}
@@ -199,7 +194,7 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
 	}
 
-	_, err = execution.AddResource(statefulResource.Id(), statefulResource.Type(), *stageExecutor.ResourceID)
+	_, err = execution.AddResource(statefulResource.Id(), statefulResource.Type(), *stage.ResourceID)
 	if err != nil {
 		return fmt.Errorf("error adding resource to execution: %v", err)
 	}

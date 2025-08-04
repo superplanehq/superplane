@@ -371,6 +371,7 @@ export type SuperplaneCanvas = {
 export type SuperplaneCanvasMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     createdBy?: string;
     createdAt?: string;
 };
@@ -430,6 +431,7 @@ export type SuperplaneConnectionGroupFieldSetStateReason = 'STATE_REASON_NONE' |
 export type SuperplaneConnectionGroupMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
     createdBy?: string;
@@ -484,6 +486,10 @@ export type SuperplaneDataFilter = {
     expression?: string;
 };
 
+export type SuperplaneDeleteCanvasResponse = {
+    [key: string]: unknown;
+};
+
 export type SuperplaneDescribeCanvasResponse = {
     canvas?: SuperplaneCanvas;
 };
@@ -508,6 +514,7 @@ export type SuperplaneEventSource = {
 export type SuperplaneEventSourceMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
     updatedAt?: string;
@@ -657,6 +664,7 @@ export type SuperplaneStageEventStateReason = 'STATE_REASON_UNKNOWN' | 'STATE_RE
 export type SuperplaneStageMetadata = {
     id?: string;
     name?: string;
+    description?: string;
     canvasId?: string;
     createdAt?: string;
 };
@@ -1270,6 +1278,35 @@ export type SuperplaneApproveStageEventResponses = {
 };
 
 export type SuperplaneApproveStageEventResponse2 = SuperplaneApproveStageEventResponses[keyof SuperplaneApproveStageEventResponses];
+
+export type SuperplaneDeleteCanvasData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: {
+        organizationId?: string;
+    };
+    url: '/api/v1/canvases/{idOrName}';
+};
+
+export type SuperplaneDeleteCanvasErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneDeleteCanvasError = SuperplaneDeleteCanvasErrors[keyof SuperplaneDeleteCanvasErrors];
+
+export type SuperplaneDeleteCanvasResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDeleteCanvasResponse;
+};
+
+export type SuperplaneDeleteCanvasResponse2 = SuperplaneDeleteCanvasResponses[keyof SuperplaneDeleteCanvasResponses];
 
 export type SuperplaneDescribeCanvasData = {
     body?: never;

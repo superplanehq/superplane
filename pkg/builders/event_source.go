@@ -25,6 +25,7 @@ type EventSourceBuilder struct {
 	registry    *registry.Registry
 	canvas      *models.Canvas
 	name        string
+	description string
 	scope       string
 	eventTypes  []models.EventType
 	integration *models.Integration
@@ -56,6 +57,11 @@ func (b *EventSourceBuilder) InCanvas(canvas *models.Canvas) *EventSourceBuilder
 
 func (b *EventSourceBuilder) WithName(name string) *EventSourceBuilder {
 	b.name = name
+	return b
+}
+
+func (b *EventSourceBuilder) WithDescription(description string) *EventSourceBuilder {
+	b.description = description
 	return b
 }
 
@@ -117,7 +123,7 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, b.eventTypes, nil)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, b.description, encryptedKey, b.scope, b.eventTypes, nil)
 	if err != nil {
 		return nil, "", err
 	}
@@ -174,7 +180,7 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, encryptedKey, b.scope, b.eventTypes, &resource.ID)
+	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, b.name, b.description, encryptedKey, b.scope, b.eventTypes, &resource.ID)
 	if err != nil {
 		return nil, "", err
 	}

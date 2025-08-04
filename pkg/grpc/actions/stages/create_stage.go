@@ -115,6 +115,7 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithEncryptor(encryptor).
 		InCanvas(canvas).
 		WithName(req.Stage.Metadata.Name).
+		WithDescription(req.Stage.Metadata.Description).
 		WithRequester(uuid.MustParse(userID)).
 		WithConditions(conditions).
 		WithConnections(connections).
@@ -275,12 +276,7 @@ func serializeStage(
 	outputs []*pb.OutputDefinition,
 	inputMappings []*pb.InputMapping,
 ) (*pb.Stage, error) {
-	stageExecutor, err := stage.GetExecutor()
-	if err != nil {
-		return nil, err
-	}
-
-	executor, err := serializeExecutor(stageExecutor)
+	executor, err := serializeExecutor(stage)
 	if err != nil {
 		return nil, err
 	}
@@ -297,10 +293,11 @@ func serializeStage(
 
 	return &pb.Stage{
 		Metadata: &pb.Stage_Metadata{
-			Id:        stage.ID.String(),
-			Name:      stage.Name,
-			CanvasId:  stage.CanvasID.String(),
-			CreatedAt: timestamppb.New(*stage.CreatedAt),
+			Id:          stage.ID.String(),
+			Name:        stage.Name,
+			Description: stage.Description,
+			CanvasId:    stage.CanvasID.String(),
+			CreatedAt:   timestamppb.New(*stage.CreatedAt),
 		},
 		Spec: &pb.Stage_Spec{
 			Conditions:    conditions,
@@ -456,32 +453,32 @@ func serializeCondition(condition models.StageCondition) (*pb.Condition, error) 
 	}
 }
 
-func serializeExecutor(executor *models.StageExecutor) (*pb.Executor, error) {
-	var specMap map[string]any
-	err := json.Unmarshal(executor.Spec, &specMap)
+func serializeExecutor(stage models.Stage) (*pb.Executor, error) {
+	var executorSpec map[string]any
+	err := json.Unmarshal(stage.ExecutorSpec, &executorSpec)
 	if err != nil {
 		return nil, err
 	}
 
-	spec, err := structpb.NewStruct(specMap)
+	spec, err := structpb.NewStruct(executorSpec)
 	if err != nil {
 		return nil, err
 	}
 
-	if executor.ResourceID == nil {
+	if stage.ResourceID == nil {
 		return &pb.Executor{
-			Type: executor.Type,
+			Type: stage.ExecutorType,
 			Spec: spec,
 		}, nil
 	}
 
-	integrationResource, err := executor.GetIntegrationResource()
+	integrationResource, err := stage.GetIntegrationResource()
 	if err != nil {
 		return nil, err
 	}
 
 	return &pb.Executor{
-		Type: executor.Type,
+		Type: stage.ExecutorType,
 		Spec: spec,
 		Integration: &integrationpb.IntegrationRef{
 			Name:       integrationResource.IntegrationName,

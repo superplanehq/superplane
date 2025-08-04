@@ -36,6 +36,10 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 	return canvases.CreateCanvas(ctx, req, s.authorizationService)
 }
 
+func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
+	return canvases.DeleteCanvas(ctx, req, s.authorizationService)
+}
+
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
 	return canvases.DescribeCanvas(ctx, req)
 }

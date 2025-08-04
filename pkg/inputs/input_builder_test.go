@@ -15,10 +15,10 @@ func Test__InputBuilder(t *testing.T) {
 		Integration: true,
 	})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", []byte("docs-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+	docsSource, err := r.Canvas.CreateEventSource("docs", "docs-description", []byte("docs-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", []byte("tf-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+	tfSource, err := r.Canvas.CreateEventSource("tf", "tf-description", []byte("tf-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {

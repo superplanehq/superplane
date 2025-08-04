@@ -24,17 +24,21 @@ export const transformEventSourcesToNodes = (
         }).slice(0, 3)
       : [];
     
-    
     return ({
       id: es.metadata?.id || '',
       type: 'githubIntegration',
       data: {
         id: es.metadata?.id || '',
         name: es.metadata?.name,
-        events: lastEvents
+        description: es.metadata?.description,
+        events: lastEvents,
+        integration: es.spec?.integration,
+        resource: es.spec?.resource,
+        eventSourceType: es.eventSourceType,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
-      draggable: true
+      draggable: true,
+ 
     }) as unknown as AllNodeType;
   });
 };
@@ -51,22 +55,26 @@ export const transformStagesToNodes = (
       label: st.metadata?.name || '',
       labels: [],
       status: "",
+      description: st.metadata?.description || '',
       icon: "storage",
       queues: st.queue || [],
       connections: st.spec?.connections || [],
       conditions: st.spec?.conditions || [],
       outputs: st.spec?.outputs || [],
       inputs: st.spec?.inputs || [],
+      secrets: st.spec?.secrets || [],
       executor: st.spec?.executor,
       approveStageEvent: (event: SuperplaneStageEvent) => {
         approveStageEvent(event.id!, st.metadata?.id || '');
-      }
+      },
+      isDraft: st.isDraft || false
     },
     position: nodePositions[st.metadata?.id || ''] || {
       x: 600 * ((st.spec?.connections?.length || 1)),
       y: (idx - 1) * 400
     },
-    draggable: true
+    draggable: true,
+
   } as unknown as AllNodeType));
 };
 
@@ -80,6 +88,7 @@ export const transformConnectionGroupsToNodes = (
     data: {
       id: g.metadata?.id || '',
       name: g.metadata?.name || '',
+      description: g.metadata?.description || '',
       connections: g.spec?.connections || [],
       groupBy: g.spec?.groupBy || [],
     },
@@ -87,7 +96,9 @@ export const transformConnectionGroupsToNodes = (
       x: 600 * ((g.spec?.connections?.length || 1)),
       y: (idx - 1) * 400
     },
-    draggable: true
+    draggable: true,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
   } as unknown as AllNodeType));
 };
 
@@ -96,7 +107,7 @@ export const transformToEdges = (
   connectionGroups: SuperplaneConnectionGroup[],
   eventSources: SuperplaneEventSource[]
 ): EdgeType[] => {
-  let stageEdges = stages.flatMap((st) =>
+  const stageEdges = stages.flatMap((st) =>
     (st.spec?.connections || []).map((conn) => {
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||
@@ -117,7 +128,7 @@ export const transformToEdges = (
     })
   );
 
-  let connectionGroupEdges = connectionGroups.flatMap((g) =>
+  const connectionGroupEdges = connectionGroups.flatMap((g) =>
     (g.spec?.connections || []).map((conn) => {
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||
@@ -145,17 +156,21 @@ export const autoLayoutNodes = async (
   nodes: AllNodeType[],
   edges: Edge[]
 ) => {
-  const elkNodes: ElkNode[] = nodes.map((node) => ({
+  let elkNodes: ElkNode[] = nodes.map((node) => ({
     id: node.id,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
   }));
 
-  const elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
+
+  let elkEdges: ElkExtendedEdge[] = edges.map((edge) => ({
     id: edge.id,
     sources: [edge.source],
     targets: [edge.target],
   }));
+
+  elkNodes = Array.from(new Map(elkNodes.map((node) => [node.id, node])).values());
+  elkEdges = Array.from(new Map(elkEdges.map((edge) => [edge.id, edge])).values());
 
   try {
     const layoutedGraph = await elk.layout({

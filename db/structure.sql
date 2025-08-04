@@ -66,7 +66,9 @@ CREATE TABLE public.canvases (
     created_at timestamp without time zone NOT NULL,
     created_by uuid NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    organization_id uuid NOT NULL
+    organization_id uuid NOT NULL,
+    deleted_at timestamp with time zone,
+    description text
 );
 
 
@@ -150,7 +152,8 @@ CREATE TABLE public.connection_groups (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone,
     updated_by uuid,
-    spec jsonb DEFAULT '{}'::jsonb NOT NULL
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    description text
 );
 
 
@@ -184,6 +187,7 @@ CREATE TABLE public.event_sources (
     resource_id uuid,
     state character varying(64) NOT NULL,
     scope character varying(64) NOT NULL,
+    description text,
     event_types jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
@@ -382,19 +386,6 @@ CREATE TABLE public.stage_executions (
 
 
 --
--- Name: stage_executors; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.stage_executors (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    stage_id uuid NOT NULL,
-    resource_id uuid,
-    type character varying(64) NOT NULL,
-    spec jsonb DEFAULT '{}'::jsonb NOT NULL
-);
-
-
---
 -- Name: stages; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -406,11 +397,15 @@ CREATE TABLE public.stages (
     created_by uuid NOT NULL,
     updated_at timestamp without time zone,
     updated_by uuid,
+    executor_spec jsonb DEFAULT '{}'::jsonb NOT NULL,
     conditions jsonb,
     inputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     outputs jsonb DEFAULT '[]'::jsonb NOT NULL,
     input_mappings jsonb DEFAULT '[]'::jsonb NOT NULL,
-    secrets jsonb DEFAULT '[]'::jsonb NOT NULL
+    secrets jsonb DEFAULT '[]'::jsonb NOT NULL,
+    executor_type character varying(64) NOT NULL,
+    resource_id uuid,
+    description text
 );
 
 
@@ -675,14 +670,6 @@ ALTER TABLE ONLY public.stage_executions
 
 
 --
--- Name: stage_executors stage_executors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executors
-    ADD CONSTRAINT stage_executors_pkey PRIMARY KEY (id);
-
-
---
 -- Name: stages stages_canvas_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -734,6 +721,13 @@ CREATE INDEX idx_account_providers_provider ON public.account_providers USING bt
 --
 
 CREATE INDEX idx_account_providers_user_id ON public.account_providers USING btree (user_id);
+
+
+--
+-- Name: idx_canvases_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvases_deleted_at ON public.canvases USING btree (deleted_at);
 
 
 --
@@ -951,22 +945,6 @@ ALTER TABLE ONLY public.stage_executions
 
 ALTER TABLE ONLY public.stage_executions
     ADD CONSTRAINT stage_executions_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
-
-
---
--- Name: stage_executors stage_executors_resource_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executors
-    ADD CONSTRAINT stage_executors_resource_id_fkey FOREIGN KEY (resource_id) REFERENCES public.resources(id);
-
-
---
--- Name: stage_executors stage_executors_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.stage_executors
-    ADD CONSTRAINT stage_executors_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
 
 
 --

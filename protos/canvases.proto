@@ -51,6 +51,17 @@ service Superplane {
     };
   }
 
+  rpc DeleteCanvas(DeleteCanvasRequest) returns (DeleteCanvasResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{id_or_name}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a canvas";
+      description: "Deletes the specified canvas (can be referenced by ID or name)";
+      tags: "Canvas";
+    };
+  }
+
   rpc CreateConnectionGroup(CreateConnectionGroupRequest) returns (CreateConnectionGroupResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id_or_name}/connection-groups"
@@ -247,8 +258,9 @@ message Canvas {
   message Metadata {
     string id = 1;
     string name = 2;
-    string created_by = 3;
-    google.protobuf.Timestamp created_at = 4;
+    string description = 3;
+    string created_by = 4;
+    google.protobuf.Timestamp created_at = 5;
   }
 
   Metadata metadata = 1;
@@ -264,6 +276,13 @@ message CreateCanvasResponse {
   Canvas canvas = 1;
 }
 
+message DeleteCanvasRequest {
+  string id_or_name = 1;
+  string organization_id = 2;
+}
+
+message DeleteCanvasResponse {}
+
 message DescribeCanvasRequest {
   string id = 1;
   string name = 2;
@@ -278,9 +297,10 @@ message EventSource {
   message Metadata {
     string id = 1;
     string name = 2;
-    string canvas_id = 3;
-    google.protobuf.Timestamp created_at = 4;
-    google.protobuf.Timestamp updated_at = 5;
+    string description = 3;
+    string canvas_id = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
   }
 
   message Spec {
@@ -379,11 +399,12 @@ message ConnectionGroup {
   message Metadata {
     string id = 1;
     string name = 2;
-    string canvas_id = 3;
-    google.protobuf.Timestamp created_at = 4;
-    string created_by = 5;
-    google.protobuf.Timestamp updated_at = 6;
-    string updated_by = 7;
+    string description = 3;
+    string canvas_id = 4;
+    google.protobuf.Timestamp created_at = 5;
+    string created_by = 6;
+    google.protobuf.Timestamp updated_at = 7;
+    string updated_by = 8;
   }
 
   message Spec {
@@ -460,8 +481,9 @@ message Stage {
   message Metadata {
     string id = 1;
     string name = 2;
-    string canvas_id = 3;
-    google.protobuf.Timestamp created_at = 4;
+    string description = 3;
+    string canvas_id = 4;
+    google.protobuf.Timestamp created_at = 5;
   }
 
   message Spec {

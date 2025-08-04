@@ -20,13 +20,18 @@ const (
 )
 
 type Stage struct {
-	ID        uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID  uuid.UUID
-	Name      string
-	CreatedAt *time.Time
-	UpdatedAt *time.Time
-	CreatedBy uuid.UUID
-	UpdatedBy uuid.UUID
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID    uuid.UUID
+	Name        string
+	Description string
+	CreatedAt   *time.Time
+	UpdatedAt   *time.Time
+	CreatedBy   uuid.UUID
+	UpdatedBy   uuid.UUID
+
+	ExecutorType string
+	ExecutorSpec datatypes.JSON
+	ResourceID   *uuid.UUID
 
 	Conditions    datatypes.JSONSlice[StageCondition]
 	Inputs        datatypes.JSONSlice[InputDefinition]
@@ -222,6 +227,57 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	return &stage, nil
 }
 
+func (s *Stage) GetResource() (*Resource, error) {
+	var resource Resource
+
+	err := database.Conn().
+		Where("id = ?", s.ResourceID).
+		First(&resource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
+func (s *Stage) GetIntegrationResource() (*IntegrationResource, error) {
+	var r IntegrationResource
+
+	err := database.Conn().
+		Table("resources").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Select("resources.name as name, resources.type as type, integrations.name as integration_name, integrations.domain_type as domain_type").
+		Where("resources.id = ?", s.ResourceID).
+		First(&r).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
+}
+
+func (s *Stage) FindIntegration() (*Integration, error) {
+	var integration Integration
+
+	err := database.Conn().
+		Table("resources").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Where("resources.id = ?", s.ResourceID).
+		Select("integrations.*").
+		First(&integration).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &integration, nil
+}
+
 func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
 	connection.TargetID = s.ID
 	connection.TargetType = ConnectionTargetTypeStage
@@ -246,21 +302,6 @@ func (s *Stage) HasApprovalCondition() bool {
 	}
 
 	return false
-}
-
-func (s *Stage) GetExecutor() (*StageExecutor, error) {
-	var executor StageExecutor
-
-	err := database.Conn().
-		Where("stage_id = ?", s.ID).
-		First(&executor).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &executor, nil
 }
 
 func (s *Stage) MissingRequiredOutputs(outputs map[string]any) []string {
