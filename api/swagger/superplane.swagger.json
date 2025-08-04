@@ -2119,6 +2119,24 @@
       },
       "title": "Common data structures"
     },
+    "EventSourceEventType": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/SuperplaneFilter"
+          }
+        },
+        "filterOperator": {
+          "$ref": "#/definitions/SuperplaneFilterOperator"
+        }
+      }
+    },
     "ExecutionResult": {
       "type": "string",
       "enum": [
@@ -2356,14 +2374,6 @@
       ],
       "default": "AUTH_TYPE_NONE"
     },
-    "IntegrationOIDC": {
-      "type": "object",
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        }
-      }
-    },
     "IntegrationsCreateIntegrationRequest": {
       "type": "object",
       "properties": {
@@ -2451,9 +2461,6 @@
         },
         "auth": {
           "$ref": "#/definitions/IntegrationAuth"
-        },
-        "oidc": {
-          "$ref": "#/definitions/IntegrationOIDC"
         }
       }
     },
@@ -3306,6 +3313,13 @@
         },
         "resource": {
           "$ref": "#/definitions/IntegrationsResourceRef"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/EventSourceEventType"
+          }
         }
       }
     },

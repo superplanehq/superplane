@@ -2,6 +2,7 @@ package public
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -11,7 +12,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -20,15 +20,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test__HealthCheckEndpoint(t *testing.T) {
+	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -39,184 +41,53 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	require.Equal(t, 200, response.Code)
 }
 
-func Test__ReceiveGitHubEvent(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
+func Test__ReceiveWebhookFromIntegration(t *testing.T) {
+	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
+	defer r.Close()
+
+	source, key, err := builders.NewEventSourceBuilder(r.Encryptor).
+		InCanvas(r.Canvas).
+		WithName("demo-project").
+		WithScope(models.EventSourceScopeExternal).
+		ForIntegration(r.Integration).
+		ForResource(&models.Resource{
+			ResourceType:  semaphore.ResourceTypeProject,
+			ExternalID:    uuid.NewString(),
+			IntegrationID: r.Integration.ID,
+			ResourceName:  "demo-project",
+		}).
+		Create()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
-	org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
-	require.NoError(t, err)
-
-	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, org.ID, "test", "test")
-	require.NoError(t, err)
-
-	eventSource, err := canvas.CreateEventSource("github-repo-1", "github-repo-1-description", []byte("my-key"), models.EventSourceScopeExternal, nil)
-	require.NoError(t, err)
-
-	validEvent := []byte(`{"action": "created"}`)
-	validSignature := "sha256=ee9f99fa8d06b44ffc69ee1c2a7e32e848e8b40536bb5e8405dabb3bbbcaf619"
-	validURL := "/sources/" + eventSource.ID.String() + "/github"
-
-	t.Run("event for invalid source -> 404", func(t *testing.T) {
-		invalidURL := "/sources/invalidsource/github"
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        invalidURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "source ID not found\n", response.Body.String())
+	validEvent, _ := json.Marshal(semaphore.Hook{
+		Workflow: semaphore.HookWorkflow{ID: uuid.NewString()},
+		Pipeline: semaphore.HookPipeline{ID: uuid.NewString()},
 	})
 
-	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "",
-		})
-
-		assert.Equal(t, 404, response.Code)
-	})
-
-	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/x-www-form-urlencoded",
-		})
-
-		assert.Equal(t, 404, response.Code)
-	})
-
-	t.Run("event for source that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/sources/" + uuid.New().String() + "/github"
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        invalidURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "source ID not found\n", response.Body.String())
-	})
-
-	t.Run("event with missing signature header -> 400", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   "",
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 400, response.Code)
-		assert.Equal(t, "Missing X-Hub-Signature-256 header\n", response.Body.String())
-	})
-
-	t.Run("invalid signature -> 403", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   "sha256=823a7b73b066321f4f644e70e1d32c15dc8f4677968149c1f35eb07639013271",
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 403, response.Code)
-		assert.Equal(t, "Invalid signature\n", response.Body.String())
-	})
-
-	t.Run("properly signed event is received -> 200", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 200, response.Code)
-		events, err := models.ListEventsBySourceID(eventSource.ID)
-		require.NoError(t, err)
-		require.Len(t, events, 1)
-		assert.Equal(t, eventSource.ID, events[0].SourceID)
-		assert.Equal(t, models.EventStatePending, events[0].State)
-		assert.Equal(t, []byte(`{"action": "created"}`), []byte(events[0].Raw))
-		assert.NotNil(t, events[0].ReceivedAt)
-	})
-
-	t.Run("event data is limited to 64k", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        generateBigBody(t),
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
-		assert.Equal(t, "Request body is too large - must be up to 65536 bytes\n", response.Body.String())
-	})
-}
-
-func Test__ReceiveSemaphoreEvent(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-
-	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
-	require.NoError(t, err)
-
-	org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
-	require.NoError(t, err)
-
-	userID := uuid.New()
-	canvas, err := models.CreateCanvas(userID, org.ID, "test", "test")
-	require.NoError(t, err)
-
-	eventSource, err := canvas.CreateEventSource("semaphore-source-1", "semaphore-source-1-description", []byte("my-key"), models.EventSourceScopeExternal, nil)
-	require.NoError(t, err)
-
-	// No need to include organization ID in the payload anymore
-	validEvent := []byte(`{"version": "1.0.0", "event_type": "workflow_completed"}`)
-
-	key := []byte("my-key")
-	mac := hmac.New(sha256.New, key)
+	mac := hmac.New(sha256.New, []byte(key))
 	mac.Write(validEvent)
-	validSignatureBytes := mac.Sum(nil)
-	validSignature := "sha256=" + hex.EncodeToString(validSignatureBytes)
-
-	validURL := "/sources/" + eventSource.ID.String() + "/semaphore"
+	validSignature := "sha256=" + hex.EncodeToString(mac.Sum(nil))
 
 	t.Run("event for invalid source -> 404", func(t *testing.T) {
-		invalidURL := "/sources/invalidsource/semaphore"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
+			path:        "/sources/invalidsource/semaphore",
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
 		})
 
 		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "source ID not found\n", response.Body.String())
+		assert.Equal(t, "source not found\n", response.Body.String())
 	})
 
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:    "POST",
-			path:      validURL,
+			path:      "/sources/" + source.ID.String() + "/semaphore",
 			body:      validEvent,
 			signature: validSignature,
 		})
@@ -227,7 +98,7 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/sources/" + source.ID.String() + "/semaphore",
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/x-www-form-urlencoded",
@@ -237,35 +108,34 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 	})
 
 	t.Run("event for source that does not exist -> 404", func(t *testing.T) {
-		invalidURL := "/sources/" + uuid.New().String() + "/semaphore"
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        invalidURL,
+			path:        "/sources/" + uuid.New().String() + "/semaphore",
 			body:        validEvent,
 			signature:   validSignature,
 			contentType: "application/json",
 		})
 
 		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "source ID not found\n", response.Body.String())
+		assert.Equal(t, "source not found\n", response.Body.String())
 	})
 
 	t.Run("event with missing signature header -> 400", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/sources/" + source.ID.String() + "/semaphore",
 			body:        validEvent,
 			contentType: "application/json",
 		})
 
-		assert.Equal(t, 400, response.Code)
-		assert.Equal(t, "Missing X-Semaphore-Signature-256 header\n", response.Body.String())
+		assert.Equal(t, 403, response.Code)
+		assert.Equal(t, "Invalid signature\n", response.Body.String())
 	})
 
 	t.Run("invalid signature -> 403", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/sources/" + source.ID.String() + "/semaphore",
 			body:        validEvent,
 			signature:   "sha256=invalid-signature",
 			contentType: "application/json",
@@ -275,38 +145,10 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 		assert.Equal(t, "Invalid signature\n", response.Body.String())
 	})
 
-	t.Run("properly signed event is received -> 200", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:      "POST",
-			path:        validURL,
-			body:        validEvent,
-			signature:   validSignature,
-			contentType: "application/json",
-		})
-
-		assert.Equal(t, 200, response.Code)
-		events, err := models.ListEventsBySourceID(eventSource.ID)
-		require.NoError(t, err)
-		require.Len(t, events, 1)
-		assert.Equal(t, eventSource.ID, events[0].SourceID)
-		assert.Equal(t, models.EventStatePending, events[0].State)
-
-		// Compare the event payload
-		var savedEvent map[string]interface{}
-		err = json.Unmarshal([]byte(events[0].Raw), &savedEvent)
-		require.NoError(t, err)
-
-		var expectedEvent map[string]interface{}
-		err = json.Unmarshal(validEvent, &expectedEvent)
-		require.NoError(t, err)
-		assert.Equal(t, expectedEvent["event_type"], savedEvent["event_type"])
-		assert.NotNil(t, events[0].ReceivedAt)
-	})
-
 	t.Run("event data is limited to 64k", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
-			path:        validURL,
+			path:        "/sources/" + source.ID.String() + "/semaphore",
 			body:        generateBigBody(t),
 			signature:   validSignature,
 			contentType: "application/json",
@@ -314,6 +156,160 @@ func Test__ReceiveSemaphoreEvent(t *testing.T) {
 
 		assert.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
 		assert.Equal(t, "Request body is too large - must be up to 65536 bytes\n", response.Body.String())
+	})
+
+	t.Run("properly signed event is received -> 200", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/sources/" + source.ID.String() + "/semaphore",
+			body:        validEvent,
+			signature:   validSignature,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, 200, response.Code)
+		events, err := models.ListEventsBySourceID(source.ID)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		assert.Equal(t, source.ID, events[0].SourceID)
+		assert.Equal(t, models.EventStatePending, events[0].State)
+		assert.Equal(t, semaphore.PipelineDoneEvent, events[0].Type)
+		assert.NotNil(t, events[0].ReceivedAt)
+		assert.NotNil(t, events[0].Raw)
+		assert.NotNil(t, events[0].Headers)
+	})
+}
+
+func Test__ReceiveCustomWebhook(t *testing.T) {
+	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
+	defer r.Close()
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
+	require.NoError(t, err)
+
+	key, err := r.Source.GetDecryptedKey(context.Background(), r.Encryptor)
+	require.NoError(t, err)
+
+	validEvent := []byte(`{"foo": "bar"}`)
+	mac := hmac.New(sha256.New, key)
+	mac.Write(validEvent)
+	validSignature := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+	t.Run("event for invalid source -> 404", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/invalidsource",
+			body:         validEvent,
+			signature:    validSignature,
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, 404, response.Code)
+		assert.Equal(t, "source not found\n", response.Body.String())
+	})
+
+	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         validEvent,
+			signature:    validSignature,
+			customSource: true,
+		})
+
+		assert.Equal(t, 404, response.Code)
+	})
+
+	t.Run("unsupported Content-Type header -> 400", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         validEvent,
+			signature:    validSignature,
+			contentType:  "application/x-www-form-urlencoded",
+			customSource: true,
+		})
+
+		assert.Equal(t, 404, response.Code)
+	})
+
+	t.Run("event for source that does not exist -> 404", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + uuid.New().String(),
+			body:         validEvent,
+			signature:    validSignature,
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, 404, response.Code)
+		assert.Equal(t, "source not found\n", response.Body.String())
+	})
+
+	t.Run("event with missing signature header -> 400", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         validEvent,
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, 403, response.Code)
+		assert.Equal(t, "Invalid signature\n", response.Body.String())
+	})
+
+	t.Run("invalid signature -> 403", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         validEvent,
+			signature:    "sha256=invalid-signature",
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, 403, response.Code)
+		assert.Equal(t, "Invalid signature\n", response.Body.String())
+	})
+
+	t.Run("event data is limited to 64k", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         generateBigBody(t),
+			signature:    validSignature,
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, http.StatusRequestEntityTooLarge, response.Code)
+		assert.Equal(t, "Request body is too large - must be up to 65536 bytes\n", response.Body.String())
+	})
+
+	t.Run("properly signed event is received -> 200", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:       "POST",
+			path:         "/sources/" + r.Source.ID.String(),
+			body:         validEvent,
+			signature:    validSignature,
+			contentType:  "application/json",
+			customSource: true,
+		})
+
+		assert.Equal(t, 200, response.Code)
+		events, err := models.ListEventsBySourceID(r.Source.ID)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+		assert.Equal(t, r.Source.ID, events[0].SourceID)
+		assert.Equal(t, models.EventStatePending, events[0].State)
+		assert.Equal(t, "custom", events[0].Type)
+		assert.NotNil(t, events[0].ReceivedAt)
+		assert.NotNil(t, events[0].Raw)
+		assert.NotNil(t, events[0].Headers)
 	})
 }
 
@@ -347,22 +343,27 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
-	validToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	superplaneToken, err := signer.Generate(execution.ID.String(), time.Hour)
+	require.NoError(t, err)
+
+	workflowID := uuid.NewString()
+	_, err = execution.AddResource(workflowID, "workflow", *stage.ResourceID)
 	require.NoError(t, err)
 
 	outputs := map[string]any{"version": "v1.0.0", "sha": "078fc8755c051"}
 
-	goodBody, _ := json.Marshal(&OutputsRequest{
+	goodBody, _ := json.Marshal(&ExecutionOutputRequest{
+		ExternalID:  workflowID,
 		ExecutionID: execution.ID.String(),
 		Outputs:     outputs,
 	})
 
 	t.Run("event for invalid execution -> 404", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: "not-a-uuid",
 			Outputs:     outputs,
 		})
@@ -371,12 +372,12 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
 		assert.Equal(t, 404, response.Code)
-		assert.Equal(t, "execution not found\n", response.Body.String())
+		assert.Equal(t, "Execution not found\n", response.Body.String())
 	})
 
 	t.Run("missing Content-Type header -> 400", func(t *testing.T) {
@@ -385,7 +386,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
@@ -397,14 +398,14 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        goodBody,
 			contentType: "application/x-www-form-urlencoded",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
 		assert.Equal(t, 404, response.Code)
 	})
 
 	t.Run("execution that does not exist -> 401", func(t *testing.T) {
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: uuid.NewString(),
 			Outputs:     outputs,
 		})
@@ -414,11 +415,10 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			path:        "/outputs",
 			body:        body,
 			contentType: "application/json",
-			authToken:   validToken,
+			authToken:   superplaneToken,
 		})
 
-		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, 404, response.Code)
 	})
 
 	t.Run("event with missing authorization header -> 401", func(t *testing.T) {
@@ -432,7 +432,6 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Missing Authorization header\n", response.Body.String())
 	})
 
 	t.Run("invalid auth token -> 403", func(t *testing.T) {
@@ -445,15 +444,31 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		})
 
 		assert.Equal(t, 401, response.Code)
-		assert.Equal(t, "Invalid token\n", response.Body.String())
+		assert.Equal(t, "Unauthorized\n", response.Body.String())
 	})
 
-	t.Run("proper request -> 200 and execution outputs are updated", func(t *testing.T) {
+	t.Run("superplane token is used -> 200 and execution outputs are updated", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:      "POST",
 			path:        "/outputs",
 			body:        goodBody,
-			authToken:   validToken,
+			authToken:   superplaneToken,
+			contentType: "application/json",
+		})
+
+		assert.Equal(t, 200, response.Code)
+		execution, err := models.FindExecutionByID(execution.ID)
+		require.NoError(t, err)
+		assert.Equal(t, outputs, execution.Outputs.Data())
+	})
+
+	t.Run("integration OIDC ID token is used -> 200 and execution outputs are updated", func(t *testing.T) {
+		token := r.SemaphoreAPIMock.GenerateIDToken(resource.Id(), workflowID)
+		response := execRequest(server, requestParams{
+			method:      "POST",
+			path:        "/outputs",
+			body:        goodBody,
+			authToken:   token,
 			contentType: "application/json",
 		})
 
@@ -465,7 +480,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	t.Run("output not defined in stage is ignored", func(t *testing.T) {
 		// 'time' output is not defined in the stage
-		body, _ := json.Marshal(&OutputsRequest{
+		body, _ := json.Marshal(&ExecutionOutputRequest{
 			ExecutionID: execution.ID.String(),
 			Outputs: map[string]any{
 				"sha":     "078fc8755c051",
@@ -478,7 +493,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        body,
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -493,7 +508,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 			method:      "POST",
 			path:        "/outputs",
 			body:        generateBigBody(t),
-			authToken:   validToken,
+			authToken:   superplaneToken,
 			contentType: "application/json",
 		})
 
@@ -502,12 +517,12 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	})
 }
 
-// Test__OpenAPIEndpoints tests that the OpenAPI endpoints serve the files correctly
 func Test__OpenAPIEndpoints(t *testing.T) {
 	checkSwaggerFiles(t)
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -572,7 +587,8 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 
 func Test__GRPCGatewayRegistration(t *testing.T) {
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, signer, "", "")
+	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")
@@ -625,12 +641,13 @@ func checkSwaggerFiles(t *testing.T) {
 }
 
 type requestParams struct {
-	method      string
-	path        string
-	body        []byte
-	signature   string
-	authToken   string
-	contentType string
+	method       string
+	path         string
+	body         []byte
+	signature    string
+	authToken    string
+	contentType  string
+	customSource bool
 }
 
 func execRequest(server *Server, params requestParams) *httptest.ResponseRecorder {
@@ -642,13 +659,10 @@ func execRequest(server *Server, params requestParams) *httptest.ResponseRecorde
 
 	// Set the appropriate signature header based on the path
 	if params.signature != "" {
-		if strings.Contains(params.path, "/github") {
-			req.Header.Add("X-Hub-Signature-256", params.signature)
-		} else if strings.Contains(params.path, "/semaphore") {
-			req.Header.Add("X-Semaphore-Signature-256", params.signature)
+		if params.customSource {
+			req.Header.Add("X-Signature-256", params.signature)
 		} else {
-			// Default to GitHub header for backward compatibility
-			req.Header.Add("X-Hub-Signature-256", params.signature)
+			req.Header.Add("X-Semaphore-Signature-256", params.signature)
 		}
 	}
 

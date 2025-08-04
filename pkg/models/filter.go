@@ -15,6 +15,53 @@ type Filter struct {
 	Header *HeaderFilter
 }
 
+func ApplyFilters(filters []Filter, operator string, event *Event) (bool, error) {
+	if len(filters) == 0 {
+		return true, nil
+	}
+
+	switch operator {
+	case FilterOperatorOr:
+		return applyOrFilter(filters, event)
+
+	case FilterOperatorAnd:
+		return applyAndFilter(filters, event)
+
+	default:
+		return false, fmt.Errorf("invalid filter operator: %s", operator)
+	}
+}
+
+func applyAndFilter(filters []Filter, event *Event) (bool, error) {
+	for _, filter := range filters {
+		ok, err := filter.Evaluate(event)
+		if err != nil {
+			return false, fmt.Errorf("error evaluating filter: %v", err)
+		}
+
+		if !ok {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+func applyOrFilter(filters []Filter, event *Event) (bool, error) {
+	for _, filter := range filters {
+		ok, err := filter.Evaluate(event)
+		if err != nil {
+			return false, fmt.Errorf("error evaluating filter: %v", err)
+		}
+
+		if ok {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (f *Filter) EvaluateExpression(event *Event) (bool, error) {
 	switch f.Type {
 	case FilterTypeData:

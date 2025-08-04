@@ -21,6 +21,7 @@ docs/AuthorizationPermission.md
 docs/CanvasAPI.md
 docs/ConnectionGroupAPI.md
 docs/EventSourceAPI.md
+docs/EventSourceEventType.md
 docs/ExecutionResult.md
 docs/GooglerpcStatus.md
 docs/GroupByField.md
@@ -43,7 +44,6 @@ docs/InputMappingWhenTriggeredBy.md
 docs/IntegrationAPI.md
 docs/IntegrationAuth.md
 docs/IntegrationAuthType.md
-docs/IntegrationOIDC.md
 docs/IntegrationsCreateIntegrationRequest.md
 docs/IntegrationsCreateIntegrationResponse.md
 docs/IntegrationsDescribeIntegrationResponse.md
@@ -175,6 +175,7 @@ git_push.sh
 model_auth_token.go
 model_authorization_domain_type.go
 model_authorization_permission.go
+model_event_source_event_type.go
 model_execution_result.go
 model_googlerpc_status.go
 model_group_by_field.go
@@ -195,7 +196,6 @@ model_input_mapping_when.go
 model_input_mapping_when_triggered_by.go
 model_integration_auth.go
 model_integration_auth_type.go
-model_integration_oidc.go
 model_integrations_create_integration_request.go
 model_integrations_create_integration_response.go
 model_integrations_describe_integration_response.go

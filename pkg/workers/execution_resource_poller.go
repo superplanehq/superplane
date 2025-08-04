@@ -55,12 +55,12 @@ func (w *ExecutionResourcePoller) ProcessResource(resource models.ExecutionResou
 		return err
 	}
 
-	integrationImpl, err := w.Registry.NewIntegration(context.Background(), integration)
+	integrationImpl, err := w.Registry.NewResourceManager(context.Background(), integration)
 	if err != nil {
 		return err
 	}
 
-	statefulResource, err := integrationImpl.Check(resource.Type, resource.ExternalID)
+	statefulResource, err := integrationImpl.Status(resource.Type, resource.ExternalID)
 	if err != nil {
 		return err
 	}

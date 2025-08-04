@@ -10,8 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
 
 const ExecutionCreatedRoutingKey = "execution-created"

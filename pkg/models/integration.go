@@ -28,7 +28,6 @@ type Integration struct {
 	URL        string
 	AuthType   string
 	Auth       datatypes.JSONType[IntegrationAuth]
-	OIDC       datatypes.JSONType[IntegrationOIDC] `gorm:"column:oidc"`
 	CreatedAt  *time.Time
 	CreatedBy  uuid.UUID
 	UpdatedAt  *time.Time
@@ -40,10 +39,6 @@ type IntegrationAuth struct {
 
 type IntegrationAuthToken struct {
 	ValueFrom ValueDefinitionFrom `json:"value_from"`
-}
-
-type IntegrationOIDC struct {
-	Enabled bool `json:"enabled"`
 }
 
 func CreateIntegration(integration *Integration) (*Integration, error) {

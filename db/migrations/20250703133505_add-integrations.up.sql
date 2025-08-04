@@ -12,7 +12,6 @@ CREATE TABLE integrations (
   url         CHARACTER VARYING(256) NOT NULL,
   auth_type   CHARACTER VARYING(64) NOT NULL,
   auth        jsonb NOT NULL DEFAULT '{}',
-  oidc        jsonb NOT NULL DEFAULT '{}',
 
   PRIMARY KEY (id),
   UNIQUE (domain_type, domain_id, name)
@@ -37,19 +36,10 @@ ALTER TABLE event_sources
   ADD COLUMN scope CHARACTER VARYING(64) NOT NULL,
   ADD FOREIGN KEY (resource_id) REFERENCES resources(id);
 
-ALTER TABLE stages DROP COLUMN executor_spec;
-
-CREATE TABLE stage_executors (
-  id          uuid NOT NULL DEFAULT uuid_generate_v4(),
-  stage_id    uuid NOT NULL,
-  resource_id uuid,
-  type        CHARACTER VARYING(64) NOT NULL,
-  spec        jsonb NOT NULL DEFAULT '{}',
-
-  PRIMARY KEY (id),
-  FOREIGN KEY (stage_id) REFERENCES stages(id),
-  FOREIGN KEY (resource_id) REFERENCES resources(id)
-);
+ALTER TABLE stages
+  ADD COLUMN executor_type CHARACTER VARYING(64) NOT NULL,
+  ALTER COLUMN executor_spec SET DEFAULT '{}',
+  ADD COLUMN resource_id uuid;
 
 ALTER TABLE stage_executions
   DROP COLUMN reference_id;

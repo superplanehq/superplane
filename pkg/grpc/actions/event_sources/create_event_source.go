@@ -21,15 +21,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
@@ -65,6 +58,11 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		}
 	}
 
+	eventTypes, err := validateEventTypes(req.EventSource.Spec)
+	if err != nil {
+		return nil, err
+	}
+
 	//
 	// Create the event source
 	//
@@ -75,6 +73,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		WithScope(models.EventSourceScopeExternal).
 		ForIntegration(integration).
 		ForResource(resource).
+		WithEventTypes(eventTypes).
 		Create()
 
 	if err != nil {
@@ -111,8 +110,52 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	return response, nil
 }
 
+func validateEventTypes(spec *pb.EventSource_Spec) ([]models.EventType, error) {
+	if spec == nil || spec.Events == nil {
+		return []models.EventType{}, nil
+	}
+
+	out := []models.EventType{}
+	for _, i := range spec.Events {
+		filters, err := actions.ValidateFilters(i.Filters)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, models.EventType{
+			Type:           i.Type,
+			Filters:        filters,
+			FilterOperator: actions.ProtoToFilterOperator(i.FilterOperator),
+		})
+	}
+
+	return out, nil
+}
+
 func serializeEventSource(eventSource models.EventSource) (*pb.EventSource, error) {
-	spec := &pb.EventSource_Spec{}
+	spec := &pb.EventSource_Spec{
+		Events: []*pb.EventSource_EventType{},
+	}
+
+	//
+	// Serialize event types
+	//
+	for _, eventType := range eventSource.EventTypes {
+		filters, err := actions.SerializeFilters(eventType.Filters)
+		if err != nil {
+			return nil, err
+		}
+
+		spec.Events = append(spec.Events, &pb.EventSource_EventType{
+			Type:           eventType.Type,
+			Filters:        filters,
+			FilterOperator: actions.FilterOperatorToProto(eventType.FilterOperator),
+		})
+	}
+
+	//
+	// Serialize integration and resource
+	//
 	if eventSource.ResourceID != nil {
 		resource, err := models.FindResourceByID(*eventSource.ResourceID)
 		if err != nil {

@@ -81,6 +81,11 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		Encryptor: crypto.NewNoOpEncryptor(),
 	}
 
+	r.Registry = registry.NewRegistry(r.Encryptor)
+	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
+	require.NoError(t, r.SemaphoreAPIMock.Init())
+	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
+
 	var err error
 	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
 	require.NoError(t, err)
@@ -88,16 +93,9 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test", "Test Canvas")
 	require.NoError(t, err)
 
-	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", "gh-description", []byte("my-key"), models.EventSourceScopeExternal, nil)
-		require.NoError(t, err)
-	}
-
-	r.Registry = registry.NewRegistry(r.Encryptor)
-	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-	r.SemaphoreAPIMock.Init()
-	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
-
+	//
+	// Create integration
+	//
 	if options.Integration {
 		secret, err := CreateCanvasSecret(t, &r, map[string]string{"key": "test"})
 		require.NoError(t, err)
@@ -124,6 +122,14 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 
 		require.NoError(t, err)
 		r.Integration = integration
+	}
+
+	//
+	// Create source
+	//
+	if options.Source {
+		r.Source, err = r.Canvas.CreateEventSource("gh", "description", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		require.NoError(t, err)
 	}
 
 	if options.Stage {
@@ -206,7 +212,7 @@ func CreateFieldSet(t *testing.T, fields map[string]string, connectionGroup *mod
 	fieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
 	require.NoError(t, err)
 
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, []byte(`{}`), []byte(`{}`))
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", []byte(`{}`), []byte(`{}`))
 	require.NoError(t, err)
 	fieldSet.AttachEvent(database.Conn(), event)
 	return fieldSet
@@ -223,7 +229,7 @@ func CreateStageEventWithData(t *testing.T,
 	headers []byte,
 	inputs map[string]any,
 ) *models.StageEvent {
-	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, data, headers)
+	event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", data, headers)
 	require.NoError(t, err)
 	stageEvent, err := models.CreateStageEvent(stage.ID, event, models.StageEventStatePending, "", inputs)
 	require.NoError(t, err)

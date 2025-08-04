@@ -18,9 +18,9 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
@@ -35,13 +35,13 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
 		)
 
-		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 
 		fieldSet, hash, err := connectionGroup.CalculateFieldSet(event)
@@ -64,14 +64,14 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
-						{Name: "type", Expression: "type"},
+						{Name: "version", Expression: "$.ref"},
+						{Name: "type", Expression: "$.type"},
 					},
 				},
 			},
 		)
 
-		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1","type":"ce"}`), []byte(`{}`))
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1","type":"ce"}`), []byte(`{}`))
 		require.NoError(t, err)
 
 		fieldSet, hash, err := connectionGroup.CalculateFieldSet(event)
@@ -91,9 +91,9 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("single field", func(t *testing.T) {
@@ -108,7 +108,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
@@ -119,7 +119,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Create version=v1 event for source1
 		//
-		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 		fields := map[string]string{"version": "v1"}
 		hash, _ := crypto.SHA256ForMap(fields)
@@ -131,7 +131,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Create version=v2 event for source1
 		//
-		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v2"}`), []byte(`{}`))
+		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v2"}`), []byte(`{}`))
 		require.NoError(t, err)
 		fieldsV2 := map[string]string{"version": "v2"}
 		v2Hash, _ := crypto.SHA256ForMap(fieldsV2)
@@ -153,7 +153,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Create version=v1 event for source2
 		//
-		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 		_, err = fieldSet.AttachEvent(database.Conn(), event)
 		require.NoError(t, err)
@@ -183,7 +183,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
+						{Name: "version", Expression: "$.ref"},
 					},
 				},
 			},
@@ -194,7 +194,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Create version=v1 event for source1 and source2
 		//
-		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 		fields := map[string]string{"version": "v1"}
 		hash, _ := crypto.SHA256ForMap(fields)
@@ -202,7 +202,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		require.NoError(t, err)
 		_, err = fieldSet.AttachEvent(database.Conn(), event)
 		require.NoError(t, err)
-		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 		_, err = fieldSet.AttachEvent(database.Conn(), event)
 		require.NoError(t, err)
@@ -219,7 +219,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Now, we send a new version=v1 event for source1 only.
 		//
-		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1"}`), []byte(`{}`))
+		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1"}`), []byte(`{}`))
 		require.NoError(t, err)
 		newFieldSet, err := connectionGroup.CreateFieldSet(database.Conn(), fields, hash)
 		require.NoError(t, err)
@@ -246,8 +246,8 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 			ConnectionGroupSpec{
 				GroupBy: &ConnectionGroupBySpec{
 					Fields: []ConnectionGroupByField{
-						{Name: "version", Expression: "ref"},
-						{Name: "app", Expression: "app"},
+						{Name: "version", Expression: "$.ref"},
+						{Name: "app", Expression: "$.app"},
 					},
 				},
 			},
@@ -258,7 +258,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Simulate new version=v1,app=auth event coming from source1
 		//
-		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
+		event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
 		require.NoError(t, err)
 		v1AuthFields := map[string]string{"version": "v1", "app": "auth"}
 		v1AuthFieldsHash, _ := crypto.SHA256ForMap(v1AuthFields)
@@ -270,7 +270,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Simulate new version=v2,app=auth event coming from source1
 		//
-		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v2","app":"auth"}`), []byte(`{}`))
+		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v2","app":"auth"}`), []byte(`{}`))
 		require.NoError(t, err)
 		v2AuthFields := map[string]string{"version": "v2", "app": "auth"}
 		v2AuthFieldsHash, _ := crypto.SHA256ForMap(v2AuthFields)
@@ -282,7 +282,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Simulate new version=v1,app=core event coming from source1
 		//
-		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v2","app":"core"}`), []byte(`{}`))
+		event, err = CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v2","app":"core"}`), []byte(`{}`))
 		require.NoError(t, err)
 		v1CoreFields := map[string]string{"version": "v2", "app": "core"}
 		v1CoreFieldsHash, _ := crypto.SHA256ForMap(v1CoreFields)
@@ -307,7 +307,7 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 		//
 		// Simulate new version=v1,app=auth event coming from source2
 		//
-		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
+		event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
 		require.NoError(t, err)
 		_, err = v1AuthfieldSet.AttachEvent(database.Conn(), event)
 		require.NoError(t, err)
@@ -335,9 +335,9 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, nil)
+	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, nil)
+	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
 	require.NoError(t, err)
 
 	connectionGroup, err := canvas.CreateConnectionGroup(
@@ -351,8 +351,8 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 		ConnectionGroupSpec{
 			GroupBy: &ConnectionGroupBySpec{
 				Fields: []ConnectionGroupByField{
-					{Name: "version", Expression: "ref"},
-					{Name: "app", Expression: "app"},
+					{Name: "version", Expression: "$.ref"},
+					{Name: "app", Expression: "$.app"},
 				},
 			},
 		},
@@ -361,7 +361,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	//
 	// Simulate new version=v1,app=auth event coming from source1 and source2
 	//
-	event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
+	event, err := CreateEvent(source1.ID, source1.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
 	require.NoError(t, err)
 	v1AuthFields := map[string]string{"version": "v1", "app": "auth"}
 	v1AuthFieldsHash, _ := crypto.SHA256ForMap(v1AuthFields)
@@ -369,7 +369,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, err)
 	_, err = v1AuthfieldSet.AttachEvent(database.Conn(), event)
 	require.NoError(t, err)
-	event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
+	event, err = CreateEvent(source2.ID, source2.Name, SourceTypeEventSource, "push", []byte(`{"ref":"v1","app":"auth"}`), []byte(`{}`))
 	require.NoError(t, err)
 	_, err = v1AuthfieldSet.AttachEvent(database.Conn(), event)
 
@@ -380,6 +380,7 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	rawEvent, err := FindLastEventBySourceID(connectionGroup.ID)
 	require.NoError(t, err)
 	assert.Equal(t, map[string]any{
+		"type": FieldSetCompletedEventType,
 		"fields": map[string]any{
 			"app":     "auth",
 			"version": "v1",

@@ -28,6 +28,10 @@ func NewCanvasService(encryptor crypto.Encryptor, authService authorization.Auth
 	}
 }
 
+//
+// Methods for canvases
+//
+
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
 	return canvases.CreateCanvas(ctx, req, s.authorizationService)
 }
@@ -40,17 +44,37 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 	return canvases.DescribeCanvas(ctx, req)
 }
 
+func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
+	return canvases.ListCanvases(ctx, req, s.authorizationService)
+}
+
+//
+// Methods for event sources
+//
+
 func (s *CanvasService) CreateEventSource(ctx context.Context, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, canvasID, req)
 }
 
 func (s *CanvasService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
-	return eventsources.DescribeEventSource(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.DescribeEventSource(ctx, canvasID, req)
 }
 
 func (s *CanvasService) ResetEventSourceKey(ctx context.Context, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
-	return eventsources.ResetEventSourceKey(ctx, s.encryptor, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.ResetEventSourceKey(ctx, s.encryptor, canvasID, req)
 }
+
+func (s *CanvasService) ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return eventsources.ListEventSources(ctx, canvasID, req)
+}
+
+//
+// Methods for stages
+//
 
 func (s *CanvasService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
 	return stages.CreateStage(ctx, s.encryptor, s.registry, req)
@@ -68,21 +92,17 @@ func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveSt
 	return stageevents.ApproveStageEvent(ctx, req)
 }
 
-func (s *CanvasService) ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
-	return eventsources.ListEventSources(ctx, req)
-}
-
 func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
 	return stages.ListStages(ctx, req)
-}
-
-func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
-	return canvases.ListCanvases(ctx, req, s.authorizationService)
 }
 
 func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
 	return stageevents.ListStageEvents(ctx, req)
 }
+
+//
+// Methods for connection groups
+//
 
 func (s *CanvasService) CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
 	return groups.CreateConnectionGroup(ctx, req)

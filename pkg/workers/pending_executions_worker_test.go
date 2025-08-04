@@ -13,8 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
 
 const ExecutionStartedRoutingKey = "execution-started"
@@ -209,14 +209,10 @@ func assertParameters(t *testing.T, req *semaphore.CreateWorkflowRequest, execut
 		all[k] = v
 	}
 
-	assert.Len(t, req.Parameters, len(all)+1)
+	assert.Len(t, req.Parameters, len(all))
 	for name, value := range all {
 		v, ok := req.Parameters[name]
 		assert.True(t, ok)
 		assert.Equal(t, value, v)
 	}
-
-	v, ok := req.Parameters["SUPERPLANE_STAGE_EXECUTION_TOKEN"]
-	assert.True(t, ok)
-	assert.NotEmpty(t, v)
 }

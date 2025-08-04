@@ -14,8 +14,8 @@ import (
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
@@ -97,7 +97,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for internal event source -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", "internal-description", []byte(`key`), models.EventSourceScopeInternal, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", "internal-description", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())

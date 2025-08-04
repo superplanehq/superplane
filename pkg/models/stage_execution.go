@@ -120,7 +120,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 	//
 	// Create stage execution completion event
 	//
-	event, err := NewStageExecutionCompletion(e, e.Outputs.Data())
+	event, err := NewExecutionCompletionEvent(e, e.Outputs.Data())
 	if err != nil {
 		return fmt.Errorf("error creating stage completion event: %v", err)
 	}
@@ -130,7 +130,7 @@ func (e *StageExecution) FinishInTransaction(tx *gorm.DB, stage *Stage, result s
 		return fmt.Errorf("error marshaling event: %v", err)
 	}
 
-	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, raw, []byte(`{}`))
+	_, err = CreateEventInTransaction(tx, e.StageID, stage.Name, SourceTypeStage, event.Type, raw, []byte(`{}`))
 	if err != nil {
 		return fmt.Errorf("error creating event: %v", err)
 	}
@@ -144,6 +144,37 @@ func (e *StageExecution) UpdateOutputs(outputs map[string]any) error {
 		Update("outputs", datatypes.NewJSONType(outputs)).
 		Update("updated_at", time.Now()).
 		Error
+}
+
+type ExecutionIntegrationResource struct {
+	IntegrationType     string
+	IntegrationURL      string
+	ParentExternalID    string
+	ExecutionExternalID string
+}
+
+func (e *StageExecution) IntegrationResource(externalID string) (*ExecutionIntegrationResource, error) {
+	var r ExecutionIntegrationResource
+	err := database.Conn().
+		Table("execution_resources").
+		Joins("INNER JOIN resources ON resources.id = execution_resources.parent_resource_id").
+		Joins("INNER JOIN integrations ON integrations.id = resources.integration_id").
+		Where("execution_resources.execution_id = ?", e.ID).
+		Where("execution_resources.external_id = ?", externalID).
+		Select(`
+			integrations.url as integration_url,
+			integrations.type as integration_type,
+			execution_resources.external_id as execution_external_id,
+			resources.external_id as parent_external_id
+		`).
+		Scan(&r).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &r, nil
 }
 
 func FindExecutionByID(id uuid.UUID) (*StageExecution, error) {

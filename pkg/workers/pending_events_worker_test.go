@@ -11,8 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
+	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
-	testconsumer "github.com/superplanehq/superplane/test/test_consumer"
 )
 
 const EventCreatedRoutingKey = "stage-event-created"
@@ -32,7 +32,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 	executorType, executorSpec, integrationResource := support.Executor(t, r)
 
 	t.Run("source is not connected to any stage -> event is discarded", func(t *testing.T) {
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 
 		err = w.Tick()
@@ -41,6 +41,95 @@ func Test__PendingEventsWorker(t *testing.T) {
 		event, err = models.FindEventByID(event.ID)
 		require.NoError(t, err)
 		assert.Equal(t, models.EventStateDiscarded, event.State)
+	})
+
+	t.Run("source has filter for event -> event is discarded", func(t *testing.T) {
+		source, err := r.Canvas.CreateEventSource(
+			support.RandomName("source"),
+			"description",
+			[]byte(`key`),
+			models.EventSourceScopeExternal,
+			[]models.EventType{{Type: "push"}},
+			nil,
+		)
+
+		require.NoError(t, err)
+
+		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "pull_request", []byte(`{}`), []byte(`{}`))
+		require.NoError(t, err)
+
+		err = w.Tick()
+		require.NoError(t, err)
+
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateDiscarded, event.State)
+	})
+
+	t.Run("error when building inputs for stage event", func(t *testing.T) {
+		//
+		// Create stage with a bad input mapping.
+		//
+		inputs := []models.InputDefinition{{Name: "VERSION"}}
+		inputMappings := []models.InputMapping{
+			{
+				Values: []models.ValueDefinition{
+					{
+						Name: "VERSION",
+						ValueFrom: &models.ValueDefinitionFrom{
+							EventData: &models.ValueDefinitionFromEventData{
+								Connection: r.Source.Name,
+								Expression: "$.a.b.c", // <<-- this field does not exist in the event
+							},
+						},
+					},
+				},
+			},
+		}
+
+		stage, err := builders.NewStageBuilder(r.Registry).
+			WithEncryptor(r.Encryptor).
+			InCanvas(r.Canvas).
+			WithName(support.RandomName("stage")).
+			WithRequester(r.User).
+			WithConnections([]models.Connection{
+				{
+					SourceID:   r.Source.ID,
+					SourceType: models.SourceTypeEventSource,
+				},
+			}).
+			WithInputs(inputs).
+			WithInputMappings(inputMappings).
+			WithExecutorType(executorType).
+			WithExecutorSpec(executorSpec).
+			ForResource(integrationResource).
+			ForIntegration(r.Integration).
+			Create()
+
+		require.NoError(t, err)
+
+		//
+		// Create an event for the source, and trigger the worker.
+		//
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
+		require.NoError(t, err)
+		err = w.Tick()
+		require.NoError(t, err)
+
+		//
+		// Event is moved to processed state,
+		// but no stage event is created.
+		//
+		event, err = models.FindEventByID(event.ID)
+		require.NoError(t, err)
+		assert.Equal(t, models.EventStateProcessed, event.State)
+
+		//
+		// Two pending stage events are created: one for each stage.
+		//
+		stageEvents, err := stage.ListPendingEvents()
+		require.NoError(t, err)
+		require.Empty(t, stageEvents)
 	})
 
 	t.Run("source is connected to many stages -> event is added to each stage queue", func(t *testing.T) {
@@ -57,7 +146,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 						ValueFrom: &models.ValueDefinitionFrom{
 							EventData: &models.ValueDefinitionFromEventData{
 								Connection: r.Source.Name,
-								Expression: "ref",
+								Expression: "$.ref",
 							},
 						},
 					},
@@ -68,7 +157,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		stage1, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-1").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -89,7 +178,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		stage2, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-2").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -114,7 +203,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -144,15 +233,15 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", "source-2", []byte(`key`), models.EventSourceScopeExternal, nil)
+		source2, err := r.Canvas.CreateEventSource("source-2", "description", []byte(`key`), models.EventSourceScopeExternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		//
 		// Create connection group connected to both sources
 		//
 		connectionGroup, err := r.Canvas.CreateConnectionGroup(
-			"connection-group-1",
-			"test",
+			support.RandomName("connection-group"),
+			"description",
 			r.User.String(),
 			[]models.Connection{
 				{SourceID: r.Source.ID, SourceName: r.Source.Name, SourceType: models.SourceTypeEventSource},
@@ -161,7 +250,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 			models.ConnectionGroupSpec{
 				GroupBy: &models.ConnectionGroupBySpec{
 					Fields: []models.ConnectionGroupByField{
-						{Name: "VERSION", Expression: "ref"},
+						{Name: "VERSION", Expression: "$.ref"},
 					},
 				},
 			},
@@ -172,7 +261,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the first source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -191,7 +280,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the second source, and trigger the worker.
 		//
-		event, err = models.CreateEvent(source2.ID, source2.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err = models.CreateEvent(source2.ID, source2.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -218,7 +307,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-3").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -235,7 +324,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 							ValueFrom: &models.ValueDefinitionFrom{
 								EventData: &models.ValueDefinitionFromEventData{
 									Connection: r.Source.Name,
-									Expression: "ref",
+									Expression: "$.ref",
 								},
 							},
 						},
@@ -259,7 +348,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-4").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -276,7 +365,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 							ValueFrom: &models.ValueDefinitionFrom{
 								EventData: &models.ValueDefinitionFromEventData{
 									Connection: firstStage.Name,
-									Expression: "outputs.VERSION",
+									Expression: "$.outputs.VERSION",
 								},
 							},
 						},
@@ -294,7 +383,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Simulating a stage completion event coming in for the first stage.
 		//
-		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
+		event, err := models.CreateEvent(firstStage.ID, firstStage.Name, models.SourceTypeStage, models.ExecutionFinishedEventType, []byte(`{"outputs":{"VERSION":"v1"}}`), eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -328,7 +417,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-5").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -339,7 +428,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 						{
 							Type: models.FilterTypeData,
 							Data: &models.DataFilter{
-								Expression: "ref == 'v1'",
+								Expression: "$.ref == 'v1'",
 							},
 						},
 					},
@@ -356,7 +445,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-6").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -367,7 +456,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 						{
 							Type: models.FilterTypeData,
 							Data: &models.DataFilter{
-								Expression: "ref == 'v2'",
+								Expression: "$.ref == 'v2'",
 							},
 						},
 					},
@@ -384,7 +473,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		// Create an event for the source, and trigger the worker.
 		//
-		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, eventData, eventHeaders)
+		event, err := models.CreateEvent(r.Source.ID, r.Source.Name, models.SourceTypeEventSource, "push", eventData, eventHeaders)
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)
@@ -417,7 +506,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
 			InCanvas(r.Canvas).
-			WithName("stage-7").
+			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
 				{
@@ -457,7 +546,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		require.NoError(t, err)
 		source, err := resource.FindEventSource()
 		require.NoError(t, err)
-		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, eventData, []byte(`{}`))
+		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "push", eventData, []byte(`{}`))
 		require.NoError(t, err)
 		err = w.Tick()
 		require.NoError(t, err)

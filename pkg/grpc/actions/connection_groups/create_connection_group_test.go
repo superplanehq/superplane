@@ -86,7 +86,7 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("cannot use internal event source in connection -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, nil)
+		internalSource, err := r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
 		require.NoError(t, err)
 
 		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())

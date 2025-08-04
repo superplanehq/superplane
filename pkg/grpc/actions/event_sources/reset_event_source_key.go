@@ -15,17 +15,10 @@ import (
 	"gorm.io/gorm"
 )
 
-func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
+func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvasID string, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	logger := logging.ForCanvas(canvas)

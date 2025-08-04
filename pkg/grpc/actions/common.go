@@ -181,7 +181,7 @@ func ProtoToFilterOperator(in pb.FilterOperator) string {
 	}
 }
 
-func filterOperatorToProto(in string) pb.FilterOperator {
+func FilterOperatorToProto(in string) pb.FilterOperator {
 	switch in {
 	case models.FilterOperatorOr:
 		return pb.FilterOperator_FILTER_OPERATOR_OR
@@ -194,7 +194,7 @@ func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 	connections := []*pb.Connection{}
 
 	for _, c := range in {
-		filters, err := serializeFilters(c.Filters)
+		filters, err := SerializeFilters(c.Filters)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filters: %v", err)
 		}
@@ -202,7 +202,7 @@ func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 		connections = append(connections, &pb.Connection{
 			Type:           ConnectionTypeToProto(c.SourceType),
 			Name:           c.SourceName,
-			FilterOperator: filterOperatorToProto(c.FilterOperator),
+			FilterOperator: FilterOperatorToProto(c.FilterOperator),
 			Filters:        filters,
 		})
 	}
@@ -217,11 +217,11 @@ func SerializeConnections(in []models.Connection) ([]*pb.Connection, error) {
 	return connections, nil
 }
 
-func serializeFilters(in []models.Filter) ([]*pb.Filter, error) {
+func SerializeFilters(in []models.Filter) ([]*pb.Filter, error) {
 	filters := []*pb.Filter{}
 
 	for _, f := range in {
-		filter, err := serializeFilter(f)
+		filter, err := SerializeFilter(f)
 		if err != nil {
 			return nil, fmt.Errorf("invalid filter: %v", err)
 		}
@@ -232,7 +232,7 @@ func serializeFilters(in []models.Filter) ([]*pb.Filter, error) {
 	return filters, nil
 }
 
-func serializeFilter(in models.Filter) (*pb.Filter, error) {
+func SerializeFilter(in models.Filter) (*pb.Filter, error) {
 	switch in.Type {
 	case models.FilterTypeData:
 		return &pb.Filter{
@@ -328,7 +328,7 @@ func ValidateResource(ctx context.Context, registry *registry.Registry, integrat
 	//
 	// If resource record does not exist yet, we need to go to the integration to find it.
 	//
-	integrationImpl, err := registry.NewIntegration(ctx, integration)
+	integrationImpl, err := registry.NewResourceManager(ctx, integration)
 	if err != nil {
 		return nil, fmt.Errorf("error starting integration implementation: %v", err)
 	}

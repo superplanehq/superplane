@@ -60,16 +60,6 @@ spec:
     # For example, we can use this for AWS.
     #
     # use: oidc
-
-  #
-  # Specifies whether or not the integration supports OIDC ID tokens,
-  # and can use them to authenticate requests sent to SuperPlane.
-  #
-  # If it does, the integration can also specify which claims it accepts.
-  #
-  oidc:
-    enabled: true
-    claims: {}
 ```
 
 ### Using an integration in a stage executor
