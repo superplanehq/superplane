@@ -12,11 +12,16 @@ import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSource
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   // Initial state
   canvas: {},
+  canvasId: '',
   stages: [],
   eventSources: [],
   connectionGroups: [],
   nodePositions: {},
+  eventSourceKeys: {},
   selectedStageId: null,
+  editingStageId: null,
+  editingEventSourceId: null,
+  editingConnectionGroupId: null,
   webSocketConnectionStatus: ReadyState.UNINSTANTIATED,
 
   // reactflow state
@@ -29,20 +34,33 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   initialize: (data: CanvasData) => {
     set({
       canvas: data.canvas || {},
+      canvasId: data.canvas?.metadata?.id || '',
       stages: data.stages || [],
       eventSources: data.eventSources || [],
       connectionGroups: data.connectionGroups || [],
       nodePositions: {},
+      eventSourceKeys: {},
     });
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage) => {
+  addStage: (stage: SuperplaneStage, draft = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
-        queue: []
+        queue: [],
+        isDraft: draft
       }]
+    }));
+    get().syncToReactFlow();
+  },
+
+  removeStage: (stageId: string) => {
+    set((state) => ({
+      stages: state.stages.filter(s => s.metadata?.id !== stageId),
+      // Also clear selection and editing state if this stage was selected/being edited
+      selectedStageId: state.selectedStageId === stageId ? null : state.selectedStageId,
+      editingStageId: state.editingStageId === stageId ? null : state.editingStageId
     }));
     get().syncToReactFlow();
   },
@@ -63,9 +81,32 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
+  removeConnectionGroup: (connectionGroupId: string) => {
+    set((state) => ({
+      connectionGroups: state.connectionGroups.filter(cg => cg.metadata?.id !== connectionGroupId)
+    }));
+    get().syncToReactFlow();
+  },
+
+  updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => {
+    set((state) => ({
+      connectionGroups: state.connectionGroups.map(cg => cg.metadata?.id === connectionGroup.metadata?.id ? connectionGroup : cg)
+    }));
+    get().syncToReactFlow();
+  },
+
   addEventSource: (eventSource: EventSourceWithEvents) => {
     set((state) => ({
       eventSources: [...state.eventSources, eventSource]
+    }));
+    get().syncToReactFlow();
+  },
+
+  removeEventSource: (eventSourceId: string) => {
+    set((state) => ({
+      eventSources: state.eventSources.filter(es => es.metadata?.id !== eventSourceId),
+      // Also clear editing state if this event source was being edited
+      editingEventSourceId: state.editingEventSourceId === eventSourceId ? null : state.editingEventSourceId
     }));
     get().syncToReactFlow();
   },
@@ -86,7 +127,6 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   updateNodePosition: (nodeId: string, position: { x: number, y: number }) => {
-    // console.log("Updating node position:", nodeId, position);
     set((state) => ({
       nodePositions: {
         ...state.nodePositions,
@@ -115,6 +155,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   cleanSelectedStageId: () => {
     set({ selectedStageId: null });
+  },
+
+  setEditingStage: (stageId: string | null) => {
+    set({ editingStageId: stageId });
+  },
+
+  setEditingEventSource: (eventSourceId: string | null) => {
+    set({ editingEventSourceId: eventSourceId });
+  },
+
+  setEditingConnectionGroup: (connectionGroupId: string | null) => {
+    set({ editingConnectionGroupId: connectionGroupId });
   },
 
   updateWebSocketConnectionStatus: (status) => {
@@ -239,4 +291,21 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   fitViewNode: () => {
     // Will be replaced when setReactFlowInstance is called
   },
+
+  updateEventSourceKey: (eventSourceId: string, key: string) => {
+    set((state) => ({
+      eventSourceKeys: {
+        ...state.eventSourceKeys,
+        [eventSourceId]: key
+      }
+    }));
+  },
+
+  resetEventSourceKey: (eventSourceId: string) => {
+    set((state) => {
+      const updatedEventSourceKeys = { ...state.eventSourceKeys };
+      delete updatedEventSourceKeys[eventSourceId];
+      return { eventSourceKeys: updatedEventSourceKeys };
+    });
+  }
 }));

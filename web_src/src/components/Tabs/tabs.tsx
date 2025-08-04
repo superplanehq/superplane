@@ -36,10 +36,10 @@ export function useTabs(defaultTab: string, tabs: Tab[]): TabsState & { setActiv
   }
 }
 
-export function Tabs({ 
-  tabs, 
-  defaultTab, 
-  onTabChange, 
+export function Tabs({
+  tabs,
+  defaultTab,
+  onTabChange,
   className,
   variant = 'default'
 }: TabsProps) {
@@ -47,7 +47,6 @@ export function Tabs({
 
   const handleTabClick = useCallback((tabId: string) => {
     if (tabs.find(tab => tab.id === tabId)?.disabled) return
-    
     setActiveTab(tabId)
     onTabChange?.(tabId)
   }, [tabs, onTabChange])
@@ -73,10 +72,10 @@ export function Tabs({
     <div className={baseClasses}>
       <nav className={navClasses}>
         {tabs.map((tab) => (
-          <TabItem 
-            key={tab.id} 
-            tab={tab} 
-            activeTab={activeTab} 
+          <TabItem
+            key={tab.id}
+            tab={tab}
+            activeTab={activeTab}
             onClick={handleTabClick}
             variant={variant}
           />
@@ -86,12 +85,12 @@ export function Tabs({
   )
 }
 
-function TabItem({ 
-  tab, 
-  activeTab, 
-  onClick, 
-  variant 
-}: { 
+function TabItem({
+  tab,
+  activeTab,
+  onClick,
+  variant
+}: {
   tab: Tab
   activeTab: string
   onClick: (tabId: string) => void
@@ -109,18 +108,18 @@ function TabItem({
   const buttonClasses = clsx(
     'relative flex items-center gap-2 font-medium text-sm transition-all duration-200 ease-in-out focus:outline-hidden',
     {
-      'px-1 py-3 border-b-2 border-transparent': variant === 'default',
+      'px-2 py-3 border-b-2 border-transparent': variant === 'default',
       'text-blue-600 border-blue-500 dark:text-blue-400': variant === 'default' && isActive,
-      
+
       'px-3 py-2 rounded-md': variant === 'pills',
       'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white': variant === 'pills' && isActive,
       'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white': variant === 'pills' && !isActive && !isDisabled,
-      
+
       'px-3 py-2 relative': variant === 'underline',
       'text-blue-600 dark:text-blue-400': variant === 'underline' && isActive,
-      
+
       'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': (variant === 'default' || variant === 'underline') && !isActive && !isDisabled,
-      
+
       'opacity-50 cursor-not-allowed': isDisabled,
       'cursor-pointer': !isDisabled,
     }
@@ -147,7 +146,6 @@ function TabItem({
           {tab.count > 99 ? '99+' : tab.count}
         </span>
       )}
-      
       {variant === 'underline' && (
         <div className={clsx(
           'absolute inset-x-0 bottom-0 h-0.5 bg-blue-500 transition-all duration-200 ease-in-out',
@@ -161,10 +159,10 @@ function TabItem({
   )
 }
 
-export function ControlledTabs({ 
-  tabs, 
-  activeTab, 
-  onTabChange, 
+export function ControlledTabs({
+  tabs,
+  activeTab,
+  onTabChange,
   className,
   variant = 'default'
 }: {
@@ -188,10 +186,10 @@ export function ControlledTabs({
   )
 
   const navClasses = clsx(
-    'flex',
+    'flex ml-3',
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
-      'gap-6': variant === 'default',
+      'gap-1': variant === 'default',
       'gap-4': variant === 'underline',
     }
   )
@@ -200,10 +198,10 @@ export function ControlledTabs({
     <div className={baseClasses}>
       <nav className={navClasses}>
         {tabs.map((tab) => (
-          <TabItem 
-            key={tab.id} 
-            tab={tab} 
-            activeTab={activeTab} 
+          <TabItem
+            key={tab.id}
+            tab={tab}
+            activeTab={activeTab}
             onClick={handleTabClick}
             variant={variant}
           />

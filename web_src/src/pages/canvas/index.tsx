@@ -1,5 +1,5 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FlowRenderer } from "./components/FlowRenderer";
 import { useCanvasStore } from "./store/canvasStore";
 import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
@@ -7,18 +7,41 @@ import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSour
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
+import { CanvasNavigation } from "../../components/CanvasNavigation";
+import { SettingsPage } from "../../components/SettingsPage";
+import { useNodeHandlers } from "./utils/nodeHandlers";
+import { NodeType } from "./utils/nodeFactories";
 
 // No props needed as we'll get the ID from the URL params
 
 export function Canvas() {
   // Get the canvas ID from the URL params
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
-  const { initialize, selectedStageId, cleanSelectedStageId, stages, approveStageEvent } = useCanvasStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
+  const [canvasName, setCanvasName] = useState<string>('');
+
+  // Determine active view from URL hash or default to editor
+  const activeView = location.hash.startsWith('#settings') ? 'settings' : 'editor';
+
+  // Handle view changes by updating URL hash
+  const handleViewChange = (view: 'editor' | 'settings') => {
+    if (view === 'settings') {
+      navigate(`${location.pathname}#settings`);
+    } else {
+      navigate(location.pathname);
+    }
+  };
+
   // Custom hook for setting up event handlers - must be called at top level
   useWebsocketEvents(canvasId!);
+
+  // Use the modular node handlers
+  const { handleAddNode } = useNodeHandlers(canvasId || '');
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
@@ -43,6 +66,9 @@ export function Canvas() {
         if (!canvasResponse.data?.canvas) {
           throw new Error('Failed to fetch canvas data');
         }
+
+        // Store canvas name for navigation
+        setCanvasName(canvasResponse.data.canvas.metadata?.name || 'Unknown Canvas');
 
         // Fetch stages for the canvas
         const stagesResponse = await superplaneListStages({
@@ -75,7 +101,7 @@ export function Canvas() {
 
         // Use the API stages directly with minimal adaptation
         const mappedStages = stagesResponse.data?.stages || [];
-        
+
         // Collect all events from all stages
         const allEvents: Record<string, SuperplaneStageEvent> = {};
         const stagesWithQueues: StageWithEventQueue[] = [];
@@ -87,7 +113,7 @@ export function Canvas() {
           });
 
           const stageEvents = stageEventsResponse.data?.events || [];
-          
+
           // Add events to the collection
           for (const event of stageEvents) {
             allEvents[event.id!] = event;
@@ -149,28 +175,86 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
+  // Handle adding nodes using the modular system
+  const handleAddNodeByType = (nodeType: string, executorType?: string, eventSourceType?: string) => {
+    try {
+      // Map string types to NodeType enum
+      const nodeTypeMap: Record<string, NodeType> = {
+        'stage': 'stage',
+        'event_source': 'event_source',
+        'eventSource': 'event_source', // Support both naming conventions
+        'connection_group': 'connection_group',
+        'connectionGroup': 'connection_group' // Support both naming conventions
+      };
+
+      const mappedNodeType = nodeTypeMap[nodeType];
+      if (!mappedNodeType) {
+        console.error(`Unknown node type: ${nodeType}`);
+        return;
+      }
+
+      // Handle stages with executor types
+      if (mappedNodeType === 'stage' && executorType) {
+        const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' :
+          executorType === 'http' ? 'HTTP Stage' : 'New Stage';
+        handleAddNode(mappedNodeType, { name: stageName, executorType });
+      } else if (mappedNodeType === 'event_source' && eventSourceType) {
+        const eventName = eventSourceType === 'webhook' ? 'Webhook Event Source' :
+          eventSourceType === 'semaphore' ? 'Semaphore Event Source' : 'New Event Source';
+        handleAddNode(mappedNodeType, { name: eventName, eventSourceType });
+      } else {
+        handleAddNode(mappedNodeType);
+      }
+    } catch (error) {
+      console.error(`Failed to add node of type ${nodeType}:`, error);
+    }
+  };
+
+
   return (
-    <StrictMode>      
-      <div className="relative" style={{ height: "calc(100vh - 3rem)", marginTop: "3rem", overflow: "hidden" }}>
-        <ComponentSidebar 
-          isOpen={isComponentSidebarOpen} 
-          onToggle={() => setIsComponentSidebarOpen(!isComponentSidebarOpen)} 
+    <StrictMode>
+      {/* Canvas Navigation */}
+      <div className="h-[100vh]">
+
+        <CanvasNavigation
+          canvasId={canvasId!}
+          canvasName={canvasName}
+          activeView={activeView}
+          onViewChange={handleViewChange}
+          organizationId={orgId!}
         />
-        
-        {/* Toggle Button for ComponentSidebar - Only show when closed */}
-        {!isComponentSidebarOpen && (
-          <button
-            onClick={() => setIsComponentSidebarOpen(true)}
-            className="fixed top-16 left-4 z-30 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2"
-            title="Open Components"
-          >
-            <span className="text-medium font-semibold text-gray-700">Components</span>
-            <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 -scale-x-100">menu_open</span>
-          </button>
+
+        {/* Content based on active view */}
+        {activeView === 'editor' ? (
+          <div className="relative" style={{ height: "calc(100vh - 3rem)", overflow: "hidden" }}>
+            <ComponentSidebar
+              isOpen={isComponentSidebarOpen}
+              onClose={() => setIsComponentSidebarOpen(false)}
+              onNodeAdd={(nodeType: string, executorType?: string, eventSourceType?: string) => {
+                handleAddNodeByType(nodeType, executorType, eventSourceType);
+              }}
+            />
+
+            {/* Toggle Button for ComponentSidebar - Only show when closed */}
+            {!isComponentSidebarOpen && (
+              <button
+                onClick={() => setIsComponentSidebarOpen(true)}
+                className="fixed top-16 left-4 z-30 px-4 py-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-50 transition-all duration-300 flex items-center gap-2"
+                title="Open Components"
+              >
+                <span className="text-medium font-semibold text-gray-700">Components</span>
+                <span style={{ fontSize: '1.2rem' }} className="material-symbols-outlined text-gray-600 -scale-x-100">menu_open</span>
+              </button>
+            )}
+
+            <FlowRenderer />
+            {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+          </div>
+        ) : (
+          <div className="h-[calc(100%-2.7rem)]" >
+            <SettingsPage organizationId={orgId!} />
+          </div>
         )}
-        
-        <FlowRenderer />
-        {selectedStage && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
       </div>
     </StrictMode>
   );
