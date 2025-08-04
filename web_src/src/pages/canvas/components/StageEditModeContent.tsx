@@ -12,13 +12,13 @@ import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useParams } from 'react-router-dom';
 
-interface EditModeContentProps {
+interface StageEditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
   onDataChange?: (data: { label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean }) => void;
 }
 
-export function EditModeContent({ data, currentStageId, onDataChange }: EditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, onDataChange }: StageEditModeContentProps) {
   const [openSections, setOpenSections] = useState<string[]>(['general']);
 
   const [originalData] = useState({

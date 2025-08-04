@@ -6,7 +6,7 @@ import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
 import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage } from '@/api-client';
-import { EditModeContent } from '../EditModeContent';
+import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
@@ -389,7 +389,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       </div>
 
       {isEditMode ? (
-        <EditModeContent
+        <StageEditModeContent
           data={{
             ...props.data,
             label: stageName,
