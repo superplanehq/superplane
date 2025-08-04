@@ -1,4 +1,12 @@
-## Integrations
+- [Management and usage](#management-and-usage)
+  - [Creating an integration](#creating-an-integration)
+  - [Using an integration in a stage](#using-an-integration-in-a-stage)
+  - [Creating an event source through an integration](#creating-an-event-source-through-an-integration)
+- [Supported Integration Types](#supported-integration-types)
+  - [Semaphore](#semaphore)
+  - [GitHub](#github)
+
+---
 
 Integrations are a way to connect Superplane to external services.
 
@@ -24,9 +32,9 @@ spec:
   #
   # Type of the integration.
   # This field would determine what SuperPlane
-  # actually does when an integration of this type is created.
+  # actually does when this integration is used on a stage or event source.
   #
-  # For example, when a Semaphore integration is created,  
+  # For example, when an event source for a Semaphore integration is created, 
   # SuperPlane needs to create a Semaphore notification to monitor the result of executions.
   # For a GitHub integration, SuperPlane would create the webhook, ...
   #
@@ -62,9 +70,9 @@ spec:
     # use: oidc
 ```
 
-### Using an integration in a stage executor
+### Using an integration in a stage
 
-When creating stages, you must specify the stage executor, and in the executor, you should reference an integration. For example, this is how you run a Semaphore workflow during the stage execution, through the `semaphore-integration` integration:
+When creating stages, you must specify the stage executor, and in the executor, you should reference an integration. For example, this is how you run a Semaphore workflow through the `semaphore-integration` integration:
 
 ```yaml
 executor:
@@ -79,8 +87,6 @@ executor:
     pipelineFile: .semaphore/semaphore.yml
     parameters: {}
 ```
-
-NOTE: not all executor types require an integration, but most of them do. For example, the HTTP executor does not require an integration to be used.
 
 ### Creating an event source through an integration
 
@@ -104,31 +110,36 @@ spec:
 
 ### Semaphore
 
-The Semaphore integration allows you to connect to Semaphore CI/CD and trigger workflows or tasks.
+The Semaphore integration allows you to connect to Semaphore CI/CD and trigger workflows or tasks in specific Semaphore projects, and receive notifications about pipeline status updates. For authentication, you must use a personal API token or service account token.
 
-**Authentication**: Uses a personal API token or service account token.
+Here's an example of a Semaphore integration:
 
-**Supported Resources**:
-- `project`: Semaphore projects that can be used as event sources or executor targets
-
-**Event Sources**: Creates notifications in Semaphore to receive pipeline status updates.
-
-**Executors**: Can trigger workflows or specific tasks within a Semaphore project.
+```yaml
+kind: Integration
+metadata:
+  name: semaphore-integration
+  canvasId: canvas-123
+spec:
+  type: semaphore
+  url: https://myorg.semaphoreci.com
+  auth:
+    use: AUTH_TYPE_TOKEN
+    token:
+      valueFrom:
+        secret:
+          name: semaphore
+          key: token
+```
 
 ### GitHub
 
 The GitHub integration allows you to connect to GitHub repositories and trigger GitHub Actions workflows.
 
-**Authentication**: Uses a GitHub personal access token (PAT) with appropriate permissions.
+For authentication, you must use a GitHub fine-grained personal access token (PAT) with appropriate permissions:
+- Actions - Read and Write
+- Webhooks - Read and Write
 
-**Supported Resources**:
-- `repository`: GitHub repositories that can be used as event sources or executor targets
-
-**Event Sources**: Creates webhooks in GitHub repositories to receive events for push, pull requests, and workflow runs.
-
-**Executors**: Can trigger GitHub Actions workflows via workflow dispatch events.
-
-#### Example GitHub Integration
+Here's an example of a GitHub integration:
 
 ```yaml
 kind: Integration
@@ -144,20 +155,4 @@ spec:
         secret:
           name: github-token
           key: token
-```
-
-#### Example GitHub Event Source
-
-```yaml
-apiVersion: v1
-kind: EventSource
-metadata:
-  name: my-repo
-  canvasId: a1787a2e-dba7-42d0-8431-31dbf0252b92
-spec:
-  integration:
-    name: github-integration
-  resource:
-    type: repository
-    name: owner/repository-name
 ```
