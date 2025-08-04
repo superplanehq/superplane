@@ -24,29 +24,7 @@ import {
 } from '../../../components/Table/table'
 import { useOrganizationGroups, useOrganizationRoles, useUpdateGroup, useDeleteGroup } from '../../../hooks/useOrganizationData'
 import debounce from 'lodash.debounce'
-
-// Utility function to format relative time
-const formatRelativeTime = (dateString: string | undefined) => {
-  if (!dateString) return 'Unknown'
-
-  const now = new Date()
-  const date = new Date(dateString)
-  const diffInMs = now.getTime() - date.getTime()
-  const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
-  const diffInHours = Math.floor(diffInMinutes / 60)
-  const diffInDays = Math.floor(diffInHours / 24)
-  const diffInWeeks = Math.floor(diffInDays / 7)
-  const diffInMonths = Math.floor(diffInDays / 30)
-  const diffInYears = Math.floor(diffInDays / 365)
-
-  if (diffInMinutes < 1) return 'Just now'
-  if (diffInMinutes < 60) return `${diffInMinutes}m ago`
-  if (diffInHours < 24) return `${diffInHours}h ago`
-  if (diffInDays < 7) return `${diffInDays}d ago`
-  if (diffInWeeks < 4) return `${diffInWeeks}w ago`
-  if (diffInMonths < 12) return `${diffInMonths}mo ago`
-  return `${diffInYears}y ago`
-}
+import { formatRelativeTime } from '@/pages/canvas/utils/stageEventUtils'
 
 interface GroupsSettingsProps {
   organizationId: string
