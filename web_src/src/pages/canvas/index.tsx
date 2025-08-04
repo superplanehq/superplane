@@ -175,22 +175,34 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  // Handle adding nodes using the modular system
   const handleAddNodeByType = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
     try {
-      if (nodeType === 'stage' && executorType) {
-        const stageName = executorType === 'semaphore' ? 'SEMAPHORE Stage' :
-          executorType === 'http' ? 'HTTP Stage' : 'New Stage';
-        handleAddNode(nodeType, { name: stageName, executorType });
-      } else if (nodeType === 'event_source' && eventSourceType) {
-        const eventName = eventSourceType === 'webhook' ? 'Webhook Event Source' :
-          eventSourceType === 'semaphore' ? 'Semaphore Event Source' : 'New Event Source';
-        handleAddNode(nodeType, { name: eventName, eventSourceType });
-      } else {
-        handleAddNode(nodeType);
-      }
+      const config = getNodeConfig(nodeType, executorType, eventSourceType);
+      handleAddNode(nodeType, config);
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
+    }
+  };
+
+  const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
+    const stageNames = { semaphore: 'SEMAPHORE Stage', http: 'HTTP Stage' };
+    const eventNames = { webhook: 'Webhook Event Source', semaphore: 'Semaphore Event Source' };
+
+    switch (nodeType) {
+      case 'stage':
+        return executorType ? {
+          name: stageNames[executorType as keyof typeof stageNames] || 'New Stage',
+          executorType
+        } : undefined;
+
+      case 'event_source':
+        return eventSourceType ? {
+          name: eventNames[eventSourceType as keyof typeof eventNames] || 'New Event Source',
+          eventSourceType
+        } : undefined;
+
+      default:
+        return undefined;
     }
   };
 
