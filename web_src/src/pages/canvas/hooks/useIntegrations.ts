@@ -55,7 +55,6 @@ export interface CreateIntegrationParams {
   authType: 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'
   tokenSecretName?: string
   tokenSecretKey?: string
-  oidcEnabled?: boolean
 }
 
 export interface UpdateIntegrationParams extends CreateIntegrationParams {
@@ -91,9 +90,6 @@ export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
                   }
                 }
               })
-            },
-            oidc: {
-              enabled: params.oidcEnabled || false
             }
           }
         }

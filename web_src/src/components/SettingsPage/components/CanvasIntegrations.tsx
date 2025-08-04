@@ -36,7 +36,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   const [authType, setAuthType] = useState<'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE'>('AUTH_TYPE_NONE')
   const [selectedSecretId, setSelectedSecretId] = useState('')
   const [selectedSecretKey, setSelectedSecretKey] = useState('')
-  const [oidcEnabled, setOidcEnabled] = useState(false)
   const [editingIntegration, setEditingIntegration] = useState<IntegrationsIntegration | null>(null)
 
   const { data: integrations, isLoading, error } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS")
@@ -61,7 +60,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
     setAuthType('AUTH_TYPE_NONE')
     setSelectedSecretId('')
     setSelectedSecretKey('')
-    setOidcEnabled(false)
     setEditingIntegration(null)
   }
 
@@ -82,7 +80,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
       tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
-      oidcEnabled: authType === 'AUTH_TYPE_OIDC' ? oidcEnabled : undefined,
     }
 
     try {
@@ -102,7 +99,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
     setAuthType(integration.spec?.auth?.use || 'AUTH_TYPE_NONE' as 'AUTH_TYPE_TOKEN' | 'AUTH_TYPE_OIDC' | 'AUTH_TYPE_NONE')
     setSelectedSecretId(integration.spec?.auth?.token?.valueFrom?.secret?.name || '')
     setSelectedSecretKey(integration.spec?.auth?.token?.valueFrom?.secret?.key || '')
-    setOidcEnabled(integration.spec?.oidc?.enabled || false)
     setSection('edit')
   }
 
@@ -124,7 +120,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
       tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
-      oidcEnabled: authType === 'AUTH_TYPE_OIDC' ? oidcEnabled : undefined,
     }
 
     try {
@@ -429,21 +424,6 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
                       </Text>
                     </div>
                   )}
-                </div>
-              )}
-
-              {/* OIDC Enabled (if OIDC auth) */}
-              {authType === 'AUTH_TYPE_OIDC' && (
-                <div>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={oidcEnabled}
-                      onChange={(e) => setOidcEnabled(e.target.checked)}
-                      className="rounded border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className="text-sm text-zinc-700 dark:text-zinc-300">Enable OIDC Authentication</span>
-                  </label>
                 </div>
               )}
 
