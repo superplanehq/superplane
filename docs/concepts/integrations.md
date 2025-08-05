@@ -148,6 +148,7 @@ metadata:
   canvasId: canvas-123
 spec:
   type: github
+  url: https://github.com/myorg
   auth:
     use: AUTH_TYPE_TOKEN
     token:

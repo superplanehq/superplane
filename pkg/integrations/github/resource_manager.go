@@ -3,6 +3,7 @@ package github
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"slices"
 	"strconv"
 
@@ -23,12 +24,15 @@ var defaultEventTypes = []string{
 
 type GitHubResourceManager struct {
 	client *github.Client
+	URL    string
+	Owner  string
 }
 
 func NewGitHubResourceManager(ctx context.Context, URL string, authenticate integrations.AuthenticateFn) (integrations.ResourceManager, error) {
-	//
-	// TODO: figure out if the URL will be important here or not.
-	//
+	owner, err := parseOwnerFromURL(URL)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing URL: %v", err)
+	}
 
 	token, err := authenticate()
 	if err != nil {
@@ -36,6 +40,8 @@ func NewGitHubResourceManager(ctx context.Context, URL string, authenticate inte
 	}
 
 	return &GitHubResourceManager{
+		URL:   URL,
+		Owner: owner,
 		client: github.NewClient(
 			oauth2.NewClient(ctx,
 				oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
@@ -43,12 +49,25 @@ func NewGitHubResourceManager(ctx context.Context, URL string, authenticate inte
 		)}, nil
 }
 
-func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
-	owner, repo, err := parseRepoName(options.Parent.Name())
+// URL should be https://github.com/<owner>
+func parseOwnerFromURL(URL string) (string, error) {
+	u, err := url.Parse(URL)
 	if err != nil {
-		return nil, err
+		return "", fmt.Errorf("error parsing URL %s: %v", URL, err)
 	}
 
+	if u.Scheme != "https" {
+		return "", fmt.Errorf("%s does not use HTTPS", URL)
+	}
+
+	if u.Host != "github.com" {
+		return "", fmt.Errorf("URL %s is not a GitHub URL", URL)
+	}
+
+	return u.Path[1:], nil
+}
+
+func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	//
 	// If a webhook already exists for this repository,
 	// we update it. If not, we create a new one.
@@ -58,11 +77,11 @@ func (i *GitHubResourceManager) SetupWebhook(options integrations.WebhookOptions
 	})
 
 	if webhookIndex == -1 {
-		return i.createRepositoryWebhook(owner, repo, options)
+		return i.createRepositoryWebhook(options)
 	}
 
 	hook := options.Children[webhookIndex]
-	return i.updateRepositoryWebhook(owner, repo, hook, options)
+	return i.updateRepositoryWebhook(hook, options)
 }
 
 func (i *GitHubResourceManager) getEventTypes(options integrations.WebhookOptions) []string {
@@ -93,7 +112,7 @@ func (i *GitHubResourceManager) getEventTypes(options integrations.WebhookOption
 	return options.EventTypes
 }
 
-func (i *GitHubResourceManager) createRepositoryWebhook(owner, repo string, options integrations.WebhookOptions) ([]integrations.Resource, error) {
+func (i *GitHubResourceManager) createRepositoryWebhook(options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	hook := &github.Hook{
 		Active: github.Ptr(true),
 		Events: i.getEventTypes(options),
@@ -104,7 +123,7 @@ func (i *GitHubResourceManager) createRepositoryWebhook(owner, repo string, opti
 		},
 	}
 
-	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), owner, repo, hook)
+	createdHook, _, err := i.client.Repositories.CreateHook(context.Background(), i.Owner, options.Parent.Name(), hook)
 	if err != nil {
 		return nil, fmt.Errorf("error creating webhook: %v", err)
 	}
@@ -117,13 +136,13 @@ func (i *GitHubResourceManager) createRepositoryWebhook(owner, repo string, opti
 	}, nil
 }
 
-func (i *GitHubResourceManager) updateRepositoryWebhook(owner, repo string, hook integrations.Resource, options integrations.WebhookOptions) ([]integrations.Resource, error) {
+func (i *GitHubResourceManager) updateRepositoryWebhook(hook integrations.Resource, options integrations.WebhookOptions) ([]integrations.Resource, error) {
 	hookID, err := strconv.ParseInt(hook.Id(), 10, 64)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing webhook ID: %v", err)
 	}
 
-	updatedHook, _, err := i.client.Repositories.EditHook(context.Background(), owner, repo, hookID, &github.Hook{
+	updatedHook, _, err := i.client.Repositories.EditHook(context.Background(), i.Owner, options.Parent.Name(), hookID, &github.Hook{
 		Active: github.Ptr(true),
 		Events: i.getEventTypes(options),
 		Config: &github.HookConfig{
@@ -163,20 +182,15 @@ func (i *GitHubResourceManager) Status(resourceType, id string, parentResource i
 	}
 }
 
-func (i *GitHubResourceManager) getRepository(fullName string) (integrations.Resource, error) {
-	owner, repo, err := parseRepoName(fullName)
-	if err != nil {
-		return nil, err
-	}
-
-	repository, _, err := i.client.Repositories.Get(context.Background(), owner, repo)
+func (i *GitHubResourceManager) getRepository(repoName string) (integrations.Resource, error) {
+	repository, _, err := i.client.Repositories.Get(context.Background(), i.Owner, repoName)
 	if err != nil {
 		return nil, fmt.Errorf("error getting repository: %v", err)
 	}
 
 	return &Repository{
-		ID:       repository.GetID(),
-		FullName: repository.GetFullName(),
+		ID:             repository.GetID(),
+		RepositoryName: repository.GetName(),
 	}, nil
 }
 
@@ -186,12 +200,7 @@ func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resou
 		return nil, err
 	}
 
-	owner, repo, err := parseRepoName(parentResource.Name())
-	if err != nil {
-		return nil, err
-	}
-
-	workflowRun, _, err := i.client.Actions.GetWorkflowRunByID(context.Background(), owner, repo, runID)
+	workflowRun, _, err := i.client.Actions.GetWorkflowRunByID(context.Background(), i.Owner, parentResource.Name(), runID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting workflow run: %v", err)
 	}
@@ -204,8 +213,8 @@ func (i *GitHubResourceManager) getWorkflowRun(parentResource integrations.Resou
 }
 
 type Repository struct {
-	ID       int64
-	FullName string
+	ID             int64
+	RepositoryName string
 }
 
 func (r *Repository) Id() string {
@@ -213,7 +222,7 @@ func (r *Repository) Id() string {
 }
 
 func (r *Repository) Name() string {
-	return r.FullName
+	return r.RepositoryName
 }
 
 func (r *Repository) Type() string {

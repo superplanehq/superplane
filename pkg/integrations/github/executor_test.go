@@ -13,8 +13,8 @@ import (
 func Test_GitHubExecutor_Validate(t *testing.T) {
 	resourceManager := &github.GitHubResourceManager{}
 	resource := &github.Repository{
-		ID:       123456789,
-		FullName: "owner/test-repo",
+		ID:             123456789,
+		RepositoryName: "test-repo",
 	}
 
 	executor, err := github.NewGitHubExecutor(resourceManager, resource)

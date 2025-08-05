@@ -85,15 +85,6 @@ func (i *GitHubEventHandler) Status(eventType string, eventPayload []byte) (inte
 	}
 }
 
-func parseRepoName(fullName string) (string, string, error) {
-	parts := strings.Split(fullName, "/")
-	if len(parts) == 2 {
-		return parts[0], parts[1], nil
-	}
-
-	return "", "", fmt.Errorf("invalid repository name format: %s", fullName)
-}
-
 type Webhook struct {
 	ID          int64
 	WebhookName string

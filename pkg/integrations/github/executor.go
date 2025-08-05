@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/retry"
 )
 
+var inProgressRunStates = []string{"in_progress", "queued", "requested", "waiting", "pending"}
+
 type GitHubExecutor struct {
 	Resource integrations.Resource
 	gh       *GitHubResourceManager
@@ -55,12 +57,7 @@ func (e *GitHubExecutor) Validate(ctx context.Context, specData []byte) error {
 }
 
 func (e *GitHubExecutor) validateWorkflow(ctx context.Context, spec ExecutorSpec) error {
-	owner, repo, err := parseRepoName(e.Resource.Name())
-	if err != nil {
-		return fmt.Errorf("error parsing repository name: %v", err)
-	}
-
-	_, err = e.findWorkflow(ctx, owner, repo, spec.Workflow)
+	_, err := e.findWorkflow(ctx, spec.Workflow)
 	if err != nil {
 		return err
 	}
@@ -68,8 +65,8 @@ func (e *GitHubExecutor) validateWorkflow(ctx context.Context, spec ExecutorSpec
 	return nil
 }
 
-func (e *GitHubExecutor) findWorkflow(ctx context.Context, owner, repo string, workflowName string) (*github.Workflow, error) {
-	workflows, _, err := e.gh.client.Actions.ListWorkflows(ctx, owner, repo, nil)
+func (e *GitHubExecutor) findWorkflow(ctx context.Context, workflowName string) (*github.Workflow, error) {
+	workflows, _, err := e.gh.client.Actions.ListWorkflows(ctx, e.gh.Owner, e.Resource.Name(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error listing workflows: %v", err)
 	}
@@ -94,20 +91,15 @@ func (e *GitHubExecutor) Execute(specData []byte, parameters executors.Execution
 }
 
 func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors.ExecutionParameters) (integrations.StatefulResource, error) {
-	owner, repo, err := parseRepoName(e.Resource.Name())
-	if err != nil {
-		return nil, fmt.Errorf("error parsing repository name: %v", err)
-	}
-
-	workflow, err := e.findWorkflow(context.Background(), owner, repo, spec.Workflow)
+	workflow, err := e.findWorkflow(context.Background(), spec.Workflow)
 	if err != nil {
 		return nil, err
 	}
 
 	_, err = e.gh.client.Actions.CreateWorkflowDispatchEventByID(
 		context.Background(),
-		owner,
-		repo,
+		e.gh.Owner,
+		e.Resource.Name(),
 		*workflow.ID,
 		github.CreateWorkflowDispatchEventRequest{
 			Ref:    spec.Ref,
@@ -122,7 +114,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 	//
 	// GitHub doesn't expose the run ID from the dispatch call, so we need to find it.
 	//
-	workflowRun, err := e.findTriggeredWorkflowRun(owner, repo, *workflow.ID, spec.Ref)
+	workflowRun, err := e.findTriggeredWorkflowRun(*workflow.ID, spec.Ref)
 	if err != nil {
 		return nil, fmt.Errorf("error finding triggered workflow run: %v", err)
 	}
@@ -134,7 +126,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 	}, nil
 }
 
-func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID int64, ref string) (*github.WorkflowRun, error) {
+func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string) (*github.WorkflowRun, error) {
 	var run *github.WorkflowRun
 
 	//
@@ -143,15 +135,15 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID
 	//
 	creationTimeFilter := fmt.Sprintf(
 		"%s..%s",
-		time.Now().Add(-5*time.Second).Format(time.RFC3339),
-		time.Now().Add(5*time.Second).Format(time.RFC3339),
+		time.Now().Add(-time.Minute).Format(time.RFC3339),
+		time.Now().Add(time.Minute).Format(time.RFC3339),
 	)
 
 	err := retry.WithConstantWait(func() error {
 		runs, _, err := e.gh.client.Actions.ListWorkflowRunsByID(
 			context.Background(),
-			owner,
-			repo,
+			e.gh.Owner,
+			e.Resource.Name(),
 			workflowID,
 			&github.ListWorkflowRunsOptions{
 				Branch:  ref,
@@ -168,11 +160,11 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID
 		}
 
 		if len(runs.WorkflowRuns) == 0 {
-			return fmt.Errorf("no workflow runs found for workflow %d", workflowID)
+			return fmt.Errorf("Empty list of workflow_dispatch runs found for workflow %d with filter %s", workflowID, creationTimeFilter)
 		}
 
 		for _, r := range runs.WorkflowRuns {
-			if slices.Contains([]string{"in_progress", "queued", "requested", "waiting", "pending"}, r.GetStatus()) {
+			if slices.Contains(inProgressRunStates, r.GetStatus()) {
 				run = r
 				return nil
 			}
@@ -181,9 +173,9 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(owner, repo string, workflowID
 		return fmt.Errorf("workflow run not found")
 	}, retry.Options{
 		Task:         "Find triggered workflow run",
-		MaxAttempts:  10,
-		Wait:         5 * time.Second,
-		InitialDelay: 5 * time.Second,
+		MaxAttempts:  15,
+		Wait:         2 * time.Second,
+		InitialDelay: 2 * time.Second,
 		Verbose:      false,
 	})
 

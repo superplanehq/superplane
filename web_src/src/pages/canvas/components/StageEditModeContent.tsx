@@ -459,6 +459,34 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     updateExecutorField('parameters', updatedParams);
   };
 
+  const addExecutorInput = () => {
+    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
+    const newKey = `INPUT_${Object.keys(currentParams).length + 1}`;
+    updateExecutorField('inputs', {
+      ...currentParams,
+      [newKey]: ''
+    });
+  };
+
+  const updateExecutorInput = (oldKey: string, newKey: string, value: string) => {
+    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
+    const updatedParams = { ...currentParams };
+
+    if (oldKey !== newKey) {
+      delete updatedParams[oldKey];
+    }
+    updatedParams[newKey] = value;
+
+    updateExecutorField('inputs', updatedParams);
+  };
+
+  const removeExecutorInput = (key: string) => {
+    const currentParams = (executor.spec?.inputs as Record<string, string>) || {};
+    const updatedParams = { ...currentParams };
+    delete updatedParams[key];
+    updateExecutorField('inputs', updatedParams);
+  };
+
   const updateExecutorIntegration = (integrationName: string) => {
     const availableIntegrations = getAllIntegrations();
     const integration = availableIntegrations.find(int => int.metadata?.name === integrationName);
@@ -1220,6 +1248,108 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         />
                         <button
                           onClick={() => removeExecutorParameter(key)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+            )}
+
+            {executor.type === 'github' && (
+              <div className="space-y-4">
+                <div className="text-xs text-zinc-500 mb-2">
+                  Configure your GitHub executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
+                </div>
+
+                <Field>
+                  <Label>Integration</Label>
+                  <select
+                    value={executor.integration?.name || ''}
+                    onChange={(e) => updateExecutorIntegration(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  >
+                    <option value="">Select an integration...</option>
+                    {getAllIntegrations()
+                      .filter(integration => integration.spec?.type === 'github')
+                      .map((integration) => (
+                        <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                          {integration.metadata?.name}
+                        </option>
+                      ))}
+                  </select>
+                  {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
+                    <div className="text-xs text-zinc-500 mt-1">
+                      No GitHub integrations available. Create one in canvas settings.
+                    </div>
+                  )}
+                </Field>
+
+                <Field>
+                  <Label>Repository Name</Label>
+                  <input
+                    type="text"
+                    value={(executor.resource?.name as string) || ''}
+                    onChange={(e) => updateExecutorResource('name', e.target.value)}
+                    placeholder="my-repository"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Workflow</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.workflow as string) || ''}
+                    onChange={(e) => updateExecutorField('workflow', e.target.value)}
+                    placeholder=".github/workflows/task.yml"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <Label>Ref</Label>
+                  <input
+                    type="text"
+                    value={(executor.spec?.ref as string) || ''}
+                    onChange={(e) => updateExecutorField('ref', e.target.value)}
+                    placeholder="main"
+                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                  />
+                </Field>
+
+                <Field>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Inputs</Label>
+                    <button
+                      onClick={addExecutorInput}
+                      className="text-blue-600 hover:text-blue-700 text-sm"
+                    >
+                      + Add Input
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value]) => (
+                      <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                        <input
+                          type="text"
+                          value={key}
+                          onChange={(e) => updateExecutorInput(key, e.target.value, value)}
+                          placeholder="Input name"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <input
+                          type="text"
+                          value={value}
+                          onChange={(e) => updateExecutorInput(key, key, e.target.value)}
+                          placeholder="Input value"
+                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                        />
+                        <button
+                          onClick={() => removeExecutorInput(key)}
                           className="text-red-600 hover:text-red-700"
                         >
                           <span className="material-symbols-outlined text-sm">delete</span>
