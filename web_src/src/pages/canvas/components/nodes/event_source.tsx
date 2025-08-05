@@ -12,6 +12,12 @@ import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import { useParams } from 'react-router-dom';
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+
+const EventSourceImageMap = {
+  'webhook': <MaterialSymbol className='w-6 h-5 -mt-2' name="webhook" size="xl" />,
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" />
+}
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const { orgId } = useParams<{ orgId: string }>();
@@ -149,7 +155,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   return (
     <div
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
-      style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {isEditMode && (
         <EditModeActionButtons
@@ -177,7 +183,9 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       {/* Header Section */}
       <div className="px-4 py-4 flex justify-between items-start">
         <div className="flex items-start flex-1 min-w-0">
-          <span className="material-symbols-outlined mr-2 text-gray-700 mt-1">bolt</span>
+          <div className='max-w-8 mt-2'>
+            {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="mb-1">
               <InlineEditable
@@ -244,19 +252,16 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
           <div className="px-3 py-3 border-t w-full">
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Events</div>
-              <div className="text-xs text-gray-600">
-                {props.data.events?.length || 0} events
-              </div>
+              <div className="text-sm my-2 font-semibold text-gray-500 uppercase tracking-wide">Events</div>
             </div>
 
-            <div className="space-y-1">
+            <div className="space-y-2">
               {props.data.events?.length ? (
                 props.data.events.map((event) => (
-                  <div key={event.id} className="bg-gray-100 rounded p-2">
+                  <div key={event.id} className="bg-gray-50 rounded-xl p-2">
                     <div className="flex justify-start items-center gap-3 overflow-hidden">
                       <span className="text-sm text-gray-600">
-                        <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">bolt</i>
+                        <MaterialSymbol name="bolt" size="md" />
                       </span>
                       <span className="truncate">{event.id!}</span>
                     </div>
