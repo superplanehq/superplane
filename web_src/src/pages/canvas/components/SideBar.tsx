@@ -9,6 +9,13 @@ import { ResizeHandle } from "./ResizeHandle";
 import { ActivityTab } from "./tabs/ActivityTab";
 import { HistoryTab } from "./tabs/HistoryTab";
 import { SettingsTab } from "./tabs/SettingsTab";
+import { MaterialSymbol } from "@/components/MaterialSymbol/material-symbol";
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+
+const StageImageMap = {
+  'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" />
+}
 
 interface SidebarProps {
   selectedStage: StageWithEventQueue;
@@ -18,7 +25,7 @@ interface SidebarProps {
 
 export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarProps) => {
   const [activeTab, setActiveTab] = useState('activity');
-  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(600);
+  const { width, isDragging, sidebarRef, handleMouseDown } = useResizableSidebar(400);
 
   // Sidebar tab definitions - memoized to prevent unnecessary re-renders
   const tabs = useMemo(() => [
@@ -30,7 +37,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   const allExecutions = useMemo(() =>
     selectedStage.queue
       ?.filter(event => event.execution)
-      .flatMap(event => ({...event.execution, event}) as ExecutionWithEvent)
+      .flatMap(event => ({ ...event.execution, event }) as ExecutionWithEvent)
       .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [selectedStage.queue]
   );
@@ -81,25 +88,22 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   return (
     <aside
       ref={sidebarRef}
-      className={`fixed top-12 right-0 z-10 bg-white flex flex-col ${
-        isDragging.current ? '' : 'transition-all duration-200'
-      }`}
+      className={`fixed top-[2.6rem] right-0 z-10 bg-white flex flex-col w-[250px] ${isDragging.current ? '' : 'transition-all duration-200'
+        }`}
       style={{
         width: width,
-        height: 'calc(100vh - 4rem)',
-        minWidth: 300,
-        maxWidth: 800,
+        height: 'calc(100vh - 3rem)',
         boxShadow: 'rgba(0,0,0,0.07) -2px 0 12px',
       }}
     >
       {/* Sidebar Header */}
-      <SidebarHeader stageName={selectedStage.metadata!.name || ''} onClose={onClose} />
+      <SidebarHeader image={StageImageMap[(selectedStage.spec?.executor?.type || 'http') as keyof typeof StageImageMap]} stageName={selectedStage.metadata!.name || ''} onClose={onClose} />
 
       {/* Sidebar Tabs */}
       <SidebarTabs tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Sidebar Content */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
+      <div className="flex-1 overflow-y-auto">
         {renderTabContent()}
       </div>
 

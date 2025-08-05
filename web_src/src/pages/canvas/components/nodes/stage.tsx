@@ -360,7 +360,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-start">
+      <div className="px-4 py-4 pb-0 flex justify-between items-start">
         <div className="flex flex-col items-start flex-1 min-w-0">
           <div className="flex flex-1 w-full items-center">
             {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
@@ -420,7 +420,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         <>
 
           {props.data.executor?.type === 'semaphore' && (
-            <div className="flex items-center w-full gap-2 mb-5 mx-4 font-semibold">
+            <div className="flex items-center w-full gap-2 mx-4 font-semibold">
               <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
                 <MaterialSymbol name="assignment" size="md" />
                 <span>{(props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')}</span>
@@ -432,7 +432,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             </div>
           )}
           {/* Last Run Section */}
-          <div className={`px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
+          <div className={`mt-4 px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">Last run</div>
               <div className="text-xs text-gray-600">

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType } from '@/api-client/types.gen';
 import { useParams } from 'react-router-dom';
-import { useCanvasStore } from '../store/canvasStore';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -54,7 +53,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   // Get URL params and canvas data
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const organizationId = orgId || '';
-  const { stages } = useCanvasStore();
 
   // Fetch secrets and integrations
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -96,12 +94,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     const allSecrets = getAllSecrets();
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
     return selectedSecret ? Object.keys(selectedSecret.data) : [];
-  };
-
-  const getOutputsFromConnection = (connectionName: string) => {
-    if (!connectionName) return [];
-    const connectedStage = stages.find(stage => stage.metadata?.name === connectionName);
-    return connectedStage?.spec?.outputs || [];
   };
 
   // Validation functions
@@ -611,23 +603,18 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             <select
                               value={mapping.name || ''}
                               onChange={(e) => updateMapping(index, mappingIndex, 'name', e.target.value)}
-                              className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
                             >
                               <option value="">Select connection</option>
                               {data.connections.map((conn, connIndex) => (
                                 <option key={connIndex} value={conn.name}>{conn.name}</option>
                               ))}
                             </select>
-                            <select
+                            <input
                               value={mapping.value || ''}
                               onChange={(e) => updateMapping(index, mappingIndex, 'value', e.target.value)}
-                              className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            >
-                              <option value="">Select output value</option>
-                              {getOutputsFromConnection(mapping.name || '').map((output, outputIndex) => (
-                                <option key={outputIndex} value={output.name || ''}>{output.name || 'Unnamed Output'}</option>
-                              ))}
-                            </select>
+                              className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                            />
                             <button
                               onClick={() => removeMapping(index, mappingIndex)}
                               className="text-red-600 hover:text-red-700"

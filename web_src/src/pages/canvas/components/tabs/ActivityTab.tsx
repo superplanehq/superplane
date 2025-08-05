@@ -23,29 +23,29 @@ export const ActivityTab = ({
   onChangeTab
 }: ActivityTabProps) => {
   const queueCount = pendingEvents.length + waitingEvents.length;
-  
+
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Recent Runs Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm text-gray-700 uppercase tracking-wide">Recent Runs</h3>
+          <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide">Recent Runs</h3>
           <button className="text-xs text-blue-600 hover:text-blue-800 font-medium"
             onClick={() => onChangeTab('history')}
           >
             View all
           </button>
         </div>
-        <ExecutionTimeline 
+        <ExecutionTimeline
           selectedStage={selectedStage}
-          executions={allExecutions.slice(0, 3)} 
+          executions={allExecutions.slice(0, 3)}
         />
       </div>
 
       {/* Queue Section */}
       <div>
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm text-gray-700 uppercase tracking-wide">
+          <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide">
             Queue ({queueCount})
           </h3>
           {queueCount > 0 && (
@@ -54,7 +54,7 @@ export const ActivityTab = ({
             </button>
           )}
         </div>
-        
+
         <div className="space-y-3">
           {/* All queue events using MessageItem */}
           {[...pendingEvents, ...waitingEvents].length === 0 ? (

@@ -1,13 +1,14 @@
 interface SidebarHeaderProps {
   stageName: string;
+  image: React.ReactNode;
   onClose: () => void;
 }
 
-export const SidebarHeader = ({ stageName, onClose }: SidebarHeaderProps) => {
+export const SidebarHeader = ({ stageName, image, onClose }: SidebarHeaderProps) => {
   return (
     <div className="flex items-center justify-between px-4 py-3 bg-white">
-      <div className="flex items-center">
-        <span className="material-symbols-outlined text-gray-700 mr-2 text-lg">rocket_launch</span>
+      <div className="flex items-center gap-2">
+        {image}
         <span className="text-lg font-semibold text-gray-900">{stageName}</span>
       </div>
       <button
