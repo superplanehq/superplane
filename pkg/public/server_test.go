@@ -188,7 +188,7 @@ func Test__ReceiveCustomWebhook(t *testing.T) {
 	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
 	require.NoError(t, err)
 
-	key, err := r.Source.GetDecryptedKey(context.Background(), r.Encryptor)
+	key, err := r.Encryptor.Decrypt(context.Background(), r.Source.Key, []byte(r.Source.ID.String()))
 	require.NoError(t, err)
 
 	validEvent := []byte(`{"foo": "bar"}`)

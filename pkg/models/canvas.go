@@ -32,12 +32,13 @@ func (Canvas) TableName() string {
 }
 
 func (c *Canvas) CreateEventSource(name string, description string, key []byte, scope string, eventTypes []EventType, resourceId *uuid.UUID) (*EventSource, error) {
-	return c.CreateEventSourceInTransaction(database.Conn(), name, description, key, scope, eventTypes, resourceId)
+	return c.CreateEventSourceInTransaction(database.Conn(), uuid.New(), name, description, key, scope, eventTypes, resourceId)
 }
 
 // NOTE: caller must encrypt the key before calling this method.
 func (c *Canvas) CreateEventSourceInTransaction(
 	tx *gorm.DB,
+	id uuid.UUID,
 	name string,
 	description string,
 	key []byte,
@@ -48,6 +49,7 @@ func (c *Canvas) CreateEventSourceInTransaction(
 	now := time.Now()
 
 	eventSource := EventSource{
+		ID:          id,
 		Name:        name,
 		CanvasID:    c.ID,
 		Description: description,
