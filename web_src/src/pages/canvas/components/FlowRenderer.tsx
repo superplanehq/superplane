@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { ReactFlow, Background, BackgroundVariant } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 
@@ -21,35 +21,69 @@ export const nodeTypes = {
 export const FlowRenderer: React.FC = () => {
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
+  const stages = useCanvasStore((state) => state.stages);
   const onNodesChange = useCanvasStore((state) => state.onNodesChange);
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
+  const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
 
   const { applyElkAutoLayout } = useAutoLayout();
   const { onNodeDragStop, onInit } = useFlowHandlers();
+
+  const animatedEdges = useMemo(() => {
+    const runningStages = new Set<string>();
+
+    stages.forEach(stage => {
+      const allExecutions = stage.queue?.flatMap(event => event.execution)
+        .filter(execution => execution)
+        .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [];
+
+      const executionRunning = allExecutions.some(execution => execution?.state === 'STATE_STARTED');
+      const isRunning = executionRunning || stage.metadata?.name?.toLowerCase().includes('running');
+
+      if (isRunning && stage.metadata?.id) {
+        runningStages.add(stage.metadata.id);
+      }
+    });
+
+    return edges.map(edge => ({
+      ...edge,
+      animated: runningStages.has(edge.target)
+    }));
+  }, [edges, stages]);
 
   return (
     <div style={{ width: "100vw", height: "100%", minWidth: 0, minHeight: 0 }}>
       <ReactFlow
         nodes={nodes}
-        edges={edges}
+        edges={animatedEdges}
         nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onNodeClick={(_, node) => {
+          setFocusedNodeId(node.id)
+        }}
+        onNodeDrag={(_, node) => {
+          setFocusedNodeId(node.id)
+        }}
         onInit={onInit}
         fitView
         minZoom={0.4}
         maxZoom={1.5}
-        colorMode="light"
+        colorMode={"system"}
       >
         <FlowControls
           onAutoLayout={applyElkAutoLayout}
           nodes={nodes}
-          edges={edges}
+          edges={animatedEdges}
         />
-        <Background variant={BackgroundVariant.Dots} gap={24} size={2} color="#96A0A6" bgColor="#f3f4f6" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+        />
         <FlowDevTools />
         <ConnectionStatus />
       </ReactFlow>

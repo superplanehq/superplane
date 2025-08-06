@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
-import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType } from '@/api-client/types.gen';
+import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
 import { useParams } from 'react-router-dom';
-import { useCanvasStore } from '../store/canvasStore';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -15,6 +14,7 @@ import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { Field } from './Field';
 import { Label } from './Label';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -28,6 +28,7 @@ interface StageEditModeContentProps {
     executor: SuperplaneExecutor;
     secrets: SuperplaneValueDefinition[];
     conditions: SuperplaneCondition[];
+    inputMappings: SuperplaneInputMapping[];
     isValid: boolean
   }) => void;
 }
@@ -40,7 +41,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
   const [executor, setExecutor] = useState<SuperplaneExecutor>(data.executor || { type: '', spec: {} });
-  const [inputMappings, setInputMappings] = useState<Record<number, SuperplaneValueDefinition[]>>({});
+  const [inputMappings, setInputMappings] = useState<SuperplaneInputMapping[]>(data.inputMappings || []);
   const [responsePolicyStatusCodesDisplay, setResponsePolicyStatusCodesDisplay] = useState(
     ((executor.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
   );
@@ -54,7 +55,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   // Get URL params and canvas data
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const organizationId = orgId || '';
-  const { stages } = useCanvasStore();
 
   // Fetch secrets and integrations
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -96,12 +96,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     const allSecrets = getAllSecrets();
     const selectedSecret = allSecrets.find(secret => secret.name === secretName);
     return selectedSecret ? Object.keys(selectedSecret.data) : [];
-  };
-
-  const getOutputsFromConnection = (connectionName: string) => {
-    if (!connectionName) return [];
-    const connectedStage = stages.find(stage => stage.metadata?.name === connectionName);
-    return connectedStage?.spec?.outputs || [];
   };
 
   // Validation functions
@@ -227,12 +221,16 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
+      label: data.label,
+      description: data.description,
       inputs: data.inputs || [],
       outputs: data.outputs || [],
       connections: data.connections || [],
       secrets: data.secrets || [],
       conditions: data.conditions || [],
-      executor: data.executor || { type: '', spec: {} }
+      executor: data.executor || { type: '', spec: {} },
+      inputMappings: data.inputMappings || [],
+      isValid: true
     },
     onDataChange,
     validateAllFields
@@ -296,16 +294,35 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     errorPrefix: 'condition'
   });
 
+  const inputMappingsEditor = useArrayEditor({
+    items: inputMappings,
+    setItems: setInputMappings,
+    createNewItem: () => ({
+      when: { triggeredBy: { connection: '' } },
+      values: []
+    }),
+    validateItem: (item) => {
+      const hasConnection = !!item.when?.triggeredBy?.connection;
+      return hasConnection ? [] : ['Trigger connection is required'];
+    },
+    setValidationErrors,
+    errorPrefix: 'inputMapping'
+  });
+
   // Sync component state with incoming data prop changes
   useEffect(() => {
     syncWithIncomingData(
       {
+        label: data.label,
+        description: data.description,
         inputs: data.inputs || [],
         outputs: data.outputs || [],
         connections: data.connections || [],
         secrets: data.secrets || [],
         conditions: data.conditions || [],
-        executor: data.executor || { type: '', spec: {} }
+        executor: data.executor || { type: '', spec: {} },
+        inputMappings: data.inputMappings || [],
+        isValid: true
       },
       (incomingData) => {
         setInputs(incomingData.inputs);
@@ -314,12 +331,14 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         setSecrets(incomingData.secrets);
         setConditions(incomingData.conditions);
         setExecutor(incomingData.executor);
+        setInputMappings(incomingData.inputMappings);
         setResponsePolicyStatusCodesDisplay(
           ((incomingData.executor?.spec?.responsePolicy as Record<string, unknown>)?.statusCodes as number[] || []).join(', ')
         );
       }
     );
-  }, [data, syncWithIncomingData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -332,10 +351,11 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         connections,
         executor,
         secrets,
-        conditions
+        conditions,
+        inputMappings
       });
     }
-  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, onDataChange, handleDataChange]);
+  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {
@@ -363,32 +383,14 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       case 'executor':
         setExecutor({ ...originalData.executor });
         break;
+      case 'inputMappings':
+        setInputMappings([...(originalData.inputMappings || [])]);
+        inputMappingsEditor.setEditingIndex(null);
+        break;
     }
   };
 
-  // Helper functions for mappings and executor
-  const addMapping = (inputIndex: number) => {
-    setInputMappings(prev => ({
-      ...prev,
-      [inputIndex]: [...(prev[inputIndex] || []), { name: '', value: '' }]
-    }));
-  };
-
-  const updateMapping = (inputIndex: number, mappingIndex: number, field: keyof SuperplaneValueDefinition, value: string) => {
-    setInputMappings(prev => ({
-      ...prev,
-      [inputIndex]: prev[inputIndex]?.map((mapping, i) =>
-        i === mappingIndex ? { ...mapping, [field]: value } : mapping
-      ) || []
-    }));
-  };
-
-  const removeMapping = (inputIndex: number, mappingIndex: number) => {
-    setInputMappings(prev => ({
-      ...prev,
-      [inputIndex]: prev[inputIndex]?.filter((_, i) => i !== mappingIndex) || []
-    }));
-  };
+  // Helper functions for executor
 
   const updateSecretMode = (index: number, useValueFrom: boolean) => {
     secretsEditor.updateItem(index, 'value', useValueFrom ? undefined : '');
@@ -544,7 +546,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 onDelete={() => connectionsEditor.removeItem(index)}
                 displayName={connection.name || `Connection ${index + 1}`}
                 badge={connection.type && (
-                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
                     {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                   </span>
                 )}
@@ -567,9 +569,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={connectionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Connection
           </button>
         </EditableAccordionSection>
@@ -622,50 +624,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       />
                     </ValidationField>
 
-                    {/* Mappings Section */}
-                    <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="text-sm font-medium">Mappings</label>
-                        <button
-                          onClick={() => addMapping(index)}
-                          className="text-blue-600 hover:text-blue-700 text-sm"
-                        >
-                          + Add Mapping
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {(inputMappings[index] || []).map((mapping, mappingIndex) => (
-                          <div key={mappingIndex} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                            <select
-                              value={mapping.name || ''}
-                              onChange={(e) => updateMapping(index, mappingIndex, 'name', e.target.value)}
-                              className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            >
-                              <option value="">Select connection</option>
-                              {data.connections.map((conn, connIndex) => (
-                                <option key={connIndex} value={conn.name}>{conn.name}</option>
-                              ))}
-                            </select>
-                            <select
-                              value={mapping.value || ''}
-                              onChange={(e) => updateMapping(index, mappingIndex, 'value', e.target.value)}
-                              className="flex-1 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                            >
-                              <option value="">Select output value</option>
-                              {getOutputsFromConnection(mapping.name || '').map((output, outputIndex) => (
-                                <option key={outputIndex} value={output.name || ''}>{output.name || 'Unnamed Output'}</option>
-                              ))}
-                            </select>
-                            <button
-                              onClick={() => removeMapping(index, mappingIndex)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <span className="material-symbols-outlined text-sm">delete</span>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
                   </div>
                 }
               />
@@ -673,10 +631,232 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={inputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Input
+          </button>
+        </EditableAccordionSection>
+
+        {/* Input Mappings Section */}
+        <EditableAccordionSection
+          id="inputMappings"
+          title="Input Mappings"
+          isOpen={openSections.includes('inputMappings')}
+          onToggle={handleAccordionToggle}
+          isModified={isSectionModified(inputMappings, 'inputMappings')}
+          onRevert={revertSection}
+          count={inputMappings.length}
+          countLabel="mappings"
+        >
+          {inputMappings.map((mapping, index) => (
+            <div key={index}>
+              <InlineEditor
+                isEditing={inputMappingsEditor.editingIndex === index}
+                onSave={inputMappingsEditor.saveEdit}
+                onCancel={() => inputMappingsEditor.cancelEdit(index, (item) => !item.when?.triggeredBy?.connection)}
+                onEdit={() => inputMappingsEditor.startEdit(index)}
+                onDelete={() => inputMappingsEditor.removeItem(index)}
+                displayName={mapping.when?.triggeredBy?.connection ? `Triggered by ${mapping.when.triggeredBy.connection}` : `Mapping ${index + 1}`}
+                editForm={
+                  <div className="space-y-4">
+                    {/* Trigger Connection */}
+                    <ValidationField
+                      label="Triggered by Connection"
+                      error={validationErrors[`inputMapping_${index}`]}
+                    >
+                      <select
+                        value={mapping.when?.triggeredBy?.connection || ''}
+                        onChange={(e) => inputMappingsEditor.updateItem(index, 'when', {
+                          ...mapping.when,
+                          triggeredBy: { connection: e.target.value }
+                        })}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
+                      >
+                        <option value="">Select trigger connection</option>
+                        {connections.map((conn, connIndex) => (
+                          <option key={connIndex} value={conn.name}>{conn.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 dark:text-zinc-400 mt-1">
+                        This mapping applies when the selected connection triggers the stage
+                      </p>
+                    </ValidationField>
+
+                    {/* Input Values */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3 text-zinc-600 dark:text-zinc-400">
+                        <label className="text-sm font-medium">Input Values</label>
+                        <button
+                          onClick={() => {
+                            const newValues = [...(mapping.values || []), { name: '', value: '' }];
+                            inputMappingsEditor.updateItem(index, 'values', newValues);
+                          }}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
+                        >
+                          + Add Value
+                        </button>
+                      </div>
+
+                      <div className="space-y-3 text-zinc-600 dark:text-zinc-400">
+                        {(mapping.values || []).map((value, valueIndex) => (
+                          <div key={valueIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
+                            {/* Input Name */}
+                            <div className="mb-3">
+                              <label className="block text-xs font-medium mb-1">Input Name</label>
+                              <select
+                                value={value.name || ''}
+                                onChange={(e) => {
+                                  const newValues = [...(mapping.values || [])];
+                                  newValues[valueIndex] = { ...newValues[valueIndex], name: e.target.value };
+                                  inputMappingsEditor.updateItem(index, 'values', newValues);
+                                }}
+                                className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                              >
+                                <option value="">Select input to map</option>
+                                {inputs.map((input, inputIndex) => (
+                                  <option key={inputIndex} value={input.name}>{input.name}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            {/* Value Mode Toggle */}
+                            <div className="mb-3">
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={!!value.valueFrom?.eventData}
+                                  onChange={(e) => {
+                                    const newValues = [...(mapping.values || [])];
+                                    if (e.target.checked) {
+                                      newValues[valueIndex] = {
+                                        ...newValues[valueIndex],
+                                        value: undefined,
+                                        valueFrom: {
+                                          eventData: {
+                                            connection: '',
+                                            expression: newValues[valueIndex]?.value || ''
+                                          }
+                                        }
+                                      };
+                                    } else {
+                                      newValues[valueIndex] = {
+                                        ...newValues[valueIndex],
+                                        value: newValues[valueIndex]?.valueFrom?.eventData?.expression || '',
+                                        valueFrom: undefined
+                                      };
+                                    }
+                                    inputMappingsEditor.updateItem(index, 'values', newValues);
+                                  }}
+                                  className="w-4 h-4"
+                                />
+                                Use expression (dynamic value)
+                              </label>
+                            </div>
+
+                            {value.valueFrom?.eventData ? (
+                              /* Expression Mode */
+                              <div className="space-y-2">
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
+                                  <select
+                                    value={value.valueFrom.eventData.connection || ''}
+                                    onChange={(e) => {
+                                      const newValues = [...(mapping.values || [])];
+                                      newValues[valueIndex] = {
+                                        ...newValues[valueIndex],
+                                        valueFrom: {
+                                          eventData: {
+                                            ...newValues[valueIndex]?.valueFrom?.eventData,
+                                            connection: e.target.value
+                                          }
+                                        }
+                                      };
+                                      inputMappingsEditor.updateItem(index, 'values', newValues);
+                                    }}
+                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  >
+                                    <option value="">Select data source</option>
+                                    {connections.map((conn, connIndex) => (
+                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Expression</label>
+                                  <input
+                                    value={value.valueFrom.eventData.expression || ''}
+                                    onChange={(e) => {
+                                      const newValues = [...(mapping.values || [])];
+                                      newValues[valueIndex] = {
+                                        ...newValues[valueIndex],
+                                        valueFrom: {
+                                          eventData: {
+                                            ...newValues[valueIndex]?.valueFrom?.eventData,
+                                            expression: e.target.value
+                                          }
+                                        }
+                                      };
+                                      inputMappingsEditor.updateItem(index, 'values', newValues);
+                                    }}
+                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
+                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              /* Static Value Mode */
+                              <div>
+                                <label className="block text-xs font-medium mb-1">Static Value</label>
+                                <input
+                                  value={value.value || ''}
+                                  onChange={(e) => {
+                                    const newValues = [...(mapping.values || [])];
+                                    newValues[valueIndex] = { ...newValues[valueIndex], value: e.target.value };
+                                    inputMappingsEditor.updateItem(index, 'values', newValues);
+                                  }}
+                                  placeholder="e.g., production, staging"
+                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                />
+                              </div>
+                            )}
+
+                            {/* Remove Value Button */}
+                            <div className="flex justify-end mt-2">
+                              <button
+                                onClick={() => {
+                                  const newValues = (mapping.values || []).filter((_, vi) => vi !== valueIndex);
+                                  inputMappingsEditor.updateItem(index, 'values', newValues);
+                                }}
+                                className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 text-xs"
+                              >
+                                Remove Value
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {(mapping.values || []).length === 0 && (
+                        <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
+                          No input values configured. Click "Add Value" to start.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                }
+              />
+            </div>
+          ))}
+          <button
+            onClick={inputMappingsEditor.addItem}
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <MaterialSymbol name="add" size="sm" />
+            Add Input Mapping
           </button>
         </EditableAccordionSection>
 
@@ -738,7 +918,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           onChange={(e) => outputsEditor.updateItem(index, 'required', e.target.checked)}
                           className="w-4 h-4 text-blue-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-blue-500"
                         />
-                        <label htmlFor={`required-${index}`}>Required</label>
+                        <label className="text-gray-900 dark:text-zinc-100" htmlFor={`required-${index}`}>Required</label>
                       </div>
                     </ValidationField>
                   </div>
@@ -748,9 +928,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={outputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Output
           </button>
         </EditableAccordionSection>
@@ -829,7 +1009,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       <ValidationField label="Days of Week">
                         <div className="grid grid-cols-7 gap-1">
                           {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                            <label key={day} className="flex flex-col items-center gap-1 p-2 border rounded text-xs">
+                            <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
                               <input
                                 type="checkbox"
                                 checked={condition.timeWindow?.weekDays?.includes(day) || false}
@@ -845,7 +1025,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                                 }}
                                 className="w-3 h-3"
                               />
-                              <span>{day.slice(0, 3)}</span>
+                              <span className="text-gray-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
                             </label>
                           ))}
                         </div>
@@ -856,27 +1036,27 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   <div className="flex items-center justify-between pt-2">
                     <button
                       onClick={() => conditionsEditor.saveEdit()}
-                      className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
-                      <span className="material-symbols-outlined text-sm">check</span>
+                      <MaterialSymbol name="check" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <MaterialSymbol name="delete" size="sm" />
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-sm">
+                    <div className="font-medium text-sm text-gray-900 dark:text-zinc-100">
                       {condition.type === 'CONDITION_TYPE_APPROVAL' && `Approval (${condition.approval?.count || 1} required)`}
                       {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`}
                     </div>
                     {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
-                      <div className="text-xs text-zinc-500 mt-1">
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
                       </div>
                     )}
@@ -884,15 +1064,15 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => conditionsEditor.startEdit(index)}
-                      className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
-                      <span className="material-symbols-outlined text-sm">edit</span>
+                      <MaterialSymbol name="edit" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <MaterialSymbol name="delete" size="sm" />
                     </button>
                   </div>
                 </div>
@@ -901,9 +1081,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={conditionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Condition
           </button>
         </EditableAccordionSection>
@@ -958,7 +1138,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                               onChange={() => updateSecretMode(index, false)}
                               className="w-4 h-4"
                             />
-                            <span className="text-sm">Direct Value</span>
+                            <span className="text-sm text-gray-900 dark:text-zinc-100">Direct Value</span>
                           </label>
                           <label className="flex items-center gap-2">
                             <input
@@ -968,7 +1148,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                               onChange={() => updateSecretMode(index, true)}
                               className="w-4 h-4"
                             />
-                            <span className="text-sm">From Secret</span>
+                            <span className="text-sm text-gray-900 dark:text-zinc-100">From Secret</span>
                           </label>
                         </div>
                       </div>
@@ -1094,9 +1274,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={secretsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Secret
           </button>
         </EditableAccordionSection>
@@ -1113,7 +1293,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           <div className="space-y-3">
             {executor.type === 'semaphore' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                   Configure your Semaphore executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
 
@@ -1134,7 +1314,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       ))}
                   </select>
                   {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
-                    <div className="text-xs text-zinc-500 mt-1">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       No Semaphore integrations available. Create one in canvas settings.
                     </div>
                   )}
@@ -1163,7 +1343,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         onChange={() => updateSemaphoreExecutionType('workflow')}
                         className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm">Workflow</span>
+                      <span className="text-sm text-gray-900 dark:text-zinc-100">Workflow</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -1174,10 +1354,10 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         onChange={() => updateSemaphoreExecutionType('task')}
                         className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm">Task</span>
+                      <span className="text-sm text-gray-900 dark:text-zinc-100">Task</span>
                     </label>
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                     {semaphoreExecutionType === 'workflow'
                       ? 'Uses the workflows API to run a workflow'
                       : 'Uses the tasks API to run a specific task'}
@@ -1224,7 +1404,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     <Label>Parameters</Label>
                     <button
                       onClick={addExecutorParameter}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
                     >
                       + Add Parameter
                     </button>
@@ -1248,9 +1428,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         />
                         <button
                           onClick={() => removeExecutorParameter(key)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" size="sm" />
                         </button>
                       </div>
                     ))}
@@ -1363,7 +1543,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
             {executor.type === 'http' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                   Configure your HTTP executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
 
@@ -1409,7 +1589,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           [newKey]: ''
                         });
                       }}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
                     >
                       + Add Header
                     </button>
@@ -1452,9 +1632,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             delete updatedHeaders[key];
                             updateExecutorField('headers', updatedHeaders);
                           }}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" size="sm" />
                         </button>
                       </div>
                     ))}
@@ -1480,7 +1660,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             )}
 
             {!executor.type && (
-              <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+              <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                 Select an executor type to configure how this stage will execute when triggered.
               </div>
             )}

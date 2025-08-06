@@ -32,7 +32,7 @@ export function EditableAccordionSection({
   const titleContent = (
     <div className="flex items-center justify-between w-full">
       <div className="flex items-center gap-2">
-        <span>{title}</span>
+        <span className="text-zinc-900 dark:text-zinc-100">{title}</span>
         <RevertButton
           sectionId={id}
           isModified={isModified}

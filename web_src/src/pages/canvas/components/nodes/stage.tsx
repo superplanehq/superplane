@@ -1,22 +1,31 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage } from '@/api-client';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
+import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import { formatRelativeTime } from '../../utils/stageEventUtils';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
+
+const StageImageMap = {
+  'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
+}
 
 export default function StageNode(props: NodeProps<StageNodeType>) {
   const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [stageName, setStageName] = useState(props.data.label);
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
@@ -27,15 +36,36 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
+  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
   const pendingEvents = useMemo(() =>
-    currentStage?.queue?.filter(event => event.state === 'STATE_PENDING') || [],
+    currentStage?.queue
+      ?.filter(event => event.state === 'STATE_PENDING')
+      ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
+  const lastPendingEvent = useMemo(() =>
+    pendingEvents.at(-1),
+    [pendingEvents]
+  );
+
   const waitingEvents = useMemo(() =>
-    currentStage?.queue?.filter(event => event.state === 'STATE_WAITING') || [],
+    currentStage?.queue
+      ?.filter(event => event.state === 'STATE_WAITING')
+      ?.sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [],
     [currentStage?.queue]
   );
+
+  const lastWaitingEvent = useMemo(() => {
+    const event = waitingEvents.at(-1);
+    if (!event || event.stateReason !== 'STATE_REASON_APPROVAL') {
+      return null;
+    }
+    return event;
+  },
+    [waitingEvents]
+  );
+
   const allExecutions = useMemo(() =>
     currentStage?.queue?.flatMap(event => event.execution as SuperplaneExecution)
       .filter(execution => execution)
@@ -54,21 +84,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     [allExecutions]
   );
 
-
-  const outputs = useMemo(() => {
-    const lastFinishedExecution = allFinishedExecutions.at(0);
-
-    return props.data.outputs.map(output => {
-      const executionOutput = lastFinishedExecution?.outputs?.find(
-        executionOutput => executionOutput.name === output.name
-      )
-      return {
-        key: output.name,
-        value: executionOutput?.value || '—',
-        required: !!output.required
-      }
-    })
-  }, [props.data.outputs, allFinishedExecutions])
+  const lastFinishedExecution = allFinishedExecutions.at(0);
+  const lastExecutionEvent = currentStage?.queue?.find(event => event.execution?.id === lastFinishedExecution?.id);
+  const lastInputsCount = lastExecutionEvent?.inputs?.length || 0;
+  const lastOutputsCount = lastFinishedExecution?.outputs?.length || 0;
 
   const getStatusIcon = () => {
     const latestExecution = allExecutions.at(0);
@@ -78,34 +97,30 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     switch (status) {
       case 'STATE_STARTED':
         return (
-          <span className="rounded-full bg-blue-500 w-[22px] h-[22px] border border-blue-200 text-center mr-2 flex items-center justify-center">
-            <span className="text-white text-base job-log-working"></span>
-          </span>
+          <MaterialSymbol name="sync" size="lg" className="text-blue-600 mr-2 animate-spin" />
         );
       case 'STATE_FINISHED':
         if (result === 'RESULT_PASSED') {
-          return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
+          return <MaterialSymbol name="check_circle" size="lg" className="text-green-600 mr-2" />;
         }
         if (result === 'RESULT_FAILED') {
-          return <span className="material-icons text-red-600 text-2xl mr-2">cancel</span>;
+          return <MaterialSymbol name="cancel" size="lg" className="text-red-600 mr-2" />;
         }
         return <span className="material-icons text-green-600 text-2xl mr-2">check_circle</span>;
       case 'STATE_PENDING':
         return (
-          <span className="rounded-full bg-orange-500 w-[22px] h-[22px] border border-orange-200 text-center mr-2 flex items-center justify-center">
-            <span className="text-white text-xs job-log-pending"></span>
-          </span>
+          <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 mr-2 animate-spin" />
         );
       default:
         return (
-          <span className="material-icons text-gray-600 text-2xl mr-2">help</span>
+          <span className="material-icons text-gray-600 dark:text-gray-400 text-2xl mr-2">help</span>
         );
     }
   };
 
   const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
   const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
+    e.stopPropagation?.();
     setIsEditMode(true);
     setEditingStage(props.id);
 
@@ -125,12 +140,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
     setApiError(null);
 
+
     const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
     const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
 
     try {
       if (isNewStage && !saveAsDraft) {
-        await createStageMutation.mutateAsync({
+        const createParams = {
           name: stageName,
           description: stageDescription,
           inputs: currentFormData.inputs,
@@ -138,8 +154,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentFormData.conditions
-        });
+          conditions: currentFormData.conditions,
+          inputMappings: currentFormData.inputMappings
+        };
+        await createStageMutation.mutateAsync(createParams);
         removeStage(props.id);
       } else if (!isNewStage && !saveAsDraft) {
 
@@ -147,7 +165,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           throw new Error('Stage ID is required for update');
         }
 
-        await updateStageMutation.mutateAsync({
+        const updateParams = {
           stageId: currentStage.metadata.id,
           name: stageName,
           description: stageDescription,
@@ -156,8 +174,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentFormData.conditions
-        });
+          conditions: currentFormData.conditions,
+          inputMappings: currentFormData.inputMappings
+        };
+        await updateStageMutation.mutateAsync(updateParams);
 
         updateStage({
           ...currentStage,
@@ -172,7 +192,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
             executor: currentFormData.executor,
-            secrets: currentFormData.secrets
+            secrets: currentFormData.secrets,
+            inputMappings: currentFormData.inputMappings
           }
         });
 
@@ -192,7 +213,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             inputs: currentFormData.inputs,
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
-            executor: currentFormData.executor
+            executor: currentFormData.executor,
+            inputMappings: currentFormData.inputMappings
           },
           isDraft: true
         };
@@ -274,11 +296,16 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         executor: yamlData.spec.executor || currentFormData.executor,
         secrets: yamlData.spec.secrets || currentFormData.secrets,
         conditions: yamlData.spec.conditions || currentFormData.conditions,
+        inputMappings: yamlData.spec.inputMappings || currentFormData.inputMappings,
         isValid: currentFormData.isValid
       });
     }
   };
 
+
+  const handleDataChange = useCallback((data: typeof currentFormData) => {
+    setCurrentFormData(data);
+  }, []);
 
   const getBackgroundColorClass = () => {
     const latestExecution = allExecutions.at(0);
@@ -287,33 +314,35 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
     switch (status) {
       case 'STATE_STARTED':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-50 dark:bg-blue-900/50 border-blue-200 dark:border-blue-700';
       case 'STATE_FINISHED':
         if (result === 'RESULT_PASSED') {
-          return 'bg-green-50 border-green-200';
+          return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
         }
         if (result === 'RESULT_FAILED') {
-          return 'bg-red-50 border-red-200';
+          return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
         }
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
       case 'STATE_PENDING':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }
   };
 
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative `}
-      style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400 dark:border-gray-200' : 'border-gray-200 dark:border-gray-700'} relative `}
+      style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
-      {isEditMode && (
+      {focusedNodeId === props.id && (
         <EditModeActionButtons
           onSave={handleSaveStage}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
+          onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
+          isEditMode={isEditMode}
           entityType="stage"
           entityData={currentFormData ? {
             metadata: {
@@ -326,7 +355,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentFormData.connections,
               executor: currentFormData.executor,
               secrets: currentFormData.secrets,
-              conditions: currentFormData.conditions
+              conditions: currentFormData.conditions,
+              inputMappings: currentFormData.inputMappings
             }
           } : (currentStage ? {
             metadata: {
@@ -339,7 +369,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentStage.spec?.connections || [],
               executor: currentStage.spec?.executor || { type: '', spec: {} },
               secrets: currentStage.spec?.secrets || [],
-              conditions: currentStage.spec?.conditions || []
+              conditions: currentStage.spec?.conditions || [],
+              inputMappings: currentStage.spec?.inputMappings || []
             }
           } : null)}
           onYamlApply={handleYamlApply}
@@ -347,43 +378,29 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-start">
-        <div className="flex items-start flex-1 min-w-0">
-          <span className="material-symbols-outlined mr-2 text-gray-700 mt-1">rocket_launch</span>
-          <div className="flex-1 min-w-0">
-            <div className="mb-1">
-              <InlineEditable
-                value={stageName}
-                onSave={handleStageNameChange}
-                placeholder="Stage name"
-                className="font-bold text-gray-900 text-base text-left px-2 py-1"
-                isEditMode={isEditMode}
-              />
-            </div>
-            <div>
-              <InlineEditable
-                value={stageDescription}
-                onSave={handleStageDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : "No description available"}
-                className="text-gray-600 text-sm text-left px-2 py-1"
-                isEditMode={isEditMode}
-              />
-            </div>
-            {/* API Error Display */}
-            {isEditMode && apiError && (
-              <p className="text-left text-sm text-red-700 mt-1">{apiError}</p>
-            )}
+      <div className="px-4 py-4 pb-0 flex justify-between items-start">
+        <div className="flex flex-col items-start flex-1 min-w-0">
+          <div className="flex flex-1 w-full items-center">
+            {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
+            <InlineEditable
+              value={stageName}
+              onSave={handleStageNameChange}
+              placeholder="Stage name"
+              className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 w-full"
+              isEditMode={isEditMode}
+            />
+
           </div>
-        </div>
-        <div className="flex items-center gap-2 ml-2">
-          {!isEditMode && (
-            <button
-              onClick={handleEditClick}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              title="Edit stage"
-            >
-              <MaterialSymbol name="edit" size="md" />
-            </button>
+          <InlineEditable
+            value={stageDescription}
+            onSave={handleStageDescriptionChange}
+            placeholder={isEditMode ? "Add description..." : "No description available"}
+            className="text-gray-600 dark:text-gray-400 text-sm text-left py-1 w-full mt-2 mb-2"
+            isEditMode={isEditMode}
+          />
+          {/* API Error Display */}
+          {isEditMode && apiError && (
+            <p className="text-left text-sm text-red-700 mt-1">{apiError}</p>
           )}
         </div>
       </div>
@@ -400,20 +417,34 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentFormData.connections,
               executor: currentFormData.executor,
               secrets: currentFormData.secrets,
-              conditions: currentFormData.conditions
+              conditions: currentFormData.conditions,
+              inputMappings: currentFormData.inputMappings
             })
           }}
           currentStageId={props.id}
-          onDataChange={setCurrentFormData}
+          onDataChange={handleDataChange}
         />
       ) : (
         <>
+
+          {props.data.executor?.type === 'semaphore' && (
+            <div className="flex items-center w-full gap-2 mx-4 font-semibold">
+              <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <MaterialSymbol name="assignment" size="md" />
+                <span>{(props.data.executor?.resource?.name as string)?.replace('.semaphore/', '')}</span>
+              </div>
+              <div className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">
+                <MaterialSymbol name="code" size="md" />
+                <span>{(props.data.executor?.spec?.['pipelineFile'] as string)?.replace('.semaphore/', '')}</span>
+              </div>
+            </div>
+          )}
           {/* Last Run Section */}
-          <div className={`px-3 py-3 border-t w-full ${getBackgroundColorClass()}`}>
+          <div className={`mt-4 px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Last run</div>
-              <div className="text-xs text-gray-600">
-                {isRunning ? 'Running...' : props.data.timestamp || 'No recent runs'}
+              <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last run</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
+                {isRunning ? 'Running...' : lastFinishedExecution ? formatRelativeTime(lastFinishedExecution?.finishedAt) : 'No recent runs'}
               </div>
             </div>
 
@@ -423,55 +454,56 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 {getStatusIcon()}
                 <a
                   href="#"
-                  className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900"
+                  className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900 dark:text-gray-100"
                   onClick={() => selectStageId(props.id)}
                 >
                   {props.data.label || 'Stage execution'}
                 </a>
               </div>
-
-              {/* Output Tags */}
-              <div className="flex flex-wrap gap-1 mt-2">
-                {outputs.slice(0, 4).map((output, index) => (
-                  <span
-                    key={index}
-                    className={`text-xs px-2 py-1 rounded-full ${output.required
-                      ? 'bg-gray-200 text-gray-800 border border-gray-300 font-medium'
-                      : 'bg-gray-100 text-gray-700'
-                      }`}
-                  >
-                    {output.key}: {output.value}
-                  </span>
-                ))}
+              <div className="flex items-center gap-2 font-semibold">
+                {lastInputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} inputs</span>}
+                {lastOutputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} outputs</span>}
               </div>
             </div>
           </div>
 
           {/* Queue Section */}
-          <div className="px-3 pt-2 pb-0 w-full">
-            <div className="w-full text-left text-xs font-medium text-gray-700 uppercase tracking-wide mb-1">Queue</div>
-
-            <div className="w-full pt-1 pb-6">
-              {/* Pending Events */}
-              {pendingEvents.length > 0 && (
-                <div className="flex items-center w-full p-2 bg-gray-100 rounded-lg mt-1">
-                  <div className="rounded-full bg-[var(--lightest-orange)] text-[var(--dark-orange)] w-6 h-6 mr-2 flex items-center justify-center">
-                    <span className="material-symbols-outlined" style={{ fontSize: '19px' }}>how_to_reg</span>
-                  </div>
-                  <a
-                    href="#"
-                    className="min-w-0 font-semibold text-sm flex items-center hover:underline"
-                  >
-                    <div className="truncate">Pending ({pendingEvents.length})</div>
-                  </a>
-                </div>
-              )}
-
-              {/* Show empty state when no queue items */}
-              {!pendingEvents.length && !waitingEvents.length && (
-                <div className="text-sm text-gray-500 italic py-2">No queue activity</div>
-              )}
+          <div className="px-3 pt-2 pb-2 w-full">
+            <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-1">
+              Next in queue
+              <span className="text-xs text-gray-400 font-medium">+{pendingEvents.length + waitingEvents.length} more</span>
             </div>
+
+            {
+              lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL" && (
+                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
+                  <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
+                  <Tippy content="Manual approval required" placement="top">
+                    <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700' />
+                  </Tippy>
+                </div>
+              )
+            }
+
+            {
+              lastPendingEvent && (
+                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastPendingEvent?.id}</span>
+                  <Tippy content="Waiting For the current execution to finish" placement="top">
+                    <MaterialSymbol name="timer" size="md" className='text-orange-700' />
+                  </Tippy>
+                </div>
+              )
+            }
+
+            {
+              !lastPendingEvent && !lastWaitingEvent && (
+                <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <span className='font-semibold text-gray-500 dark:text-gray-400 text-sm truncate mt-[2px]'>No events in queue..</span>
+                </div>
+              )
+            }
+
           </div>
         </>
       )}

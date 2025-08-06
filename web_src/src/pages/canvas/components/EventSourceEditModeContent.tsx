@@ -56,9 +56,10 @@ export function EventSourceEditModeContent({
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
-      integration: data.integration,
-      resource: data.resource,
-      integrationConfig: {} as Record<string, string | boolean>
+      spec: {
+        integration: data.integration,
+        resource: data.resource
+      } as SuperplaneEventSourceSpec
     },
     onDataChange,
     validateAllFields
@@ -71,14 +72,15 @@ export function EventSourceEditModeContent({
   useEffect(() => {
     syncWithIncomingData(
       {
-        integration: data.integration,
-        resource: data.resource,
-        integrationConfig: {}
+        spec: {
+          integration: data.integration,
+          resource: data.resource
+        } as SuperplaneEventSourceSpec
       },
       (incomingData) => {
-        setSelectedIntegration(incomingData.integration);
-        setResourceType(incomingData.resource?.type);
-        setResourceName(incomingData.resource?.name || '');
+        setSelectedIntegration(incomingData.spec.integration || null);
+        setResourceType(incomingData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(incomingData.spec.resource?.name || '');
       }
     );
   }, [data, eventSourceType, syncWithIncomingData]);
@@ -113,10 +115,10 @@ export function EventSourceEditModeContent({
   const revertSection = (section: string) => {
     switch (section) {
       case 'integration':
-        setSelectedIntegration(originalData.integration);
-        setResourceType(originalData.resource?.type);
-        setResourceName(originalData.resource?.name || '');
-        setIntegrationConfig({ ...originalData.integrationConfig });
+        setSelectedIntegration(originalData.spec.integration || null);
+        setResourceType(originalData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(originalData.spec.resource?.name || '');
+        setIntegrationConfig({});
         break;
     }
   };
@@ -212,7 +214,7 @@ export function EventSourceEditModeContent({
             title="Semaphore Configuration"
             isOpen={openSections.includes('integration')}
             onToggle={handleAccordionToggle}
-            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'integration')}
+            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'spec')}
             onRevert={revertSection}
             requiredBadge={true}
           >
@@ -236,7 +238,7 @@ export function EventSourceEditModeContent({
               </ValidationField>
 
               {availableIntegrations.length === 0 && (
-                <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+                <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                   No Semaphore integrations available. Create one first in the &nbsp;
                   <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#settings?tab=integrations`}>canvas settings</Link>.
                 </div>
@@ -271,7 +273,7 @@ export function EventSourceEditModeContent({
             title="GitHub Configuration"
             isOpen={openSections.includes('integration')}
             onToggle={handleAccordionToggle}
-            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'integration')}
+            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'spec')}
             onRevert={revertSection}
             requiredBadge={true}
           >

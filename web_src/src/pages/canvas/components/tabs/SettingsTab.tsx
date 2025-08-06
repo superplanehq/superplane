@@ -97,13 +97,13 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
   return (
     <div className="h-full flex flex-col">
       {/* View Mode Toggle */}
-      <div className="flex items-center justify-between border-b border-gray-200 pb-2 px-3 pt-3">
+      <div className="flex items-center justify-between border-b border-gray-200 dark:border-zinc-700 pb-2 px-3 pt-3">
         <div className="flex items-center">
           <button
             className={`px-3 py-1 text-sm font-medium rounded-l border ${
               viewMode === 'form' 
-                ? 'bg-gray-100 text-gray-900 border-gray-300 shadow-inner' 
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner' 
+                : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
             }`}
             onClick={() => setViewMode('form')}
           >
@@ -112,8 +112,8 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           <button
             className={`px-3 py-1 text-sm font-medium rounded-r border-l-0 border ${
               viewMode === 'yaml' 
-                ? 'bg-gray-100 text-gray-900 border-gray-300 shadow-inner' 
-                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                ? 'bg-gray-100 dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 border-gray-300 dark:border-zinc-600 shadow-inner' 
+                : 'bg-white dark:bg-zinc-800 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-600 hover:bg-gray-50 dark:hover:bg-zinc-700'
             }`}
             onClick={() => setViewMode('yaml')}
           >
@@ -123,56 +123,56 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
       </div>
 
       {/* Content */}
-      <div className="bg-white flex-1 overflow-auto ml-2">
+      <div className="bg-white dark:bg-zinc-900 flex-1 overflow-auto ml-2">
         {viewMode === 'form' ? (
           <div className='text-sm p-3'>
             {/* Stage Details */}
-            <div className='mt-3 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+            <div className='mt-3 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
               Stage Details
             </div>
             <div className="space-y-2">
               <div className="flex items-start w-full">
-                <div className='text-gray-600 w-1/4 text-left'>Name</div>
-                <div className="block w-full font-mono text-sm text-left">{selectedStage.metadata!.name || '—'}</div>
+                <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Name</div>
+                <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.metadata!.name || '—'}</div>
               </div>
               <div className="flex items-start w-full">
-                <div className='text-gray-600 w-1/4 text-left'>ID</div>
-                <div className="block w-full font-mono text-sm text-left">{selectedStage.metadata!.id || '—'}</div>
+                <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>ID</div>
+                <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.metadata!.id || '—'}</div>
               </div>
             </div>
 
             {/* Executor */}
             {selectedStage.spec!.executor && (
               <>
-                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
                   Executor
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-start w-full">
-                    <div className='text-gray-600 w-1/4 text-left'>Type</div>
-                    <div className="block w-full text-left">{selectedStage.spec!.executor!.type}</div>
+                    <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Type</div>
+                    <div className="block w-full text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.type}</div>
                   </div>
                   {selectedStage.spec!.executor!.spec && selectedStage.spec!.executor!.type == "semaphore" && (
                     <>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 w-1/4 text-left'>Project</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.resource!.name || '—'}</div>
+                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Project</div>
+                        <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.resource!.name || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 w-1/4 text-left'>Branch</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.branch as string || '—'}</div>
+                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Branch</div>
+                        <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.spec.branch as string || '—'}</div>
                       </div>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 w-1/4 text-left'>Pipeline file</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.pipelineFile as string || '—'}</div>
+                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Pipeline file</div>
+                        <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.spec.pipelineFile as string || '—'}</div>
                       </div>
                     </>
                   )}
                   {selectedStage.spec!.executor!.spec && selectedStage.spec!.executor!.type == "http" && (
                     <>
                       <div className="flex items-start w-full">
-                        <div className='text-gray-600 w-1/4 text-left'>URL</div>
-                        <div className="block w-full font-mono text-sm text-left">{selectedStage.spec!.executor!.spec.url as string || '—'}</div>
+                        <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>URL</div>
+                        <div className="block w-full font-mono text-sm text-left text-gray-900 dark:text-zinc-100">{selectedStage.spec!.executor!.spec.url as string || '—'}</div>
                       </div>
                     </>
                   )}
@@ -183,14 +183,14 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Gates */}
             {selectedStage.spec!.conditions && selectedStage.spec!.conditions.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
                   Gates
                 </div>
                 <div className="space-y-2">
                   {selectedStage.spec!.conditions.map((condition, index) => (
                     <div key={index} className="flex items-start w-full">
-                      <div className='text-gray-600 w-1/4 text-left'>Manual approval</div>
-                      <div className="block w-full text-left">
+                      <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>Manual approval</div>
+                      <div className="block w-full text-left text-gray-900 dark:text-zinc-100">
                         {condition.approval ? `Required: ${condition.approval.count} approvals` : 'Enabled'}
                       </div>
                     </div>
@@ -202,7 +202,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Connections */}
             {selectedStage.spec!.connections && selectedStage.spec!.connections.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
                   Connections
                 </div>
                 <div className="space-y-2">
@@ -222,11 +222,11 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
 
                     return (
                       <div key={connection.name || `connection-${index + 1}`} className="flex items-center justify-between w-full">
-                        <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono text-left">
+                        <span className="bg-gray-100 dark:bg-zinc-700 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-zinc-600 font-mono text-left">
                           <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
                           {connection.name || `Connection ${index + 1}`}
                         </span>
-                        <span className='text-sm text-green-600 text-left'>{getConnectionTypeLabel(connection.type)}</span>
+                        <span className='text-sm text-green-600 dark:text-green-400 text-left'>{getConnectionTypeLabel(connection.type)}</span>
                       </div>
                     );
                   })}
@@ -237,7 +237,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Inputs */}
             {selectedStage.spec!.inputs && selectedStage.spec!.inputs.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
                   Inputs
                 </div>
                 <div className="space-y-3">
@@ -247,7 +247,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                     return (
                       <div key={`input_${input.name}_${index + 1}`}>
                         <div className="flex items-start w-full mb-2">
-                          <div className='text-gray-600 w-1/4 text-left'>{input.name || `Input ${index + 1}`}</div>
+                          <div className='text-gray-600 dark:text-zinc-400 w-1/4 text-left'>{input.name || `Input ${index + 1}`}</div>
                           <div className="block w-full text-left">
                             {inputMappings.length > 0 ? (
                               <div className="space-y-1">
@@ -255,16 +255,16 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                                   const valueSource = formatValueSource(inputMapping.mapping);
                                   return (
                                     <div key={`mapping_${index}_${mappingIndex}`} className="flex items-center w-full">
-                                      <span className="bg-gray-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">
+                                      <span className="bg-gray-100 dark:bg-zinc-700 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-zinc-600 font-mono mr-1 text-left">
                                         <span className="material-symbols-outlined mr-1 text-sm">rocket_launch</span>
                                         {inputMapping.triggeredBy}
                                       </span>
                                       <span className="text-sm">.</span>
-                                      <span className="bg-purple-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">
+                                      <span className="bg-purple-100 dark:bg-purple-900/50 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-purple-700 font-mono mx-1 text-left">
                                         outputs
                                       </span>
                                       <span className="text-sm">.</span>
-                                      <span className="bg-yellow-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">
+                                      <span className="bg-yellow-100 dark:bg-yellow-900/50 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-yellow-700 font-mono ml-1 text-left">
                                         {valueSource?.source || input.name || 'VALUE'}
                                       </span>
                                     </div>
@@ -272,7 +272,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
                                 })}
                               </div>
                             ) : (
-                              <span className="text-gray-500 text-sm text-left">No mappings configured</span>
+                              <span className="text-gray-500 dark:text-zinc-400 text-sm text-left">No mappings configured</span>
                             )}
                           </div>
                         </div>
@@ -286,20 +286,20 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
             {/* Outputs */}
             {selectedStage.spec!.outputs && selectedStage.spec!.outputs.length > 0 && (
               <>
-                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 tracking-wide text-left'>
+                <div className='mt-6 mb-2 uppercase text-sm font-bold text-gray-700 dark:text-zinc-300 tracking-wide text-left'>
                   Outputs
                 </div>
                 <div className="space-y-2">
                   {selectedStage.spec!.outputs.map((output, index) => (
                     <div key={index} className="flex items-center justify-between w-full">
                       <div className='flex items-center'>
-                        <span className="h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mr-1 text-left">this</span>
+                        <span className="h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-zinc-600 font-mono mr-1 text-left bg-gray-50 dark:bg-zinc-700">this</span>
                         <span className="text-sm">.</span>
-                        <span className="bg-purple-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono mx-1 text-left">outputs</span>
+                        <span className="bg-purple-100 dark:bg-purple-900/50 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-purple-700 font-mono mx-1 text-left">outputs</span>
                         <span className="text-sm">.</span>
-                        <span className="bg-yellow-100 h-[26px] text-gray-600 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 font-mono ml-1 text-left">{output.name || `output_${index + 1}`}</span>
+                        <span className="bg-yellow-100 dark:bg-yellow-900/50 h-[26px] text-gray-600 dark:text-zinc-300 text-sm px-2 py-1 rounded leading-none flex items-center border border-gray-200 dark:border-yellow-700 font-mono ml-1 text-left">{output.name || `output_${index + 1}`}</span>
                       </div>
-                      <span className={`text-sm text-left ${output.required ? 'text-red-600' : 'text-gray-500'}`}>
+                      <span className={`text-sm text-left ${output.required ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-zinc-400'}`}>
                         {output.required ? 'required' : 'optional'}
                       </span>
                     </div>
@@ -310,7 +310,7 @@ export const SettingsTab = ({ selectedStage }: SettingsTabProps) => {
           </div>
         ) : (
           <div className="h-full">
-            <pre className="bg-white p-4 font-mono text-sm h-full overflow-auto text-left">
+            <pre className="bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100 p-4 font-mono text-sm h-full overflow-auto text-left">
               {convertToYaml(selectedStage)}
             </pre>
           </div>

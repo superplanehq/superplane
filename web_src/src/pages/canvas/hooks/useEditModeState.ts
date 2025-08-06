@@ -1,9 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface UseEditModeStateProps<T> {
   initialData: T;
-  onDataChange?: ((data: any) => void) | undefined;
+  onDataChange?: ((data: T) => void) | undefined;
   validateAllFields: () => boolean;
 }
 
@@ -15,7 +14,7 @@ export function useEditModeState<T extends Record<string, unknown>>({
   const [openSections, setOpenSections] = useState<string[]>(['general']);
   const [originalData] = useState(initialData);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
-  const [isInternalUpdate, setIsInternalUpdate] = useState(false);
+  const isInternalUpdateRef = useRef(false);
 
   const handleAccordionToggle = useCallback((sectionId: string) => {
     setOpenSections(prev => {
@@ -32,7 +31,7 @@ export function useEditModeState<T extends Record<string, unknown>>({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleDataChange = useCallback((data: any) => {
     if (onDataChange) {
-      setIsInternalUpdate(true);
+      isInternalUpdateRef.current = true;
       const isValid = validateAllFields();
       onDataChange({
         ...data,
@@ -42,11 +41,11 @@ export function useEditModeState<T extends Record<string, unknown>>({
   }, [onDataChange, validateAllFields]);
 
   const syncWithIncomingData = useCallback((incomingData: T, stateSetter: (data: T) => void) => {
-    if (!isInternalUpdate) {
+    if (!isInternalUpdateRef.current) {
       stateSetter(incomingData);
     }
-    setIsInternalUpdate(false);
-  }, [isInternalUpdate]);
+    isInternalUpdateRef.current = false;
+  }, []);
 
   return {
     openSections,
@@ -54,8 +53,6 @@ export function useEditModeState<T extends Record<string, unknown>>({
     originalData,
     validationErrors,
     setValidationErrors,
-    isInternalUpdate,
-    setIsInternalUpdate,
     handleAccordionToggle,
     isSectionModified,
     handleDataChange,

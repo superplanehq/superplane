@@ -81,6 +81,11 @@ export function useWebsocketEvents(canvasId: string): void {
 
         syncStageEvents(canvasId, newEventPayload.stage_id);
 
+        // Resync to check if stage event needs approval
+        setTimeout(() => {
+          syncStageEvents(canvasId, newEventPayload.stage_id);
+        }, 3000);
+
         if (eventSourceWithNewEvent) {
           updatedEventSource = {
             ...eventSourceWithNewEvent,

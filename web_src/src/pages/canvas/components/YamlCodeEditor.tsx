@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Editor from '@monaco-editor/react';
 import * as yaml from 'js-yaml';
@@ -36,6 +36,25 @@ export function YamlCodeEditor({
 
   const [parseError, setParseError] = useState<string | null>(null);
   const [isValidYaml, setIsValidYaml] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Detect dark mode
+  useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    };
+
+    checkDarkMode();
+
+    // Watch for changes in dark mode
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     if (value === undefined) return;
@@ -85,13 +104,13 @@ export function YamlCodeEditor({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50/55">
-      <div className="bg-white rounded-lg shadow-xl w-[95vw] h-[95vh] max-w-7xl flex flex-col">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-50/55 dark:bg-zinc-900/55">
+      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-xl w-[95vw] h-[95vh] max-w-7xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700">
           <div className="flex items-center gap-2">
             <MaterialSymbol name="code" size="md" />
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
               Edit {entityType} YAML
             </h2>
           </div>
@@ -106,7 +125,7 @@ export function YamlCodeEditor({
             </Button>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+              className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors text-gray-600 dark:text-zinc-400"
               title="Close editor"
             >
               <MaterialSymbol name="close" size="md" />
@@ -116,8 +135,8 @@ export function YamlCodeEditor({
 
         {/* Error Display */}
         {parseError && (
-          <div className="p-3 bg-red-50 border-b border-red-200">
-            <div className="flex items-start gap-2 text-red-800">
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
+            <div className="flex items-start gap-2 text-red-800 dark:text-red-300">
               <MaterialSymbol name="error" size="sm" className="mt-0.5 flex-shrink-0" />
               <div>
                 <div className="font-medium text-sm">YAML Parse Error</div>
@@ -128,13 +147,13 @@ export function YamlCodeEditor({
         )}
 
         {/* Editor */}
-        <div className="flex-1 border-b border-gray-200">
+        <div className="flex-1 border-b border-gray-200 dark:border-zinc-700">
           <Editor
             height="100%"
             defaultLanguage="yaml"
             value={yamlContent}
             onChange={handleEditorChange}
-            theme="vs"
+            theme={isDarkMode ? 'vs-dark' : 'vs'}
             options={{
               minimap: { enabled: false },
               fontSize: 14,
@@ -159,10 +178,10 @@ export function YamlCodeEditor({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 bg-gray-50">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-zinc-800">
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-400">
             <MaterialSymbol name="info" size="sm" />
-            <span>
+            <span className='dark:text-zinc-100'>
               Edit the YAML configuration for your {entityType}. Changes will be applied to the form when you click Apply.
             </span>
           </div>
