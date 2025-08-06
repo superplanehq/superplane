@@ -660,7 +660,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
                     {/* Input Values */}
                     <div>
-                      <div className="flex justify-between items-center mb-3">
+                      <div className="flex justify-between items-center mb-3 text-zinc-600 dark:text-zinc-400">
                         <label className="text-sm font-medium">Input Values</label>
                         <button
                           onClick={() => {
@@ -673,7 +673,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         </button>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-3 text-zinc-600 dark:text-zinc-400">
                         {(mapping.values || []).map((value, valueIndex) => (
                           <div key={valueIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
                             {/* Input Name */}
