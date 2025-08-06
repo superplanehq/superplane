@@ -62,6 +62,7 @@ export const transformStagesToNodes = (
       conditions: st.spec?.conditions || [],
       outputs: st.spec?.outputs || [],
       inputs: st.spec?.inputs || [],
+      inputMappings: st.spec?.inputMappings || [],
       secrets: st.spec?.secrets || [],
       executor: st.spec?.executor,
       approveStageEvent: (event: SuperplaneStageEvent) => {
@@ -115,15 +116,15 @@ export const transformToEdges = (
         connectionGroups.find((g) => g.metadata?.name === conn.name);
 
       const sourceId = sourceObj?.metadata?.id ?? conn.name;
-      const strokeColor = '#000000';
+      const strokeColor = '#707070';
       return {
         id: `e-${conn.name}-${st.metadata?.id}`,
         source: sourceId,
         target: st.metadata?.id || '',
         type: ConnectionLineType.Bezier,
-        animated: true,
-        style: { stroke: strokeColor, strokeWidth: 4 },
-        markerEnd: { type: MarkerType.Arrow, color: strokeColor, strokeWidth: 2 }
+        animated: false,
+        style: { stroke: strokeColor, strokeWidth: 2 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, strokeWidth: 2 }
       } as EdgeType;
     })
   );

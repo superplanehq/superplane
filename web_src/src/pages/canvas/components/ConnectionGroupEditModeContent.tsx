@@ -100,10 +100,13 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
+      name: data.name || '',
+      description: data.description,
       connections: data.connections || [],
       groupByFields: data.groupBy?.fields || [],
       timeout: undefined,
-      timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP'
+      timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP',
+      isValid: true
     },
     onDataChange,
     validateAllFields
@@ -151,10 +154,13 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   useEffect(() => {
     syncWithIncomingData(
       {
+        name: data.name || '',
+        description: data.description,
         connections: data.connections || [],
         groupByFields: data.groupBy?.fields || [],
         timeout: undefined,
-        timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP'
+        timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP',
+        isValid: true
       },
       (incomingData) => {
         setConnections(incomingData.connections);
@@ -222,7 +228,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                 onDelete={() => connectionsEditor.removeItem(index)}
                 displayName={connection.name || `Connection ${index + 1}`}
                 badge={connection.type && (
-                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
                     {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                   </span>
                 )}
@@ -245,7 +251,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           ))}
           <button
             onClick={connectionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <span className="material-symbols-outlined text-sm">add</span>
             Add Connection
@@ -314,7 +320,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
           ))}
           <button
             onClick={groupByEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <span className="material-symbols-outlined text-sm">add</span>
             Add Group By Field
@@ -346,7 +352,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                   : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
                   }`}
               />
-              <div className="text-xs text-zinc-500 mt-1">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 How long to wait for all connections to send events with the same grouping fields
               </div>
             </ValidationField>
@@ -360,7 +366,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                 <option value="TIMEOUT_BEHAVIOR_DROP">Drop - Do not emit anything</option>
                 <option value="TIMEOUT_BEHAVIOR_EMIT">Emit - Emit event with missing connections indicated</option>
               </select>
-              <div className="text-xs text-zinc-500 mt-1">
+              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 What to do when the timeout is reached
               </div>
             </ValidationField>

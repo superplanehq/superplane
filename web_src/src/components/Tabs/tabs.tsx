@@ -111,11 +111,11 @@ function TabItem({
       'px-2 py-3 border-b-2 border-transparent': variant === 'default',
       'text-blue-600 border-blue-500 dark:text-blue-400': variant === 'default' && isActive,
 
-      'px-3 py-2 rounded-md': variant === 'pills',
+      'px-3 py-23 rounded-md': variant === 'pills',
       'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white': variant === 'pills' && isActive,
       'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white': variant === 'pills' && !isActive && !isDisabled,
 
-      'px-3 py-2 relative': variant === 'underline',
+      'px-3 py-3 relative': variant === 'underline',
       'text-blue-600 dark:text-blue-400': variant === 'underline' && isActive,
 
       'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': (variant === 'default' || variant === 'underline') && !isActive && !isDisabled,

@@ -54,7 +54,7 @@ export default function CustomBarHandle({ type, conditions, connections }: Handl
 
 
 function BarHandleRight({ handleStyle }: { handleStyle: CSSProperties }) {
-  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500" />
+  return <Handle type="source" position={Position.Right} id="source" style={handleStyle} className="custom-bar-handle !bg-blue-500 dark:!bg-gray-200" />
 }
 
 function BarHandleLeft({ handleStyle, connections = [], conditions = [] }: { handleStyle: CSSProperties, connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[] }) {
@@ -124,7 +124,7 @@ function BarHandleLeft({ handleStyle, connections = [], conditions = [] }: { han
         position={Position.Left}
         id="target"
         style={handleStyle}
-        className="custom-bar-handle !bg-blue-500"
+        className="custom-bar-handle !bg-blue-500 dark:!bg-gray-200"
         {...getReferenceProps()}
       />
 
@@ -154,7 +154,7 @@ function BarHandleLeft({ handleStyle, connections = [], conditions = [] }: { han
 
 function TooltipContent({ connections = [], conditions = [] }: { connections?: SuperplaneConnection[], conditions?: SuperplaneCondition[] }) {
   return (
-    <div className="p-2 min-w-[300px] bg-white">
+    <div className="p-2 min-w-[300px] bg-white dark:bg-gray-700 dark:text-white">
       <div className="text-xs text-gray-600 font-semibold mb-1">Connections:</div>
       <div className="flex gap-1 mb-2 flex-wrap">
         {connections.map((connection) => (

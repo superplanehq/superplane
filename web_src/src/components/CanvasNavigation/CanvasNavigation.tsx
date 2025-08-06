@@ -28,7 +28,7 @@ export function CanvasNavigation({
   const navigationTabs: Tab[] = [
     {
       id: 'editor',
-      label: 'Workflow',
+      label: 'Preview',
     },
     {
       id: 'settings',
@@ -81,7 +81,7 @@ export function CanvasNavigation({
         <ControlledTabs
           tabs={navigationTabs}
           activeTab={activeView}
-          variant='default'
+          variant='underline'
           onTabChange={(tabId) => onViewChange(tabId as 'editor' | 'settings')}
         />
       </div>

@@ -45,21 +45,21 @@ export function InlineEditor({
   return (
     <div className={`flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded ${className}`}>
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium">{displayName}</span>
+        <span className="text-sm font-medium text-gray-900 dark:text-zinc-100">{displayName}</span>
         {badge}
       </div>
       <div className="flex items-center gap-2">
         <button
           onClick={onEdit}
-          className="text-zinc-500 hover:text-zinc-700"
+          className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          <span className="material-symbols-outlined text-sm">edit</span>
+          <MaterialSymbol name="edit" size="sm" />
         </button>
         <button
           onClick={onDelete}
-          className="text-red-600 hover:text-red-700"
+          className="text-zinc-500 dark:text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-300"
         >
-          <span className="material-symbols-outlined text-sm">delete</span>
+          <MaterialSymbol name="delete" size="sm" />
         </button>
       </div>
     </div>

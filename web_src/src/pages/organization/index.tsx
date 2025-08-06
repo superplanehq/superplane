@@ -231,9 +231,6 @@ const HomePage = () => {
                                 </p>
                               </div>
                             </div>
-                            <Button plain className="text-zinc-400 hover:text-zinc-600 opacity-100 group-hover:opacity-100 transition-opacity">
-                              <MaterialSymbol name="more_vert" />
-                            </Button>
                           </div>
                         </div>
                       </div>
@@ -291,9 +288,6 @@ const HomePage = () => {
                                   className="w-6 h-6 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
                                 />
                               </div>
-                              <Button plain className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-100 dark:hover:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <MaterialSymbol name="more_vert" />
-                              </Button>
                             </div>
                           </div>
                         </div>

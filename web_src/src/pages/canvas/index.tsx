@@ -222,7 +222,7 @@ export function Canvas() {
 
         {/* Content based on active view */}
         {activeView === 'editor' ? (
-          <div className="relative" style={{ height: "calc(100vh - 3rem)", overflow: "hidden" }}>
+          <div className="relative" style={{ height: "calc(100vh - 2.6rem)", overflow: "hidden" }}>
             <ComponentSidebar
               isOpen={isComponentSidebarOpen}
               onClose={() => setIsComponentSidebarOpen(false)}
