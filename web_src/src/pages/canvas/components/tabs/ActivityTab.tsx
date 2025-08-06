@@ -37,7 +37,6 @@ export const ActivityTab = ({
           </button>
         </div>
         <ExecutionTimeline
-          selectedStage={selectedStage}
           executions={allExecutions.slice(0, 3)}
         />
       </div>

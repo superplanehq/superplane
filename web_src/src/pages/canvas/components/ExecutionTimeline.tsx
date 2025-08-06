@@ -1,15 +1,12 @@
 import { ExecutionWithEvent } from "../store/types";
-import { SuperplaneStage } from "@/api-client";
 import { RunItem } from "./tabs/RunItem";
 
 interface ExecutionTimelineProps {
   executions: ExecutionWithEvent[];
-  selectedStage: SuperplaneStage;
 }
 
 export const ExecutionTimeline = ({
   executions,
-  selectedStage
 }: ExecutionTimelineProps) => {
   if (executions.length === 0) {
     return (
@@ -40,17 +37,12 @@ export const ExecutionTimeline = ({
 
   const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
     const map: Record<string, string> = {};
-    const executionOutputs = execution.outputs?.map(output => [output.name, output.value]).reduce((acc, [key, value]) => {
-      acc[key!] = value!;
-      return acc;
-    }, {} as Record<string, string>);
-
-    selectedStage.spec?.outputs?.forEach((output) => {
+    execution.outputs?.forEach((output) => {
       if (!output.name) {
         return;
       }
 
-      map[output.name!] = executionOutputs?.[output.name!] || "-";
+      map[output.name!] = output.value!;
     });
 
     return map;
@@ -58,17 +50,12 @@ export const ExecutionTimeline = ({
 
   const mapExecutionEventInputs = (execution: ExecutionWithEvent) => {
     const map: Record<string, string> = {};
-    const executionEventInputs = execution.event.inputs?.map(input => [input.name, input.value]).reduce((acc, [key, value]) => {
-      acc[key!] = value!;
-      return acc;
-    }, {} as Record<string, string>);
-
-    selectedStage.spec?.inputs?.forEach((input) => {
+    execution.event.inputs?.forEach((input) => {
       if (!input.name) {
         return;
       }
 
-      map[input.name!] = executionEventInputs?.[input.name!] || "-";
+      map[input.name!] = input.value!;
     });
 
     return map;

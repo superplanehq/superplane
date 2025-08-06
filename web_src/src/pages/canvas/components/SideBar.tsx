@@ -75,7 +75,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
         );
 
       case 'history':
-        return <HistoryTab allExecutions={allExecutions} selectedStage={selectedStage} />;
+        return <HistoryTab allExecutions={allExecutions} />;
 
       case 'settings':
         return <SettingsTab selectedStage={selectedStage} />;
