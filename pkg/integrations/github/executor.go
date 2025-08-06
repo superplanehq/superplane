@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v74/github"
@@ -12,8 +12,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/retry"
 )
-
-var inProgressRunStates = []string{"in_progress", "queued", "requested", "waiting", "pending"}
 
 type GitHubExecutor struct {
 	Resource integrations.Resource
@@ -114,7 +112,7 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 	//
 	// GitHub doesn't expose the run ID from the dispatch call, so we need to find it.
 	//
-	workflowRun, err := e.findTriggeredWorkflowRun(*workflow.ID, spec.Ref)
+	workflowRun, err := e.findTriggeredWorkflowRun(*workflow.ID, spec.Ref, parameters.ExecutionID)
 	if err != nil {
 		return nil, fmt.Errorf("error finding triggered workflow run: %v", err)
 	}
@@ -126,11 +124,11 @@ func (e *GitHubExecutor) triggerWorkflow(spec ExecutorSpec, parameters executors
 	}, nil
 }
 
-func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string) (*github.WorkflowRun, error) {
+func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string, executionID string) (*github.WorkflowRun, error) {
 	var run *github.WorkflowRun
 
 	//
-	// We need to use a creation time filter to ensure we only get the run we just triggered.
+	// We use a creation time filter to decrease the number of runs we need to check.
 	// See: https://docs.github.com/en/search-github/getting-started-with-searching-on-github/understanding-the-search-syntax
 	//
 	creationTimeFilter := fmt.Sprintf(
@@ -139,6 +137,9 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string) 
 		time.Now().Add(time.Minute).Format(time.RFC3339),
 	)
 
+	//
+	// We poll for the workflow with a few retries.
+	//
 	err := retry.WithConstantWait(func() error {
 		runs, _, err := e.gh.client.Actions.ListWorkflowRunsByID(
 			context.Background(),
@@ -164,7 +165,13 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string) 
 		}
 
 		for _, r := range runs.WorkflowRuns {
-			if slices.Contains(inProgressRunStates, r.GetStatus()) {
+
+			//
+			// The only way to ensure we are getting the right run is by checking that the
+			// superplane_execution_id input is present in the workflow run name.
+			// See: https://github.com/orgs/community/discussions/9752
+			//
+			if strings.Contains(r.GetName(), executionID) {
 				run = r
 				return nil
 			}
@@ -173,9 +180,9 @@ func (e *GitHubExecutor) findTriggeredWorkflowRun(workflowID int64, ref string) 
 		return fmt.Errorf("workflow run not found")
 	}, retry.Options{
 		Task:         "Find triggered workflow run",
-		MaxAttempts:  15,
+		InitialDelay: time.Second,
 		Wait:         2 * time.Second,
-		InitialDelay: 2 * time.Second,
+		MaxAttempts:  15,
 		Verbose:      false,
 	})
 

@@ -1512,8 +1512,8 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     </button>
                   </div>
                   <div className="space-y-2">
-                    {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value]) => (
-                      <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                    {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value], index) => (
+                      <div key={index} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
                         <input
                           type="text"
                           value={key}
