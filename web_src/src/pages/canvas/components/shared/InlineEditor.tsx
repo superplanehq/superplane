@@ -53,13 +53,13 @@ export function InlineEditor({
           onClick={onEdit}
           className="text-zinc-500 hover:text-zinc-700"
         >
-          <span className="material-symbols-outlined text-sm">edit</span>
+          <MaterialSymbol name="edit" size="sm" />
         </button>
         <button
           onClick={onDelete}
-          className="text-red-600 hover:text-red-700"
+          className="text-zinc-500 hover:text-zinc-700"
         >
-          <span className="material-symbols-outlined text-sm">delete</span>
+          <MaterialSymbol name="delete" size="sm" />
         </button>
       </div>
     </div>

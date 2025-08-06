@@ -14,6 +14,7 @@ import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { Field } from './Field';
 import { Label } from './Label';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -542,7 +543,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={connectionsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Connection
           </button>
         </EditableAccordionSection>
@@ -604,7 +605,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={inputsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Input
           </button>
         </EditableAccordionSection>
@@ -802,7 +803,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                                   const newValues = (mapping.values || []).filter((_, vi) => vi !== valueIndex);
                                   inputMappingsEditor.updateItem(index, 'values', newValues);
                                 }}
-                                className="text-red-600 hover:text-red-700 text-xs"
+                                className="text-zinc-600 hover:text-zinc-700 text-xs"
                               >
                                 Remove Value
                               </button>
@@ -826,7 +827,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={inputMappingsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Input Mapping
           </button>
         </EditableAccordionSection>
@@ -901,7 +902,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={outputsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Output
           </button>
         </EditableAccordionSection>
@@ -1009,13 +1010,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       onClick={() => conditionsEditor.saveEdit()}
                       className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
-                      <span className="material-symbols-outlined text-sm">check</span>
+                      <MaterialSymbol name="check" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-zinc-600 hover:text-zinc-700"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <MaterialSymbol name="delete" size="sm" />
                     </button>
                   </div>
                 </div>
@@ -1037,13 +1038,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       onClick={() => conditionsEditor.startEdit(index)}
                       className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
-                      <span className="material-symbols-outlined text-sm">edit</span>
+                      <MaterialSymbol name="edit" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-zinc-600 hover:text-zinc-700"
                     >
-                      <span className="material-symbols-outlined text-sm">delete</span>
+                      <MaterialSymbol name="delete" size="sm" />
                     </button>
                   </div>
                 </div>
@@ -1054,7 +1055,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={conditionsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Condition
           </button>
         </EditableAccordionSection>
@@ -1247,7 +1248,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             onClick={secretsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            <span className="material-symbols-outlined text-sm">add</span>
+            <MaterialSymbol name="add" size="sm" />
             Add Secret
           </button>
         </EditableAccordionSection>
@@ -1399,9 +1400,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         />
                         <button
                           onClick={() => removeExecutorParameter(key)}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-zinc-600 hover:text-zinc-700"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" size="sm" />
                         </button>
                       </div>
                     ))}
@@ -1501,9 +1502,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             delete updatedHeaders[key];
                             updateExecutorField('headers', updatedHeaders);
                           }}
-                          className="text-red-600 hover:text-red-700"
+                          className="text-zinc-600 hover:text-zinc-700"
                         >
-                          <span className="material-symbols-outlined text-sm">delete</span>
+                          <MaterialSymbol name="delete" size="sm" />
                         </button>
                       </div>
                     ))}
