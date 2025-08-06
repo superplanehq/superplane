@@ -333,7 +333,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative `}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400 dark:border-gray-200' : 'border-gray-200 dark:border-gray-700'} relative `}
       style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
