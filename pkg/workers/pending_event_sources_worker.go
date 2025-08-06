@@ -76,7 +76,7 @@ func (w *PendingEventSourcesWorker) ProcessEventSource(eventSource models.EventS
 		return fmt.Errorf("error creating integration: %v", err)
 	}
 
-	key, err := w.Encryptor.Decrypt(context.Background(), eventSource.Key, []byte(eventSource.Name))
+	key, err := w.Encryptor.Decrypt(context.Background(), eventSource.Key, []byte(eventSource.ID.String()))
 	if err != nil {
 		return fmt.Errorf("error decrypting event source key: %v", err)
 	}

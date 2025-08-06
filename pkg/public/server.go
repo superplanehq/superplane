@@ -630,7 +630,7 @@ func (s *Server) HandleCustomWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key, err := source.GetDecryptedKey(r.Context(), s.encryptor)
+	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.ID.String()))
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -726,7 +726,7 @@ func (s *Server) HandleIntegrationWebhook(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	key, err := source.GetDecryptedKey(r.Context(), s.encryptor)
+	key, err := s.encryptor.Decrypt(r.Context(), source.Key, []byte(source.ID.String()))
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
