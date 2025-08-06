@@ -7,8 +7,8 @@ interface ExecutionTimelineProps {
   selectedStage: SuperplaneStage;
 }
 
-export const ExecutionTimeline = ({ 
-  executions, 
+export const ExecutionTimeline = ({
+  executions,
   selectedStage
 }: ExecutionTimelineProps) => {
   if (executions.length === 0) {
@@ -30,9 +30,12 @@ export const ExecutionTimeline = ({
     }
     const duration = new Date(finishedAt).getTime() - new Date(startedAt).getTime();
     const hours = Math.floor(duration / (1000 * 60 * 60));
+    const prefixHours = hours >= 10 ? `${hours}h ` : `0${hours}h`;
     const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
+    const prefixMinutes = minutes >= 10 ? `${minutes}m ` : `0${minutes}m`;
     const seconds = Math.floor((duration % (1000 * 60)) / 1000);
-    return `${hours}h ${minutes}m ${seconds}s`;
+    const prefixSeconds = seconds >= 10 ? `${seconds}s` : `0${seconds}s`;
+    return `${prefixHours} ${prefixMinutes} ${prefixSeconds}`;
   };
 
   const mapExecutionOutputs = (execution: ExecutionWithEvent) => {
@@ -49,7 +52,7 @@ export const ExecutionTimeline = ({
 
       map[output.name!] = executionOutputs?.[output.name!] || "-";
     });
-    
+
     return map;
   };
 
@@ -67,23 +70,23 @@ export const ExecutionTimeline = ({
 
       map[input.name!] = executionEventInputs?.[input.name!] || "-";
     });
-    
+
     return map;
   };
-    
+
 
   return (
     <div className="space-y-3">
       {
         executions.map((execution) => (
-          <RunItem 
-            key={execution.id!} 
-            title={execution.id || 'Execution'} 
-            inputs={mapExecutionEventInputs(execution)} 
-            outputs={mapExecutionOutputs(execution)} 
-            state={execution.state || 'STATE_UNKNOWN'} 
-            result={execution.result || 'RESULT_UNKNOWN'} 
-            timestamp={execution.createdAt || new Date().toISOString()} 
+          <RunItem
+            key={execution.id!}
+            title={execution.id || 'Execution'}
+            inputs={mapExecutionEventInputs(execution)}
+            outputs={mapExecutionOutputs(execution)}
+            state={execution.state || 'STATE_UNKNOWN'}
+            result={execution.result || 'RESULT_UNKNOWN'}
+            timestamp={execution.createdAt || new Date().toISOString()}
             executionDuration={formatDuration(execution.startedAt, execution.finishedAt)}
           />
         ))

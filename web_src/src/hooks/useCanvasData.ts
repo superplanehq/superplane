@@ -16,7 +16,7 @@ import {
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
 } from '../api-client/sdk.gen'
-import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior } from '../api-client/types.gen'
+import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
 
 export const canvasKeys = {
   all: ['canvas'] as const,
@@ -171,6 +171,7 @@ export const useCreateStage = (canvasId: string) => {
       executor?: SuperplaneExecutor;
       secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
+      inputMappings?: SuperplaneInputMapping[];
     }) => {
       return await superplaneCreateStage({
         path: { canvasIdOrName: canvasId },
@@ -187,7 +188,8 @@ export const useCreateStage = (canvasId: string) => {
               connections: stageData.connections || [],
               executor: stageData.executor,
               secrets: stageData.secrets || [],
-              conditions: stageData.conditions || []
+              conditions: stageData.conditions || [],
+              inputMappings: stageData.inputMappings || []
             }
           }
         }
@@ -260,6 +262,7 @@ export const useUpdateStage = (canvasId: string) => {
       executor?: SuperplaneExecutor;
       secrets?: SuperplaneValueDefinition[];
       conditions?: SuperplaneCondition[];
+      inputMappings?: SuperplaneInputMapping[];
     }) => {
       return await superplaneUpdateStage({
         path: { canvasIdOrName: canvasId, idOrName: params.stageId },
@@ -276,7 +279,8 @@ export const useUpdateStage = (canvasId: string) => {
               connections: params.connections || [],
               executor: params.executor,
               secrets: params.secrets || [],
-              conditions: params.conditions || []
+              conditions: params.conditions || [],
+              inputMappings: params.inputMappings || []
             }
           }
         }

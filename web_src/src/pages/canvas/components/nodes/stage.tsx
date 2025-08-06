@@ -1,11 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
 import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
-import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage } from '@/api-client';
+import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
@@ -24,7 +24,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; isValid: boolean } | null>(null);
+  const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
   const [stageName, setStageName] = useState(props.data.label);
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
@@ -35,6 +35,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
+  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
   const pendingEvents = useMemo(() =>
     currentStage?.queue
@@ -118,7 +119,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const isRunning = executionRunning || props.data.status?.toLowerCase() === 'running';
   const handleEditClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
+    e.stopPropagation?.();
     setIsEditMode(true);
     setEditingStage(props.id);
 
@@ -138,12 +139,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
     setApiError(null);
 
+
     const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
     const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
 
     try {
       if (isNewStage && !saveAsDraft) {
-        await createStageMutation.mutateAsync({
+        const createParams = {
           name: stageName,
           description: stageDescription,
           inputs: currentFormData.inputs,
@@ -151,8 +153,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentFormData.conditions
-        });
+          conditions: currentFormData.conditions,
+          inputMappings: currentFormData.inputMappings
+        };
+        await createStageMutation.mutateAsync(createParams);
         removeStage(props.id);
       } else if (!isNewStage && !saveAsDraft) {
 
@@ -160,7 +164,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           throw new Error('Stage ID is required for update');
         }
 
-        await updateStageMutation.mutateAsync({
+        const updateParams = {
           stageId: currentStage.metadata.id,
           name: stageName,
           description: stageDescription,
@@ -169,8 +173,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           connections: currentFormData.connections,
           executor: currentFormData.executor,
           secrets: currentFormData.secrets,
-          conditions: currentFormData.conditions
-        });
+          conditions: currentFormData.conditions,
+          inputMappings: currentFormData.inputMappings
+        };
+        await updateStageMutation.mutateAsync(updateParams);
 
         updateStage({
           ...currentStage,
@@ -185,7 +191,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
             executor: currentFormData.executor,
-            secrets: currentFormData.secrets
+            secrets: currentFormData.secrets,
+            inputMappings: currentFormData.inputMappings
           }
         });
 
@@ -205,7 +212,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             inputs: currentFormData.inputs,
             outputs: currentFormData.outputs,
             connections: currentFormData.connections,
-            executor: currentFormData.executor
+            executor: currentFormData.executor,
+            inputMappings: currentFormData.inputMappings
           },
           isDraft: true
         };
@@ -287,11 +295,16 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         executor: yamlData.spec.executor || currentFormData.executor,
         secrets: yamlData.spec.secrets || currentFormData.secrets,
         conditions: yamlData.spec.conditions || currentFormData.conditions,
+        inputMappings: yamlData.spec.inputMappings || currentFormData.inputMappings,
         isValid: currentFormData.isValid
       });
     }
   };
 
+
+  const handleDataChange = useCallback((data: typeof currentFormData) => {
+    setCurrentFormData(data);
+  }, []);
 
   const getBackgroundColorClass = () => {
     const latestExecution = allExecutions.at(0);
@@ -322,11 +335,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative `}
       style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
-      {isEditMode && (
+      {focusedNodeId === props.id && (
         <EditModeActionButtons
           onSave={handleSaveStage}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
+          onEdit={() => handleEditClick({} as React.MouseEvent<HTMLButtonElement>)}
+          isEditMode={isEditMode}
           entityType="stage"
           entityData={currentFormData ? {
             metadata: {
@@ -339,7 +354,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentFormData.connections,
               executor: currentFormData.executor,
               secrets: currentFormData.secrets,
-              conditions: currentFormData.conditions
+              conditions: currentFormData.conditions,
+              inputMappings: currentFormData.inputMappings
             }
           } : (currentStage ? {
             metadata: {
@@ -352,7 +368,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentStage.spec?.connections || [],
               executor: currentStage.spec?.executor || { type: '', spec: {} },
               secrets: currentStage.spec?.secrets || [],
-              conditions: currentStage.spec?.conditions || []
+              conditions: currentStage.spec?.conditions || [],
+              inputMappings: currentStage.spec?.inputMappings || []
             }
           } : null)}
           onYamlApply={handleYamlApply}
@@ -385,17 +402,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             <p className="text-left text-sm text-red-700 mt-1">{apiError}</p>
           )}
         </div>
-        <div className="flex items-center gap-2 ml-2">
-          {!isEditMode && (
-            <button
-              onClick={handleEditClick}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              title="Edit stage"
-            >
-              <MaterialSymbol name="edit" size="md" />
-            </button>
-          )}
-        </div>
       </div>
 
       {isEditMode ? (
@@ -410,11 +416,12 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               connections: currentFormData.connections,
               executor: currentFormData.executor,
               secrets: currentFormData.secrets,
-              conditions: currentFormData.conditions
+              conditions: currentFormData.conditions,
+              inputMappings: currentFormData.inputMappings
             })
           }}
           currentStageId={props.id}
-          onDataChange={setCurrentFormData}
+          onDataChange={handleDataChange}
         />
       ) : (
         <>

@@ -29,6 +29,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
   const updateConnectionGroupMutation = useUpdateConnectionGroup(canvasId);
+  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
 
   const groupByFields = props.data.groupBy?.fields || [];
@@ -201,11 +202,13 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
-      {isEditMode && (
+      {focusedNodeId === props.id && (
         <EditModeActionButtons
           onSave={handleSaveConnectionGroup}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
+          onEdit={handleEditClick}
+          isEditMode={isEditMode}
           entityType="connection group"
           entityData={currentFormData ? {
             metadata: {

@@ -39,6 +39,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const organizationId = orgId || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
+  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
   const handleEditClick = () => {
     setIsEditMode(true);
@@ -157,11 +158,13 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
       style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
-      {isEditMode && (
+      {focusedNodeId === props.id && (
         <EditModeActionButtons
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
+          onEdit={handleEditClick}
+          isEditMode={isEditMode}
           entityType="event source"
           entityData={currentFormData ? {
             metadata: {
@@ -207,17 +210,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-2">
-          {!isEditMode && (
-            <button
-              onClick={handleEditClick}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
-              title="Edit event source"
-            >
-              <MaterialSymbol name="edit" size="md" />
-            </button>
-          )}
-        </div>
       </div>
 
       {isEditMode ? (
@@ -250,7 +242,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             )}
 
-          <div className="px-3 py-3 border-t w-full">
+          <div className="px-3 py-3 border-t border-gray-200 w-full">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-sm my-2 font-semibold text-gray-500 uppercase tracking-wide">Events</div>
             </div>

@@ -24,6 +24,7 @@ export const FlowRenderer: React.FC = () => {
   const onNodesChange = useCanvasStore((state) => state.onNodesChange);
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
+  const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
 
   const { applyElkAutoLayout } = useAutoLayout();
   const { onNodeDragStop, onInit } = useFlowHandlers();
@@ -38,6 +39,9 @@ export const FlowRenderer: React.FC = () => {
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
+        onNodeClick={(_, node) => {
+          setFocusedNodeId(node.id)
+        }}
         onInit={onInit}
         fitView
         minZoom={0.4}

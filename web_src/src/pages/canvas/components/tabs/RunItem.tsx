@@ -122,11 +122,11 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
               <div className="grid grid-cols-2 gap-4 text-xs p-4 rounded-md bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700">
                 <div>
                   <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">State</div>
-                  <div className="font-medium text-blue-600 dark:text-blue-400">{state}</div>
+                  <div className="font-semibold text-blue-600 dark:text-blue-400">{state.split('_').at(-1)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Result</div>
-                  <div className="font-medium text-blue-600 dark:text-blue-400">{result}</div>
+                  <div className="font-semibold text-blue-600 dark:text-blue-400">{result.split('_').at(-1)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-gray-700 dark:text-zinc-400 uppercase tracking-wide mb-1 font-bold">Duration</div>

@@ -311,7 +311,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         );
       }
     );
-  }, [data, syncWithIncomingData]);
+  }, [data]);
 
   // Notify parent of data changes
   useEffect(() => {
@@ -327,7 +327,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         conditions
       });
     }
-  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, onDataChange, handleDataChange]);
+  }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, onDataChange]);
 
   // Revert function for each section
   const revertSection = (section: string) => {

@@ -10,6 +10,7 @@ import {
   SuperplaneOutputDefinition,
   SuperplaneExecutor,
   SuperplaneValueDefinition,
+  SuperplaneInputMapping,
   SpecGroupBy,
   IntegrationsIntegrationRef,
   IntegrationsResourceRef
@@ -56,6 +57,7 @@ export type StageData = {
   inputs: SuperplaneInputDefinition[];
   outputs: SuperplaneOutputDefinition[];
   secrets: SuperplaneValueDefinition[];
+  inputMappings?: SuperplaneInputMapping[];
   executor?: SuperplaneExecutor;
   spec: object;
   approveStageEvent: (event: SuperplaneStageEvent) => void;
