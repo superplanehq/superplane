@@ -56,9 +56,10 @@ export function EventSourceEditModeContent({
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
-      integration: data.integration,
-      resource: data.resource,
-      integrationConfig: {} as Record<string, string | boolean>
+      spec: {
+        integration: data.integration,
+        resource: data.resource
+      } as SuperplaneEventSourceSpec
     },
     onDataChange,
     validateAllFields
@@ -71,14 +72,15 @@ export function EventSourceEditModeContent({
   useEffect(() => {
     syncWithIncomingData(
       {
-        integration: data.integration,
-        resource: data.resource,
-        integrationConfig: {}
+        spec: {
+          integration: data.integration,
+          resource: data.resource
+        } as SuperplaneEventSourceSpec
       },
       (incomingData) => {
-        setSelectedIntegration(incomingData.integration);
-        setResourceType(incomingData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
-        setResourceName(incomingData.resource?.name || '');
+        setSelectedIntegration(incomingData.spec.integration || null);
+        setResourceType(incomingData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(incomingData.spec.resource?.name || '');
       }
     );
   }, [data, eventSourceType, syncWithIncomingData]);
@@ -115,10 +117,10 @@ export function EventSourceEditModeContent({
   const revertSection = (section: string) => {
     switch (section) {
       case 'integration':
-        setSelectedIntegration(originalData.integration);
-        setResourceType(originalData.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
-        setResourceName(originalData.resource?.name || '');
-        setIntegrationConfig({ ...originalData.integrationConfig });
+        setSelectedIntegration(originalData.spec.integration || null);
+        setResourceType(originalData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
+        setResourceName(originalData.spec.resource?.name || '');
+        setIntegrationConfig({});
         break;
     }
   };
@@ -214,7 +216,7 @@ export function EventSourceEditModeContent({
             title="Semaphore Configuration"
             isOpen={openSections.includes('integration')}
             onToggle={handleAccordionToggle}
-            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'integration')}
+            isModified={isSectionModified({ selectedIntegration, resourceType, resourceName, integrationConfig }, 'spec')}
             onRevert={revertSection}
             requiredBadge={true}
           >

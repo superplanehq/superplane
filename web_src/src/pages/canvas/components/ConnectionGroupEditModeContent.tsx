@@ -100,10 +100,13 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
     syncWithIncomingData
   } = useEditModeState({
     initialData: {
+      name: data.name || '',
+      description: data.description,
       connections: data.connections || [],
       groupByFields: data.groupBy?.fields || [],
       timeout: undefined,
-      timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP'
+      timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP',
+      isValid: true
     },
     onDataChange,
     validateAllFields
@@ -151,10 +154,13 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
   useEffect(() => {
     syncWithIncomingData(
       {
+        name: data.name || '',
+        description: data.description,
         connections: data.connections || [],
         groupByFields: data.groupBy?.fields || [],
         timeout: undefined,
-        timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP'
+        timeoutBehavior: 'TIMEOUT_BEHAVIOR_DROP',
+        isValid: true
       },
       (incomingData) => {
         setConnections(incomingData.connections);
