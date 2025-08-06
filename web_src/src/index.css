@@ -34,3 +34,8 @@ h1 {
 button {
   cursor: pointer;
 }
+
+.react-flow.light {
+  --xy-background-pattern-dots-color-default: #96A0A6;
+  --xy-background-color-default: #f4f5f8;
+}
