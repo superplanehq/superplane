@@ -34,38 +34,38 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
         if (result === 'RESULT_PASSED') {
           return (
             <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-              <MaterialSymbol name="check_circle" size='lg' className="text-green-600" />
+              <MaterialSymbol name="check_circle" size='lg' className="text-green-600 dark:text-green-400" />
             </div>
           );
         }
         if (result === 'RESULT_FAILED') {
           return (
             <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-              <MaterialSymbol name="cancel" size='lg' className="text-red-600" />
+              <MaterialSymbol name="cancel" size='lg' className="text-red-600 dark:text-red-400" />
             </div>
           );
         }
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <MaterialSymbol name="help" size="lg" className="text-gray-600" />
+            <MaterialSymbol name="help" size="lg" className="text-gray-600 dark:text-gray-400" />
           </div>
         );
       case 'STATE_PENDING':
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <MaterialSymbol name="hourglass" size="lg" className="text-orange-600" />
+            <MaterialSymbol name="hourglass" size="lg" className="text-orange-600 dark:text-orange-400" />
           </div>
         );
       case 'STATE_STARTED':
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center animate-spin">
-            <MaterialSymbol name="sync" size="lg" className="text-blue-600" />
+            <MaterialSymbol name="sync" size="lg" className="text-blue-600 dark:text-blue-400" />
           </div>
         );
       default:
         return (
           <div className="w-5 h-5 rounded-full mr-2 flex items-center justify-center">
-            <MaterialSymbol name="help" size="lg" className="text-gray-600" />
+            <MaterialSymbol name="help" size="lg" className="text-gray-600 dark:text-gray-400" />
           </div>
         );
     }
@@ -75,36 +75,36 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
     switch (state) {
       case 'STATE_FINISHED':
         if (result === 'RESULT_PASSED') {
-          return 'bg-green-50 border-t-1 border-green-500';
+          return 'bg-green-50 dark:bg-green-900/50 border-t-1 border-green-500 dark:border-green-700';
         }
         if (result === 'RESULT_FAILED') {
-          return 'bg-red-50 border-t-1 border-red-500';
+          return 'bg-red-50 dark:bg-red-900/50 border-t-1 border-red-500 dark:border-red-700';
         }
-        return 'bg-gray-50 border-t-1 border-gray-500';
+        return 'bg-gray-50 dark:bg-gray-900/50 border-t-1 border-gray-500 dark:border-gray-700';
       case 'STATE_PENDING':
-        return 'bg-orange-50 border-t-1 border-orange-500';
+        return 'bg-yellow-50 dark:bg-yellow-900/50 border-t-1 border-yellow-500 dark:border-yellow-700';
       case 'STATE_STARTED':
-        return 'bg-blue-50 border-t-1 border-blue-500';
+        return 'bg-blue-50 dark:bg-blue-900/50 border-t-1 border-blue-500 dark:border-blue-700';
       default:
-        return 'bg-gray-50 border-t-1 border-gray-500';
+        return 'bg-gray-50 dark:bg-gray-900/50 border-t-1 border-gray-500 dark:border-gray-700';
     }
   };
 
 
   return (
-    <div className={`mb-2 bg-white border border-gray-200 overflow-hidden`}>
+    <div className={`mb-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 overflow-hidden`}>
       <div className={`flex w-full items-start p-2 ${getBackgroundClass()}`}>
 
         <div className='w-full cursor-pointer' onClick={toggleExpand}>
           <div className="flex justify-between items-center">
             <div className="flex items-center min-w-0 flex-1">
               {renderStatusIcon()}
-              <span className="font-semibold text-sm text-gray-900 truncate">{title}</span>
+              <span className="font-semibold text-sm text-gray-900 dark:text-zinc-100 truncate">{title}</span>
             </div>
             <div className="flex items-center gap-2">
               {
                 !isExpanded && (
-                  <div className="text-xs text-gray-500">{formatRelativeTime(timestamp)}</div>
+                  <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
                 )
               }
             </div>
@@ -112,7 +112,7 @@ export const RunItem: React.FC<RunItemProps> = React.memo(({
               className='pt-[3px]'
               title={isExpanded ? "Hide details" : "Show details"}
             >
-              <MaterialSymbol name={isExpanded ? 'expand_less' : 'expand_more'} size="lg" className="text-gray-600" />
+              <MaterialSymbol name={isExpanded ? 'expand_less' : 'expand_more'} size="lg" className="text-gray-600 dark:text-gray-400" />
             </button>
           </div>
 

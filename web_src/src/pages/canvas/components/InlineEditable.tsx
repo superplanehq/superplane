@@ -77,7 +77,7 @@ export function InlineEditable({
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyPress}
           onBlur={handleBlur}
-          className={`${className} w-full border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+          className={`${className} w-full border border-blue-300 dark:border-blue-600 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-zinc-800 text-gray-900 dark:text-zinc-100`}
           placeholder={placeholder}
           rows={multiline ? 2 : undefined}
         />
@@ -102,7 +102,7 @@ export function InlineEditable({
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`${className} ${showHoverEffect ? 'bg-gray-100 rounded  py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200`}
+      className={`${className} ${showHoverEffect ? 'bg-gray-100 dark:bg-zinc-700 rounded py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200`}
       title={isEditMode ? 'Click to edit' : undefined}
     >
       {displayValue}

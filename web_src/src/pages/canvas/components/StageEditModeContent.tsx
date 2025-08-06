@@ -518,7 +518,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 onDelete={() => connectionsEditor.removeItem(index)}
                 displayName={connection.name || `Connection ${index + 1}`}
                 badge={connection.type && (
-                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
                     {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                   </span>
                 )}
@@ -541,7 +541,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={connectionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Connection
@@ -603,7 +603,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={inputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Input
@@ -653,7 +653,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           <option key={connIndex} value={conn.name}>{conn.name}</option>
                         ))}
                       </select>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400 dark:text-zinc-400 mt-1">
                         This mapping applies when the selected connection triggers the stage
                       </p>
                     </ValidationField>
@@ -667,7 +667,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             const newValues = [...(mapping.values || []), { name: '', value: '' }];
                             inputMappingsEditor.updateItem(index, 'values', newValues);
                           }}
-                          className="text-blue-600 hover:text-blue-700 text-sm"
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
                         >
                           + Add Value
                         </button>
@@ -803,7 +803,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                                   const newValues = (mapping.values || []).filter((_, vi) => vi !== valueIndex);
                                   inputMappingsEditor.updateItem(index, 'values', newValues);
                                 }}
-                                className="text-zinc-600 hover:text-zinc-700 text-xs"
+                                className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 text-xs"
                               >
                                 Remove Value
                               </button>
@@ -813,7 +813,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       </div>
 
                       {(mapping.values || []).length === 0 && (
-                        <div className="text-center py-4 text-zinc-500 text-sm">
+                        <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
                           No input values configured. Click "Add Value" to start.
                         </div>
                       )}
@@ -825,7 +825,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={inputMappingsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Input Mapping
@@ -890,7 +890,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           onChange={(e) => outputsEditor.updateItem(index, 'required', e.target.checked)}
                           className="w-4 h-4 text-blue-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-blue-500"
                         />
-                        <label htmlFor={`required-${index}`}>Required</label>
+                        <label className="text-gray-900 dark:text-zinc-100" htmlFor={`required-${index}`}>Required</label>
                       </div>
                     </ValidationField>
                   </div>
@@ -900,7 +900,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={outputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Output
@@ -981,7 +981,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       <ValidationField label="Days of Week">
                         <div className="grid grid-cols-7 gap-1">
                           {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                            <label key={day} className="flex flex-col items-center gap-1 p-2 border rounded text-xs">
+                            <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
                               <input
                                 type="checkbox"
                                 checked={condition.timeWindow?.weekDays?.includes(day) || false}
@@ -997,7 +997,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                                 }}
                                 className="w-3 h-3"
                               />
-                              <span>{day.slice(0, 3)}</span>
+                              <span className="text-gray-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
                             </label>
                           ))}
                         </div>
@@ -1008,13 +1008,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   <div className="flex items-center justify-between pt-2">
                     <button
                       onClick={() => conditionsEditor.saveEdit()}
-                      className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
                       <MaterialSymbol name="check" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 hover:text-zinc-700"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                     >
                       <MaterialSymbol name="delete" size="sm" />
                     </button>
@@ -1023,12 +1023,12 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
               ) : (
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    <div className="font-medium text-sm">
+                    <div className="font-medium text-sm text-gray-900 dark:text-zinc-100">
                       {condition.type === 'CONDITION_TYPE_APPROVAL' && `Approval (${condition.approval?.count || 1} required)`}
                       {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`}
                     </div>
                     {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
-                      <div className="text-xs text-zinc-500 mt-1">
+                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                         {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
                       </div>
                     )}
@@ -1036,13 +1036,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => conditionsEditor.startEdit(index)}
-                      className="text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                     >
                       <MaterialSymbol name="edit" size="sm" />
                     </button>
                     <button
                       onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 hover:text-zinc-700"
+                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                     >
                       <MaterialSymbol name="delete" size="sm" />
                     </button>
@@ -1053,7 +1053,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={conditionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Condition
@@ -1110,7 +1110,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                               onChange={() => updateSecretMode(index, false)}
                               className="w-4 h-4"
                             />
-                            <span className="text-sm">Direct Value</span>
+                            <span className="text-sm text-gray-900 dark:text-zinc-100">Direct Value</span>
                           </label>
                           <label className="flex items-center gap-2">
                             <input
@@ -1120,7 +1120,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                               onChange={() => updateSecretMode(index, true)}
                               className="w-4 h-4"
                             />
-                            <span className="text-sm">From Secret</span>
+                            <span className="text-sm text-gray-900 dark:text-zinc-100">From Secret</span>
                           </label>
                         </div>
                       </div>
@@ -1246,7 +1246,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           ))}
           <button
             onClick={secretsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <MaterialSymbol name="add" size="sm" />
             Add Secret
@@ -1265,7 +1265,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           <div className="space-y-3">
             {executor.type === 'semaphore' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                   Configure your Semaphore executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
 
@@ -1286,7 +1286,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       ))}
                   </select>
                   {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
-                    <div className="text-xs text-zinc-500 mt-1">
+                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                       No Semaphore integrations available. Create one in canvas settings.
                     </div>
                   )}
@@ -1315,7 +1315,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         onChange={() => updateSemaphoreExecutionType('workflow')}
                         className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm">Workflow</span>
+                      <span className="text-sm text-gray-900 dark:text-zinc-100">Workflow</span>
                     </label>
                     <label className="flex items-center gap-2">
                       <input
@@ -1326,10 +1326,10 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         onChange={() => updateSemaphoreExecutionType('task')}
                         className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm">Task</span>
+                      <span className="text-sm text-gray-900 dark:text-zinc-100">Task</span>
                     </label>
                   </div>
-                  <div className="text-xs text-zinc-500 mt-1">
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                     {semaphoreExecutionType === 'workflow'
                       ? 'Uses the workflows API to run a workflow'
                       : 'Uses the tasks API to run a specific task'}
@@ -1376,7 +1376,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     <Label>Parameters</Label>
                     <button
                       onClick={addExecutorParameter}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
                     >
                       + Add Parameter
                     </button>
@@ -1400,7 +1400,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         />
                         <button
                           onClick={() => removeExecutorParameter(key)}
-                          className="text-zinc-600 hover:text-zinc-700"
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                         >
                           <MaterialSymbol name="delete" size="sm" />
                         </button>
@@ -1413,7 +1413,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
             {executor.type === 'http' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
+                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
                   Configure your HTTP executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
 
@@ -1459,7 +1459,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           [newKey]: ''
                         });
                       }}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
+                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
                     >
                       + Add Header
                     </button>
@@ -1502,7 +1502,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             delete updatedHeaders[key];
                             updateExecutorField('headers', updatedHeaders);
                           }}
-                          className="text-zinc-600 hover:text-zinc-700"
+                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
                         >
                           <MaterialSymbol name="delete" size="sm" />
                         </button>
@@ -1530,7 +1530,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             )}
 
             {!executor.type && (
-              <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
+              <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                 Select an executor type to configure how this stage will execute when triggered.
               </div>
             )}

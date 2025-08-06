@@ -46,14 +46,18 @@ export const FlowRenderer: React.FC = () => {
         fitView
         minZoom={0.4}
         maxZoom={1.5}
-        colorMode="light"
+        colorMode={"system"}
       >
         <FlowControls
           onAutoLayout={applyElkAutoLayout}
           nodes={nodes}
           edges={edges}
         />
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="#96A0A6" bgColor="#f3f4f6" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+        />
         <FlowDevTools />
         <ConnectionStatus />
       </ReactFlow>

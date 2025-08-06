@@ -18,7 +18,7 @@ import 'tippy.js/dist/tippy.css';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
 }
 
 export default function StageNode(props: NodeProps<StageNodeType>) {
@@ -113,7 +113,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         );
       default:
         return (
-          <span className="material-icons text-gray-600 text-2xl mr-2">help</span>
+          <span className="material-icons text-gray-600 dark:text-gray-400 text-2xl mr-2">help</span>
         );
     }
   };
@@ -314,26 +314,26 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
     switch (status) {
       case 'STATE_STARTED':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-50 dark:bg-blue-900/50 border-blue-200 dark:border-blue-700';
       case 'STATE_FINISHED':
         if (result === 'RESULT_PASSED') {
-          return 'bg-green-50 border-green-200';
+          return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
         }
         if (result === 'RESULT_FAILED') {
-          return 'bg-red-50 border-red-200';
+          return 'bg-red-50 dark:bg-red-900/50 border-red-200 dark:border-red-700';
         }
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 dark:bg-green-900/50 border-green-200 dark:border-green-700';
       case 'STATE_PENDING':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-50 dark:bg-yellow-900/50 border-yellow-200 dark:border-yellow-700';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }
   };
 
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
-      className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative `}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative `}
       style={{ width: isEditMode ? '390px' : '320px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
@@ -386,7 +386,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
               value={stageName}
               onSave={handleStageNameChange}
               placeholder="Stage name"
-              className="font-bold text-gray-900 text-base text-left px-2 py-1 w-full"
+              className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 w-full"
               isEditMode={isEditMode}
             />
 
@@ -395,7 +395,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             value={stageDescription}
             onSave={handleStageDescriptionChange}
             placeholder={isEditMode ? "Add description..." : "No description available"}
-            className="text-gray-600 text-sm text-left py-1 w-full mt-2 mb-2"
+            className="text-gray-600 dark:text-gray-400 text-sm text-left py-1 w-full mt-2 mb-2"
             isEditMode={isEditMode}
           />
           {/* API Error Display */}
@@ -442,8 +442,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           {/* Last Run Section */}
           <div className={`mt-4 px-3 py-3 border-t-2 w-full ${getBackgroundColorClass()}`}>
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-bold text-gray-900 uppercase tracking-wide">Last run</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide">Last run</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 {isRunning ? 'Running...' : lastFinishedExecution ? formatRelativeTime(lastFinishedExecution?.finishedAt) : 'No recent runs'}
               </div>
             </div>
@@ -454,7 +454,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 {getStatusIcon()}
                 <a
                   href="#"
-                  className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900"
+                  className="min-w-0 font-semibold text-sm flex items-center hover:underline truncate text-gray-900 dark:text-gray-100"
                   onClick={() => selectStageId(props.id)}
                 >
                   {props.data.label || 'Stage execution'}
@@ -469,15 +469,15 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
           {/* Queue Section */}
           <div className="px-3 pt-2 pb-2 w-full">
-            <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 uppercase tracking-wide mb-1">
+            <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-1">
               Next in queue
               <span className="text-xs text-gray-400 font-medium">+{pendingEvents.length + waitingEvents.length} more</span>
             </div>
 
             {
               lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL" && (
-                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 bg-gray-50 mb-2">
-                  <span className='font-semibold text-gray-900 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
+                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 mb-2">
+                  <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastWaitingEvent?.id}</span>
                   <Tippy content="Manual approval required" placement="top">
                     <MaterialSymbol name="how_to_reg" size="md" className='text-orange-700' />
                   </Tippy>
@@ -487,8 +487,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
             {
               lastPendingEvent && (
-                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 bg-gray-50">
-                  <span className='font-semibold text-gray-900 text-sm truncate mt-[2px]'>{lastPendingEvent?.id}</span>
+                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <span className='font-semibold text-gray-900 dark:text-gray-100 text-sm truncate mt-[2px]'>{lastPendingEvent?.id}</span>
                   <Tippy content="Waiting For the current execution to finish" placement="top">
                     <MaterialSymbol name="timer" size="md" className='text-orange-700' />
                   </Tippy>
@@ -498,8 +498,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
             {
               !lastPendingEvent && !lastWaitingEvent && (
-                <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 bg-gray-50">
-                  <span className='font-semibold text-gray-500 text-sm truncate mt-[2px]'>No events in queue..</span>
+                <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                  <span className='font-semibold text-gray-500 dark:text-gray-400 text-sm truncate mt-[2px]'>No events in queue..</span>
                 </div>
               )
             }

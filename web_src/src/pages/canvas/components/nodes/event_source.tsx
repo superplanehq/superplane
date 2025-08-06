@@ -16,7 +16,7 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='w-6 h-5 -mt-2' name="webhook" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -155,7 +155,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   return (
     <div
-      className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
       style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
@@ -195,7 +195,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 value={eventSourceName}
                 onSave={handleEventSourceNameChange}
                 placeholder="Event source name"
-                className="font-bold text-gray-900 text-base text-left px-2 py-1"
+                className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1"
                 isEditMode={isEditMode}
               />
             </div>
@@ -204,7 +204,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 value={eventSourceDescription}
                 onSave={handleEventSourceDescriptionChange}
                 placeholder={isEditMode ? "Add description..." : "No description available"}
-                className="text-gray-600 text-sm text-left px-2 py-1"
+                className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
               />
             </div>
@@ -234,7 +234,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               <div className="px-3 py-3 border-t w-full text-left bg-amber-50">
                 <p className="text-sm text-amber-600">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
                 <div className="flex items-center justify-between gap-2 mt-2">
-                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 rounded bg-white" />
+                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-zinc-700" />
                   <button className='font-bold bg-gray-100 text-gray-700 p-2 rounded' onClick={() => resetEventSourceKey(props.id)}>
                     Dismiss
                   </button>
@@ -242,25 +242,25 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             )}
 
-          <div className="px-3 py-3 border-t border-gray-200 w-full">
+          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-700 w-full">
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-sm my-2 font-semibold text-gray-500 uppercase tracking-wide">Events</div>
+              <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>
             </div>
 
             <div className="space-y-2">
               {props.data.events?.length ? (
                 props.data.events.map((event) => (
-                  <div key={event.id} className="bg-gray-50 rounded-xl p-2">
+                  <div key={event.id} className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-2">
                     <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         <MaterialSymbol name="bolt" size="md" />
                       </span>
-                      <span className="truncate">{event.id!}</span>
+                      <span className="truncate dark:text-zinc-200">{event.id!}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-gray-500 italic py-2">No events received</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No events received</div>
               )}
             </div>
           </div>

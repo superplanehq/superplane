@@ -175,14 +175,14 @@ const MessageItem = React.memo(({
 
       {isDropdownOpen && (
         <div
-          className="absolute right-0 bg-white shadow-lg rounded-lg w-32 z-10"
+          className="absolute right-0 bg-white dark:bg-zinc-800 shadow-lg rounded-lg w-32 z-10 border border-gray-200 dark:border-zinc-700"
           style={{ marginTop: '4px' }}
           ref={dropdownRef}
         >
           <div className="py-1">
             <button
               onClick={handleRemove}
-              className="block w-full text-left px-4 py-2 hover:bg-gray-100"
+              className="block w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 text-gray-900 dark:text-zinc-100"
             >
               Remove
             </button>

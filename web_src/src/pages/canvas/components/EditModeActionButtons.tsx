@@ -41,12 +41,12 @@ export function EditModeActionButtons({
     return (
       <>
         <div
-          className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-[2px] border border-gray-200 z-50"
+          className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-lg rounded-lg px-2 py-[2px] border border-gray-200 dark:border-zinc-700 z-50"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             onClick={handleCodeClick}
-            className="flex font-semibold items-center gap-2 px-3 py-2 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+            className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
             title="View code"
           >
             <MaterialSymbol name="code" size="md" />
@@ -68,7 +68,7 @@ export function EditModeActionButtons({
 
           <button
             onClick={onCancel}
-            className="flex font-semibold items-center gap-2 px-3 py-2 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+            className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
             title="Cancel"
           >
             Cancel
@@ -103,12 +103,12 @@ export function EditModeActionButtons({
 
   return (
     <div
-      className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white shadow-lg rounded-lg px-2 py-[2px] border border-gray-200 z-50"
+      className="action-buttons absolute z-50 text-sm -top-13 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-lg rounded-lg px-2 py-[2px] border border-gray-200 dark:border-zinc-700 z-50"
       onClick={(e) => e.stopPropagation()}
     >
       <button
         onClick={onEdit}
-        className="flex font-semibold items-center gap-2 px-3 py-2 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+        className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
         title="Edit"
       >
         <MaterialSymbol name="edit" size="md" />

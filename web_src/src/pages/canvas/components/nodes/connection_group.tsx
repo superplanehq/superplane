@@ -199,7 +199,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   return (
     <div
-      className={`bg-white rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200'} relative`}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
       style={{ width: '390px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
@@ -244,14 +244,14 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       {/* Header Section */}
       <div className="px-4 py-4 flex justify-between items-start">
         <div className="flex items-start flex-1 min-w-0">
-          <span className="material-symbols-outlined mr-2 text-gray-700 mt-1">account_tree</span>
+          <span className="material-symbols-outlined mr-2 text-gray-700 dark:text-gray-300 mt-1">account_tree</span>
           <div className="flex-1 min-w-0">
             <div className="mb-1">
               <InlineEditable
                 value={connectionGroupName}
                 onSave={handleConnectionGroupNameChange}
                 placeholder="Connection group name"
-                className="font-bold text-gray-900 text-base text-left px-2 py-1"
+                className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1"
                 isEditMode={isEditMode}
               />
             </div>
@@ -260,7 +260,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
                 value={connectionGroupDescription}
                 onSave={handleConnectionGroupDescriptionChange}
                 placeholder={isEditMode ? "Add description..." : "No description available"}
-                className="text-gray-600 text-sm text-left px-2 py-1"
+                className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
               />
             </div>
@@ -270,7 +270,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           {!isEditMode && (
             <button
               onClick={handleEditClick}
-              className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               title="Edit connection group"
             >
               <MaterialSymbol name="edit" size="md" />
@@ -300,8 +300,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           {/* Group By Section */}
           <div className="px-3 py-3 border-t w-full">
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Group By Fields</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 {groupByFields.length} fields
               </div>
             </div>
@@ -309,19 +309,19 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             <div className="space-y-1">
               {groupByFields.length > 0 ? (
                 groupByFields.map((field, index) => (
-                  <div key={index} className="bg-gray-100 rounded p-2">
+                  <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
                     <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-blue)] black-60 p-1">label</i>
                       </span>
                       <span className="truncate font-medium">{field.name}</span>
-                      <span className="text-xs text-gray-500">→</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">→</span>
                       <span className="truncate text-sm">{field.expression}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-gray-500 italic py-2">No group by fields configured</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No group by fields configured</div>
               )}
             </div>
           </div>
@@ -329,8 +329,8 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           {/* Connections Section */}
           <div className="px-3 py-3 border-t w-full">
             <div className="flex items-center w-full justify-between mb-2">
-              <div className="text-xs font-medium text-gray-700 uppercase tracking-wide">Connections</div>
-              <div className="text-xs text-gray-600">
+              <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Connections</div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">
                 {props.data.connections?.length || 0} connections
               </div>
             </div>
@@ -338,20 +338,20 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             <div className="space-y-1">
               {props.data.connections?.length ? (
                 props.data.connections.map((connection, index) => (
-                  <div key={index} className="bg-gray-100 rounded p-2">
+                  <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
                     <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
                         <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
                       </span>
                       <span className="truncate font-medium">{connection.name}</span>
-                      <span className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
                         {connection.type?.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                       </span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-gray-500 italic py-2">No connections configured</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 italic py-2">No connections configured</div>
               )}
             </div>
           </div>

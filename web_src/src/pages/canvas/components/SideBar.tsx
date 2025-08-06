@@ -14,7 +14,7 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-8 h-8 p-1 rounded dark:bg-white dark:rounded-lg" />
 }
 
 interface SidebarProps {
@@ -88,7 +88,7 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
   return (
     <aside
       ref={sidebarRef}
-      className={`fixed top-[2.6rem] right-0 z-10 bg-white flex flex-col w-[250px] ${isDragging.current ? '' : 'transition-all duration-200'
+      className={`fixed top-[2.6rem] right-0 z-10 bg-white dark:bg-zinc-900 flex flex-col w-[250px] ${isDragging.current ? '' : 'transition-all duration-200'
         }`}
       style={{
         width: width,
@@ -109,7 +109,6 @@ export const Sidebar = ({ selectedStage, onClose, approveStageEvent }: SidebarPr
 
       {/* Resize Handle */}
       <ResizeHandle
-        isDragging={isDragging.current}
         onMouseDown={handleMouseDown}
         onMouseEnter={() => {
           if (!isDragging.current && sidebarRef.current)
