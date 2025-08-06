@@ -14,6 +14,7 @@ import { EditModeActionButtons } from '../EditModeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import { formatRelativeTime } from '../../utils/stageEventUtils';
 import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
@@ -394,7 +395,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             value={stageDescription}
             onSave={handleStageDescriptionChange}
             placeholder={isEditMode ? "Add description..." : "No description available"}
-            className="text-gray-600 text-sm text-left px-2 py-1 w-full mt-3"
+            className="text-gray-600 text-sm text-left py-1 w-full mt-2 mb-2"
             isEditMode={isEditMode}
           />
           {/* API Error Display */}
@@ -468,8 +469,9 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
           {/* Queue Section */}
           <div className="px-3 pt-2 pb-2 w-full">
-            <div className="w-full text-left text-xs font-bold text-gray-900 uppercase tracking-wide mb-1">
+            <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 uppercase tracking-wide mb-1">
               Next in queue
+              <span className="text-xs text-gray-400 font-medium">+{pendingEvents.length + waitingEvents.length} more</span>
             </div>
 
             {
@@ -496,8 +498,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
             {
               !lastPendingEvent && !lastWaitingEvent && (
-                <div className="flex justify-between w-full px-2 py-3 border-1 rounded border-gray-200 bg-gray-50">
-                  <span className='font-semibold text-gray-900 text-sm truncate mt-[2px]'>No events in queue..</span>
+                <div className="flex justify-between w-full mb-2 px-2 py-3 border-1 rounded border-gray-200 bg-gray-50">
+                  <span className='font-semibold text-gray-500 text-sm truncate mt-[2px]'>No events in queue..</span>
                 </div>
               )
             }

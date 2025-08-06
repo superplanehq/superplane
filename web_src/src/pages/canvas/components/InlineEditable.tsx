@@ -102,7 +102,7 @@ export function InlineEditable({
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`${className} ${showHoverEffect ? 'bg-gray-100 rounded px-2 py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200`}
+      className={`${className} ${showHoverEffect ? 'bg-gray-100 rounded  py-1' : ''} ${isEditMode ? 'cursor-pointer' : ''} transition-colors duration-200`}
       title={isEditMode ? 'Click to edit' : undefined}
     >
       {displayValue}

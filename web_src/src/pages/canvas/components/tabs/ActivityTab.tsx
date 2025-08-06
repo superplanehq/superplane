@@ -47,11 +47,6 @@ export const ActivityTab = ({
           <h3 className="font-bold text-sm text-gray-500 uppercase tracking-wide">
             Queue ({queueCount})
           </h3>
-          {queueCount > 0 && (
-            <button className="text-xs text-blue-600 hover:text-blue-800 font-medium">
-              Manage queue
-            </button>
-          )}
         </div>
 
         <div className="space-y-3">

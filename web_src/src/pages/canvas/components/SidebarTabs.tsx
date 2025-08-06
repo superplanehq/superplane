@@ -15,7 +15,7 @@ export const SidebarTabs = ({ tabs, activeTab, onTabChange }: SidebarTabsProps) 
       {tabs.map(tab => (
         <button
           key={tab.key}
-          className={`cursor-pointer px-5 py-1 text-sm font-medium transition-colors text-color-[var(--dark-indigo)] ${activeTab === tab.key
+          className={`cursor-pointer px-5 py-1 text-sm font-semibold transition-colors text-color-[var(--dark-indigo)] ${activeTab === tab.key
             ? 'text-[var(--indigo)] border-b-2 border-color-[var(--indigo)] font-bold'
             : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
