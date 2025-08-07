@@ -31,24 +31,25 @@ export const FlowRenderer: React.FC = () => {
   const { onNodeDragStop, onInit } = useFlowHandlers();
 
   const animatedEdges = useMemo(() => {
-    const runningStages = new Set<string>();
+    const runningEdges = new Set<string>();
 
     stages.forEach(stage => {
-      const allExecutions = stage.queue?.flatMap(event => event.execution)
+      const allExecutions = stage.queue?.flatMap(event => ({ ...event.execution, sourceId: event.sourceId }))
         .filter(execution => execution)
         .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [];
 
-      const executionRunning = allExecutions.some(execution => execution?.state === 'STATE_STARTED');
-      const isRunning = executionRunning || stage.metadata?.name?.toLowerCase().includes('running');
+      const executionsRunning = allExecutions.filter(execution => execution?.state === 'STATE_STARTED');
+      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.sourceId}-${stage.metadata?.id}`);
+      const isRunning = sourceIdStageIdPairs.length > 0;
 
-      if (isRunning && stage.metadata?.id) {
-        runningStages.add(stage.metadata.id);
+      if (isRunning) {
+        sourceIdStageIdPairs.forEach(pair => runningEdges.add(pair));
       }
     });
 
     return edges.map(edge => ({
       ...edge,
-      animated: runningStages.has(edge.target)
+      animated: runningEdges.has(`${edge.source}-${edge.target}`)
     }));
   }, [edges, stages]);
 
