@@ -42,7 +42,7 @@ func NewSemaphoreResourceManager(ctx context.Context, URL string, authenticate i
 	}, nil
 }
 
-func (i *SemaphoreResourceManager) Status(resourceType, id string) (integrations.StatefulResource, error) {
+func (i *SemaphoreResourceManager) Status(resourceType, id string, _ integrations.Resource) (integrations.StatefulResource, error) {
 	switch resourceType {
 	case ResourceTypeWorkflow:
 		resource, err := i.getWorkflow(id)
@@ -84,16 +84,23 @@ type CreateWorkflowResponse struct {
 	WorkflowID string `json:"workflow_id"`
 }
 
-func (i *SemaphoreResourceManager) createSecret(params any) (integrations.Resource, error) {
+func (i *SemaphoreResourceManager) createWebhookSecret(name, key string) (integrations.Resource, error) {
 	URL := fmt.Sprintf("%s/api/v1beta/secrets", i.URL)
 
-	secret, ok := params.(*Secret)
-	if !ok {
-		return nil, fmt.Errorf("invalid params type %T", params)
+	secret := &Secret{
+		APIVersion: "v1beta",
+		Kind:       "Secret",
+		Metadata:   SecretMetadata{Name: name},
+		Data: SecretSpecData{
+			EnvVars: []SecretSpecDataEnvVar{
+				{
+					Name:  "WEBHOOK_SECRET",
+					Value: string(key),
+				},
+			},
+		},
 	}
 
-	secret.APIVersion = "v1beta"
-	secret.Kind = "Secret"
 	body, err := json.Marshal(secret)
 	if err != nil {
 		return nil, fmt.Errorf("error marshaling secret: %v", err)
@@ -608,20 +615,7 @@ func (i *SemaphoreResourceManager) createSemaphoreSecret(name string, key []byte
 	//
 	// Secret does not exist, create it.
 	//
-	secret, err = i.createSecret(&Secret{
-		Metadata: SecretMetadata{
-			Name: name,
-		},
-		Data: SecretSpecData{
-			EnvVars: []SecretSpecDataEnvVar{
-				{
-					Name:  "WEBHOOK_SECRET",
-					Value: string(key),
-				},
-			},
-		},
-	})
-
+	secret, err = i.createWebhookSecret(name, string(key))
 	if err != nil {
 		return nil, fmt.Errorf("error creating secret: %v", err)
 	}
@@ -648,11 +642,11 @@ func (i *SemaphoreResourceManager) createSemaphoreNotification(name string, opti
 		Spec: NotificationSpec{
 			Rules: []NotificationRule{
 				{
-					Name: fmt.Sprintf("webhook-for-%s", options.Resource.Name()),
+					Name: fmt.Sprintf("webhook-for-%s", options.Parent.Name()),
 					Filter: NotificationRuleFilter{
 						Branches:  []string{},
 						Pipelines: []string{},
-						Projects:  []string{options.Resource.Name()},
+						Projects:  []string{options.Parent.Name()},
 						Results:   []string{},
 					},
 					Notify: NotificationRuleNotify{

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import GithubLogo from '@/assets/github-mark.svg';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 import { NodeType } from '../utils/nodeFactories';
@@ -46,6 +47,14 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
     },
     {
       id: 'stage',
+      name: 'GitHub Stage',
+      description: 'Add a GitHub-based stage to your canvas',
+      image: GithubLogo,
+      category: 'Stages',
+      executorType: 'github'
+    },
+    {
+      id: 'stage',
       name: 'HTTP Stage',
       description: 'Add an HTTP-based stage to your canvas',
       icon: 'rocket_launch',
@@ -67,6 +76,14 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       image: SemaphoreLogo,
       category: 'Event Sources',
       eventSourceType: 'semaphore'
+    },
+    {
+      id: 'event_source',
+      name: 'GitHub Event Source',
+      description: 'Add a GitHub-based event source to your canvas',
+      image: GithubLogo,
+      category: 'Event Sources',
+      eventSourceType: 'github'
     },
     {
       id: 'connection_group',

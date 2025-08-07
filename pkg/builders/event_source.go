@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -21,6 +23,7 @@ type EventSourceBuilder struct {
 	tx          *gorm.DB
 	ctx         context.Context
 	encryptor   crypto.Encryptor
+	registry    *registry.Registry
 	canvas      *models.Canvas
 	name        string
 	description string
@@ -30,10 +33,11 @@ type EventSourceBuilder struct {
 	resource    integrations.Resource
 }
 
-func NewEventSourceBuilder(encryptor crypto.Encryptor) *EventSourceBuilder {
+func NewEventSourceBuilder(encryptor crypto.Encryptor, registry *registry.Registry) *EventSourceBuilder {
 	return &EventSourceBuilder{
 		ctx:       context.Background(),
 		encryptor: encryptor,
+		registry:  registry,
 	}
 }
 
@@ -131,6 +135,25 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 
 func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSource, string, error) {
 	//
+	// Ensure event types are valid for the integration.
+	//
+	eventHandler, err := b.registry.GetEventHandler(b.integration.Type)
+	if err != nil {
+		return nil, "", fmt.Errorf("no event handler for integration %s: %v", b.integration.Type, err)
+	}
+
+	eventTypes := eventHandler.EventTypes()
+	for _, eventType := range b.eventTypes {
+		if !slices.Contains(eventTypes, eventType.Type) {
+			return nil, "", fmt.Errorf("event type %s is not supported for integration %s. Available event types are: %v",
+				eventType.Type,
+				b.integration.Type,
+				eventTypes,
+			)
+		}
+	}
+
+	//
 	// Ensure resource record exists.
 	//
 	resource, err := b.findOrCreateResource(tx)
@@ -200,11 +223,13 @@ func (b *EventSourceBuilder) createForExistingSource(tx *gorm.DB, eventSource *m
 
 	//
 	// If the creation is for an external event source,
-	// and there's already an existing internal one, update its name and make it external.
+	// and there's already an existing internal one, update its name, make it external,
+	// and set it to pending, so the worker can reset the webhook on the integration.
 	//
 	now := time.Now()
 	eventSource.Name = b.name
 	eventSource.Scope = b.scope
+	eventSource.State = models.EventSourceStatePending
 	eventSource.EventTypes = datatypes.NewJSONSlice(b.eventTypes)
 	eventSource.UpdatedAt = &now
 	err := tx.Save(eventSource).Error

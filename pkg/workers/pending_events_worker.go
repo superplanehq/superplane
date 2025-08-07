@@ -144,7 +144,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 		return err
 	}
 
-	statefulResource, err := eventHandler.Status([]byte(event.Raw))
+	statefulResource, err := eventHandler.Status(event.Type, []byte(event.Raw))
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (w *PendingEventsWorker) UpdateExecutionResource(logger *log.Entry, event *
 	executionResource, err := models.FindExecutionResource(statefulResource.Id(), *source.ResourceID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			logger.Infof("No execution resource %s found for source %s - skipping execution update", statefulResource.Id(), source.ID)
+			logger.Infof("No execution resource %s found - skipping execution update", statefulResource.Id())
 			return nil
 		}
 

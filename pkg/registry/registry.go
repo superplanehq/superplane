@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -47,6 +48,13 @@ func (r *Registry) Init() {
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
 		NewExecutor:        semaphore.NewSemaphoreExecutor,
+	}
+
+	r.Integrations[models.IntegrationTypeGithub] = Integration{
+		EventHandler:       &github.GitHubEventHandler{},
+		OIDCVerifier:       &github.GitHubOIDCVerifier{},
+		NewResourceManager: github.NewGitHubResourceManager,
+		NewExecutor:        github.NewGitHubExecutor,
 	}
 
 	//
