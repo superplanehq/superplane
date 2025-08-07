@@ -22,13 +22,13 @@ export interface CanvasState {
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: SuperplaneStage, draft?: boolean) => void;
+  addStage: (stage: SuperplaneStage, draft?: boolean, autoLayout?: boolean) => void;
   removeStage: (stageId: string) => void;
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   removeConnectionGroup: (connectionGroupId: string) => void;
   updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   updateStage: (stage: SuperplaneStage) => void;
-  addEventSource: (eventSource: EventSourceWithEvents) => void;
+  addEventSource: (eventSource: EventSourceWithEvents, autoLayout?: boolean) => void;
   removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;

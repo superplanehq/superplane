@@ -45,7 +45,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage, draft = false) => {
+  addStage: (stage: SuperplaneStage, draft = false, autoLayout = true) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
@@ -53,7 +53,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         isDraft: draft
       }]
     }));
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout });
   },
 
   removeStage: (stageId: string) => {
@@ -96,11 +96,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  addEventSource: (eventSource: EventSourceWithEvents) => {
+  addEventSource: (eventSource: EventSourceWithEvents, autoLayout = false) => {
     set((state) => ({
       eventSources: [...state.eventSources, eventSource]
     }));
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout });
   },
 
   removeEventSource: (eventSourceId: string) => {
