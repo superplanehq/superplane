@@ -37,8 +37,6 @@ export const transformEventSourcesToNodes = (
         eventSourceType: es.eventSourceType,
       },
       position: nodePositions[es.metadata?.id || ''] || { x: 0, y: idx * 320 },
-      draggable: true,
- 
     }) as unknown as AllNodeType;
   });
 };
@@ -74,8 +72,6 @@ export const transformStagesToNodes = (
       x: 600 * ((st.spec?.connections?.length || 1)),
       y: (idx - 1) * 400
     },
-    draggable: true,
-
   } as unknown as AllNodeType));
 };
 
@@ -97,7 +93,6 @@ export const transformConnectionGroupsToNodes = (
       x: 600 * ((g.spec?.connections?.length || 1)),
       y: (idx - 1) * 400
     },
-    draggable: true,
     width: DEFAULT_WIDTH,
     height: DEFAULT_HEIGHT,
   } as unknown as AllNodeType));
