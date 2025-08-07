@@ -66,7 +66,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	//
 	// Create the event source
 	//
-	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
+	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor, registry).
 		InCanvas(canvas).
 		WithName(req.EventSource.Metadata.Name).
 		WithDescription(req.EventSource.Metadata.Description).

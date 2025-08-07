@@ -8,6 +8,7 @@ import { useIntegrations, useCreateIntegration, useUpdateIntegration, type Creat
 import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
+import GithubLogo from '@/assets/github-mark.svg'
 import { TabType } from '../SettingsPage'
 
 interface CanvasIntegrationsProps {
@@ -23,6 +24,14 @@ const INTEGRATION_TYPES = [
     label: 'Semaphore',
     description: 'Connect to Semaphore CI/CD pipelines for automated deployments and testing workflows',
     icon: SemaphoreLogo,
+    color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
+    popular: true
+  },
+  {
+    value: 'github' as const,
+    label: 'GitHub',
+    description: 'Connect to GitHub repositories for Actions running workflows',
+    icon: GithubLogo,
     color: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
     popular: true
   },
