@@ -338,6 +338,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons
+          isNewNode={!!isNewNode}
           onSave={handleSaveStage}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}

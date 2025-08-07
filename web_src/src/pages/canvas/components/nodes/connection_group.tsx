@@ -12,7 +12,6 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
-
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -25,15 +24,11 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     state.connectionGroups.find(cg => cg.metadata?.id === props.id)
   );
 
-
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
   const updateConnectionGroupMutation = useUpdateConnectionGroup(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
-
-
   const groupByFields = props.data.groupBy?.fields || [];
-
 
   const handleEditClick = () => {
     setIsEditMode(true);
@@ -204,6 +199,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons
+          isNewNode={!!isNewNode}
           onSave={handleSaveConnectionGroup}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}

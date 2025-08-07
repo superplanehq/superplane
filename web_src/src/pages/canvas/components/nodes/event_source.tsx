@@ -160,6 +160,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons
+          isNewNode={!!isNewNode}
           onSave={handleSaveEventSource}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
