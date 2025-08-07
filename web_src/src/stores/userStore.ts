@@ -6,6 +6,7 @@ export interface User {
   name: string;
   avatar_url: string;
   created_at: string;
+  organization_id?: string;
   account_providers?: Array<{
     id: string;
     user_id: string;
@@ -63,6 +64,7 @@ export const useUserStore = create<UserState>((set, get) => ({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch user';
       set({ error: errorMessage, loading: false });
+      throw error; // Re-throw so AuthGuard can catch it and redirect
     }
   },
   

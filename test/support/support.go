@@ -60,11 +60,28 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
-	user := &models.User{
-		Name:     "Test User",
-		IsActive: true,
+	r := ResourceRegistry{
+		Encryptor: crypto.NewNoOpEncryptor(),
 	}
+
+	//
+	// Create organization
+	//
+	var err error
+	r.Organization, err = models.CreateOrganization(uuid.New().String(), "test", "")
+	require.NoError(t, err)
+
+	//
+	// Create user
+	//
+	user := &models.User{
+		Name:           "Test User",
+		IsActive:       true,
+		OrganizationID: r.Organization.ID,
+	}
+
 	require.NoError(t, user.Create())
+	r.User = user.ID
 
 	accountProvider := &models.AccountProvider{
 		UserID:     user.ID,
@@ -76,19 +93,10 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 
 	require.NoError(t, accountProvider.Create())
 
-	r := ResourceRegistry{
-		User:      user.ID,
-		Encryptor: crypto.NewNoOpEncryptor(),
-	}
-
 	r.Registry = registry.NewRegistry(r.Encryptor)
 	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
 	require.NoError(t, r.SemaphoreAPIMock.Init())
 	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
-
-	var err error
-	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
-	require.NoError(t, err)
 
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test", "Test Canvas")
 	require.NoError(t, err)
@@ -128,8 +136,17 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create source
 	//
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", "description", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		source := models.EventSource{
+			Name:        "gh",
+			Description: "description",
+			Key:         []byte("my-key"),
+			Scope:       models.EventSourceScopeExternal,
+			CanvasID:    r.Canvas.ID,
+			EventTypes:  []models.EventType{},
+		}
+		err = source.Create([]models.EventType{}, nil)
 		require.NoError(t, err)
+		r.Source = &source
 	}
 
 	if options.Stage {
@@ -143,7 +160,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		executorType, executorSpec, resource := Executor(t, &r)
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-1").
 			WithRequester(r.User).
 			WithConditions(conditions).
@@ -248,7 +265,7 @@ func CreateExecutionWithData(t *testing.T,
 	inputs map[string]any,
 ) *models.StageExecution {
 	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
-	execution, err := models.CreateStageExecution(stage.ID, event.ID)
+	execution, err := models.CreateStageExecution(stage.CanvasID, stage.ID, event.ID)
 	require.NoError(t, err)
 	return execution
 }

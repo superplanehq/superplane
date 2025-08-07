@@ -2,12 +2,14 @@ package models
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -36,6 +38,68 @@ type EventType struct {
 	Type           string   `json:"type"`
 	FilterOperator string   `json:"filter_operator"`
 	Filters        []Filter `json:"filters"`
+}
+
+func (s *EventSource) Create(eventTypes []EventType, resourceId *uuid.UUID) error {
+	return s.CreateInTransaction(database.Conn(), eventTypes, resourceId)
+}
+
+func (s *EventSource) CreateInTransaction(tx *gorm.DB, eventTypes []EventType, resourceId *uuid.UUID) error {
+	now := time.Now()
+
+	s.CreatedAt = &now
+	s.UpdatedAt = &now
+	s.ResourceID = resourceId
+	s.EventTypes = datatypes.NewJSONSlice(eventTypes)
+	s.State = EventSourceStatePending
+
+	err := tx.
+		Clauses(clause.Returning{}).
+		Create(&s).
+		Error
+
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrNameAlreadyUsed
+	}
+
+	return err
+}
+
+func FindEventSourceByName(canvasID string, name string) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("name = ?", name).
+		Where("scope = ?", EventSourceScopeExternal).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
+// NOTE: the caller must decrypt the key before using it
+func FindEventSourceByID(canvasID string, id uuid.UUID) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("id = ?", id).
+		Where("canvas_id = ?", canvasID).
+		Where("scope = ?", EventSourceScopeExternal).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {
@@ -102,24 +166,6 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	var eventSource EventSource
 	err := database.Conn().
 		Where("id = ?", id).
-		First(&eventSource).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &eventSource, nil
-}
-
-func FindEventSourceByName(name string) (*EventSource, error) {
-	return FindEventSourceByNameInTransaction(database.Conn(), name)
-}
-
-func FindEventSourceByNameInTransaction(tx *gorm.DB, name string) (*EventSource, error) {
-	var eventSource EventSource
-	err := tx.
-		Where("name = ?", name).
 		First(&eventSource).
 		Error
 

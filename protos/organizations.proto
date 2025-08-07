@@ -81,6 +81,30 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{organization_id}/invitations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create an organization invitation";
+      description: "Invites a user to join an organization by email";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{organization_id}/invitations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization invitations";
+      description: "Returns pending invitations for an organization";
+      tags: "Organization";
+    };
+  }
+
 }
 
 message Organization {
@@ -89,9 +113,8 @@ message Organization {
     string name = 2;
     string display_name = 3;
     string description = 4;
-    string created_by = 5;
-    google.protobuf.Timestamp created_at = 6;
-    google.protobuf.Timestamp updated_at = 7;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
   }
 
   Metadata metadata = 1;
@@ -133,6 +156,34 @@ message DeleteOrganizationRequest {
 }
 
 message DeleteOrganizationResponse {}
+
+// Invitation messages
+message Invitation {
+  string id = 1;
+  string organization_id = 2;
+  string email = 3;
+  string status = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateInvitationRequest {
+  string organization_id = 1;
+  string email = 2;
+}
+
+message CreateInvitationResponse {
+  Invitation invitation = 1;
+}
+
+message ListInvitationsRequest {
+  string organization_id = 1;
+}
+
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
+}
+
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {

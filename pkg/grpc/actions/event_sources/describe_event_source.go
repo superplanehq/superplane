@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	uuid "github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/logging"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -13,20 +13,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeEventSource(ctx context.Context, canvasID string, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
-	canvas, err := models.FindCanvasByID(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	logger := logging.ForCanvas(canvas)
-	source, err := findEventSource(canvas, req)
+func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) (*pb.DescribeEventSourceResponse, error) {
+	source, err := findEventSource(canvasID, idOrName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "event source not found")
 		}
 
-		logger.Errorf("Error describing event source. Request: %v. Error: %v", req, err)
+		log.Errorf("Error describing event source %s in canvas %s. Error: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 
@@ -42,19 +36,15 @@ func DescribeEventSource(ctx context.Context, canvasID string, req *pb.DescribeE
 	return response, nil
 }
 
-func findEventSource(canvas *models.Canvas, req *pb.DescribeEventSourceRequest) (*models.EventSource, error) {
-	if req.Name == "" && req.Id == "" {
+func findEventSource(canvasID string, idOrName string) (*models.EventSource, error) {
+	if idOrName == "" {
 		return nil, status.Errorf(codes.InvalidArgument, "must specify one of: id or name")
 	}
 
-	if req.Name != "" {
-		return canvas.FindEventSourceByName(req.Name)
-	}
-
-	ID, err := uuid.Parse(req.Id)
+	ID, err := uuid.Parse(idOrName)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid ID")
+		return models.FindEventSourceByName(canvasID, idOrName)
 	}
 
-	return canvas.FindEventSourceByID(ID)
+	return models.FindEventSourceByID(canvasID, ID)
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
@@ -17,14 +16,8 @@ import (
 
 func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, authorizationService authorization.Authorization) (*pb.CreateOrganizationResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
-
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
-	}
-
-	userIDUUID, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user ID")
 	}
 
 	if req.Organization == nil || req.Organization.Metadata == nil || req.Organization.Metadata.Name == "" {
@@ -35,7 +28,7 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, 
 		return nil, status.Error(codes.InvalidArgument, "organization display name is required")
 	}
 
-	organization, err := models.CreateOrganization(userIDUUID, req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName, req.Organization.Metadata.Description)
+	organization, err := models.CreateOrganization(req.Organization.Metadata.Name, req.Organization.Metadata.DisplayName, req.Organization.Metadata.Description)
 	if err != nil {
 		if errors.Is(err, models.ErrNameAlreadyUsed) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
@@ -66,7 +59,6 @@ func CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest, 
 				Name:        organization.Name,
 				DisplayName: organization.DisplayName,
 				Description: organization.Description,
-				CreatedBy:   organization.CreatedBy.String(),
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},

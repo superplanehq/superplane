@@ -8,19 +8,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__CreateOrganization(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
+	r := support.Setup(t)
+
 	user := models.User{
-		ID:   uuid.New(),
-		Name: "test-user",
+		ID:             uuid.New(),
+		Name:           "test-user",
+		OrganizationID: r.Organization.ID,
 	}
 
 	err := user.Create()

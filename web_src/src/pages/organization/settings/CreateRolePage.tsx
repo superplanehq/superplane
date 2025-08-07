@@ -180,7 +180,7 @@ export function CreateRolePage() {
         })
       }
 
-      navigate(`/organization/${orgId}/settings/roles`)
+      navigate(`/settings/roles`)
     } catch {
       console.error('Failed to create role')
     }
@@ -201,7 +201,7 @@ export function CreateRolePage() {
               items={[
                 {
                   label: 'Roles',
-                  onClick: () => navigate(`/organization/${orgId}/settings/roles`)
+                  onClick: () => navigate(`/settings/roles`)
                 },
                 {
                   label: isEditMode ? 'Edit organization role' : 'Create new organization role',
@@ -358,7 +358,7 @@ export function CreateRolePage() {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3">
-            <Link to={`/organization/${orgId}/settings/roles`}>
+            <Link to={`/settings/roles`}>
               <Button outline>
                 Cancel
               </Button>

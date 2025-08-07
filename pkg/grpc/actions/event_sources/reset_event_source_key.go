@@ -5,9 +5,9 @@ import (
 	"errors"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -15,19 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvasID string, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
-	canvas, err := models.FindCanvasByID(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	logger := logging.ForCanvas(canvas)
-	err = actions.ValidateUUIDs(req.IdOrName)
+func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvasID string, idOrName string) (*pb.ResetEventSourceKeyResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var source *models.EventSource
 	if err != nil {
-		source, err = canvas.FindEventSourceByName(req.IdOrName)
+		source, err = models.FindEventSourceByName(canvasID, idOrName)
 	} else {
-		source, err = canvas.FindEventSourceByID(uuid.MustParse(req.IdOrName))
+		source, err = models.FindEventSourceByID(canvasID, uuid.MustParse(idOrName))
 	}
 
 	if err != nil {
@@ -35,19 +29,19 @@ func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvas
 			return nil, status.Error(codes.NotFound, "event source not found")
 		}
 
-		logger.Errorf("Error describing event source. Request: %v. Error: %v", req, err)
+		log.Errorf("Error resetting key for event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 
 	plainKey, encryptedKey, err := crypto.NewRandomKey(ctx, encryptor, source.Name)
 	if err != nil {
-		logger.Errorf("Error generating event source key. Request: %v. Error: %v", req, err)
+		log.Errorf("Error generating new key for event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, status.Error(codes.Internal, "error generating key")
 	}
 
 	err = source.UpdateKey(encryptedKey)
 	if err != nil {
-		logger.Errorf("Error updating event source key. Request: %v. Error: %v", req, err)
+		log.Errorf("Error updating key for event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, status.Error(codes.Internal, "error updating key")
 	}
 

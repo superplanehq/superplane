@@ -10,16 +10,18 @@ import (
 )
 
 func RemoveRole(ctx context.Context, domainType string, domainID string, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
+	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
+
 	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	userId, err := ResolveUserIDWithoutCreation(userID, userEmail)
+	user, err := FindUser(orgID, userID, userEmail)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
+		return nil, err
 	}
 
-	err = authService.RemoveRole(userId, roleName, domainID, domainType)
+	err = authService.RemoveRole(user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to remove role")
 	}

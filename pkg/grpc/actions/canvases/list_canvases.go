@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest, authorizationService authorization.Authorization) (*pb.ListCanvasesResponse, error) {
+func ListCanvases(ctx context.Context, orgID string, req *pb.ListCanvasesRequest, authorizationService authorization.Authorization) (*pb.ListCanvasesResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 
 	if !userIsSet {
@@ -24,7 +24,7 @@ func ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest, authorizatio
 		return nil, err
 	}
 
-	canvases, err := models.ListCanvasesByIDs(accessibleCanvasIDs, req.OrganizationId)
+	canvases, err := models.ListCanvasesByIDs(accessibleCanvasIDs, orgID)
 	if err != nil {
 		return nil, err
 	}

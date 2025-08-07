@@ -14,14 +14,12 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(user, uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test", "")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
+	source1 := createExternalSource(t, canvas.ID)
+	source2 := createExternalSource(t, canvas.ID)
 
 	t.Run("single field", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
@@ -87,14 +85,12 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(user, uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test", "")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
+	source1 := createExternalSource(t, canvas.ID)
+	source2 := createExternalSource(t, canvas.ID)
 
 	t.Run("single field", func(t *testing.T) {
 		connectionGroup, err := canvas.CreateConnectionGroup(
@@ -331,14 +327,12 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	user := uuid.New()
-	org, err := CreateOrganization(user, uuid.New().String(), "test", "")
+	org, err := CreateOrganization(uuid.New().String(), "test", "")
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
+	source1 := createExternalSource(t, canvas.ID)
+	source2 := createExternalSource(t, canvas.ID)
 
 	connectionGroup, err := canvas.CreateConnectionGroup(
 		"group1",
@@ -386,8 +380,21 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 			"version": "v1",
 		},
 		"events": map[string]any{
-			"source-1": map[string]any{"ref": "v1", "app": "auth"},
-			"source-2": map[string]any{"ref": "v1", "app": "auth"},
+			source1.Name: map[string]any{"ref": "v1", "app": "auth"},
+			source2.Name: map[string]any{"ref": "v1", "app": "auth"},
 		},
 	}, rawEvent)
+}
+
+func createExternalSource(t *testing.T, canvasID uuid.UUID) *EventSource {
+	source := EventSource{
+		Name:       "source-" + uuid.New().String(),
+		Key:        []byte("my-key"),
+		Scope:      EventSourceScopeExternal,
+		CanvasID:   canvasID,
+		EventTypes: []EventType{},
+	}
+	err := source.Create([]EventType{}, nil)
+	require.NoError(t, err)
+	return &source
 }

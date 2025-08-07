@@ -152,7 +152,7 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 	// Otherwise, the integration is on the canvas level, but the secret is on the organization level,
 	// so we need to get the organization ID for the canvas where the integration is.
 	//
-	canvas, err := models.FindCanvasByID(integration.DomainID.String())
+	canvas, err := models.FindCanvasByIDOnly(integration.DomainID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
 	}

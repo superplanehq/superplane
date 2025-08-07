@@ -17,6 +17,7 @@ CREATE TABLE connection_groups (
 
 CREATE TABLE connection_group_field_sets (
   id                  uuid NOT NULL DEFAULT uuid_generate_v4(),
+  canvas_id           uuid NOT NULL,
   connection_group_id uuid NOT NULL,
   field_set           jsonb NOT NULL,
   field_set_hash      CHARACTER(64) NOT NULL,
@@ -24,6 +25,7 @@ CREATE TABLE connection_group_field_sets (
   created_at          TIMESTAMP NOT NULL,
 
   PRIMARY KEY (id),
+  FOREIGN KEY (canvas_id) REFERENCES canvases(id),
   FOREIGN KEY (connection_group_id) REFERENCES connection_groups(id)
 );
 

@@ -21,7 +21,7 @@ type StageBuilder struct {
 	ctx           context.Context
 	encryptor     crypto.Encryptor
 	registry      *registry.Registry
-	canvas        *models.Canvas
+	canvasID      uuid.UUID
 	requesterID   uuid.UUID
 	existingStage *models.Stage
 	newStage      *models.Stage
@@ -62,8 +62,8 @@ func (b *StageBuilder) WithContext(ctx context.Context) *StageBuilder {
 	return b
 }
 
-func (b *StageBuilder) InCanvas(canvas *models.Canvas) *StageBuilder {
-	b.canvas = canvas
+func (b *StageBuilder) InCanvas(canvasID uuid.UUID) *StageBuilder {
+	b.canvasID = canvasID
 	return b
 }
 
@@ -140,7 +140,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 
 	now := time.Now()
 	stage := &models.Stage{
-		CanvasID:      b.canvas.ID,
+		CanvasID:      b.canvasID,
 		Name:          b.newStage.Name,
 		Description:   b.newStage.Description,
 		Conditions:    b.newStage.Conditions,
@@ -235,7 +235,7 @@ func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UU
 	eventSource, _, err := NewEventSourceBuilder(b.encryptor).
 		WithTransaction(tx).
 		WithContext(b.ctx).
-		InCanvas(b.canvas).
+		InCanvas(b.canvasID).
 		WithName(b.integration.Name + "-" + b.resource.Name()).
 		WithScope(models.EventSourceScopeInternal).
 		ForIntegration(b.integration).

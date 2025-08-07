@@ -22,7 +22,7 @@ import (
 )
 
 func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	canvas, err := models.FindCanvasByID(canvasID)
+	canvas, err := models.FindCanvasByIDOnly(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
@@ -67,7 +67,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	// Create the event source
 	//
 	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
-		InCanvas(canvas).
+		InCanvas(canvas.ID).
 		WithName(req.EventSource.Metadata.Name).
 		WithDescription(req.EventSource.Metadata.Description).
 		WithScope(models.EventSourceScopeExternal).

@@ -26,6 +26,13 @@ func SetUserIdInMetadata(ctx context.Context, userId string) context.Context {
 	return metadata.NewIncomingContext(ctx, metadata.Pairs("x-user-id", userId))
 }
 
+func SetUserAndOrganizationInMetadata(ctx context.Context, userId, organizationId string) context.Context {
+	return metadata.NewIncomingContext(ctx, metadata.Pairs(
+		"x-user-id", userId,
+		"x-organization-id", organizationId,
+	))
+}
+
 func GetUserIdFromMetadata(ctx context.Context) (string, bool) {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -38,6 +45,20 @@ func GetUserIdFromMetadata(ctx context.Context) (string, bool) {
 	}
 
 	return userMeta[0], true
+}
+
+func GetOrganizationIdFromMetadata(ctx context.Context) (string, bool) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", false
+	}
+
+	orgMeta, ok := md["x-organization-id"]
+	if !ok || len(orgMeta) == 0 {
+		return "", false
+	}
+
+	return orgMeta[0], true
 }
 
 // MustGetUserFromContext retrieves the user from context, panics if not found

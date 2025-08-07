@@ -61,7 +61,14 @@ func Test__PendingFieldSetsWorkerTest(t *testing.T) {
 	})
 
 	t.Run("field set is timed out, emit -> emit with missing connections", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", "description", []byte(`mykey`), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		source2 := models.EventSource{
+			CanvasID: r.Canvas.ID,
+			Name:     "source-2",
+			Key:      []byte(`mykey`),
+			Scope:    models.EventSourceScopeExternal,
+		}
+
+		err := source2.Create([]models.EventType{}, nil)
 		require.NoError(t, err)
 
 		connectionGroup, err := r.Canvas.CreateConnectionGroup(

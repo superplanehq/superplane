@@ -22,7 +22,7 @@ func Test__CreateCanvas(t *testing.T) {
 	authService, err := authorization.NewAuthService()
 	require.NoError(t, err)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), user.String())
-	org, err := models.CreateOrganization(user, "test", "test", "")
+	org, err := models.CreateOrganization("test", "test", "")
 	require.NoError(t, err)
 
 	t.Run("name still not used -> canvas is created", func(t *testing.T) {

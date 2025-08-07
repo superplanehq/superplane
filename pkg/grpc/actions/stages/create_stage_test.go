@@ -29,19 +29,16 @@ func Test__CreateStage(t *testing.T) {
 		Integration: true,
 	})
 
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	executor := support.ProtoExecutor(t, r)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: uuid.New().String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-				},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, uuid.NewString(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
 			},
 		})
 
@@ -52,15 +49,12 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-				},
+		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
 			},
 		})
 
@@ -71,20 +65,16 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: "source-does-not-exist",
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: "source-does-not-exist",
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -97,23 +87,26 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for internal event source -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", "internal-description", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
+		internalSource := models.EventSource{
+			CanvasID: r.Canvas.ID,
+			Name:     "internal",
+			Scope:    models.EventSourceScopeInternal,
+			Key:      []byte(`key`),
+		}
+
+		err := internalSource.Create([]models.EventType{}, nil)
 		require.NoError(t, err)
 
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: internalSource.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: internalSource.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -126,24 +119,20 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
+					},
 				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
-					},
-					Conditions: []*pb.Condition{
-						{Type: pb.Condition_CONDITION_TYPE_APPROVAL, Approval: &pb.ConditionApproval{}},
-					},
+				Conditions: []*pb.Condition{
+					{Type: pb.Condition_CONDITION_TYPE_APPROVAL, Approval: &pb.ConditionApproval{}},
 				},
 			},
 		})
@@ -155,26 +144,22 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*pb.Condition{
-						{
-							Type:       pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{},
-						},
+				},
+				Conditions: []*pb.Condition{
+					{
+						Type:       pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{},
 					},
 				},
 			},
@@ -187,27 +172,23 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*pb.Condition{
-						{
-							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{
-								Start: "08:00",
-							},
+				},
+				Conditions: []*pb.Condition{
+					{
+						Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{
+							Start: "08:00",
 						},
 					},
 				},
@@ -221,27 +202,23 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*pb.Condition{
-						{
-							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{
-								Start: "52:00",
-							},
+				},
+				Conditions: []*pb.Condition{
+					{
+						Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{
+							Start: "52:00",
 						},
 					},
 				},
@@ -255,28 +232,24 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*pb.Condition{
-						{
-							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{
-								Start: "08:00",
-								End:   "17:00",
-							},
+				},
+				Conditions: []*pb.Condition{
+					{
+						Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{
+							Start: "08:00",
+							End:   "17:00",
 						},
 					},
 				},
@@ -290,29 +263,25 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: "test",
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: "test",
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*pb.Condition{
-						{
-							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{
-								Start:    "08:00",
-								End:      "17:00",
-								WeekDays: []string{"Monday", "DoesNotExist"},
-							},
+				},
+				Conditions: []*pb.Condition{
+					{
+						Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{
+							Start:    "08:00",
+							End:      "17:00",
+							WeekDays: []string{"Monday", "DoesNotExist"},
 						},
 					},
 				},
@@ -332,22 +301,18 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("test")
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{Name: name},
-				Spec: &pb.Stage_Spec{
-					Executor: &pb.Executor{
-						Type:        executor.Type,
-						Spec:        executor.Spec,
-						Integration: &integrationpb.IntegrationRef{Name: "does-not-exist"},
-					},
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{Name: name},
+			Spec: &pb.Stage_Spec{
+				Executor: &pb.Executor{
+					Type:        executor.Type,
+					Spec:        executor.Spec,
+					Integration: &integrationpb.IntegrationRef{Name: "does-not-exist"},
+				},
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -368,46 +333,42 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		description := support.RandomName("description")
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name:        name,
-					Description: description,
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Conditions: []*pb.Condition{
-						{
-							Type:     pb.Condition_CONDITION_TYPE_APPROVAL,
-							Approval: &pb.ConditionApproval{Count: 1},
-						},
-						{
-							Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
-							TimeWindow: &pb.ConditionTimeWindow{
-								Start:    "08:00",
-								End:      "17:00",
-								WeekDays: []string{"Monday", "Tuesday"},
-							},
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name:        name,
+				Description: description,
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Conditions: []*pb.Condition{
+					{
+						Type:     pb.Condition_CONDITION_TYPE_APPROVAL,
+						Approval: &pb.ConditionApproval{Count: 1},
+					},
+					{
+						Type: pb.Condition_CONDITION_TYPE_TIME_WINDOW,
+						TimeWindow: &pb.ConditionTimeWindow{
+							Start:    "08:00",
+							End:      "17:00",
+							WeekDays: []string{"Monday", "Tuesday"},
 						},
 					},
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-							Filters: []*pb.Filter{
-								{
-									Type: pb.FilterType_FILTER_TYPE_DATA,
-									Data: &pb.DataFilter{
-										Expression: "test == 12",
-									},
+				},
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
+						Filters: []*pb.Filter{
+							{
+								Type: pb.FilterType_FILTER_TYPE_DATA,
+								Data: &pb.DataFilter{
+									Expression: "test == 12",
 								},
-								{
-									Type: pb.FilterType_FILTER_TYPE_HEADER,
-									Header: &pb.HeaderFilter{
-										Expression: "test == 12",
-									},
+							},
+							{
+								Type: pb.FilterType_FILTER_TYPE_HEADER,
+								Header: &pb.HeaderFilter{
+									Expression: "test == 12",
 								},
 							},
 						},
@@ -484,30 +445,26 @@ func Test__CreateStage(t *testing.T) {
 		})
 
 		name := support.RandomName("test")
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{Name: name},
-				Spec: &pb.Stage_Spec{
-					Executor: &pb.Executor{
-						Type: executor.Type,
-						Integration: &integrationpb.IntegrationRef{
-							Name:       integration.Name,
-							DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-						},
-						Resource: &integrationpb.ResourceRef{
-							Type: executor.Resource.Type,
-							Name: executor.Resource.Name,
-						},
-						Spec: executor.Spec,
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{Name: name},
+			Spec: &pb.Stage_Spec{
+				Executor: &pb.Executor{
+					Type: executor.Type,
+					Integration: &integrationpb.IntegrationRef{
+						Name:       integration.Name,
+						DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
 					},
-					Conditions: []*pb.Condition{},
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+					Resource: &integrationpb.ResourceRef{
+						Type: executor.Resource.Type,
+						Name: executor.Resource.Name,
+					},
+					Spec: executor.Spec,
+				},
+				Conditions: []*pb.Condition{},
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -543,25 +500,21 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("stage with same integration resource re-uses internally scoped event source", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 		//
 		// Create first stage using the demo-project Semaphore project integration resource.
 		//
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: support.RandomName("test"),
-				},
-				Spec: &pb.Stage_Spec{
-					Executor:   executor,
-					Conditions: []*pb.Condition{},
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: support.RandomName("test"),
+			},
+			Spec: &pb.Stage_Spec{
+				Executor:   executor,
+				Conditions: []*pb.Condition{},
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -573,20 +526,17 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create second stage using the demo-project Semaphore project integration resource.
 		//
-		res, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: support.RandomName("test"),
-				},
-				Spec: &pb.Stage_Spec{
-					Executor:   executor,
-					Conditions: []*pb.Condition{},
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		res, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: support.RandomName("test"),
+			},
+			Spec: &pb.Stage_Spec{
+				Executor:   executor,
+				Conditions: []*pb.Condition{},
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -608,25 +558,21 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("stage name already used -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
 		//
 		// First stage works
 		//
 		name := support.RandomName("test")
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: name,
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: name,
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -638,19 +584,16 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Second stage with the same name fails
 		//
-		_, err = CreateStage(ctx, r.Encryptor, r.Registry, &pb.CreateStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &pb.Stage{
-				Metadata: &pb.Stage_Metadata{
-					Name: name,
-				},
-				Spec: &pb.Stage_Spec{
-					Executor: executor,
-					Connections: []*pb.Connection{
-						{
-							Name: r.Source.Name,
-							Type: pb.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+			Metadata: &pb.Stage_Metadata{
+				Name: name,
+			},
+			Spec: &pb.Stage_Spec{
+				Executor: executor,
+				Connections: []*pb.Connection{
+					{
+						Name: r.Source.Name,
+						Type: pb.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},

@@ -14,13 +14,12 @@ import { useOrganization } from '../../../hooks/useOrganizationData'
 import { useUserStore } from '../../../stores/userStore'
 
 export function OrganizationSettings() {
-  const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, fetchUser } = useUserStore()
 
   // Use React Query hook for organization data
-  const { data: organization, isLoading: loading, error } = useOrganization(orgId || '')
+  const { data: organization, isLoading: loading, error } = useOrganization(user?.organization_id || '')
 
   // Fetch user data when component mounts
   useEffect(() => {
@@ -30,10 +29,10 @@ export function OrganizationSettings() {
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
 
-  if (!orgId) {
+  if (!user?.organization_id) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <p className="text-zinc-500 dark:text-zinc-400">Organization ID not found</p>
+        <p className="text-zinc-500 dark:text-zinc-400">Organization not found</p>
       </div>
     )
   }
@@ -78,12 +77,12 @@ export function OrganizationSettings() {
                 />
                 <SidebarLabel className='text-zinc-900 dark:text-white'>{user?.name || 'My Account'}</SidebarLabel>
               </div>
-              <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/organization/${orgId}/settings/profile`)}>
+              <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate('/settings/profile')}>
                 <span className='px-7'>
                   <SidebarLabel>My Profile</SidebarLabel>
                 </span>
               </SidebarItem>
-              <SidebarItem className={`${currentSection === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/organization/${orgId}/settings/api_token`)}>
+              <SidebarItem className={`${currentSection === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate('/settings/api_token')}>
                 <span className='px-7'>
                   <SidebarLabel>API Token</SidebarLabel>
                 </span>
@@ -95,15 +94,15 @@ export function OrganizationSettings() {
                 <Avatar
                   className='w-6 h-6 bg-blue-200 dark:bg-blue-800 text-blue-800 dark:text-white'
                   slot="icon"
-                  initials={(organization?.metadata?.displayName || organization?.metadata?.name || orgId).charAt(0).toUpperCase()}
-                  alt={organization?.metadata?.displayName || organization?.metadata?.name || orgId}
+                  initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                  alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
                 />
-                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization?.metadata?.displayName || organization?.metadata?.name || orgId}</SidebarLabel>
+                <SidebarLabel className='text-zinc-900 dark:text-white'>{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</SidebarLabel>
               </div>
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem
                   key={tab.id}
-                  onClick={() => navigate(`/organization/${orgId}/settings/${tab.id}`)}
+                  onClick={() => navigate(`/settings/${tab.id}`)}
                   className={`${currentSection === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
                 >
                   <span className={`px-7 ${currentSection === tab.id ? 'font-semibold' : 'font-normal'}`}>
@@ -128,9 +127,9 @@ export function OrganizationSettings() {
                   </div>
                 )
               } />
-              <Route path="members" element={<MembersSettings organizationId={orgId} />} />
-              <Route path="groups" element={<GroupsSettings organizationId={orgId} />} />
-              <Route path="roles" element={<RolesSettings organizationId={orgId} />} />
+              <Route path="members" element={<MembersSettings organizationId={user?.organization_id || ''} />} />
+              <Route path="groups" element={<GroupsSettings organizationId={user?.organization_id || ''} />} />
+              <Route path="roles" element={<RolesSettings organizationId={user?.organization_id || ''} />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />

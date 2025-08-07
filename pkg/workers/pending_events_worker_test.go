@@ -44,15 +44,14 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("source has filter for event -> event is discarded", func(t *testing.T) {
-		source, err := r.Canvas.CreateEventSource(
-			support.RandomName("source"),
-			"description",
-			[]byte(`key`),
-			models.EventSourceScopeExternal,
-			[]models.EventType{{Type: "push"}},
-			nil,
-		)
+		source := models.EventSource{
+			CanvasID: r.Canvas.ID,
+			Name:     support.RandomName("source"),
+			Key:      []byte(`key`),
+			Scope:    models.EventSourceScopeExternal,
+		}
 
+		err := source.Create([]models.EventType{{Type: "push"}}, nil)
 		require.NoError(t, err)
 
 		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "pull_request", []byte(`{}`), []byte(`{}`))
@@ -89,7 +88,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -156,7 +155,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		stage1, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -177,7 +176,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		stage2, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -233,7 +232,14 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2, err := r.Canvas.CreateEventSource("source-2", "description", []byte(`key`), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		source2 := models.EventSource{
+			CanvasID: r.Canvas.ID,
+			Name:     support.RandomName("source"),
+			Key:      []byte(`key`),
+			Scope:    models.EventSourceScopeExternal,
+		}
+
+		err := source2.Create([]models.EventType{}, nil)
 		require.NoError(t, err)
 
 		//
@@ -306,7 +312,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -347,7 +353,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -416,7 +422,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		//
 		firstStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -444,7 +450,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 
 		secondStage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -505,7 +511,7 @@ func Test__PendingEventsWorker(t *testing.T) {
 		workflowID := uuid.New().String()
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(support.RandomName("stage")).
 			WithRequester(r.User).
 			WithConnections([]models.Connection{

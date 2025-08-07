@@ -18,6 +18,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
 
@@ -74,11 +75,12 @@ func NewServer(
 	oidcVerifier *crypto.OIDCVerifier,
 	basePath string,
 	appEnv string,
+	authorizationService authorization.Authorization,
 	middlewares ...mux.MiddlewareFunc,
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -178,7 +180,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	// Protect the gRPC gateway routes with authentication
 	protectedGRPCHandler := s.authHandler.Middleware(
-		s.stripUserIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
+		s.stripIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
 	)
 
 	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
@@ -193,17 +195,17 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 }
 
 // stripUserIDHeaderHandler removes the X-User-Id header from the request before we set it manually
-func (s *Server) stripUserIDHeaderHandler(next http.Handler) http.Handler {
+func (s *Server) stripIDHeaderHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Header.Del("X-User-Id")
-		r.Header.Del("x-user-id")
+		r.Header.Del("X-Organization-Id")
 		next.ServeHTTP(w, r)
 	})
 }
 
 func headersMatcher(key string) (string, bool) {
 	switch key {
-	case "X-User-Id":
+	case "X-User-Id", "X-Organization-Id":
 		return key, true
 	default:
 		return runtime.DefaultHeaderMatcher(key)
@@ -222,7 +224,8 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		*r2 = *r
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
-		r2.Header.Set("x-user-id", user.ID.String())
+		r2.Header.Set("x-User-id", user.ID.String())
+		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
@@ -376,6 +379,7 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 
 	safeUser := UserProfileResponse{
 		ID:               user.ID.String(),
+		OrganizationID:   user.OrganizationID.String(),
 		Email:            email,
 		Name:             user.Name,
 		AvatarURL:        avatarURL,
@@ -440,6 +444,7 @@ type OutputsRequest struct {
 
 type UserProfileResponse struct {
 	ID               string                   `json:"id"`
+	OrganizationID   string                   `json:"organization_id"`
 	Email            string                   `json:"email"`
 	Name             string                   `json:"name"`
 	AvatarURL        string                   `json:"avatar_url"`
@@ -551,7 +556,7 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	stage, err := models.FindStageByID(execution.StageID.String())
+	stage, err := models.FindStageByIDOnly(execution.StageID.String())
 	if err != nil {
 		http.Error(w, "error finding stage", http.StatusInternalServerError)
 		return

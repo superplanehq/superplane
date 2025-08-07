@@ -33,6 +33,28 @@ func (s *Signer) Generate(subject string, duration time.Duration) (string, error
 	return tokenString, nil
 }
 
+func (s *Signer) GenerateWithClaims(subject string, duration time.Duration, additionalClaims map[string]any) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"iat": now.Unix(),
+		"nbf": now.Unix(),
+		"exp": now.Add(duration).Unix(),
+		"sub": subject,
+	}
+
+	for k, v := range additionalClaims {
+		claims[k] = v
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString([]byte(s.Secret))
+	if err != nil {
+		return "", err
+	}
+
+	return tokenString, nil
+}
+
 func (s *Signer) Validate(tokenString, subject string) error {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

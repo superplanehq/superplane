@@ -17,20 +17,13 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
+func CreateConnectionGroup(ctx context.Context, canvasID string, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
+	canvas, err := models.FindCanvasByIDOnly(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
@@ -44,7 +37,7 @@ func CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupReq
 		return nil, status.Error(codes.InvalidArgument, "connection group name is required")
 	}
 
-	connections, err := actions.ValidateConnections(canvas, req.ConnectionGroup.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvas.ID.String(), req.ConnectionGroup.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

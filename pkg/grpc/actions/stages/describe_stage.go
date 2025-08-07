@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -15,28 +15,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
-	}
-
-	logger := logging.ForCanvas(canvas)
-	stage, err := findStage(canvas, req)
+func DescribeStage(ctx context.Context, canvasID string, idOrName string) (*pb.DescribeStageResponse, error) {
+	stage, err := findStage(canvasID, idOrName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "stage not found")
 		}
 
-		logger.Errorf("Error describing stage. Request: %v. Error: %v", req, err)
+		log.Errorf("Error describing stage %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 
@@ -69,19 +55,15 @@ func DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.Descr
 	return response, nil
 }
 
-func findStage(canvas *models.Canvas, req *pb.DescribeStageRequest) (*models.Stage, error) {
-	if req.Id == "" && req.Name == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "must specify one of: id or name")
+func findStage(canvasID string, idOrName string) (*models.Stage, error) {
+	if idOrName == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "must specify either the ID or name of the stage")
 	}
 
-	if req.Name != "" {
-		return canvas.FindStageByName(req.Name)
-	}
-
-	ID, err := uuid.Parse(req.Id)
+	ID, err := uuid.Parse(idOrName)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid ID")
+		return models.FindStageByName(canvasID, idOrName)
 	}
 
-	return canvas.FindStageByID(ID.String())
+	return models.FindStageByID(canvasID, ID.String())
 }

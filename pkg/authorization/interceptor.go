@@ -23,6 +23,7 @@ import (
 
 type contextKey string
 
+const OrganizationContextKey contextKey = "organization"
 const DomainTypeContextKey contextKey = "domainType"
 const DomainIdContextKey contextKey = "domainId"
 
@@ -125,8 +126,15 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
+		orgMeta, ok := md["x-organization-id"]
+		if !ok || len(orgMeta) == 0 {
+			log.Errorf("Organization not found in metadata, metadata %v", md)
+			return nil, status.Error(codes.NotFound, "Not found")
+		}
+
 		userID := userMeta[0]
-		domainType, domainID, err := a.getDomainTypeAndId(req, rule.DomainTypes)
+		organizationID := orgMeta[0]
+		domainType, domainID, err := a.getDomainTypeAndId(req, rule.DomainTypes, organizationID)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
@@ -150,44 +158,44 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
-		newContext := context.WithValue(ctx, DomainTypeContextKey, domainType)
+		newContext := context.WithValue(ctx, OrganizationContextKey, organizationID)
+		newContext = context.WithValue(newContext, DomainTypeContextKey, domainType)
 		newContext = context.WithValue(newContext, DomainIdContextKey, domainID)
 		return handler(newContext, req)
 	}
 }
 
-func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string) (string, string, error) {
+func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string, organizationID string) (string, string, error) {
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeOrganization {
 		return getOrganizationIdFromRequest(req)
 	}
 
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeCanvas {
-		return getCanvasIdFromRequest(req)
+		return getCanvasIdFromRequest(req, organizationID)
 	}
 
 	// Handle mixed domain types (multiple domain types supported)
-	return a.getDomainTypeAndIdFromRequest(req)
+	return a.getDomainTypeAndIdFromRequest(req, organizationID)
 }
 
-func (a *AuthorizationInterceptor) getDomainTypeAndIdFromRequest(req interface{}) (string, string, error) {
+func (a *AuthorizationInterceptor) getDomainTypeAndIdFromRequest(req interface{}, organizationID string) (string, string, error) {
 	switch r := req.(type) {
 	case interface {
 		GetDomainType() pbAuth.DomainType
 		GetDomainId() string
 	}:
-		return getDomainTypeAndId(r.GetDomainId(), r.GetDomainType())
+		return getDomainTypeAndId(r.GetDomainId(), r.GetDomainType(), organizationID)
 
 	default:
 		return "", "", fmt.Errorf("unable to extract domain information from request")
 	}
 }
 
-func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType) (string, string, error) {
+func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizationID string) (string, string, error) {
 	switch domainType {
 	case pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION:
 		_, err := uuid.Parse(domainID)
 		if err != nil {
-			// Try to find organization by name if not a valid UUID
 			org, err := models.FindOrganizationByName(domainID)
 			if err != nil {
 				return "", "", fmt.Errorf("organization %s not found", domainID)
@@ -203,19 +211,24 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType) (string, 
 		return models.DomainTypeOrganization, org.ID.String(), nil
 
 	case pbAuth.DomainType_DOMAIN_TYPE_CANVAS:
-		_, err := uuid.Parse(domainID)
+		orgID, err := uuid.Parse(organizationID)
+		if err != nil {
+			return "", "", fmt.Errorf("invalid organization ID: %s", organizationID)
+		}
+
+		_, err = uuid.Parse(domainID)
 		if err != nil {
 			// Try to find canvas by name if not a valid UUID
-			canvas, err := models.FindCanvasByName(domainID)
+			canvas, err := models.FindCanvasByName(domainID, orgID)
 			if err != nil {
-				return "", "", fmt.Errorf("canvas %s not found", domainID)
+				return "", "", fmt.Errorf("canvas %s not found in organization", domainID)
 			}
 			return models.DomainTypeCanvas, canvas.ID.String(), nil
 		}
 
-		canvas, err := models.FindCanvasByID(domainID)
+		canvas, err := models.FindCanvasByID(domainID, orgID)
 		if err != nil {
-			return "", "", fmt.Errorf("canvas %s not found", domainID)
+			return "", "", fmt.Errorf("canvas %s not found in organization", domainID)
 		}
 
 		return models.DomainTypeCanvas, canvas.ID.String(), nil
@@ -254,12 +267,17 @@ func getOrganizationIdFromRequest(req interface{}) (string, string, error) {
 	return models.DomainTypeOrganization, org.ID.String(), nil
 }
 
-func getCanvasIdFromRequest(req interface{}) (string, string, error) {
+func getCanvasIdFromRequest(req interface{}, organizationID string) (string, string, error) {
+	orgUUID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid organization ID: %s", organizationID)
+	}
+
 	switch r := req.(type) {
 	case interface{ GetCanvasId() string }:
-		_, err := models.FindCanvasByID(r.GetCanvasId())
+		_, err := models.FindCanvasByID(r.GetCanvasId(), orgUUID)
 		if err != nil {
-			return "", "", fmt.Errorf("canvas %s not found", r.GetCanvasId())
+			return "", "", fmt.Errorf("canvas %s not found in organization", r.GetCanvasId())
 		}
 
 		return models.DomainTypeCanvas, r.GetCanvasId(), nil
@@ -268,17 +286,17 @@ func getCanvasIdFromRequest(req interface{}) (string, string, error) {
 		canvasIDOrName := r.GetCanvasIdOrName()
 		_, err := uuid.Parse(canvasIDOrName)
 		if err == nil {
-			_, err := models.FindCanvasByID(canvasIDOrName)
+			_, err := models.FindCanvasByID(canvasIDOrName, orgUUID)
 			if err != nil {
-				return "", "", fmt.Errorf("canvas %s not found", canvasIDOrName)
+				return "", "", fmt.Errorf("canvas %s not found in organization", canvasIDOrName)
 			}
 
 			return models.DomainTypeCanvas, canvasIDOrName, nil
 		}
 
-		canvas, err := models.FindCanvasByName(canvasIDOrName)
+		canvas, err := models.FindCanvasByName(canvasIDOrName, orgUUID)
 		if err != nil {
-			return "", "", fmt.Errorf("canvas %s not found", canvasIDOrName)
+			return "", "", fmt.Errorf("canvas %s not found in organization", canvasIDOrName)
 		}
 
 		return models.DomainTypeCanvas, canvas.ID.String(), nil

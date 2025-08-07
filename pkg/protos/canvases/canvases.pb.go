@@ -1064,9 +1064,8 @@ func (x *EventSource) GetSpec() *EventSource_Spec {
 
 type DescribeStageRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1101,23 +1100,16 @@ func (*DescribeStageRequest) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *DescribeStageRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *DescribeStageRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
 func (x *DescribeStageRequest) GetCanvasIdOrName() string {
 	if x != nil {
 		return x.CanvasIdOrName
+	}
+	return ""
+}
+
+func (x *DescribeStageRequest) GetIdOrName() string {
+	if x != nil {
+		return x.IdOrName
 	}
 	return ""
 }
@@ -1376,9 +1368,8 @@ func (x *ResetEventSourceKeyResponse) GetKey() string {
 
 type DescribeEventSourceRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CanvasIdOrName string                 `protobuf:"bytes,3,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	CanvasIdOrName string                 `protobuf:"bytes,1,opt,name=canvas_id_or_name,json=canvasIdOrName,proto3" json:"canvas_id_or_name,omitempty"`
+	IdOrName       string                 `protobuf:"bytes,2,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1413,23 +1404,16 @@ func (*DescribeEventSourceRequest) Descriptor() ([]byte, []int) {
 	return file_canvases_proto_rawDescGZIP(), []int{16}
 }
 
-func (x *DescribeEventSourceRequest) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *DescribeEventSourceRequest) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
 func (x *DescribeEventSourceRequest) GetCanvasIdOrName() string {
 	if x != nil {
 		return x.CanvasIdOrName
+	}
+	return ""
+}
+
+func (x *DescribeEventSourceRequest) GetIdOrName() string {
+	if x != nil {
+		return x.IdOrName
 	}
 	return ""
 }
@@ -5593,11 +5577,11 @@ const file_canvases_proto_rawDesc = "" +
 	"\tEventType\x12\x12\n" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12,\n" +
 	"\afilters\x18\x02 \x03(\v2\x12.Superplane.FilterR\afilters\x12C\n" +
-	"\x0ffilter_operator\x18\x03 \x01(\x0e2\x1a.Superplane.FilterOperatorR\x0efilterOperator\"e\n" +
-	"\x14DescribeStageRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"@\n" +
+	"\x0ffilter_operator\x18\x03 \x01(\x0e2\x1a.Superplane.FilterOperatorR\x0efilterOperator\"_\n" +
+	"\x14DescribeStageRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x02 \x01(\tR\bidOrName\"@\n" +
 	"\x15DescribeStageResponse\x12'\n" +
 	"\x05stage\x18\x01 \x01(\v2\x11.Superplane.StageR\x05stage\"\x81\x01\n" +
 	"\x18CreateEventSourceRequest\x12:\n" +
@@ -5612,11 +5596,11 @@ const file_canvases_proto_rawDesc = "" +
 	"id_or_name\x18\x02 \x01(\tR\bidOrName\"k\n" +
 	"\x1bResetEventSourceKeyResponse\x12:\n" +
 	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"k\n" +
-	"\x1aDescribeEventSourceRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12)\n" +
-	"\x11canvas_id_or_name\x18\x03 \x01(\tR\x0ecanvasIdOrName\"Y\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\"e\n" +
+	"\x1aDescribeEventSourceRequest\x12)\n" +
+	"\x11canvas_id_or_name\x18\x01 \x01(\tR\x0ecanvasIdOrName\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x02 \x01(\tR\bidOrName\"Y\n" +
 	"\x1bDescribeEventSourceResponse\x12:\n" +
 	"\fevent_source\x18\x01 \x01(\v2\x17.Superplane.EventSourceR\veventSource\"\x91\x01\n" +
 	"\x1cCreateConnectionGroupRequest\x12F\n" +
@@ -5958,7 +5942,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02*A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x012\x9a)\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x012\x81)\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
@@ -5976,11 +5960,11 @@ const file_canvases_proto_rawDesc = "" +
 	"\vCreateStage\x12\x1e.Superplane.CreateStageRequest\x1a\x1f.Superplane.CreateStageResponse\"\xa4\x01\x92Ak\n" +
 	"\x05Stage\x12\x12Create a new stage\x1aNCreates a new stage for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/canvases/{canvas_id_or_name}/stages\x12\xbf\x01\n" +
 	"\x0eDescribeCanvas\x12!.Superplane.DescribeCanvasRequest\x1a\".Superplane.DescribeCanvasResponse\"f\x92AF\n" +
-	"\x06Canvas\x12\x12Get canvas details\x1a(Returns the details of a specific canvas\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/canvases/{id}\x12\xfe\x01\n" +
-	"\rDescribeStage\x12 .Superplane.DescribeStageRequest\x1a!.Superplane.DescribeStageResponse\"\xa7\x01\x92Al\n" +
-	"\x05Stage\x12\x11Get stage details\x1aPReturns the details of a specific stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x022\x120/api/v1/canvases/{canvas_id_or_name}/stages/{id}\x12\xac\x02\n" +
-	"\x13DescribeEventSource\x12&.Superplane.DescribeEventSourceRequest\x1a'.Superplane.DescribeEventSourceResponse\"\xc3\x01\x92A\x80\x01\n" +
-	"\vEventSource\x12\x18Get event source details\x1aWReturns the details of a specific event source (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x029\x127/api/v1/canvases/{canvas_id_or_name}/event-sources/{id}\x12\xd0\x02\n" +
+	"\x06Canvas\x12\x12Get canvas details\x1a(Returns the details of a specific canvas\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/canvases/{id}\x12\xdd\x01\n" +
+	"\rDescribeStage\x12 .Superplane.DescribeStageRequest\x1a!.Superplane.DescribeStageResponse\"\x86\x01\x92AC\n" +
+	"\x05Stage\x12\x11Get stage details\x1a'Returns the details of a specific stage\x82\xd3\xe4\x93\x02:\x128/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}\x12\xb4\x02\n" +
+	"\x13DescribeEventSource\x12&.Superplane.DescribeEventSourceRequest\x1a'.Superplane.DescribeEventSourceResponse\"\xcb\x01\x92A\x80\x01\n" +
+	"\vEventSource\x12\x18Get event source details\x1aWReturns the details of a specific event source (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02A\x12?/api/v1/canvases/{canvas_id_or_name}/event-sources/{id_or_name}\x12\xd0\x02\n" +
 	"\x17DescribeConnectionGroup\x12*.Superplane.DescribeConnectionGroupRequest\x1a+.Superplane.DescribeConnectionGroupResponse\"\xdb\x01\x92A\x8c\x01\n" +
 	"\x0fConnectionGroup\x12\x1cGet connection group details\x1a[Returns the details of a specific connection group (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02E\x12C/api/v1/canvases/{canvas_id_or_name}/connection-groups/{id_or_name}\x12\xf1\x01\n" +
 	"\n" +

@@ -14,26 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.StageIdOrName)
+func ListStageEvents(ctx context.Context, canvasID string, idOrName string, pbStates []pb.StageEvent_State) (*pb.ListStageEventsResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var stage *models.Stage
 	if err != nil {
-		stage, err = canvas.FindStageByName(req.StageIdOrName)
+		stage, err = models.FindStageByName(canvasID, idOrName)
 	} else {
-		stage, err = canvas.FindStageByID(req.StageIdOrName)
+		stage, err = models.FindStageByID(canvasID, idOrName)
 	}
 
 	if err != nil {
@@ -44,7 +31,7 @@ func ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.L
 		return nil, err
 	}
 
-	states, err := validateStageEventStates(req.States)
+	states, err := validateStageEventStates(pbStates)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

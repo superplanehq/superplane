@@ -15,10 +15,25 @@ func Test__InputBuilder(t *testing.T) {
 		Integration: true,
 	})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", "docs-description", []byte("docs-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+	docsSource := models.EventSource{
+		CanvasID: r.Canvas.ID,
+		Name:     "docs",
+		Key:      []byte("docs-key"),
+		Scope:    models.EventSourceScopeExternal,
+	}
+
+	err := docsSource.Create([]models.EventType{}, nil)
 	require.NoError(t, err)
 	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", "tf-description", []byte("tf-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+
+	tfSource := models.EventSource{
+		Name:     "tf",
+		Key:      []byte("tf-key"),
+		Scope:    models.EventSourceScopeExternal,
+		CanvasID: r.Canvas.ID,
+	}
+
+	err = tfSource.Create([]models.EventType{}, nil)
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {
@@ -87,7 +102,7 @@ func Test__InputBuilder(t *testing.T) {
 		executorType, executorSpec, resource := support.Executor(t, r)
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-1").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -195,7 +210,7 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Mock a completed previous execution of the stage
 		//
-		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
+		execution := support.CreateExecutionWithData(t, &docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
 		execution.Finish(stage, models.ResultPassed)
 
 		//

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -22,6 +23,10 @@ import (
 func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 	require.NoError(t, database.TruncateTables())
 
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	// Set test environment variables
 	os.Setenv("GITHUB_CLIENT_ID", "test-client-id")
 	os.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
@@ -29,16 +34,18 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 
 	signer := jwt.NewSigner("test-client-secret")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
-	// Create test user
-	user := &models.User{
-		Name: "Test User",
-	}
+	//
+	// Create org and user
+	//
+	org, err := models.CreateOrganization("test", "test", "")
+	require.NoError(t, err)
+
+	user := &models.User{Name: "Test User", OrganizationID: org.ID}
 	require.NoError(t, user.Create())
 
-	// Create test repo host account
 	account := &models.AccountProvider{
 		UserID:      user.ID,
 		Provider:    "github",
@@ -48,9 +55,9 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 		Name:        "Test User",
 		AccessToken: "encrypted-token",
 	}
+
 	require.NoError(t, account.Create())
 
-	// Generate auth token
 	token, err := signer.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)
 

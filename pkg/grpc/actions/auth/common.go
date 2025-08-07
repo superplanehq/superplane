@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -79,77 +81,26 @@ func SetupTestAuthService(t *testing.T) authorization.Authorization {
 	return authService
 }
 
-func ResolveUserID(userID, userEmail string) (string, error) {
-	if userID == "" && userEmail == "" {
-		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
+func FindUser(org, id, email string) (*models.User, error) {
+	if id == "" && email == "" {
+		return nil, fmt.Errorf("user identifier must be specified")
 	}
 
-	if userID != "" {
-		return resolveByID(userID)
-	}
-
-	return resolveByEmail(userEmail, true)
-}
-
-func ResolveUserIDWithoutCreation(userID, userEmail string) (string, error) {
-	if userID == "" && userEmail == "" {
-		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
-	}
-
-	if userID != "" {
-		return resolveByID(userID)
-	}
-
-	return resolveByEmail(userEmail, false)
-}
-
-func resolveByID(userID string) (string, error) {
-	if err := actions.ValidateUUIDs(userID); err != nil {
-		return "", status.Error(codes.InvalidArgument, "invalid user ID")
-	}
-
-	if _, err := models.FindUserByID(userID); err != nil {
-		return "", status.Error(codes.NotFound, "user not found")
-	}
-
-	return userID, nil
-}
-
-func resolveByEmail(userEmail string, create bool) (string, error) {
-	if !create {
-		user, err := models.FindUserByEmail(userEmail)
-		if err != nil {
-			return "", status.Error(codes.NotFound, "user not found")
-		}
-		return user.ID.String(), nil
-	}
-
-	user, err := findOrCreateUser(userEmail)
+	orgID, err := uuid.Parse(org)
 	if err != nil {
-		return "", err
-	}
-	return user.ID.String(), nil
-}
-
-func findOrCreateUser(email string) (*models.User, error) {
-	if user, err := models.FindUserByEmail(email); err == nil {
-		return user, nil
+		return nil, fmt.Errorf("invalid org ID: %v", err)
 	}
 
-	if user, err := models.FindInactiveUserByEmail(email); err == nil {
-		return user, nil
+	if id != "" {
+		userID, err := uuid.Parse(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %v", err)
+		}
+
+		return models.FindUserByID(orgID, userID)
 	}
 
-	user := &models.User{
-		Name:     email,
-		IsActive: false,
-	}
-
-	if err := user.Create(); err != nil {
-		return nil, status.Error(codes.Internal, "failed to create user")
-	}
-
-	return user, nil
+	return models.FindUserByEmail(email, orgID)
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
@@ -213,7 +164,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 }
 
 func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	dbUser, err := models.FindUserByID(userID)
+	dbUser, err := models.FindUserByIDOnly(userID)
 	if err != nil {
 		return &pb.User{
 			Metadata: &pb.User_Metadata{

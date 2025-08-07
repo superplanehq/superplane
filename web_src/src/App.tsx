@@ -6,9 +6,10 @@ import './App.css'
 // Import pages
 import HomePage from './pages/home'
 import { Canvas } from './pages/canvas'
-import OrganizationPage from './pages/organization'
 import { OrganizationSettings } from './pages/organization/settings'
 import Navigation from './components/Navigation'
+import AuthGuard from './components/AuthGuard'
+import OrganizationLogin from './pages/auth/OrganizationLogin'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -24,12 +25,18 @@ const queryClient = new QueryClient({
 // Get the base URL from environment or default to '/app' for production
 const BASE_PATH = import.meta.env.BASE_URL || '/app'
 
-// Helper function to wrap components with Navigation
-const withNavigation = (Component: React.ComponentType) => (
-  <>
+// Helper function to wrap components with Navigation and Auth Guard
+const withAuthAndNavigation = (Component: React.ComponentType) => (
+  <AuthGuard>
     <Navigation />
     <Component />
-  </>
+  </AuthGuard>
+)
+
+const withAuthOnly = (Component: React.ComponentType) => (
+  <AuthGuard>
+    <Component />
+  </AuthGuard>
 )
 
 // Main App component with router
@@ -38,10 +45,13 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter basename={BASE_PATH}>
         <Routes>
-          <Route path="" element={withNavigation(HomePage)} />
-          <Route path="organization/:orgId" element={withNavigation(OrganizationPage)} />
-          <Route path="organization/:orgId/canvas/:canvasId" element={<Canvas />} />
-          <Route path="organization/:orgId/settings/*" element={withNavigation(OrganizationSettings)} />
+          {/* Public auth routes */}
+          <Route path="auth/login" element={<OrganizationLogin />} />
+          
+          {/* Protected routes */}
+          <Route path="" element={withAuthAndNavigation(HomePage)} />
+          <Route path="canvas/:canvasId" element={withAuthOnly(Canvas)} />
+          <Route path="settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

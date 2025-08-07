@@ -41,7 +41,7 @@ export function CanvasNavigation({
       {/* Back Button */}
       <div className='flex border-r border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900'>
         <Link
-          to={`/organization/${organizationId}`}
+          to={`/`}
           className='px-3 py-1 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-950 dark:text-white'
         >
           <MaterialSymbol size='lg' weight={400} name="arrow_back" />
@@ -66,7 +66,7 @@ export function CanvasNavigation({
             {canvasesData.map((canvas) => (
               <DropdownItem
                 key={canvas.metadata?.id}
-                href={`/organization/${organizationId}/canvas/${canvas.metadata?.id}#${activeView}`}
+                href={`//canvas/${canvas.metadata?.id}#${activeView}`}
               >
                 {canvas.metadata?.name}
               </DropdownItem>

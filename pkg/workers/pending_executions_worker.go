@@ -45,7 +45,7 @@ func (w *PendingExecutionsWorker) Tick() error {
 	}
 
 	for _, execution := range executions {
-		stage, err := models.FindStageByID(execution.StageID.String())
+		stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 		if err != nil {
 			return fmt.Errorf("error finding stage %s: %v", execution.StageID, err)
 		}
@@ -245,7 +245,7 @@ func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitio
 		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, stage.CanvasID)
 	}
 
-	canvas, err := models.FindCanvasByID(stage.CanvasID.String())
+	canvas, err := models.FindCanvasByIDOnly(stage.CanvasID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error finding canvas %s: %v", stage.CanvasID, err)
 	}

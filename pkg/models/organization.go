@@ -1,28 +1,48 @@
 package models
 
 import (
+	"slices"
 	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
 type Organization struct {
-	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name        string    `gorm:"uniqueIndex"`
-	DisplayName string
-	Description string
-	CreatedAt   *time.Time
-	CreatedBy   uuid.UUID
-	UpdatedAt   *time.Time
-	DeletedAt   gorm.DeletedAt `gorm:"index"`
+	ID                  uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name                string    `gorm:"uniqueIndex"`
+	DisplayName         string
+	Description         string
+	AllowedProviders    datatypes.JSONSlice[string]
+	EmailDomainsAllowed datatypes.JSONSlice[string]
+	CreatedAt           *time.Time
+	UpdatedAt           *time.Time
+	DeletedAt           gorm.DeletedAt `gorm:"index"`
 }
 
-func (Organization) TableName() string {
-	return "organizations"
+func (o *Organization) IsProviderAllowed(provider string) bool {
+	return slices.Contains(o.AllowedProviders, provider)
+}
+
+func (o *Organization) IsEmailDomainAllowed(email string) bool {
+	if len(o.EmailDomainsAllowed) == 0 {
+		return true
+	}
+
+	//
+	// TODO: there's a better way to do this
+	//
+	for _, domain := range o.EmailDomainsAllowed {
+		if len(email) >= len(domain) && email[len(email)-len(domain):] == domain {
+			return true
+		}
+	}
+
+	return false
 }
 
 func ListOrganizations() ([]Organization, error) {
@@ -86,15 +106,15 @@ func FindOrganizationByName(name string) (*Organization, error) {
 	return &organization, nil
 }
 
-func CreateOrganization(requesterID uuid.UUID, name, displayName, description string) (*Organization, error) {
+func CreateOrganization(name, displayName, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:        name,
-		DisplayName: displayName,
-		Description: description,
-		CreatedAt:   &now,
-		CreatedBy:   requesterID,
-		UpdatedAt:   &now,
+		Name:             name,
+		DisplayName:      displayName,
+		Description:      description,
+		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub}, // Default to GitHub
+		CreatedAt:        &now,
+		UpdatedAt:        &now,
 	}
 
 	err := database.Conn().

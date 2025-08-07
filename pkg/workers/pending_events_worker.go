@@ -266,7 +266,7 @@ func (w *PendingEventsWorker) handleEventForConnection(tx *gorm.DB, event *model
 }
 
 func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Event, connection models.Connection) error {
-	stage, err := models.FindStageByIDInTransaction(tx, connection.TargetID.String())
+	stage, err := models.FindStageByIDInTransaction(tx, connection.CanvasID.String(), connection.TargetID.String())
 	if err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func (w *PendingEventsWorker) handleEventForStage(tx *gorm.DB, event *models.Eve
 }
 
 func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *models.Event, connection models.Connection) error {
-	connectionGroup, err := models.FindConnectionGroupByIDInTransaction(tx, connection.TargetID)
+	connectionGroup, err := models.FindConnectionGroupByIDInTransaction(tx, connection.CanvasID.String(), connection.TargetID)
 	if err != nil {
 		return err
 	}

@@ -21,7 +21,7 @@ type EventSourceBuilder struct {
 	tx          *gorm.DB
 	ctx         context.Context
 	encryptor   crypto.Encryptor
-	canvas      *models.Canvas
+	canvasID    uuid.UUID
 	name        string
 	description string
 	scope       string
@@ -47,8 +47,8 @@ func (b *EventSourceBuilder) WithContext(ctx context.Context) *EventSourceBuilde
 	return b
 }
 
-func (b *EventSourceBuilder) InCanvas(canvas *models.Canvas) *EventSourceBuilder {
-	b.canvas = canvas
+func (b *EventSourceBuilder) InCanvas(canvasID uuid.UUID) *EventSourceBuilder {
+	b.canvasID = canvasID
 	return b
 }
 
@@ -121,12 +121,21 @@ func (b *EventSourceBuilder) createWithoutIntegration(tx *gorm.DB) (*models.Even
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, id, b.name, b.description, encryptedKey, b.scope, b.eventTypes, nil)
+	source := models.EventSource{
+		ID:          id,
+		CanvasID:    b.canvasID,
+		Name:        b.name,
+		Description: b.description,
+		Scope:       b.scope,
+		Key:         encryptedKey,
+	}
+
+	err = source.CreateInTransaction(tx, b.eventTypes, nil)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return eventSource, plainKey, nil
+	return &source, plainKey, nil
 }
 
 func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSource, string, error) {
@@ -160,12 +169,21 @@ func (b *EventSourceBuilder) createForIntegration(tx *gorm.DB) (*models.EventSou
 		return nil, "", err
 	}
 
-	eventSource, err := b.canvas.CreateEventSourceInTransaction(tx, id, b.name, b.description, encryptedKey, b.scope, b.eventTypes, &resource.ID)
+	source := models.EventSource{
+		ID:          id,
+		CanvasID:    b.canvasID,
+		Name:        b.name,
+		Description: b.description,
+		Scope:       b.scope,
+		Key:         encryptedKey,
+	}
+
+	err = source.CreateInTransaction(tx, b.eventTypes, &resource.ID)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return eventSource, plainKey, nil
+	return &source, plainKey, nil
 }
 
 func (b *EventSourceBuilder) findOrCreateResource(tx *gorm.DB) (*models.Resource, error) {

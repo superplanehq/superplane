@@ -104,7 +104,7 @@ func startInternalAPI(encryptor crypto.Encryptor, authService authorization.Auth
 	grpc.RunServer(encryptor, authService, registry, 50051)
 }
 
-func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier) {
+func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcVerifier *crypto.OIDCVerifier, authService authorization.Authorization) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	basePath := os.Getenv("PUBLIC_API_BASE_PATH")
@@ -114,7 +114,7 @@ func startPublicAPI(encryptor crypto.Encryptor, registry *registry.Registry, jwt
 
 	appEnv := os.Getenv("APP_ENV")
 
-	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv)
+	server, err := public.NewServer(encryptor, registry, jwtSigner, oidcVerifier, basePath, appEnv, authService)
 	if err != nil {
 		log.Panicf("Error creating public API server: %v", err)
 	}
@@ -210,7 +210,7 @@ func main() {
 	registry := registry.NewRegistry(encryptorInstance)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier)
+		go startPublicAPI(encryptorInstance, registry, jwtSigner, oidcVerifier, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {

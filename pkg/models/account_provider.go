@@ -63,6 +63,16 @@ func FindAccountProviderByProviderID(provider, providerID string) (*AccountProvi
 	return &account, err
 }
 
+func FindAccountProviderByProviderIDInOrganization(provider, providerID string, organizationID uuid.UUID) (*AccountProvider, error) {
+	var account AccountProvider
+	err := database.Conn().
+		Joins("JOIN users ON account_providers.user_id = users.id").
+		Where("account_providers.provider = ? AND account_providers.provider_id = ? AND users.organization_id = ?", 
+			provider, providerID, organizationID).
+		First(&account).Error
+	return &account, err
+}
+
 func FindAccountProvidersByUserID(userID uuid.UUID) ([]AccountProvider, error) {
 	var accounts []AccountProvider
 	err := database.Conn().Where("user_id = ?", userID).Find(&accounts).Error

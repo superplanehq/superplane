@@ -36,7 +36,7 @@ func Test__DeleteOrganization(t *testing.T) {
 	})
 
 	t.Run("delete organization by ID -> success", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org-delete", "Test Organization Delete", "Organization to be deleted")
+		organization, err := models.CreateOrganization("test-org-delete", "Test Organization Delete", "Organization to be deleted")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
 
@@ -52,7 +52,7 @@ func Test__DeleteOrganization(t *testing.T) {
 	})
 
 	t.Run("delete organization by name -> success", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org-delete-2", "Test Organization Delete 2", "Organization to be deleted by name")
+		organization, err := models.CreateOrganization("test-org-delete-2", "Test Organization Delete 2", "Organization to be deleted by name")
 		require.NoError(t, err)
 		authService.SetupOrganizationRoles(organization.ID.String())
 
@@ -79,7 +79,7 @@ func Test__DeleteOrganization(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org-delete-3", "Test Organization Delete 3", "Organization for unauthenticated test")
+		organization, err := models.CreateOrganization("test-org-delete-3", "Test Organization Delete 3", "Organization for unauthenticated test")
 		require.NoError(t, err)
 
 		_, err = DeleteOrganization(context.Background(), &protos.DeleteOrganizationRequest{

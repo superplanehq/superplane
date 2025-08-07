@@ -50,7 +50,7 @@ export function CreateGroupPage() {
         description: groupDescription
       })
 
-      navigate(`/organization/${orgId}/settings/groups`)
+      navigate(`/settings/groups`)
     } catch {
       setError('Failed to create group. Please try again.')
     } finally {
@@ -79,7 +79,7 @@ export function CreateGroupPage() {
               items={[
                 {
                   label: 'Groups',
-                  onClick: () => navigate(`/organization/${orgId}/settings/groups`)
+                  onClick: () => navigate(`/settings/groups`)
                 },
                 {
                   label: 'Create new group',
@@ -160,7 +160,7 @@ export function CreateGroupPage() {
                           Create a role first to assign it to this group.
                         </p>
                         <Link
-                          to={`/organization/${orgId}/settings/create-role`}
+                          to={`/settings/create-role`}
                           className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
                         >
                           <MaterialSymbol name="add" size="sm" />

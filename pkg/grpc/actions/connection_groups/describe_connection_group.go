@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	uuid "github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -15,29 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeConnectionGroup(ctx context.Context, req *pb.DescribeConnectionGroupRequest) (*pb.DescribeConnectionGroupResponse, error) {
-	// Find canvas
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "canvas not found")
-	}
-
-	// Find connection group
-	logger := logging.ForCanvas(canvas)
-	err = actions.ValidateUUIDs(req.IdOrName)
+func DescribeConnectionGroup(ctx context.Context, canvasID string, idOrName string) (*pb.DescribeConnectionGroupResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var connectionGroup *models.ConnectionGroup
 	if err != nil {
-		connectionGroup, err = canvas.FindConnectionGroupByName(req.IdOrName)
+		connectionGroup, err = models.FindConnectionGroupByName(canvasID, idOrName)
 	} else {
-		connectionGroup, err = canvas.FindConnectionGroupByID(uuid.MustParse(req.IdOrName))
+		connectionGroup, err = models.FindConnectionGroupByID(canvasID, uuid.MustParse(idOrName))
 	}
 
 	if err != nil {
@@ -45,7 +29,7 @@ func DescribeConnectionGroup(ctx context.Context, req *pb.DescribeConnectionGrou
 			return nil, status.Error(codes.NotFound, "connection group not found")
 		}
 
-		logger.Errorf("Error describing connection group. Request: %v. Error: %v", req, err)
+		log.Errorf("Error describing connection group %s in canvas %s. Error: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 

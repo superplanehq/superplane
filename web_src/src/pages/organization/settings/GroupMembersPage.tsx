@@ -66,7 +66,7 @@ export function GroupMembersPage() {
 
 
   const handleBackToGroups = () => {
-    navigate(`/organization/${orgId}/settings/groups`)
+    navigate(`/settings/groups`)
   }
 
   const handleEditGroupName = () => {

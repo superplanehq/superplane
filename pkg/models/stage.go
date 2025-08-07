@@ -192,11 +192,48 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-func FindStageByID(id string) (*Stage, error) {
-	return FindStageByIDInTransaction(database.Conn(), id)
+func ListStages(canvasID string) ([]Stage, error) {
+	var stages []Stage
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Order("name ASC").
+		Find(&stages).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
 }
 
-func FindStageByIDInTransaction(tx *gorm.DB, id string) (*Stage, error) {
+func FindStageByID(canvasID string, id string) (*Stage, error) {
+	return FindStageByIDInTransaction(database.Conn(), canvasID, id)
+}
+
+func FindStageByIDInTransaction(tx *gorm.DB, canvasID string, id string) (*Stage, error) {
+	var stage Stage
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("id = ?", id).
+		First(&stage).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &stage, nil
+}
+
+// TODO: review the usage of this method and remove if possible
+func FindStageByIDOnly(id string) (*Stage, error) {
+	return FindStageByIDOnlyInTransaction(database.Conn(), id)
+}
+
+func FindStageByIDOnlyInTransaction(tx *gorm.DB, id string) (*Stage, error) {
 	var stage Stage
 
 	err := tx.
@@ -217,6 +254,22 @@ func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
 	err := database.Conn().
 		Where("canvas_id = ?", canvasID).
 		Where("id = ?", id).
+		First(&stage).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &stage, nil
+}
+
+func FindStageByName(canvasID string, name string) (*Stage, error) {
+	var stage Stage
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("name = ?", name).
 		First(&stage).
 		Error
 
@@ -281,6 +334,7 @@ func (s *Stage) FindIntegration() (*Integration, error) {
 func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
 	connection.TargetID = s.ID
 	connection.TargetType = ConnectionTargetTypeStage
+	connection.CanvasID = s.CanvasID
 	return tx.Create(&connection).Error
 }
 

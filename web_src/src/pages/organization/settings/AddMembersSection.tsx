@@ -1,4 +1,5 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '../../../components/Button/button'
 import { Textarea } from '../../../components/Textarea/textarea'
 import { Input, InputGroup } from '../../../components/Input/input'
@@ -16,6 +17,15 @@ import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symb
 import { Text } from '../../../components/Text/text'
 import { Field, Label } from '../../../components/Fieldset/fieldset'
 import { Tabs, type Tab } from '../../../components/Tabs/tabs'
+import { Badge } from '../../../components/Badge/badge'
+import {
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableHeader,
+  TableCell
+} from '../../../components/Table/table'
 import {
   useOrganizationUsers,
   useOrganizationRoles,
@@ -24,6 +34,15 @@ import {
   useAddUserToGroup
 } from '../../../hooks/useOrganizationData'
 import Papa from 'papaparse'
+
+interface Invitation {
+  id: string
+  organizationId: string
+  email: string
+  status: 'pending' | 'accepted' | 'expired'
+  expiresAt: string
+  createdAt: string
+}
 
 interface AddMembersSectionProps {
   showRoleSelection?: boolean
@@ -46,17 +65,67 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
     const [emailRole, setEmailRole] = useState('')
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [memberSearchTerm, setMemberSearchTerm] = useState('')
+    const [invitationError, setInvitationError] = useState<string | null>(null)
+    const queryClient = useQueryClient()
 
     // React Query hooks
     const { data: roles = [], isLoading: loadingRoles, error: rolesError } = useOrganizationRoles(organizationId)
     const { data: orgUsers = [], isLoading: loadingOrgUsers, error: orgUsersError } = useOrganizationUsers(organizationId)
     const { data: groupUsers = [], isLoading: loadingGroupUsers, error: groupUsersError } = useOrganizationGroupUsers(organizationId, groupName || '')
+    
+    // Fetch pending invitations - only when not in group context
+    const { data: invitations = [], isLoading: loadingInvitations } = useQuery<Invitation[]>({
+      queryKey: ['invitations', organizationId],
+      queryFn: async () => {
+        const response = await fetch(`/api/v1/organizations/${organizationId}/invitations`, {
+          credentials: 'include',
+        })
+        if (!response.ok) {
+          throw new Error('Failed to fetch invitations')
+        }
+        const data = await response.json()
+        return data.invitations || []
+      },
+      enabled: !groupName, // Only fetch invitations when not in group context
+    })
 
     // Mutations
     const assignRoleMutation = useAssignRole(organizationId)
     const addUserToGroupMutation = useAddUserToGroup(organizationId)
+    
+    // Create invitation mutation
+    const createInvitationMutation = useMutation({
+      mutationFn: async (email: string) => {
+        const response = await fetch(`/api/v1/organizations/${organizationId}/invitations`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: email,
+            organization_id: organizationId,
+          }),
+        })
 
-    const isInviting = assignRoleMutation.isPending || addUserToGroupMutation.isPending
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Failed to send invitation')
+        }
+
+        return response.json()
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['invitations', organizationId] })
+        setInvitationError(null)
+        onMemberAdded?.()
+      },
+      onError: (error: Error) => {
+        setInvitationError(error.message)
+      },
+    })
+
+    const isInviting = assignRoleMutation.isPending || addUserToGroupMutation.isPending || createInvitationMutation.isPending
     const error = rolesError || orgUsersError || groupUsersError
 
     const addMembersTabs: Tab[] = [
@@ -183,11 +252,8 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               organizationId
             })
           } else {
-            // Add user to organization with role
-            await assignRoleMutation.mutateAsync({
-              userEmail: email,
-              roleName: roleToAssign,
-            })
+            // For organization-level, send invitation instead of directly adding user
+            await createInvitationMutation.mutateAsync(email)
           }
         }
 
@@ -225,14 +291,10 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
               organizationId
             })
           } else {
-            // Add user to organization with role
-            await assignRoleMutation.mutateAsync({
-              userEmail: email,
-              roleName: roleToAssign
-            })
+            // For organization-level, send invitation instead of directly adding user
+            await createInvitationMutation.mutateAsync(email)
           }
         }
-
 
         setEmailsInput('')
         const defaultRole = roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || ''
@@ -311,6 +373,38 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
       }
     }
 
+    const getStatusBadge = (status: string) => {
+      switch (status) {
+        case 'pending':
+          return <Badge color="yellow">Pending</Badge>
+        case 'accepted':
+          return <Badge color="green">Accepted</Badge>
+        case 'expired':
+          return <Badge color="red">Expired</Badge>
+        default:
+          return <Badge color="gray">{status}</Badge>
+      }
+    }
+
+    const formatDate = (dateString: string) => {
+      if (!dateString) return 'N/A'
+      
+      const date = new Date(dateString)
+      
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString)
+        return 'Invalid Date'
+      }
+      
+      return date.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    }
+
     return (
       <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
         <div className="flex items-center justify-between mb-4">
@@ -321,9 +415,11 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           </div>
         </div>
 
-        {error && (
+        {(error || invitationError) && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-            <p className="text-sm">{error instanceof Error ? error.message : 'Failed to fetch data'}</p>
+            <p className="text-sm">
+              {error instanceof Error ? error.message : error ? 'Failed to fetch data' : invitationError}
+            </p>
           </div>
         )}
 
@@ -383,7 +479,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 disabled={!emailsInput.trim() || isInviting || (!groupName && showRoleSelection && !emailRole)}
               >
                 <MaterialSymbol name="add" size="sm" />
-                {isInviting ? 'Adding...' : (groupName ? 'Add to Group' : 'Invite')}
+                {isInviting ? (groupName ? 'Adding...' : 'Inviting...') : (groupName ? 'Add to Group' : 'Send Invitation')}
               </Button>
             </div>
           </div>
@@ -551,7 +647,7 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                 className="flex items-center gap-2"
               >
                 <MaterialSymbol name="add" size="sm" />
-                {isInviting ? 'Processing...' : (groupName ? 'Add to Group' : 'Invite')}
+                {isInviting ? (groupName ? 'Processing...' : 'Sending Invitations...') : (groupName ? 'Add to Group' : 'Send Invitations')}
               </Button>
             </div>
           </div >
@@ -567,6 +663,63 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
             </div>
           )
         }
+
+        {/* Pending Invitations - only show when not in group context */}
+        {!groupName && (
+          <div className="mt-8 pt-6 border-t border-zinc-200 dark:border-zinc-700">
+            <Text className="font-semibold text-zinc-900 dark:text-white mb-4">
+              Pending Invitations
+            </Text>
+            
+            {loadingInvitations ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto"></div>
+                <Text className="mt-2 text-zinc-500 dark:text-zinc-400">Loading invitations...</Text>
+              </div>
+            ) : invitations && invitations.length > 0 ? (
+              <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                <Table dense>
+                  <TableHead>
+                    <TableRow>
+                      <TableHeader>Email</TableHeader>
+                      <TableHeader>Status</TableHeader>
+                      <TableHeader>Sent</TableHeader>
+                      <TableHeader>Expires</TableHeader>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {invitations.map((invitation) => (
+                      <TableRow key={invitation.id}>
+                        <TableCell>
+                          <Text className="font-medium">{invitation.email}</Text>
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(invitation.status)}
+                        </TableCell>
+                        <TableCell>
+                          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                            {formatDate(invitation.createdAt)}
+                          </Text>
+                        </TableCell>
+                        <TableCell>
+                          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                            {formatDate(invitation.expiresAt)}
+                          </Text>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                <Text className="text-zinc-500 dark:text-zinc-400">
+                  No pending invitations
+                </Text>
+              </div>
+            )}
+          </div>
+        )}
       </div >
     )
   })

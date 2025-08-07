@@ -9,13 +9,13 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Name      string    `json:"name"`
-	IsActive  bool      `json:"is_active" gorm:"default:false"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-
-	AccountProviders []AccountProvider `json:"account_providers,omitempty" gorm:"foreignKey:UserID"`
+	ID             uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID uuid.UUID `json:"organization_id" gorm:"type:uuid;not null;index"`
+	Email          string    `json:"email" gorm:"index:idx_users_email_org,unique"`
+	Name           string    `json:"name"`
+	IsActive       bool      `json:"is_active" gorm:"default:false"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
@@ -33,7 +33,8 @@ func (u *User) Update() error {
 	return database.Conn().Save(u).Error
 }
 
-func FindUserByID(id string) (*User, error) {
+// TODO: check this function usage and remove if possible
+func FindUserByIDOnly(id string) (*User, error) {
 	var user User
 	userUUID, err := uuid.Parse(id)
 	if err != nil {
@@ -44,31 +45,65 @@ func FindUserByID(id string) (*User, error) {
 	return &user, err
 }
 
+func FindUserByID(id, organizationID uuid.UUID) (*User, error) {
+	var user User
+
+	err := database.Conn().
+		Where("id = ?", id).
+		Where("organization_id = ?", organizationID).
+		First(&user).
+		Error
+
+	return &user, err
+}
+
 func FindUserByProviderId(providerId, provider string) (*User, error) {
 	var user User
+
 	err := database.Conn().
 		Joins("JOIN account_providers ON users.id = account_providers.user_id").
-		Where("account_providers.provider_id = ? AND account_providers.provider = ?", providerId, provider).
+		Where("account_providers.provider_id = ?", providerId).
+		Where("account_providers.provider = ?", provider).
 		First(&user).Error
+
 	return &user, err
 }
 
-func FindUserByEmail(email string) (*User, error) {
+func FindUserByEmail(email string, organizationID uuid.UUID) (*User, error) {
 	var user User
+
 	err := database.Conn().
-		Joins("JOIN account_providers ON users.id = account_providers.user_id").
-		Where("account_providers.email = ? AND account_providers.email != '' AND account_providers.email IS NOT NULL", email).
-		First(&user).Error
+		Where("organization_id = ?", organizationID).
+		Where("email = ?", email).
+		First(&user).
+		Error
+
 	return &user, err
 }
 
-// FindInactiveUserByEmail finds an inactive user by email (used for pre-invited users)
-func FindInactiveUserByEmail(email string) (*User, error) {
+func FindInactiveUserByEmail(email string, organizationID uuid.UUID) (*User, error) {
 	var user User
+
 	err := database.Conn().
-		Where("name = ? AND is_active = false", email).
-		First(&user).Error
+		Where("email = ?", email).
+		Where("organization_id = ?", organizationID).
+		Where("is_active = false").
+		First(&user).
+		Error
+
 	return &user, err
+}
+
+func ListUsersInOrganization(organizationID uuid.UUID) ([]User, error) {
+	var users []User
+
+	err := database.Conn().
+		Where("organization_id = ?", organizationID).
+		Order("name ASC").
+		Find(&users).
+		Error
+
+	return users, err
 }
 
 func (u *User) GetAccountProviders() ([]AccountProvider, error) {
@@ -82,4 +117,17 @@ func (u *User) GetAccountProvider(provider string) (*AccountProvider, error) {
 func (u *User) HasAccountProvider(provider string) bool {
 	_, err := u.GetAccountProvider(provider)
 	return err == nil
+}
+
+func FindUserOrganizationsByEmail(email string) ([]Organization, error) {
+	var organizations []Organization
+
+	err := database.Conn().
+		Table("organizations").
+		Joins("JOIN users ON organizations.id = users.organization_id").
+		Where("users.email = ? AND users.is_active = true", email).
+		Find(&organizations).
+		Error
+
+	return organizations, err
 }

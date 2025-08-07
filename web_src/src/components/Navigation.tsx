@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import { Avatar } from './Avatar/avatar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from './Dropdown/dropdown';
 import { Text } from './Text/text';
@@ -9,10 +8,9 @@ import { useOrganization } from '../hooks/useOrganizationData';
 import { useUserStore } from '../stores/userStore';
 
 const Navigation: React.FC = () => {
-  const { orgId } = useParams<{ orgId?: string }>();
-  const { user, fetchUser } = useUserStore();
+  const { user, fetchUser, clearUser } = useUserStore();
 
-  const { data: organization } = useOrganization(orgId || '');
+  const { data: organization } = useOrganization(user?.organization_id || '');
 
   useEffect(() => {
     fetchUser();
@@ -78,9 +76,8 @@ const Navigation: React.FC = () => {
                 </DropdownItem>
               </DropdownSection>
 
-              {/* Organization Section - Only show when in organization context */}
-              {orgId && (
-                <>
+              {/* Organization Section */}
+              <>
                   <DropdownDivider />
 
                   <DropdownHeader>
@@ -98,33 +95,34 @@ const Navigation: React.FC = () => {
 
                   {/* Organization Actions */}
                   <DropdownSection>
-                    <DropdownItem href={`/organization/${orgId}/settings/general`}>
+                    <DropdownItem href="/settings/general">
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="business" data-slot="icon" size='sm' />
                         <DropdownLabel>Organization Settings</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href={`/organization/${orgId}/settings/members`}>
+                    <DropdownItem href="/settings/members">
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="person" data-slot="icon" size='sm' />
                         <DropdownLabel>Members</DropdownLabel>
                       </span>
                     </DropdownItem>
-                    <DropdownItem href={`/organization/${orgId}/settings/groups`}>
+
+                    <DropdownItem href="/settings/groups">
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="group" data-slot="icon" size='sm' />
                         <DropdownLabel>Groups</DropdownLabel>
                       </span>
                     </DropdownItem>
-                    <DropdownItem href={`/organization/${orgId}/settings/roles`}>
+                    <DropdownItem href="/settings/roles">
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="shield" data-slot="icon" size='sm' />
                         <DropdownLabel>Roles</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href={`/organization/${orgId}/settings/billing`}>
+                    <DropdownItem href="/settings/billing">
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
                         <DropdownLabel>Billing & Plans</DropdownLabel>
@@ -132,13 +130,16 @@ const Navigation: React.FC = () => {
                     </DropdownItem>
                   </DropdownSection>
                 </>
-              )}
 
               <DropdownDivider />
 
               {/* Sign Out Section */}
               <DropdownSection>
-                <DropdownItem onClick={() => {}}>
+                <DropdownItem onClick={() => {
+                  // Clear user from store and redirect to login
+                  clearUser();
+                  window.location.href = '/logout';
+                }}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="logout" data-slot="icon" size='sm' />
                     <DropdownLabel>Sign Out</DropdownLabel>

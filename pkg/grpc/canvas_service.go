@@ -37,15 +37,18 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 }
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
-	return canvases.DeleteCanvas(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.DeleteCanvas(ctx, orgID, req, s.authorizationService)
 }
 
 func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
-	return canvases.DescribeCanvas(ctx, req)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.DescribeCanvas(ctx, orgID, req)
 }
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
-	return canvases.ListCanvases(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return canvases.ListCanvases(ctx, orgID, req, s.authorizationService)
 }
 
 //
@@ -59,17 +62,17 @@ func (s *CanvasService) CreateEventSource(ctx context.Context, req *pb.CreateEve
 
 func (s *CanvasService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return eventsources.DescribeEventSource(ctx, canvasID, req)
+	return eventsources.DescribeEventSource(ctx, canvasID, req.IdOrName)
 }
 
 func (s *CanvasService) ResetEventSourceKey(ctx context.Context, req *pb.ResetEventSourceKeyRequest) (*pb.ResetEventSourceKeyResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return eventsources.ResetEventSourceKey(ctx, s.encryptor, canvasID, req)
+	return eventsources.ResetEventSourceKey(ctx, s.encryptor, canvasID, req.IdOrName)
 }
 
 func (s *CanvasService) ListEventSources(ctx context.Context, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return eventsources.ListEventSources(ctx, canvasID, req)
+	return eventsources.ListEventSources(ctx, canvasID)
 }
 
 //
@@ -77,27 +80,33 @@ func (s *CanvasService) ListEventSources(ctx context.Context, req *pb.ListEventS
 //
 
 func (s *CanvasService) CreateStage(ctx context.Context, req *pb.CreateStageRequest) (*pb.CreateStageResponse, error) {
-	return stages.CreateStage(ctx, s.encryptor, s.registry, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.CreateStage(ctx, s.encryptor, s.registry, canvasID, req.Stage)
 }
 
 func (s *CanvasService) DescribeStage(ctx context.Context, req *pb.DescribeStageRequest) (*pb.DescribeStageResponse, error) {
-	return stages.DescribeStage(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.DescribeStage(ctx, canvasID, req.IdOrName)
 }
 
 func (s *CanvasService) UpdateStage(ctx context.Context, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
-	return stages.UpdateStage(ctx, s.encryptor, s.registry, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.UpdateStage(ctx, s.encryptor, s.registry, canvasID, req.IdOrName, req.Stage)
 }
 
 func (s *CanvasService) ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
-	return stageevents.ApproveStageEvent(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stageevents.ApproveStageEvent(ctx, canvasID, req.StageIdOrName, req.EventId)
 }
 
 func (s *CanvasService) ListStages(ctx context.Context, req *pb.ListStagesRequest) (*pb.ListStagesResponse, error) {
-	return stages.ListStages(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stages.ListStages(ctx, canvasID)
 }
 
 func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEventsRequest) (*pb.ListStageEventsResponse, error) {
-	return stageevents.ListStageEvents(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return stageevents.ListStageEvents(ctx, canvasID, req.StageIdOrName, req.States)
 }
 
 //
@@ -105,21 +114,26 @@ func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEv
 //
 
 func (s *CanvasService) CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
-	return groups.CreateConnectionGroup(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.CreateConnectionGroup(ctx, canvasID, req)
 }
 
 func (s *CanvasService) UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupRequest) (*pb.UpdateConnectionGroupResponse, error) {
-	return groups.UpdateConnectionGroup(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.UpdateConnectionGroup(ctx, canvasID, req.IdOrName, req.ConnectionGroup)
 }
 
 func (s *CanvasService) DescribeConnectionGroup(ctx context.Context, req *pb.DescribeConnectionGroupRequest) (*pb.DescribeConnectionGroupResponse, error) {
-	return groups.DescribeConnectionGroup(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.DescribeConnectionGroup(ctx, canvasID, req.IdOrName)
 }
 
 func (s *CanvasService) ListConnectionGroups(ctx context.Context, req *pb.ListConnectionGroupsRequest) (*pb.ListConnectionGroupsResponse, error) {
-	return groups.ListConnectionGroups(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.ListConnectionGroups(ctx, canvasID)
 }
 
 func (s *CanvasService) ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
-	return groups.ListConnectionGroupFieldSets(ctx, req)
+	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return groups.ListConnectionGroupFieldSets(ctx, canvasID, req.IdOrName)
 }

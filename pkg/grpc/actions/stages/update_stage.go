@@ -21,30 +21,30 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, req *pb.UpdateStageRequest) (*pb.UpdateStageResponse, error) {
+func UpdateStage(
+	ctx context.Context,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	canvasID string,
+	idOrName string,
+	stage *pb.Stage,
+) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.IdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
+	canvas, err := models.FindCanvasByIDOnly(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
-	err = actions.ValidateUUIDs(req.IdOrName)
-	var stage *models.Stage
+	err = actions.ValidateUUIDs(idOrName)
+	var existingStage *models.Stage
 	if err != nil {
-		stage, err = canvas.FindStageByName(req.IdOrName)
+		existingStage, err = models.FindStageByName(canvasID, idOrName)
 	} else {
-		stage, err = canvas.FindStageByID(req.IdOrName)
+		existingStage, err = models.FindStageByID(canvasID, idOrName)
 	}
 
 	if err != nil {
@@ -55,28 +55,28 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, err
 	}
 
-	if req.Stage == nil || req.Stage.Spec == nil {
+	if stage == nil || stage.Spec == nil {
 		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
 	}
 
-	if req.Stage.Metadata != nil && req.Stage.Metadata.Name != "" && req.Stage.Metadata.Name != stage.Name {
-		_, err := canvas.FindStageByName(req.Stage.Metadata.Name)
+	if stage.Metadata != nil && stage.Metadata.Name != "" && stage.Metadata.Name != existingStage.Name {
+		_, err := models.FindStageByName(canvasID, stage.Metadata.Name)
 		if err == nil {
 			return nil, status.Error(codes.InvalidArgument, "stage name already in use")
 		}
-		stage.Name = req.Stage.Metadata.Name
+		existingStage.Name = stage.Metadata.Name
 	}
 
-	if req.Stage.Metadata != nil && req.Stage.Metadata.Description != "" {
-		stage.Description = req.Stage.Metadata.Description
+	if stage.Metadata != nil && stage.Metadata.Description != "" {
+		existingStage.Description = stage.Metadata.Description
 	}
 
 	//
 	// It is OK to create a stage without an integration.
 	//
 	var integration *models.Integration
-	if req.Stage.Spec != nil && req.Stage.Spec.Executor != nil && req.Stage.Spec.Executor.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.Stage.Spec.Executor.Integration)
+	if stage.Spec != nil && stage.Spec.Executor != nil && stage.Spec.Executor.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, stage.Spec.Executor.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -87,17 +87,17 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, registry, integration, req.Stage.Spec.Executor.Resource)
+		resource, err = actions.ValidateResource(ctx, registry, integration, stage.Spec.Executor.Resource)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	inputValidator := inputs.NewValidator(
-		inputs.WithInputs(req.Stage.Spec.Inputs),
-		inputs.WithOutputs(req.Stage.Spec.Outputs),
-		inputs.WithInputMappings(req.Stage.Spec.InputMappings),
-		inputs.WithConnections(req.Stage.Spec.Connections),
+		inputs.WithInputs(stage.Spec.Inputs),
+		inputs.WithOutputs(stage.Spec.Outputs),
+		inputs.WithInputMappings(stage.Spec.InputMappings),
+		inputs.WithConnections(stage.Spec.Connections),
 	)
 
 	err = inputValidator.Validate()
@@ -105,33 +105,33 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	connections, err := actions.ValidateConnections(canvas, req.Stage.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvas.ID.String(), stage.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	conditions, err := validateConditions(req.Stage.Spec.Conditions)
+	conditions, err := validateConditions(stage.Spec.Conditions)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	secrets, err := validateSecrets(ctx, encryptor, canvas, req.Stage.Spec.Secrets)
+	secrets, err := validateSecrets(ctx, encryptor, canvas, stage.Spec.Secrets)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	executorSpec, err := req.Stage.Spec.Executor.Spec.MarshalJSON()
+	executorSpec, err := stage.Spec.Executor.Spec.MarshalJSON()
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "failed to marshal executor spec: %v", err)
 	}
 
-	stage, err = builders.NewStageBuilder(registry).
+	newStage, err := builders.NewStageBuilder(registry).
 		WithContext(ctx).
-		WithExistingStage(stage).
-		WithName(stage.Name).
-		WithDescription(stage.Description).
+		WithExistingStage(existingStage).
+		WithName(existingStage.Name).
+		WithDescription(existingStage.Description).
 		WithEncryptor(encryptor).
-		InCanvas(canvas).
+		InCanvas(canvas.ID).
 		WithRequester(uuid.MustParse(userID)).
 		WithConditions(conditions).
 		WithConnections(connections).
@@ -139,7 +139,7 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		WithInputMappings(inputValidator.SerializeInputMappings()).
 		WithOutputs(inputValidator.SerializeOutputs()).
 		WithSecrets(secrets).
-		WithExecutorType(req.Stage.Spec.Executor.Type).
+		WithExecutorType(stage.Spec.Executor.Type).
 		WithExecutorSpec(executorSpec).
 		ForResource(resource).
 		ForIntegration(integration).
@@ -153,17 +153,12 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		return nil, err
 	}
 
-	stage, err = canvas.FindStageByID(stage.ID.String())
-	if err != nil {
-		return nil, err
-	}
-
 	serialized, err := serializeStage(
-		*stage,
-		req.Stage.Spec.Connections,
-		req.Stage.Spec.Inputs,
-		req.Stage.Spec.Outputs,
-		req.Stage.Spec.InputMappings,
+		*newStage,
+		stage.Spec.Connections,
+		stage.Spec.Inputs,
+		stage.Spec.Outputs,
+		stage.Spec.InputMappings,
 	)
 
 	if err != nil {
@@ -174,10 +169,10 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 		Stage: serialized,
 	}
 
-	err = messages.NewStageCreatedMessage(stage).Publish()
+	err = messages.NewStageCreatedMessage(newStage).Publish()
 
 	if err != nil {
-		logging.ForStage(stage).Errorf("failed to publish stage created message: %v", err)
+		logging.ForStage(newStage).Errorf("failed to publish stage created message: %v", err)
 	}
 
 	return response, nil

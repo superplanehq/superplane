@@ -262,7 +262,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		internalName := support.RandomName("internal")
 		internalSource, _, err := builders.NewEventSourceBuilder(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName(internalName).
 			WithScope(models.EventSourceScopeInternal).
 			ForIntegration(r.Integration).
@@ -311,7 +311,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Verify that internal source was updated to be external
 		//
-		_, err = models.FindEventSourceByName(internalSource.Name)
+		_, err = models.FindEventSourceByName(r.Canvas.ID.String(), internalSource.Name)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		source, err := models.FindEventSource(internalSource.ID)
 		require.NoError(t, err)
