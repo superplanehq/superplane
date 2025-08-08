@@ -16,13 +16,35 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean } | null>(null);
-  const [connectionGroupName, setConnectionGroupName] = useState(props.data.name);
+  const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
+  const [nameError, setNameError] = useState<string | null>(null);
   const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
+  const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
     state.connectionGroups.find(cg => cg.metadata?.id === props.id)
   );
+
+  const validateConnectionGroupName = (name: string) => {
+    if (!name || name.trim() === '') {
+      setNameError('Connection group name is required');
+      return false;
+    }
+
+    const isDuplicate = allConnectionGroups.some(cg =>
+      cg.metadata?.name?.toLowerCase() === name.toLowerCase() &&
+      cg.metadata?.id !== props.id
+    );
+
+    if (isDuplicate) {
+      setNameError('A connection group with this name already exists');
+      return false;
+    }
+
+    setNameError(null);
+    return true;
+  };
 
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
@@ -40,6 +62,10 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   const handleSaveConnectionGroup = async (saveAsDraft = false) => {
     if (!currentFormData || !currentConnectionGroup) {
+      return;
+    }
+
+    if (!validateConnectionGroupName(connectionGroupName)) {
       return;
     }
 
@@ -148,6 +174,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   const handleConnectionGroupNameChange = (newName: string) => {
     setConnectionGroupName(newName);
+    validateConnectionGroupName(newName);
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
@@ -247,9 +274,17 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
                 value={connectionGroupName}
                 onSave={handleConnectionGroupNameChange}
                 placeholder="Connection group name"
-                className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1"
+                className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
+                  }`}
                 isEditMode={isEditMode}
+                autoFocus={!!isNewNode && !props.data.name}
+                dataTestId="connection-group-name-input"
               />
+              {nameError && isEditMode && (
+                <div className="text-xs text-red-600 mt-1 px-2">
+                  {nameError}
+                </div>
+              )}
             </div>
             <div>
               <InlineEditable

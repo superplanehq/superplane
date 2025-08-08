@@ -185,28 +185,16 @@ export function Canvas() {
   };
 
   const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
-    const stageNames = {
-      semaphore: 'Semaphore Stage',
-      github: 'GitHub Stage',
-      http: 'HTTP Stage'
-    };
-
-    const eventNames = {
-      webhook: 'Webhook Event Source',
-      semaphore: 'Semaphore Event Source',
-      github: 'GitHub Event Source'
-    };
-
     switch (nodeType) {
       case 'stage':
         return executorType ? {
-          name: stageNames[executorType as keyof typeof stageNames] || 'New Stage',
+          name: '',
           executorType
         } : undefined;
 
       case 'event_source':
         return eventSourceType ? {
-          name: eventNames[eventSourceType as keyof typeof eventNames] || 'New Event Source',
+          name: '',
           eventSourceType
         } : undefined;
 

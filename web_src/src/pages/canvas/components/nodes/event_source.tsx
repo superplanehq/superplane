@@ -29,12 +29,36 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     description: props.data.description || '',
     spec: {}
   });
-  const [eventSourceName, setEventSourceName] = useState(props.data.name);
+  const [eventSourceName, setEventSourceName] = useState(props.data.name || '');
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
   const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
+  const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
   );
+
+  const validateEventSourceName = (name: string) => {
+    if (!name || name.trim() === '') {
+      setNameError('Event source name is required');
+      return false;
+    }
+
+    const isDuplicate = allEventSources.some(es =>
+      es.metadata?.name?.toLowerCase() === name.toLowerCase() &&
+      es.metadata?.id !== props.id
+    );
+
+    if (isDuplicate) {
+      setNameError('An event source with this name already exists');
+      return false;
+    }
+
+    setNameError(null);
+    return true;
+  };
+
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const organizationId = orgId || '';
@@ -52,10 +76,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       return;
     }
 
+    if (!validateEventSourceName(eventSourceName)) {
+      return;
+    }
+
     const isTemporaryId = currentEventSource.metadata?.id && /^\d+$/.test(currentEventSource.metadata.id);
     const isNewEventSource = !currentEventSource.metadata?.id || isTemporaryId;
 
     try {
+      // Clear any previous errors
+      setApiError(null);
+
       if (isNewEventSource && !saveAsDraft) {
 
         const result = await createEventSourceMutation.mutateAsync({
@@ -89,7 +120,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       setEditingEventSource(null);
       setCurrentFormData(null);
     } catch (error) {
-      console.error(`Failed to ${isNewEventSource ? 'create' : 'update'} event source:`, error);
+      setApiError(((error as Error)?.message) || error?.toString() || 'An error occurred');
     }
   };
 
@@ -111,6 +142,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
 
   const handleEventSourceNameChange = (newName: string) => {
     setEventSourceName(newName);
+    validateEventSourceName(newName);
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
@@ -196,9 +228,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 value={eventSourceName}
                 onSave={handleEventSourceNameChange}
                 placeholder="Event source name"
-                className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1"
+                className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
+                  }`}
                 isEditMode={isEditMode}
+                autoFocus={!!isNewNode && !props.data.name}
+                dataTestId="event-source-name-input"
               />
+              {nameError && isEditMode && (
+                <div className="text-xs text-red-600 text-left mt-1 px-2">
+                  {nameError}
+                </div>
+              )}
             </div>
             <div>
               <InlineEditable
@@ -226,7 +266,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           canvasId={canvasId}
           organizationId={organizationId}
           eventSourceType={eventSourceType}
-          onDataChange={({ spec }) => { if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) setCurrentFormData(prev => ({ ...prev!, spec })) }}
+          onDataChange={({ spec }) => {
+            if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {
+              setCurrentFormData(prev => ({ ...prev!, spec }));
+              // Clear API errors when user makes changes
+              setApiError(null);
+            }
+          }}
+          onDelete={handleDiscardEventSource}
+          apiError={apiError}
         />
       ) : (
         <>

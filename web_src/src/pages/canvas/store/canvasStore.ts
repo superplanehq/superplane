@@ -45,7 +45,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage, draft = false, autoLayout = true) => {
+  addStage: (stage: SuperplaneStage, draft = false, autoLayout = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,

@@ -27,12 +27,34 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [stageName, setStageName] = useState(props.data.label);
+  const [stageName, setStageName] = useState(props.data.label || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
-  const { selectStageId, updateStage, setEditingStage, removeStage } = useCanvasStore()
+  const [nameError, setNameError] = useState<string | null>(null);
+  const { selectStageId, updateStage, setEditingStage, removeStage } = useCanvasStore();
+  const allStages = useCanvasStore(state => state.stages);
   const currentStage = useCanvasStore(state =>
     state.stages.find(stage => stage.metadata?.id === props.id)
-  )
+  );
+
+  const validateStageName = (name: string) => {
+    if (!name || name.trim() === '') {
+      setNameError('Stage name is required');
+      return false;
+    }
+
+    const isDuplicate = allStages.some(stage =>
+      stage.metadata?.name?.toLowerCase() === name.toLowerCase() &&
+      stage.metadata?.id !== props.id
+    );
+
+    if (isDuplicate) {
+      setNameError('A stage with this name already exists');
+      return false;
+    }
+
+    setNameError(null);
+    return true;
+  };
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
@@ -130,6 +152,10 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const handleSaveStage = async (saveAsDraft = false) => {
     if (!currentFormData || !currentStage) {
+      return;
+    }
+
+    if (!validateStageName(stageName)) {
       return;
     }
 
@@ -257,6 +283,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
 
   const handleStageNameChange = (newName: string) => {
     setStageName(newName);
+    validateStageName(newName);
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
@@ -383,20 +410,30 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         <div className="flex flex-col items-start flex-1 min-w-0">
           <div className="flex flex-1 w-full items-center">
             {StageImageMap[(props.data.executor?.type || 'http') as keyof typeof StageImageMap]}
-            <InlineEditable
-              value={stageName}
-              onSave={handleStageNameChange}
-              placeholder="Stage name"
-              className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 w-full"
-              isEditMode={isEditMode}
-            />
+            <div className="flex flex-col w-full text-left ml-1 relative">
+              <InlineEditable
+                value={stageName}
+                onSave={handleStageNameChange}
+                placeholder="Stage name"
+                className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 w-full ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
+                  }`}
+                isEditMode={isEditMode}
+                autoFocus={!!isNewNode && !props.data.label}
+                dataTestId="stage-name-input"
+              />
+              {nameError && isEditMode && (
+                <span className="text-xs text-red-600 absolute -bottom-4">
+                  {nameError}
+                </span>
+              )}
+            </div>
 
           </div>
           <InlineEditable
             value={stageDescription}
             onSave={handleStageDescriptionChange}
             placeholder={isEditMode ? "Add description..." : "No description available"}
-            className="text-gray-600 dark:text-gray-400 text-sm text-left py-1 w-full mt-2 mb-2"
+            className={`text-gray-600 dark:text-gray-400 text-sm text-left py-1 w-full mb-2 ` + (isEditMode && nameError ? 'mt-5' : 'mt-2')}
             isEditMode={isEditMode}
           />
           {/* API Error Display */}
