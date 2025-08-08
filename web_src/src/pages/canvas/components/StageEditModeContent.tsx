@@ -563,6 +563,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     currentEntityId={currentStageId}
                     validationError={validationErrors[`connection_${index}`]}
                     showFilters={true}
+                    existingConnections={connections}
                   />
                 }
               />
