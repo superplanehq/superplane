@@ -232,10 +232,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <>
           {
             eventSourceKey && eventSourceType === "webhook" && (
-              <div className="px-3 py-3 border-t w-full text-left bg-amber-50">
-                <p className="text-sm text-amber-600">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
+              <div className="px-3 py-3 border-t w-full text-left bg-amber-50 dark:bg-amber-700">
+                <p className="text-sm text-amber-600 dark:text-amber-400">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
                 <div className="flex items-center justify-between gap-2 mt-2">
-                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-zinc-700" />
+                  <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-zinc-700 dark:text-zinc-200" />
                   <button className='font-bold bg-gray-100 text-gray-700 p-2 rounded' onClick={() => resetEventSourceKey(props.id)}>
                     Dismiss
                   </button>
