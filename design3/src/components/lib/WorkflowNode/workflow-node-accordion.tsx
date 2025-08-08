@@ -29,6 +29,7 @@ import { Text } from '../Text/text'
 import { Link } from '../Link/link'
 import Tippy from '@tippyjs/react'
 import { Badge, BadgeButton } from '../Badge/badge'
+import { ControlledTabs } from '../Tabs/tabs';
 
 export type { WorkflowNodeData } from './workflow-node'
 
@@ -1796,14 +1797,16 @@ export function WorkflowNodeAccordion({
                   <div className="flex-auto space-y-3 bg-zinc-50 dark:bg-zinc-900/20 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3 rounded-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 space-y-3">
-                        {/* Executor Type */}
+                        {/* Semaphore Integration */}
                         <Field>
                           <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                            Executor Type
+                            Semaphore integration
                           </Label>
                           <Dropdown>
                             <DropdownButton color='white' className="w-full flex items-center !justify-between">
-                              <span>{yamlConfig.spec.executor?.type || 'Select executor type'}</span>
+                              <span>
+                                {yamlConfig.spec.executor?.config?.integration || 'Select Semaphore integration'}
+                              </span>
                               <MaterialSymbol name="expand_more" size="sm" />
                             </DropdownButton>
                             <DropdownMenu anchor="bottom start">
@@ -1812,114 +1815,265 @@ export function WorkflowNodeAccordion({
                                   ...prev, 
                                   spec: { 
                                     ...prev.spec, 
-                                    executor: { type: 'semaphore', config: {} }
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: "zawkey's semaphore org"
+                                      } 
+                                    }
                                   }
                                 }))
                                 markSectionModified('executor');
                               }}>
-                                <DropdownLabel>Semaphore</DropdownLabel>
+                                <DropdownLabel>zawkey's semaphore org</DropdownLabel>
                               </DropdownItem>
                               <DropdownItem onClick={() => {
                                 setYamlConfig(prev => ({ 
                                   ...prev, 
                                   spec: { 
                                     ...prev.spec, 
-                                    executor: { type: 'github', config: {} }
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: 'semaphore test org'
+                                      } 
+                                    }
                                   }
                                 }))
                                 markSectionModified('executor');
-                              }} className='flex items-center gap-2'>
-                             
-                                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-                                    <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8"/>
-                                  </svg>
-                                  <DropdownLabel>GitHub</DropdownLabel>
-                                
+                              }}>
+                                <DropdownLabel>semaphore test org</DropdownLabel>
+                              </DropdownItem>
+                              <DropdownItem onClick={() => {
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      type: 'semaphore', 
+                                      config: { 
+                                        integration: 'my organization'
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
+                              }}>
+                                <DropdownLabel>my organization</DropdownLabel>
                               </DropdownItem>
                             </DropdownMenu>
                           </Dropdown>
                         </Field>
 
 
-                        {/* GitHub specific fields */}
-                        {yamlConfig.spec.executor?.type === 'github' && (
-                          <Field>
-                            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                              GitHub Project
-                            </Label>
-                            {!isGitHubConnected ? (
-                              <div className="space-y-2">
-                                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                                  Connect with GitHub to proceed
-                                </Text>
-                                <Link
-                                  href='#'
-                                  onClick={handleConnectGitHub}
-                                  className="w-full flex items-center text-sm gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                  
-                                >
-                                  <MaterialSymbol name="link" size="sm" />
-                                  Connect with GitHub
-                                </Link>
-                              </div>
-                            ) : (
-                              <Dropdown>
-                                <DropdownButton outline className="w-full flex items-center !justify-between">
-                                  <span>
-                                    {selectedGitHubProject ? 
-                                      githubProjects.find(p => p.id === selectedGitHubProject)?.name : 
-                                      'Select a project'
-                                    }
-                                  </span>
-                                  <MaterialSymbol name="expand_more" size="sm" />
-                                </DropdownButton>
-                                <DropdownMenu anchor="bottom start">
-                                  {githubProjects.map((project) => (
-                                    <DropdownItem 
-                                      key={project.id} 
-                                      onClick={() => handleGitHubProjectSelect(project.id)}
-                                    >
-                                      <DropdownLabel>{project.name}</DropdownLabel>
-                                    </DropdownItem>
-                                  ))}
-                                </DropdownMenu>
-                              </Dropdown>
-                            )}
-                          </Field>
-                        )}
+                       
 
                         {/* Semaphore specific fields */}
-                        {yamlConfig.spec.executor?.type === 'semaphore' && (
-                          <Field>
-                            <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                              Configuration (JSON)
-                            </Label>
-                            <Textarea
-                              value={JSON.stringify(yamlConfig.spec.executor?.config || {}, null, 2)}
-                              onChange={(e) => {
-                                try {
-                                  const config = JSON.parse(e.target.value)
-                                  setYamlConfig(prev => ({ 
-                                    ...prev, 
-                                    spec: { 
-                                      ...prev.spec, 
-                                      executor: { 
-                                        type: prev.spec.executor?.type || 'semaphore',
-                                        config 
-                                      }
-                                    }
-                                  }))
-                                  markSectionModified('executor');
-                                } catch (err) {
-                                  // Invalid JSON, don't update
+                        
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Project Name
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.projectName} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    projectName: e.target.value 
+                                  } 
                                 }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Execution type
+                          </Label>
+                        
+                          <ControlledTabs 
+                            className='mt-3'
+                            tabs={[
+                              { id: 'workflow', label: 'Workflow' },
+                              { id: 'task', label: 'Task' },
+                            ]}
+                            activeTab='workflow'
+                            variant='pills'
+                            onTabChange={(tabId) => {
+                              console.log('Tab changed to:', tabId);
+                            }}  
+                          />  
+                          
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Branch
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.branch} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    branch: e.target.value 
+                                  } 
+                                }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                          
+                        </Field>
+                        <Field>
+                          <Label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                            Pipeline
+                          </Label>
+                          <Input value={yamlConfig.spec.executor?.config?.pipeline} onChange={(e) => {
+                            setYamlConfig(prev => ({ 
+                              ...prev, 
+                              spec: { 
+                                ...prev.spec, 
+                                executor: { 
+                                  type: 'semaphore', 
+                                  config: { 
+                                    integration: 'my organization',
+                                    branch: e.target.value 
+                                  } 
+                                }
+                              }
+                            }))
+                            markSectionModified('executor');
+                          }} />
+                          
+                        </Field>
+
+                        {/* Parameters Section */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                              Parameters
+                            </div>
+                            
+                          </div>
+                          
+                          {/* Parameters List */}
+                          {yamlConfig.spec.executor?.config?.parameters && yamlConfig.spec.executor.config.parameters.length > 0 && yamlConfig.spec.executor.config.parameters.map((param: any, index: number) => (
+                               <div className="flex w-full justify-between p-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded gap-1 space-y-2">
+                                  <div key={index} className="flex items-center">
+                                    <Input
+                                      value={param.key}
+                                      onChange={(e) => {
+                                        const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
+                                        newParams[index] = { ...param, key: e.target.value };
+                                        setYamlConfig(prev => ({ 
+                                          ...prev, 
+                                          spec: { 
+                                            ...prev.spec, 
+                                            executor: { 
+                                              ...prev.spec.executor,
+                                              type: 'semaphore', 
+                                              config: { 
+                                                ...prev.spec.executor?.config,
+                                                parameters: newParams
+                                              } 
+                                            }
+                                          }
+                                        }))
+                                        markSectionModified('executor');
+                                      }}
+                                      placeholder="VERSION"
+                                      className="flex-1 text-xs"
+                                    />
+                                      <Input
+                                        value={param.value}
+                                        onChange={(e) => {
+                                          const newParams = [...(yamlConfig.spec.executor?.config?.parameters || [])];
+                                          newParams[index] = { ...param, value: e.target.value };
+                                          setYamlConfig(prev => ({ 
+                                            ...prev, 
+                                            spec: { 
+                                              ...prev.spec, 
+                                              executor: { 
+                                                ...prev.spec.executor,
+                                                type: 'semaphore', 
+                                                config: { 
+                                                  ...prev.spec.executor?.config,
+                                                  parameters: newParams
+                                                } 
+                                              }
+                                            }
+                                          }))
+                                          markSectionModified('executor');
+                                        }}
+                                        placeholder="VERSION"
+                                        className="border-none bg-transparent p-0 text-xs focus:ring-0 focus:border-none flex-1 ml-2"
+                                        style={{ boxShadow: 'none' }}
+                                      />
+                                        
+                                    
+                                    <Button
+                                      plain
+                                      onClick={() => {
+                                        const newParams = yamlConfig.spec.executor?.config?.parameters?.filter((_: any, i: number) => i !== index) || [];
+                                        setYamlConfig(prev => ({ 
+                                          ...prev, 
+                                          spec: { 
+                                            ...prev.spec, 
+                                            executor: { 
+                                              ...prev.spec.executor,
+                                              type: 'semaphore', 
+                                              config: { 
+                                                ...prev.spec.executor?.config,
+                                                parameters: newParams
+                                              } 
+                                            }
+                                          }
+                                        }))
+                                        markSectionModified('executor');
+                                      }}
+                                      className="p-1 text-gray-400 hover:text-gray-900 dark:hover:text-gray-400"
+                                    >
+                                      <MaterialSymbol name="close" size="sm" />
+                                    </Button>
+                                  </div>
+                                 </div>
+                          ))}
+                           
+                          
+                          <Link
+                              href="#"
+                              onClick={() => {
+                                const newParams = yamlConfig.spec.executor?.config?.parameters || [];
+                                setYamlConfig(prev => ({ 
+                                  ...prev, 
+                                  spec: { 
+                                    ...prev.spec, 
+                                    executor: { 
+                                      ...prev.spec.executor,
+                                      type: 'semaphore', 
+                                      config: { 
+                                        ...prev.spec.executor?.config,
+                                        parameters: [...newParams, { key: '', value: '' }]
+                                      } 
+                                    }
+                                  }
+                                }))
+                                markSectionModified('executor');
                               }}
-                              placeholder="{}"
-                              rows={6}
-                              className="w-full font-mono text-sm"
-                            />
-                          </Field>
-                        )}
+                              className="flex items-center text-xs"
+                            >
+                              <MaterialSymbol name="add" size="sm" className="mr-1" />
+                              Add parameter
+                            </Link>
+                        </div>
 
                         {/* Save Button - only show if saveGranular is true */}
                         {saveGranular && (

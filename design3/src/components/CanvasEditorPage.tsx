@@ -57,7 +57,6 @@ import {
 } from './lib/Table/table';
 import { Link } from './lib/Link/link';
 import { Field, Label } from './lib/Fieldset/fieldset';
-import { SettingsPage } from './SettingsPage';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import { NodeDetailsSidebar } from './lib/NodeDetailsSidebar/node-details-sidebar';
 import Tippy from '@tippyjs/react';
@@ -682,7 +681,9 @@ const computedEdges = edges.map(edge => {
     )
   }, [setNodes, setEdges])
   const [showMiniMap, setShowMiniMap] = useState(true)
-  const [activeView, setActiveView] = useState<'preview' | 'settings'>('preview')
+  const [activeView, setActiveView] = useState<'preview' | 'integrations' | 'members' | 'secrets' | 'integration-setup'>('preview')
+  const [integrationsTab, setIntegrationsTab] = useState<'connected' | 'add-new'>('connected')
+  const [selectedIntegrationType, setSelectedIntegrationType] = useState<string | null>(null)
   
   // Define tabs for navigation
   const navigationTabs: Tab[] = [
@@ -691,8 +692,28 @@ const computedEdges = edges.map(edge => {
       label: 'Preview',
     },
     {
-      id: 'settings',
-      label: 'Settings',
+      id: 'integrations',
+      label: 'Integrations',
+    },
+    {
+      id: 'members',
+      label: 'Members',
+    },
+    {
+      id: 'secrets',
+      label: 'Secrets',
+    }
+  ]
+
+  // Define tabs for integrations page
+  const integrationsTabs: Tab[] = [
+    {
+      id: 'connected',
+      label: 'Connected',
+    },
+    {
+      id: 'add-new',
+      label: 'Add new integrations',
     }
   ]
 
@@ -924,7 +945,10 @@ const computedEdges = edges.map(edge => {
       event.preventDefault();
       const isSelecting = selectedNode !== node.id;
       setSelectedNode(isSelecting ? node.id : null);
-      setShowNodeDetails(isSelecting);
+      
+      // Don't show sidebar if it's an EventSource node in edit mode
+      const isEventSourceInEditMode = node.type === 'eventSource' && node.data?.isEditMode === true;
+      setShowNodeDetails(isSelecting && !isEventSourceInEditMode);
       
       // Update node selection state
       setNodes((nds) =>
@@ -949,6 +973,70 @@ const computedEdges = edges.map(edge => {
       const nodeId = `node-${Date.now()}`;
       // Use accordion version by default, alternate with tab version
       const useAccordion = nodes.length % 2 === 0;
+      
+      // Special handling for test stage - create EventSourceWorkflowNode in edit mode
+      if (nodeType === 'test') {
+        const newNode: WorkflowNode = {
+          id: nodeId,
+          type: 'eventSource',
+          position: { x: 300, y: 300 },
+          data: {
+            id: nodeId,
+            title: 'Test Stage',
+            cluster: 'test-cluster',
+            icon: 'semaphore',
+            events: [
+              {
+                id: 'event-1',
+                url: 'https://hooks.semaphoreci.com/webhook/test',
+                type: 'webhook',
+                enabled: true
+              }
+            ],
+            selected: false,
+            isEditMode: true
+          }
+        };
+        
+        setNodes((nds) => {
+          const updatedNodes = [...nds, newNode];
+          return updatedNodes;
+        });
+        setSidebarOpen(false);
+        return;
+      }
+
+      // Special handling for semaphore-event - create EventSourceWorkflowNode in edit mode
+      if (nodeType === 'semaphore-event') {
+        const newNode: WorkflowNode = {
+          id: nodeId,
+          type: 'eventSource',
+          position: { x: 300, y: 300 },
+          data: {
+            id: nodeId,
+            title: 'Semaphore Event Source',
+            cluster: 'semaphore-cluster',
+            icon: 'semaphore',
+            events: [
+              {
+                id: 'event-1',
+                url: 'https://hooks.semaphoreci.com/webhook/semaphore',
+                type: 'webhook',
+                enabled: true
+              }
+            ],
+            selected: false,
+            isEditMode: true
+          }
+        };
+        
+        setNodes((nds) => {
+          const updatedNodes = [...nds, newNode];
+          return updatedNodes;
+        });
+        setSidebarOpen(false);
+        return;
+      }
       
       const newNode: WorkflowNode = {
         id: nodeId,
@@ -1132,7 +1220,8 @@ const computedEdges = edges.map(edge => {
   // Function to render navigation based on URL parameter
   const renderNavigation = () => {
     return (
-      <nav className="flex items-center bg-zinc-200 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+      <nav className="flex items-center justify-between bg-zinc-200 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+        <div className='flex items-center'>
         <div className='flex border-r border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900'>
           <Link href="/canvases"
             className='px-3 py-1 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-950 dark:text-white' 
@@ -1165,7 +1254,7 @@ const computedEdges = edges.map(edge => {
         
         {/* Navigation Tabs */}
         
-        <div className='border-r border-zinc-400 dark:border-zinc-600'>
+        <div className='border-r border-zinc-400 dark:border-zinc-600 hidden'>
         <Button plain>
           <MaterialSymbol size='lg' opticalSize={20} weight={400} name="star" />
         </Button>
@@ -1173,25 +1262,26 @@ const computedEdges = edges.map(edge => {
           <MaterialSymbol size='lg' opticalSize={20} weight={400} name="person" />
         </Button>
         </div>
-        <div className='hidden'>
-          <Dropdown> 
-            <DropdownButton plain aria-label="More options">
-              <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
-            </DropdownButton>
-            <DropdownMenu className="min-w-(--button-width)">
-              <DropdownItem onClick={() => setShowSecretsModal(true)}>Secrets</DropdownItem>
-            <DropdownItem href="#">Integrations</DropdownItem>
-            <DropdownItem href="#">Delete</DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
-        </div>
+        
         <div className="flex items-center h-full">
           <ControlledTabs
             tabs={navigationTabs}
             activeTab={activeView}
             variant='default'
-            onTabChange={(tabId) => setActiveView(tabId as 'preview' | 'settings')}
+            onTabChange={(tabId) => setActiveView(tabId as 'preview' | 'integrations' | 'members' | 'secrets')}
           />
+        
+        </div>
+        </div>
+        <div className=''>
+          <Dropdown> 
+            <DropdownButton plain aria-label="More options">
+              <MaterialSymbol size='lg' opticalSize={20} weight={400} name="more_vert" />
+            </DropdownButton>
+            <DropdownMenu className="min-w-(--button-width)">
+            <DropdownItem href="#">Delete</DropdownItem>
+          </DropdownMenu>
+        </Dropdown>
         </div>
       </nav>
     );
@@ -1207,12 +1297,12 @@ const computedEdges = edges.map(edge => {
         /* React Flow Canvas */
         <div className="flex-1 flex relative">
           {/* Component Sidebar */}
-          <div className='w-96 bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700 hidden'> 
-            <ComponentSidebar
-              isOpen={true}
-              onClose={() => setSidebarOpen(false)}
-              onNodeAdd={addNode}
-            />
+          <div className='h-[calc(100vh-41px)] relative w-[300px] bg-transparent transition-[width] duration-300 ease-linear bg-white dark:bg-zinc-800 border-r border-zinc-200 dark:border-zinc-700'> 
+              <ComponentSidebar
+                isOpen={true}
+                onClose={() => setSidebarOpen(false)}
+                onNodeAdd={addNode}
+              />
           </div>
           
           {/* Canvas Area */}
@@ -1266,12 +1356,404 @@ const computedEdges = edges.map(edge => {
               />
             )}
         </div>
-      ) : (
-        /* Settings Page */
-        <div className="flex-1">
-          <SettingsPage />
+      ) : activeView === 'integrations' ? (
+        /* Integrations Page */
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="mb-6">
+              <Heading level={2}>Integrations</Heading>
+              <Text>Manage your integrations and external services.</Text>
+            </div>
+            
+            {/* Integrations Tabs */}
+            <div className="mb-6">
+              <ControlledTabs
+                tabs={integrationsTabs}
+                activeTab={integrationsTab}
+                variant='underline'
+                onTabChange={(tabId) => setIntegrationsTab(tabId as 'connected' | 'add-new')}
+              />
+            </div>
+            
+            {/* Tab Content */}
+            {integrationsTab === 'connected' ? (
+              /* Connected Integrations Tab */
+              <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
+                <div className="text-center py-12">
+                  <MaterialSymbol name="integration_instructions" size="lg" className="mx-auto text-zinc-400 mb-4" />
+                  <Text className="text-zinc-700 dark:text-zinc-100 mb-1 !text-xl">You have not connected any integrations yet</Text>
+                  <Text className="text-zinc-500 dark:text-zinc-400 text-sm">
+                    Browse full <Link href="/integrations" className='text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300'> list of integrations</Link> to get started
+                  </Text>
+                </div>
+              </div>
+            ) : (
+              /* Add New Integrations Tab */
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Semaphore Integration Card */}
+                <div 
+                  className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => {
+                    setSelectedIntegrationType('semaphore');
+                    setActiveView('integration-setup');
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                      <img width={24} height={24} src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Semaphore</h3>
+                    </div>
+                  </div>
+                  <Text className="!text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                    Connect your Semaphore CI/CD pipelines to automate deployments and testing workflows.
+                  </Text>
+                  
+                </div>
+                <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 hover:shadow-md transition-shadow cursor-pointer">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                      <img width={24} height={24} src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAAb1BMVEX////4+Pi3ubtvcnZNUVU+Q0cpLjLr6+x3en0sMTYkKS59gIORk5aUl5n8/Pzw8PFTV1tbX2Pc3d5DSEzn5+g3PECLjpFKTlKFh4qxs7XCxMUuMze/wcLh4uPV1tZzd3o/Q0jOz9CmqKpjZ2qfoaTxAyfNAAABPUlEQVR4AW3TBYKDMBQE0AltAgzuzur9z7ibH5oKfWjc4UEFl6s2Rl8vgcJZGMX04iTEM5UaPomzHA+KkidVAa/WfKNpffMd32oKCHUlWfb27Q19ZSMVrNHGTMDckMtQLqSegdXGpvi3Sf93W9UudRby2WzsEgL4oMvwoqY1AsrQNfFipbXkCGh1BV6oT1pfRwvfOJlo9ZA5NAonStbmB1pawBuDTAgkX4MzV/eC2H3e0C7lk1aBEzd+7SpigJOZVoXx+J5UxzADil+8+KZYoRaK5y2WZxSdgm0j+dakzkIc2kzT6W3IcFnDTzdt4sKbWMqkpNl229IMsfMmg6UaMsJXmv4qCMXDoI4mO5oADwyFDnGoO3KI0jSHQ6E3eJum5TP4Y+EVyUOGXHZjgWd7ZEwOJzZRjbPQt7mF8P4AzsYZpmkFLF4AAAAASUVORK5CYII=' alt="GitHub" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">GitHub</h3>
+                    </div>
+                  </div>
+                  <Text className="!text-sm text-zinc-600 dark:text-zinc-400 mb-4">
+                    Connect your GitHub repositories to trigger workflows on code changes and pull requests.
+                  </Text>
+                  
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      )}
+      ) : activeView === 'members' ? (
+        /* Members Page */
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <Subheading>Members</Subheading>
+                <Text>Manage canvas access and permissions.</Text>
+              </div>
+              <Button onClick={() => setShowMembersModal(true)}>
+                <MaterialSymbol name="person_add" size="md" />
+                Invite Member
+              </Button>
+            </div>
+
+            {/* Search */}
+            <div className="mb-6">
+              <InputGroup>
+                <MaterialSymbol name="search" size="md" data-slot="icon" />
+                <Input
+                  placeholder="Search members..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </InputGroup>
+            </div>
+
+            {/* Members Table */}
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden px-6 py-2">
+              <Table dense>
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Member</TableHeader>
+                    <TableHeader>Email</TableHeader>
+                    <TableHeader>Role</TableHeader>
+                    <TableHeader>Last Active</TableHeader>
+                    <TableHeader></TableHeader>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {canvasMembers
+                    .filter(member =>
+                      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      member.email.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((member) => (
+                    <TableRow key={member.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            src={member.avatar}
+                            className="size-8"
+                            alt={member.name}
+                          />
+                          <div>
+                            <div className="font-medium text-zinc-900 dark:text-white text-sm">
+                              {member.name}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                          {member.email}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Dropdown>
+                          <DropdownButton outline className="flex items-center gap-2 text-sm">
+                            {member.role}
+                            <MaterialSymbol name="keyboard_arrow_down" size="sm" />
+                          </DropdownButton>
+                          <DropdownMenu>
+                            <DropdownItem onClick={() => console.log('Change to Owner')}>
+                              Owner
+                            </DropdownItem>
+                            <DropdownItem onClick={() => console.log('Change to Admin')}>
+                              Admin
+                            </DropdownItem>
+                            <DropdownItem onClick={() => console.log('Change to Member')}>
+                              Member
+                            </DropdownItem>
+                          </DropdownMenu>
+                        </Dropdown>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                          {member.lastActive}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end">
+                          <Button plain onClick={() => console.log('Remove member', member.id)}>
+                            <MaterialSymbol name="close" size="md" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      ) : activeView === 'integration-setup' ? (
+        /* Integration Setup Page */
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            {/* Breadcrumbs */}
+            <div className="flex items-center gap-2 mb-6 text-sm text-zinc-500 dark:text-zinc-400">
+              <Link 
+                href="#" 
+                onClick={() => setActiveView('integrations')}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Integrations
+              </Link>
+              <MaterialSymbol name="chevron_right" size="sm" />
+              <Link 
+                href="#" 
+                onClick={() => {
+                  setActiveView('integrations');
+                  setIntegrationsTab('add-new');
+                }}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300"
+              >
+                Add new integrations
+              </Link>
+              <MaterialSymbol name="chevron_right" size="sm" />
+              <span className="text-zinc-900 dark:text-white">
+                {selectedIntegrationType === 'semaphore' ? 'Semaphore integration' : 'Integration setup'}
+              </span>
+            </div>
+
+            {/* Form Content */}
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
+              <div className="mb-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+                    {selectedIntegrationType === 'semaphore' && (
+                      <img width={24} height={24} src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+                    )}
+                  </div>
+                  <div>
+                    <Heading level={2}>
+                      {selectedIntegrationType === 'semaphore' ? 'Semaphore Integration' : 'Integration Setup'}
+                    </Heading>
+                  </div>
+                </div>
+                <Text className="text-zinc-600 dark:text-zinc-400">
+                  Configure your {selectedIntegrationType === 'semaphore' ? 'Semaphore' : 'integration'} connection settings
+                </Text>
+              </div>
+
+              <div className="space-y-6">
+                {/* Integration Name */}
+                <Field>
+                  <Label htmlFor="integration-name" className="text-sm font-medium text-gray-900 dark:text-white">
+                    Integration Name
+                  </Label>
+                  <Input
+                    id="integration-name"
+                    type="text"
+                    placeholder={selectedIntegrationType === 'semaphore' ? 'My Semaphore Integration' : 'Enter integration name'}
+                    className="w-full"
+                  />
+                </Field>
+
+                {/* URL */}
+                <Field>
+                  <Label htmlFor="integration-url" className="text-sm font-medium text-gray-900 dark:text-white">
+                    {selectedIntegrationType === 'semaphore' ? 'Semaphore Organization URL' : 'URL'}
+                  </Label>
+                  <Input
+                    id="integration-url"
+                    type="url"
+                    placeholder={selectedIntegrationType === 'semaphore' ? 'https://your-org.semaphoreci.com' : 'https://example.com'}
+                    className="w-full"
+                  />
+                </Field>
+
+                {/* Authentication */}
+                <Field>
+                  <Label htmlFor="integration-auth" className="text-sm font-medium text-gray-900 dark:text-white">
+                    Authentication
+                  </Label>
+                  <Dropdown>
+                    <DropdownButton outline className="flex items-center w-full !justify-between">
+                      {selectedIntegrationType === 'semaphore' ? 'API Token' : 'Select authentication method'}
+                      <MaterialSymbol name="keyboard_arrow_down" />
+                    </DropdownButton>
+                    <DropdownMenu>
+                      <DropdownItem>
+                        <DropdownLabel>API Token</DropdownLabel>
+                      </DropdownItem>
+                      <DropdownItem>
+                        <DropdownLabel>OAuth</DropdownLabel>
+                      </DropdownItem>
+                      <DropdownItem>
+                        <DropdownLabel>Basic Auth</DropdownLabel>
+                      </DropdownItem>
+                    </DropdownMenu>
+                  </Dropdown>
+                </Field>
+
+                {/* API Token Field (when API Token is selected) */}
+                <Field>
+                  <Label htmlFor="api-token" className="text-sm font-medium text-gray-900 dark:text-white">
+                    API Token
+                  </Label>
+                  <Input
+                    id="api-token"
+                    type="password"
+                    placeholder="Enter your API token"
+                    className="w-full"
+                  />
+                </Field>
+
+                {/* Action Buttons */}
+                <div className="flex items-center justify-between pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                  <Button 
+                    plain
+                    onClick={() => {
+                      setActiveView('integrations');
+                      setIntegrationsTab('add-new');
+                      setSelectedIntegrationType(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    color="blue"
+                    onClick={() => {
+                      // Handle integration creation
+                      console.log('Creating integration:', selectedIntegrationType);
+                      // For now, just go back to integrations page
+                      setActiveView('integrations');
+                      setIntegrationsTab('connected');
+                      setSelectedIntegrationType(null);
+                    }}
+                  >
+                    Create integration
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : activeView === 'secrets' ? (
+        /* Secrets Page */
+        <div className="flex-1 p-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <Subheading>Secrets</Subheading>
+                <Text>Manage environment variables and sensitive data.</Text>
+              </div>
+              <Button>
+                <MaterialSymbol name="add" size="md" />
+                Add Secret
+              </Button>
+            </div>
+
+            {/* Secrets Table */}
+            <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Name</TableHeader>
+                    <TableHeader>Description</TableHeader>
+                    <TableHeader>Created</TableHeader>
+                    <TableHeader>Last Used</TableHeader>
+                    <TableHeader></TableHeader>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {secrets.map((secret) => (
+                    <TableRow key={secret.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <MaterialSymbol name="key" className="text-zinc-400" size="sm" />
+                          <span className="font-mono text-sm text-zinc-900 dark:text-white">
+                            {secret.name}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                          {secret.description}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                          {secret.createdAt}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                          {secret.lastUsed}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            plain
+                            onClick={() => console.log('Edit secret', secret.id)}
+                          >
+                            <MaterialSymbol name="edit" size="sm" />
+                          </Button>
+                          <Button
+                            plain
+                            onClick={() => console.log('Delete secret', secret.id)}
+                          >
+                            <MaterialSymbol name="delete" size="sm" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Canvas Members Modal */}
       <Dialog 

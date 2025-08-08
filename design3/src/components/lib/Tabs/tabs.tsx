@@ -117,7 +117,7 @@ function TabItem({
       'text-blue-600 dark:text-blue-400 bg-zinc-600/10 dark:bg-zinc-100/10 !border-blue-500 dark:border-blue-400 border-b-2 border-width-2 !border-t-transparent': variant === 'default' && isActive,
       
       // Pills variant
-      'px-3 py-2 rounded-md': variant === 'pills',
+      'px-3 py-2 rounded-md justify-center flex-grow-1': variant === 'pills',
       'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white': variant === 'pills' && isActive,
       'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white': variant === 'pills' && !isActive && !isDisabled,
       
@@ -213,9 +213,8 @@ export function ControlledTabs({
   }, [tabs, onTabChange])
 
   const baseClasses = clsx(
-    'w-full',
     {
-      'border-b border-zinc-200 dark:border-zinc-700': variant === 'default' || variant === 'underline',
+      'w-full border-b border-zinc-200 dark:border-zinc-700': variant === 'default' || variant === 'underline',
     },
     className
   )

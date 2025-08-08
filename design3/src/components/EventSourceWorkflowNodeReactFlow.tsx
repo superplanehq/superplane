@@ -7,6 +7,11 @@ import { Input } from './lib/Input/input';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { Link } from './lib/Link/link';
 import { BadgeButton } from './lib/Badge/badge';
+import { Dialog, DialogTitle, DialogDescription, DialogBody, DialogActions } from './lib/Dialog/dialog';
+import { Dropdown, DropdownButton, DropdownMenu, DropdownItem, DropdownLabel } from './lib/Dropdown/dropdown';
+import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
+import Tippy from '@tippyjs/react';
+import { Text } from './lib/Text/text';
 
 export interface EventSourceWorkflowNodeReactFlowData {
   id: string;
@@ -38,6 +43,74 @@ export function EventSourceWorkflowNodeReactFlow({
     cluster: data.cluster || '',
     events: [...data.events]
   });
+  
+  // Check URL parameter for inline integration mode
+  const urlParams = new URLSearchParams(window.location.search);
+  const inlineIntegration = urlParams.get('inlineIntegration') === 'true';
+  
+  // Integration modal state
+  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
+  const [integrationData, setIntegrationData] = useState({
+    name: '',
+    orgUrl: '',
+    apiToken: {
+      secretName: '',
+      secretKey: ''
+    }
+  });
+  
+  // Inline integration form state
+  const [inlineIntegrationData, setInlineIntegrationData] = useState({
+    orgUrl: '',
+    apiToken: ''
+  });
+  
+  // Secrets management
+  const [secrets, setSecrets] = useState<Array<{
+    id: string;
+    name: string;
+    keys: Array<{ key: string; value: string; }>;
+  }>>([
+    // Mock existing secret
+    {
+      id: 'secret-1',
+      name: 'my semaphore org secrets',
+      keys: [{ key: 'API_TOKEN', value: 'hidden' }]
+    }
+  ]);
+  const [showAddSecret, setShowAddSecret] = useState(false);
+  const [newSecret, setNewSecret] = useState({
+    name: '',
+    key: '',
+    value: ''
+  });
+  
+  // API Token tabs state
+  const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('existing');
+  const [newSecretToken, setNewSecretToken] = useState('');
+  
+  // Selected integration state
+  const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
+  
+  // Available integrations (mock data + created ones)
+  const [availableIntegrations, setAvailableIntegrations] = useState<Array<{
+    id: string;
+    name: string;
+    orgUrl: string;
+    secretName: string;
+  }>>([]);
+  
+  // Define tabs for API Token section
+  const apiTokenTabs: Tab[] = [
+    {
+      id: 'existing',
+      label: 'Select from secrets',
+    },
+    {
+      id: 'new',
+      label: 'Create new secret',
+    }
+  ];
 
   const handleEditToggle = useCallback(() => {
     setIsEditMode(!isEditMode);
@@ -84,6 +157,61 @@ export function EventSourceWorkflowNodeReactFlow({
       )
     }));
   }, []);
+
+  const handleCreateIntegration = useCallback(() => {
+    setShowIntegrationModal(true);
+  }, []);
+
+  const handleAddSecret = useCallback(() => {
+    if (newSecret.name && newSecret.key && newSecret.value) {
+      const secretId = `secret-${Date.now()}`;
+      setSecrets(prev => [
+        ...prev,
+        {
+          id: secretId,
+          name: newSecret.name,
+          keys: [{ key: newSecret.key, value: newSecret.value }]
+        }
+      ]);
+      setNewSecret({ name: '', key: '', value: '' });
+      setShowAddSecret(false);
+    }
+  }, [newSecret]);
+
+  const handleSaveIntegration = useCallback(() => {
+    // Create new integration
+    const newIntegration = {
+      id: `integration-${Date.now()}`,
+      name: integrationData.name,
+      orgUrl: integrationData.orgUrl,
+      secretName: integrationData.apiToken.secretName
+    };
+    
+    // If creating a new secret, add it to secrets
+    if (apiTokenTab === 'new' && newSecretToken) {
+      const newSecret = {
+        id: `secret-${Date.now()}`,
+        name: `${integrationData.name} Secret`,
+        keys: [{ key: 'API_TOKEN', value: newSecretToken }]
+      };
+      setSecrets(prev => [...prev, newSecret]);
+      newIntegration.secretName = newSecret.name;
+    }
+    
+    // Add the integration to available integrations and select it
+    setAvailableIntegrations(prev => [...prev, newIntegration]);
+    setSelectedIntegration(newIntegration.id);
+    
+    // Close modal and reset form
+    setShowIntegrationModal(false);
+    setIntegrationData({
+      name: '',
+      orgUrl: '',
+      apiToken: { secretName: '', secretKey: '' }
+    });
+    setNewSecretToken('');
+    setApiTokenTab('existing');
+  }, [integrationData, apiTokenTab, newSecretToken]);
 
   const truncateUrl = (url: string, maxLength: number = 40) => {
     if (url.length <= maxLength) return url;
@@ -183,109 +311,174 @@ export function EventSourceWorkflowNodeReactFlow({
   return (
     <div 
       className={clsx(
-        'bg-white dark:bg-zinc-800 rounded-lg border-2 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
-        selected ? 'border-blue-600 dark:border-zinc-200 ring-2 ring-blue-200 dark:ring-white' : 'border-gray-200 dark:border-zinc-700'
+        'bg-white dark:bg-zinc-800 relative transition-all duration-200 hover:shadow-lg min-w-[320px]',
+        
       )}
       style={{ width: 380, boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}
       role="article"
     >
       {/* Edit Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-zinc-700 bg-blue-50 dark:bg-blue-900/20">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-            <MaterialSymbol 
-              name="edit" 
-              size="md" 
-              className="text-blue-600 dark:text-blue-400" 
-            />
-          </div>
-          <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-            Edit Event Source
-          </span>
+      <div 
+          className="action-buttons absolute -top-14 left-1/2 transform -translate-x-1/2 flex gap-1 bg-white dark:bg-zinc-800 shadow-xs rounded-lg p-1 border border-gray-200 dark:border-zinc-600 z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+         
+
+            <Button
+              type="button"
+              plain
+              className="flex items-center gap-2"
+            >
+              <MaterialSymbol name="code" size="md"/>
+              Code
+            </Button>
+            
+          
+            
+            
+            <Dropdown>
+              <DropdownButton plain className='flex items-center gap-2 !pr-1'>
+                <MaterialSymbol name="save" size="md"/> 
+                Save
+                <MaterialSymbol name="expand_more" size="md"/>
+              </DropdownButton>
+              <DropdownMenu anchor="bottom start">
+                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save & Commit</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><DropdownLabel>Save as Draft</DropdownLabel></DropdownItem>
+               
+              </DropdownMenu>
+            </Dropdown>
+           
+            <Button
+              type="button"
+              plain
+              onClick={handleCancel}
+              className="flex items-center gap-2"
+            >
+              
+              Cancel
+            </Button>
+            <Tippy content="More options" placement="top">
+            <Dropdown>
+              <DropdownButton plain>
+                <MaterialSymbol name="more_vert" size="md"/>
+              </DropdownButton>
+              <DropdownMenu anchor="bottom start">
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="play_arrow" size="md"/><DropdownLabel>Run</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="tune" size="md"/><DropdownLabel>Advanced configuration</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2'><MaterialSymbol name="menu_book" size="md"/><DropdownLabel>Documentation</DropdownLabel></DropdownItem>
+                <DropdownItem className='flex items-center gap-2 text-red-600 dark:text-red-200' color='red'><MaterialSymbol name="delete" size="md"/><DropdownLabel>Delete</DropdownLabel></DropdownItem>
+
+              </DropdownMenu>
+            </Dropdown>
+          </Tippy>
+         
+          
+          
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={handleSave}
-            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Save
-          </Button>
-          <Button
-            plain
-            onClick={handleCancel}
-            className="px-3 py-1 text-xs text-gray-600 dark:text-zinc-400 hover:text-gray-800 dark:hover:text-zinc-200"
-          >
-            Cancel
-          </Button>
-        </div>
-      </div>
 
       {/* Edit Form */}
-      <div className="p-4 space-y-4">
-        {/* Title Field */}
-        <Field>
-          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-            Title
-          </Label>
-          <Input
-            value={editData.title}
-            onChange={(e) => setEditData(prev => ({ ...prev, title: e.target.value }))}
-            placeholder="Enter event source title"
-            className="w-full"
-          />
-        </Field>
-
-        {/* Cluster Field */}
-        <Field>
-          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-            Cluster
-          </Label>
-          <Input
-            value={editData.cluster}
-            onChange={(e) => setEditData(prev => ({ ...prev, cluster: e.target.value }))}
-            placeholder="Enter cluster name"
-            className="w-full"
-          />
-        </Field>
-
-        {/* Events Section */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-              Events
-            </Label>
-            <Button
-              onClick={handleAddEvent}
-              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              <MaterialSymbol name="add" size="sm" className="mr-1" />
-              Add Event
-            </Button>
+      <div>
+        {/* Main content area with blue border */}
+        <div className="border-2 border-blue-500 rounded-lg bg-white dark:bg-zinc-800">
+          {/* Header with icon and title */}
+          <div className='flex flex-col p-4'>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center">
+              <img width="24" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAcCAMAAABF0y+mAAAAM1BMVEVHcEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADbQS4qAAAAEXRSTlMAYq64jCpx/8oGF/mjNBDW6uM72ZcAAACJSURBVHgBzdBFAoAwEATBjbv8/7WwTHA50ziFhv6ekEpp80jWIR/uJt1W/LCbwpTV6a7ZcYV3vePq1QwOGu8n1sifJvb7Nm1EgVd8J6x0vWqlkBxU98XmkxlaxwM8jYzjxLwX+Gtr2hWGO1F1m8Ik0VWTtmMU6FR0aLe73g0FP8zSU0YrJQX9vAn47gbljcJgwwAAAABJRU5ErkJggg==" alt=""/>
+              </div>
+              
+                <h2 className="text-md font-semibold text-gray-900 dark:text-white">
+                  Semaphore Event Source
+                </h2>
+              
+            
+            </div>
+            <span className='text-xs font-medium text-zinc-600 dark:text-zinc-400'>Description</span>
           </div>
           
-          <div className="space-y-2 max-h-40 overflow-y-auto">
-            {editData.events.map((event, index) => (
-              <div key={event.id} className="flex items-center gap-2">
-                <div className="flex-1">
+
+          {/* Semaphore integration section */}
+          <div className="space-y-3 border-t border-gray-200 dark:border-zinc-600 p-4">
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              Semaphore integration
+            </div>
+            
+            {inlineIntegration ? (
+              /* Inline integration form */
+              <div className="space-y-4 border border-gray-300 dark:border-zinc-600 rounded-lg p-4">
+                <Field>
+                  <Label className="text-sm font-medium text-gray-900 dark:text-white">
+                    Semaphore Organization URL
+                  </Label>
                   <Input
-                    value={event.url}
-                    onChange={(e) => handleEventChange(event.id, 'url', e.target.value)}
-                    placeholder="https://hooks.example.com/webhook"
-                    className="w-full text-xs font-mono"
+                    type="url"
+                    value={inlineIntegrationData.orgUrl}
+                    onChange={(e) => setInlineIntegrationData(prev => ({ ...prev, orgUrl: e.target.value }))}
+                    placeholder="https://your-org.semaphoreci.com"
+                    className="w-full"
                   />
+                </Field>
+                
+                <Field>
+                  <Label className="text-sm font-medium text-gray-900 dark:text-white">
+                    API Token
+                  </Label>
+                  <Input
+                    type="password"
+                    value={inlineIntegrationData.apiToken}
+                    onChange={(e) => setInlineIntegrationData(prev => ({ ...prev, apiToken: e.target.value }))}
+                    placeholder="Enter your API token"
+                    className="w-full"
+                  />
+                </Field>
+              </div>
+            ) : availableIntegrations.length > 0 ? (
+              /* Show integration dropdown */
+              <div className="space-y-3">
+                <Dropdown>
+                  <DropdownButton outline className="flex items-center w-full !justify-between">
+                    {selectedIntegration 
+                      ? availableIntegrations.find(i => i.id === selectedIntegration)?.name || 'Select integration'
+                      : 'Select Semaphore integration'
+                    }
+                    <MaterialSymbol name="keyboard_arrow_down" />
+                  </DropdownButton>
+                  <DropdownMenu>
+                    {availableIntegrations.map((integration) => (
+                      <DropdownItem
+                        key={integration.id}
+                        onClick={() => setSelectedIntegration(integration.id)}
+                      >
+                        <DropdownLabel>{integration.name}</DropdownLabel>
+                      </DropdownItem>
+                    ))}
+                    <DropdownItem onClick={handleCreateIntegration}>
+                      <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                        <MaterialSymbol name="add" size="sm" />
+                        <span>Create new integration</span>
+                      </div>
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
+                <Field>
+                  <Label className="text-sm font-medium text-gray-900 dark:text-white">Semaphore Project</Label>
+                  <Input  type="text" placeholder="Enter your Semaphore project name" className="w-full" />
+                </Field>
+              </div>
+            ) : (
+              /* Empty state */
+              <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-700 border border-gray-200 dark:border-gray-700 rounded-md">
+                <div className="text-gray-500 dark:text-zinc-400 mb-3">
+                  No Semaphore integrations
                 </div>
                 <Button
-                  plain
-                  onClick={() => handleRemoveEvent(event.id)}
-                  className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                  onClick={handleCreateIntegration}
+                  color='blue'
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                 >
-                  <MaterialSymbol name="delete" size="sm" />
+                  Create integration
                 </Button>
-              </div>
-            ))}
-            {editData.events.length === 0 && (
-              <div className="text-sm text-gray-500 dark:text-zinc-400 italic p-3 border border-dashed border-gray-300 dark:border-zinc-600 rounded">
-                No events configured. Click "Add Event" to add webhook URLs.
               </div>
             )}
           </div>
@@ -303,6 +496,144 @@ export function EventSourceWorkflowNodeReactFlow({
         position={Position.Right} 
         className="w-3 h-3 bg-blue-600 border-2 border-white" 
       />
+
+      {/* Integration Creation Modal */}
+      <Dialog 
+        open={showIntegrationModal} 
+        onClose={() => setShowIntegrationModal(false)}
+        className="relative z-50"
+        size="md"
+      >
+        <DialogTitle>Create Semaphore Integration</DialogTitle>
+        <DialogDescription>
+          New integration will be saved to integrations page. Manage integrations  
+          <Link href="/integrations" className='text-blue-600 dark:text-blue-400'> here</Link>.
+        </DialogDescription>
+        
+        <DialogBody className="space-y-6">
+          {/* Integration Name */}
+          <Field>
+            <Label className="text-sm font-medium text-gray-900 dark:text-white">
+              Integration Name
+            </Label>
+            <Input
+              type="text"
+              value={integrationData.name}
+              onChange={(e) => setIntegrationData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter integration name"
+              className="w-full"
+            />
+          </Field>
+
+          {/* Semaphore Org URL */}
+          <Field>
+            <Label className="text-sm font-medium text-gray-900 dark:text-white">
+              Semaphore Org URL
+            </Label>
+            <Input
+              type="url"
+              value={integrationData.orgUrl}
+              onChange={(e) => setIntegrationData(prev => ({ ...prev, orgUrl: e.target.value }))}
+              placeholder="https://your-org.semaphoreci.com"
+              className="w-full"
+            />
+          </Field>
+
+          {/* API Token Section */}
+          <div className="space-y-4">
+            <div className="text-sm font-medium text-gray-900 dark:text-white flex items-center justify-between">
+              API Token
+              <Link href={'#'} className='flex items-center gap-2 text-blue-600 dark:text-blue-200 hidden'>
+                <MaterialSymbol name="add" size="md"/>Add new secret
+              </Link>
+            </div>
+            
+            {/* API Token Tabs */}
+            <div>
+              <ControlledTabs
+                tabs={apiTokenTabs}
+                activeTab={apiTokenTab}
+                variant='pills'
+                className='w-full'
+                onTabChange={(tabId) => setApiTokenTab(tabId as 'existing' | 'new')}
+              />
+              
+              <div className="pt-4">
+                {apiTokenTab === 'existing' ? (
+                  /* Select existing secret */
+                  <div className="space-y-4">
+                    <Field>
+                     
+                      <Dropdown>
+                        <DropdownButton outline className='flex items-center w-full !justify-between'>
+                          {integrationData.apiToken.secretName || 'Select secret'}
+                          <MaterialSymbol name="keyboard_arrow_down" />
+                        </DropdownButton>
+                        <DropdownMenu anchor="bottom start">
+                          {secrets.map((secret) => (
+                            <DropdownItem
+                              key={secret.id}
+                              onClick={() => setIntegrationData(prev => ({
+                                ...prev,
+                                apiToken: { ...prev.apiToken, secretName: secret.name, secretKey: secret.keys[0]?.key || '' }
+                              }))}
+                            >
+                              <DropdownLabel>{secret.name}</DropdownLabel>
+                            </DropdownItem>
+                          ))}
+                        </DropdownMenu>
+                      </Dropdown>
+                    </Field>
+                  </div>
+                ) : (
+                  /* Create new secret */
+                  <div className="space-y-4 w-full">
+                    <Text className='text-xs text-gray-500 dark:text-zinc-400'>
+                      New secret will be stored in your canvas secrets. 
+                      Manage your secrets in the secrets tab <Link href="#" className='text-blue-600 dark:text-blue-200'>here</Link>
+                    </Text>
+
+                    <Field className='flex items-start gap-3 w-full'>
+                      <div className='w-50'>
+                        <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                          Key
+                        </Label>
+                        <Input
+                          type="text"
+                          placeholder="Enter key"
+                          className="w-full"
+                        />
+                      </div>
+                      <div className='w-50'>
+                        <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                          Value
+                        </Label>
+                        <Input
+                          type="password"
+                          value={newSecretToken}
+                          onChange={(e) => setNewSecretToken(e.target.value)}
+                          placeholder="Enter your API token"
+                          className="w-full"
+                        />
+                      </div>
+                    </Field>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogBody>
+
+        <DialogActions>
+          <Button
+            color='blue'
+            onClick={handleSaveIntegration}
+            disabled={!integrationData.name || !integrationData.orgUrl || !integrationData.apiToken.secretName || !integrationData.apiToken.secretKey}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
