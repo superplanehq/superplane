@@ -30,12 +30,12 @@ export function ConnectionSelector({
   const { getConnectionOptions } = useConnectionOptions(currentEntityId);
 
   const renderConnectionOptions = () => {
-    const options = getConnectionOptions(connection.type);
+    const options = getConnectionOptions();
 
     if (options.length === 0 && connection.type) {
       return (
         <option value="" disabled>
-          No {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}s available
+          No connections available
         </option>
       );
     }
@@ -63,26 +63,8 @@ export function ConnectionSelector({
 
   return (
     <div className="space-y-3">
-      <ValidationField 
-        label="Connection Type"
-        error={validationError}
-      >
-        <select
-          value={connection.type || 'TYPE_EVENT_SOURCE'}
-          onChange={(e) => onConnectionUpdate(index, 'type', e.target.value as SuperplaneConnectionType)}
-          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
-            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-          }`}
-        >
-          <option value="TYPE_EVENT_SOURCE">Event Source</option>
-          <option value="TYPE_STAGE">Stage</option>
-          <option value="TYPE_CONNECTION_GROUP">Connection Group</option>
-        </select>
-      </ValidationField>
-
-      <ValidationField 
-        label="Connection Name"
+      <ValidationField
+        label="Connection"
         error={validationError}
       >
         <select
@@ -91,7 +73,7 @@ export function ConnectionSelector({
           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
             ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
             : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-          }`}
+            }`}
         >
           <option value="">
             {connection.type ? 'Select a connection...' : 'Select connection type first'}

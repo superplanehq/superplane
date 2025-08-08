@@ -15,21 +15,11 @@ export function useConnectionManager({ connections, setConnections, currentEntit
     setConnections(connections.map((conn, i) => {
       if (i === index) {
         const updatedConnection = { ...conn, [field]: value };
-
-        // If connection type changed, clear the connection name since available options will be different
-        if (field === 'type' && updatedConnection.name) {
-          const newOptions = getConnectionOptions(value as SuperplaneConnectionType);
-          const isCurrentNameValid = newOptions.some(option => option.value === updatedConnection.name);
-          if (!isCurrentNameValid) {
-            updatedConnection.name = '';
-          }
-        }
-
         return updatedConnection;
       }
       return conn;
     }));
-  }, [connections, setConnections, getConnectionOptions]);
+  }, [connections, setConnections]);
 
   const addFilter = useCallback((connectionIndex: number) => {
     const newFilter: SuperplaneFilter = {

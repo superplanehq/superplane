@@ -12,13 +12,16 @@ import { InlineEditable } from '../InlineEditable';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import GithubLogo from '@/assets/github-mark.svg';
+
 import { formatRelativeTime } from '../../utils/stageEventUtils';
 import Tippy from '@tippyjs/react';
 import 'tippy.js/dist/tippy.css';
 
 const StageImageMap = {
   'http': <MaterialSymbol className='w-6 h-5 -mt-2' name="rocket_launch" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />,
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
 }
 
 export default function StageNode(props: NodeProps<StageNodeType>) {
