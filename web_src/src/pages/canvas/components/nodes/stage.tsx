@@ -29,7 +29,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ label: string; description?: string; inputs: SuperplaneInputDefinition[]; outputs: SuperplaneOutputDefinition[]; connections: SuperplaneConnection[]; executor: SuperplaneExecutor; secrets: SuperplaneValueDefinition[]; conditions: SuperplaneCondition[]; inputMappings: SuperplaneInputMapping[]; isValid: boolean } | null>(null);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [stageName, setStageName] = useState(props.data.label || '');
   const [stageDescription, setStageDescription] = useState(props.data.description || '');
   const [nameError, setNameError] = useState<string | null>(null);
@@ -163,12 +162,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
 
     if (!currentFormData.isValid && !saveAsDraft) {
-      setApiError('Please fix validation errors before saving.');
       return;
     }
-
-    setApiError(null);
-
 
     const isTemporaryId = currentStage.metadata?.id && /^\d+$/.test(currentStage.metadata.id);
     const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
@@ -256,23 +251,26 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       const apiError = error as Error;
       console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, apiError);
 
-      const errorMessage = apiError.message || 'An error occurred while saving the stage';
-      setApiError(errorMessage);
+      console.error('API Error:', apiError);
+      
+      // Call the API error handler if available
+      const handleStageApiError = (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
+      if (handleStageApiError) {
+        handleStageApiError(apiError.message);
+      }
+      
       return;
     }
 
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
-    setApiError(null);
   };
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
     setEditingStage(null);
     setCurrentFormData(null);
-    setApiError(null);
-
     setStageName(props.data.label);
     setStageDescription(props.data.description || '');
   };
@@ -451,10 +449,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             className={`text-gray-600 dark:text-gray-400 text-sm text-left py-1 w-full mb-2 ` + (isEditMode && nameError ? 'mt-5' : 'mt-2')}
             isEditMode={isEditMode}
           />
-          {/* API Error Display */}
-          {isEditMode && apiError && (
-            <p className="text-left text-sm text-red-700 mt-1">{apiError}</p>
-          )}
         </div>
       </div>
 

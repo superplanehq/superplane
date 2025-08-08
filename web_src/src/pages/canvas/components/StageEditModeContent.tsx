@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
 import { useParams } from 'react-router-dom';
@@ -38,6 +38,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
@@ -62,6 +63,42 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  // API Error parsing function
+  const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
+    if (!errorMessage) return null;
+
+    // Check for project not found error
+    const projectNotFoundMatch = errorMessage.match(/project\s+([^\s]+)\s+not\s+found/i);
+    if (projectNotFoundMatch) {
+      return {
+        field: 'project',
+        message: `Project "${projectNotFoundMatch[1]}" not found`
+      };
+    }
+
+    return null;
+  }, []);
+
+  // Handle API errors by highlighting fields
+  const handleApiError = useCallback((errorMessage: string) => {
+    const parsedError = parseApiErrorMessage(errorMessage);
+    if (parsedError) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [parsedError.field]: parsedError.message
+      }));
+    }
+  }, [parseApiErrorMessage]);
+
+  // Expose handleApiError to global scope for stage.tsx to call
+  useEffect(() => {
+    (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError = handleApiError;
+
+    return () => {
+      delete (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
+    };
+  }, [handleApiError]);
 
   // Helper functions
   const getAllSecrets = () => {
@@ -101,13 +138,21 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
   // Validation functions
   const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+
     const nameErrors = validateName(input.name, inputs, index);
-    return nameErrors;
+    errors.push(...nameErrors);
+
+    return errors;
   };
 
   const validateOutput = (output: SuperplaneOutputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+
     const nameErrors = validateName(output.name, outputs, index);
-    return nameErrors;
+    errors.push(...nameErrors);
+
+    return errors;
   };
 
   const validateSecret = (secret: SuperplaneValueDefinition, index: number): string[] => {
@@ -352,7 +397,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         conditions,
         inputMappings
       });
-    }
+    }// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
 
   // Revert function for each section
@@ -535,7 +580,26 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
               <InlineEditor
                 isEditing={connectionsEditor.editingIndex === index}
                 onSave={connectionsEditor.saveEdit}
-                onCancel={() => connectionsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
+                onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
+                  if (!item.name || item.name.trim() === '') {
+                    return true;
+                  }
+
+                  if (item.filters && item.filters.length > 0) {
+                    const hasIncompleteFilters = item.filters.some(filter => {
+                      if (filter.type === 'FILTER_TYPE_DATA') {
+                        return !filter.data?.expression || filter.data.expression.trim() === '';
+                      }
+                      if (filter.type === 'FILTER_TYPE_HEADER') {
+                        return !filter.header?.expression || filter.header.expression.trim() === '';
+                      }
+                      return false;
+                    });
+                    return hasIncompleteFilters;
+                  }
+
+                  return false;
+                })}
                 onEdit={() => connectionsEditor.startEdit(index)}
                 onDelete={() => connectionsEditor.removeItem(index)}
                 displayName={connection.name || `Connection ${index + 1}`}
@@ -588,19 +652,36 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             );
 
             return (
-              <div key={`input-${currentStageId}-${input.name}-${index}`}>
+              <div key={`input-${currentStageId}-${index}`}>
                 <InlineEditor
                   isEditing={inputsEditor.editingIndex === index}
                   onSave={inputsEditor.saveEdit}
-                  onCancel={() => inputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
+                  onCancel={() => inputsEditor.cancelEdit(index, (item) => {
+                    // Remove if completely empty
+                    if (!item.name || item.name.trim() === '') {
+                      return true;
+                    }
+
+                    // Check if this is a new unsaved input (doesn't exist in originalData)
+                    const isNewInput = index >= originalData.inputs.length ||
+                      !originalData.inputs[index] ||
+                      originalData.inputs[index].name !== item.name;
+
+                    if (isNewInput) {
+                      // For new inputs, remove if they have validation errors or are incomplete
+                      const errors = validateInput(item, index);
+                      return errors.length > 0;
+                    }
+
+                    // For existing inputs, keep them even on cancel (just exit edit mode)
+                    return false;
+                  })}
                   onEdit={() => inputsEditor.startEdit(index)}
                   onDelete={() => {
                     const inputName = input.name;
 
-                    // Remove the input
                     inputsEditor.removeItem(index);
 
-                    // Clean up input mappings that reference this input
                     if (inputName) {
                       const updatedMappings = inputMappings.map(mapping => ({
                         ...mapping,
@@ -902,7 +983,21 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
               <InlineEditor
                 isEditing={outputsEditor.editingIndex === index}
                 onSave={outputsEditor.saveEdit}
-                onCancel={() => outputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
+                onCancel={() => outputsEditor.cancelEdit(index, (item) => {
+                  if (!item.name || item.name.trim() === '') {
+                    return true;
+                  }
+
+                  const isNewOutput = index >= originalData.outputs.length ||
+                    !originalData.outputs[index] ||
+                    originalData.outputs[index].name !== item.name;
+
+                  if (isNewOutput) {
+                    return true;
+                  }
+
+                  return false;
+                })}
                 onEdit={() => outputsEditor.startEdit(index)}
                 onDelete={() => outputsEditor.removeItem(index)}
                 displayName={output.name || `Output ${index + 1}`}
@@ -973,136 +1068,130 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           countLabel="conditions"
         >
           {conditions.map((condition, index) => (
-            <div key={index} className="p-3 border border-zinc-200 dark:border-zinc-700 rounded-md bg-zinc-50 dark:bg-zinc-800">
-              {conditionsEditor.editingIndex === index ? (
-                <div className="space-y-3">
-                  <ValidationField
-                    label="Condition Type"
-                    error={validationErrors[`condition_${index}`]}
-                  >
-                    <select
-                      value={condition.type || 'CONDITION_TYPE_APPROVAL'}
-                      onChange={(e) => updateConditionType(index, e.target.value as SuperplaneConditionType)}
-                      className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
-                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                        : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
-                    >
-                      <option value="CONDITION_TYPE_APPROVAL">Approval</option>
-                      <option value="CONDITION_TYPE_TIME_WINDOW">Time Window</option>
-                    </select>
-                  </ValidationField>
+            <div key={index}>
+              <InlineEditor
+                isEditing={conditionsEditor.editingIndex === index}
+                onSave={conditionsEditor.saveEdit}
+                onCancel={() => conditionsEditor.cancelEdit(index, (item) => {
+                  // Remove if condition type is not set or has validation errors
+                  if (!item.type || item.type === 'CONDITION_TYPE_UNKNOWN') {
+                    return true;
+                  }
 
-                  {condition.type === 'CONDITION_TYPE_APPROVAL' && (
-                    <ValidationField label="Required Approvals">
-                      <input
-                        type="number"
-                        min="1"
-                        value={condition.approval?.count || 1}
-                        onChange={(e) => conditionsEditor.updateItem(index, 'approval', { count: parseInt(e.target.value) || 1 })}
-                        placeholder="Number of required approvals"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                  // Check if this is a new unsaved condition
+                  const isNewCondition = index >= originalData.conditions.length ||
+                    !originalData.conditions[index];
+
+                  if (isNewCondition) {
+                    // For new conditions, remove if they have validation errors
+                    const errors = validateCondition(item);
+                    return errors.length > 0;
+                  }
+
+                  // For existing conditions, keep them even on cancel
+                  return false;
+                })}
+                onEdit={() => conditionsEditor.startEdit(index)}
+                onDelete={() => conditionsEditor.removeItem(index)}
+                displayName={
+                  condition.type === 'CONDITION_TYPE_APPROVAL'
+                    ? `Approval (${condition.approval?.count || 1} required)`
+                    : condition.type === 'CONDITION_TYPE_TIME_WINDOW'
+                      ? `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`
+                      : `Condition ${index + 1}`
+                }
+                badge={condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
+                  <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                    {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
+                  </span>
+                )}
+                editForm={
+                  <div className="space-y-4">
+                    <ValidationField
+                      label="Condition Type"
+                      error={validationErrors[`condition_${index}`]}
+                    >
+                      <select
+                        value={condition.type || 'CONDITION_TYPE_APPROVAL'}
+                        onChange={(e) => updateConditionType(index, e.target.value as SuperplaneConditionType)}
+                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                          }`}
+                      >
+                        <option value="CONDITION_TYPE_APPROVAL">Approval</option>
+                        <option value="CONDITION_TYPE_TIME_WINDOW">Time Window</option>
+                      </select>
                     </ValidationField>
-                  )}
 
-                  {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <ValidationField label="Start Time">
-                          <input
-                            type="time"
-                            value={condition.timeWindow?.start || ''}
-                            onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
-                              ...condition.timeWindow,
-                              start: e.target.value
-                            })}
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </ValidationField>
-                        <ValidationField label="End Time">
-                          <input
-                            type="time"
-                            value={condition.timeWindow?.end || ''}
-                            onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
-                              ...condition.timeWindow,
-                              end: e.target.value
-                            })}
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </ValidationField>
-                      </div>
-                      <ValidationField label="Days of Week">
-                        <div className="grid grid-cols-7 gap-1">
-                          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                            <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
-                              <input
-                                type="checkbox"
-                                checked={condition.timeWindow?.weekDays?.includes(day) || false}
-                                onChange={(e) => {
-                                  const currentDays = condition.timeWindow?.weekDays || [];
-                                  const newDays = e.target.checked
-                                    ? [...currentDays, day]
-                                    : currentDays.filter(d => d !== day);
-                                  conditionsEditor.updateItem(index, 'timeWindow', {
-                                    ...condition.timeWindow,
-                                    weekDays: newDays
-                                  });
-                                }}
-                                className="w-3 h-3"
-                              />
-                              <span className="text-gray-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
-                            </label>
-                          ))}
-                        </div>
+                    {condition.type === 'CONDITION_TYPE_APPROVAL' && (
+                      <ValidationField label="Required Approvals">
+                        <input
+                          type="number"
+                          min="1"
+                          value={condition.approval?.count || 1}
+                          onChange={(e) => conditionsEditor.updateItem(index, 'approval', { count: parseInt(e.target.value) || 1 })}
+                          placeholder="Number of required approvals"
+                          className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                       </ValidationField>
-                    </div>
-                  )}
+                    )}
 
-                  <div className="flex items-center justify-between pt-2">
-                    <button
-                      onClick={() => conditionsEditor.saveEdit()}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    >
-                      <MaterialSymbol name="check" size="sm" />
-                    </button>
-                    <button
-                      onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                    >
-                      <MaterialSymbol name="delete" size="sm" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-900 dark:text-zinc-100">
-                      {condition.type === 'CONDITION_TYPE_APPROVAL' && `Approval (${condition.approval?.count || 1} required)`}
-                      {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`}
-                    </div>
-                    {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
+                    {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <ValidationField label="Start Time">
+                            <input
+                              type="time"
+                              value={condition.timeWindow?.start || ''}
+                              onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
+                                ...condition.timeWindow,
+                                start: e.target.value
+                              })}
+                              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+                          <ValidationField label="End Time">
+                            <input
+                              type="time"
+                              value={condition.timeWindow?.end || ''}
+                              onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
+                                ...condition.timeWindow,
+                                end: e.target.value
+                              })}
+                              className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+                        </div>
+                        <ValidationField label="Days of Week">
+                          <div className="grid grid-cols-7 gap-1">
+                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                              <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
+                                <input
+                                  type="checkbox"
+                                  checked={condition.timeWindow?.weekDays?.includes(day) || false}
+                                  onChange={(e) => {
+                                    const currentDays = condition.timeWindow?.weekDays || [];
+                                    const newDays = e.target.checked
+                                      ? [...currentDays, day]
+                                      : currentDays.filter(d => d !== day);
+                                    conditionsEditor.updateItem(index, 'timeWindow', {
+                                      ...condition.timeWindow,
+                                      weekDays: newDays
+                                    });
+                                  }}
+                                  className="w-3 h-3"
+                                />
+                                <span className="text-zinc-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </ValidationField>
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => conditionsEditor.startEdit(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    >
-                      <MaterialSymbol name="edit" size="sm" />
-                    </button>
-                    <button
-                      onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                    >
-                      <MaterialSymbol name="delete" size="sm" />
-                    </button>
-                  </div>
-                </div>
-              )}
+                }
+              />
             </div>
           ))}
           <button
@@ -1154,29 +1243,22 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     </ValidationField>
 
                     <ValidationField label="Value Source">
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name={`valueSource-${index}`}
-                              checked={!secret.valueFrom}
-                              onChange={() => updateSecretMode(index, false)}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-zinc-100">Direct Value</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name={`valueSource-${index}`}
-                              checked={!!secret.valueFrom}
-                              onChange={() => updateSecretMode(index, true)}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-zinc-100">From Secret</span>
-                          </label>
-                        </div>
+                      <div className="mb-2">
+                        <ControlledTabs className="text-left m-0 max-w-[221px]"
+                          tabs={[
+                            {
+                              id: 'direct',
+                              label: 'Direct Value',
+                            },
+                            {
+                              id: 'secret',
+                              label: 'From Secret',
+                            },
+                          ]}
+                          variant="pills"
+                          activeTab={!secret.valueFrom ? 'direct' : 'secret'}
+                          onTabChange={(tabId) => updateSecretMode(index, tabId === 'secret')}
+                        />
                       </div>
 
                       {!secret.valueFrom ? (
@@ -1351,10 +1433,28 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   <input
                     type="text"
                     value={(executor.resource?.name as string) || ''}
-                    onChange={(e) => updateExecutorResource('name', e.target.value)}
+                    onChange={(e) => {
+                      updateExecutorResource('name', e.target.value);
+                      // Clear field error when user types
+                      if (fieldErrors.project) {
+                        setFieldErrors(prev => {
+                          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                          const { project, ...rest } = prev;
+                          return rest;
+                        });
+                      }
+                    }}
                     placeholder="my-semaphore-project"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                    className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.project
+                      ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                      : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                      }`}
                   />
+                  {fieldErrors.project && (
+                    <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                      {fieldErrors.project}
+                    </div>
+                  )}
                 </Field>
 
                 <Field>
