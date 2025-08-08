@@ -26,7 +26,7 @@ export const FlowRenderer: React.FC = () => {
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
   const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
-  const [lockedNodes, setLockedNodes] = useState(true);
+  const [lockedNodes, setLockedNodes] = useState(false);
 
   const { applyElkAutoLayout } = useAutoLayout();
   const { onNodeDragStop, onInit } = useFlowHandlers();

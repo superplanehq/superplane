@@ -59,7 +59,7 @@ export function useWebsocketEvents(canvasId: string): void {
     // Route the event to the appropriate handler
     switch (event) {
       case 'stage_added':
-        addStage(payload as EventMap['stage_added'], false, true);
+        addStage(payload as EventMap['stage_added'], false);
         break;
       case 'connection_group_added':
         addConnectionGroup(payload as EventMap['connection_group_added']);
@@ -68,7 +68,7 @@ export function useWebsocketEvents(canvasId: string): void {
         updateStage(payload as EventMap['stage_updated']);
         break;
       case 'event_source_added':
-        addEventSource(payload as EventMap['event_source_added'], true);
+        addEventSource(payload as EventMap['event_source_added']);
         break;
       case 'canvas_updated':
         updateCanvas(payload as EventMap['canvas_updated']);

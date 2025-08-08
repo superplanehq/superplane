@@ -15,6 +15,7 @@ import { ConnectionSelector } from './shared/ConnectionSelector';
 import { Field } from './Field';
 import { Label } from './Label';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { ControlledTabs } from '@/components/Tabs/tabs';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -1333,34 +1334,23 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
                 <Field>
                   <Label>Execution Type</Label>
-                  <div className="flex items-center gap-6 mt-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="semaphore-execution-type"
-                        value="workflow"
-                        checked={semaphoreExecutionType === 'workflow'}
-                        onChange={() => updateSemaphoreExecutionType('workflow')}
-                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-zinc-100">Workflow</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="semaphore-execution-type"
-                        value="task"
-                        checked={semaphoreExecutionType === 'task'}
-                        onChange={() => updateSemaphoreExecutionType('task')}
-                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-zinc-100">Task</span>
-                    </label>
-                  </div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    {semaphoreExecutionType === 'workflow'
-                      ? 'Uses the workflows API to run a workflow'
-                      : 'Uses the tasks API to run a specific task'}
+                  <div className="max-w-38">
+
+                    <ControlledTabs className="text-left m-0"
+                      tabs={[
+                        {
+                          id: 'workflow',
+                          label: 'Workflow',
+                        },
+                        {
+                          id: 'task',
+                          label: 'Task',
+                        },
+                      ]}
+                      variant="pills"
+                      activeTab={semaphoreExecutionType}
+                      onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
+                    />
                   </div>
                 </Field>
 

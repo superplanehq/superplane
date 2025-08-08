@@ -27,15 +27,14 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
           },
           resource: {
             type: 'project',
-            name: 'my-semaphore-project',
+            name: '',
           },
           spec: {
             task: '',
             branch: 'main',
-            pipelineFile: '.semaphore/pipeline.yml',
+            pipelineFile: '.semaphore/semaphore.yml',
             parameters: {
-              VERSION: '${{ inputs.VERSION }}',
-              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
+   
             }
           }
         };
@@ -53,8 +52,7 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             workflow: '.github/workflows/task.yaml',
             ref: 'main',
             inputs: {
-              VERSION: '${{ inputs.VERSION }}',
-              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
+              
             }
           }
         };
@@ -153,35 +151,3 @@ export function createEmptyNode(nodeType: NodeType, params: CreateNodeParams): S
       throw new Error(`Unknown node type: ${nodeType}`);
   }
 }
-
-/**
- * Get the display name for a node type
- */
-export const getNodeTypeDisplayName = (nodeType: NodeType): string => {
-  switch (nodeType) {
-    case 'stage':
-      return 'Stage';
-    case 'event_source':
-      return 'Event Source';
-    case 'connection_group':
-      return 'Connection Group';
-    default:
-      return 'Unknown';
-  }
-};
-
-/**
- * Get the default name pattern for a node type
- */
-export const getDefaultNodeName = (nodeType: NodeType): string => {
-  switch (nodeType) {
-    case 'stage':
-      return 'New Stage';
-    case 'event_source':
-      return 'New Event Source';
-    case 'connection_group':
-      return 'New Connection Group';
-    default:
-      return 'New Node';
-  }
-};

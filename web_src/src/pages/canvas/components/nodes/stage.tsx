@@ -357,6 +357,18 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     }
   };
 
+  const eventsMoreCount = useMemo(() => {
+    let total = (pendingEvents?.length || 0) + (waitingEvents?.length || 0)
+
+    if (lastWaitingEvent && lastWaitingEvent.stateReason === "STATE_REASON_APPROVAL")
+      total -= 1
+
+    if (lastPendingEvent)
+      total -= 1
+
+    return total
+  }, [lastPendingEvent, lastWaitingEvent, pendingEvents?.length, waitingEvents?.length])
+
   return (
     <div
       onClick={!isEditMode ? () => selectStageId(props.id) : undefined}
@@ -499,8 +511,8 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 </a>
               </div>
               <div className="flex items-center gap-2 font-semibold">
-                {lastInputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} inputs</span>}
-                {lastOutputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} outputs</span>}
+                {lastInputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastInputsCount} {lastInputsCount === 1 ? 'input' : 'inputs'}</span>}
+                {lastOutputsCount > 0 && <span className="inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-sm/5 font-medium sm:text-xs/5 forced-colors:outline bg-zinc-600/10 text-zinc-700 group-data-hover:bg-zinc-600/20 dark:bg-white/5 dark:text-zinc-400 dark:group-data-hover:bg-white/10">{lastOutputsCount} {lastOutputsCount === 1 ? 'output' : 'outputs'}</span>}
               </div>
             </div>
           </div>
@@ -509,7 +521,11 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
           <div className="px-3 pt-2 pb-2 w-full">
             <div className="w-full text-left flex justify-between text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-1">
               Next in queue
-              <span className="text-xs text-gray-400 font-medium">+{pendingEvents.length + waitingEvents.length} more</span>
+              {
+                eventsMoreCount > 0 && (
+                  <span className="text-xs text-gray-400 font-medium">+{eventsMoreCount} more</span>
+                )
+              }
             </div>
 
             {

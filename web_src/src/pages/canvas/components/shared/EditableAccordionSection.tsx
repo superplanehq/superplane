@@ -40,7 +40,7 @@ export function EditableAccordionSection({
         />
       </div>
       <div className="flex items-center gap-2">
-        {count !== undefined && (
+        {count !== undefined && count > 0 && (
           <span className="text-xs text-zinc-600 dark:text-zinc-400 font-normal pr-2">
             {count} {countLabel || 'items'}
           </span>
