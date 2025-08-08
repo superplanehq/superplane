@@ -78,7 +78,7 @@ func (c *StageEventApprovedConsumer) Consume(delivery tackle.Delivery) error {
 		return nil
 	}
 
-	stage, err := models.FindStageByID(stageID.String())
+	stage, err := models.FindStage(stageID.String())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			log.Warningf("stage %s not found", stageID)

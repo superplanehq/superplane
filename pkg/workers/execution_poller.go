@@ -53,7 +53,7 @@ func (w *ExecutionPoller) Tick() error {
 }
 
 func (w *ExecutionPoller) ProcessExecution(logger *log.Entry, execution *models.StageExecution) error {
-	stage, err := models.FindStageByID(execution.StageID.String())
+	stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 	if err != nil {
 		return err
 	}

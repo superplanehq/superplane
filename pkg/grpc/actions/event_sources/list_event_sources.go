@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListEventSources(ctx context.Context, canvasID string, req *pb.ListEventSourcesRequest) (*pb.ListEventSourcesResponse, error) {
+func ListEventSources(ctx context.Context, canvasID string) (*pb.ListEventSourcesResponse, error) {
 	canvas, err := models.FindCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")

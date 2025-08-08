@@ -192,14 +192,28 @@ type ApprovalCondition struct {
 	Count int `json:"count"`
 }
 
-func FindStageByID(id string) (*Stage, error) {
-	return FindStageByIDInTransaction(database.Conn(), id)
+func ListStages(canvasID string) ([]Stage, error) {
+	var stages []Stage
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Order("name ASC").
+		Find(&stages).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return stages, nil
 }
 
-func FindStageByIDInTransaction(tx *gorm.DB, id string) (*Stage, error) {
+// NOTE: we are not querying scoped by canvas here,
+// so this should be used only in the workers.
+func FindStage(id string) (*Stage, error) {
 	var stage Stage
 
-	err := tx.
+	err := database.Conn().
 		Where("id = ?", id).
 		First(&stage).
 		Error
@@ -211,12 +225,32 @@ func FindStageByIDInTransaction(tx *gorm.DB, id string) (*Stage, error) {
 	return &stage, nil
 }
 
-func FindStage(id, canvasID uuid.UUID) (*Stage, error) {
+func FindStageByID(canvasID string, id string) (*Stage, error) {
+	return FindStageByIDInTransaction(database.Conn(), canvasID, id)
+}
+
+func FindStageByIDInTransaction(tx *gorm.DB, canvasID string, id string) (*Stage, error) {
+	var stage Stage
+
+	err := tx.
+		Where("id = ?", id).
+		Where("canvas_id = ?", canvasID).
+		First(&stage).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &stage, nil
+}
+
+func FindStageByName(canvasID string, name string) (*Stage, error) {
 	var stage Stage
 
 	err := database.Conn().
 		Where("canvas_id = ?", canvasID).
-		Where("id = ?", id).
+		Where("name = ?", name).
 		First(&stage).
 		Error
 
@@ -279,6 +313,7 @@ func (s *Stage) FindIntegration() (*Integration, error) {
 }
 
 func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
+	connection.CanvasID = s.CanvasID
 	connection.TargetID = s.ID
 	connection.TargetType = ConnectionTargetTypeStage
 	return tx.Create(&connection).Error
