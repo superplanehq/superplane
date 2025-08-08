@@ -199,6 +199,17 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       }
     });
 
+    // Validate input mappings
+    inputMappings.forEach((mapping, index) => {
+      const mappingErrors: string[] = [];
+      if (!mapping.when?.triggeredBy?.connection) {
+        mappingErrors.push('Trigger connection is required');
+      }
+      if (mappingErrors.length > 0) {
+        errors[`inputMapping_${index}`] = mappingErrors.join(', ');
+      }
+    });
+
     // Validate executor
     if (executor.type && executor.type !== '') {
       if (!executor.spec || Object.keys(executor.spec).length === 0) {
@@ -295,20 +306,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     errorPrefix: 'condition'
   });
 
-  const inputMappingsEditor = useArrayEditor({
-    items: inputMappings,
-    setItems: setInputMappings,
-    createNewItem: () => ({
-      when: { triggeredBy: { connection: '' } },
-      values: []
-    }),
-    validateItem: (item) => {
-      const hasConnection = !!item.when?.triggeredBy?.connection;
-      return hasConnection ? [] : ['Trigger connection is required'];
-    },
-    setValidationErrors,
-    errorPrefix: 'inputMapping'
-  });
 
   // Sync component state with incoming data prop changes
   useEffect(() => {
@@ -383,10 +380,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         break;
       case 'executor':
         setExecutor({ ...originalData.executor });
-        break;
-      case 'inputMappings':
-        setInputMappings([...(originalData.inputMappings || [])]);
-        inputMappingsEditor.setEditingIndex(null);
         break;
     }
   };
@@ -589,48 +582,301 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           count={inputs.length}
           countLabel="inputs"
         >
-          {inputs.map((input, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={inputsEditor.editingIndex === index}
-                onSave={inputsEditor.saveEdit}
-                onCancel={() => inputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
-                onEdit={() => inputsEditor.startEdit(index)}
-                onDelete={() => inputsEditor.removeItem(index)}
-                displayName={input.name || `Input ${index + 1}`}
-                badge={null}
-                editForm={
-                  <div className="space-y-3">
-                    <ValidationField
-                      label="Name"
-                      error={validationErrors[`input_${index}`]}
-                    >
-                      <input
-                        type="text"
-                        value={input.name || ''}
-                        onChange={(e) => inputsEditor.updateItem(index, 'name', e.target.value)}
-                        placeholder="Input name"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-                    <ValidationField label="Description">
-                      <textarea
-                        value={input.description || ''}
-                        onChange={(e) => inputsEditor.updateItem(index, 'description', e.target.value)}
-                        placeholder="Input description"
-                        rows={2}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </ValidationField>
+          {inputs.map((input, index) => {
+            // Get mappings for this specific input
+            const inputMappingsForInput = inputMappings.filter(mapping =>
+              mapping.values?.some(value => value.name === input.name)
+            );
 
-                  </div>
-                }
-              />
-            </div>
-          ))}
+            return (
+              <div key={`input-${currentStageId}-${input.name}-${index}`}>
+                <InlineEditor
+                  isEditing={inputsEditor.editingIndex === index}
+                  onSave={inputsEditor.saveEdit}
+                  onCancel={() => inputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
+                  onEdit={() => inputsEditor.startEdit(index)}
+                  onDelete={() => {
+                    const inputName = input.name;
+
+                    // Remove the input
+                    inputsEditor.removeItem(index);
+
+                    // Clean up input mappings that reference this input
+                    if (inputName) {
+                      const updatedMappings = inputMappings.map(mapping => ({
+                        ...mapping,
+                        values: mapping.values?.filter(value => value.name !== inputName) || []
+                      })).filter(mapping =>
+                        // Remove mappings that have no values left
+                        mapping.values && mapping.values.length > 0
+                      );
+                      setInputMappings(updatedMappings);
+                    }
+                  }}
+                  displayName={input.name || `Input ${index + 1}`}
+                  badge={inputMappingsForInput.length > 0 ? (
+                    <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                      {inputMappingsForInput.length} mapping{inputMappingsForInput.length !== 1 ? 's' : ''}
+                    </span>
+                  ) : null}
+                  editForm={
+                    <div className="space-y-4">
+                      <ValidationField
+                        label="Name"
+                        error={validationErrors[`input_${index}`]}
+                      >
+                        <input
+                          type="text"
+                          value={input.name || ''}
+                          onChange={(e) => {
+                            const oldName = input.name;
+                            const newName = e.target.value;
+
+                            // Update the input name
+                            inputsEditor.updateItem(index, 'name', newName);
+
+                            // Update input mappings that reference this input
+                            if (oldName && newName !== oldName) {
+                              const updatedMappings = inputMappings.map(mapping => ({
+                                ...mapping,
+                                values: mapping.values?.map(value =>
+                                  value.name === oldName
+                                    ? { ...value, name: newName }
+                                    : value
+                                ) || []
+                              }));
+                              setInputMappings(updatedMappings);
+                            }
+                          }}
+                          placeholder="Input name"
+                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
+                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                            }`}
+                        />
+                      </ValidationField>
+                      <ValidationField label="Description">
+                        <textarea
+                          value={input.description || ''}
+                          onChange={(e) => inputsEditor.updateItem(index, 'description', e.target.value)}
+                          placeholder="Input description"
+                          rows={2}
+                          className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </ValidationField>
+
+                      {/* Input Mappings for this specific input */}
+                      <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                        <div className="flex justify-between items-center mb-3">
+                          <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Input Mappings</label>
+                          <button
+                            onClick={() => {
+                              // Add a new mapping for this specific input
+                              const newMapping = {
+                                when: { triggeredBy: { connection: '' } },
+                                values: [{ name: input.name, value: '' }]
+                              };
+                              setInputMappings(prev => [...prev, newMapping]);
+                            }}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
+                          >
+                            + Add Mapping
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          {inputMappingsForInput.map((mapping) => {
+                            const actualMappingIndex = inputMappings.findIndex(m => m === mapping);
+                            const inputValue = mapping.values?.find(v => v.name === input.name);
+
+                            return (
+                              <div key={actualMappingIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
+                                <div className="space-y-3">
+                                  {/* Trigger Connection */}
+                                  <ValidationField
+                                    label="Triggered by Connection"
+                                    error={validationErrors[`inputMapping_${actualMappingIndex}`]}
+                                  >
+                                    <select
+                                      value={mapping.when?.triggeredBy?.connection || ''}
+                                      onChange={(e) => {
+                                        const newMappings = [...inputMappings];
+                                        newMappings[actualMappingIndex] = {
+                                          ...newMappings[actualMappingIndex],
+                                          when: {
+                                            ...newMappings[actualMappingIndex].when,
+                                            triggeredBy: { connection: e.target.value }
+                                          }
+                                        };
+                                        setInputMappings(newMappings);
+                                      }}
+                                      className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
+                                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                        : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                        }`}
+                                    >
+                                      <option value="">Select trigger connection</option>
+                                      {connections.map((conn, connIndex) => (
+                                        <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                      ))}
+                                    </select>
+                                  </ValidationField>
+
+                                  {/* Value Mode Toggle */}
+                                  <div className="mb-3">
+                                    <label className="flex items-center gap-2 text-sm">
+                                      <input
+                                        type="checkbox"
+                                        checked={!!inputValue?.valueFrom?.eventData}
+                                        onChange={(e) => {
+                                          const newMappings = [...inputMappings];
+                                          const values = [...(newMappings[actualMappingIndex].values || [])];
+                                          const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                          if (valueIndex !== -1) {
+                                            if (e.target.checked) {
+                                              values[valueIndex] = {
+                                                ...values[valueIndex],
+                                                value: undefined,
+                                                valueFrom: {
+                                                  eventData: {
+                                                    connection: '',
+                                                    expression: values[valueIndex]?.value || ''
+                                                  }
+                                                }
+                                              };
+                                            } else {
+                                              values[valueIndex] = {
+                                                ...values[valueIndex],
+                                                value: values[valueIndex]?.valueFrom?.eventData?.expression || '',
+                                                valueFrom: undefined
+                                              };
+                                            }
+                                            newMappings[actualMappingIndex].values = values;
+                                            setInputMappings(newMappings);
+                                          }
+                                        }}
+                                        className="w-4 h-4"
+                                      />
+                                      Use expression (dynamic value)
+                                    </label>
+                                  </div>
+
+                                  {inputValue?.valueFrom?.eventData ? (
+                                    /* Expression Mode */
+                                    <div className="space-y-2">
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Data Source Connection</label>
+                                        <select
+                                          value={inputValue.valueFrom.eventData.connection || ''}
+                                          onChange={(e) => {
+                                            const newMappings = [...inputMappings];
+                                            const values = [...(newMappings[actualMappingIndex].values || [])];
+                                            const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                            if (valueIndex !== -1) {
+                                              values[valueIndex] = {
+                                                ...values[valueIndex],
+                                                valueFrom: {
+                                                  eventData: {
+                                                    ...values[valueIndex]?.valueFrom?.eventData,
+                                                    connection: e.target.value
+                                                  }
+                                                }
+                                              };
+                                              newMappings[actualMappingIndex].values = values;
+                                              setInputMappings(newMappings);
+                                            }
+                                          }}
+                                          className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                        >
+                                          <option value="">Select data source</option>
+                                          {connections.map((conn, connIndex) => (
+                                            <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-medium mb-1">Expression</label>
+                                        <input
+                                          value={inputValue.valueFrom.eventData.expression || ''}
+                                          onChange={(e) => {
+                                            const newMappings = [...inputMappings];
+                                            const values = [...(newMappings[actualMappingIndex].values || [])];
+                                            const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                            if (valueIndex !== -1) {
+                                              values[valueIndex] = {
+                                                ...values[valueIndex],
+                                                valueFrom: {
+                                                  eventData: {
+                                                    ...values[valueIndex]?.valueFrom?.eventData,
+                                                    expression: e.target.value
+                                                  }
+                                                }
+                                              };
+                                              newMappings[actualMappingIndex].values = values;
+                                              setInputMappings(newMappings);
+                                            }
+                                          }}
+                                          placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
+                                          className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                        />
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    /* Static Value Mode */
+                                    <div>
+                                      <label className="block text-xs font-medium mb-1">Static Value</label>
+                                      <input
+                                        value={inputValue?.value || ''}
+                                        onChange={(e) => {
+                                          const newMappings = [...inputMappings];
+                                          const values = [...(newMappings[actualMappingIndex].values || [])];
+                                          const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                          if (valueIndex !== -1) {
+                                            values[valueIndex] = { ...values[valueIndex], value: e.target.value };
+                                            newMappings[actualMappingIndex].values = values;
+                                            setInputMappings(newMappings);
+                                          }
+                                        }}
+                                        placeholder="e.g., production, staging"
+                                        className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                      />
+                                    </div>
+                                  )}
+
+                                  {/* Remove Mapping Button */}
+                                  <div className="flex justify-end">
+                                    <button
+                                      onClick={() => {
+                                        const newMappings = inputMappings.filter((_, i) => i !== actualMappingIndex);
+                                        setInputMappings(newMappings);
+                                      }}
+                                      className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
+                                    >
+                                      Remove Mapping
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {inputMappingsForInput.length === 0 && (
+                          <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
+                            No input mappings configured. Click "Add Mapping" to start.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  }
+                />
+              </div>
+            );
+          })}
           <button
             onClick={inputsEditor.addItem}
             className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
@@ -640,227 +886,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           </button>
         </EditableAccordionSection>
 
-        {/* Input Mappings Section */}
-        <EditableAccordionSection
-          id="inputMappings"
-          title="Input Mappings"
-          isOpen={openSections.includes('inputMappings')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(inputMappings, 'inputMappings')}
-          onRevert={revertSection}
-          count={inputMappings.length}
-          countLabel="mappings"
-        >
-          {inputMappings.map((mapping, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={inputMappingsEditor.editingIndex === index}
-                onSave={inputMappingsEditor.saveEdit}
-                onCancel={() => inputMappingsEditor.cancelEdit(index, (item) => !item.when?.triggeredBy?.connection)}
-                onEdit={() => inputMappingsEditor.startEdit(index)}
-                onDelete={() => inputMappingsEditor.removeItem(index)}
-                displayName={mapping.when?.triggeredBy?.connection ? `Triggered by ${mapping.when.triggeredBy.connection}` : `Mapping ${index + 1}`}
-                editForm={
-                  <div className="space-y-4">
-                    {/* Trigger Connection */}
-                    <ValidationField
-                      label="Triggered by Connection"
-                      error={validationErrors[`inputMapping_${index}`]}
-                    >
-                      <select
-                        value={mapping.when?.triggeredBy?.connection || ''}
-                        onChange={(e) => inputMappingsEditor.updateItem(index, 'when', {
-                          ...mapping.when,
-                          triggeredBy: { connection: e.target.value }
-                        })}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      >
-                        <option value="">Select trigger connection</option>
-                        {connections.map((conn, connIndex) => (
-                          <option key={connIndex} value={conn.name}>{conn.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 dark:text-zinc-400 mt-1">
-                        This mapping applies when the selected connection triggers the stage
-                      </p>
-                    </ValidationField>
-
-                    {/* Input Values */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3 text-zinc-600 dark:text-zinc-400">
-                        <label className="text-sm font-medium">Input Values</label>
-                        <button
-                          onClick={() => {
-                            const newValues = [...(mapping.values || []), { name: '', value: '' }];
-                            inputMappingsEditor.updateItem(index, 'values', newValues);
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                        >
-                          + Add Value
-                        </button>
-                      </div>
-
-                      <div className="space-y-3 text-zinc-600 dark:text-zinc-400">
-                        {(mapping.values || []).map((value, valueIndex) => (
-                          <div key={valueIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
-                            {/* Input Name */}
-                            <div className="mb-3">
-                              <label className="block text-xs font-medium mb-1">Input Name</label>
-                              <select
-                                value={value.name || ''}
-                                onChange={(e) => {
-                                  const newValues = [...(mapping.values || [])];
-                                  newValues[valueIndex] = { ...newValues[valueIndex], name: e.target.value };
-                                  inputMappingsEditor.updateItem(index, 'values', newValues);
-                                }}
-                                className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                              >
-                                <option value="">Select input to map</option>
-                                {inputs.map((input, inputIndex) => (
-                                  <option key={inputIndex} value={input.name}>{input.name}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {/* Value Mode Toggle */}
-                            <div className="mb-3">
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={!!value.valueFrom?.eventData}
-                                  onChange={(e) => {
-                                    const newValues = [...(mapping.values || [])];
-                                    if (e.target.checked) {
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        value: undefined,
-                                        valueFrom: {
-                                          eventData: {
-                                            connection: '',
-                                            expression: newValues[valueIndex]?.value || ''
-                                          }
-                                        }
-                                      };
-                                    } else {
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        value: newValues[valueIndex]?.valueFrom?.eventData?.expression || '',
-                                        valueFrom: undefined
-                                      };
-                                    }
-                                    inputMappingsEditor.updateItem(index, 'values', newValues);
-                                  }}
-                                  className="w-4 h-4"
-                                />
-                                Use expression (dynamic value)
-                              </label>
-                            </div>
-
-                            {value.valueFrom?.eventData ? (
-                              /* Expression Mode */
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
-                                  <select
-                                    value={value.valueFrom.eventData.connection || ''}
-                                    onChange={(e) => {
-                                      const newValues = [...(mapping.values || [])];
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        valueFrom: {
-                                          eventData: {
-                                            ...newValues[valueIndex]?.valueFrom?.eventData,
-                                            connection: e.target.value
-                                          }
-                                        }
-                                      };
-                                      inputMappingsEditor.updateItem(index, 'values', newValues);
-                                    }}
-                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  >
-                                    <option value="">Select data source</option>
-                                    {connections.map((conn, connIndex) => (
-                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Expression</label>
-                                  <input
-                                    value={value.valueFrom.eventData.expression || ''}
-                                    onChange={(e) => {
-                                      const newValues = [...(mapping.values || [])];
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        valueFrom: {
-                                          eventData: {
-                                            ...newValues[valueIndex]?.valueFrom?.eventData,
-                                            expression: e.target.value
-                                          }
-                                        }
-                                      };
-                                      inputMappingsEditor.updateItem(index, 'values', newValues);
-                                    }}
-                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
-                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              /* Static Value Mode */
-                              <div>
-                                <label className="block text-xs font-medium mb-1">Static Value</label>
-                                <input
-                                  value={value.value || ''}
-                                  onChange={(e) => {
-                                    const newValues = [...(mapping.values || [])];
-                                    newValues[valueIndex] = { ...newValues[valueIndex], value: e.target.value };
-                                    inputMappingsEditor.updateItem(index, 'values', newValues);
-                                  }}
-                                  placeholder="e.g., production, staging"
-                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                />
-                              </div>
-                            )}
-
-                            {/* Remove Value Button */}
-                            <div className="flex justify-end mt-2">
-                              <button
-                                onClick={() => {
-                                  const newValues = (mapping.values || []).filter((_, vi) => vi !== valueIndex);
-                                  inputMappingsEditor.updateItem(index, 'values', newValues);
-                                }}
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 text-xs"
-                              >
-                                Remove Value
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {(mapping.values || []).length === 0 && (
-                        <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
-                          No input values configured. Click "Add Value" to start.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={inputMappingsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Input Mapping
-          </button>
-        </EditableAccordionSection>
 
         {/* Outputs Section */}
         <EditableAccordionSection
