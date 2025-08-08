@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test__ListEventSources(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{})
 
 	t.Run("invalid canvas -> error", func(t *testing.T) {
-		_, err := ListEventSources(context.Background(), uuid.NewString(), &protos.ListEventSourcesRequest{})
+		_, err := ListEventSources(context.Background(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -26,20 +26,36 @@ func Test__ListEventSources(t *testing.T) {
 	})
 
 	t.Run("no event sources -> empty list", func(t *testing.T) {
-		res, err := ListEventSources(context.Background(), r.Canvas.ID.String(), &protos.ListEventSourcesRequest{})
+		res, err := ListEventSources(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.EventSources)
 	})
 
 	t.Run("lists only external event sources", func(t *testing.T) {
-		external, err := r.Canvas.CreateEventSource("external", "external", []byte("key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		external := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "external",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+
+		err := external.Create()
 		require.NoError(t, err)
 
-		_, err = r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
+		internal := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "internal",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeInternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+
+		err = internal.Create()
 		require.NoError(t, err)
 
-		res, err := ListEventSources(context.Background(), r.Canvas.ID.String(), &protos.ListEventSourcesRequest{})
+		res, err := ListEventSources(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.EventSources, 1)

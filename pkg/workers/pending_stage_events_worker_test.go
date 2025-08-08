@@ -35,7 +35,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-no-approval-1").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -91,7 +91,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-with-approval-1").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -136,7 +136,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-with-approval-2").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -201,7 +201,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-with-time-window").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -262,7 +262,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-with-time-window-2").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -316,7 +316,7 @@ func Test__PendingStageEventsWorker(t *testing.T) {
 		//
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-no-approval-3").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{

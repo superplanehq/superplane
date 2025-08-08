@@ -33,7 +33,7 @@ func Test__ExecutionPoller(t *testing.T) {
 	executorType, executorSpec, integrationResource := support.Executor(t, r)
 	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
-		InCanvas(r.Canvas).
+		InCanvas(r.Canvas.ID).
 		WithName("stage-1").
 		WithRequester(r.User).
 		WithConnections(connections).
@@ -113,7 +113,7 @@ func Test__ExecutionPoller(t *testing.T) {
 		executorType, executorSpec, integrationResource := support.Executor(t, r)
 		stageWithOutput, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-with-output").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{

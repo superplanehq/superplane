@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/datatypes"
 )
 
 func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
@@ -18,13 +19,11 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
+	source1, source2 := createTwoSources(t, canvas)
 
 	t.Run("single field", func(t *testing.T) {
-		connectionGroup, err := canvas.CreateConnectionGroup(
+		connectionGroup, err := CreateConnectionGroup(
+			canvas.ID,
 			"single-field-group",
 			"description",
 			uuid.NewString(),
@@ -53,7 +52,8 @@ func Test__ConnectionGroup__CalculateFieldSet(t *testing.T) {
 	})
 
 	t.Run("multiple fields", func(t *testing.T) {
-		connectionGroup, err := canvas.CreateConnectionGroup(
+		connectionGroup, err := CreateConnectionGroup(
+			canvas.ID,
 			"multiple-fields-group",
 			"description",
 			uuid.NewString(),
@@ -91,13 +91,11 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
+	source1, source2 := createTwoSources(t, canvas)
 
 	t.Run("single field", func(t *testing.T) {
-		connectionGroup, err := canvas.CreateConnectionGroup(
+		connectionGroup, err := CreateConnectionGroup(
+			canvas.ID,
 			"single-field-group",
 			"description",
 			uuid.NewString(),
@@ -172,7 +170,8 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	})
 
 	t.Run("new field set with same hash", func(t *testing.T) {
-		connectionGroup, err := canvas.CreateConnectionGroup(
+		connectionGroup, err := CreateConnectionGroup(
+			canvas.ID,
 			"group1",
 			"description",
 			uuid.NewString(),
@@ -235,7 +234,8 @@ func Test__ConnectionGroupFieldSet__MissingConnections(t *testing.T) {
 	})
 
 	t.Run("multiple fields", func(t *testing.T) {
-		connectionGroup, err := canvas.CreateConnectionGroup(
+		connectionGroup, err := CreateConnectionGroup(
+			canvas.ID,
 			"multiple-fields-group",
 			"description",
 			uuid.NewString(),
@@ -335,12 +335,10 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 	require.NoError(t, err)
 	canvas, err := CreateCanvas(user, org.ID, "test", "test")
 	require.NoError(t, err)
-	source1, err := canvas.CreateEventSource("source-1", "source-1", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
-	source2, err := canvas.CreateEventSource("source-2", "source-2", []byte("my-key"), EventSourceScopeExternal, []EventType{}, nil)
-	require.NoError(t, err)
 
-	connectionGroup, err := canvas.CreateConnectionGroup(
+	source1, source2 := createTwoSources(t, canvas)
+	connectionGroup, err := CreateConnectionGroup(
+		canvas.ID,
 		"group1",
 		"description",
 		uuid.NewString(),
@@ -390,4 +388,30 @@ func Test__ConnectionGroup__Emit(t *testing.T) {
 			"source-2": map[string]any{"ref": "v1", "app": "auth"},
 		},
 	}, rawEvent)
+}
+
+func createTwoSources(t *testing.T, canvas *Canvas) (*EventSource, *EventSource) {
+	source1 := &EventSource{
+		CanvasID:   canvas.ID,
+		Name:       "source-1",
+		Key:        []byte(`my-key`),
+		Scope:      EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]EventType{}),
+	}
+
+	err := source1.Create()
+	require.NoError(t, err)
+
+	source2 := &EventSource{
+		CanvasID:   canvas.ID,
+		Name:       "source-2",
+		Key:        []byte(`my-key`),
+		Scope:      EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]EventType{}),
+	}
+
+	err = source2.Create()
+	require.NoError(t, err)
+
+	return source1, source2
 }

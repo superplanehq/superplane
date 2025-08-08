@@ -9,6 +9,7 @@ import (
 
 type Connection struct {
 	ID             uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4()"`
+	CanvasID       uuid.UUID
 	TargetID       uuid.UUID
 	TargetType     string
 	SourceID       uuid.UUID

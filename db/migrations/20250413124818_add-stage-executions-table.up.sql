@@ -2,6 +2,7 @@ begin;
 
 CREATE TABLE stage_executions (
   id             uuid NOT NULL DEFAULT uuid_generate_v4(),
+  canvas_id      uuid NOT NULL,
   stage_id       uuid NOT NULL,
   stage_event_id uuid NOT NULL,
   reference_id   CHARACTER VARYING(64) NOT NULL,
@@ -14,6 +15,7 @@ CREATE TABLE stage_executions (
   finished_at    TIMESTAMP,
 
   PRIMARY KEY (id),
+  FOREIGN KEY (canvas_id) REFERENCES canvases(id),
   FOREIGN KEY (stage_id) REFERENCES stages(id),
   FOREIGN KEY (stage_event_id) REFERENCES stage_events(id)
 );

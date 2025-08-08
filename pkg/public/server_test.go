@@ -46,7 +46,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 	defer r.Close()
 
 	source, key, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
-		InCanvas(r.Canvas).
+		InCanvas(r.Canvas.ID).
 		WithName("demo-project").
 		WithScope(models.EventSourceScopeExternal).
 		ForIntegration(r.Integration).
@@ -322,7 +322,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 	executorType, executorSpec, resource := support.Executor(t, r)
 	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
-		InCanvas(r.Canvas).
+		InCanvas(r.Canvas.ID).
 		WithName("stage-1").
 		WithRequester(r.User).
 		WithConnections([]models.Connection{

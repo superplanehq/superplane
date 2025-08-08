@@ -31,101 +31,6 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
-func (c *Canvas) CreateEventSource(name string, description string, key []byte, scope string, eventTypes []EventType, resourceId *uuid.UUID) (*EventSource, error) {
-	return c.CreateEventSourceInTransaction(database.Conn(), uuid.New(), name, description, key, scope, eventTypes, resourceId)
-}
-
-// NOTE: caller must encrypt the key before calling this method.
-func (c *Canvas) CreateEventSourceInTransaction(
-	tx *gorm.DB,
-	id uuid.UUID,
-	name string,
-	description string,
-	key []byte,
-	scope string,
-	eventTypes []EventType,
-	resourceId *uuid.UUID,
-) (*EventSource, error) {
-	now := time.Now()
-
-	eventSource := EventSource{
-		ID:          id,
-		Name:        name,
-		CanvasID:    c.ID,
-		Description: description,
-		CreatedAt:   &now,
-		UpdatedAt:   &now,
-		Key:         key,
-		ResourceID:  resourceId,
-		State:       EventSourceStatePending,
-		Scope:       scope,
-		EventTypes:  datatypes.NewJSONSlice(eventTypes),
-	}
-
-	err := tx.
-		Clauses(clause.Returning{}).
-		Create(&eventSource).
-		Error
-
-	if err == nil {
-		return &eventSource, nil
-	}
-
-	if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
-		return nil, ErrNameAlreadyUsed
-	}
-
-	return nil, err
-}
-
-func (c *Canvas) FindEventSourceByName(name string) (*EventSource, error) {
-	var eventSource EventSource
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Where("name = ?", name).
-		Where("scope = ?", EventSourceScopeExternal).
-		First(&eventSource).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &eventSource, nil
-}
-
-func (c *Canvas) FindStageByName(name string) (*Stage, error) {
-	var stage Stage
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Where("name = ?", name).
-		First(&stage).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &stage, nil
-}
-
-func (c *Canvas) FindConnectionGroupByName(name string) (*ConnectionGroup, error) {
-	var connectionGroup ConnectionGroup
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Where("name = ?", name).
-		First(&connectionGroup).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &connectionGroup, nil
-}
-
 func (c *Canvas) FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
 	var connectionGroup ConnectionGroup
 
@@ -142,23 +47,6 @@ func (c *Canvas) FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error)
 	return &connectionGroup, nil
 }
 
-// NOTE: the caller must decrypt the key before using it
-func (c *Canvas) FindEventSourceByID(id uuid.UUID) (*EventSource, error) {
-	var eventSource EventSource
-	err := database.Conn().
-		Where("id = ?", id).
-		Where("canvas_id = ?", c.ID).
-		Where("scope = ?", EventSourceScopeExternal).
-		First(&eventSource).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &eventSource, nil
-}
-
 func (c *Canvas) FindStageByID(id string) (*Stage, error) {
 	var stage Stage
 
@@ -173,38 +61,6 @@ func (c *Canvas) FindStageByID(id string) (*Stage, error) {
 	}
 
 	return &stage, nil
-}
-
-func (c *Canvas) ListStages() ([]Stage, error) {
-	var stages []Stage
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Order("name ASC").
-		Find(&stages).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return stages, nil
-}
-
-func (c *Canvas) ListConnectionGroups() ([]ConnectionGroup, error) {
-	var connectionGroups []ConnectionGroup
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Order("name ASC").
-		Find(&connectionGroups).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return connectionGroups, nil
 }
 
 func (c *Canvas) CreateStage(

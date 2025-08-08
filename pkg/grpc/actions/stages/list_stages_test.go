@@ -10,20 +10,10 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListStages(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("no canvas ID -> error", func(t *testing.T) {
-		_, err := ListStages(context.Background(), &protos.ListStagesRequest{})
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "canvas not found")
-	})
 
 	t.Run("no stages -> empty list", func(t *testing.T) {
 		org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
@@ -32,20 +22,14 @@ func Test__ListStages(t *testing.T) {
 		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas", "empty canvas")
 		require.NoError(t, err)
 
-		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasIdOrName: canvas.ID.String(),
-		})
-
+		res, err := ListStages(context.Background(), canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		assert.Empty(t, res.Stages)
 	})
 
 	t.Run("with stage -> list", func(t *testing.T) {
-		res, err := ListStages(context.Background(), &protos.ListStagesRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
+		res, err := ListStages(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.Len(t, res.Stages, 1)

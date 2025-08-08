@@ -22,28 +22,18 @@ func Test__ApproveStageEvent(t *testing.T) {
 	r := support.Setup(t)
 	event := support.CreateStageEvent(t, r.Source, r.Stage)
 	userID := uuid.New().String()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
 
-	t.Run("no canvas ID -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
-		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
-			StageIdOrName: uuid.New().String(),
-			EventId:       event.ID.String(),
-		})
-
+	t.Run("wrong canvas -> error", func(t *testing.T) {
+		_, err := ApproveStageEvent(ctx, uuid.NewString(), r.Stage.ID.String(), event.ID.String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
+		assert.Equal(t, "stage not found", s.Message())
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
-		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			StageIdOrName:  uuid.New().String(),
-			EventId:        event.ID.String(),
-		})
-
+		_, err := ApproveStageEvent(ctx, r.Canvas.ID.String(), uuid.NewString(), event.ID.String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -51,13 +41,7 @@ func Test__ApproveStageEvent(t *testing.T) {
 	})
 
 	t.Run("stage event does not exist -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
-		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			StageIdOrName:  r.Stage.ID.String(),
-			EventId:        uuid.New().String(),
-		})
-
+		_, err := ApproveStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -70,13 +54,7 @@ func Test__ApproveStageEvent(t *testing.T) {
 		testconsumer.Start()
 		defer testconsumer.Stop()
 
-		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
-		res, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			StageIdOrName:  r.Stage.ID.String(),
-			EventId:        event.ID.String(),
-		})
-
+		res, err := ApproveStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), event.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)
 		require.NotNil(t, res.Event)
@@ -93,13 +71,7 @@ func Test__ApproveStageEvent(t *testing.T) {
 	})
 
 	t.Run("approves with same requester ID -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), userID)
-		_, err := ApproveStageEvent(ctx, &protos.ApproveStageEventRequest{
-			CanvasIdOrName: r.Canvas.Name,
-			StageIdOrName:  r.Stage.ID.String(),
-			EventId:        event.ID.String(),
-		})
-
+		_, err := ApproveStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), event.ID.String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

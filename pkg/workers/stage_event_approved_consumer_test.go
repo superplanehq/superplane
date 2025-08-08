@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/authentication"
 	stageevents "github.com/superplanehq/superplane/pkg/grpc/actions/stage_events"
 	"github.com/superplanehq/superplane/pkg/models"
-	superplane "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -43,12 +42,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	// Approve event once
 	//
 	ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-	_, err := stageevents.ApproveStageEvent(ctx, &superplane.ApproveStageEventRequest{
-		CanvasIdOrName: r.Canvas.ID.String(),
-		StageIdOrName:  r.Stage.ID.String(),
-		EventId:        event.ID.String(),
-	})
-
+	_, err := stageevents.ApproveStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), event.ID.String())
 	require.NoError(t, err)
 
 	//
@@ -64,12 +58,7 @@ func Test__StageEventApprovedConsumer(t *testing.T) {
 	// Approve event again
 	//
 	ctx = authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-	_, err = stageevents.ApproveStageEvent(ctx, &superplane.ApproveStageEventRequest{
-		CanvasIdOrName: r.Canvas.ID.String(),
-		StageIdOrName:  r.Stage.ID.String(),
-		EventId:        event.ID.String(),
-	})
-
+	_, err = stageevents.ApproveStageEvent(ctx, r.Canvas.ID.String(), r.Stage.ID.String(), event.ID.String())
 	require.NoError(t, err)
 
 	//

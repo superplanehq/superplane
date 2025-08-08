@@ -2,12 +2,14 @@ package models
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 const (
@@ -36,6 +38,34 @@ type EventType struct {
 	Type           string   `json:"type"`
 	FilterOperator string   `json:"filter_operator"`
 	Filters        []Filter `json:"filters"`
+}
+
+// NOTE: caller must encrypt the key before calling this method.
+func (s *EventSource) Create() error {
+	return s.CreateInTransaction(database.Conn())
+}
+
+func (s *EventSource) CreateInTransaction(tx *gorm.DB) error {
+	now := time.Now()
+
+	s.CreatedAt = &now
+	s.UpdatedAt = &now
+	s.State = EventSourceStatePending
+
+	err := tx.
+		Clauses(clause.Returning{}).
+		Create(&s).
+		Error
+
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
+		return ErrNameAlreadyUsed
+	}
+
+	return err
 }
 
 func (s *EventSource) UpdateKey(key []byte) error {
@@ -112,14 +142,44 @@ func FindEventSource(id uuid.UUID) (*EventSource, error) {
 	return &eventSource, nil
 }
 
-func FindEventSourceByName(name string) (*EventSource, error) {
-	return FindEventSourceByNameInTransaction(database.Conn(), name)
+func FindExternalEventSourceByID(canvasID string, id string) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("id = ?", id).
+		Where("canvas_id = ?", canvasID).
+		Where("scope = ?", EventSourceScopeExternal).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
 }
 
-func FindEventSourceByNameInTransaction(tx *gorm.DB, name string) (*EventSource, error) {
+func FindExternalEventSourceByName(canvasID string, name string) (*EventSource, error) {
 	var eventSource EventSource
-	err := tx.
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
 		Where("name = ?", name).
+		Where("scope = ?", EventSourceScopeExternal).
+		First(&eventSource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &eventSource, nil
+}
+
+func FindInternalEventSourceByName(canvasID string, name string) (*EventSource, error) {
+	var eventSource EventSource
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("name = ?", name).
+		Where("scope = ?", EventSourceScopeInternal).
 		First(&eventSource).
 		Error
 

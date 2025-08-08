@@ -20,7 +20,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	connectionGroup, err := r.Canvas.CreateConnectionGroup(
+	connectionGroup, err := models.CreateConnectionGroup(
+		r.Canvas.ID,
 		"test",
 		"test",
 		uuid.NewString(),
@@ -38,26 +39,16 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 
 	require.NoError(t, err)
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: uuid.NewString(),
-			IdOrName:       connectionGroup.ID.String(),
-		}
-
-		_, err := UpdateConnectionGroup(ctx, req)
+	t.Run("wrong canvas -> error", func(t *testing.T) {
+		_, err := UpdateConnectionGroup(ctx, uuid.NewString(), connectionGroup.ID.String(), &protos.ConnectionGroup{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
+		assert.Equal(t, "connection group not found", s.Message())
 	})
 
 	t.Run("connection group does not exist -> error", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       uuid.NewString(),
-		}
-
-		_, err := UpdateConnectionGroup(ctx, req)
+		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), uuid.NewString(), &protos.ConnectionGroup{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -65,17 +56,7 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("no user ID in context -> error", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       connectionGroup.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-			},
-		}
-
-		_, err := UpdateConnectionGroup(context.Background(), req)
+		_, err := UpdateConnectionGroup(context.Background(), r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -83,20 +64,15 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no connections -> error", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       connectionGroup.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{},
-				},
+		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
 			},
-		}
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{},
+			},
+		})
 
-		_, err := UpdateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -104,25 +80,20 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no group by fields -> error", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       connectionGroup.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
+		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
 				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{},
-					},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{},
 				},
 			},
-		}
+		})
 
-		_, err := UpdateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -130,30 +101,25 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group is updated", func(t *testing.T) {
-		req := &protos.UpdateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       connectionGroup.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name:        "updated-test",
-					Description: "updated-description",
+		response, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name:        "updated-test",
+				Description: "updated-description",
+			},
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+					{Name: r.Stage.Name, Type: protos.Connection_TYPE_STAGE},
 				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-						{Name: r.Stage.Name, Type: protos.Connection_TYPE_STAGE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
-							{Name: "a", Expression: "a"},
-							{Name: "b", Expression: "b"},
-						},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+						{Name: "a", Expression: "a"},
+						{Name: "b", Expression: "b"},
 					},
 				},
 			},
-		}
+		})
 
-		response, err := UpdateConnectionGroup(ctx, req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.ConnectionGroup)

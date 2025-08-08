@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -17,26 +16,8 @@ import (
 func Test__DescribeConnectionGroup(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.DescribeConnectionGroupRequest{
-			CanvasIdOrName: uuid.NewString(),
-			IdOrName:       "test",
-		}
-
-		_, err := DescribeConnectionGroup(context.Background(), req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("connection group does not exist -> error", func(t *testing.T) {
-		req := &protos.DescribeConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       uuid.NewString(),
-		}
-
-		_, err := DescribeConnectionGroup(context.Background(), req)
+		_, err := DescribeConnectionGroup(context.Background(), r.Canvas.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -44,7 +25,8 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group exists", func(t *testing.T) {
-		_, err := r.Canvas.CreateConnectionGroup(
+		_, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			"test",
 			"test",
 			uuid.NewString(),
@@ -61,12 +43,7 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-		req := &protos.DescribeConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			IdOrName:       "test",
-		}
-
-		response, err := DescribeConnectionGroup(context.Background(), req)
+		response, err := DescribeConnectionGroup(context.Background(), r.Canvas.ID.String(), "test")
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.ConnectionGroup)

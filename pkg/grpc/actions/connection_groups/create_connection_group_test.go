@@ -13,35 +13,20 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test__CreateConnectionGroup(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: uuid.NewString(),
-		}
-
-		_, err := CreateConnectionGroup(ctx, req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
+	ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
 
 	t.Run("no user ID in context -> error", func(t *testing.T) {
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
+		_, err := CreateConnectionGroup(context.Background(), r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
 			},
-		}
+		})
 
-		_, err := CreateConnectionGroup(context.Background(), req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -49,15 +34,10 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no name -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{},
-			},
-		}
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{},
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -65,20 +45,15 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no connections -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{},
-				},
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
 			},
-		}
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{},
+			},
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -86,25 +61,28 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("cannot use internal event source in connection -> error", func(t *testing.T) {
-		internalSource, err := r.Canvas.CreateEventSource("internal", "internal", []byte(`key`), models.EventSourceScopeInternal, []models.EventType{}, nil)
-		require.NoError(t, err)
-
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: internalSource.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-				},
-			},
+		internalSource := models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "internal",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeInternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		_, err = CreateConnectionGroup(ctx, req)
+		err := internalSource.Create()
+		require.NoError(t, err)
+
+		_, err = CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: internalSource.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+				},
+			},
+		})
+
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -112,25 +90,20 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no group by fields -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
 				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{},
-					},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{},
 				},
 			},
-		}
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -138,28 +111,23 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with timeout value below min -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
-							{Name: "test", Expression: "test"},
-						},
-					},
-					Timeout: models.MinConnectionGroupTimeout - 1,
-				},
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
 			},
-		}
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+				},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+						{Name: "test", Expression: "test"},
+					},
+				},
+				Timeout: models.MinConnectionGroupTimeout - 1,
+			},
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -167,28 +135,23 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with timeout value above max -> error", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
-							{Name: "test", Expression: "test"},
-						},
-					},
-					Timeout: models.MaxConnectionGroupTimeout + 1,
-				},
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
 			},
-		}
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+				},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+						{Name: "test", Expression: "test"},
+					},
+				},
+				Timeout: models.MaxConnectionGroupTimeout + 1,
+			},
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -196,30 +159,25 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("valid connection group is created", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name:        "test",
-					Description: "test-description",
-				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
-							{Name: "test", Expression: "test"},
-						},
-					},
-					Timeout:         models.MaxConnectionGroupTimeout,
-					TimeoutBehavior: protos.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP,
-				},
+		response, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name:        "test",
+				Description: "test-description",
 			},
-		}
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
+				},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+						{Name: "test", Expression: "test"},
+					},
+				},
+				Timeout:         models.MaxConnectionGroupTimeout,
+				TimeoutBehavior: protos.ConnectionGroup_Spec_TIMEOUT_BEHAVIOR_DROP,
+			},
+		})
 
-		response, err := CreateConnectionGroup(ctx, req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.ConnectionGroup)
@@ -236,27 +194,22 @@ func Test__CreateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("name already used", func(t *testing.T) {
-		ctx := authentication.SetUserIdInMetadata(context.Background(), uuid.NewString())
-		req := &protos.CreateConnectionGroupRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			ConnectionGroup: &protos.ConnectionGroup{
-				Metadata: &protos.ConnectionGroup_Metadata{
-					Name: "test",
+		_, err := CreateConnectionGroup(ctx, r.Canvas.ID.String(), &protos.ConnectionGroup{
+			Metadata: &protos.ConnectionGroup_Metadata{
+				Name: "test",
+			},
+			Spec: &protos.ConnectionGroup_Spec{
+				Connections: []*protos.Connection{
+					{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
 				},
-				Spec: &protos.ConnectionGroup_Spec{
-					Connections: []*protos.Connection{
-						{Name: r.Source.Name, Type: protos.Connection_TYPE_EVENT_SOURCE},
-					},
-					GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
-						Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
-							{Name: "test", Expression: "test"},
-						},
+				GroupBy: &protos.ConnectionGroup_Spec_GroupBy{
+					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{
+						{Name: "test", Expression: "test"},
 					},
 				},
 			},
-		}
+		})
 
-		_, err := CreateConnectionGroup(ctx, req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())

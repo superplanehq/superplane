@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -14,26 +13,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListConnectionGroupFieldSets(ctx context.Context, req *pb.ListConnectionGroupFieldSetsRequest) (*pb.ListConnectionGroupFieldSetsResponse, error) {
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+func ListConnectionGroupFieldSets(ctx context.Context, canvasID string, idOrName string) (*pb.ListConnectionGroupFieldSetsResponse, error) {
+	err := actions.ValidateUUIDs(idOrName)
 	var connectionGroup *models.ConnectionGroup
 	if err != nil {
-		connectionGroup, err = canvas.FindConnectionGroupByName(req.IdOrName)
+		connectionGroup, err = models.FindConnectionGroupByName(canvasID, idOrName)
 	} else {
-		connectionGroup, err = canvas.FindConnectionGroupByID(uuid.MustParse(req.IdOrName))
+		connectionGroup, err = models.FindConnectionGroupByID(canvasID, idOrName)
 	}
 
 	if err != nil {
