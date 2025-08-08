@@ -244,7 +244,6 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
                     currentEntityId={currentConnectionGroupId}
                     validationError={validationErrors[`connection_${index}`]}
                     showFilters={false}
-                    existingConnections={connections}
                   />
                 }
               />

@@ -13,7 +13,6 @@ interface ConnectionSelectorProps {
   currentEntityId?: string;
   validationError?: string;
   showFilters?: boolean;
-  existingConnections?: SuperplaneConnection[];
 }
 
 export function ConnectionSelector({
@@ -26,41 +25,25 @@ export function ConnectionSelector({
   onFilterOperatorToggle,
   currentEntityId,
   validationError,
-  showFilters = true,
-  existingConnections = []
+  showFilters = true
 }: ConnectionSelectorProps) {
   const { getConnectionOptions } = useConnectionOptions(currentEntityId);
 
-  const renderBreadcrumbConnectionOptions = () => {
-    // Get all connection options (not filtered by type)
-    const allOptions = getConnectionOptions(undefined);
+  const renderConnectionOptions = () => {
+    const options = getConnectionOptions(connection.type);
 
-    // Filter out already added connections, but keep the current connection if it exists
-    const filteredOptions = allOptions.filter(option => {
-      // Check if this connection is already in the existingConnections array
-      const isAlreadyAdded = existingConnections.some((existingConn, existingIndex) => {
-        // Skip the current connection being edited
-        if (existingIndex === index) {
-          return false;
-        }
-        return existingConn.name === option.value;
-      });
-
-      return !isAlreadyAdded;
-    });
-
-    if (filteredOptions.length === 0) {
+    if (options.length === 0 && connection.type) {
       return (
         <option value="" disabled>
-          No available connections
+          No {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}s available
         </option>
       );
     }
 
-    const groupedOptions: Record<string, typeof filteredOptions> = {};
+    const groupedOptions: Record<string, typeof options> = {};
 
     // Group options by their group property
-    filteredOptions.forEach(option => {
+    options.forEach(option => {
       if (!groupedOptions[option.group]) {
         groupedOptions[option.group] = [];
       }
@@ -70,81 +53,50 @@ export function ConnectionSelector({
     return Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
       <optgroup key={groupName} label={groupName}>
         {groupOptions.map(option => (
-          <option key={`${groupName}-${option.value}`} value={`${groupName}-${option.value}`}>
-            {groupName.replace('s', '')} → {option.label}
+          <option key={option.value} value={option.value}>
+            {option.label}
           </option>
         ))}
       </optgroup>
     ));
   };
 
-  const handleBreadcrumbConnectionChange = (value: string) => {
-    if (!value) {
-      onConnectionUpdate(index, 'type', 'TYPE_EVENT_SOURCE');
-      onConnectionUpdate(index, 'name', '');
-      return;
-    }
-
-    const [groupName, connectionName] = value.split('-');
-    let connectionType: SuperplaneConnectionType;
-
-    switch (groupName) {
-      case 'Event Sources':
-        connectionType = 'TYPE_EVENT_SOURCE';
-        break;
-      case 'Stages':
-        connectionType = 'TYPE_STAGE';
-        break;
-      case 'Connection Groups':
-        connectionType = 'TYPE_CONNECTION_GROUP';
-        break;
-      default:
-        connectionType = 'TYPE_EVENT_SOURCE';
-    }
-
-    onConnectionUpdate(index, 'type', connectionType);
-    onConnectionUpdate(index, 'name', connectionName);
-  };
-
-  const getCurrentBreadcrumbValue = () => {
-    if (!connection.type || !connection.name) {
-      return '';
-    }
-
-    let groupName = '';
-    switch (connection.type) {
-      case 'TYPE_EVENT_SOURCE':
-        groupName = 'Event Sources';
-        break;
-      case 'TYPE_STAGE':
-        groupName = 'Stages';
-        break;
-      case 'TYPE_CONNECTION_GROUP':
-        groupName = 'Connection Groups';
-        break;
-      default:
-        groupName = 'Event Sources';
-    }
-
-    return `${groupName}-${connection.name}`;
-  };
-
   return (
     <div className="space-y-3">
-      <ValidationField
-        label="Connection"
+      <ValidationField 
+        label="Connection Type"
         error={validationError}
       >
         <select
-          value={getCurrentBreadcrumbValue()}
-          onChange={(e) => handleBreadcrumbConnectionChange(e.target.value)}
+          value={connection.type || 'TYPE_EVENT_SOURCE'}
+          onChange={(e) => onConnectionUpdate(index, 'type', e.target.value as SuperplaneConnectionType)}
           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
             ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
             : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-            }`}
+          }`}
         >
-          <option value="">Select a connection...</option>
-          {renderBreadcrumbConnectionOptions()}
+          <option value="TYPE_EVENT_SOURCE">Event Source</option>
+          <option value="TYPE_STAGE">Stage</option>
+          <option value="TYPE_CONNECTION_GROUP">Connection Group</option>
+        </select>
+      </ValidationField>
+
+      <ValidationField 
+        label="Connection Name"
+        error={validationError}
+      >
+        <select
+          value={connection.name || ''}
+          onChange={(e) => onConnectionUpdate(index, 'name', e.target.value)}
+          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
+            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+          }`}
+        >
+          <option value="">
+            {connection.type ? 'Select a connection...' : 'Select connection type first'}
+          </option>
+          {renderConnectionOptions()}
         </select>
       </ValidationField>
 
