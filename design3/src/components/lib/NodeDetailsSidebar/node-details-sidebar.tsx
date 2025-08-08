@@ -10,6 +10,7 @@ import { Badge } from '../Badge/badge';
 import { Dropdown, DropdownButton, DropdownMenu, DropdownItem } from '../Dropdown/dropdown';
 import clsx from 'clsx';
 import { Divider } from '../Divider/divider';
+import { EmptyState } from '../EmptyState';
 
 interface RunData {
   id: string;
@@ -803,6 +804,13 @@ export function NodeDetailsSidebar({
         {activeTab === 'activity' && (
           <div className="p-4 space-y-6">
             {/* Recent Runs */}
+            <div className="flex items-center justify-between mb-4">
+              <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">
+                RECENT RUNS
+              </Text>
+              
+            </div>
+            <EmptyState size='sm' className='bg-gray-50 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700' title="No recent runs" body="No recent runs"/>
             <div>
               <div className="flex items-center justify-between mb-4">
                 <Text className="text-sm font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide">

@@ -59,6 +59,7 @@ import { Link } from './lib/Link/link';
 import { Field, Label } from './lib/Fieldset/fieldset';
 import { ControlledTabs, type Tab } from './lib/Tabs/tabs';
 import { NodeDetailsSidebar } from './lib/NodeDetailsSidebar/node-details-sidebar';
+import { EmptyState } from './lib/EmptyState/empty-state';
 import Tippy from '@tippyjs/react';
 
 
@@ -1379,13 +1380,19 @@ const computedEdges = edges.map(edge => {
             {integrationsTab === 'connected' ? (
               /* Connected Integrations Tab */
               <div className="bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-8">
-                <div className="text-center py-12">
-                  <MaterialSymbol name="integration_instructions" size="lg" className="mx-auto text-zinc-400 mb-4" />
-                  <Text className="text-zinc-700 dark:text-zinc-100 mb-1 !text-xl">You have not connected any integrations yet</Text>
-                  <Text className="text-zinc-500 dark:text-zinc-400 text-sm">
-                    Browse full <Link href="/integrations" className='text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300'> list of integrations</Link> to get started
-                  </Text>
-                </div>
+                <EmptyState
+                  icon="integration_instructions"
+                  title="Start by connecting your first integration"
+                  body="Integrations help you connect external services and automate your workflows. Browse our catalog to find the perfect integration for your needs."
+                  primaryAction={{
+                    label: 'Browse integrations',
+                    onClick: () => setIntegrationsTab('add-new')
+                  }}
+                  secondaryAction={{
+                    label: 'View integration documentation',
+                    href: '/docs/integrations'
+                  }}
+                />
               </div>
             ) : (
               /* Add New Integrations Tab */
