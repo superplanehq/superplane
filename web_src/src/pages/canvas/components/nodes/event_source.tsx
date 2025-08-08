@@ -13,10 +13,12 @@ import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
+import GithubLogo from '@/assets/github-mark.svg';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='w-6 h-5 -mt-2' name="webhook" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />,
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -183,12 +185,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
-  const eventSourceType = props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook");
+  let eventSourceType = props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook");
+  if (props.data.integration?.name?.includes('github')) {
+    eventSourceType = 'github';
+  }
 
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
-      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(173, 5, 5, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons

@@ -5,7 +5,7 @@ import { useConnectionOptions } from '../../hooks/useConnectionOptions';
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
   index: number;
-  onConnectionUpdate: (index: number, field: keyof SuperplaneConnection, value: string | SuperplaneConnectionType) => void;
+  onConnectionUpdate: (index: number, type: SuperplaneConnectionType, name: string) => void;
   onFilterAdd: (connectionIndex: number) => void;
   onFilterUpdate: (connectionIndex: number, filterIndex: number, updates: Partial<SuperplaneFilter>) => void;
   onFilterRemove: (connectionIndex: number, filterIndex: number) => void;
@@ -53,7 +53,7 @@ export function ConnectionSelector({
     return Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
       <optgroup key={groupName} label={groupName}>
         {groupOptions.map(option => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={`${option.type}\u001F${option.value}`}>
             {option.label}
           </option>
         ))}
@@ -68,8 +68,11 @@ export function ConnectionSelector({
         error={validationError}
       >
         <select
-          value={connection.name || ''}
-          onChange={(e) => onConnectionUpdate(index, 'name', e.target.value)}
+          value={`${connection.type}\u001F${connection.name}`}
+          onChange={(e) => {
+            const [type, name] = e.target.value.split('\u001F');
+            onConnectionUpdate(index, type as SuperplaneConnectionType, name)
+          }}
           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
             ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
             : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'

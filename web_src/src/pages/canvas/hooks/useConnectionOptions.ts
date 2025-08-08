@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
+import { SuperplaneConnectionType } from '@/api-client';
 
 interface ConnectionOption {
   value: string;
   label: string;
   group: string;
+  type: SuperplaneConnectionType;
 }
 
 export function useConnectionOptions(currentEntityId?: string) {
@@ -18,7 +20,8 @@ export function useConnectionOptions(currentEntityId?: string) {
           options.push({
             value: stage.metadata.name,
             label: stage.metadata.name,
-            group: 'Stages'
+            group: 'Stages',
+            type: 'TYPE_STAGE'
           });
         }
       });
@@ -27,7 +30,8 @@ export function useConnectionOptions(currentEntityId?: string) {
           options.push({
             value: eventSource.metadata.name,
             label: eventSource.metadata.name,
-            group: 'Event Sources'
+            group: 'Event Sources',
+            type: 'TYPE_EVENT_SOURCE'
           });
         }
       });
@@ -36,7 +40,8 @@ export function useConnectionOptions(currentEntityId?: string) {
           options.push({
             value: group.metadata.name,
             label: group.metadata.name,
-            group: 'Connection Groups'
+            group: 'Connection Groups',
+            type: 'TYPE_CONNECTION_GROUP'
           });
         }
       });

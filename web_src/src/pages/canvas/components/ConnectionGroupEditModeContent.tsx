@@ -183,7 +183,7 @@ export function ConnectionGroupEditModeContent({ data, currentConnectionGroupId,
         timeoutBehavior
       });
     }
-  }, [data.name, data.description, connections, groupByFields, timeout, timeoutBehavior, onDataChange, handleDataChange]);
+  }, [data.name, data.description, connections, groupByFields, timeout, timeoutBehavior, onDataChange]);
 
 
   const revertSection = (section: string) => {

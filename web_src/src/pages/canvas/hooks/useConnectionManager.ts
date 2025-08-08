@@ -11,10 +11,20 @@ interface UseConnectionManagerProps {
 export function useConnectionManager({ connections, setConnections, currentEntityId }: UseConnectionManagerProps) {
   const { getConnectionOptions } = useConnectionOptions(currentEntityId);
 
-  const updateConnection = useCallback((index: number, field: keyof SuperplaneConnection, value: SuperplaneConnectionType | SuperplaneFilterOperator | string) => {
+  const updateConnection = useCallback((index: number, type: SuperplaneConnectionType, name: string) => {
     setConnections(connections.map((conn, i) => {
       if (i === index) {
-        const updatedConnection = { ...conn, [field]: value };
+        const updatedConnection = { ...conn, type, name };
+        return updatedConnection;
+      }
+      return conn;
+    }));
+  }, [connections, setConnections]);
+
+  const updateFilterOperator = useCallback((index: number, operator: SuperplaneFilterOperator) => {
+    setConnections(connections.map((conn, i) => {
+      if (i === index) {
+        const updatedConnection = { ...conn, filterOperator: operator };
         return updatedConnection;
       }
       return conn;
@@ -60,8 +70,8 @@ export function useConnectionManager({ connections, setConnections, currentEntit
     const newOperator: SuperplaneFilterOperator =
       current === 'FILTER_OPERATOR_AND' ? 'FILTER_OPERATOR_OR' : 'FILTER_OPERATOR_AND';
 
-    updateConnection(connectionIndex, 'filterOperator', newOperator);
-  }, [connections, updateConnection]);
+    updateFilterOperator(connectionIndex, newOperator);
+  }, [connections, updateFilterOperator]);
 
   const validateConnection = useCallback((connection: SuperplaneConnection): string[] => {
     const errors: string[] = [];

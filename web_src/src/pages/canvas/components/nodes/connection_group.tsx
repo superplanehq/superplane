@@ -370,13 +370,15 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               {props.data.connections?.length ? (
                 props.data.connections.map((connection, index) => (
                   <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
-                    <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
-                      </span>
-                      <span className="truncate font-medium">{connection.name}</span>
+                    <div className="flex justify-between items-center gap-3 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
+                        </span>
+                        <span className="truncate font-medium">{connection.name}</span>
+                      </div>
                       <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
-                        {connection.type?.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
+                        {connection.type?.toString().replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                       </span>
                     </div>
                   </div>
