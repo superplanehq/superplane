@@ -5,24 +5,15 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/gorm"
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	Name      string    `json:"name"`
-	IsActive  bool      `json:"is_active" gorm:"default:false"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-
-	AccountProviders []AccountProvider `json:"account_providers,omitempty" gorm:"foreignKey:UserID"`
-}
-
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == uuid.Nil {
-		u.ID = uuid.New()
-	}
-	return nil
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID uuid.UUID
+	Email          string
+	Name           string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 func (u *User) Create() error {
@@ -33,14 +24,15 @@ func (u *User) Update() error {
 	return database.Conn().Save(u).Error
 }
 
-func FindUserByID(id string) (*User, error) {
+func FindUserByID(orgID, id string) (*User, error) {
 	var user User
-	userUUID, err := uuid.Parse(id)
-	if err != nil {
-		return nil, err
-	}
 
-	err = database.Conn().Where("id = ?", userUUID).First(&user).Error
+	err := database.Conn().
+		Where("organization_id = ?", orgID).
+		Where("id = ?", id).
+		First(&user).
+		Error
+
 	return &user, err
 }
 
@@ -53,12 +45,15 @@ func FindUserByProviderId(providerId, provider string) (*User, error) {
 	return &user, err
 }
 
-func FindUserByEmail(email string) (*User, error) {
+func FindUserByEmail(orgID string, email string) (*User, error) {
 	var user User
+
 	err := database.Conn().
-		Joins("JOIN account_providers ON users.id = account_providers.user_id").
-		Where("account_providers.email = ? AND account_providers.email != '' AND account_providers.email IS NOT NULL", email).
-		First(&user).Error
+		Where("organization_id = ?", orgID).
+		Where("email = ?", email).
+		First(&user).
+		Error
+
 	return &user, err
 }
 

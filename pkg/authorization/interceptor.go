@@ -23,6 +23,7 @@ import (
 
 type contextKey string
 
+const OrgIDContextKey contextKey = "domainId"
 const DomainTypeContextKey contextKey = "domainType"
 const DomainIdContextKey contextKey = "domainId"
 

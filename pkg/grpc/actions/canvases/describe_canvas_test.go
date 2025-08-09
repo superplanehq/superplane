@@ -7,16 +7,14 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeCanvas(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
-	userID := uuid.New()
+	r := support.Setup(t)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
 		_, err := DescribeCanvas(context.Background(), &protos.DescribeCanvasRequest{
@@ -30,22 +28,17 @@ func Test__DescribeCanvas(t *testing.T) {
 	})
 
 	t.Run("empty canvas", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "")
-		require.NoError(t, err)
-		canvas, err := models.CreateCanvas(userID, organization.ID, "test", "test")
-		require.NoError(t, err)
-
 		response, err := DescribeCanvas(context.Background(), &protos.DescribeCanvasRequest{
-			Id: canvas.ID.String(),
+			Id: r.Canvas.ID.String(),
 		})
 
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Canvas)
 		require.NotNil(t, response.Canvas.Metadata)
-		assert.Equal(t, canvas.ID.String(), response.Canvas.Metadata.Id)
-		assert.Equal(t, *canvas.CreatedAt, response.Canvas.Metadata.CreatedAt.AsTime())
+		assert.Equal(t, r.Canvas.ID.String(), response.Canvas.Metadata.Id)
+		assert.Equal(t, *r.Canvas.CreatedAt, response.Canvas.Metadata.CreatedAt.AsTime())
 		assert.Equal(t, "test", response.Canvas.Metadata.Name)
-		assert.Equal(t, canvas.CreatedBy.String(), response.Canvas.Metadata.CreatedBy)
+		assert.Equal(t, r.Canvas.CreatedBy.String(), response.Canvas.Metadata.CreatedBy)
 	})
 }

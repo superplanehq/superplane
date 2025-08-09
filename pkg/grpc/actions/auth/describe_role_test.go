@@ -4,22 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_DescribeRole(t *testing.T) {
-	authService := SetupTestAuthService(t)
+	r := support.Setup(t)
 	ctx := context.Background()
-
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
+	orgID := r.Organization.ID.String()
 
 	t.Run("successful role description", func(t *testing.T) {
-		resp, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.NotNil(t, resp.Role.Spec.InheritedRole)
@@ -36,11 +33,7 @@ func Test_DescribeRole(t *testing.T) {
 	})
 
 	t.Run("successful canvas role description", func(t *testing.T) {
-		canvasID := uuid.New().String()
-		err := authService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-
-		resp, err := DescribeRole(ctx, models.DomainTypeCanvas, canvasID, models.RoleCanvasAdmin, authService)
+		resp, err := DescribeRole(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), models.RoleCanvasAdmin, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp.Role)
 		assert.Equal(t, models.RoleCanvasAdmin, resp.Role.Metadata.Name)

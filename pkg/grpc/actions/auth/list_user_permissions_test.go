@@ -13,19 +13,18 @@ import (
 
 func Test_ListUserPermissions(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
 	ctx := context.Background()
 
 	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
+	err := r.AuthService.SetupOrganizationRoles(orgID)
 	require.NoError(t, err)
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
+	err = r.AuthService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful list user permissions", func(t *testing.T) {
-		resp, err := ListUserPermissions(ctx, models.DomainTypeOrganization, orgID, r.User.String(), authService)
+		resp, err := ListUserPermissions(ctx, models.DomainTypeOrganization, orgID, r.User.String(), r.AuthService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Permissions)
 

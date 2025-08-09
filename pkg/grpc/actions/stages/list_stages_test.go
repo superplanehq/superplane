@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -26,10 +25,7 @@ func Test__ListStages(t *testing.T) {
 	})
 
 	t.Run("no stages -> empty list", func(t *testing.T) {
-		org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
-		require.NoError(t, err)
-
-		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas", "empty canvas")
+		canvas, err := models.CreateCanvas(r.User, r.Organization.ID, "empty-canvas", "empty canvas")
 		require.NoError(t, err)
 
 		res, err := ListStages(context.Background(), &protos.ListStagesRequest{

@@ -9,17 +9,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func AddUserToGroup(ctx context.Context, domainType, domainID, userID, userEmail, groupName string, authService authorization.Authorization) (*pbGroups.AddUserToGroupResponse, error) {
+func AddUserToGroup(ctx context.Context, orgID, domainType, domainID, userID, userEmail, groupName string, authService authorization.Authorization) (*pbGroups.AddUserToGroupResponse, error) {
 	if groupName == "" {
 		return nil, status.Error(codes.InvalidArgument, "group name must be specified")
 	}
 
-	userID, err := ResolveUserID(userID, userEmail)
+	user, err := findUser(orgID, userID, userEmail)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, "user not found")
 	}
 
-	err = authService.AddUserToGroup(domainID, domainType, userID, groupName)
+	err = authService.AddUserToGroup(domainID, domainType, user.ID.String(), groupName)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

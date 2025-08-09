@@ -37,3 +37,13 @@ func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.Up
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
 	return organizations.DeleteOrganization(ctx, req, s.authorizationService)
 }
+
+func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.CreateInvitation(ctx, orgID, req.Email)
+}
+
+func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListInvitations(ctx, orgID)
+}

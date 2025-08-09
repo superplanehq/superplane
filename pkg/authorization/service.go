@@ -844,7 +844,7 @@ func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
 }
 
 func (a *AuthService) detectMissingOrganizationPermissions() ([]string, error) {
-	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	orgIDs, err := a.GetOrganizationsWithMissingPermissions()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organizations with missing permissions: %w", err)
 	}
@@ -868,7 +868,7 @@ func (a *AuthService) detectMissingOrganizationPermissions() ([]string, error) {
 }
 
 func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
-	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	canvasIDs, err := a.GetCanvasesWithMissingPermissions()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get canvases with missing permissions: %w", err)
 	}
@@ -892,7 +892,7 @@ func (a *AuthService) detectMissingCanvasPermissions() ([]string, error) {
 }
 
 // Optimized function to get only organization IDs that have missing permissions
-func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
+func (a *AuthService) GetOrganizationsWithMissingPermissions() ([]string, error) {
 	// Get all organization IDs first (lightweight query)
 	orgs, err := models.GetOrganizationIDs()
 	if err != nil {
@@ -916,7 +916,7 @@ func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error)
 }
 
 // Optimized function to get only canvas IDs that have missing permissions
-func (a *AuthService) getCanvasesWithMissingPermissions() ([]string, error) {
+func (a *AuthService) GetCanvasesWithMissingPermissions() ([]string, error) {
 	// Get all canvas IDs first (lightweight query)
 	canvases, err := models.GetCanvasIDs()
 	if err != nil {
@@ -994,7 +994,7 @@ func (a *AuthService) findMissingPermissionsInDomain(domain string, policyTempla
 }
 
 func (a *AuthService) syncOrganizationDefaultRoles() error {
-	orgIDs, err := a.getOrganizationsWithMissingPermissions()
+	orgIDs, err := a.GetOrganizationsWithMissingPermissions()
 	if err != nil {
 		return fmt.Errorf("failed to get organizations with missing permissions: %w", err)
 	}
@@ -1007,7 +1007,7 @@ func (a *AuthService) syncOrganizationDefaultRoles() error {
 	log.Infof("Found %d organizations with missing permissions", len(orgIDs))
 
 	for _, orgID := range orgIDs {
-		if err := a.syncOrganizationRoles(orgID); err != nil {
+		if err := a.SyncOrganizationRoles(orgID); err != nil {
 			log.Errorf("Failed to sync roles for organization %s: %v", orgID, err)
 			continue
 		}
@@ -1018,7 +1018,7 @@ func (a *AuthService) syncOrganizationDefaultRoles() error {
 }
 
 func (a *AuthService) syncCanvasDefaultRoles() error {
-	canvasIDs, err := a.getCanvasesWithMissingPermissions()
+	canvasIDs, err := a.GetCanvasesWithMissingPermissions()
 	if err != nil {
 		return fmt.Errorf("failed to get canvases with missing permissions: %w", err)
 	}
@@ -1031,7 +1031,7 @@ func (a *AuthService) syncCanvasDefaultRoles() error {
 	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
 
 	for _, canvasID := range canvasIDs {
-		if err := a.syncCanvasRoles(canvasID); err != nil {
+		if err := a.SyncCanvasRoles(canvasID); err != nil {
 			log.Errorf("Failed to sync roles for canvas %s: %v", canvasID, err)
 			continue
 		}
@@ -1041,7 +1041,7 @@ func (a *AuthService) syncCanvasDefaultRoles() error {
 	return nil
 }
 
-func (a *AuthService) syncOrganizationRoles(orgID string) error {
+func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
 
 	// First, apply default permissions from CSV templates
@@ -1053,7 +1053,7 @@ func (a *AuthService) syncOrganizationRoles(orgID string) error {
 	return nil
 }
 
-func (a *AuthService) syncCanvasRoles(canvasID string) error {
+func (a *AuthService) SyncCanvasRoles(canvasID string) error {
 	domain := fmt.Sprintf("canvas:%s", canvasID)
 
 	// First, apply default permissions from CSV templates

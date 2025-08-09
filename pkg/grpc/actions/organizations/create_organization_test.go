@@ -9,15 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/grpc/actions/auth"
 	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__CreateOrganization(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
+	authService := support.AuthService(t)
+
 	user := models.User{
 		ID:   uuid.New(),
 		Name: "test-user",
@@ -25,9 +27,7 @@ func Test__CreateOrganization(t *testing.T) {
 
 	err := user.Create()
 	require.NoError(t, err)
-	authService := auth.SetupTestAuthService(t)
-	ctx := context.Background()
-	ctx = authentication.SetUserIdInMetadata(ctx, user.ID.String())
+	ctx := authentication.SetUserIdInMetadata(context.Background(), user.ID.String())
 
 	t.Run("valid organization -> organization is created", func(t *testing.T) {
 		organization := &protos.Organization{
@@ -51,7 +51,6 @@ func Test__CreateOrganization(t *testing.T) {
 		assert.Equal(t, "test-org", response.Organization.Metadata.Name)
 		assert.Equal(t, "Test Organization", response.Organization.Metadata.DisplayName)
 		assert.Equal(t, "This is a test organization", response.Organization.Metadata.Description)
-		assert.Equal(t, user.ID.String(), response.Organization.Metadata.CreatedBy)
 	})
 
 	t.Run("name already used -> error", func(t *testing.T) {

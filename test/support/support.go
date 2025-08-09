@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -32,6 +32,7 @@ type ResourceRegistry struct {
 	Integration      *models.Integration
 	Encryptor        crypto.Encryptor
 	Registry         *registry.Registry
+	AuthService      *authorization.AuthService
 	SemaphoreAPIMock *semaphore.SemaphoreAPIMock
 }
 
@@ -60,10 +61,34 @@ func Setup(t *testing.T) *ResourceRegistry {
 func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	require.NoError(t, database.TruncateTables())
 
-	user := &models.User{
-		Name:     "Test User",
-		IsActive: true,
+	//
+	// Set up initial test resource registry
+	//
+	encryptor := crypto.NewNoOpEncryptor()
+	r := ResourceRegistry{
+		Encryptor:        encryptor,
+		Registry:         registry.NewRegistry(encryptor),
+		AuthService:      AuthService(t),
+		SemaphoreAPIMock: semaphore.NewSemaphoreAPIMock(),
 	}
+
+	require.NoError(t, r.SemaphoreAPIMock.Init())
+
+	//
+	// Create organization and user
+	//
+	var err error
+	r.Organization, err = models.CreateOrganization(uuid.New().String(), "test", "")
+	require.NoError(t, err)
+
+	err = r.AuthService.SetupOrganizationRoles(r.Organization.ID.String())
+	require.NoError(t, err)
+
+	user := &models.User{
+		Name:  "Test User",
+		Email: "test@test.com",
+	}
+
 	require.NoError(t, user.Create())
 
 	accountProvider := &models.AccountProvider{
@@ -76,21 +101,14 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 
 	require.NoError(t, accountProvider.Create())
 
-	r := ResourceRegistry{
-		User:      user.ID,
-		Encryptor: crypto.NewNoOpEncryptor(),
-	}
-
-	r.Registry = registry.NewRegistry(r.Encryptor)
-	r.SemaphoreAPIMock = semaphore.NewSemaphoreAPIMock()
-	require.NoError(t, r.SemaphoreAPIMock.Init())
-	log.Infof("Semaphore API mock started at %s", r.SemaphoreAPIMock.Server.URL)
-
-	var err error
-	r.Organization, err = models.CreateOrganization(r.User, uuid.New().String(), "test", "")
-	require.NoError(t, err)
-
+	//
+	// Create canvas
+	//
 	r.Canvas, err = models.CreateCanvas(r.User, r.Organization.ID, "test", "Test Canvas")
+	require.NoError(t, err)
+	err = r.AuthService.SetupCanvasRoles(r.Canvas.ID.String())
+	require.NoError(t, err)
+	err = r.AuthService.AssignRole(user.ID.String(), models.RoleCanvasOwner, r.Canvas.ID.String(), models.DomainTypeCanvas)
 	require.NoError(t, err)
 
 	//
@@ -314,4 +332,11 @@ func CreateOrganizationSecret(t *testing.T, r *ResourceRegistry, secretData map[
 
 func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
+}
+
+func AuthService(t *testing.T) *authorization.AuthService {
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+	return authService
 }

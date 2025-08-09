@@ -4,22 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_ListRoles(t *testing.T) {
-	authService := SetupTestAuthService(t)
+	r := support.Setup(t)
 	ctx := context.Background()
-
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
+	orgID := r.Organization.ID.String()
 
 	t.Run("successful list roles", func(t *testing.T) {
-		resp, err := ListRoles(ctx, models.DomainTypeOrganization, orgID, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeOrganization, orgID, r.AuthService)
 		require.NoError(t, err)
 		assert.Equal(t, len(resp.Roles), 3)
 
@@ -52,11 +49,7 @@ func Test_ListRoles(t *testing.T) {
 	})
 
 	t.Run("successful list canvas roles", func(t *testing.T) {
-		canvasID := uuid.New().String()
-		err := authService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-
-		resp, err := ListRoles(ctx, models.DomainTypeCanvas, canvasID, authService)
+		resp, err := ListRoles(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.AuthService)
 		require.NoError(t, err)
 		assert.Equal(t, len(resp.Roles), 3)
 

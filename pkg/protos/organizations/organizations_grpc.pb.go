@@ -24,6 +24,8 @@ const (
 	Organizations_DescribeOrganization_FullMethodName = "/Superplane.Organizations.Organizations/DescribeOrganization"
 	Organizations_UpdateOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/UpdateOrganization"
 	Organizations_DeleteOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/DeleteOrganization"
+	Organizations_CreateInvitation_FullMethodName     = "/Superplane.Organizations.Organizations/CreateInvitation"
+	Organizations_ListInvitations_FullMethodName      = "/Superplane.Organizations.Organizations/ListInvitations"
 )
 
 // OrganizationsClient is the client API for Organizations service.
@@ -35,6 +37,8 @@ type OrganizationsClient interface {
 	DescribeOrganization(ctx context.Context, in *DescribeOrganizationRequest, opts ...grpc.CallOption) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(ctx context.Context, in *DeleteOrganizationRequest, opts ...grpc.CallOption) (*DeleteOrganizationResponse, error)
+	CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error)
+	ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error)
 }
 
 type organizationsClient struct {
@@ -95,6 +99,26 @@ func (c *organizationsClient) DeleteOrganization(ctx context.Context, in *Delete
 	return out, nil
 }
 
+func (c *organizationsClient) CreateInvitation(ctx context.Context, in *CreateInvitationRequest, opts ...grpc.CallOption) (*CreateInvitationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateInvitationResponse)
+	err := c.cc.Invoke(ctx, Organizations_CreateInvitation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *organizationsClient) ListInvitations(ctx context.Context, in *ListInvitationsRequest, opts ...grpc.CallOption) (*ListInvitationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListInvitationsResponse)
+	err := c.cc.Invoke(ctx, Organizations_ListInvitations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrganizationsServer is the server API for Organizations service.
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
@@ -104,6 +128,8 @@ type OrganizationsServer interface {
 	DescribeOrganization(context.Context, *DescribeOrganizationRequest) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*DeleteOrganizationResponse, error)
+	CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error)
+	ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error)
 }
 
 // UnimplementedOrganizationsServer should be embedded to have
@@ -127,6 +153,12 @@ func (UnimplementedOrganizationsServer) UpdateOrganization(context.Context, *Upd
 }
 func (UnimplementedOrganizationsServer) DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*DeleteOrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteOrganization not implemented")
+}
+func (UnimplementedOrganizationsServer) CreateInvitation(context.Context, *CreateInvitationRequest) (*CreateInvitationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateInvitation not implemented")
+}
+func (UnimplementedOrganizationsServer) ListInvitations(context.Context, *ListInvitationsRequest) (*ListInvitationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListInvitations not implemented")
 }
 func (UnimplementedOrganizationsServer) testEmbeddedByValue() {}
 
@@ -238,6 +270,42 @@ func _Organizations_DeleteOrganization_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Organizations_CreateInvitation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateInvitationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).CreateInvitation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_CreateInvitation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).CreateInvitation(ctx, req.(*CreateInvitationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Organizations_ListInvitations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListInvitationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrganizationsServer).ListInvitations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Organizations_ListInvitations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrganizationsServer).ListInvitations(ctx, req.(*ListInvitationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Organizations_ServiceDesc is the grpc.ServiceDesc for Organizations service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -264,6 +332,14 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteOrganization",
 			Handler:    _Organizations_DeleteOrganization_Handler,
+		},
+		{
+			MethodName: "CreateInvitation",
+			Handler:    _Organizations_CreateInvitation_Handler,
+		},
+		{
+			MethodName: "ListInvitations",
+			Handler:    _Organizations_ListInvitations_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

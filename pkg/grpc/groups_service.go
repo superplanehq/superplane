@@ -28,15 +28,17 @@ func (s *GroupsService) CreateGroup(ctx context.Context, req *pb.CreateGroupRequ
 }
 
 func (s *GroupsService) AddUserToGroup(ctx context.Context, req *pb.AddUserToGroupRequest) (*pb.AddUserToGroupResponse, error) {
+	orgID := ctx.Value(authorization.OrgIDContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.AddUserToGroup(ctx, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
+	return auth.AddUserToGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) RemoveUserFromGroup(ctx context.Context, req *pb.RemoveUserFromGroupRequest) (*pb.RemoveUserFromGroupResponse, error) {
+	orgID := ctx.Value(authorization.OrgIDContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.RemoveUserFromGroup(ctx, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
+	return auth.RemoveUserFromGroup(ctx, orgID, domainType, domainID, req.UserId, req.UserEmail, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) ListGroups(ctx context.Context, req *pb.ListGroupsRequest) (*pb.ListGroupsResponse, error) {
@@ -52,9 +54,10 @@ func (s *GroupsService) DescribeGroup(ctx context.Context, req *pb.DescribeGroup
 }
 
 func (s *GroupsService) ListGroupUsers(ctx context.Context, req *pb.ListGroupUsersRequest) (*pb.ListGroupUsersResponse, error) {
+	orgID := ctx.Value(authorization.OrgIDContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.ListGroupUsers(ctx, domainType, domainID, req.GroupName, s.authService)
+	return auth.ListGroupUsers(ctx, orgID, domainType, domainID, req.GroupName, s.authService)
 }
 
 func (s *GroupsService) UpdateGroup(ctx context.Context, req *pb.UpdateGroupRequest) (*pb.UpdateGroupResponse, error) {

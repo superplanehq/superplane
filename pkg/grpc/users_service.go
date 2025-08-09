@@ -32,7 +32,8 @@ func (s *UsersService) ListUserRoles(ctx context.Context, req *pb.ListUserRolesR
 }
 
 func (s *UsersService) ListUsers(ctx context.Context, req *pb.ListUsersRequest) (*pb.ListUsersResponse, error) {
+	orgID := ctx.Value(authorization.OrgIDContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.ListUsers(ctx, domainType, domainID, s.authService)
+	return auth.ListUsers(ctx, orgID, domainType, domainID, s.authService)
 }

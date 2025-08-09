@@ -15,6 +15,7 @@ import (
 	"github.com/markbates/goth/providers/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 )
@@ -98,9 +99,6 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
 
-	// Token exchange route for CLI
-	router.HandleFunc("/auth/token/exchange", a.handleTokenExchange).Methods("POST")
-
 	if a.isDev {
 		log.Info("Registering development authentication routes")
 		// In dev: both auth and callback just auto-authenticate
@@ -111,101 +109,6 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 		router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
 		router.HandleFunc("/auth/{provider}", a.handleAuth).Methods("GET")
 	}
-
-	router.HandleFunc("/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
-}
-
-func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
-	var req TokenExchangeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	if req.GitHubToken == "" {
-		http.Error(w, "GitHub token is required", http.StatusBadRequest)
-		return
-	}
-
-	githubUser, err := a.getGitHubUserInfo(req.GitHubToken)
-	if err != nil {
-		log.Errorf("Failed to get GitHub user info: %v", err)
-		http.Error(w, "Invalid GitHub token", http.StatusUnauthorized)
-		return
-	}
-
-	accountProvider, err := a.findOrCreateAccountProvider(githubUser)
-	if err != nil {
-		log.Errorf("Failed to find or create account provider: %v", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte(githubUser.Email))
-	if err != nil {
-		log.Errorf("Failed to encrypt access token: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
-
-	accountProvider.Username = githubUser.Login
-	accountProvider.Email = githubUser.Email
-	accountProvider.Name = githubUser.Name
-	accountProvider.AvatarURL = githubUser.AvatarURL
-
-	if err := accountProvider.Update(); err != nil {
-		log.Errorf("Failed to update account provider: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	dbUser, err := models.FindUserByID(accountProvider.UserID.String())
-	if err != nil {
-		log.Errorf("Failed to find user by ID %s: %v", accountProvider.UserID.String(), err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	dbUser.Name = githubUser.Name
-	dbUser.IsActive = true // Activate user on login
-
-	if err := dbUser.Update(); err != nil {
-		log.Warnf("Failed to update user info: %v", err)
-	}
-
-	token, err := a.jwtSigner.Generate(dbUser.ID.String(), 24*time.Hour)
-	if err != nil {
-		log.Errorf("Error generating JWT: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	accountProviders, err := dbUser.GetAccountProviders()
-
-	if err != nil {
-		log.Errorf("Failed to get account providers for user %s: %v", dbUser.ID.String(), err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	authUser := User{
-		ID:               dbUser.ID.String(),
-		Name:             dbUser.Name,
-		Email:            getPrimaryEmail(accountProviders),
-		AvatarURL:        getPrimaryAvatar(accountProviders),
-		CreatedAt:        dbUser.CreatedAt,
-		AccountProviders: accountProviders,
-	}
-
-	response := TokenExchangeResponse{
-		AccessToken: token,
-		User:        authUser,
-	}
-
-	log.Infof("Token exchange successful for user %s (%s)", dbUser.Name, dbUser.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
@@ -253,13 +156,91 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 	a.handleSuccessfulAuth(w, r, gothUser)
 }
 
-func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
-	dbUser, _, err := a.findOrCreateUserAndAccount(gothUser)
+func findOrCreateAccount(email string) (*models.Account, error) {
+	account, err := models.FindAccount(email)
+	if err == nil {
+		return account, nil
+	}
+
+	account, err = models.CreateAccount(email)
 	if err != nil {
-		log.Errorf("Error creating/finding user and account: %v", err)
+		return nil, err
+	}
+
+	return account, nil
+}
+
+func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
+	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
+	if err != nil {
+		return err
+	}
+
+	accountProvider, err := account.FindAccountProviderByID(gothUser.Provider, gothUser.UserID)
+	if err != nil {
+		return err
+	}
+
+	//
+	// If we already have an account provider for this provider and provider ID, we just update it.
+	//
+	if err == nil {
+		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
+		accountProvider.Username = gothUser.NickName
+		accountProvider.Email = gothUser.Email
+		accountProvider.Name = gothUser.Name
+		accountProvider.AvatarURL = gothUser.AvatarURL
+		accountProvider.RefreshToken = gothUser.RefreshToken
+		if !gothUser.ExpiresAt.IsZero() {
+			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
+		}
+
+		return database.Conn().Save(accountProvider).Error
+	}
+
+	//
+	// Otherwise, we create a new account provider.
+	//
+	accountProvider = &models.AccountProvider{
+		AccountID:      account.ID,
+		Provider:       gothUser.Provider,
+		ProviderID:     gothUser.UserID,
+		Username:       gothUser.NickName,
+		Email:          gothUser.Email,
+		Name:           gothUser.Name,
+		AvatarURL:      gothUser.AvatarURL,
+		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
+		RefreshToken:   gothUser.RefreshToken,
+		TokenExpiresAt: &gothUser.ExpiresAt,
+	}
+
+	return database.Conn().Create(accountProvider).Error
+}
+
+func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
+	account, err := findOrCreateAccount(gothUser.Email)
+	if err != nil {
+		log.Errorf("Error creating/finding account: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	err = updateAccountProviders(a.encryptor, account, gothUser)
+	if err != nil {
+		log.Errorf("Error updating account providers: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// TODO: where do I create the user record?
+	//
+
+	//
+	//
+	// OLD CODE IS BELOW HERE
+	//
+	//
 
 	token, err := a.jwtSigner.Generate(dbUser.ID.String(), 24*time.Hour)
 	if err != nil {
@@ -302,36 +283,6 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 	} else {
 		http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
 	}
-}
-
-func (a *Handler) handleDisconnectProvider(w http.ResponseWriter, r *http.Request) {
-	user, err := a.getUserFromRequest(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	vars := mux.Vars(r)
-	provider := vars["provider"]
-
-	accountProvider, err := user.GetAccountProvider(provider)
-	if err != nil {
-		http.Error(w, "Provider account not found", http.StatusNotFound)
-		return
-	}
-
-	if err := accountProvider.Delete(); err != nil {
-		log.Errorf("Error deleting account provider: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	log.Infof("User %s disconnected %s account", user.ID, provider)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": fmt.Sprintf("Successfully disconnected %s account", provider),
-	})
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -404,74 +355,6 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
-func (a *Handler) findOrCreateUserAndAccount(gothUser goth.User) (*models.User, *models.AccountProvider, error) {
-	accountProvider, err := models.FindAccountProviderByProviderID(gothUser.Provider, gothUser.UserID)
-	if err == nil {
-
-		encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
-		accountProvider.Username = gothUser.NickName
-		accountProvider.Email = gothUser.Email
-		accountProvider.Name = gothUser.Name
-		accountProvider.AvatarURL = gothUser.AvatarURL
-		accountProvider.RefreshToken = gothUser.RefreshToken
-		if !gothUser.ExpiresAt.IsZero() {
-			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-		}
-
-		if err := accountProvider.Update(); err != nil {
-			return nil, nil, err
-		}
-
-		user, err := models.FindUserByID(accountProvider.UserID.String())
-		if err != nil {
-			return nil, nil, err
-		}
-
-		user.Name = gothUser.Name
-		user.IsActive = true
-		user.Update()
-
-		return user, accountProvider, nil
-	}
-
-	user, err := a.findOrCreateUser(gothUser)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	accountProvider = &models.AccountProvider{
-		UserID:       user.ID,
-		Provider:     gothUser.Provider,
-		ProviderID:   gothUser.UserID,
-		Username:     gothUser.NickName,
-		Email:        gothUser.Email,
-		Name:         gothUser.Name,
-		AvatarURL:    gothUser.AvatarURL,
-		AccessToken:  base64.StdEncoding.EncodeToString(encryptedAccessToken),
-		RefreshToken: gothUser.RefreshToken,
-	}
-
-	if !gothUser.ExpiresAt.IsZero() {
-		accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-	}
-
-	if err := accountProvider.Create(); err != nil {
-		return nil, nil, err
-	}
-
-	return user, accountProvider, nil
-}
-
 func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	cookie, err := r.Cookie("auth_token")
 	var token string
@@ -497,7 +380,8 @@ func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	}
 
 	userID := claims["sub"].(string)
-	user, err := models.FindUserByID(userID)
+	orgID := claims["org_id"].(string)
+	user, err := models.FindUserByID(orgID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found: %v", err)
 	}
@@ -562,78 +446,6 @@ func (a *Handler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
 	var user GitHubUserInfo
 	err = json.NewDecoder(resp.Body).Decode(&user)
 	return &user, err
-}
-
-func (a *Handler) findOrCreateAccountProvider(githubUser *GitHubUserInfo) (*models.AccountProvider, error) {
-	accountProvider, err := models.FindAccountProviderByProviderID(models.ProviderGitHub, fmt.Sprintf("%d", githubUser.ID))
-	if err == nil {
-		return accountProvider, nil
-	}
-
-	user, err := models.FindUserByEmail(githubUser.Email)
-	if err != nil {
-		user, err = models.FindInactiveUserByEmail(githubUser.Email)
-		if err != nil {
-			return nil, fmt.Errorf("No existing account found. Please sign up through the web interface first")
-		}
-
-		accountProvider = &models.AccountProvider{
-			UserID:     user.ID,
-			Provider:   models.ProviderGitHub,
-			ProviderID: fmt.Sprintf("%d", githubUser.ID),
-			Username:   githubUser.Login,
-			Email:      githubUser.Email,
-			Name:       githubUser.Name,
-			AvatarURL:  githubUser.AvatarURL,
-		}
-
-		if err := accountProvider.Create(); err != nil {
-			return nil, fmt.Errorf("Internal server error")
-		}
-		return accountProvider, nil
-	}
-
-	accountProvider, err = user.GetAccountProvider(models.ProviderGitHub)
-	if err != nil {
-		return nil, fmt.Errorf("Account exists but GitHub provider not connected. Please connect GitHub through the web interface")
-	}
-
-	return accountProvider, nil
-}
-
-func (a *Handler) findOrCreateUser(gothUser goth.User) (*models.User, error) {
-	user, err := models.FindUserByProviderId(gothUser.UserID, gothUser.Provider)
-	if err == nil {
-		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
-			return nil, err
-		}
-		return user, nil
-	}
-
-	user, err = models.FindInactiveUserByEmail(gothUser.Email)
-	if err == nil {
-		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
-			return nil, err
-		}
-		return user, nil
-	}
-
-	user = &models.User{
-		Name:     gothUser.Name,
-		IsActive: true,
-	}
-
-	if err := user.Create(); err != nil {
-		return nil, err
-	}
-
-	return user, nil
-}
-
-func (a *Handler) updateUserInfo(user *models.User, name string) error {
-	user.Name = name
-	user.IsActive = true
-	return user.Update()
 }
 
 const loginTemplate = `
