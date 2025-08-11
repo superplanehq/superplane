@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../../../components/Button/button'
 import { Input } from '../../../components/Input/input'
 import {
@@ -14,11 +14,13 @@ import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symb
 import { Text } from '../../../components/Text/text'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { useCreateGroup, useOrganizationRoles } from '../../../hooks/useOrganizationData'
+import { useUserStore } from '../../../stores/userStore'
 import { Heading } from '@/components/Heading/heading'
 
 export function CreateGroupPage() {
-  const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
+  const { user } = useUserStore()
+  const orgId = user?.organization_id
 
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
@@ -65,9 +67,6 @@ export function CreateGroupPage() {
     }
   }
 
-  if (!orgId) {
-    return <div>Error: Organization ID not found</div>
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
@@ -203,7 +202,7 @@ export function CreateGroupPage() {
               {isCreating ? 'Creating...' : 'Create Group'}
             </Button>
 
-            <Link to={`/organization/${orgId}/settings/groups`}>
+            <Link to={`/settings/groups`}>
               <Button outline>
                 Cancel
               </Button>

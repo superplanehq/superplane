@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
@@ -16,7 +16,7 @@ import { useUserStore } from '../../../stores/userStore'
 export function OrganizationSettings() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, fetchUser } = useUserStore()
+  const { user, fetchUser, loading: userLoading } = useUserStore()
 
   // Use React Query hook for organization data
   const { data: organization, isLoading: loading, error } = useOrganization(user?.organization_id || '')
@@ -28,6 +28,14 @@ export function OrganizationSettings() {
 
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
+
+  if (userLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-zinc-500 dark:text-zinc-400">Loading user...</p>
+      </div>
+    )
+  }
 
   if (!user?.organization_id) {
     return (

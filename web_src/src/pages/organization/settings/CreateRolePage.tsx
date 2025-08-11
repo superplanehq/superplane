@@ -7,6 +7,7 @@ import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
 import { Label, Description } from '../../../components/Fieldset/fieldset'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { useRole, useCreateRole, useUpdateRole } from '../../../hooks/useOrganizationData'
+import { useUserStore } from '../../../stores/userStore'
 import { Heading } from '@/components/Heading/heading'
 
 interface Permission {
@@ -72,8 +73,10 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
 ]
 
 export function CreateRolePage() {
-  const { orgId, roleName: roleNameParam } = useParams<{ orgId: string; roleName?: string }>()
+  const { roleName: roleNameParam } = useParams<{ roleName?: string }>()
   const navigate = useNavigate()
+  const { user } = useUserStore()
+  const orgId = user?.organization_id
   const isEditMode = !!roleNameParam
 
   const [roleName, setRoleName] = useState('')
@@ -187,9 +190,6 @@ export function CreateRolePage() {
   }
 
 
-  if (!orgId) {
-    return <div>Error: Organization ID not found</div>
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-4 text-left">

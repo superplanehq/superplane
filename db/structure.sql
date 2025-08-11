@@ -63,6 +63,7 @@ CREATE TABLE public.account_providers (
 CREATE TABLE public.accounts (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     email character varying(255) NOT NULL,
+    name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -451,8 +452,7 @@ CREATE TABLE public.users (
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    is_active boolean DEFAULT false
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 

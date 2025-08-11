@@ -8,10 +8,11 @@ import (
 type Account struct {
 	ID    uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	Email string
+	Name  string
 }
 
-func CreateAccount(email string) (*Account, error) {
-	account := &Account{Email: email}
+func CreateAccount(name, email string) (*Account, error) {
+	account := &Account{Name: name, Email: email}
 	err := database.Conn().Create(account).Error
 	if err != nil {
 		return nil, err
@@ -20,7 +21,22 @@ func CreateAccount(email string) (*Account, error) {
 	return account, nil
 }
 
-func FindAccount(email string) (*Account, error) {
+func FindAccountByID(id string) (*Account, error) {
+	var account Account
+
+	err := database.Conn().
+		Where("id = ?", id).
+		First(&account).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &account, nil
+}
+
+func FindAccountByEmail(email string) (*Account, error) {
 	var account Account
 
 	err := database.Conn().

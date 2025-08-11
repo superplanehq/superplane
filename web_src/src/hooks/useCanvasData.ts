@@ -148,7 +148,7 @@ export const useStageDetails = (canvasId: string, stageId: string) => {
     queryKey: canvasKeys.stage(canvasId, stageId),
     queryFn: async () => {
       const response = await superplaneDescribeStage({
-        path: { canvasIdOrName: canvasId, id: stageId }
+        path: { canvasIdOrName: canvasId, idOrName: stageId }
       })
       return response.data?.stage
     },
@@ -300,7 +300,7 @@ export const useEventSourceDetails = (canvasId: string, eventSourceId: string) =
     queryKey: canvasKeys.eventSource(canvasId, eventSourceId),
     queryFn: async () => {
       const response = await superplaneDescribeEventSource({
-        path: { canvasIdOrName: canvasId, id: eventSourceId }
+        path: { canvasIdOrName: canvasId, idOrName: eventSourceId }
       })
       return response.data?.eventSource
     },

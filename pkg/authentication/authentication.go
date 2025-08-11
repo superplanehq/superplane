@@ -173,7 +173,7 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	account, err := findOrCreateAccount(mockUser.Email)
+	account, err := findOrCreateAccount(mockUser.Name, mockUser.Email)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -208,7 +208,7 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	account, err := findOrCreateAccount(user.Email)
+	account, err := findOrCreateAccount(user.Name, user.Email)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -236,11 +236,38 @@ func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, organization *models.Organization) {
+	//
+	// TODO: should we create an account if one doesn't exist here?
+	// TODO: do we even need account records at all?
+	//
+	account, err := models.FindAccountByEmail(gothUser.Email)
+	if err != nil {
+		http.Error(w, "Account not found", http.StatusNotFound)
+		return
+	}
+
+	//
+	// If no organization has been selected yet,
+	// we generate a token for the account and redirect to the organization selection page.
+	//
 	if organization == nil {
-		http.Redirect(w, r,
-			fmt.Sprintf("/organization/select?email=%s&provider=%s&name=%s", gothUser.Email, gothUser.Provider, gothUser.Name),
-			http.StatusTemporaryRedirect,
-		)
+		token, err := a.jwtSigner.Generate(account.ID.String(), 24*time.Hour)
+		if err != nil {
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "account_token",
+			Value:    token,
+			Path:     "/",
+			MaxAge:   int(24 * time.Hour.Seconds()),
+			HttpOnly: true,
+			Secure:   r.TLS != nil,
+			SameSite: http.SameSiteLaxMode,
+		})
+
+		http.Redirect(w, r, "/organization/select", http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -250,16 +277,6 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 	//
 	if !organization.IsProviderAllowed(gothUser.Provider) {
 		http.Error(w, fmt.Sprintf("%s authentication is not allowed for this organization", gothUser.Provider), http.StatusForbidden)
-		return
-	}
-
-	//
-	// TODO: should we create an account if one doesn't exist here?
-	// TODO: do we even need account records at all?
-	//
-	account, err := models.FindAccount(gothUser.Email)
-	if err != nil {
-		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
 
@@ -345,6 +362,17 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Clear the account cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
@@ -370,18 +398,52 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
+func (a *Handler) getAccountFromCookie(w http.ResponseWriter, r *http.Request) (*models.Account, error) {
+	cookie, err := r.Cookie("account_token")
+	if err != nil {
+		return nil, err
+	}
+
+	claims, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
+	if err != nil {
+		return nil, err
+	}
+
+	accountClaim, exists := claims["sub"]
+	if !exists {
+		return nil, err
+	}
+
+	accountID, ok := accountClaim.(string)
+	if !ok {
+		return nil, err
+	}
+
+	account, err := models.FindAccountByID(accountID)
+	if err != nil {
+		return nil, err
+	}
+
+	return account, nil
+}
+
 func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http.Request) {
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		http.Error(w, "Missing user information", http.StatusBadRequest)
+	account, err := a.getAccountFromCookie(w, r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 		return
 	}
 
-	// Look up organizations for this user
-	organizations, err := models.FindUserOrganizationsByEmail(email)
+	providers, err := account.GetAccountProviders()
 	if err != nil {
-		log.Errorf("Error finding organizations for user %s: %v", email, err)
-		organizations = []models.Organization{}
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	organizations, err := models.FindUserOrganizationsByEmail(account.Email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
 	}
 
 	t, err := template.New("org-selection").Parse(organizationSelectionTemplate)
@@ -391,14 +453,14 @@ func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http
 	}
 
 	data := struct {
-		Email         string
 		Name          string
+		Email         string
 		Provider      string
 		Organizations []models.Organization
 	}{
-		Email:         email,
-		Name:          r.URL.Query().Get("name"),
-		Provider:      r.URL.Query().Get("provider"),
+		Name:          account.Name,
+		Email:         account.Email,
+		Provider:      providers[0].Provider,
 		Organizations: organizations,
 	}
 
@@ -406,6 +468,12 @@ func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http
 }
 
 func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Request) {
+	account, err := a.getAccountFromCookie(w, r)
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		http.Error(w, "Invalid form data", http.StatusBadRequest)
 		return
@@ -414,18 +482,9 @@ func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Reques
 	name := r.FormValue("name")
 	displayName := r.FormValue("display_name")
 	description := r.FormValue("description")
-	email := r.FormValue("email")
-	provider := r.FormValue("provider")
-	userName := r.FormValue("user_name")
 
-	if name == "" || displayName == "" || email == "" {
+	if name == "" || displayName == "" {
 		http.Error(w, "Name, display name, and email are required", http.StatusBadRequest)
-		return
-	}
-
-	account, err := models.FindAccount(email)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -454,7 +513,7 @@ func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Reques
 	//
 	// Create the owner user for it
 	//
-	user, err := models.CreateUser(organization.ID, account.ID, email, userName)
+	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
 	if err != nil {
 		log.Errorf("Error creating user for new organization: %v", err)
 		models.HardDeleteOrganization(organization.ID.String())
@@ -470,9 +529,8 @@ func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Redirect to auth with the new organization
-	redirectURL := fmt.Sprintf("/auth/%s?org=%s", provider, organization.Name)
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+	redirectURL := fmt.Sprintf("/auth/%s?org=%s", organization.AllowedProviders[0], organization.Name)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
@@ -523,13 +581,13 @@ func (a *Handler) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func findOrCreateAccount(email string) (*models.Account, error) {
-	account, err := models.FindAccount(email)
+func findOrCreateAccount(name, email string) (*models.Account, error) {
+	account, err := models.FindAccountByEmail(email)
 	if err == nil {
 		return account, nil
 	}
 
-	account, err = models.CreateAccount(email)
+	account, err = models.CreateAccount(name, email)
 	if err != nil {
 		return nil, err
 	}
@@ -745,8 +803,6 @@ const organizationSelectionTemplate = `
             <div id="create-form" class="create-form">
                 <form action="/organization/create" method="post">
                     <input type="hidden" name="email" value="{{.Email}}">
-                    <input type="hidden" name="provider" value="{{.Provider}}">
-                    <input type="hidden" name="user_name" value="{{.Name}}">
                     <div class="form-group">
                         <label for="org-name">Organization Name</label>
                         <input type="text" id="org-name" name="name" placeholder="my-company" required>
