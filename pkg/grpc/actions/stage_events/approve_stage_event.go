@@ -16,34 +16,20 @@ import (
 	"gorm.io/gorm"
 )
 
-func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*pb.ApproveStageEventResponse, error) {
+func ApproveStageEvent(ctx context.Context, canvasID string, stageIdOrName string, eventID string) (*pb.ApproveStageEventResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.InvalidArgument, "canvas not found")
-		}
-
-		return nil, err
-	}
-
-	err = actions.ValidateUUIDs(req.StageIdOrName)
+	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
-		stage, err = canvas.FindStageByName(req.StageIdOrName)
+		stage, err = models.FindStageByName(canvasID, stageIdOrName)
 	} else {
-		stage, err = canvas.FindStageByID(req.StageIdOrName)
+		stage, err = models.FindStageByID(canvasID, stageIdOrName)
 	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.InvalidArgument, "stage not found")
@@ -53,7 +39,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 	}
 
 	logger := logging.ForStage(stage)
-	event, err := models.FindStageEventByID(req.EventId, stage.ID.String())
+	event, err := models.FindStageEventByID(eventID, stage.ID.String())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.InvalidArgument, "event not found")
@@ -74,7 +60,7 @@ func ApproveStageEvent(ctx context.Context, req *pb.ApproveStageEventRequest) (*
 
 	logger.Infof("event %s approved", event.ID)
 
-	err = messages.NewStageEventApprovedMessage(canvas.ID.String(), event).Publish()
+	err = messages.NewStageEventApprovedMessage(canvasID, event).Publish()
 	if err != nil {
 		logger.Errorf("failed to publish event approved message: %v", err)
 	}

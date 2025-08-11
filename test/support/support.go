@@ -138,7 +138,15 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create source
 	//
 	if options.Source {
-		r.Source, err = r.Canvas.CreateEventSource("gh", "description", []byte("my-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+		r.Source = &models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       "gh",
+			Key:        []byte(`my-key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+		}
+
+		err = r.Source.Create()
 		require.NoError(t, err)
 	}
 
@@ -153,7 +161,7 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 		executorType, executorSpec, resource := Executor(t, &r)
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-1").
 			WithRequester(r.User).
 			WithConditions(conditions).
@@ -193,7 +201,8 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 }
 
 func CreateConnectionGroup(t *testing.T, name string, canvas *models.Canvas, source *models.EventSource, timeout uint32, timeoutBehavior string) *models.ConnectionGroup {
-	connectionGroup, err := canvas.CreateConnectionGroup(
+	connectionGroup, err := models.CreateConnectionGroup(
+		canvas.ID,
 		name,
 		"description",
 		uuid.NewString(),
@@ -258,7 +267,7 @@ func CreateExecutionWithData(t *testing.T,
 	inputs map[string]any,
 ) *models.StageExecution {
 	event := CreateStageEventWithData(t, source, stage, data, headers, inputs)
-	execution, err := models.CreateStageExecution(stage.ID, event.ID)
+	execution, err := models.CreateStageExecution(stage.CanvasID, stage.ID, event.ID)
 	require.NoError(t, err)
 	return execution
 }

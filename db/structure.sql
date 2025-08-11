@@ -163,6 +163,7 @@ CREATE TABLE public.connection_groups (
 
 CREATE TABLE public.connections (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
     target_id uuid NOT NULL,
     source_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
@@ -373,6 +374,7 @@ CREATE TABLE public.stage_events (
 
 CREATE TABLE public.stage_executions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
     stage_id uuid NOT NULL,
     stage_event_id uuid NOT NULL,
     state character varying(64) NOT NULL,
@@ -916,6 +918,14 @@ ALTER TABLE ONLY public.resources
 
 
 --
+-- Name: connections stage_connections_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT stage_connections_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
+
+
+--
 -- Name: stage_event_approvals stage_event_approvals_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -929,6 +939,14 @@ ALTER TABLE ONLY public.stage_event_approvals
 
 ALTER TABLE ONLY public.stage_events
     ADD CONSTRAINT stage_events_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
+
+
+--
+-- Name: stage_executions stage_executions_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.stage_executions
+    ADD CONSTRAINT stage_executions_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
 
 
 --

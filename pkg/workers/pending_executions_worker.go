@@ -45,7 +45,7 @@ func (w *PendingExecutionsWorker) Tick() error {
 	}
 
 	for _, execution := range executions {
-		stage, err := models.FindStageByID(execution.StageID.String())
+		stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 		if err != nil {
 			return fmt.Errorf("error finding stage %s: %v", execution.StageID, err)
 		}

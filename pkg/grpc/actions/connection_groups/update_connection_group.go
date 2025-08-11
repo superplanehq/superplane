@@ -3,7 +3,7 @@ package connectiongroups
 import (
 	"context"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -13,73 +13,62 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupRequest) (*pb.UpdateConnectionGroupResponse, error) {
+func UpdateConnectionGroup(ctx context.Context, canvasID, idOrName string, group *pb.ConnectionGroup) (*pb.UpdateConnectionGroupResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(req.CanvasIdOrName)
-	var canvas *models.Canvas
-	if err != nil {
-		canvas, err = models.FindCanvasByName(req.CanvasIdOrName)
-	} else {
-		canvas, err = models.FindCanvasByID(req.CanvasIdOrName)
-	}
-
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	err = actions.ValidateUUIDs(req.IdOrName)
+	err := actions.ValidateUUIDs(idOrName)
 	var connectionGroup *models.ConnectionGroup
 	if err != nil {
-		connectionGroup, err = canvas.FindConnectionGroupByName(req.IdOrName)
+		connectionGroup, err = models.FindConnectionGroupByName(canvasID, idOrName)
 	} else {
-		connectionGroup, err = canvas.FindConnectionGroupByID(uuid.MustParse(req.IdOrName))
+		connectionGroup, err = models.FindConnectionGroupByID(canvasID, idOrName)
 	}
 
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "connection group not found")
 	}
 
-	connections, err := actions.ValidateConnections(canvas, req.ConnectionGroup.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvasID, group.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	spec, err := validateSpec(req.ConnectionGroup.Spec)
+	spec, err := validateSpec(group.Spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if req.ConnectionGroup.Metadata != nil && req.ConnectionGroup.Metadata.Name != "" && req.ConnectionGroup.Metadata.Name != connectionGroup.Name {
-		_, err := canvas.FindConnectionGroupByName(req.ConnectionGroup.Metadata.Name)
-		if err == nil {
-			return nil, status.Error(codes.InvalidArgument, "connection group name already in use")
-		}
-
-		connectionGroup.Name = req.ConnectionGroup.Metadata.Name
+	if group.Metadata == nil {
+		return nil, status.Error(codes.InvalidArgument, "missing metadata")
 	}
 
-	if req.ConnectionGroup.Metadata != nil && req.ConnectionGroup.Metadata.Description != "" {
-		connectionGroup.Description = req.ConnectionGroup.Metadata.Description
+	if group.Metadata.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "empty group name")
 	}
 
-	err = canvas.UpdateConnectionGroup(connectionGroup.ID.String(), connectionGroup.Name, connectionGroup.Description, userID, connections, *spec)
+	connectionGroup.Name = group.Metadata.Name
+	if group.Metadata.Description != "" {
+		connectionGroup.Description = group.Metadata.Description
+	}
+
+	connectionGroup.UpdatedBy = uuid.MustParse(userID)
+	err = connectionGroup.Update(connections, *spec)
 	if err != nil {
-		log.Errorf("Error updating connection group. Request: %v. Error: %v", req, err)
+		log.Errorf("Error updating connection group in canvas %s. Group: %v. Error: %v", canvasID, group, err)
 		return nil, err
 	}
 
-	connectionGroup, _ = canvas.FindConnectionGroupByID(connectionGroup.ID)
-	group, err := serializeConnectionGroup(*connectionGroup, connections)
+	connectionGroup, _ = models.FindConnectionGroupByID(canvasID, connectionGroup.ID.String())
+	pbGroup, err := serializeConnectionGroup(*connectionGroup, connections)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &pb.UpdateConnectionGroupResponse{
-		ConnectionGroup: group,
+		ConnectionGroup: pbGroup,
 	}
 
 	return response, nil

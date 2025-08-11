@@ -2,6 +2,7 @@ begin;
 
 CREATE TABLE stage_connections (
   id              uuid NOT NULL DEFAULT uuid_generate_v4(),
+  canvas_id       uuid NOT NULL,
   stage_id        uuid NOT NULL,
   source_id       uuid NOT NULL,
   source_name     CHARACTER VARYING(128) NOT NULL,
@@ -11,6 +12,7 @@ CREATE TABLE stage_connections (
 
   PRIMARY KEY (id),
   UNIQUE (stage_id, source_id),
+  FOREIGN KEY (canvas_id) REFERENCES canvases(id),
   FOREIGN KEY (stage_id) REFERENCES stages(id)
 );
 

@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__InputBuilder(t *testing.T) {
@@ -15,10 +16,26 @@ func Test__InputBuilder(t *testing.T) {
 		Integration: true,
 	})
 
-	docsSource, err := r.Canvas.CreateEventSource("docs", "docs-description", []byte("docs-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+	docsSource := &models.EventSource{
+		CanvasID:   r.Canvas.ID,
+		Name:       "docs",
+		Key:        []byte(`docs-key`),
+		Scope:      models.EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+	}
+
+	err := docsSource.Create()
 	require.NoError(t, err)
-	require.NotNil(t, docsSource)
-	tfSource, err := r.Canvas.CreateEventSource("tf", "tf-description", []byte("tf-key"), models.EventSourceScopeExternal, []models.EventType{}, nil)
+
+	tfSource := &models.EventSource{
+		CanvasID:   r.Canvas.ID,
+		Name:       "tf",
+		Key:        []byte(`tf-key`),
+		Scope:      models.EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
+	}
+
+	err = tfSource.Create()
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {
@@ -87,7 +104,7 @@ func Test__InputBuilder(t *testing.T) {
 		executorType, executorSpec, resource := support.Executor(t, r)
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-1").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
