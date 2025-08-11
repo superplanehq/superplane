@@ -29,14 +29,6 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             type: 'project',
             name: '',
           },
-          spec: {
-            task: '',
-            branch: 'main',
-            pipelineFile: '.semaphore/semaphore.yml',
-            parameters: {
-   
-            }
-          }
         };
       case 'github':
         return {
@@ -48,31 +40,10 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             type: 'repository',
             name: 'my-repository',
           },
-          spec: {
-            workflow: '.github/workflows/task.yaml',
-            ref: 'main',
-            inputs: {
-              
-            }
-          }
         };
       case 'http':
         return {
           type: 'http',
-          spec: {
-            url: 'https://api.example.com/endpoint',
-            payload: {
-              key1: 'value1',
-              key2: '${{ inputs.KEY2 }}'
-            },
-            headers: {
-              'Authorization': 'Bearer ${{ secrets.API_TOKEN }}',
-              'Content-Type': 'application/json'
-            },
-            responsePolicy: {
-              statusCodes: [200, 201, 202]
-            }
-          }
         };
       default:
         return { type: '', spec: {} };
