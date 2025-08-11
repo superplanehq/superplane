@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { CanvasData } from "../types";
 import { CanvasState, EventSourceWithEvents } from './types';
-import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage, SuperplaneConnection } from "@/api-client/types.gen";
+import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents } from '@/api-client';
 import { ReadyState } from 'react-use-websocket';
-import { Connection, Viewport, applyNodeChanges, applyEdgeChanges, ConnectionLineType, MarkerType } from '@xyflow/react';
+import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
 import { autoLayoutNodes, transformConnectionGroupsToNodes, transformEventSourcesToNodes, transformStagesToNodes, transformToEdges } from '../utils/flowTransformers';
 
@@ -249,66 +249,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // Edge operations
   onConnect: (connection: Connection) => {
-    const { stages, eventSources, connectionGroups, editingStageId } = get();
-    
-    if (!editingStageId || connection.target !== editingStageId) {
-      return;
-    }
-
-    const sourceNode = eventSources.find(es => es.metadata?.id === connection.source) ||
-                      stages.find(s => s.metadata?.id === connection.source) ||
-                      connectionGroups.find(cg => cg.metadata?.id === connection.source);
-    
-    if (!sourceNode || !sourceNode.metadata?.name) {
-      return;
-    }
-
-    const targetStage = stages.find(s => s.metadata?.id === connection.target);
-    if (!targetStage) {
-      return;
-    }
-
-    const existingConnection = targetStage.spec?.connections?.find(
-      conn => conn.name === sourceNode.metadata!.name
-    );
-    if (existingConnection) {
-      return;
-    }
-
-    let connectionType: SuperplaneConnection['type'] = 'TYPE_STAGE';
-    if (eventSources.find(es => es.metadata?.id === connection.source)) {
-      connectionType = 'TYPE_EVENT_SOURCE';
-    } else if (connectionGroups.find(cg => cg.metadata?.id === connection.source)) {
-      connectionType = 'TYPE_CONNECTION_GROUP';
-    }
-
-    const newConnection = {
-      name: sourceNode.metadata.name,
-      type: connectionType,
-      filters: []
-    } as SuperplaneConnection;
-
-    const updatedStage = {
-      ...targetStage,
-      spec: {
-        ...targetStage.spec,
-        connections: [...(targetStage.spec?.connections || []), newConnection]
-      }
-    };
-
-    get().updateStage(updatedStage);
-
-    const strokeColor = '#707070';
+    // Create a new edge when a connection is made
     const newEdge: EdgeType = {
-      id: `e-${sourceNode.metadata.name}-${connection.target}`,
+      id: `e-${connection.source}-${connection.target}-${Math.floor(Math.random() * 1000)}`,
       source: connection.source || '',
       target: connection.target || '',
       sourceHandle: connection.sourceHandle || undefined,
       targetHandle: connection.targetHandle || undefined,
-      type: ConnectionLineType.Bezier,
-      animated: false,
-      style: { stroke: strokeColor, strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, strokeWidth: 2 }
+      type: 'smoothstep',
+      animated: true
     };
 
     set({
@@ -376,46 +325,5 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       delete updatedEventSourceKeys[eventSourceId];
       return { eventSourceKeys: updatedEventSourceKeys };
     });
-  },
-
-  // Edge management functions
-  addEdge: (edge: EdgeType) => {
-    set((state) => ({
-      edges: [...state.edges.filter(e => e.id !== edge.id), edge]
-    }));
-  },
-
-  removeEdge: (edgeId: string) => {
-    set((state) => ({
-      edges: state.edges.filter(edge => edge.id !== edgeId)
-    }));
-  },
-
-  removeEdgesByConnection: (sourceId: string, targetId: string, connectionName?: string) => {
-    set((state) => ({
-      edges: state.edges.filter(edge => {
-        if (connectionName) {
-          return !(edge.source === sourceId && edge.target === targetId && edge.id.includes(connectionName));
-        }
-        return !(edge.source === sourceId && edge.target === targetId);
-      })
-    }));
-  },
-
-  createConnectionEdge: (sourceId: string, targetId: string, connectionName: string) => {
-    const strokeColor = '#707070';
-    
-    const newEdge: EdgeType = {
-      id: `e-${connectionName}-${targetId}`,
-      source: sourceId,
-      target: targetId,
-      type: ConnectionLineType.Bezier,
-      animated: false,
-      style: { stroke: strokeColor, strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, strokeWidth: 2 }
-    };
-
-    get().addEdge(newEdge);
-    return newEdge;
   }
 }));

@@ -81,12 +81,6 @@ export interface CanvasState {
 
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
-
-  // Edge management
-  addEdge: (edge: EdgeType) => void;
-  removeEdge: (edgeId: string) => void;
-  removeEdgesByConnection: (sourceId: string, targetId: string, connectionName?: string) => void;
-  createConnectionEdge: (sourceId: string, targetId: string, connectionName: string) => EdgeType;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}
