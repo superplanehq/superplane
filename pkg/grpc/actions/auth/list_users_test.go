@@ -9,26 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestGetCanvasUsers(t *testing.T) {
-	authService := SetupTestAuthService(t)
-
-	canvasID := uuid.New().String()
-
-	err := authService.SetupCanvasRoles(canvasID)
-	require.NoError(t, err)
+	r := support.Setup(t)
+	canvasID := r.Canvas.ID.String()
 
 	userID1 := uuid.New().String()
 	userID2 := uuid.New().String()
 
-	err = authService.AssignRole(userID1, "canvas_admin", canvasID, models.DomainTypeCanvas)
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(userID1, "canvas_admin", canvasID, models.DomainTypeCanvas))
+	require.NoError(t, r.AuthService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainTypeCanvas))
 
-	err = authService.AssignRole(userID2, "canvas_viewer", canvasID, models.DomainTypeCanvas)
-	require.NoError(t, err)
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -49,14 +43,10 @@ func TestGetCanvasUsers(t *testing.T) {
 }
 
 func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
-	authService := SetupTestAuthService(t)
+	r := support.Setup(t)
+	canvasID := r.Canvas.ID.String()
 
-	canvasID := uuid.New().String()
-
-	err := authService.SetupCanvasRoles(canvasID)
-	require.NoError(t, err)
-
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -64,40 +54,22 @@ func TestGetCanvasUsersEmptyCanvas(t *testing.T) {
 }
 
 func TestGetCanvasUsersWithActiveUser(t *testing.T) {
-	authService := SetupTestAuthService(t)
-
-	canvasID := uuid.New().String()
-
-	err := authService.SetupCanvasRoles(canvasID)
-	require.NoError(t, err)
-
-	// Create an active user
-	user := &models.User{
-		Name:     "Active Canvas User",
-		IsActive: true,
-	}
-	err = user.Create()
-	require.NoError(t, err)
+	r := support.Setup(t)
+	canvasID := r.Canvas.ID.String()
 
 	// Assign role to the active user
-	err = authService.AssignRole(user.ID.String(), "canvas_admin", canvasID, models.DomainTypeCanvas)
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(r.User.String(), "canvas_admin", canvasID, models.DomainTypeCanvas))
 
-	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, authService)
+	resp, err := ListUsers(context.Background(), models.DomainTypeCanvas, canvasID, r.AuthService)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-
-	// Should have 1 user
 	assert.Len(t, resp.Users, 1)
 
-	// Check that the active user is properly returned
 	activeUser := resp.Users[0]
-	assert.Equal(t, user.ID.String(), activeUser.Metadata.Id)
+	assert.Equal(t, r.User.String(), activeUser.Metadata.Id)
 	assert.True(t, activeUser.Status.IsActive)
 	assert.Equal(t, "Active Canvas User", activeUser.Spec.DisplayName)
 	assert.NotEmpty(t, activeUser.Status.RoleAssignments)
-
-	// Check role assignment details
 	assert.Equal(t, "canvas_admin", activeUser.Status.RoleAssignments[0].RoleName)
 	assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, activeUser.Status.RoleAssignments[0].DomainType)
 	assert.Equal(t, canvasID, activeUser.Status.RoleAssignments[0].DomainId)

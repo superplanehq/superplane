@@ -1007,7 +1007,7 @@ func (a *AuthService) syncOrganizationDefaultRoles() error {
 	log.Infof("Found %d organizations with missing permissions", len(orgIDs))
 
 	for _, orgID := range orgIDs {
-		if err := a.syncOrganizationRoles(orgID); err != nil {
+		if err := a.SyncOrganizationRoles(orgID); err != nil {
 			log.Errorf("Failed to sync roles for organization %s: %v", orgID, err)
 			continue
 		}
@@ -1031,7 +1031,7 @@ func (a *AuthService) syncCanvasDefaultRoles() error {
 	log.Infof("Found %d canvases with missing permissions", len(canvasIDs))
 
 	for _, canvasID := range canvasIDs {
-		if err := a.syncCanvasRoles(canvasID); err != nil {
+		if err := a.SyncCanvasRoles(canvasID); err != nil {
 			log.Errorf("Failed to sync roles for canvas %s: %v", canvasID, err)
 			continue
 		}
@@ -1041,7 +1041,7 @@ func (a *AuthService) syncCanvasDefaultRoles() error {
 	return nil
 }
 
-func (a *AuthService) syncOrganizationRoles(orgID string) error {
+func (a *AuthService) SyncOrganizationRoles(orgID string) error {
 	domain := fmt.Sprintf("org:%s", orgID)
 
 	// First, apply default permissions from CSV templates
@@ -1053,7 +1053,7 @@ func (a *AuthService) syncOrganizationRoles(orgID string) error {
 	return nil
 }
 
-func (a *AuthService) syncCanvasRoles(canvasID string) error {
+func (a *AuthService) SyncCanvasRoles(canvasID string) error {
 	domain := fmt.Sprintf("canvas:%s", canvasID)
 
 	// First, apply default permissions from CSV templates
