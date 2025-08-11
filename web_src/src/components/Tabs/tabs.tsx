@@ -14,7 +14,7 @@ export interface TabsProps {
   defaultTab?: string
   onTabChange?: (tabId: string) => void
   className?: string
-  variant?: 'default' | 'pills' | 'underline'
+  variant?: 'default' | 'pills' | 'underline' | 'dark-underline'
 }
 
 export interface TabsState {
@@ -54,7 +54,7 @@ export function Tabs({
   const baseClasses = clsx(
     'w-full',
     {
-      'border-b border-zinc-200 dark:border-zinc-700': variant === 'default' || variant === 'underline',
+      'border-b border-zinc-200 dark:border-zinc-700': variant === 'default' || variant === 'underline' || variant === 'dark-underline',
     },
     className
   )
@@ -64,7 +64,7 @@ export function Tabs({
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
       'gap-6': variant === 'default',
-      'gap-4': variant === 'underline',
+      'gap-4': variant === 'underline' || variant === 'dark-underline',
     }
   )
 
@@ -94,7 +94,7 @@ function TabItem({
   tab: Tab
   activeTab: string
   onClick: (tabId: string) => void
-  variant: 'default' | 'pills' | 'underline'
+  variant: 'default' | 'pills' | 'underline' | 'dark-underline'
 }) {
   const isActive = activeTab === tab.id
   const isDisabled = tab.disabled
@@ -115,10 +115,12 @@ function TabItem({
       'bg-white text-zinc-900 shadow-sm dark:bg-zinc-700 dark:text-white': variant === 'pills' && isActive,
       'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white': variant === 'pills' && !isActive && !isDisabled,
 
-      'px-3 py-3 relative': variant === 'underline',
+      'px-3 py-3 relative': variant === 'underline' || variant === 'dark-underline',
       'text-blue-600 dark:text-blue-400': variant === 'underline' && isActive,
+      'text-blue-600 dark:text-blue-500': variant === 'dark-underline' && isActive,
+      'bg-zinc-300 dark:bg-zinc-900': variant === 'dark-underline' && isActive,
 
-      'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': (variant === 'default' || variant === 'underline') && !isActive && !isDisabled,
+      'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-300': (variant === 'default' || variant === 'underline' || variant === 'dark-underline') && !isActive && !isDisabled,
 
       'opacity-50 cursor-not-allowed': isDisabled,
       'cursor-pointer': !isDisabled,
@@ -146,7 +148,7 @@ function TabItem({
           {tab.count > 99 ? '99+' : tab.count}
         </span>
       )}
-      {variant === 'underline' && (
+      {variant === 'underline' || variant === 'dark-underline' && (
         <div className={clsx(
           'absolute inset-x-0 bottom-0 h-0.5 bg-blue-500 transition-all duration-200 ease-in-out',
           {
@@ -170,7 +172,7 @@ export function ControlledTabs({
   activeTab: string
   onTabChange: (tabId: string) => void
   className?: string
-  variant?: 'default' | 'pills' | 'underline'
+  variant?: 'default' | 'pills' | 'underline' | 'dark-underline'
 }) {
   const handleTabClick = useCallback((tabId: string) => {
     if (tabs.find(tab => tab.id === tabId)?.disabled) return
@@ -178,7 +180,7 @@ export function ControlledTabs({
   }, [tabs, onTabChange])
 
   const baseClasses = clsx(
-    'w-full',
+    'w-full h-full',
     {
       'border-b border-zinc-200 dark:border-zinc-700': variant === 'default' || variant === 'underline',
     },
@@ -186,11 +188,11 @@ export function ControlledTabs({
   )
 
   const navClasses = clsx(
-    'flex',
+    'flex h-full',
     {
       'gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg': variant === 'pills',
       'gap-1': variant === 'default',
-      'gap-4': variant === 'underline',
+      'gap-4': variant === 'underline' || variant === 'dark-underline',
     }
   )
 

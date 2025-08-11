@@ -9,11 +9,11 @@ import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 import GithubLogo from '@/assets/github-mark.svg'
-import { TabType } from '../SettingsPage'
+import { useNavigate } from 'react-router-dom'
 
 interface CanvasIntegrationsProps {
   canvasId: string
-  updateActiveTab: (tab: TabType) => void
+  organizationId: string
 }
 
 type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
@@ -37,7 +37,7 @@ const INTEGRATION_TYPES = [
   },
 ]
 
-export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrationsProps) {
+export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
   const [selectedType, setSelectedType] = useState<string>('semaphore')
   const [integrationName, setIntegrationName] = useState('')
@@ -52,6 +52,8 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   const updateIntegrationMutation = useUpdateIntegration(canvasId, "DOMAIN_TYPE_CANVAS", editingIntegration?.metadata?.id || '')
   const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS")
   const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", selectedSecretId)
+
+  const navigate = useNavigate()
 
   const handleAddIntegration = () => {
     setSection('choose-type')
@@ -143,7 +145,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   const hasIntegrations = integrations && integrations.length > 0
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         {section === 'choose-type' && (
@@ -404,7 +406,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
                     {secrets.length === 0 && (
                       <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
                         No secrets available. Create a secret first in the &nbsp;
-                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => updateActiveTab('secrets')}>secrets section</span>.
+                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/organization/${organizationId}/canvas/${canvasId}#secrets`)}>secrets section</span>.
                       </Text>
                     )}
                   </div>

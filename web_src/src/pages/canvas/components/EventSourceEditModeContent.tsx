@@ -305,7 +305,7 @@ export function EventSourceEditModeContent({
               {availableIntegrations.length === 0 && (
                 <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                   No Semaphore integrations available. Create one first in the &nbsp;
-                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#settings?tab=integrations`}>canvas settings</Link>.
+                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#integrations`}>canvas settings</Link>.
                 </div>
               )}
 
@@ -372,7 +372,7 @@ export function EventSourceEditModeContent({
               {availableIntegrations.length === 0 && (
                 <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
                   No GitHub integrations available. Create one first in the &nbsp;
-                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#settings?tab=integrations`}>canvas settings</Link>.
+                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#integrations`}>canvas settings</Link>.
                 </div>
               )}
 

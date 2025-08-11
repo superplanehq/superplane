@@ -7,8 +7,7 @@ import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSour
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
-import { CanvasNavigation } from "../../components/CanvasNavigation";
-import { SettingsPage } from "../../components/SettingsPage";
+import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
 
@@ -26,14 +25,30 @@ export function Canvas() {
   const [canvasName, setCanvasName] = useState<string>('');
 
   // Determine active view from URL hash or default to editor
-  const activeView = location.hash.startsWith('#settings') ? 'settings' : 'editor';
+  const getActiveViewFromHash = (): CanvasView => {
+    const hash = location.hash.substring(1); // Remove the #
+    switch (hash) {
+      case 'secrets':
+        return 'secrets';
+      case 'integrations':
+        return 'integrations';
+      case 'members':
+        return 'members';
+      case 'delete':
+        return 'delete';
+      default:
+        return 'editor';
+    }
+  };
+
+  const activeView = getActiveViewFromHash();
 
   // Handle view changes by updating URL hash
-  const handleViewChange = (view: 'editor' | 'settings') => {
-    if (view === 'settings') {
-      navigate(`${location.pathname}#settings`);
-    } else {
+  const handleViewChange = (view: CanvasView) => {
+    if (view === 'editor') {
       navigate(location.pathname);
+    } else {
+      navigate(`${location.pathname}#${view}`);
     }
   };
 
@@ -179,7 +194,7 @@ export function Canvas() {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
       const nodeId = handleAddNode(nodeType, config);
-      
+
       // Focus on the newly added node after a short delay to allow the layout to update
       setTimeout(() => {
         fitViewNode(nodeId);
@@ -215,7 +230,6 @@ export function Canvas() {
       <div className="h-[100vh]">
 
         <CanvasNavigation
-          canvasId={canvasId!}
           canvasName={canvasName}
           activeView={activeView}
           onViewChange={handleViewChange}
@@ -249,8 +263,8 @@ export function Canvas() {
             {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
           </div>
         ) : (
-          <div className="h-[calc(100%-2.7rem)]" >
-            <SettingsPage organizationId={orgId!} />
+          <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >
+            <CanvasNavigationContent canvasId={canvasId!} activeView={activeView} organizationId={orgId!} />
           </div>
         )}
       </div>

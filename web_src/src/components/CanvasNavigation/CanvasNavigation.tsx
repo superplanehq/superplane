@@ -4,16 +4,22 @@ import { MaterialSymbol } from '../MaterialSymbol/material-symbol'
 import {
   Dropdown,
   DropdownMenu,
-  DropdownItem
+  DropdownItem,
+  DropdownButton
 } from '../Dropdown/dropdown'
 import { ControlledTabs, type Tab } from '../Tabs/tabs'
 import { useOrganizationCanvases } from '../../hooks/useOrganizationData'
+import { CanvasSecrets } from '../SettingsPage/components/CanvasSecrets'
+import { CanvasIntegrations } from '../SettingsPage/components/CanvasIntegrations'
+import { CanvasMembers } from '../SettingsPage/components/CanvasMembers'
+import { CanvasDelete } from '../SettingsPage/components/CanvasDelete'
+
+export type CanvasView = 'editor' | 'integrations' | 'members' | 'secrets' | 'delete'
 
 export interface CanvasNavigationProps {
-  canvasId: string
   canvasName: string
-  activeView: 'editor' | 'settings'
-  onViewChange: (view: 'editor' | 'settings') => void
+  activeView: CanvasView
+  onViewChange: (view: CanvasView) => void
   organizationId: string
 }
 
@@ -31,13 +37,21 @@ export function CanvasNavigation({
       label: 'Preview',
     },
     {
-      id: 'settings',
-      label: 'Settings',
+      id: 'integrations',
+      label: 'Integrations',
+    },
+    {
+      id: 'members',
+      label: 'Members',
+    },
+    {
+      id: 'secrets',
+      label: 'Secrets',
     }
   ]
 
   return (
-    <nav className="flex items-center bg-zinc-200 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800">
+    <nav className="flex items-center bg-zinc-200 dark:bg-zinc-950 border-b border-zinc-200 dark:border-zinc-800 h-[2.7rem]">
       {/* Back Button */}
       <div className='flex border-r border-zinc-400 dark:border-zinc-600 dark:bg-zinc-900'>
         <Link
@@ -77,14 +91,48 @@ export function CanvasNavigation({
 
 
       {/* Navigation Tabs */}
-      <div className="flex items-center h-full">
+      <div className="flex items-center justify-between w-full h-full">
         <ControlledTabs
           tabs={navigationTabs}
-          activeTab={activeView}
-          variant='underline'
-          onTabChange={(tabId) => onViewChange(tabId as 'editor' | 'settings')}
+          activeTab={activeView === 'delete' ? 'secrets' : activeView}
+          variant='dark-underline'
+          onTabChange={(tabId) => onViewChange(tabId as CanvasView)}
         />
+
+        {/* More Actions Dropdown */}
+        <div className="flex items-center">
+          <Dropdown>
+            <DropdownButton plain className="p-1 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded">
+              <MaterialSymbol name="more_vert" size="md" className="text-black dark:text-zinc-400" />
+            </DropdownButton>
+            <DropdownMenu>
+              <DropdownItem onClick={() => onViewChange('delete')}>
+                Delete
+              </DropdownItem>
+            </DropdownMenu>
+          </Dropdown>
+        </div>
       </div>
     </nav>
   )
+}
+
+export function CanvasNavigationContent({ canvasId, activeView, organizationId }: {
+  canvasId: string
+  activeView: CanvasView
+  organizationId: string
+}) {
+
+  switch (activeView) {
+    case 'secrets':
+      return <CanvasSecrets canvasId={canvasId} organizationId={organizationId} />
+    case 'integrations':
+      return <CanvasIntegrations canvasId={canvasId} organizationId={organizationId} />
+    case 'members':
+      return <CanvasMembers canvasId={canvasId} organizationId={organizationId} />
+    case 'delete':
+      return <CanvasDelete canvasId={canvasId} organizationId={organizationId} />
+    default:
+      return null
+  }
 }
