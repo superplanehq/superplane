@@ -21,8 +21,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
-	canvas, err := models.FindCanvasByIDOnly(canvasID)
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, newSource *pb.EventSource) (*pb.CreateEventSourceResponse, error) {
+	canvas, err := models.FindUnscopedCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
@@ -32,7 +32,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	//
 	// Validate request
 	//
-	if req.EventSource == nil || req.EventSource.Metadata == nil || req.EventSource.Metadata.Name == "" {
+	if newSource == nil || newSource.Metadata == nil || newSource.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "event source name is required")
 	}
 
@@ -40,8 +40,8 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	// It is OK to create an event source without an integration.
 	//
 	var integration *models.Integration
-	if req.EventSource.Spec != nil && req.EventSource.Spec.Integration != nil {
-		integration, err = actions.ValidateIntegration(canvas, req.EventSource.Spec.Integration)
+	if newSource.Spec != nil && newSource.Spec.Integration != nil {
+		integration, err = actions.ValidateIntegration(canvas, newSource.Spec.Integration)
 		if err != nil {
 			return nil, err
 		}
@@ -52,13 +52,13 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	//
 	var resource integrations.Resource
 	if integration != nil {
-		resource, err = actions.ValidateResource(ctx, registry, integration, req.EventSource.Spec.Resource)
+		resource, err = actions.ValidateResource(ctx, registry, integration, newSource.Spec.Resource)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	eventTypes, err := validateEventTypes(req.EventSource.Spec)
+	eventTypes, err := validateEventTypes(newSource.Spec)
 	if err != nil {
 		return nil, err
 	}
@@ -66,10 +66,10 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 	//
 	// Create the event source
 	//
-	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor).
+	eventSource, plainKey, err := builders.NewEventSourceBuilder(encryptor, registry).
 		InCanvas(canvas.ID).
-		WithName(req.EventSource.Metadata.Name).
-		WithDescription(req.EventSource.Metadata.Description).
+		WithName(newSource.Metadata.Name).
+		WithDescription(newSource.Metadata.Description).
 		WithScope(models.EventSourceScopeExternal).
 		ForIntegration(integration).
 		ForResource(resource).
@@ -85,7 +85,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 			return nil, status.Errorf(codes.InvalidArgument, "event source for %s %s already exists", resource.Type(), resource.Name())
 		}
 
-		log.Errorf("Error creating event source. Request: %v. Error: %v", req, err)
+		log.Errorf("Error creating event source in canvas %s. Event source: %v. Error: %v", canvasID, newSource, err)
 		return nil, err
 	}
 
@@ -99,10 +99,7 @@ func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry
 		Key:         string(plainKey),
 	}
 
-	logger.Infof("Created event source. Request: %v", req)
-
 	err = messages.NewEventSourceCreatedMessage(eventSource).Publish()
-
 	if err != nil {
 		logger.Errorf("failed to publish event source created message: %v", err)
 	}

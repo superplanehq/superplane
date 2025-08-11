@@ -34,6 +34,22 @@ func (Canvas) TableName() string {
 	return "canvases"
 }
 
+func (c *Canvas) FindConnectionGroupByID(id uuid.UUID) (*ConnectionGroup, error) {
+	var connectionGroup ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", c.ID).
+		Where("id = ?", id).
+		First(&connectionGroup).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &connectionGroup, nil
+}
+
 func (c *Canvas) FindStageByID(id string) (*Stage, error) {
 	var stage Stage
 
@@ -48,22 +64,6 @@ func (c *Canvas) FindStageByID(id string) (*Stage, error) {
 	}
 
 	return &stage, nil
-}
-
-func (c *Canvas) ListConnectionGroups() ([]ConnectionGroup, error) {
-	var connectionGroups []ConnectionGroup
-
-	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
-		Order("name ASC").
-		Find(&connectionGroups).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return connectionGroups, nil
 }
 
 func (c *Canvas) CreateStage(
@@ -175,7 +175,7 @@ func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 }
 
 // TODO: review the usage of this function, and remove if possible
-func FindCanvasByIDOnly(id string) (*Canvas, error) {
+func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().

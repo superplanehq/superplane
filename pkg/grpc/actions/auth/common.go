@@ -2,10 +2,8 @@ package auth
 
 import (
 	"fmt"
-	"testing"
 
 	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -72,13 +70,6 @@ func convertPermissionToProto(permission *authorization.Permission) *pbAuth.Perm
 		Action:     permission.Action,
 		DomainType: actions.DomainTypeToProto(permission.DomainType),
 	}
-}
-
-func SetupTestAuthService(t *testing.T) authorization.Authorization {
-	authService, err := authorization.NewAuthService()
-	require.NoError(t, err)
-	authService.EnableCache(false)
-	return authService
 }
 
 func FindUser(org, id, email string) (*models.User, error) {

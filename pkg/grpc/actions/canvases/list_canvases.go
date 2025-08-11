@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListCanvases(ctx context.Context, orgID string, req *pb.ListCanvasesRequest, authorizationService authorization.Authorization) (*pb.ListCanvasesResponse, error) {
+func ListCanvases(ctx context.Context, orgID string, authorizationService authorization.Authorization) (*pb.ListCanvasesResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 
 	if !userIsSet {

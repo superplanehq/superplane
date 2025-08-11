@@ -6,25 +6,20 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_RemoveRole(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
-	err := authService.SetupOrganizationRoles(r.Organization.ID.String())
-	require.NoError(t, err)
+	ctx := context.Background()
+	orgID := r.Organization.ID.String()
 
 	// Assign role first
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, r.Organization.ID.String(), models.DomainTypeOrganization)
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization))
 
-	ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-
-	t.Run("remove role with user ID", func(t *testing.T) {
-		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, r.User.String(), "", authService)
+	t.Run("successful role removal with user ID", func(t *testing.T) {
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
@@ -50,28 +45,28 @@ func Test_RemoveRole(t *testing.T) {
 		err = accountProvider.Create()
 		require.NoError(t, err)
 
-		err = authService.AssignRole(user.ID.String(), models.RoleOrgAdmin, r.Organization.ID.String(), models.DomainTypeOrganization)
+		err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
-		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "", email, authService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
 	t.Run("user not found by email", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "", "nonexistent@example.com", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "nonexistent@example.com", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "", "", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := RemoveRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "invalid-uuid", "", authService)
+		_, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

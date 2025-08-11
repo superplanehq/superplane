@@ -20,7 +20,7 @@ type EventHandler interface {
 	// Used by the pending events worker to update execution resources.
 	// Used in conjunction with Status() to update the status of an execution resource.
 	//
-	Status([]byte) (StatefulResource, error)
+	Status(string, []byte) (StatefulResource, error)
 
 	//
 	// Convert the webhook data into an event.
@@ -28,6 +28,11 @@ type EventHandler interface {
 	// for a resource from the integration.
 	//
 	Handle(data []byte, header http.Header) (Event, error)
+
+	//
+	// List of event types supported by the integration.
+	//
+	EventTypes() []string
 }
 
 type ResourceManager interface {
@@ -44,10 +49,12 @@ type ResourceManager interface {
 	// Used by the execution resource poller. Ideally, not needed at all, since the status
 	// should be received in a webhook, through WebhookStatus().
 	//
-	Status(resourceType, id string) (StatefulResource, error)
+	Status(resourceType, id string, parentResource Resource) (StatefulResource, error)
 
 	//
 	// Configure the webhook for a integration resource.
+	// This method might be called multiple times for the same parent resource,
+	// so it should also update webhook-related resources, if needed.
 	//
 	SetupWebhook(options WebhookOptions) ([]Resource, error)
 }
@@ -108,8 +115,11 @@ type Event interface {
 }
 
 type WebhookOptions struct {
-	Resource Resource
-	ID       string
-	URL      string
-	Key      []byte
+	Parent     Resource
+	Children   []Resource
+	ID         string
+	URL        string
+	Key        []byte
+	EventTypes []string
+	Internal   bool
 }

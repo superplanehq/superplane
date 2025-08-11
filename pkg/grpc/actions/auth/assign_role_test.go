@@ -6,29 +6,24 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_AssignRole(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
+	ctx := context.Background()
+	orgID := r.Organization.ID.String()
 
-	err := authService.SetupOrganizationRoles(r.Organization.ID.String())
-	require.NoError(t, err)
-
-	ctx := context.WithValue(context.Background(), authorization.OrganizationContextKey, r.Organization.ID.String())
-
-	t.Run("assign role with ID", func(t *testing.T) {
-		resp, err := AssignRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, r.User.String(), "", authService)
+	t.Run("successful role assignment with user ID", func(t *testing.T) {
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
-	t.Run("assign role with email", func(t *testing.T) {
+	t.Run("successful role assignment with user email", func(t *testing.T) {
 		email := "test@example.com"
-		resp, err := AssignRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "", email, authService)
+		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
@@ -43,19 +38,19 @@ func Test_AssignRole(t *testing.T) {
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), "", r.User.String(), "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, "", r.User.String(), "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid role")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "", "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, r.Organization.ID.String(), models.RoleOrgAdmin, "invalid-uuid", "", authService)
+		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})

@@ -34,6 +34,59 @@ var updateCmd = &cobra.Command{
 		c := DefaultClient()
 
 		switch kind {
+		case "Secret":
+			// Parse YAML to map
+			var yamlData map[string]any
+			err = yaml.Unmarshal(data, &yamlData)
+			Check(err)
+
+			// Extract the metadata from the YAML
+			metadata, ok := yamlData["metadata"].(map[string]any)
+			if !ok {
+				Fail("Invalid Secret YAML: metadata section missing")
+			}
+
+			domainId, ok := metadata["domainId"].(string)
+			if !ok {
+				Fail("Invalid Secret YAML: domainId field missing")
+			}
+
+			domainTypeFromYaml, ok := metadata["domainType"].(string)
+			if !ok {
+				Fail("Invalid Secret YAML: domainType field missing")
+			}
+
+			ID, ok := metadata["id"].(string)
+			if !ok {
+				Fail("Invalid Secret YAML: id field missing")
+			}
+
+			var secret openapi_client.SecretsSecret
+			err = yaml.Unmarshal(data, &secret)
+			Check(err)
+
+			domainType, err := openapi_client.NewAuthorizationDomainTypeFromValue(domainTypeFromYaml)
+			Check(err)
+
+			response, httpResponse, err := c.SecretAPI.
+				SecretsUpdateSecret(context.Background(), ID).
+				Body(openapi_client.SecretsUpdateSecretBody{
+					Secret:     &secret,
+					DomainId:   &domainId,
+					DomainType: domainType,
+				}).
+				Execute()
+
+			if err != nil {
+				b, _ := io.ReadAll(httpResponse.Body)
+				fmt.Printf("%s\n", string(b))
+				os.Exit(1)
+			}
+
+			out, err := yaml.Marshal(response.Secret)
+			Check(err)
+			fmt.Printf("%s", string(out))
+
 		case "Stage":
 			var yamlData map[string]any
 			err = yaml.Unmarshal(data, &yamlData)

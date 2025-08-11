@@ -80,7 +80,7 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 		return nil, err
 	}
 
-	return &models.Integration{
+	record := &models.Integration{
 		Name:       integration.Metadata.Name,
 		DomainType: domainType,
 		DomainID:   domainID,
@@ -88,7 +88,17 @@ func buildIntegration(ctx context.Context, encryptor crypto.Encryptor, registry 
 		URL:        integration.Spec.Url,
 		AuthType:   authType,
 		Auth:       datatypes.NewJSONType(*auth),
-	}, nil
+	}
+
+	//
+	// We instantiate the resource manager to validate that everything is OK with the integration.
+	//
+	_, err = registry.NewResourceManager(ctx, record)
+	if err != nil {
+		return nil, err
+	}
+
+	return record, nil
 }
 
 func validateAuth(ctx context.Context, encryptor crypto.Encryptor, integrationDomainType string, integrationDomainID uuid.UUID, auth *pb.Integration_Auth) (*models.IntegrationAuth, string, error) {

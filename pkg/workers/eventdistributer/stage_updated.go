@@ -25,7 +25,7 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to describe stage: %w", err)
 	}
 
-	wsEventJSON, err := json.Marshal(map[string]any{
+	event, err := json.Marshal(map[string]any{
 		"event":   "stage_updated",
 		"payload": describeStageResp.Stage,
 	})
@@ -34,7 +34,7 @@ func HandleStageUpdated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to marshal websocket event: %w", err)
 	}
 
-	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
+	wsHub.BroadcastToCanvas(pbMsg.CanvasId, event)
 	log.Debugf("Broadcasted stage_updated event to canvas %s", pbMsg.CanvasId)
 
 	return nil

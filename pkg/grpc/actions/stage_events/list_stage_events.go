@@ -14,13 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func ListStageEvents(ctx context.Context, canvasID string, idOrName string, pbStates []pb.StageEvent_State) (*pb.ListStageEventsResponse, error) {
-	err := actions.ValidateUUIDs(idOrName)
+func ListStageEvents(ctx context.Context, canvasID string, stageIdOrName string, pbStates []pb.StageEvent_State) (*pb.ListStageEventsResponse, error) {
+	err := actions.ValidateUUIDs(stageIdOrName)
 	var stage *models.Stage
 	if err != nil {
-		stage, err = models.FindStageByName(canvasID, idOrName)
+		stage, err = models.FindStageByName(canvasID, stageIdOrName)
 	} else {
-		stage, err = models.FindStageByID(canvasID, idOrName)
+		stage, err = models.FindStageByID(canvasID, stageIdOrName)
 	}
 
 	if err != nil {

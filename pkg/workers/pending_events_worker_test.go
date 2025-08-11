@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	testconsumer "github.com/superplanehq/superplane/test/consumer"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 const EventCreatedRoutingKey = "stage-event-created"
@@ -44,14 +45,15 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("source has filter for event -> event is discarded", func(t *testing.T) {
-		source := models.EventSource{
-			CanvasID: r.Canvas.ID,
-			Name:     support.RandomName("source"),
-			Key:      []byte(`key`),
-			Scope:    models.EventSourceScopeExternal,
+		source := &models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       support.RandomName("source"),
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err := source.Create([]models.EventType{{Type: "push"}}, nil)
+		err := source.Create()
 		require.NoError(t, err)
 
 		event, err := models.CreateEvent(source.ID, source.Name, models.SourceTypeEventSource, "pull_request", []byte(`{}`), []byte(`{}`))
@@ -232,20 +234,22 @@ func Test__PendingEventsWorker(t *testing.T) {
 	})
 
 	t.Run("sources are connected to connection group", func(t *testing.T) {
-		source2 := models.EventSource{
-			CanvasID: r.Canvas.ID,
-			Name:     support.RandomName("source"),
-			Key:      []byte(`key`),
-			Scope:    models.EventSourceScopeExternal,
+		source2 := &models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       support.RandomName("source"),
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err := source2.Create([]models.EventType{}, nil)
+		err := source2.Create()
 		require.NoError(t, err)
 
 		//
 		// Create connection group connected to both sources
 		//
-		connectionGroup, err := r.Canvas.CreateConnectionGroup(
+		connectionGroup, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			support.RandomName("connection-group"),
 			"description",
 			r.User.String(),

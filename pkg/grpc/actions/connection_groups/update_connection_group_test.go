@@ -20,7 +20,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	connectionGroup, err := r.Canvas.CreateConnectionGroup(
+	connectionGroup, err := models.CreateConnectionGroup(
+		r.Canvas.ID,
 		"test",
 		"test",
 		uuid.NewString(),
@@ -38,7 +39,7 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 
 	require.NoError(t, err)
 
-	t.Run("wrong canvas ID -> error", func(t *testing.T) {
+	t.Run("wrong canvas -> error", func(t *testing.T) {
 		_, err := UpdateConnectionGroup(ctx, uuid.NewString(), connectionGroup.ID.String(), &protos.ConnectionGroup{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
@@ -63,16 +64,15 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no connections -> error", func(t *testing.T) {
-		newGroup := &protos.ConnectionGroup{
+		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
 			Metadata: &protos.ConnectionGroup_Metadata{
 				Name: "test",
 			},
 			Spec: &protos.ConnectionGroup_Spec{
 				Connections: []*protos.Connection{},
 			},
-		}
+		})
 
-		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), newGroup)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -80,7 +80,7 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group with no group by fields -> error", func(t *testing.T) {
-		newGroup := &protos.ConnectionGroup{
+		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
 			Metadata: &protos.ConnectionGroup_Metadata{
 				Name: "test",
 			},
@@ -92,9 +92,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 					Fields: []*protos.ConnectionGroup_Spec_GroupBy_Field{},
 				},
 			},
-		}
+		})
 
-		_, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), newGroup)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -102,7 +101,7 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group is updated", func(t *testing.T) {
-		newGroup := &protos.ConnectionGroup{
+		response, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), &protos.ConnectionGroup{
 			Metadata: &protos.ConnectionGroup_Metadata{
 				Name:        "updated-test",
 				Description: "updated-description",
@@ -119,9 +118,8 @@ func Test__UpdateConnectionGroup(t *testing.T) {
 					},
 				},
 			},
-		}
+		})
 
-		response, err := UpdateConnectionGroup(ctx, r.Canvas.ID.String(), connectionGroup.ID.String(), newGroup)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.ConnectionGroup)

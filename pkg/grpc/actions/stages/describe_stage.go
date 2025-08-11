@@ -22,7 +22,7 @@ func DescribeStage(ctx context.Context, canvasID string, idOrName string) (*pb.D
 			return nil, status.Error(codes.NotFound, "stage not found")
 		}
 
-		log.Errorf("Error describing stage %s in canvas %s: %v", idOrName, canvasID, err)
+		log.Errorf("Error describing stage %s in canvas %s: %v", canvasID, idOrName, err)
 		return nil, err
 	}
 
@@ -57,13 +57,13 @@ func DescribeStage(ctx context.Context, canvasID string, idOrName string) (*pb.D
 
 func findStage(canvasID string, idOrName string) (*models.Stage, error) {
 	if idOrName == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "must specify either the ID or name of the stage")
+		return nil, status.Errorf(codes.InvalidArgument, "must specify one of: id or name")
 	}
 
-	ID, err := uuid.Parse(idOrName)
-	if err != nil {
-		return models.FindStageByName(canvasID, idOrName)
+	_, err := uuid.Parse(idOrName)
+	if err == nil {
+		return models.FindStageByID(canvasID, idOrName)
 	}
 
-	return models.FindStageByID(canvasID, ID.String())
+	return models.FindStageByName(canvasID, idOrName)
 }

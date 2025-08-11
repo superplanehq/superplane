@@ -39,6 +39,25 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             }
           }
         };
+      case 'github':
+        return {
+          type: 'github',
+          integration: {
+            name: 'github',
+          },
+          resource: {
+            type: 'repository',
+            name: 'my-repository',
+          },
+          spec: {
+            workflow: '.github/workflows/task.yaml',
+            ref: 'main',
+            inputs: {
+              VERSION: '${{ inputs.VERSION }}',
+              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
+            }
+          }
+        };
       case 'http':
         return {
           type: 'http',

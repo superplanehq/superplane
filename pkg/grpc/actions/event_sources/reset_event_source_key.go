@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
-	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,20 +13,13 @@ import (
 )
 
 func ResetEventSourceKey(ctx context.Context, encryptor crypto.Encryptor, canvasID string, idOrName string) (*pb.ResetEventSourceKeyResponse, error) {
-	err := actions.ValidateUUIDs(idOrName)
-	var source *models.EventSource
-	if err != nil {
-		source, err = models.FindEventSourceByName(canvasID, idOrName)
-	} else {
-		source, err = models.FindEventSourceByID(canvasID, uuid.MustParse(idOrName))
-	}
-
+	source, err := findEventSource(canvasID, idOrName)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "event source not found")
 		}
 
-		log.Errorf("Error resetting key for event source %s in canvas %s: %v", idOrName, canvasID, err)
+		log.Errorf("Error describing event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 

@@ -32,7 +32,7 @@ func Test__ApproveStageEvent(t *testing.T) {
 		assert.Equal(t, "stage not found", s.Message())
 	})
 
-	t.Run("stage not found -> error", func(t *testing.T) {
+	t.Run("stage does not exist -> error", func(t *testing.T) {
 		_, err := ApproveStageEvent(ctx, r.Canvas.ID.String(), uuid.NewString(), event.ID.String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)

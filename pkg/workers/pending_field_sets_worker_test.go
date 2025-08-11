@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__PendingFieldSetsWorkerTest(t *testing.T) {
@@ -61,17 +62,19 @@ func Test__PendingFieldSetsWorkerTest(t *testing.T) {
 	})
 
 	t.Run("field set is timed out, emit -> emit with missing connections", func(t *testing.T) {
-		source2 := models.EventSource{
-			CanvasID: r.Canvas.ID,
-			Name:     "source-2",
-			Key:      []byte(`mykey`),
-			Scope:    models.EventSourceScopeExternal,
+		source2 := &models.EventSource{
+			CanvasID:   r.Canvas.ID,
+			Name:       support.RandomName("source"),
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err := source2.Create([]models.EventType{}, nil)
+		err := source2.Create()
 		require.NoError(t, err)
 
-		connectionGroup, err := r.Canvas.CreateConnectionGroup(
+		connectionGroup, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			"connection-group-emit",
 			"description",
 			uuid.NewString(),

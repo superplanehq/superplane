@@ -337,6 +337,21 @@ func (e *ExecutionResource) FindIntegration() (*Integration, error) {
 	return &integration, nil
 }
 
+func (e *ExecutionResource) FindParentResource() (*Resource, error) {
+	var resource Resource
+
+	err := database.Conn().
+		Where("id = ?", e.ParentResourceID).
+		First(&resource).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resource, nil
+}
+
 func FindExecutionResource(externalID string, parentResourceID uuid.UUID) (*ExecutionResource, error) {
 	var resource ExecutionResource
 

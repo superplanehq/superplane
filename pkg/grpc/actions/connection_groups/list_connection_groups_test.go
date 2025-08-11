@@ -9,20 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListConnectionGroups(t *testing.T) {
 	r := support.Setup(t)
-
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := ListConnectionGroups(context.Background(), uuid.NewString())
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
 
 	t.Run("no connection groups", func(t *testing.T) {
 		response, err := ListConnectionGroups(context.Background(), r.Canvas.ID.String())
@@ -32,7 +22,8 @@ func Test__ListConnectionGroups(t *testing.T) {
 	})
 
 	t.Run("connection group exists", func(t *testing.T) {
-		_, err := r.Canvas.CreateConnectionGroup(
+		_, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			"test",
 			"test",
 			uuid.NewString(),
@@ -48,7 +39,6 @@ func Test__ListConnectionGroups(t *testing.T) {
 			},
 		)
 
-		require.NoError(t, err)
 		response, err := ListConnectionGroups(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)

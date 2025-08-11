@@ -48,7 +48,7 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 
 func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRequest) (*pb.ListCanvasesResponse, error) {
 	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return canvases.ListCanvases(ctx, orgID, req, s.authorizationService)
+	return canvases.ListCanvases(ctx, orgID, s.authorizationService)
 }
 
 //
@@ -57,7 +57,7 @@ func (s *CanvasService) ListCanvases(ctx context.Context, req *pb.ListCanvasesRe
 
 func (s *CanvasService) CreateEventSource(ctx context.Context, req *pb.CreateEventSourceRequest) (*pb.CreateEventSourceResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, canvasID, req)
+	return eventsources.CreateEventSource(ctx, s.encryptor, s.registry, canvasID, req.EventSource)
 }
 
 func (s *CanvasService) DescribeEventSource(ctx context.Context, req *pb.DescribeEventSourceRequest) (*pb.DescribeEventSourceResponse, error) {
@@ -115,7 +115,7 @@ func (s *CanvasService) ListStageEvents(ctx context.Context, req *pb.ListStageEv
 
 func (s *CanvasService) CreateConnectionGroup(ctx context.Context, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
 	canvasID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return groups.CreateConnectionGroup(ctx, canvasID, req)
+	return groups.CreateConnectionGroup(ctx, canvasID, req.ConnectionGroup)
 }
 
 func (s *CanvasService) UpdateConnectionGroup(ctx context.Context, req *pb.UpdateConnectionGroupRequest) (*pb.UpdateConnectionGroupResponse, error) {

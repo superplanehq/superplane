@@ -75,7 +75,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), uuid.NewString(), &protos.Stage{})
+		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -15,13 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeConnectionGroup(ctx context.Context, canvasID string, idOrName string) (*pb.DescribeConnectionGroupResponse, error) {
+func DescribeConnectionGroup(ctx context.Context, canvasID, idOrName string) (*pb.DescribeConnectionGroupResponse, error) {
 	err := actions.ValidateUUIDs(idOrName)
 	var connectionGroup *models.ConnectionGroup
 	if err != nil {
 		connectionGroup, err = models.FindConnectionGroupByName(canvasID, idOrName)
 	} else {
-		connectionGroup, err = models.FindConnectionGroupByID(canvasID, uuid.MustParse(idOrName))
+		connectionGroup, err = models.FindConnectionGroupByID(canvasID, idOrName)
 	}
 
 	if err != nil {
@@ -29,7 +28,7 @@ func DescribeConnectionGroup(ctx context.Context, canvasID string, idOrName stri
 			return nil, status.Error(codes.NotFound, "connection group not found")
 		}
 
-		log.Errorf("Error describing connection group %s in canvas %s. Error: %v", idOrName, canvasID, err)
+		log.Errorf("Error describing connection group %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 

@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
-	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -17,32 +17,25 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateConnectionGroup(ctx context.Context, canvasID string, req *pb.CreateConnectionGroupRequest) (*pb.CreateConnectionGroupResponse, error) {
+func CreateConnectionGroup(ctx context.Context, canvasID string, group *pb.ConnectionGroup) (*pb.CreateConnectionGroupResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	canvas, err := models.FindCanvasByIDOnly(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	logger := logging.ForCanvas(canvas)
-
 	//
 	// Validate request
 	//
-	if req.ConnectionGroup == nil || req.ConnectionGroup.Metadata == nil || req.ConnectionGroup.Metadata.Name == "" {
+	if group == nil || group.Metadata == nil || group.Metadata.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "connection group name is required")
 	}
 
-	connections, err := actions.ValidateConnections(canvas.ID.String(), req.ConnectionGroup.Spec.Connections)
+	connections, err := actions.ValidateConnections(canvasID, group.Spec.Connections)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	spec, err := validateSpec(req.ConnectionGroup.Spec)
+	spec, err := validateSpec(group.Spec)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -50,9 +43,10 @@ func CreateConnectionGroup(ctx context.Context, canvasID string, req *pb.CreateC
 	//
 	// Create connection group
 	//
-	connectionGroup, err := canvas.CreateConnectionGroup(
-		req.ConnectionGroup.Metadata.Name,
-		req.ConnectionGroup.Metadata.Description,
+	connectionGroup, err := models.CreateConnectionGroup(
+		uuid.MustParse(canvasID),
+		group.Metadata.Name,
+		group.Metadata.Description,
 		userID,
 		connections,
 		*spec,
@@ -63,25 +57,23 @@ func CreateConnectionGroup(ctx context.Context, canvasID string, req *pb.CreateC
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 
-		log.Errorf("Error creating connection group. Request: %v. Error: %v", req, err)
+		log.Errorf("Error creating connection group in canvas %s. Group: %v. Error: %v", canvasID, group, err)
 		return nil, err
 	}
 
-	group, err := serializeConnectionGroup(*connectionGroup, connections)
+	pbGroup, err := serializeConnectionGroup(*connectionGroup, connections)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &pb.CreateConnectionGroupResponse{
-		ConnectionGroup: group,
+		ConnectionGroup: pbGroup,
 	}
 
 	err = messages.NewConnectionGroupCreatedMessage(connectionGroup).Publish()
 	if err != nil {
 		log.Errorf("failed to publish connection group created message: %v", err)
 	}
-
-	logger.Infof("Created connection group. Request: %v", req)
 
 	return response, nil
 }

@@ -11,13 +11,14 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test__DescribeEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 
 	t.Run("wrong canvas -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), uuid.New().String(), r.Source.ID.String())
+		_, err := DescribeEventSource(context.Background(), uuid.NewString(), r.Source.ID.String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -25,7 +26,7 @@ func Test__DescribeEventSource(t *testing.T) {
 	})
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
-		_, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), uuid.New().String())
+		_, err := DescribeEventSource(context.Background(), r.Canvas.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -56,14 +57,13 @@ func Test__DescribeEventSource(t *testing.T) {
 
 	t.Run("internal event source cannot be described", func(t *testing.T) {
 		internalSource := models.EventSource{
-			CanvasID:    r.Canvas.ID,
-			Name:        "internal",
-			Description: "internal",
-			Key:         []byte(`key`),
-			Scope:       models.EventSourceScopeInternal,
+			CanvasID:   r.Canvas.ID,
+			Name:       "internal",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeInternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
-
-		err := internalSource.Create([]models.EventType{}, nil)
+		err := internalSource.Create()
 		require.NoError(t, err)
 
 		_, err = DescribeEventSource(context.Background(), r.Canvas.ID.String(), internalSource.Name)

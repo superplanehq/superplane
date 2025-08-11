@@ -16,7 +16,8 @@ import (
 func Test__ListConnectionGroupFieldSets(t *testing.T) {
 	r := support.Setup(t)
 
-	connectionGroup, err := r.Canvas.CreateConnectionGroup(
+	connectionGroup, err := models.CreateConnectionGroup(
+		r.Canvas.ID,
 		"test",
 		"test",
 		uuid.NewString(),
@@ -33,6 +34,14 @@ func Test__ListConnectionGroupFieldSets(t *testing.T) {
 	)
 
 	require.NoError(t, err)
+
+	t.Run("wrong canvas -> error", func(t *testing.T) {
+		_, err := ListConnectionGroupFieldSets(context.Background(), uuid.NewString(), "test")
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "connection group not found", s.Message())
+	})
 
 	t.Run("connection group does not exist -> error", func(t *testing.T) {
 		_, err := ListConnectionGroupFieldSets(context.Background(), r.Canvas.ID.String(), uuid.NewString())

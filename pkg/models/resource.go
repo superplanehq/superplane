@@ -11,6 +11,7 @@ import (
 type Resource struct {
 	ID            uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
 	IntegrationID uuid.UUID
+	ParentID      *uuid.UUID
 	ExternalID    string
 	ResourceName  string `gorm:"column:name"`
 	ResourceType  string `gorm:"column:type"`
@@ -59,6 +60,20 @@ func (r *Resource) FindEventSourceInTransaction(tx *gorm.DB) (*EventSource, erro
 	}
 
 	return &eventSource, nil
+}
+
+func (r *Resource) FindChildren() ([]Resource, error) {
+	var resources []Resource
+	err := database.Conn().
+		Where("parent_id = ?", r.ID).
+		Find(&resources).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resources, nil
 }
 
 func FindResourceByID(id uuid.UUID) (*Resource, error) {

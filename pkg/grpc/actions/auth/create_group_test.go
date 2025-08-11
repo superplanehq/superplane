@@ -4,21 +4,18 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_CreateGroup(t *testing.T) {
-	authService := SetupTestAuthService(t)
+	r := support.Setup(t)
 	ctx := context.Background()
-
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
+	orgID := r.Organization.ID.String()
 
 	t.Run("successful group creation", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
@@ -34,23 +31,21 @@ func Test_CreateGroup(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
+		resp, err := CreateGroup(ctx, "org", orgID, req.Group, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 
 		// Check if group was created
-		groups, err := authService.GetGroups(orgID, models.DomainTypeOrganization)
+		groups, err := r.AuthService.GetGroups(orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 		assert.Contains(t, groups, "test-group")
 		assert.Len(t, groups, 1)
 	})
 
 	t.Run("successful canvas group creation", func(t *testing.T) {
-		canvasID := uuid.New().String()
-		err := authService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-
 		req := &pb.CreateGroupRequest{
+			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
+			DomainId:   r.Canvas.ID.String(),
 			Group: &pb.Group{
 				Metadata: &pb.Group_Metadata{
 					Name: "canvas-group",
@@ -63,12 +58,12 @@ func Test_CreateGroup(t *testing.T) {
 			},
 		}
 
-		resp, err := CreateGroup(ctx, "canvas", canvasID, req.Group, authService)
+		resp, err := CreateGroup(ctx, "canvas", r.Canvas.ID.String(), req.Group, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Equal(t, "canvas-group", resp.Group.Metadata.Name)
 		assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, resp.Group.Metadata.DomainType)
-		assert.Equal(t, canvasID, resp.Group.Metadata.DomainId)
+		assert.Equal(t, r.Canvas.ID.String(), resp.Group.Metadata.DomainId)
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
@@ -85,7 +80,7 @@ func Test_CreateGroup(t *testing.T) {
 			},
 		}
 
-		_, err := CreateGroup(ctx, "org", orgID, req.Group, authService)
+		_, err := CreateGroup(ctx, "org", orgID, req.Group, r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})

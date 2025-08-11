@@ -25,7 +25,8 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 	})
 
 	t.Run("connection group exists", func(t *testing.T) {
-		_, err := r.Canvas.CreateConnectionGroup(
+		_, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			"test",
 			"test",
 			uuid.NewString(),
@@ -42,7 +43,6 @@ func Test__DescribeConnectionGroup(t *testing.T) {
 		)
 
 		require.NoError(t, err)
-
 		response, err := DescribeConnectionGroup(context.Background(), r.Canvas.ID.String(), "test")
 		require.NoError(t, err)
 		require.NotNil(t, response)

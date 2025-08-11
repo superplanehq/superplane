@@ -33,7 +33,7 @@ func Test__CreateStage(t *testing.T) {
 	executor := support.ProtoExecutor(t, r)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, uuid.NewString(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, uuid.New().String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -88,13 +88,14 @@ func Test__CreateStage(t *testing.T) {
 
 	t.Run("connection for internal event source -> error", func(t *testing.T) {
 		internalSource := models.EventSource{
-			CanvasID: r.Canvas.ID,
-			Name:     "internal",
-			Scope:    models.EventSourceScopeInternal,
-			Key:      []byte(`key`),
+			CanvasID:   r.Canvas.ID,
+			Name:       "internal",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeInternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err := internalSource.Create([]models.EventType{}, nil)
+		err := internalSource.Create()
 		require.NoError(t, err)
 
 		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{

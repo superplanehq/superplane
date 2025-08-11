@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 
-	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -20,7 +19,7 @@ func ListConnectionGroupFieldSets(ctx context.Context, canvasID string, idOrName
 	if err != nil {
 		connectionGroup, err = models.FindConnectionGroupByName(canvasID, idOrName)
 	} else {
-		connectionGroup, err = models.FindConnectionGroupByID(canvasID, uuid.MustParse(idOrName))
+		connectionGroup, err = models.FindConnectionGroupByID(canvasID, idOrName)
 	}
 
 	if err != nil {

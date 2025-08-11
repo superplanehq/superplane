@@ -26,21 +26,15 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(
-	ctx context.Context,
-	encryptor crypto.Encryptor,
-	registry *registry.Registry,
-	canvasID string,
-	stage *pb.Stage,
-) (*pb.CreateStageResponse, error) {
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, stage *pb.Stage) (*pb.CreateStageResponse, error) {
+	canvas, err := models.FindUnscopedCanvasByID(canvasID)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
+	}
+
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
-	}
-
-	canvas, err := models.FindCanvasByIDOnly(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	if stage == nil {
@@ -48,11 +42,11 @@ func CreateStage(
 	}
 
 	if stage.Metadata == nil {
-		return nil, status.Error(codes.InvalidArgument, "stage metadata is required")
+		return nil, status.Error(codes.InvalidArgument, "stage.metadata is required")
 	}
 
 	if stage.Spec == nil {
-		return nil, status.Error(codes.InvalidArgument, "stage spec is required")
+		return nil, status.Error(codes.InvalidArgument, "stage.spec is required")
 	}
 
 	inputValidator := inputs.NewValidator(
@@ -112,7 +106,7 @@ func CreateStage(
 	newStage, err := builders.NewStageBuilder(registry).
 		WithContext(ctx).
 		WithEncryptor(encryptor).
-		InCanvas(uuid.MustParse(canvasID)).
+		InCanvas(canvas.ID).
 		WithName(stage.Metadata.Name).
 		WithDescription(stage.Metadata.Description).
 		WithRequester(uuid.MustParse(userID)).

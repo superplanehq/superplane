@@ -36,7 +36,8 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to marshal stage to JSON: %w", err)
 	}
 
-	wsEventJSON, err := json.Marshal(StageCreatedWebsocketEvent{
+	// Convert to JSON for websocket transmission
+	event, err := json.Marshal(StageCreatedWebsocketEvent{
 		Event:   "stage_added",
 		Payload: json.RawMessage(stageJSON),
 	})
@@ -45,7 +46,7 @@ func HandleStageCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to marshal websocket event: %w", err)
 	}
 
-	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
+	wsHub.BroadcastToCanvas(pbMsg.CanvasId, event)
 	log.Debugf("Broadcasted stage_added event to canvas %s", pbMsg.CanvasId)
 
 	return nil

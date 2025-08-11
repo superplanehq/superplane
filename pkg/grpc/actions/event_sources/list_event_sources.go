@@ -10,7 +10,7 @@ import (
 )
 
 func ListEventSources(ctx context.Context, canvasID string) (*pb.ListEventSourcesResponse, error) {
-	canvas, err := models.FindCanvasByIDOnly(canvasID)
+	canvas, err := models.FindUnscopedCanvasByID(canvasID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}

@@ -159,7 +159,7 @@ func (b *StageBuilder) Create() (*models.Stage, error) {
 		//
 		// Find or create the event source for the executor
 		//
-		resourceID, err := b.findOrCreateEventSourceForExecutor(tx)
+		resourceID, err := b.findOrCreateEventSource(tx)
 		if err != nil {
 			return err
 		}
@@ -220,7 +220,7 @@ func (b *StageBuilder) validateExecutorSpec() error {
 	return executor.Validate(b.ctx, b.executorSpec)
 }
 
-func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UUID, error) {
+func (b *StageBuilder) findOrCreateEventSource(tx *gorm.DB) (*uuid.UUID, error) {
 	//
 	// If this stage is not using an integration, it does not need an event source.
 	//
@@ -232,7 +232,7 @@ func (b *StageBuilder) findOrCreateEventSourceForExecutor(tx *gorm.DB) (*uuid.UU
 	// The event source builder will ensure an event source for this resource
 	// will be re-used if already exists, or a new one will be created.
 	//
-	eventSource, _, err := NewEventSourceBuilder(b.encryptor).
+	eventSource, _, err := NewEventSourceBuilder(b.encryptor, b.registry).
 		WithTransaction(tx).
 		WithContext(b.ctx).
 		InCanvas(b.canvasID).
@@ -271,7 +271,7 @@ func (b *StageBuilder) Update() (*models.Stage, error) {
 		//
 		// Find or create the event source for the executor
 		//
-		resourceID, err := b.findOrCreateEventSourceForExecutor(tx)
+		resourceID, err := b.findOrCreateEventSource(tx)
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/executors"
 	"github.com/superplanehq/superplane/pkg/executors/http"
 	"github.com/superplanehq/superplane/pkg/integrations"
+	"github.com/superplanehq/superplane/pkg/integrations/github"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -47,6 +48,13 @@ func (r *Registry) Init() {
 		OIDCVerifier:       &semaphore.SemaphoreOIDCVerifier{},
 		NewResourceManager: semaphore.NewSemaphoreResourceManager,
 		NewExecutor:        semaphore.NewSemaphoreExecutor,
+	}
+
+	r.Integrations[models.IntegrationTypeGithub] = Integration{
+		EventHandler:       &github.GitHubEventHandler{},
+		OIDCVerifier:       &github.GitHubOIDCVerifier{},
+		NewResourceManager: github.NewGitHubResourceManager,
+		NewExecutor:        github.NewGitHubExecutor,
 	}
 
 	//
@@ -152,7 +160,7 @@ func (r *Registry) secretProvider(secretDef *models.ValueDefinitionFromSecret, i
 	// Otherwise, the integration is on the canvas level, but the secret is on the organization level,
 	// so we need to get the organization ID for the canvas where the integration is.
 	//
-	canvas, err := models.FindCanvasByIDOnly(integration.DomainID.String())
+	canvas, err := models.FindUnscopedCanvasByID(integration.DomainID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error finding canvas %s: %v", integration.DomainID, err)
 	}

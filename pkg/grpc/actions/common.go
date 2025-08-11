@@ -50,7 +50,7 @@ func FindConnectionSourceID(canvasID string, connection *pb.Connection) (*uuid.U
 		return &stage.ID, nil
 
 	case pb.Connection_TYPE_EVENT_SOURCE:
-		eventSource, err := models.FindEventSourceByName(canvasID, connection.Name)
+		eventSource, err := models.FindExternalEventSourceByName(canvasID, connection.Name)
 		if err != nil {
 			return nil, fmt.Errorf("event source %s not found", connection.Name)
 		}
@@ -371,7 +371,7 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 	// If a canvas-level resource is being created and is using a org-level secret,
 	// we need to find the organization ID for the canvas where the resource is being created.
 	//
-	canvas, err := models.FindCanvasByIDOnly(domainIdForResource.String())
+	canvas, err := models.FindUnscopedCanvasByID(domainIdForResource.String())
 	if err != nil {
 		return "", nil, fmt.Errorf("canvas not found")
 	}

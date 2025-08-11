@@ -6,17 +6,10 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func ListConnectionGroups(ctx context.Context, canvasID string) (*pb.ListConnectionGroupsResponse, error) {
-	canvas, err := models.FindCanvasByIDOnly(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	connectionGroups, err := canvas.ListConnectionGroups()
+	connectionGroups, err := models.ListConnectionGroups(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list stages for canvas: %w", err)
 	}

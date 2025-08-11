@@ -556,7 +556,7 @@ func (s *Server) HandleExecutionOutputs(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	stage, err := models.FindStageByIDOnly(execution.StageID.String())
+	stage, err := models.FindStageByID(execution.CanvasID.String(), execution.StageID.String())
 	if err != nil {
 		http.Error(w, "error finding stage", http.StatusInternalServerError)
 		return

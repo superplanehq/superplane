@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 func Test__InputBuilder(t *testing.T) {
@@ -15,25 +16,26 @@ func Test__InputBuilder(t *testing.T) {
 		Integration: true,
 	})
 
-	docsSource := models.EventSource{
-		CanvasID: r.Canvas.ID,
-		Name:     "docs",
-		Key:      []byte("docs-key"),
-		Scope:    models.EventSourceScopeExternal,
+	docsSource := &models.EventSource{
+		CanvasID:   r.Canvas.ID,
+		Name:       "docs",
+		Key:        []byte(`docs-key`),
+		Scope:      models.EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 	}
 
-	err := docsSource.Create([]models.EventType{}, nil)
+	err := docsSource.Create()
 	require.NoError(t, err)
-	require.NotNil(t, docsSource)
 
-	tfSource := models.EventSource{
-		Name:     "tf",
-		Key:      []byte("tf-key"),
-		Scope:    models.EventSourceScopeExternal,
-		CanvasID: r.Canvas.ID,
+	tfSource := &models.EventSource{
+		CanvasID:   r.Canvas.ID,
+		Name:       "tf",
+		Key:        []byte(`tf-key`),
+		Scope:      models.EventSourceScopeExternal,
+		EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 	}
 
-	err = tfSource.Create([]models.EventType{}, nil)
+	err = tfSource.Create()
 	require.NoError(t, err)
 
 	t.Run("no inputs", func(t *testing.T) {
@@ -210,7 +212,7 @@ func Test__InputBuilder(t *testing.T) {
 		//
 		// Mock a completed previous execution of the stage
 		//
-		execution := support.CreateExecutionWithData(t, &docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
+		execution := support.CreateExecutionWithData(t, docsSource, stage, []byte(`{"ref":"docs.v1"}`), []byte(`{}`), map[string]any{"DOCS_VERSION": "docs.v1", "TF_VERSION": "terraform.v1"})
 		execution.Finish(stage, models.ResultPassed)
 
 		//

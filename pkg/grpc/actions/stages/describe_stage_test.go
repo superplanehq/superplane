@@ -21,6 +21,14 @@ func Test__DescribeStage(t *testing.T) {
 		Approvals:   1,
 	})
 
+	t.Run("wrong canvas ID -> error", func(t *testing.T) {
+		_, err := DescribeStage(context.Background(), uuid.New().String(), r.Stage.Name)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, "stage not found", s.Message())
+	})
+
 	t.Run("no name and no ID -> error", func(t *testing.T) {
 		_, err := DescribeStage(context.Background(), r.Canvas.ID.String(), "")
 		s, ok := status.FromError(err)

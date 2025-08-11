@@ -24,7 +24,7 @@ func Test__ResetEventSourceKey(t *testing.T) {
 	})
 
 	t.Run("source that does not exist -> error", func(t *testing.T) {
-		_, err := ResetEventSourceKey(context.Background(), r.Encryptor, r.Canvas.ID.String(), uuid.New().String())
+		_, err := ResetEventSourceKey(context.Background(), r.Encryptor, r.Canvas.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())

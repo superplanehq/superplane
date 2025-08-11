@@ -20,7 +20,7 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 			return nil, status.Error(codes.NotFound, "event source not found")
 		}
 
-		log.Errorf("Error describing event source %s in canvas %s. Error: %v", idOrName, canvasID, err)
+		log.Errorf("Error describing event source %s in canvas %s: %v", idOrName, canvasID, err)
 		return nil, err
 	}
 
@@ -43,8 +43,8 @@ func findEventSource(canvasID string, idOrName string) (*models.EventSource, err
 
 	ID, err := uuid.Parse(idOrName)
 	if err != nil {
-		return models.FindEventSourceByName(canvasID, idOrName)
+		return models.FindExternalEventSourceByName(canvasID, idOrName)
 	}
 
-	return models.FindEventSourceByID(canvasID, ID)
+	return models.FindExternalEventSourceByID(canvasID, ID.String())
 }

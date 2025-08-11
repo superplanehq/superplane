@@ -28,15 +28,12 @@ func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: "test",
-				},
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, uuid.NewString(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: "test",
 			},
-		}
+		})
 
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, uuid.NewString(), req)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -50,15 +47,12 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("source")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: name,
-				},
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
 			},
-		}
+		})
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
@@ -74,24 +68,25 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("name already used -> error", func(t *testing.T) {
 		name := support.RandomName("source")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: name,
-				},
-			},
-		}
 
 		//
 		// First one is created.
 		//
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+		})
 		require.NoError(t, err)
 
 		//
 		// Second one fails.
 		//
-		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
+		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+		})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -106,25 +101,22 @@ func Test__CreateEventSource(t *testing.T) {
 
 		name := support.RandomName("source")
 		description := support.RandomName("description")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name:        name,
-					Description: description,
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name:        name,
+				Description: description,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
 				},
-				Spec: &protos.EventSource_Spec{
-					Integration: &integrationPb.IntegrationRef{
-						Name: r.Integration.Name,
-					},
-					Resource: &integrationPb.ResourceRef{
-						Type: "project",
-						Name: "demo-project",
-					},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
-		}
+		})
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
@@ -142,24 +134,20 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("event source for integration that does not exist -> error", func(t *testing.T) {
 		name := support.RandomName("source")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: name,
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: "does-not-exist",
 				},
-				Spec: &protos.EventSource_Spec{
-					Integration: &integrationPb.IntegrationRef{
-						Name: "does-not-exist",
-					},
-					Resource: &integrationPb.ResourceRef{
-						Type: "project",
-						Name: "demo-project",
-					},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
-		}
-
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
+		})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -196,25 +184,22 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("source")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: name,
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					DomainType: authpb.DomainType_DOMAIN_TYPE_ORGANIZATION,
+					Name:       integration.Name,
 				},
-				Spec: &protos.EventSource_Spec{
-					Integration: &integrationPb.IntegrationRef{
-						DomainType: authpb.DomainType_DOMAIN_TYPE_ORGANIZATION,
-						Name:       integration.Name,
-					},
-					Resource: &integrationPb.ResourceRef{
-						Type: "project",
-						Name: "demo-project",
-					},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
-		}
+		})
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
@@ -232,24 +217,20 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("event source for the same integration resource -> error", func(t *testing.T) {
 		name := support.RandomName("source")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: name,
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: name,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
 				},
-				Spec: &protos.EventSource_Spec{
-					Integration: &integrationPb.IntegrationRef{
-						Name: r.Integration.Name,
-					},
-					Resource: &integrationPb.ResourceRef{
-						Type: "project",
-						Name: "demo-project",
-					},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project",
 				},
 			},
-		}
-
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
+		})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -261,7 +242,7 @@ func Test__CreateEventSource(t *testing.T) {
 		// Create internal source for integration resource
 		//
 		internalName := support.RandomName("internal")
-		internalSource, _, err := builders.NewEventSourceBuilder(r.Encryptor).
+		internalSource, _, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
 			InCanvas(r.Canvas.ID).
 			WithName(internalName).
 			WithScope(models.EventSourceScopeInternal).
@@ -278,24 +259,21 @@ func Test__CreateEventSource(t *testing.T) {
 		// Create external source for the same integration resource
 		//
 		externalName := support.RandomName("external")
-		req := &protos.CreateEventSourceRequest{
-			EventSource: &protos.EventSource{
-				Metadata: &protos.EventSource_Metadata{
-					Name: externalName,
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+			Metadata: &protos.EventSource_Metadata{
+				Name: externalName,
+			},
+			Spec: &protos.EventSource_Spec{
+				Integration: &integrationPb.IntegrationRef{
+					Name: r.Integration.Name,
 				},
-				Spec: &protos.EventSource_Spec{
-					Integration: &integrationPb.IntegrationRef{
-						Name: r.Integration.Name,
-					},
-					Resource: &integrationPb.ResourceRef{
-						Type: "project",
-						Name: "demo-project-2",
-					},
+				Resource: &integrationPb.ResourceRef{
+					Type: "project",
+					Name: "demo-project-2",
 				},
 			},
-		}
+		})
 
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), req)
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.EventSource)
@@ -311,7 +289,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Verify that internal source was updated to be external
 		//
-		_, err = models.FindEventSourceByName(r.Canvas.ID.String(), internalSource.Name)
+		_, err = models.FindInternalEventSourceByName(r.Canvas.ID.String(), internalSource.Name)
 		require.ErrorIs(t, err, gorm.ErrRecordNotFound)
 		source, err := models.FindEventSource(internalSource.ID)
 		require.NoError(t, err)

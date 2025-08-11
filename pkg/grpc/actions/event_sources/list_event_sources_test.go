@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func Test__ListEventSources(t *testing.T) {
@@ -33,25 +34,25 @@ func Test__ListEventSources(t *testing.T) {
 
 	t.Run("lists only external event sources", func(t *testing.T) {
 		external := models.EventSource{
-			CanvasID:    r.Canvas.ID,
-			Name:        "external",
-			Description: "external",
-			Key:         []byte(`key`),
-			Scope:       models.EventSourceScopeExternal,
+			CanvasID:   r.Canvas.ID,
+			Name:       "external",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeExternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err := external.Create([]models.EventType{}, nil)
+		err := external.Create()
 		require.NoError(t, err)
 
 		internal := models.EventSource{
-			CanvasID:    r.Canvas.ID,
-			Name:        "internal",
-			Description: "internal",
-			Key:         []byte(`key`),
-			Scope:       models.EventSourceScopeInternal,
+			CanvasID:   r.Canvas.ID,
+			Name:       "internal",
+			Key:        []byte(`key`),
+			Scope:      models.EventSourceScopeInternal,
+			EventTypes: datatypes.NewJSONSlice([]models.EventType{}),
 		}
 
-		err = internal.Create([]models.EventType{}, nil)
+		err = internal.Create()
 		require.NoError(t, err)
 
 		res, err := ListEventSources(context.Background(), r.Canvas.ID.String())

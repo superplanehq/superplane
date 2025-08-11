@@ -308,7 +308,8 @@ CREATE TABLE public.resources (
     name character varying(128) NOT NULL,
     integration_id uuid NOT NULL,
     created_at timestamp without time zone NOT NULL,
-    updated_at timestamp without time zone
+    updated_at timestamp without time zone,
+    parent_id uuid
 );
 
 
@@ -971,6 +972,14 @@ ALTER TABLE ONLY public.resources
 
 
 --
+-- Name: connections stage_connections_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT stage_connections_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
+
+
+--
 -- Name: stage_event_approvals stage_event_approvals_stage_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1054,7 +1063,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20250731205910	f
+20250804194751	f
 \.
 
 

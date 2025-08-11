@@ -42,6 +42,22 @@ type ConnectionGroup struct {
 	UpdatedBy   uuid.UUID
 }
 
+func FindConnectionGroupByName(canvasID string, name string) (*ConnectionGroup, error) {
+	var connectionGroup ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Where("name = ?", name).
+		First(&connectionGroup).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &connectionGroup, nil
+}
+
 func (g *ConnectionGroup) CalculateFieldSet(event *Event) (map[string]string, string, error) {
 	fieldSet := map[string]string{}
 	for _, fieldDef := range g.Spec.Data().GroupBy.Fields {
@@ -184,7 +200,24 @@ type ConnectionGroupByField struct {
 	Expression string `json:"expression"`
 }
 
-func (c *Canvas) CreateConnectionGroup(
+func ListConnectionGroups(canvasID string) ([]ConnectionGroup, error) {
+	var connectionGroups []ConnectionGroup
+
+	err := database.Conn().
+		Where("canvas_id = ?", canvasID).
+		Order("name ASC").
+		Find(&connectionGroups).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return connectionGroups, nil
+}
+
+func CreateConnectionGroup(
+	canvasID uuid.UUID,
 	name, description, createdBy string,
 	connections []Connection,
 	spec ConnectionGroupSpec,
@@ -197,7 +230,7 @@ func (c *Canvas) CreateConnectionGroup(
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		connectionGroup = &ConnectionGroup{
 			ID:          ID,
-			CanvasID:    c.ID,
+			CanvasID:    canvasID,
 			Name:        name,
 			Description: description,
 			CreatedAt:   &now,
@@ -216,9 +249,9 @@ func (c *Canvas) CreateConnectionGroup(
 
 		for _, i := range connections {
 			connection := i
+			connection.CanvasID = canvasID
 			connection.TargetID = ID
 			connection.TargetType = ConnectionTargetTypeConnectionGroup
-			connection.CanvasID = c.ID
 			err := tx.Create(&connection).Error
 			if err != nil {
 				return err
@@ -250,9 +283,7 @@ func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupS
 			}
 		}
 
-		now := time.Now()
 		g.Spec = datatypes.NewJSONType(spec)
-		g.UpdatedAt = &now
 		err := tx.Save(g).Error
 		if err != nil {
 			return fmt.Errorf("failed to update connection group: %v", err)
@@ -262,12 +293,13 @@ func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupS
 	})
 }
 
-func FindConnectionGroupByName(canvasID string, name string) (*ConnectionGroup, error) {
-	var connectionGroup ConnectionGroup
+// NOTE: we are not querying scoped by canvas here,
+// so this should be used only in the workers.
+func FindUnscopedConnectionGroup(id string) (*ConnectionGroup, error) {
+	var connectionGroup *ConnectionGroup
 
 	err := database.Conn().
-		Where("canvas_id = ?", canvasID).
-		Where("name = ?", name).
+		Where("id = ?", id).
 		First(&connectionGroup).
 		Error
 
@@ -275,17 +307,17 @@ func FindConnectionGroupByName(canvasID string, name string) (*ConnectionGroup, 
 		return nil, err
 	}
 
-	return &connectionGroup, nil
+	return connectionGroup, nil
 }
 
-func FindConnectionGroupByID(canvasID string, id uuid.UUID) (*ConnectionGroup, error) {
+func FindConnectionGroupByID(canvasID string, id string) (*ConnectionGroup, error) {
 	return FindConnectionGroupByIDInTransaction(database.Conn(), canvasID, id)
 }
 
-func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id uuid.UUID) (*ConnectionGroup, error) {
-	var connectionGroup ConnectionGroup
+func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id string) (*ConnectionGroup, error) {
+	var connectionGroup *ConnectionGroup
 
-	err := database.Conn().
+	err := tx.
 		Where("id = ?", id).
 		Where("canvas_id = ?", canvasID).
 		First(&connectionGroup).
@@ -295,5 +327,5 @@ func FindConnectionGroupByIDInTransaction(tx *gorm.DB, canvasID string, id uuid.
 		return nil, err
 	}
 
-	return &connectionGroup, nil
+	return connectionGroup, nil
 }

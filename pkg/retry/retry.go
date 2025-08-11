@@ -3,24 +3,38 @@ package retry
 
 import (
 	"fmt"
-	"log"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
+
+type Options struct {
+	Task         string
+	MaxAttempts  int
+	Wait         time.Duration
+	InitialDelay time.Duration
+	Verbose      bool
+}
 
 // WithConstantWait tries to execute the task and if it fails,
 // awaits the specified duration before retrying maxAttempts times.
-func WithConstantWait(task string, maxAttempts int, wait time.Duration, f func() error) error {
+func WithConstantWait(f func() error, options Options) error {
 	for attempt := 1; ; attempt++ {
+		time.Sleep(options.InitialDelay)
+
 		err := f()
 		if err == nil {
 			return nil
 		}
 
-		if attempt > maxAttempts {
-			return fmt.Errorf("[%s] failed after [%d] attempts - giving up: %v", task, attempt, err)
+		if attempt > options.MaxAttempts {
+			return fmt.Errorf("[%s] failed after [%d] attempts - giving up: %v", options.Task, attempt, err)
 		}
 
-		log.Printf("[%s] attempt [%d] failed with [%v] - retrying in %s", task, attempt, err, wait)
-		time.Sleep(wait)
+		if options.Verbose {
+			log.Infof("[%s] attempt [%d] failed with [%v] - retrying in %s", options.Task, attempt, err, options.Wait)
+		}
+
+		time.Sleep(options.Wait)
 	}
 }

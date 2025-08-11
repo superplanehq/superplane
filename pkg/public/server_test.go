@@ -50,11 +50,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 	defer r.Close()
 
-	authService, err := authorization.NewAuthService()
-	require.NoError(t, err)
-	authService.EnableCache(false)
-
-	source, key, err := builders.NewEventSourceBuilder(r.Encryptor).
+	source, key, err := builders.NewEventSourceBuilder(r.Encryptor, r.Registry).
 		InCanvas(r.Canvas.ID).
 		WithName("demo-project").
 		WithScope(models.EventSourceScopeExternal).
@@ -68,7 +64,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 		Create()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", r.AuthService)
 	require.NoError(t, err)
 
 	validEvent, _ := json.Marshal(semaphore.Hook{
