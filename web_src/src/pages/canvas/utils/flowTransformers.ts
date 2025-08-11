@@ -103,8 +103,17 @@ export const transformToEdges = (
   connectionGroups: SuperplaneConnectionGroup[],
   eventSources: SuperplaneEventSource[]
 ): EdgeType[] => {
-  const stageEdges = stages.flatMap((st) =>
-    (st.spec?.connections || []).map((conn) => {
+  const allEdges: EdgeType[] = [];
+  const edgeIdSet = new Set<string>();
+
+  stages.forEach((st) => {
+    (st.spec?.connections || []).forEach((conn) => {
+      const edgeId = `e-${conn.name}-${st.metadata?.id}`;
+      
+      if (edgeIdSet.has(edgeId)) {
+        return;
+      }
+
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||
         stages.find((s) => s.metadata?.name === conn.name) ||
@@ -112,20 +121,30 @@ export const transformToEdges = (
 
       const sourceId = sourceObj?.metadata?.id ?? conn.name;
       const strokeColor = '#707070';
-      return {
-        id: `e-${conn.name}-${st.metadata?.id}`,
-        source: sourceId,
+      
+      const edge: EdgeType = {
+        id: edgeId,
+        source: sourceId || '',
         target: st.metadata?.id || '',
         type: ConnectionLineType.Bezier,
         animated: false,
         style: { stroke: strokeColor, strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, strokeWidth: 2 }
-      } as EdgeType;
-    })
-  );
+      };
 
-  const connectionGroupEdges = connectionGroups.flatMap((g) =>
-    (g.spec?.connections || []).map((conn) => {
+      edgeIdSet.add(edgeId);
+      allEdges.push(edge);
+    });
+  });
+
+  connectionGroups.forEach((g) => {
+    (g.spec?.connections || []).forEach((conn) => {
+      const edgeId = `e-${conn.name}-${g.metadata?.id}`;
+      
+      if (edgeIdSet.has(edgeId)) {
+        return;
+      }
+
       const sourceObj =
         eventSources.find((es) => es.metadata?.name === conn.name) ||
         stages.find((s) => s.metadata?.name === conn.name) ||
@@ -133,19 +152,23 @@ export const transformToEdges = (
 
       const sourceId = sourceObj?.metadata?.id ?? conn.name;
       const strokeColor = '#707070';
-      return {
-        id: `e-${conn.name}-${g.metadata?.id}`,
-        source: sourceId,
+      
+      const edge: EdgeType = {
+        id: edgeId,
+        source: sourceId || '',
         target: g.metadata?.id || '',
         type: ConnectionLineType.Bezier,
         animated: false,
         style: { stroke: strokeColor, strokeWidth: 2 },
         markerEnd: { type: MarkerType.ArrowClosed, color: strokeColor, strokeWidth: 2 }
-      } as EdgeType;
-    })
-  );
+      };
 
-  return [...stageEdges, ...connectionGroupEdges];
+      edgeIdSet.add(edgeId);
+      allEdges.push(edge);
+    });
+  });
+
+  return allEdges;
 };
 
 export const autoLayoutNodes = async (

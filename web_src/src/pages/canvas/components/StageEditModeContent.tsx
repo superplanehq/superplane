@@ -14,6 +14,7 @@ import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { ControlledTabs } from '@/components/Tabs/tabs';
+import { useCanvasStore } from '../store/canvasStore';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
@@ -62,6 +63,27 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  // Canvas store edge management
+  const { stages, eventSources, connectionGroups, createConnectionEdge, removeEdgesByConnection } = useCanvasStore();
+
+  const currentStageFromStore = useCanvasStore(state =>
+    state.stages.find(s => s.metadata?.id === currentStageId)
+  );
+
+  // Helper function to find source node ID by connection name
+  const findSourceNodeId = useCallback((connectionName: string): string | null => {
+    const eventSource = eventSources.find(es => es.metadata?.name === connectionName);
+    if (eventSource) return eventSource.metadata?.id || null;
+
+    const stage = stages.find(s => s.metadata?.name === connectionName);
+    if (stage) return stage.metadata?.id || null;
+
+    const connectionGroup = connectionGroups.find(cg => cg.metadata?.name === connectionName);
+    if (connectionGroup) return connectionGroup.metadata?.id || null;
+
+    return null;
+  }, [eventSources, stages, connectionGroups]);
 
   // API Error parsing function
   const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
@@ -323,7 +345,8 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     errorPrefix: 'output'
   });
 
-  const connectionsEditor = useArrayEditor({
+  // Enhanced connections editor with edge management
+  const baseConnectionsEditor = useArrayEditor({
     items: connections,
     setItems: setConnections,
     createNewItem: () => ({ name: '', type: 'TYPE_EVENT_SOURCE' as SuperplaneConnection['type'], filters: [] }),
@@ -331,6 +354,21 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     setValidationErrors,
     errorPrefix: 'connection'
   });
+
+  // Override removeItem to handle edge removal
+  const connectionsEditor = {
+    ...baseConnectionsEditor,
+    removeItem: (index: number) => {
+      const connectionToRemove = connections[index];
+      if (connectionToRemove && connectionToRemove.name && currentStageId) {
+        const sourceNodeId = findSourceNodeId(connectionToRemove.name);
+        if (sourceNodeId) {
+          removeEdgesByConnection(sourceNodeId, currentStageId, connectionToRemove.name);
+        }
+      }
+      baseConnectionsEditor.removeItem(index);
+    }
+  };
 
   const secretsEditor = useArrayEditor({
     items: secrets,
@@ -432,6 +470,31 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       });
     }// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
+
+  // Sync connections from store when they change (e.g., from manual connection in ReactFlow)
+  useEffect(() => {
+    if (currentStageFromStore && currentStageFromStore.spec?.connections) {
+      const storeConnections = currentStageFromStore.spec.connections;
+      // Only update if connections have actually changed
+      if (JSON.stringify(storeConnections) !== JSON.stringify(connections)) {
+        setConnections(storeConnections);
+      }
+    }
+  }, [currentStageFromStore, connections]);
+
+  // Edge management effect - create/update edges when connections change
+  useEffect(() => {
+    if (!currentStageId) return;
+
+    connections.forEach((connection) => {
+      if (connection.name) {
+        const sourceNodeId = findSourceNodeId(connection.name);
+        if (sourceNodeId) {
+          createConnectionEdge(sourceNodeId, currentStageId, connection.name);
+        }
+      }
+    });
+  }, [connections, currentStageId, createConnectionEdge, findSourceNodeId]);
 
   // Revert function for each section
   const revertSection = (section: string) => {
