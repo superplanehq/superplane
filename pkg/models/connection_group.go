@@ -295,7 +295,7 @@ func (g *ConnectionGroup) Update(connections []Connection, spec ConnectionGroupS
 
 // NOTE: we are not querying scoped by canvas here,
 // so this should be used only in the workers.
-func FindConnectionGroup(id string) (*ConnectionGroup, error) {
+func FindUnscopedConnectionGroup(id string) (*ConnectionGroup, error) {
 	var connectionGroup *ConnectionGroup
 
 	err := database.Conn().

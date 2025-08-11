@@ -49,7 +49,7 @@ func (w *PendingFieldSetsWorker) Tick() error {
 }
 
 func (w *PendingFieldSetsWorker) ProcessFieldSet(fieldSet models.ConnectionGroupFieldSet) error {
-	connectionGroup, err := models.FindConnectionGroup(fieldSet.ConnectionGroupID.String())
+	connectionGroup, err := models.FindUnscopedConnectionGroup(fieldSet.ConnectionGroupID.String())
 	if err != nil {
 		return fmt.Errorf("error finding connection group %s: %v", fieldSet.ConnectionGroupID, err)
 	}

@@ -210,7 +210,7 @@ func ListStages(canvasID string) ([]Stage, error) {
 
 // NOTE: we are not querying scoped by canvas here,
 // so this should be used only in the workers.
-func FindStage(id string) (*Stage, error) {
+func FindUnscopedStage(id string) (*Stage, error) {
 	var stage Stage
 
 	err := database.Conn().
