@@ -39,10 +39,10 @@ func ExecutionResultToProto(result string) pb.Execution_Result {
 	}
 }
 
-func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*uuid.UUID, error) {
+func FindConnectionSourceID(canvasID string, connection *pb.Connection) (*uuid.UUID, error) {
 	switch connection.Type {
 	case pb.Connection_TYPE_STAGE:
-		stage, err := canvas.FindStageByName(connection.Name)
+		stage, err := models.FindStageByName(canvasID, connection.Name)
 		if err != nil {
 			return nil, fmt.Errorf("stage %s not found", connection.Name)
 		}
@@ -50,7 +50,7 @@ func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*
 		return &stage.ID, nil
 
 	case pb.Connection_TYPE_EVENT_SOURCE:
-		eventSource, err := canvas.FindEventSourceByName(connection.Name)
+		eventSource, err := models.FindExternalEventSourceByName(canvasID, connection.Name)
 		if err != nil {
 			return nil, fmt.Errorf("event source %s not found", connection.Name)
 		}
@@ -58,7 +58,7 @@ func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*
 		return &eventSource.ID, nil
 
 	case pb.Connection_TYPE_CONNECTION_GROUP:
-		connectionGroup, err := canvas.FindConnectionGroupByName(connection.Name)
+		connectionGroup, err := models.FindConnectionGroupByName(canvasID, connection.Name)
 		if err != nil {
 			return nil, fmt.Errorf("connection group %s not found", connection.Name)
 		}
@@ -70,7 +70,7 @@ func FindConnectionSourceID(canvas *models.Canvas, connection *pb.Connection) (*
 	}
 }
 
-func ValidateConnections(canvas *models.Canvas, connections []*pb.Connection) ([]models.Connection, error) {
+func ValidateConnections(canvasID string, connections []*pb.Connection) ([]models.Connection, error) {
 	cs := []models.Connection{}
 
 	if len(connections) == 0 {
@@ -78,7 +78,7 @@ func ValidateConnections(canvas *models.Canvas, connections []*pb.Connection) ([
 	}
 
 	for _, connection := range connections {
-		sourceID, err := FindConnectionSourceID(canvas, connection)
+		sourceID, err := FindConnectionSourceID(canvasID, connection)
 		if err != nil {
 			return nil, fmt.Errorf("invalid connection: %v", err)
 		}
