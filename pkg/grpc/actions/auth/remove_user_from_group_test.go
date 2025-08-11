@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,23 +12,15 @@ import (
 
 func Test_RemoveUserFromGroup(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
 	ctx := context.Background()
-
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
+	orgID := r.Organization.ID.String()
 
 	// Create a group first
-	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
-	require.NoError(t, err)
-
-	// Add user to group first
-	err = authService.AddUserToGroup(orgID, models.DomainTypeOrganization, r.User.String(), "test-group")
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description"))
+	require.NoError(t, r.AuthService.AddUserToGroup(orgID, models.DomainTypeOrganization, r.User.String(), "test-group"))
 
 	t.Run("successful remove user from group with user ID", func(t *testing.T) {
-		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "test-group", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "test-group", r.AuthService)
 		require.NoError(t, err)
 	})
 
@@ -40,7 +31,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 			Name:     testEmail,
 			IsActive: false,
 		}
-		err = user.Create()
+		err := user.Create()
 		require.NoError(t, err)
 
 		accountProvider := &models.AccountProvider{
@@ -51,51 +42,45 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 		err = accountProvider.Create()
 		require.NoError(t, err)
 
-		err = authService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin, "Test Group Email Remove", "Test group email remove description")
+		err = r.AuthService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin, "Test Group Email Remove", "Test group email remove description")
 		require.NoError(t, err)
 
-		err = authService.AddUserToGroup(orgID, "org", user.ID.String(), "test-group-email-remove")
+		err = r.AuthService.AddUserToGroup(orgID, "org", user.ID.String(), "test-group-email-remove")
 		require.NoError(t, err)
 
-		_, err = RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", testEmail, "test-group-email-remove", authService)
+		_, err = RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", testEmail, "test-group-email-remove", r.AuthService)
 		require.NoError(t, err)
 	})
 
 	t.Run("user not found by email", func(t *testing.T) {
-		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", "nonexistent@example.com", "test-group", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", "nonexistent@example.com", "test-group", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", "", "test-group", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "", "", "test-group", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID or Email")
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", "", "test-group", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", "", "test-group", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid user ID")
 	})
 
 	t.Run("successful canvas group remove user", func(t *testing.T) {
-		canvasID := uuid.New().String()
+		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description"))
+		require.NoError(t, r.AuthService.AddUserToGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, r.User.String(), "canvas-group"))
 
-		err := authService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group", models.RoleCanvasAdmin, "Canvas Group", "Canvas group description")
-		require.NoError(t, err)
-		err = authService.AddUserToGroup(canvasID, models.DomainTypeCanvas, r.User.String(), "canvas-group")
-		require.NoError(t, err)
-
-		_, err = RemoveUserFromGroup(ctx, models.DomainTypeCanvas, canvasID, r.User.String(), "", "canvas-group", authService)
+		_, err := RemoveUserFromGroup(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.User.String(), "", "canvas-group", r.AuthService)
 		require.NoError(t, err)
 	})
 }
