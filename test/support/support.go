@@ -77,26 +77,11 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	//
 	// Create organization and user
 	//
-	user := &models.User{
-		Name:     "Test User",
-		IsActive: true,
-	}
-
-	require.NoError(t, user.Create())
-	r.User = user.ID
-
 	var err error
+	user, err := models.CreateUser(r.Organization.ID, uuid.New(), "test@example.com", "Test User")
+	require.NoError(t, err)
+	r.User = user.ID
 	r.Organization = CreateOrganization(t, &r, r.User)
-
-	accountProvider := &models.AccountProvider{
-		UserID:     user.ID,
-		Email:      "test@test.com",
-		Username:   "Test",
-		Provider:   "github",
-		ProviderID: "123",
-	}
-
-	require.NoError(t, accountProvider.Create())
 
 	//
 	// Create canvas

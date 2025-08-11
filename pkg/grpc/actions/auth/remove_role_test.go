@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,30 +26,13 @@ func Test_RemoveRole(t *testing.T) {
 	})
 
 	t.Run("remove role with user email", func(t *testing.T) {
-		email := "test-remove@example.com"
-
-		user := &models.User{
-			Name:           email,
-			IsActive:       false,
-			OrganizationID: r.Organization.ID,
-		}
-
-		err := user.Create()
-		require.NoError(t, err)
-
-		accountProvider := &models.AccountProvider{
-			Provider: "github",
-			UserID:   user.ID,
-			Email:    email,
-		}
-
-		err = accountProvider.Create()
+		user, err := models.CreateUser(r.Organization.ID, uuid.New(), "test-remove@example.com", "Test Remove")
 		require.NoError(t, err)
 
 		err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 		require.NoError(t, err)
 
-		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", email, r.AuthService)
+		resp, err := RemoveRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", user.Email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})

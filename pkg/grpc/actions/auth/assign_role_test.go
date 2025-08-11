@@ -26,15 +26,6 @@ func Test_AssignRole(t *testing.T) {
 		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-
-		//
-		// Verify user was created
-		// TODO: this should create an invitation and not an inactive user?
-		//
-		user, err := models.FindInactiveUserByEmail(email, r.Organization.ID)
-		require.NoError(t, err)
-		assert.Equal(t, email, user.Name)
-		assert.False(t, user.IsActive)
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {

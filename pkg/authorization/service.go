@@ -845,7 +845,7 @@ func (a *AuthService) DetectMissingPermissions() ([]string, []string, error) {
 }
 
 func (a *AuthService) getOrganizationsWithMissingPermissions() ([]string, error) {
-	orgs, err := models.GetOrganizationIDs()
+	orgs, err := models.GetActiveOrganizationIDs()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get organization IDs: %w", err)
 	}

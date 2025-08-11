@@ -5,36 +5,36 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
-	"gorm.io/gorm"
 )
 
 type User struct {
-	ID             uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	OrganizationID uuid.UUID `json:"organization_id" gorm:"type:uuid;not null;index"`
-	Email          string    `json:"email" gorm:"index:idx_users_email_org,unique"`
-	Name           string    `json:"name"`
-	IsActive       bool      `json:"is_active" gorm:"default:false"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	OrganizationID uuid.UUID
+	AccountID      uuid.UUID
+	Email          string
+	Name           string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == uuid.Nil {
-		u.ID = uuid.New()
+func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
+	user := &User{
+		OrganizationID: orgID,
+		AccountID:      accountID,
+		Email:          email,
+		Name:           name,
 	}
-	return nil
-}
 
-func (u *User) Create() error {
-	return database.Conn().Create(u).Error
-}
+	err := database.Conn().Create(user).Error
+	if err != nil {
+		return nil, err
+	}
 
-func (u *User) Update() error {
-	return database.Conn().Save(u).Error
+	return user, nil
 }
 
 // TODO: check this function usage and remove if possible
-func FindUserByIDOnly(id string) (*User, error) {
+func FindUnscopedUserByID(id string) (*User, error) {
 	var user User
 	userUUID, err := uuid.Parse(id)
 	if err != nil {
@@ -45,12 +45,12 @@ func FindUserByIDOnly(id string) (*User, error) {
 	return &user, err
 }
 
-func FindUserByID(id, organizationID uuid.UUID) (*User, error) {
+func FindUserByID(orgID, id string) (*User, error) {
 	var user User
 
 	err := database.Conn().
 		Where("id = ?", id).
-		Where("organization_id = ?", organizationID).
+		Where("organization_id = ?", orgID).
 		First(&user).
 		Error
 
@@ -69,11 +69,11 @@ func FindUserByProviderId(providerId, provider string) (*User, error) {
 	return &user, err
 }
 
-func FindUserByEmail(email string, organizationID uuid.UUID) (*User, error) {
+func FindUserByEmail(orgID, email string) (*User, error) {
 	var user User
 
 	err := database.Conn().
-		Where("organization_id = ?", organizationID).
+		Where("organization_id = ?", orgID).
 		Where("email = ?", email).
 		First(&user).
 		Error
@@ -81,42 +81,16 @@ func FindUserByEmail(email string, organizationID uuid.UUID) (*User, error) {
 	return &user, err
 }
 
-func FindInactiveUserByEmail(email string, organizationID uuid.UUID) (*User, error) {
-	var user User
-
-	err := database.Conn().
-		Where("email = ?", email).
-		Where("organization_id = ?", organizationID).
-		Where("is_active = false").
-		First(&user).
-		Error
-
-	return &user, err
-}
-
-func ListUsersInOrganization(organizationID uuid.UUID) ([]User, error) {
+func ListUsersInOrganization(orgID uuid.UUID) ([]User, error) {
 	var users []User
 
 	err := database.Conn().
-		Where("organization_id = ?", organizationID).
+		Where("organization_id = ?", orgID).
 		Order("name ASC").
 		Find(&users).
 		Error
 
 	return users, err
-}
-
-func (u *User) GetAccountProviders() ([]AccountProvider, error) {
-	return FindAccountProvidersByUserID(u.ID)
-}
-
-func (u *User) GetAccountProvider(provider string) (*AccountProvider, error) {
-	return FindAccountProviderByUserAndProvider(u.ID, provider)
-}
-
-func (u *User) HasAccountProvider(provider string) bool {
-	_, err := u.GetAccountProvider(provider)
-	return err == nil
 }
 
 func FindUserOrganizationsByEmail(email string) ([]Organization, error) {
@@ -125,7 +99,7 @@ func FindUserOrganizationsByEmail(email string) ([]Organization, error) {
 	err := database.Conn().
 		Table("organizations").
 		Joins("JOIN users ON organizations.id = users.organization_id").
-		Where("users.email = ? AND users.is_active = true", email).
+		Where("users.email = ?", email).
 		Find(&organizations).
 		Error
 

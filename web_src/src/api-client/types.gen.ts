@@ -171,6 +171,14 @@ export type IntegrationsResourceRef = {
     name?: string;
 };
 
+export type OrganizationsCreateInvitationBody = {
+    email?: string;
+};
+
+export type OrganizationsCreateInvitationResponse = {
+    invitation?: OrganizationsInvitation;
+};
+
 export type OrganizationsCreateOrganizationRequest = {
     organization?: OrganizationsOrganization;
 };
@@ -187,6 +195,18 @@ export type OrganizationsDescribeOrganizationResponse = {
     organization?: OrganizationsOrganization;
 };
 
+export type OrganizationsInvitation = {
+    id?: string;
+    organizationId?: string;
+    email?: string;
+    status?: string;
+    createdAt?: string;
+};
+
+export type OrganizationsListInvitationsResponse = {
+    invitations?: Array<OrganizationsInvitation>;
+};
+
 export type OrganizationsListOrganizationsResponse = {
     organizations?: Array<OrganizationsOrganization>;
 };
@@ -200,7 +220,6 @@ export type OrganizationsOrganizationMetadata = {
     name?: string;
     displayName?: string;
     description?: string;
-    createdBy?: string;
     createdAt?: string;
     updatedAt?: string;
 };
@@ -780,7 +799,6 @@ export type UsersUserSpec = {
 };
 
 export type UsersUserStatus = {
-    isActive?: boolean;
     roleAssignments?: Array<UsersUserRoleAssignment>;
 };
 
@@ -1049,6 +1067,34 @@ export type SuperplaneCreateEventSourceResponses = {
 
 export type SuperplaneCreateEventSourceResponse2 = SuperplaneCreateEventSourceResponses[keyof SuperplaneCreateEventSourceResponses];
 
+export type SuperplaneDescribeEventSourceData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}';
+};
+
+export type SuperplaneDescribeEventSourceErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneDescribeEventSourceError = SuperplaneDescribeEventSourceErrors[keyof SuperplaneDescribeEventSourceErrors];
+
+export type SuperplaneDescribeEventSourceResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeEventSourceResponse;
+};
+
+export type SuperplaneDescribeEventSourceResponse2 = SuperplaneDescribeEventSourceResponses[keyof SuperplaneDescribeEventSourceResponses];
+
 export type SuperplaneResetEventSourceKeyData = {
     body: SuperplaneResetEventSourceKeyBody;
     path: {
@@ -1076,36 +1122,6 @@ export type SuperplaneResetEventSourceKeyResponses = {
 };
 
 export type SuperplaneResetEventSourceKeyResponse2 = SuperplaneResetEventSourceKeyResponses[keyof SuperplaneResetEventSourceKeyResponses];
-
-export type SuperplaneDescribeEventSourceData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        id: string;
-    };
-    query?: {
-        name?: string;
-    };
-    url: '/api/v1/canvases/{canvasIdOrName}/event-sources/{id}';
-};
-
-export type SuperplaneDescribeEventSourceErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneDescribeEventSourceError = SuperplaneDescribeEventSourceErrors[keyof SuperplaneDescribeEventSourceErrors];
-
-export type SuperplaneDescribeEventSourceResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneDescribeEventSourceResponse;
-};
-
-export type SuperplaneDescribeEventSourceResponse2 = SuperplaneDescribeEventSourceResponses[keyof SuperplaneDescribeEventSourceResponses];
 
 export type SuperplaneListStagesData = {
     body?: never;
@@ -1161,6 +1177,34 @@ export type SuperplaneCreateStageResponses = {
 
 export type SuperplaneCreateStageResponse2 = SuperplaneCreateStageResponses[keyof SuperplaneCreateStageResponses];
 
+export type SuperplaneDescribeStageData = {
+    body?: never;
+    path: {
+        canvasIdOrName: string;
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}';
+};
+
+export type SuperplaneDescribeStageErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type SuperplaneDescribeStageError = SuperplaneDescribeStageErrors[keyof SuperplaneDescribeStageErrors];
+
+export type SuperplaneDescribeStageResponses = {
+    /**
+     * A successful response.
+     */
+    200: SuperplaneDescribeStageResponse;
+};
+
+export type SuperplaneDescribeStageResponse2 = SuperplaneDescribeStageResponses[keyof SuperplaneDescribeStageResponses];
+
 export type SuperplaneUpdateStageData = {
     body: SuperplaneUpdateStageBody;
     path: {
@@ -1188,36 +1232,6 @@ export type SuperplaneUpdateStageResponses = {
 };
 
 export type SuperplaneUpdateStageResponse2 = SuperplaneUpdateStageResponses[keyof SuperplaneUpdateStageResponses];
-
-export type SuperplaneDescribeStageData = {
-    body?: never;
-    path: {
-        canvasIdOrName: string;
-        id: string;
-    };
-    query?: {
-        name?: string;
-    };
-    url: '/api/v1/canvases/{canvasIdOrName}/stages/{id}';
-};
-
-export type SuperplaneDescribeStageErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type SuperplaneDescribeStageError = SuperplaneDescribeStageErrors[keyof SuperplaneDescribeStageErrors];
-
-export type SuperplaneDescribeStageResponses = {
-    /**
-     * A successful response.
-     */
-    200: SuperplaneDescribeStageResponse;
-};
-
-export type SuperplaneDescribeStageResponse2 = SuperplaneDescribeStageResponses[keyof SuperplaneDescribeStageResponses];
 
 export type SuperplaneListStageEventsData = {
     body?: never;
@@ -1775,6 +1789,60 @@ export type OrganizationsUpdateOrganizationResponses = {
 };
 
 export type OrganizationsUpdateOrganizationResponse2 = OrganizationsUpdateOrganizationResponses[keyof OrganizationsUpdateOrganizationResponses];
+
+export type OrganizationsListInvitationsData = {
+    body?: never;
+    path: {
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{idOrName}/invitations';
+};
+
+export type OrganizationsListInvitationsErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsListInvitationsError = OrganizationsListInvitationsErrors[keyof OrganizationsListInvitationsErrors];
+
+export type OrganizationsListInvitationsResponses = {
+    /**
+     * A successful response.
+     */
+    200: OrganizationsListInvitationsResponse;
+};
+
+export type OrganizationsListInvitationsResponse2 = OrganizationsListInvitationsResponses[keyof OrganizationsListInvitationsResponses];
+
+export type OrganizationsCreateInvitationData = {
+    body: OrganizationsCreateInvitationBody;
+    path: {
+        idOrName: string;
+    };
+    query?: never;
+    url: '/api/v1/organizations/{idOrName}/invitations';
+};
+
+export type OrganizationsCreateInvitationErrors = {
+    /**
+     * An unexpected error response.
+     */
+    default: GooglerpcStatus;
+};
+
+export type OrganizationsCreateInvitationError = OrganizationsCreateInvitationErrors[keyof OrganizationsCreateInvitationErrors];
+
+export type OrganizationsCreateInvitationResponses = {
+    /**
+     * A successful response.
+     */
+    200: OrganizationsCreateInvitationResponse;
+};
+
+export type OrganizationsCreateInvitationResponse2 = OrganizationsCreateInvitationResponses[keyof OrganizationsCreateInvitationResponses];
 
 export type RolesListRolesData = {
     body?: never;

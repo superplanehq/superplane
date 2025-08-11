@@ -124,7 +124,6 @@ message User {
   }
 
   message Status {
-    bool is_active = 1;
     repeated UserRoleAssignment role_assignments = 2;
   }
 

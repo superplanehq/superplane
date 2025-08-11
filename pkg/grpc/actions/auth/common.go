@@ -88,10 +88,10 @@ func FindUser(org, id, email string) (*models.User, error) {
 			return nil, fmt.Errorf("invalid user ID: %v", err)
 		}
 
-		return models.FindUserByID(orgID, userID)
+		return models.FindUserByID(orgID.String(), userID.String())
 	}
 
-	return models.FindUserByEmail(email, orgID)
+	return models.FindUserByEmail(email, orgID.String())
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
@@ -155,7 +155,7 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 }
 
 func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	dbUser, err := models.FindUserByIDOnly(userID)
+	dbUser, err := models.FindUnscopedUserByID(userID)
 	if err != nil {
 		return &pb.User{
 			Metadata: &pb.User_Metadata{
@@ -170,61 +170,53 @@ func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssign
 				AccountProviders: []*pbUsers.AccountProvider{},
 			},
 			Status: &pb.User_Status{
-				IsActive:        false,
 				RoleAssignments: roleAssignments,
 			},
 		}, nil
 	}
 
-	accountProviders, err := dbUser.GetAccountProviders()
-	if err != nil {
-		accountProviders = []models.AccountProvider{}
-	}
+	// TODO: revisit this
 
-	pbAccountProviders := make([]*pbUsers.AccountProvider, len(accountProviders))
-	for i, provider := range accountProviders {
-		pbAccountProviders[i] = &pb.AccountProvider{
-			ProviderType: provider.Provider,
-			ProviderId:   provider.ProviderID,
-			Email:        provider.Email,
-			DisplayName:  provider.Name,
-			AvatarUrl:    provider.AvatarURL,
-			IsPrimary:    i == 0, // TODO: Change when we have another login besides github
-			CreatedAt:    timestamppb.New(provider.CreatedAt),
-			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
-		}
-	}
+	// accountProviders, err := dbUser.GetAccountProviders()
+	// if err != nil {
+	// 	accountProviders = []models.AccountProvider{}
+	// }
 
-	// Determine primary email and avatar
-	primaryEmail := ""
-	primaryAvatar := ""
-	primaryDisplayName := dbUser.Name
-
-	if !dbUser.IsActive {
-		primaryEmail = dbUser.Name
-	} else if len(accountProviders) > 0 {
-		primaryEmail = accountProviders[0].Email
-		primaryAvatar = accountProviders[0].AvatarURL
-		if primaryDisplayName == "" {
-			primaryDisplayName = accountProviders[0].Name
-		}
-	}
+	// pbAccountProviders := make([]*pbUsers.AccountProvider, len(accountProviders))
+	// for i, provider := range accountProviders {
+	// 	pbAccountProviders[i] = &pb.AccountProvider{
+	// 		ProviderType: provider.Provider,
+	// 		ProviderId:   provider.ProviderID,
+	// 		Email:        provider.Email,
+	// 		DisplayName:  provider.Name,
+	// 		AvatarUrl:    provider.AvatarURL,
+	// 		IsPrimary:    i == 0, // TODO: Change when we have another login besides github
+	// 		CreatedAt:    timestamppb.New(provider.CreatedAt),
+	// 		UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+	// 	}
+	// }
 
 	return &pb.User{
 		Metadata: &pb.User_Metadata{
 			Id:        userID,
-			Email:     primaryEmail,
+			Email:     dbUser.Email,
 			CreatedAt: timestamppb.New(dbUser.CreatedAt),
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},
 		Spec: &pb.User_Spec{
-			DisplayName:      primaryDisplayName,
-			AvatarUrl:        primaryAvatar,
-			AccountProviders: pbAccountProviders,
+			DisplayName: dbUser.Name,
+			// AvatarUrl:        avatarURL(accountProviders),
+			// AccountProviders: pbAccountProviders,
 		},
 		Status: &pb.User_Status{
-			IsActive:        dbUser.IsActive,
 			RoleAssignments: roleAssignments,
 		},
 	}, nil
+}
+
+func avatarURL(accountProviders []models.AccountProvider) string {
+	if len(accountProviders) > 0 {
+		return accountProviders[0].AvatarURL
+	}
+	return ""
 }

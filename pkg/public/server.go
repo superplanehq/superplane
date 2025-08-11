@@ -337,7 +337,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 
 	// Add protected API routes here
 	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
-	protectedRoute.HandleFunc("/api/v1/user/account-providers", s.handleUserAccountProviders).Methods("GET")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -348,6 +347,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	s.Router = r
 }
 
+// TODO: do we need this?
 func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {
@@ -355,58 +355,16 @@ func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accountProviders, err := user.GetAccountProviders()
-	if err != nil {
-		log.Errorf("Error getting account providers: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	var email, avatarURL string
-	if len(accountProviders) > 0 {
-		email = accountProviders[0].Email
-		avatarURL = accountProviders[0].AvatarURL
-
-		// Fallback to user name if no email from provider
-		if email == "" && user.Name != "" {
-			email = user.Name
-		}
-	} else {
-		if user.Name != "" {
-			email = user.Name
-		}
-	}
-
 	safeUser := UserProfileResponse{
-		ID:               user.ID.String(),
-		OrganizationID:   user.OrganizationID.String(),
-		Email:            email,
-		Name:             user.Name,
-		AvatarURL:        avatarURL,
-		CreatedAt:        user.CreatedAt,
-		AccountProviders: accountProviders,
+		ID:             user.ID.String(),
+		OrganizationID: user.OrganizationID.String(),
+		Email:          user.Email,
+		Name:           user.Name,
+		CreatedAt:      user.CreatedAt,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(safeUser)
-}
-
-func (s *Server) handleUserAccountProviders(w http.ResponseWriter, r *http.Request) {
-	user, ok := authentication.GetUserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	accountProviders, err := user.GetAccountProviders()
-	if err != nil {
-		log.Errorf("Error getting repo host accounts: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(accountProviders)
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -443,13 +401,11 @@ type OutputsRequest struct {
 }
 
 type UserProfileResponse struct {
-	ID               string                   `json:"id"`
-	OrganizationID   string                   `json:"organization_id"`
-	Email            string                   `json:"email"`
-	Name             string                   `json:"name"`
-	AvatarURL        string                   `json:"avatar_url"`
-	CreatedAt        time.Time                `json:"created_at"`
-	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	Email          string    `json:"email"`
+	Name           string    `json:"name"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {

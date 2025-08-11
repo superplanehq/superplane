@@ -455,14 +455,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                             {member.metadata?.email || "Invalid email"}
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status?.isActive
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                            }`}>
-                            {member.status?.isActive ? 'Active' : 'Pending'}
-                          </span>
-                        </div>
                       </div>
                     ))}
                   </div>

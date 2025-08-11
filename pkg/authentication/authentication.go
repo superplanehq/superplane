@@ -3,13 +3,11 @@ package authentication
 import (
 	"context"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
@@ -17,15 +15,17 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 type Handler struct {
-	jwtSigner           *jwt.Signer
-	encryptor           crypto.Encryptor
+	jwtSigner            *jwt.Signer
+	encryptor            crypto.Encryptor
 	authorizationService authorization.Authorization
-	isDev               bool
+	isDev                bool
 }
 
 type User struct {
@@ -65,14 +65,13 @@ type GitHubUserInfo struct {
 
 func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authorizationService authorization.Authorization, appEnv string) *Handler {
 	return &Handler{
-		jwtSigner:           jwtSigner,
-		encryptor:           encryptor,
+		jwtSigner:            jwtSigner,
+		encryptor:            encryptor,
 		authorizationService: authorizationService,
-		isDev:               appEnv == "development",
+		isDev:                appEnv == "development",
 	}
 }
 
-// InitializeProviders sets up the OAuth providers
 func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 	var gothProviders []goth.Provider
 
@@ -98,191 +97,62 @@ func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 	}
 }
 
-// RegisterRoutes adds authentication routes to the router
 func (a *Handler) RegisterRoutes(router *mux.Router) {
-	router.HandleFunc("/auth/me", a.handleMe).Methods("GET")
 	router.HandleFunc("/logout", a.handleLogout).Methods("GET")
 	router.HandleFunc("/login", a.handleLoginPage).Methods("GET")
-	router.HandleFunc("/login/{organization}", a.handleOrganizationLoginPage).Methods("GET")
-
-	// Token exchange route for CLI
-	router.HandleFunc("/auth/token/exchange", a.handleTokenExchange).Methods("POST")
-
-	// OAuth routes - register these before more specific routes to avoid conflicts
-	if a.isDev {
-		log.Info("Registering development authentication routes")
-		// In dev: both auth and callback just auto-authenticate
-		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
-		router.HandleFunc("/auth/{provider}", a.handleDevAuth).Methods("GET")
-	} else {
-		// Production OAuth routes
-		router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
-		router.HandleFunc("/auth/{provider}", a.handleAuth).Methods("GET")
-	}
-
-	router.HandleFunc("/auth/{provider}/disconnect", a.handleDisconnectProvider).Methods("POST")
-
-	// Organization selection page (shows orgs + create option) - register after provider routes
 	router.HandleFunc("/organization/select", a.handleOrganizationSelectionPage).Methods("GET")
 	router.HandleFunc("/organization/create", a.handleCreateOrganization).Methods("POST")
-}
 
-func (a *Handler) handleTokenExchange(w http.ResponseWriter, r *http.Request) {
-	var req TokenExchangeRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+	//
+	// If we are running the application locally,
+	// we provide handlers that auto-autenticate to
+	// avoid having to authenticate with GitHub every time.
+	//
+	// TODO: there's probably a better to do this other than
+	// changing the handler based on a configuration.
+	//
+	if a.isDev {
+		log.Info("Registering development authentication routes")
+		router.HandleFunc("/auth/{provider}/callback", a.handleDevAuth).Methods("GET")
+		router.HandleFunc("/auth/{provider}", a.handleDevAuth).Methods("GET")
 		return
 	}
 
-	if req.GitHubToken == "" {
-		http.Error(w, "GitHub token is required", http.StatusBadRequest)
-		return
-	}
-
-	if req.OrganizationName == "" {
-		http.Error(w, "Organization name is required", http.StatusBadRequest)
-		return
-	}
-
-	// Find organization
-	organization, err := models.FindOrganizationByName(req.OrganizationName)
-	if err != nil {
-		log.Errorf("Organization not found: %v", err)
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	githubUser, err := a.getGitHubUserInfo(req.GitHubToken)
-	if err != nil {
-		log.Errorf("Failed to get GitHub user info: %v", err)
-		http.Error(w, "Invalid GitHub token", http.StatusUnauthorized)
-		return
-	}
-
-	if !organization.IsProviderAllowed(models.ProviderGitHub) {
-		http.Error(w, "GitHub authentication is not allowed for this organization", http.StatusForbidden)
-		return
-	}
-
-	if !organization.IsEmailDomainAllowed(githubUser.Email) {
-		http.Error(w, "Email domain not allowed for this organization", http.StatusForbidden)
-		return
-	}
-
-	accountProvider, err := a.findOrCreateAccountProviderInOrganization(githubUser, organization.ID)
-	if err != nil {
-		log.Errorf("Failed to find or create account provider: %v", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(req.GitHubToken), []byte(githubUser.Email))
-	if err != nil {
-		log.Errorf("Failed to encrypt access token: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
-
-	accountProvider.Username = githubUser.Login
-	accountProvider.Email = githubUser.Email
-	accountProvider.Name = githubUser.Name
-	accountProvider.AvatarURL = githubUser.AvatarURL
-
-	if err := accountProvider.Update(); err != nil {
-		log.Errorf("Failed to update account provider: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	dbUser, err := models.FindUserByID(accountProvider.UserID, organization.ID)
-	if err != nil {
-		log.Errorf("Failed to find user by ID %s: %v", accountProvider.UserID.String(), err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	dbUser.Name = githubUser.Name
-	dbUser.IsActive = true // Activate user on login
-
-	if err := dbUser.Update(); err != nil {
-		log.Warnf("Failed to update user info: %v", err)
-	}
-
-	token, err := a.jwtSigner.GenerateWithClaims(dbUser.ID.String(), 24*time.Hour, map[string]any{
-		"org": dbUser.OrganizationID.String(),
-	})
-
-	if err != nil {
-		log.Errorf("Error generating JWT: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	accountProviders, err := dbUser.GetAccountProviders()
-
-	if err != nil {
-		log.Errorf("Failed to get account providers for user %s: %v", dbUser.ID.String(), err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	authUser := User{
-		ID:               dbUser.ID.String(),
-		OrganizationID:   dbUser.OrganizationID.String(),
-		Name:             dbUser.Name,
-		Email:            getPrimaryEmail(accountProviders),
-		AvatarURL:        getPrimaryAvatar(accountProviders),
-		CreatedAt:        dbUser.CreatedAt,
-		AccountProviders: accountProviders,
-	}
-
-	response := TokenExchangeResponse{
-		AccessToken: token,
-		User:        authUser,
-	}
-
-	log.Infof("Token exchange successful for user %s (%s)", dbUser.Name, dbUser.ID)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	router.HandleFunc("/auth/{provider}/callback", a.handleAuthCallback).Methods("GET")
+	router.HandleFunc("/auth/{provider}", a.handleAuth).Methods("GET")
 }
 
 func (a *Handler) handleAuth(w http.ResponseWriter, r *http.Request) {
-	log.Infof("handleAuth called: URL=%s, Method=%s", r.URL.String(), r.Method)
-
-	// Get organization from query parameter - if not provided, we'll handle organization selection after auth
+	//
+	// Look for an organization parameter in the URL.
+	// if not provided, the user is not logging into an specific organization.
+	//
 	orgName := r.URL.Query().Get("org")
-	var organization *models.Organization
-
-	if orgName != "" {
-		log.Infof("handleAuth: Found org parameter: %s", orgName)
-		var err error
-		organization, err = models.FindOrganizationByName(orgName)
-		if err != nil {
-			log.Errorf("handleAuth: Organization %s not found: %v", orgName, err)
-			http.Error(w, "Organization not found", http.StatusNotFound)
+	if orgName == "" {
+		gothUser, err := gothic.CompleteUserAuth(w, r)
+		if err == nil {
+			a.handleSuccessfulAuth(w, r, gothUser, nil)
 			return
 		}
 
-		// Store organization ID in session for callback
-		r = r.WithContext(context.WithValue(r.Context(), "organization_id", organization.ID))
-
-		// If we have an organization context, always start fresh OAuth flow
-		// to ensure proper authentication for this specific organization
-		log.Infof("handleAuth: Starting OAuth flow for organization: %s", orgName)
 		gothic.BeginAuthHandler(w, r)
 		return
 	}
 
-	log.Info("handleAuth: No org parameter, checking existing auth")
-	// No organization context - check if user is already authenticated
-	if gothUser, err := gothic.CompleteUserAuth(w, r); err == nil {
-		log.Infof("handleAuth: User already authenticated: %s", gothUser.Email)
-		a.handleSuccessfulAuth(w, r, gothUser, organization)
-	} else {
-		log.Infof("handleAuth: No existing auth, starting OAuth flow: %v", err)
-		gothic.BeginAuthHandler(w, r)
+	// TODO: verify user is with the proper auth mechanism as specified in org
+
+	organization, err := models.FindOrganizationByName(orgName)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
 	}
+
+	gothUser, err := gothic.CompleteUserAuth(w, r)
+	if err == nil {
+		a.handleSuccessfulAuth(w, r, gothUser, organization)
+		return
+	}
+
+	gothic.BeginAuthHandler(w, r)
 }
 
 func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
@@ -293,22 +163,6 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	provider := vars["provider"]
-
-	// Check for organization parameter in dev mode too
-	orgName := r.URL.Query().Get("org")
-	var organization *models.Organization
-
-	if orgName != "" {
-		log.Infof("handleDevAuth: Found org parameter: %s", orgName)
-		var err error
-		organization, err = models.FindOrganizationByName(orgName)
-		if err != nil {
-			log.Errorf("handleDevAuth: Organization %s not found: %v", orgName, err)
-			http.Error(w, "Organization not found", http.StatusNotFound)
-			return
-		}
-	}
-
 	mockUser := goth.User{
 		UserID:      "dev-user-123",
 		Email:       "dev@superplane.local",
@@ -319,78 +173,147 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		AccessToken: "dev-token-" + provider,
 	}
 
-	log.Infof("Development mode: auto-authenticating as %s via %s, org=%v", mockUser.Email, provider, organization)
+	account, err := findOrCreateAccount(mockUser.Email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	err = updateAccountProviders(a.encryptor, account, mockUser)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	orgName := r.URL.Query().Get("org")
+	if orgName == "" {
+		a.handleSuccessfulAuth(w, r, mockUser, nil)
+		return
+	}
+
+	// TODO: verify user is with the proper auth mechanism as specified in org
+
+	organization, err := models.FindOrganizationByName(orgName)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+	}
+
 	a.handleSuccessfulAuth(w, r, mockUser, organization)
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
-	gothUser, err := gothic.CompleteUserAuth(w, r)
+	user, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
-		log.Errorf("Authentication error: %v", err)
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
 		return
 	}
 
-	// Get organization from query parameter - if not provided, we'll handle organization selection
-	orgName := r.URL.Query().Get("org")
-	var organization *models.Organization
-
-	if orgName != "" {
-		organization, err = models.FindOrganizationByName(orgName)
-		if err != nil {
-			http.Error(w, "Organization not found", http.StatusNotFound)
-			return
-		}
-		log.Infof("Authentication successful for user: %s via %s in organization: %s", gothUser.Email, gothUser.Provider, orgName)
-	} else {
-		log.Infof("Authentication successful for user: %s via %s (no org context)", gothUser.Email, gothUser.Provider)
-	}
-
-	a.handleSuccessfulAuth(w, r, gothUser, organization)
-}
-
-func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, organization *models.Organization) {
-	log.Infof("handleSuccessfulAuth called: user=%s, org=%v", gothUser.Email, organization)
-
-	// If no organization context, redirect to organization selection page
-	if organization == nil {
-		log.Info("handleSuccessfulAuth: No organization, redirecting to selection")
-		a.handleOrganizationSelection(w, r, gothUser)
+	account, err := findOrCreateAccount(user.Email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
+	err = updateAccountProviders(a.encryptor, account, user)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	orgName := r.URL.Query().Get("org")
+	if orgName == "" {
+		a.handleSuccessfulAuth(w, r, user, nil)
+		return
+	}
+
+	organization, err := models.FindOrganizationByName(orgName)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	a.handleSuccessfulAuth(w, r, user, organization)
+}
+
+func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User, organization *models.Organization) {
+	if organization == nil {
+		http.Redirect(w, r,
+			fmt.Sprintf("/organization/select?email=%s&provider=%s&name=%s", gothUser.Email, gothUser.Provider, gothUser.Name),
+			http.StatusTemporaryRedirect,
+		)
+		return
+	}
+
+	//
+	// TODO: instead of rejecting, we should probably redirect
+	// the user to log in as the organization requests it.
+	//
 	if !organization.IsProviderAllowed(gothUser.Provider) {
 		http.Error(w, fmt.Sprintf("%s authentication is not allowed for this organization", gothUser.Provider), http.StatusForbidden)
 		return
 	}
 
-	if !organization.IsEmailDomainAllowed(gothUser.Email) {
-		http.Error(w, "Email domain not allowed for this organization", http.StatusForbidden)
-		return
-	}
-
-	dbUser, _, err := a.findOrCreateUserAndAccountInOrganization(gothUser, organization.ID)
+	//
+	// TODO: should we create an account if one doesn't exist here?
+	// TODO: do we even need account records at all?
+	//
+	account, err := models.FindAccount(gothUser.Email)
 	if err != nil {
-		log.Errorf("Error creating/finding user and account: %v", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Account not found", http.StatusNotFound)
 		return
 	}
 
-	userIDStr := dbUser.ID.String()
-	orgIDStr := organization.ID.String()
-	log.Infof("Generating JWT for user %s in org %s", userIDStr, orgIDStr)
+	user, err := models.FindUserByEmail(organization.ID.String(), gothUser.Email)
 
-	token, err := a.jwtSigner.GenerateWithClaims(userIDStr, 24*time.Hour, map[string]any{
-		"org": orgIDStr,
+	//
+	// If user already exists, this user is already a member of the organization,
+	// so just generate the token for it, and redirect to the home page.
+	//
+	if err == nil {
+		a.generateJWT(w, r, user, organization)
+		return
+	}
+
+	//
+	// The user is not part of the organization,
+	// so we need to check if the user has been invited to join.
+	//
+	invitation, err := models.FindPendingInvitation(organization.ID.String(), gothUser.Email)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		user, err = models.CreateUser(organization.ID, account.ID, gothUser.Email, gothUser.Name)
+		if err != nil {
+			return err
+		}
+
+		return invitation.Accept()
 	})
 
 	if err != nil {
-		log.Errorf("Error generating JWT: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Infof("Generated JWT token, length: %d", len(token))
+	a.generateJWT(w, r, user, organization)
+}
+
+func (a *Handler) generateJWT(w http.ResponseWriter, r *http.Request, user *models.User, organization *models.Organization) {
+	token, err := a.jwtSigner.GenerateWithClaims(
+		user.ID.String(),
+		24*time.Hour,
+		map[string]any{
+			"org": organization.ID.String(),
+		},
+	)
+
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
@@ -402,60 +325,10 @@ func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, g
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	if r.Header.Get("Accept") == "application/json" {
-		accountProviders, err := dbUser.GetAccountProviders()
-
-		if err != nil {
-			log.Errorf("Error getting account providers for user %s: %v", dbUser.ID.String(), err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		authUser := User{
-			ID:               dbUser.ID.String(),
-			Name:             dbUser.Name,
-			Email:            getPrimaryEmail(accountProviders),
-			AvatarURL:        getPrimaryAvatar(accountProviders),
-			AccessToken:      token,
-			CreatedAt:        dbUser.CreatedAt,
-			AccountProviders: accountProviders,
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(authUser)
-	} else {
-		http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
-	}
-}
-
-func (a *Handler) handleDisconnectProvider(w http.ResponseWriter, r *http.Request) {
-	user, err := a.getUserFromRequest(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	vars := mux.Vars(r)
-	provider := vars["provider"]
-
-	accountProvider, err := user.GetAccountProvider(provider)
-	if err != nil {
-		http.Error(w, "Provider account not found", http.StatusNotFound)
-		return
-	}
-
-	if err := accountProvider.Delete(); err != nil {
-		log.Errorf("Error deleting account provider: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	log.Infof("User %s disconnected %s account", user.ID, provider)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": fmt.Sprintf("Successfully disconnected %s account", provider),
-	})
+	//
+	// TODO: the URL should <BASE_URL>/<ORG_NAME> or <BASE_URL>/<ORG_SHORT_ID>
+	//
+	http.Redirect(w, r, "/app", http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
@@ -472,38 +345,7 @@ func (a *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 	})
 
-	if r.Header.Get("Accept") == "application/json" {
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"message": "Logged out successfully"})
-	} else {
-		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
-	}
-}
-
-func (a *Handler) handleMe(w http.ResponseWriter, r *http.Request) {
-	user, err := a.getUserFromRequest(r)
-	if err != nil {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	accountProviders, err := user.GetAccountProviders()
-	if err != nil {
-		log.Errorf("Error getting account providers: %v", err)
-		accountProviders = []models.AccountProvider{}
-	}
-
-	authUser := User{
-		ID:               user.ID.String(),
-		Name:             user.Name,
-		Email:            getPrimaryEmail(accountProviders),
-		AvatarURL:        getPrimaryAvatar(accountProviders),
-		CreatedAt:        user.CreatedAt,
-		AccountProviders: accountProviders,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(authUser)
+	http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -526,43 +368,6 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.Execute(w, data)
-}
-
-func (a *Handler) handleOrganizationLoginPage(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	orgName := vars["organization"]
-
-	// Verify organization exists
-	organization, err := models.FindOrganizationByName(orgName)
-	if err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	t, err := template.New("org-login").Parse(organizationLoginTemplate)
-	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	data := struct {
-		AllowedProviders []string
-		OrganizationName string
-		DisplayName      string
-	}{
-		AllowedProviders: organization.AllowedProviders,
-		OrganizationName: orgName,
-		DisplayName:      organization.DisplayName,
-	}
-
-	t.Execute(w, data)
-}
-
-func (a *Handler) handleOrganizationSelection(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
-	log.Infof("handleOrganizationSelection: User %s needs to select organization", gothUser.Email)
-	redirectURL := fmt.Sprintf("/organization/select?email=%s&provider=%s&name=%s", gothUser.Email, gothUser.Provider, gothUser.Name)
-	log.Infof("handleOrganizationSelection: Redirecting to %s", redirectURL)
-	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http.Request) {
@@ -618,6 +423,19 @@ func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	account, err := models.FindAccount(email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// TODO: the organization creation should be in a transaction
+	//
+
+	//
+	// Create the organization and set up roles for it.
+	//
 	organization, err := models.CreateOrganization(name, displayName, description)
 	if err != nil {
 		log.Errorf("Error creating organization: %v", err)
@@ -625,171 +443,65 @@ func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Create the user as the organization owner (but don't create account provider yet)
-	// The account provider will be created during the OAuth flow
-	user := &models.User{
-		OrganizationID: organization.ID,
-		Email:          email,
-		Name:           userName,
-		IsActive:       true, // User is active since they're creating the org
+	err = a.authorizationService.SetupOrganizationRoles(organization.ID.String())
+	if err != nil {
+		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
+		models.HardDeleteOrganization(organization.ID.String())
+		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
+		return
 	}
 
-	if err := user.Create(); err != nil {
+	//
+	// Create the owner user for it
+	//
+	user, err := models.CreateUser(organization.ID, account.ID, email, userName)
+	if err != nil {
 		log.Errorf("Error creating user for new organization: %v", err)
-		// Clean up the organization if user creation fails
 		models.HardDeleteOrganization(organization.ID.String())
 		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
 		return
 	}
 
-	// Set up organization roles
-	err = a.authorizationService.SetupOrganizationRoles(organization.ID.String())
-	if err != nil {
-		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
-		// Clean up the organization and user if role setup fails
-		models.HardDeleteOrganization(organization.ID.String())
-		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
-		return
-	}
-	log.Infof("Set up organization roles for %s (%s)", organization.Name, organization.ID.String())
-
-	// Create organization owner
 	err = a.authorizationService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
 	if err != nil {
 		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
-		// Clean up the organization and user if owner creation fails
 		models.HardDeleteOrganization(organization.ID.String())
 		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
 		return
 	}
-	log.Infof("Created organization owner for %s (%s) for user %s", organization.Name, organization.ID.String(), user.ID.String())
-
-	log.Infof("Created organization %s with owner %s (%s)", organization.Name, user.Name, user.Email)
 
 	// Redirect to auth with the new organization
 	redirectURL := fmt.Sprintf("/auth/%s?org=%s", provider, organization.Name)
 	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
-func (a *Handler) findOrCreateUserAndAccountInOrganization(gothUser goth.User, organizationID uuid.UUID) (*models.User, *models.AccountProvider, error) {
-	accountProvider, err := models.FindAccountProviderByProviderIDInOrganization(gothUser.Provider, gothUser.UserID, organizationID)
-	if err == nil {
-
-		encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(encryptedAccessToken)
-		accountProvider.Username = gothUser.NickName
-		accountProvider.Email = gothUser.Email
-		accountProvider.Name = gothUser.Name
-		accountProvider.AvatarURL = gothUser.AvatarURL
-		accountProvider.RefreshToken = gothUser.RefreshToken
-		if !gothUser.ExpiresAt.IsZero() {
-			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-		}
-
-		if err := accountProvider.Update(); err != nil {
-			return nil, nil, err
-		}
-
-		user, err := models.FindUserByID(accountProvider.UserID, organizationID)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		user.Name = gothUser.Name
-		user.IsActive = true
-		user.Update()
-
-		return user, accountProvider, nil
-	}
-
-	user, err := a.findOrCreateUserInOrganization(gothUser, organizationID)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	encryptedAccessToken, err := a.encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	accountProvider = &models.AccountProvider{
-		UserID:       user.ID,
-		Provider:     gothUser.Provider,
-		ProviderID:   gothUser.UserID,
-		Username:     gothUser.NickName,
-		Email:        gothUser.Email,
-		Name:         gothUser.Name,
-		AvatarURL:    gothUser.AvatarURL,
-		AccessToken:  base64.StdEncoding.EncodeToString(encryptedAccessToken),
-		RefreshToken: gothUser.RefreshToken,
-	}
-
-	if !gothUser.ExpiresAt.IsZero() {
-		accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
-	}
-
-	if err := accountProvider.Create(); err != nil {
-		return nil, nil, err
-	}
-
-	return user, accountProvider, nil
-}
-
 func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	cookie, err := r.Cookie("auth_token")
-	var token string
-
-	if err == nil {
-		token = cookie.Value
-	} else {
-		// Fallback to Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			return nil, fmt.Errorf("no authentication token provided")
-		}
-
-		if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
-			return nil, fmt.Errorf("malformed authorization header")
-		}
-		token = authHeader[7:]
+	if err != nil {
+		return nil, fmt.Errorf("cookie not found")
 	}
 
-	claims, err := a.jwtSigner.ValidateAndGetClaims(token)
+	claims, err := a.jwtSigner.ValidateAndGetClaims(cookie.Value)
 	if err != nil {
 		return nil, fmt.Errorf("invalid token: %v", err)
 	}
 
-	userIDClaim, exists := claims["sub"]
+	userClaim, exists := claims["sub"]
 	if !exists {
 		return nil, fmt.Errorf("user ID missing from token")
 	}
 
-	userID, ok := userIDClaim.(string)
+	userID, ok := userClaim.(string)
 	if !ok {
 		return nil, fmt.Errorf("invalid user ID in token")
 	}
 
-	// Get organization ID from claims (required)
-	orgClaim, exists := claims["org"]
+	orgID, exists := claims["org"]
 	if !exists {
 		return nil, fmt.Errorf("organization context missing from token")
 	}
 
-	orgIDStr, ok := orgClaim.(string)
-	if !ok {
-		return nil, fmt.Errorf("invalid organization context in token")
-	}
-
-	organizationID, err := uuid.Parse(orgIDStr)
-	if err != nil {
-		return nil, fmt.Errorf("invalid organization ID in token: %v", err)
-	}
-
-	user, err := models.FindUserByID(uuid.MustParse(userID), organizationID)
+	user, err := models.FindUserByID(orgID.(string), userID)
 	if err != nil {
 		return nil, fmt.Errorf("user not found in organization: %v", err)
 	}
@@ -797,30 +509,11 @@ func (a *Handler) getUserFromRequest(r *http.Request) (*models.User, error) {
 	return user, nil
 }
 
-func getPrimaryEmail(accountProviders []models.AccountProvider) string {
-	if len(accountProviders) > 0 {
-		return accountProviders[0].Email
-	}
-	return ""
-}
-
-func getPrimaryAvatar(accountProviders []models.AccountProvider) string {
-	if len(accountProviders) > 0 {
-		return accountProviders[0].AvatarURL
-	}
-	return ""
-}
-
 func (a *Handler) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := a.getUserFromRequest(r)
 		if err != nil {
-			log.Errorf("User not found: %v", err)
-			if r.Header.Get("Accept") == "application/json" {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			} else {
-				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
-			}
+			http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -830,267 +523,67 @@ func (a *Handler) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-func (a *Handler) getGitHubUserInfo(token string) (*GitHubUserInfo, error) {
-	req, err := http.NewRequest("GET", "https://api.github.com/user", nil)
+func findOrCreateAccount(email string) (*models.Account, error) {
+	account, err := models.FindAccount(email)
+	if err == nil {
+		return account, nil
+	}
+
+	account, err = models.CreateAccount(email)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "superplane-server/1.0")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
-	}
-
-	var user GitHubUserInfo
-	err = json.NewDecoder(resp.Body).Decode(&user)
-	return &user, err
+	return account, nil
 }
 
-func (a *Handler) findOrCreateAccountProviderInOrganization(githubUser *GitHubUserInfo, organizationID uuid.UUID) (*models.AccountProvider, error) {
-	accountProvider, err := models.FindAccountProviderByProviderIDInOrganization(models.ProviderGitHub, fmt.Sprintf("%d", githubUser.ID), organizationID)
-	if err == nil {
-		return accountProvider, nil
-	}
-
-	// Check if user exists in organization
-	user, err := models.FindUserByEmail(githubUser.Email, organizationID)
+func updateAccountProviders(encryptor crypto.Encryptor, account *models.Account, gothUser goth.User) error {
+	accessToken, err := encryptor.Encrypt(context.Background(), []byte(gothUser.AccessToken), []byte(gothUser.Email))
 	if err != nil {
-		// Check for inactive invited user
-		user, err = models.FindInactiveUserByEmail(githubUser.Email, organizationID)
-		if err != nil {
-			// Check for pending invitation and create user
-			invitation, err := models.FindPendingInvitation(githubUser.Email, organizationID)
-			if err != nil {
-				return nil, fmt.Errorf("No invitation found for this email in the organization. Please contact an administrator")
-			}
-
-			// Check if invitation is expired
-			if invitation.IsExpired() {
-				invitation.Expire()
-				return nil, fmt.Errorf("Invitation has expired. Please request a new invitation")
-			}
-
-			// Create user account from invitation
-			user = &models.User{
-				OrganizationID: organizationID,
-				Email:          githubUser.Email,
-				Name:           githubUser.Name,
-				IsActive:       true, // Activate immediately upon successful auth
-			}
-
-			if err := user.Create(); err != nil {
-				return nil, fmt.Errorf("Failed to create user account: %v", err)
-			}
-
-			// Mark invitation as accepted
-			if err := invitation.Accept(); err != nil {
-				log.Errorf("Failed to mark invitation as accepted: %v", err)
-			}
-
-			log.Infof("Created user account for %s in organization %s via invitation", githubUser.Email, organizationID)
-		} else {
-			// Accept any pending invitation for existing inactive user
-			a.acceptPendingInvitation(githubUser.Email, organizationID)
-		}
+		return err
 	}
 
-	// Create account provider for existing user
+	accountProvider, err := account.FindAccountProviderByID(gothUser.Provider, gothUser.UserID)
+
+	//
+	// If we already have an account provider for this provider and provider ID, we just update it.
+	//
+	if err == nil {
+		accountProvider.AccessToken = base64.StdEncoding.EncodeToString(accessToken)
+		accountProvider.Username = gothUser.NickName
+		accountProvider.Email = gothUser.Email
+		accountProvider.Name = gothUser.Name
+		accountProvider.AvatarURL = gothUser.AvatarURL
+		accountProvider.RefreshToken = gothUser.RefreshToken
+		if !gothUser.ExpiresAt.IsZero() {
+			accountProvider.TokenExpiresAt = &gothUser.ExpiresAt
+		}
+
+		return database.Conn().Save(accountProvider).Error
+	}
+
+	//
+	// Otherwise, we create a new account provider.
+	//
 	accountProvider = &models.AccountProvider{
-		UserID:     user.ID,
-		Provider:   models.ProviderGitHub,
-		ProviderID: fmt.Sprintf("%d", githubUser.ID),
-		Username:   githubUser.Login,
-		Email:      githubUser.Email,
-		Name:       githubUser.Name,
-		AvatarURL:  githubUser.AvatarURL,
-	}
-
-	if err := accountProvider.Create(); err != nil {
-		return nil, fmt.Errorf("Internal server error")
-	}
-	return accountProvider, nil
-}
-
-func (a *Handler) findOrCreateUserInOrganization(gothUser goth.User, organizationID uuid.UUID) (*models.User, error) {
-	// Try to find existing user by email in organization
-	user, err := models.FindUserByEmail(gothUser.Email, organizationID)
-	if err == nil {
-		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
-			return nil, err
-		}
-		return user, nil
-	}
-
-	// Try to find inactive (invited) user
-	user, err = models.FindInactiveUserByEmail(gothUser.Email, organizationID)
-	if err == nil {
-		// Accept any pending invitation for this email
-		a.acceptPendingInvitation(gothUser.Email, organizationID)
-
-		if err := a.updateUserInfo(user, gothUser.Name); err != nil {
-			return nil, err
-		}
-		return user, nil
-	}
-
-	// Check for pending invitation and create user
-	invitation, err := models.FindPendingInvitation(gothUser.Email, organizationID)
-	if err != nil {
-		return nil, fmt.Errorf("No invitation found for this email in the organization. Please contact an administrator")
-	}
-
-	// Check if invitation is expired
-	if invitation.IsExpired() {
-		invitation.Expire()
-		return nil, fmt.Errorf("Invitation has expired. Please request a new invitation")
-	}
-
-	// Create user account from invitation
-	user = &models.User{
-		OrganizationID: organizationID,
+		AccountID:      account.ID,
+		Provider:       gothUser.Provider,
+		ProviderID:     gothUser.UserID,
+		Username:       gothUser.NickName,
 		Email:          gothUser.Email,
 		Name:           gothUser.Name,
-		IsActive:       true, // Activate immediately upon successful auth
+		AvatarURL:      gothUser.AvatarURL,
+		AccessToken:    base64.StdEncoding.EncodeToString(accessToken),
+		RefreshToken:   gothUser.RefreshToken,
+		TokenExpiresAt: &gothUser.ExpiresAt,
 	}
 
-	if err := user.Create(); err != nil {
-		return nil, fmt.Errorf("Failed to create user account: %v", err)
-	}
-
-	// Mark invitation as accepted
-	if err := invitation.Accept(); err != nil {
-		log.Errorf("Failed to mark invitation as accepted: %v", err)
-		// Don't fail the auth process for this
-	}
-
-	log.Infof("Created user account for %s in organization %s via invitation", gothUser.Email, organizationID)
-	return user, nil
+	return database.Conn().Create(accountProvider).Error
 }
 
-func (a *Handler) acceptPendingInvitation(email string, organizationID uuid.UUID) {
-	invitation, err := models.FindPendingInvitation(email, organizationID)
-	if err != nil {
-		return // No pending invitation found
-	}
-
-	if !invitation.IsExpired() {
-		if err := invitation.Accept(); err != nil {
-			log.Errorf("Failed to accept invitation: %v", err)
-		} else {
-			log.Infof("Automatically accepted invitation for %s in organization %s", email, organizationID)
-		}
-	}
-}
-
-func (a *Handler) updateUserInfo(user *models.User, name string) error {
-	user.Name = name
-	user.IsActive = true
-	return user.Update()
-}
-
-const organizationLoginTemplate = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sign in to {{.DisplayName}} - Superplane</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .login-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            text-align: center;
-            max-width: 400px;
-            width: 90%;
-        }
-        .logo {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        .org-name {
-            font-size: 1.2rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-        }
-        .subtitle {
-            color: #888;
-            margin-bottom: 2rem;
-            font-size: 0.9rem;
-        }
-        .login-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.2s;
-            width: 100%;
-            box-sizing: border-box;
-            margin-bottom: 12px;
-        }
-        .login-btn:last-child {
-            margin-bottom: 0;
-        }
-        .login-btn.github {
-            background: #24292e;
-            color: white;
-        }
-        .login-btn.github:hover {
-            background: #1a1e22;
-        }
-        .provider-icon {
-            width: 20px;
-            height: 20px;
-            margin-right: 8px;
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="logo">🛩️ Superplane</div>
-        <div class="org-name">{{.DisplayName}}</div>
-        <div class="subtitle">Sign in to your organization</div>
-        
-        {{range .AllowedProviders}}
-        <a href="/auth/{{.}}?org={{$.OrganizationName}}" class="login-btn {{.}}">
-            {{if eq . "github"}}
-                <svg class="provider-icon" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-                </svg>
-                Continue with GitHub
-            {{end}}
-        </a>
-        {{end}}
-    </div>
-</body>
-</html>
-`
+//
+// TODO: move these templates to their own files
+//
 
 const organizationSelectionTemplate = `
 <!DOCTYPE html>

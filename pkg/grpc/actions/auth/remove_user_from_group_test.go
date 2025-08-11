@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -25,16 +26,7 @@ func Test_RemoveUserFromGroup(t *testing.T) {
 	})
 
 	t.Run("remove user from group with email", func(t *testing.T) {
-		user := &models.User{
-			Name:     "test-remove-group@example.com",
-			IsActive: false,
-		}
-
-		err := user.Create()
-		require.NoError(t, err)
-
-		accountProvider := &models.AccountProvider{Provider: "github", UserID: user.ID, Email: user.Email}
-		err = accountProvider.Create()
+		user, err := models.CreateUser(r.Organization.ID, uuid.New(), "test-remove-group@example.com", "Test Remove Group")
 		require.NoError(t, err)
 
 		err = r.AuthService.CreateGroup(orgID, "org", "test-group-email-remove", models.RoleOrgAdmin, "Test Group Email Remove", "Test group email remove description")

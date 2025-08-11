@@ -39,8 +39,7 @@ interface Invitation {
   id: string
   organizationId: string
   email: string
-  status: 'pending' | 'accepted' | 'expired'
-  expiresAt: string
+  status: 'pending' | 'accepted'
   createdAt: string
 }
 
@@ -174,8 +173,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
         return
       }
 
-      const roleToAssign = showRoleSelection ? bulkUserRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
-
       if (!groupName && showRoleSelection && !bulkUserRole) {
         console.error('No role selected')
         return
@@ -279,7 +276,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
 
       try {
         const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
-        const roleToAssign = showRoleSelection ? emailRole : (roles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || roles[0]?.metadata?.name || '')
 
         // Process each email
         for (const email of emails) {
@@ -379,8 +375,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
           return <Badge color="yellow">Pending</Badge>
         case 'accepted':
           return <Badge color="green">Accepted</Badge>
-        case 'expired':
-          return <Badge color="red">Expired</Badge>
         default:
           return <Badge color="gray">{status}</Badge>
       }
@@ -562,14 +556,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                             {member.metadata?.email || `${member.metadata!.id!}@email.placeholder`}
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member?.status?.isActive
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                            }`}>
-                            {member?.status?.isActive ? 'Active' : 'Pending'}
-                          </span>
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -684,7 +670,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                       <TableHeader>Email</TableHeader>
                       <TableHeader>Status</TableHeader>
                       <TableHeader>Sent</TableHeader>
-                      <TableHeader>Expires</TableHeader>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -699,11 +684,6 @@ const AddMembersSectionComponent = forwardRef<AddMembersSectionRef, AddMembersSe
                         <TableCell>
                           <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                             {formatDate(invitation.createdAt)}
-                          </Text>
-                        </TableCell>
-                        <TableCell>
-                          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                            {formatDate(invitation.expiresAt)}
                           </Text>
                         </TableCell>
                       </TableRow>

@@ -43,20 +43,8 @@ func setupTestServer(t *testing.T) (*Server, *models.User, string) {
 	org, err := models.CreateOrganization("test", "test", "")
 	require.NoError(t, err)
 
-	user := &models.User{Name: "Test User", OrganizationID: org.ID}
-	require.NoError(t, user.Create())
-
-	account := &models.AccountProvider{
-		UserID:      user.ID,
-		Provider:    "github",
-		ProviderID:  "12345",
-		Username:    "testuser",
-		Email:       "test@example.com",
-		Name:        "Test User",
-		AccessToken: "encrypted-token",
-	}
-
-	require.NoError(t, account.Create())
+	user, err := models.CreateUser(org.ID, uuid.New(), "test@example.com", "Test User")
+	require.NoError(t, err)
 
 	token, err := signer.Generate(user.ID.String(), time.Hour)
 	require.NoError(t, err)

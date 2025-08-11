@@ -13,51 +13,18 @@ import (
 )
 
 type Organization struct {
-	ID                  uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                string    `gorm:"uniqueIndex"`
-	DisplayName         string
-	Description         string
-	AllowedProviders    datatypes.JSONSlice[string]
-	EmailDomainsAllowed datatypes.JSONSlice[string]
-	CreatedAt           *time.Time
-	UpdatedAt           *time.Time
-	DeletedAt           gorm.DeletedAt `gorm:"index"`
+	ID               uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name             string    `gorm:"uniqueIndex"`
+	DisplayName      string
+	Description      string
+	AllowedProviders datatypes.JSONSlice[string]
+	CreatedAt        *time.Time
+	UpdatedAt        *time.Time
+	DeletedAt        gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
 	return slices.Contains(o.AllowedProviders, provider)
-}
-
-func (o *Organization) IsEmailDomainAllowed(email string) bool {
-	if len(o.EmailDomainsAllowed) == 0 {
-		return true
-	}
-
-	//
-	// TODO: there's a better way to do this
-	//
-	for _, domain := range o.EmailDomainsAllowed {
-		if len(email) >= len(domain) && email[len(email)-len(domain):] == domain {
-			return true
-		}
-	}
-
-	return false
-}
-
-func ListOrganizations() ([]Organization, error) {
-	var organizations []Organization
-
-	err := database.Conn().
-		Order("display_name ASC").
-		Find(&organizations).
-		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return organizations, nil
 }
 
 func ListOrganizationsByIDs(ids []string) ([]Organization, error) {
@@ -112,7 +79,7 @@ func CreateOrganization(name, displayName, description string) (*Organization, e
 		Name:             name,
 		DisplayName:      displayName,
 		Description:      description,
-		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub}, // Default to GitHub
+		AllowedProviders: datatypes.JSONSlice[string]{ProviderGitHub},
 		CreatedAt:        &now,
 		UpdatedAt:        &now,
 	}
@@ -148,8 +115,7 @@ func HardDeleteOrganization(id string) error {
 		Error
 }
 
-// GetOrganizationIDs returns only the IDs of all non-deleted organizations
-func GetOrganizationIDs() ([]string, error) {
+func GetActiveOrganizationIDs() ([]string, error) {
 	var orgIDs []string
 	err := database.Conn().Model(&Organization{}).
 		Select("id").

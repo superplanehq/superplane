@@ -334,43 +334,6 @@ func exchangeGitHubToken(githubToken string) (string, *TokenExchangeResponse, er
 	return tokenResp.AccessToken, &tokenResp, nil
 }
 
-// Updated to use your server's /auth/me endpoint instead of GitHub's API
-func getUserInfo(token string) (*GitHubUser, error) {
-	baseURL := GetAPIURL()
-	req, err := http.NewRequest("GET", baseURL+"/auth/me", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "superplane-cli/1.0")
-
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Server returned status %d", resp.StatusCode)
-	}
-
-	var user ServerUserResponse
-	err = json.NewDecoder(resp.Body).Decode(&user)
-	if err != nil {
-		return nil, err
-	}
-
-	return &GitHubUser{
-		Login:     user.Email,
-		Name:      user.Name,
-		Email:     user.Email,
-		AvatarURL: user.AvatarURL,
-	}, nil
-}
-
 func openBrowser(url string) {
 	var err error
 
@@ -404,42 +367,9 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
-var whoamiCmd = &cobra.Command{
-	Use:   "whoami",
-	Short: "Show current user information",
-	Long:  `Display information about the currently authenticated user.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		token := GetAuthToken()
-		if token == "" {
-			fmt.Println("Not authenticated. Run 'superplane login' first.")
-			os.Exit(1)
-		}
-
-		if token == mockedToken {
-			fmt.Println("Logged in as: Dev User (dev@superplane.local)")
-			fmt.Println("User ID: dev-user-123")
-			fmt.Println("Email: dev@superplane.local")
-			fmt.Println("Mode: Development")
-			return
-		}
-
-		user, err := getUserInfo(token)
-		if err != nil {
-			fmt.Println("Authentication token expired or invalid. Run 'superplane login' again.")
-			os.Exit(1)
-		}
-
-		fmt.Printf("Logged in as: %s (%s)\n", user.Name, user.Login)
-		if user.Email != "" {
-			fmt.Printf("Email: %s\n", user.Email)
-		}
-	},
-}
-
 func init() {
 	RootCmd.AddCommand(loginCmd)
 	RootCmd.AddCommand(logoutCmd)
-	RootCmd.AddCommand(whoamiCmd)
 
 	loginCmd.Flags().Bool("dev", false, "Use development mode authentication")
 	loginCmd.Flags().String("provider", "github", "OAuth provider to use (github)")

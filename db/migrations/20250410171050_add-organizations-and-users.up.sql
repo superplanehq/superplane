@@ -1,15 +1,14 @@
 BEGIN;
 
 CREATE TABLE organizations (
-    id                    UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name                  VARCHAR(255) NOT NULL UNIQUE,
-    description           TEXT DEFAULT '',
-    display_name          VARCHAR(255) NOT NULL,
-    allowed_providers     JSONB NOT NULL DEFAULT '[]',
-    email_domains_allowed JSONB DEFAULT '[]',
-    created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    deleted_at            TIMESTAMP
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name              VARCHAR(255) NOT NULL UNIQUE,
+  description       TEXT DEFAULT '',
+  display_name      VARCHAR(255) NOT NULL,
+  allowed_providers JSONB NOT NULL DEFAULT '[]',
+  created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at        TIMESTAMP
 );
 
 CREATE INDEX idx_organizations_deleted_at ON organizations(deleted_at);
@@ -20,26 +19,38 @@ CREATE TABLE organization_invitations (
   email           VARCHAR(255) NOT NULL,
   invited_by      UUID NOT NULL,
   status          VARCHAR(20) NOT NULL DEFAULT 'pending',
-  expires_at      TIMESTAMP NOT NULL,
   created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT      unique_org_email UNIQUE(organization_id, email)
+
+  UNIQUE(organization_id, email)
+);
+
+CREATE TABLE accounts (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  email           VARCHAR(255) NOT NULL,
+  created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  UNIQUE(email)
 );
 
 CREATE TABLE users (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  organization_id UUID NOT NULL,
+  account_id      UUID NOT NULL,
   email           VARCHAR(255) NOT NULL,
   name            VARCHAR(255) NOT NULL,
   created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  UNIQUE(organization_id, email)
+  UNIQUE(organization_id, email),
+  FOREIGN KEY (organization_id) REFERENCES organizations(id),
+  FOREIGN KEY (account_id) REFERENCES accounts(id)
 );
 
 CREATE TABLE account_providers (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id          UUID NOT NULL REFERENCES users(id),
+  account_id       UUID NOT NULL,
   provider         VARCHAR(50) NOT NULL,
   provider_id      VARCHAR(255) NOT NULL,
   username         VARCHAR(255),
@@ -52,8 +63,9 @@ CREATE TABLE account_providers (
   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   
-  UNIQUE(user_id, provider),
-  UNIQUE(provider, provider_id)
+  UNIQUE(account_id, provider),
+  UNIQUE(provider, provider_id),
+  FOREIGN KEY (account_id) REFERENCES accounts(id)
 );
 
 

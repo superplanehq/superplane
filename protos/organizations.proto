@@ -84,7 +84,7 @@ service Organizations {
 
   rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
     option (google.api.http) = {
-      post: "/api/v1/organizations/{organization_id}/invitations"
+      post: "/api/v1/organizations/{id_or_name}/invitations"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -96,7 +96,7 @@ service Organizations {
 
   rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{organization_id}/invitations"
+      get: "/api/v1/organizations/{id_or_name}/invitations"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "List organization invitations";
@@ -157,18 +157,16 @@ message DeleteOrganizationRequest {
 
 message DeleteOrganizationResponse {}
 
-// Invitation messages
 message Invitation {
   string id = 1;
   string organization_id = 2;
   string email = 3;
   string status = 4;
-  google.protobuf.Timestamp expires_at = 5;
-  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp created_at = 5;
 }
 
 message CreateInvitationRequest {
-  string organization_id = 1;
+  string id_or_name = 1;
   string email = 2;
 }
 
@@ -177,7 +175,7 @@ message CreateInvitationResponse {
 }
 
 message ListInvitationsRequest {
-  string organization_id = 1;
+  string id_or_name = 1;
 }
 
 message ListInvitationsResponse {

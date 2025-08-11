@@ -753,7 +753,6 @@ func (x *User_Spec) GetAccountProviders() []*AccountProvider {
 
 type User_Status struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	IsActive        bool                   `protobuf:"varint,1,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
 	RoleAssignments []*UserRoleAssignment  `protobuf:"bytes,2,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -787,13 +786,6 @@ func (x *User_Status) ProtoReflect() protoreflect.Message {
 // Deprecated: Use User_Status.ProtoReflect.Descriptor instead.
 func (*User_Status) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{6, 2}
-}
-
-func (x *User_Status) GetIsActive() bool {
-	if x != nil {
-		return x.IsActive
-	}
-	return false
 }
 
 func (x *User_Status) GetRoleAssignments() []*UserRoleAssignment {
@@ -835,7 +827,7 @@ const file_users_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
-	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xe7\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xca\x04\n" +
 	"\x04User\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Users.User.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Users.User.SpecR\x04spec\x125\n" +
@@ -851,9 +843,8 @@ const file_users_proto_rawDesc = "" +
 	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
 	"avatar_url\x18\x02 \x01(\tR\tavatarUrl\x12N\n" +
-	"\x11account_providers\x18\x03 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1av\n" +
-	"\x06Status\x12\x1b\n" +
-	"\tis_active\x18\x01 \x01(\bR\bisActive\x12O\n" +
+	"\x11account_providers\x18\x03 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1aY\n" +
+	"\x06Status\x12O\n" +
 	"\x10role_assignments\x18\x02 \x03(\v2$.Superplane.Users.UserRoleAssignmentR\x0froleAssignments\"\xa9\x02\n" +
 	"\x12UserRoleAssignment\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +

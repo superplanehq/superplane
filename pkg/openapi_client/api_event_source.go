@@ -150,13 +150,7 @@ type ApiSuperplaneDescribeEventSourceRequest struct {
 	ctx context.Context
 	ApiService *EventSourceAPIService
 	canvasIdOrName string
-	id string
-	name *string
-}
-
-func (r ApiSuperplaneDescribeEventSourceRequest) Name(name string) ApiSuperplaneDescribeEventSourceRequest {
-	r.name = &name
-	return r
+	idOrName string
 }
 
 func (r ApiSuperplaneDescribeEventSourceRequest) Execute() (*SuperplaneDescribeEventSourceResponse, *http.Response, error) {
@@ -170,15 +164,15 @@ Returns the details of a specific event source (canvas can be referenced by ID o
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @param id
+ @param idOrName
  @return ApiSuperplaneDescribeEventSourceRequest
 */
-func (a *EventSourceAPIService) SuperplaneDescribeEventSource(ctx context.Context, canvasIdOrName string, id string) ApiSuperplaneDescribeEventSourceRequest {
+func (a *EventSourceAPIService) SuperplaneDescribeEventSource(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneDescribeEventSourceRequest {
 	return ApiSuperplaneDescribeEventSourceRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
-		id: id,
+		idOrName: idOrName,
 	}
 }
 
@@ -197,17 +191,14 @@ func (a *EventSourceAPIService) SuperplaneDescribeEventSourceExecute(r ApiSuperp
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.name != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "", "")
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

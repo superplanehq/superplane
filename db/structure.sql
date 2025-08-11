@@ -41,7 +41,7 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.account_providers (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    user_id uuid NOT NULL,
+    account_id uuid NOT NULL,
     provider character varying(50) NOT NULL,
     provider_id character varying(255) NOT NULL,
     username character varying(255),
@@ -53,6 +53,18 @@ CREATE TABLE public.account_providers (
     token_expires_at timestamp without time zone,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.accounts (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    email character varying(255) NOT NULL,
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 
@@ -165,11 +177,12 @@ CREATE TABLE public.connection_groups (
 CREATE TABLE public.connections (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     canvas_id uuid NOT NULL,
-    target_id uuid NOT NULL,
-    target_type character varying(64) NOT NULL,
+    stage_id uuid NOT NULL,
     source_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
+    target_id uuid NOT NULL,
+    target_type character varying(64) NOT NULL,
     filter_operator character varying(16) NOT NULL,
     filters jsonb NOT NULL
 );
@@ -274,7 +287,6 @@ CREATE TABLE public.organization_invitations (
     email character varying(255) NOT NULL,
     invited_by uuid NOT NULL,
     status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
-    expires_at timestamp without time zone NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
 );
@@ -290,7 +302,6 @@ CREATE TABLE public.organizations (
     description text DEFAULT ''::text,
     display_name character varying(255) NOT NULL,
     allowed_providers jsonb DEFAULT '[]'::jsonb NOT NULL,
-    email_domains_allowed jsonb DEFAULT '[]'::jsonb,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     deleted_at timestamp without time zone
@@ -436,6 +447,7 @@ CREATE TABLE public.stages (
 CREATE TABLE public.users (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     organization_id uuid NOT NULL,
+    account_id uuid NOT NULL,
     email character varying(255) NOT NULL,
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
@@ -449,6 +461,14 @@ CREATE TABLE public.users (
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
+
+
+--
+-- Name: account_providers account_providers_account_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.account_providers
+    ADD CONSTRAINT account_providers_account_id_provider_key UNIQUE (account_id, provider);
 
 
 --
@@ -468,11 +488,19 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: account_providers account_providers_user_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_user_id_provider_key UNIQUE (user_id, provider);
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_email_key UNIQUE (email);
+
+
+--
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.accounts
+    ADD CONSTRAINT accounts_pkey PRIMARY KEY (id);
 
 
 --
@@ -532,19 +560,19 @@ ALTER TABLE ONLY public.connection_groups
 
 
 --
--- Name: connections connections_canvas_id_target_id_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connections
-    ADD CONSTRAINT connections_canvas_id_target_id_source_id_key UNIQUE (canvas_id, target_id, source_id);
-
-
---
 -- Name: connections connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.connections
     ADD CONSTRAINT connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connections connections_stage_id_source_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT connections_stage_id_source_id_key UNIQUE (stage_id, source_id);
 
 
 --
@@ -601,6 +629,14 @@ ALTER TABLE ONLY public.integrations
 
 ALTER TABLE ONLY public.integrations
     ADD CONSTRAINT integrations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organization_invitations organization_invitations_organization_id_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organization_invitations
+    ADD CONSTRAINT organization_invitations_organization_id_email_key UNIQUE (organization_id, email);
 
 
 --
@@ -713,14 +749,6 @@ ALTER TABLE ONLY public.stages
 
 ALTER TABLE ONLY public.stages
     ADD CONSTRAINT stages_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_invitations unique_org_email; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_invitations
-    ADD CONSTRAINT unique_org_email UNIQUE (organization_id, email);
 
 
 --
@@ -868,11 +896,11 @@ CREATE INDEX uix_stages_canvas ON public.stages USING btree (canvas_id);
 
 
 --
--- Name: account_providers account_providers_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.account_providers
-    ADD CONSTRAINT account_providers_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+    ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
 
 
 --
@@ -924,6 +952,14 @@ ALTER TABLE ONLY public.connections
 
 
 --
+-- Name: connections connections_stage_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connections
+    ADD CONSTRAINT connections_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES public.stages(id);
+
+
+--
 -- Name: event_sources event_sources_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -969,14 +1005,6 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.resources
     ADD CONSTRAINT resources_integration_id_fkey FOREIGN KEY (integration_id) REFERENCES public.integrations(id);
-
-
---
--- Name: connections stage_connections_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.connections
-    ADD CONSTRAINT stage_connections_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.canvases(id);
 
 
 --
@@ -1028,11 +1056,19 @@ ALTER TABLE ONLY public.stages
 
 
 --
+-- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
 -- Name: users users_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+    ADD CONSTRAINT users_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
 
 
 --

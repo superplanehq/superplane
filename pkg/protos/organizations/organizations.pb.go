@@ -500,15 +500,13 @@ func (*DeleteOrganizationResponse) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{10}
 }
 
-// Invitation messages
 type Invitation struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	OrganizationId string                 `protobuf:"bytes,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
 	Email          string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
 	Status         string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
-	ExpiresAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
-	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedAt      *timestamp.Timestamp   `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -571,13 +569,6 @@ func (x *Invitation) GetStatus() string {
 	return ""
 }
 
-func (x *Invitation) GetExpiresAt() *timestamp.Timestamp {
-	if x != nil {
-		return x.ExpiresAt
-	}
-	return nil
-}
-
 func (x *Invitation) GetCreatedAt() *timestamp.Timestamp {
 	if x != nil {
 		return x.CreatedAt
@@ -586,11 +577,11 @@ func (x *Invitation) GetCreatedAt() *timestamp.Timestamp {
 }
 
 type CreateInvitationRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	Email          string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdOrName      string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	Email         string                 `protobuf:"bytes,2,opt,name=email,proto3" json:"email,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *CreateInvitationRequest) Reset() {
@@ -623,9 +614,9 @@ func (*CreateInvitationRequest) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *CreateInvitationRequest) GetOrganizationId() string {
+func (x *CreateInvitationRequest) GetIdOrName() string {
 	if x != nil {
-		return x.OrganizationId
+		return x.IdOrName
 	}
 	return ""
 }
@@ -682,10 +673,10 @@ func (x *CreateInvitationResponse) GetInvitation() *Invitation {
 }
 
 type ListInvitationsRequest struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	OrganizationId string                 `protobuf:"bytes,1,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IdOrName      string                 `protobuf:"bytes,1,opt,name=id_or_name,json=idOrName,proto3" json:"id_or_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListInvitationsRequest) Reset() {
@@ -718,9 +709,9 @@ func (*ListInvitationsRequest) Descriptor() ([]byte, []int) {
 	return file_organizations_proto_rawDescGZIP(), []int{14}
 }
 
-func (x *ListInvitationsRequest) GetOrganizationId() string {
+func (x *ListInvitationsRequest) GetIdOrName() string {
 	if x != nil {
-		return x.OrganizationId
+		return x.IdOrName
 	}
 	return ""
 }
@@ -1047,7 +1038,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\x19DeleteOrganizationRequest\x12\x1c\n" +
 	"\n" +
 	"id_or_name\x18\x01 \x01(\tR\bidOrName\"\x1c\n" +
-	"\x1aDeleteOrganizationResponse\"\xe9\x01\n" +
+	"\x1aDeleteOrganizationResponse\"\xae\x01\n" +
 	"\n" +
 	"Invitation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
@@ -1055,18 +1046,18 @@ const file_organizations_proto_rawDesc = "" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12\x16\n" +
 	"\x06status\x18\x04 \x01(\tR\x06status\x129\n" +
 	"\n" +
-	"expires_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\x129\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"M\n" +
+	"\x17CreateInvitationRequest\x12\x1c\n" +
 	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"X\n" +
-	"\x17CreateInvitationRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x12\x14\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\x12\x14\n" +
 	"\x05email\x18\x02 \x01(\tR\x05email\"`\n" +
 	"\x18CreateInvitationResponse\x12D\n" +
 	"\n" +
 	"invitation\x18\x01 \x01(\v2$.Superplane.Organizations.InvitationR\n" +
-	"invitation\"A\n" +
-	"\x16ListInvitationsRequest\x12'\n" +
-	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\"a\n" +
+	"invitation\"6\n" +
+	"\x16ListInvitationsRequest\x12\x1c\n" +
+	"\n" +
+	"id_or_name\x18\x01 \x01(\tR\bidOrName\"a\n" +
 	"\x17ListInvitationsResponse\x12F\n" +
 	"\vinvitations\x18\x01 \x03(\v2$.Superplane.Organizations.InvitationR\vinvitations\"x\n" +
 	"\x13OrganizationCreated\x12'\n" +
@@ -1077,7 +1068,7 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"x\n" +
 	"\x13OrganizationDeleted\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xcc\x0f\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xc2\x0f\n" +
 	"\rOrganizations\x12\xfd\x01\n" +
 	"\x11ListOrganizations\x122.Superplane.Organizations.ListOrganizationsRequest\x1a3.Superplane.Organizations.ListOrganizationsResponse\"\x7f\x92A_\n" +
 	"\fOrganization\x12\x12List organizations\x1a;Returns a list of all organizations ordered by display name\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/organizations\x12\x8f\x02\n" +
@@ -1088,11 +1079,11 @@ const file_organizations_proto_rawDesc = "" +
 	"\x12UpdateOrganization\x123.Superplane.Organizations.UpdateOrganizationRequest\x1a4.Superplane.Organizations.UpdateOrganizationResponse\"\x9c\x01\x92Al\n" +
 	"\fOrganization\x12\x16Update an organization\x1aDUpdates the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02':\x01*2\"/api/v1/organizations/{id_or_name}\x12\x9b\x02\n" +
 	"\x12DeleteOrganization\x123.Superplane.Organizations.DeleteOrganizationRequest\x1a4.Superplane.Organizations.DeleteOrganizationResponse\"\x99\x01\x92Al\n" +
-	"\fOrganization\x12\x16Delete an organization\x1aDDeletes the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02$*\"/api/v1/organizations/{id_or_name}\x12\x9f\x02\n" +
-	"\x10CreateInvitation\x121.Superplane.Organizations.CreateInvitationRequest\x1a2.Superplane.Organizations.CreateInvitationResponse\"\xa3\x01\x92Ab\n" +
-	"\fOrganization\x12!Create an organization invitation\x1a/Invites a user to join an organization by email\x82\xd3\xe4\x93\x028:\x01*\"3/api/v1/organizations/{organization_id}/invitations\x12\x95\x02\n" +
-	"\x0fListInvitations\x120.Superplane.Organizations.ListInvitationsRequest\x1a1.Superplane.Organizations.ListInvitationsResponse\"\x9c\x01\x92A^\n" +
-	"\fOrganization\x12\x1dList organization invitations\x1a/Returns pending invitations for an organization\x82\xd3\xe4\x93\x025\x123/api/v1/organizations/{organization_id}/invitationsB\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
+	"\fOrganization\x12\x16Delete an organization\x1aDDeletes the specified organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02$*\"/api/v1/organizations/{id_or_name}\x12\x9a\x02\n" +
+	"\x10CreateInvitation\x121.Superplane.Organizations.CreateInvitationRequest\x1a2.Superplane.Organizations.CreateInvitationResponse\"\x9e\x01\x92Ab\n" +
+	"\fOrganization\x12!Create an organization invitation\x1a/Invites a user to join an organization by email\x82\xd3\xe4\x93\x023:\x01*\"./api/v1/organizations/{id_or_name}/invitations\x12\x90\x02\n" +
+	"\x0fListInvitations\x120.Superplane.Organizations.ListInvitationsRequest\x1a1.Superplane.Organizations.ListInvitationsResponse\"\x97\x01\x92A^\n" +
+	"\fOrganization\x12\x1dList organization invitations\x1a/Returns pending invitations for an organization\x82\xd3\xe4\x93\x020\x12./api/v1/organizations/{id_or_name}/invitationsB\xf0\x01\x92A\xaf\x01\x12\x84\x01\n" +
 	"\x1cSuperplane Organizations API\x128API for managing organizations in the Superplane service\"%\n" +
 	"\vAPI Support\x1a\x16support@superplane.com2\x031.0*\x02\x01\x022\x10application/json:\x10application/jsonZ;github.com/superplanehq/superplane/pkg/protos/organizationsb\x06proto3"
 
@@ -1140,34 +1131,33 @@ var file_organizations_proto_depIdxs = []int32{
 	0,  // 4: Superplane.Organizations.DescribeOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
 	0,  // 5: Superplane.Organizations.UpdateOrganizationRequest.organization:type_name -> Superplane.Organizations.Organization
 	0,  // 6: Superplane.Organizations.UpdateOrganizationResponse.organization:type_name -> Superplane.Organizations.Organization
-	20, // 7: Superplane.Organizations.Invitation.expires_at:type_name -> google.protobuf.Timestamp
-	20, // 8: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
-	11, // 9: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
-	11, // 10: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
-	20, // 11: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
-	20, // 12: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
-	20, // 13: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
-	20, // 14: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
-	20, // 15: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 16: Superplane.Organizations.Organizations.ListOrganizations:input_type -> Superplane.Organizations.ListOrganizationsRequest
-	3,  // 17: Superplane.Organizations.Organizations.CreateOrganization:input_type -> Superplane.Organizations.CreateOrganizationRequest
-	5,  // 18: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
-	7,  // 19: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
-	9,  // 20: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
-	12, // 21: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
-	14, // 22: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
-	2,  // 23: Superplane.Organizations.Organizations.ListOrganizations:output_type -> Superplane.Organizations.ListOrganizationsResponse
-	4,  // 24: Superplane.Organizations.Organizations.CreateOrganization:output_type -> Superplane.Organizations.CreateOrganizationResponse
-	6,  // 25: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	8,  // 26: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	10, // 27: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	13, // 28: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	15, // 29: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	23, // [23:30] is the sub-list for method output_type
-	16, // [16:23] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	20, // 7: Superplane.Organizations.Invitation.created_at:type_name -> google.protobuf.Timestamp
+	11, // 8: Superplane.Organizations.CreateInvitationResponse.invitation:type_name -> Superplane.Organizations.Invitation
+	11, // 9: Superplane.Organizations.ListInvitationsResponse.invitations:type_name -> Superplane.Organizations.Invitation
+	20, // 10: Superplane.Organizations.OrganizationCreated.timestamp:type_name -> google.protobuf.Timestamp
+	20, // 11: Superplane.Organizations.OrganizationUpdated.timestamp:type_name -> google.protobuf.Timestamp
+	20, // 12: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
+	20, // 13: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
+	20, // 14: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
+	1,  // 15: Superplane.Organizations.Organizations.ListOrganizations:input_type -> Superplane.Organizations.ListOrganizationsRequest
+	3,  // 16: Superplane.Organizations.Organizations.CreateOrganization:input_type -> Superplane.Organizations.CreateOrganizationRequest
+	5,  // 17: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
+	7,  // 18: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
+	9,  // 19: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
+	12, // 20: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
+	14, // 21: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
+	2,  // 22: Superplane.Organizations.Organizations.ListOrganizations:output_type -> Superplane.Organizations.ListOrganizationsResponse
+	4,  // 23: Superplane.Organizations.Organizations.CreateOrganization:output_type -> Superplane.Organizations.CreateOrganizationResponse
+	6,  // 24: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	8,  // 25: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	10, // 26: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	13, // 27: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	15, // 28: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	22, // [22:29] is the sub-list for method output_type
+	15, // [15:22] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_organizations_proto_init() }
