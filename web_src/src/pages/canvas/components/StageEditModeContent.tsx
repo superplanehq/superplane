@@ -1401,10 +1401,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
           <div className="space-y-3">
             {executor.type === 'semaphore' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                  Configure your Semaphore executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
-                </div>
-
                 <Field>
                   <Label>Integration</Label>
                   <select
@@ -1556,10 +1552,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
             {executor.type === 'github' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
-                  Configure your GitHub executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
-                </div>
-
                 <Field>
                   <Label>Integration</Label>
                   <select
@@ -1658,10 +1650,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
             {executor.type === 'http' && (
               <div className="space-y-4">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                  Configure your HTTP executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
-                </div>
-
                 <Field>
                   <Label>URL</Label>
                   <input
