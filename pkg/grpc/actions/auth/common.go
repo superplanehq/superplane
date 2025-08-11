@@ -91,7 +91,7 @@ func FindUser(org, id, email string) (*models.User, error) {
 		return models.FindUserByID(orgID.String(), userID.String())
 	}
 
-	return models.FindUserByEmail(email, orgID.String())
+	return models.FindUserByEmail(orgID.String(), email)
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {

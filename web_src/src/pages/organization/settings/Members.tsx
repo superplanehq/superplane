@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import { AddMembersSection } from './AddMembersSection'
 import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveRole } from '../../../hooks/useOrganizationData'
 
 interface Member {
@@ -32,11 +31,11 @@ interface Member {
   avatar?: string
 }
 
-interface MembersSettingsProps {
+interface MembersProps {
   organizationId: string
 }
 
-export function MembersSettings({ organizationId }: MembersSettingsProps) {
+export function Members({ organizationId }: MembersProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null
@@ -150,9 +149,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
     }
   }
 
-  const handleMemberAdded = () => {
-    // No need to manually refresh - React Query will handle cache invalidation
-  }
 
   return (
     <div className="space-y-6 pt-6">
@@ -161,11 +157,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
           Members
         </Heading>
       </div>
-
-      <AddMembersSection
-        organizationId={organizationId}
-        onMemberAdded={handleMemberAdded}
-      />
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">

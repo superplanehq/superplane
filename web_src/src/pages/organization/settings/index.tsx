@@ -2,14 +2,15 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useEffect } from 'react'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
-import { GeneralSettings } from './GeneralSettings'
-import { MembersSettings } from './MembersSettings'
-import { GroupsSettings } from './GroupsSettings'
-import { RolesSettings } from './RolesSettings'
+import { General } from './General'
+import { Members } from './Members'
+import { Invitations } from './Invitations'
+import { Groups } from './Groups'
+import { Roles } from './Roles'
 import { GroupMembersPage } from './GroupMembersPage'
 import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
-import { ProfileSettings } from './ProfileSettings'
+import { Profile } from './Profile'
 import { useOrganization } from '../../../hooks/useOrganizationData'
 import { useUserStore } from '../../../stores/userStore'
 
@@ -65,6 +66,7 @@ export function OrganizationSettings() {
     { id: 'profile', label: 'Profile', icon: 'person' },
     { id: 'general', label: 'General', icon: 'settings' },
     { id: 'members', label: 'Members', icon: 'group' },
+    { id: 'invitations', label: 'Invitations', icon: 'mail' },
     { id: 'groups', label: 'Groups', icon: 'group' },
     { id: 'roles', label: 'Roles', icon: 'admin_panel_settings' }
   ]
@@ -128,21 +130,22 @@ export function OrganizationSettings() {
               <Route path="" element={<Navigate to="general" replace />} />
               <Route path="general" element={
                 organization ? (
-                  <GeneralSettings organization={organization} />
+                  <General organization={organization} />
                 ) : (
                   <div className="flex justify-center items-center h-32">
                     <p className="text-zinc-500 dark:text-zinc-400">Loading...</p>
                   </div>
                 )
               } />
-              <Route path="members" element={<MembersSettings organizationId={user?.organization_id || ''} />} />
-              <Route path="groups" element={<GroupsSettings organizationId={user?.organization_id || ''} />} />
-              <Route path="roles" element={<RolesSettings organizationId={user?.organization_id || ''} />} />
+              <Route path="members" element={<Members organizationId={user?.organization_id || ''} />} />
+              <Route path="invitations" element={<Invitations organizationId={user?.organization_id || ''} />} />
+              <Route path="groups" element={<Groups organizationId={user?.organization_id || ''} />} />
+              <Route path="roles" element={<Roles organizationId={user?.organization_id || ''} />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />
               <Route path="create-role/:roleName" element={<CreateRolePage />} />
-              <Route path="profile" element={<ProfileSettings />} />
+              <Route path="profile" element={<Profile />} />
               <Route path="api_token" element={<div className="pt-6"><h1 className="text-2xl font-semibold">API Token</h1><p>API token management coming soon...</p></div>} />
               <Route path="billing" element={<div className="pt-6"><h1 className="text-2xl font-semibold">Billing & Plans</h1><p>Billing management coming soon...</p></div>} />
             </Routes>

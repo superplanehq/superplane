@@ -26,11 +26,11 @@ import { useOrganizationGroups, useOrganizationRoles, useUpdateGroup, useDeleteG
 import debounce from 'lodash.debounce'
 import { formatRelativeTime } from '@/pages/canvas/utils/stageEventUtils'
 
-interface GroupsSettingsProps {
+interface GroupsProps {
   organizationId: string
 }
 
-export function GroupsSettings({ organizationId }: GroupsSettingsProps) {
+export function Groups({ organizationId }: GroupsProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{

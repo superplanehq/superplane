@@ -4,7 +4,7 @@ import { Text } from '../../../components/Text/text';
 import { Heading } from '../../../components/Heading/heading';
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol';
 
-export function ProfileSettings() {
+export function Profile() {
   const { user, loading, error } = useUserStore();
 
   if (loading) {

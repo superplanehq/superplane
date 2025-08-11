@@ -22,12 +22,12 @@ import {
 import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
 import { RolesRole } from '../../../api-client/types.gen'
 
-interface RolesSettingsProps {
+interface RolesProps {
   organizationId: string
 }
 
 
-export function RolesSettings({ organizationId }: RolesSettingsProps) {
+export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{

@@ -8,11 +8,11 @@ import type { OrganizationsOrganization } from '../../../api-client/types.gen'
 import { useParams } from 'react-router-dom'
 import { Textarea } from '@/components/Textarea/textarea'
 
-interface GeneralSettingsProps {
+interface GeneralProps {
   organization: OrganizationsOrganization
 }
 
-export function GeneralSettings({ organization }: GeneralSettingsProps) {
+export function General({ organization }: GeneralProps) {
   const { orgId } = useParams<{ orgId: string }>()
   const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)

@@ -25,7 +25,7 @@ func CreateInvitation(ctx context.Context, orgID string, email string) (*pb.Crea
 	//
 	// Check if user already exists in organization
 	//
-	_, err := models.FindUserByEmail(email, orgID)
+	_, err := models.FindUserByEmail(orgID, email)
 	if err == nil {
 		return nil, status.Error(codes.AlreadyExists, "user is already a member of the organization")
 	}
