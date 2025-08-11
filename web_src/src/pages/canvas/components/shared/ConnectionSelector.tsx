@@ -1,6 +1,7 @@
 import { SuperplaneConnection, SuperplaneConnectionType, SuperplaneFilter } from '@/api-client/types.gen';
 import { ValidationField } from './ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
@@ -90,12 +91,6 @@ export function ConnectionSelector({
         <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
-            <button
-              onClick={() => onFilterAdd(index)}
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-            >
-              + Add Filter
-            </button>
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => (
@@ -161,6 +156,13 @@ export function ConnectionSelector({
               </div>
             ))}
           </div>
+          <button
+            onClick={() => onFilterAdd(index)}
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <MaterialSymbol name="add" size="sm" />
+            Add Filter
+          </button>
         </div>
       )}
     </div>

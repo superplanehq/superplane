@@ -657,24 +657,15 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                   isEditing={inputsEditor.editingIndex === index}
                   onSave={inputsEditor.saveEdit}
                   onCancel={() => inputsEditor.cancelEdit(index, (item) => {
-                    // Remove if completely empty
                     if (!item.name || item.name.trim() === '') {
                       return true;
                     }
 
-                    // Check if this is a new unsaved input (doesn't exist in originalData)
                     const isNewInput = index >= originalData.inputs.length ||
                       !originalData.inputs[index] ||
                       originalData.inputs[index].name !== item.name;
 
-                    if (isNewInput) {
-                      // For new inputs, remove if they have validation errors or are incomplete
-                      const errors = validateInput(item, index);
-                      return errors.length > 0;
-                    }
-
-                    // For existing inputs, keep them even on cancel (just exit edit mode)
-                    return false;
+                    return isNewInput;
                   })}
                   onEdit={() => inputsEditor.startEdit(index)}
                   onDelete={() => {
@@ -749,19 +740,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
                         <div className="flex justify-between items-center mb-3">
                           <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Input Mappings</label>
-                          <button
-                            onClick={() => {
-                              // Add a new mapping for this specific input
-                              const newMapping = {
-                                when: { triggeredBy: { connection: '' } },
-                                values: [{ name: input.name, value: '' }]
-                              };
-                              setInputMappings(prev => [...prev, newMapping]);
-                            }}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                          >
-                            + Add Mapping
-                          </button>
+
                         </div>
 
                         <div className="space-y-3">
@@ -944,13 +923,21 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                             );
                           })}
                         </div>
-
-                        {inputMappingsForInput.length === 0 && (
-                          <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
-                            No input mappings configured. Click "Add Mapping" to start.
-                          </div>
-                        )}
                       </div>
+                      <button
+                        onClick={() => {
+                          // Add a new mapping for this specific input
+                          const newMapping = {
+                            when: { triggeredBy: { connection: '' } },
+                            values: [{ name: input.name, value: '' }]
+                          };
+                          setInputMappings(prev => [...prev, newMapping]);
+                        }}
+                        className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                      >
+                        <MaterialSymbol name="add" size="sm" />
+                        Add Mapping
+                      </button>
                     </div>
                   }
                 />
@@ -992,11 +979,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     !originalData.outputs[index] ||
                     originalData.outputs[index].name !== item.name;
 
-                  if (isNewOutput) {
-                    return true;
-                  }
-
-                  return false;
+                  return isNewOutput;
                 })}
                 onEdit={() => outputsEditor.startEdit(index)}
                 onDelete={() => outputsEditor.removeItem(index)}
@@ -1078,18 +1061,10 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     return true;
                   }
 
-                  // Check if this is a new unsaved condition
                   const isNewCondition = index >= originalData.conditions.length ||
                     !originalData.conditions[index];
 
-                  if (isNewCondition) {
-                    // For new conditions, remove if they have validation errors
-                    const errors = validateCondition(item);
-                    return errors.length > 0;
-                  }
-
-                  // For existing conditions, keep them even on cancel
-                  return false;
+                  return isNewCondition;
                 })}
                 onEdit={() => conditionsEditor.startEdit(index)}
                 onDelete={() => conditionsEditor.removeItem(index)}
@@ -1219,7 +1194,16 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
               <InlineEditor
                 isEditing={secretsEditor.editingIndex === index}
                 onSave={secretsEditor.saveEdit}
-                onCancel={() => secretsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
+                onCancel={() => secretsEditor.cancelEdit(index, (item) => {
+                  if (!item.name || item.name.trim() === '') {
+                    return true;
+                  }
+
+                  const isNewSecret = index >= originalData.secrets.length ||
+                    !originalData.secrets[index];
+
+                  return isNewSecret;
+                })}
                 onEdit={() => secretsEditor.startEdit(index)}
                 onDelete={() => secretsEditor.removeItem(index)}
                 displayName={secret.name || `Secret ${index + 1}`}
@@ -1513,12 +1497,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 <Field>
                   <div className="flex justify-between items-center mb-2">
                     <Label>Parameters</Label>
-                    <button
-                      onClick={addExecutorParameter}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                    >
-                      + Add Parameter
-                    </button>
                   </div>
                   <div className="space-y-2">
                     {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
@@ -1547,6 +1525,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     ))}
                   </div>
                 </Field>
+                <button
+                  onClick={addExecutorParameter}
+                  className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <MaterialSymbol name="add" size="sm" />
+                  Add Parameter
+                </button>
               </div>
             )}
 
@@ -1611,12 +1596,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 <Field>
                   <div className="flex justify-between items-center mb-2">
                     <Label>Inputs</Label>
-                    <button
-                      onClick={addExecutorInput}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
-                    >
-                      + Add Input
-                    </button>
+
                   </div>
                   <div className="space-y-2">
                     {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value], index) => (
@@ -1645,6 +1625,13 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                     ))}
                   </div>
                 </Field>
+                <button
+                  onClick={addExecutorInput}
+                  className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                >
+                  <MaterialSymbol name="add" size="sm" />
+                  Add Input
+                </button>
               </div>
             )}
 
@@ -1683,19 +1670,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 <Field>
                   <div className="flex justify-between items-center mb-2">
                     <Label>Headers</Label>
-                    <button
-                      onClick={() => {
-                        const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                        const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
-                        updateExecutorField('headers', {
-                          ...currentHeaders,
-                          [newKey]: ''
-                        });
-                      }}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                    >
-                      + Add Header
-                    </button>
                   </div>
                   <div className="space-y-2">
                     {Object.entries((executor.spec?.headers as Record<string, string>) || {}).map(([key, value]) => (
@@ -1742,6 +1716,20 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                       </div>
                     ))}
                   </div>
+                  <button
+                    onClick={() => {
+                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                      const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
+                      updateExecutorField('headers', {
+                        ...currentHeaders,
+                        [newKey]: ''
+                      });
+                    }}
+                    className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                  >
+                    <MaterialSymbol name="add" size="sm" />
+                    Add Header
+                  </button>
                 </Field>
 
                 <Field>
