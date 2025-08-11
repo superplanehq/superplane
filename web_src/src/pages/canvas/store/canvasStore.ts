@@ -296,9 +296,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ handleDragging: data });
   },
 
-  // Initialization with default properties
-  fitViewNode: () => {
-    // Will be replaced when setReactFlowInstance is called
+  // Flow instance reference
+  fitViewNodeRef: null as ((nodeId: string) => void) | null,
+  
+  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => {
+    set({ fitViewNodeRef: fitViewNodeFn });
+  },
+
+  fitViewNode: (nodeId: string) => {
+    const { fitViewNodeRef } = get();
+    if (fitViewNodeRef) {
+      fitViewNodeRef(nodeId);
+    }
   },
 
   updateEventSourceKey: (eventSourceId: string, key: string) => {

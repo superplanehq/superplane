@@ -236,7 +236,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
                 className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
                   }`}
                 isEditMode={isEditMode}
-                autoFocus={!!isNewNode && !props.data.name}
+                autoFocus={!!isNewNode}
                 dataTestId="event-source-name-input"
               />
               {nameError && isEditMode && (

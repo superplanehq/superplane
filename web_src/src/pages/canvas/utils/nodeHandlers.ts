@@ -11,7 +11,7 @@ export const useNodeHandlers = (canvasId: string) => {
   /**
    * Handles adding a new node of the specified type
    */
-  const handleAddNode = (nodeType: NodeType, customParams?: Partial<CreateNodeParams>) => {
+  const handleAddNode = (nodeType: NodeType, customParams?: Partial<CreateNodeParams>): string => {
     const params: CreateNodeParams = {
       canvasId,
       ...customParams
@@ -22,7 +22,7 @@ export const useNodeHandlers = (canvasId: string) => {
         case 'stage': {
           const stage = createEmptyNode('stage', params);
           addStage(stage, true); // true = draft mode
-          break;
+          return stage.metadata?.id || '';
         }
         
         case 'event_source': {
@@ -34,13 +34,13 @@ export const useNodeHandlers = (canvasId: string) => {
             eventSourceType: params.eventSourceType,
           };
           addEventSource(eventSourceWithEvents);
-          break;
+          return eventSource.metadata?.id || '';
         }
         
         case 'connection_group': {
           const connectionGroup = createEmptyNode('connection_group', params);
           addConnectionGroup(connectionGroup);
-          break;
+          return connectionGroup.metadata?.id || '';
         }
         
         default:

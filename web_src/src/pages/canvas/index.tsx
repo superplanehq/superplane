@@ -19,7 +19,7 @@ export function Canvas() {
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -178,7 +178,12 @@ export function Canvas() {
   const handleAddNodeByType = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
-      handleAddNode(nodeType, config);
+      const nodeId = handleAddNode(nodeType, config);
+      
+      // Focus on the newly added node after a short delay to allow the layout to update
+      setTimeout(() => {
+        fitViewNode(nodeId);
+      }, 100);
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
     }

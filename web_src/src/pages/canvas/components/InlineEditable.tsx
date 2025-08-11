@@ -32,8 +32,11 @@ export function InlineEditable({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+      // Required to ensure the input is focused after the component is mounted
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 100);
     }
   }, [isEditing]);
 

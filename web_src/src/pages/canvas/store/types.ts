@@ -60,6 +60,8 @@ export interface CanvasState {
   // flow actions
   syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
   fitViewNode: (nodeId: string) => void;
+  fitViewNodeRef: ((nodeId: string) => void) | null;
+  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => void;
   onNodesChange: OnNodesChange<AllNodeType>;
   onEdgesChange: OnEdgesChange<EdgeType>;
   onConnect: (connection: Connection) => void;

@@ -26,10 +26,16 @@ export const FlowRenderer: React.FC = () => {
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
   const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
+  const fitViewNode = useCanvasStore((state) => state.fitViewNode);
+  const setFitViewNodeRef = useCanvasStore((state) => state.setFitViewNodeRef);
   const [lockedNodes, setLockedNodes] = useState(false);
 
   const { applyElkAutoLayout } = useAutoLayout();
-  const { onNodeDragStop, onInit } = useFlowHandlers();
+  const { onNodeDragStop, onInit, fitViewToNode } = useFlowHandlers();
+
+  React.useEffect(() => {
+    setFitViewNodeRef(fitViewToNode);
+  }, [fitViewToNode, setFitViewNodeRef]);
 
   const animatedEdges = useMemo(() => {
     const runningEdges = new Set<string>();
@@ -65,7 +71,8 @@ export const FlowRenderer: React.FC = () => {
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={(_, node) => {
-          setFocusedNodeId(node.id)
+          setFocusedNodeId(node.id);
+          fitViewNode(node.id);
         }}
         onNodeDrag={(_, node) => {
           setFocusedNodeId(node.id)

@@ -252,13 +252,13 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       console.error(`Failed to ${isNewStage ? 'create' : 'update'} stage:`, apiError);
 
       console.error('API Error:', apiError);
-      
+
       // Call the API error handler if available
       const handleStageApiError = (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
       if (handleStageApiError) {
         handleStageApiError(apiError.message);
       }
-      
+
       return;
     }
 
@@ -431,7 +431,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 w-full ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
                   }`}
                 isEditMode={isEditMode}
-                autoFocus={!!isNewNode && !props.data.label}
+                autoFocus={!!isNewNode}
                 dataTestId="stage-name-input"
               />
               {nameError && isEditMode && (
