@@ -19,19 +19,16 @@ func Test__AuthService_BasicPermissions(t *testing.T) {
 	orgID := r.Organization.ID.String()
 
 	t.Run("user without roles has no permissions", func(t *testing.T) {
-		allowedOrg, err := r.AuthService.CheckOrganizationPermission(userID, orgID, "canvas", "read")
+		allowedOrg, err := r.AuthService.CheckOrganizationPermission(uuid.NewString(), orgID, "canvas", "read")
 		require.NoError(t, err)
 		assert.False(t, allowedOrg)
 
-		allowedCanvas, err := r.AuthService.CheckCanvasPermission(userID, canvasID, "stage", "read")
+		allowedCanvas, err := r.AuthService.CheckCanvasPermission(uuid.NewString(), canvasID, "stage", "read")
 		require.NoError(t, err)
 		assert.False(t, allowedCanvas)
 	})
 
 	t.Run("canvas owner has all permissions", func(t *testing.T) {
-		err := r.AuthService.AssignRole(userID, models.RoleCanvasOwner, canvasID, models.DomainTypeCanvas)
-		require.NoError(t, err)
-
 		roles, err := r.AuthService.GetUserRolesForCanvas(userID, canvasID)
 		require.NoError(t, err)
 		flatRoles := make(map[string]bool)
@@ -392,15 +389,15 @@ func Test__AuthService_AccessibleResources(t *testing.T) {
 	t.Run("get accessible organizations", func(t *testing.T) {
 		orgs, err := r.AuthService.GetAccessibleOrgsForUser(r.User.String())
 		require.NoError(t, err)
-		assert.Contains(t, orgs, org1)
-		assert.Contains(t, orgs, org2)
+		assert.Contains(t, orgs, org1.ID.String())
+		assert.Contains(t, orgs, org2.ID.String())
 	})
 
 	t.Run("get accessible canvases", func(t *testing.T) {
 		canvases, err := r.AuthService.GetAccessibleCanvasesForUser(r.User.String())
 		require.NoError(t, err)
-		assert.Contains(t, canvases, canvas1)
-		assert.Contains(t, canvases, canvas2)
+		assert.Contains(t, canvases, canvas1.ID.String())
+		assert.Contains(t, canvases, canvas2.ID.String())
 	})
 }
 
