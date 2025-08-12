@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCanvasStore } from '../store/canvasStore';
 import GithubLogo from '@/assets/github-mark.svg';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
@@ -49,8 +49,21 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
   className = '',
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [hideComingSoon, setHideComingSoon] = useState(false);
+  const [hideComingSoon, setHideComingSoon] = useState<boolean>(true);
   const [showConfigPanel, setShowConfigPanel] = useState(false);
+
+  useEffect(() => {
+    const storedHideComingSoon = localStorage.getItem('hideComingSoon');
+    if (storedHideComingSoon !== null) {
+      setHideComingSoon(JSON.parse(storedHideComingSoon));
+    }
+  }, []);
+
+  const handleHideComingSoonToggle = () => {
+    const newValue = !hideComingSoon;
+    setHideComingSoon(newValue);
+    localStorage.setItem('hideComingSoon', JSON.stringify(newValue));
+  };
   const { eventSources } = useCanvasStore();
 
   // Check if there are any event sources in the canvas
@@ -285,7 +298,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
               <div className="flex items-center text-xs">
                 <Switch
                   checked={!hideComingSoon}
-                  onChange={() => setHideComingSoon(!hideComingSoon)}
+                  onChange={handleHideComingSoonToggle}
                   aria-label="Show coming soon components"
                   color='blue'
                 />

@@ -69,11 +69,6 @@ export function SidebarItem({
           >
             <MaterialSymbol name={disabled ? 'block' : 'add'} size="md" />
           </Button>
-          <MaterialSymbol
-            name="drag_indicator"
-            size="md"
-            className={disabled ? 'opacity-30' : 'text-black dark:text-zinc-500'}
-          />
         </div>
       )}
     </div>
