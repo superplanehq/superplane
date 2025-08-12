@@ -1,11 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef } from '@/api-client/types.gen';
-import { Link } from '@/components/Link/link';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
 import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { ValidationField } from './shared/ValidationField';
+import IntegrationZeroState from '@/components/IntegrationZeroState';
 
 interface EventSourceEditModeContentProps {
   data: EventSourceNodeType['data'];
@@ -150,6 +150,17 @@ export function EventSourceEditModeContent({
 
   const allIntegrations = [...canvasIntegrations, ...orgIntegrations];
   const availableIntegrations = allIntegrations.filter(int => int.spec?.type === eventSourceType);
+  const requireIntegration = ['semaphore', 'github'].includes(eventSourceType);
+  const zeroStateLabel = useMemo(() => {
+    switch (eventSourceType) {
+      case 'semaphore':
+        return 'Semaphore organizations';
+      case 'github':
+        return 'GitHub accounts';
+      default:
+        return `${eventSourceType} integrations`;
+    }
+  }, [eventSourceType]);
 
   const normalizeSpecForComparison = (spec: SuperplaneEventSourceSpec) => {
     return {
@@ -291,8 +302,13 @@ export function EventSourceEditModeContent({
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className="">
+        {requireIntegration && availableIntegrations.length === 0 && (
+          <IntegrationZeroState integrationType={eventSourceType} label={zeroStateLabel} />
+        )}
+
+
         {/* Configuration Section */}
-        {eventSourceType === 'semaphore' && (
+        {availableIntegrations.length > 0 && eventSourceType === 'semaphore' && (
           <EditableAccordionSection
             id="integration"
             title="Semaphore Configuration"
@@ -324,13 +340,6 @@ export function EventSourceEditModeContent({
                   ))}
                 </select>
               </ValidationField>
-
-              {availableIntegrations.length === 0 && (
-                <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                  No Semaphore integrations available. Create one first in the &nbsp;
-                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#integrations`}>canvas settings</Link>.
-                </div>
-              )}
 
               {(selectedIntegration || combinedErrors.resourceName) && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
@@ -367,7 +376,7 @@ export function EventSourceEditModeContent({
           </EditableAccordionSection>
         )}
 
-        {eventSourceType === 'github' && (
+        {availableIntegrations.length > 0 && eventSourceType === 'github' && (
           <EditableAccordionSection
             id="integration"
             title="GitHub Configuration"
@@ -399,13 +408,6 @@ export function EventSourceEditModeContent({
                   ))}
                 </select>
               </ValidationField>
-
-              {availableIntegrations.length === 0 && (
-                <div className="text-sm text-zinc-500 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                  No GitHub integrations available. Create one first in the &nbsp;
-                  <Link className="text-blue-600 hover:underline" href={`/organization/${organizationId}/canvas/${canvasId}#integrations`}>canvas settings</Link>.
-                </div>
-              )}
 
               {(selectedIntegration || combinedErrors.resourceName) && (
                 <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
