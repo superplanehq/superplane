@@ -36,6 +36,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const [apiError, setApiError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
+  const [shouldValidateFields, setShouldValidateFields] = useState(false);
+  const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
   const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
@@ -80,6 +82,38 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
 
     if (!validateEventSourceName(eventSourceName)) {
+      return;
+    }
+
+    // Trigger field validation
+    setValidationPassed(null); // Reset validation state
+    setShouldValidateFields(true);
+    
+    // Reset validation trigger after a short delay and wait for validation result
+    setTimeout(() => {
+      setShouldValidateFields(false);
+      
+      // Wait for validation result to be set
+      setTimeout(() => {
+        // For webhook event sources, validation is not required
+        const isWebhook = eventSourceType === 'webhook';
+        
+        if (isWebhook) {
+          // Webhooks don't require field validation, proceed with save
+          proceedWithSave(saveAsDraft);
+        } else {
+          // For semaphore/github sources, only proceed if validation explicitly passed
+          if (validationPassed === true) {
+            proceedWithSave(saveAsDraft);
+          }
+          // If validationPassed is false or null, don't proceed (validation failed or didn't complete)
+        }
+      }, 50);
+    }, 100);
+  };
+
+  const proceedWithSave = async (saveAsDraft = false) => {
+    if (!currentFormData || !currentEventSource) {
       return;
     }
 
@@ -285,6 +319,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           onDelete={handleDiscardEventSource}
           apiError={apiError}
+          shouldValidate={shouldValidateFields}
+          onValidationResult={setValidationPassed}
         />
       ) : (
         <>

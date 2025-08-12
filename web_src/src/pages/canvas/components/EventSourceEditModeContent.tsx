@@ -17,6 +17,8 @@ interface EventSourceEditModeContentProps {
   }) => void;
   onDelete?: () => void;
   apiError?: string | null;
+  shouldValidate?: boolean;
+  onValidationResult?: (isValid: boolean) => void;
 }
 
 export function EventSourceEditModeContent({
@@ -26,7 +28,9 @@ export function EventSourceEditModeContent({
   eventSourceType = 'webhook',
   onDataChange,
   onDelete,
-  apiError
+  apiError,
+  shouldValidate = false,
+  onValidationResult
 }: EventSourceEditModeContentProps) {
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type);
@@ -48,7 +52,7 @@ export function EventSourceEditModeContent({
     return errors;
   };
 
-  const validateAllFields = () => {
+  const validateAllFields = (setErrors?: (errors: Record<string, string>) => void) => {
     const errors: Record<string, string> = {};
 
     if (eventSourceType === 'semaphore' || eventSourceType === 'github') {
@@ -59,6 +63,10 @@ export function EventSourceEditModeContent({
       if (!resourceName || resourceName.trim() === '') {
         errors.resourceName = eventSourceType === 'semaphore' ? 'Project name is required' : 'Resource name is required';
       }
+    }
+
+    if (setErrors) {
+      setErrors(errors);
     }
 
     return Object.keys(errors).length === 0;
@@ -91,6 +99,7 @@ export function EventSourceEditModeContent({
     setOpenSections,
     originalData,
     validationErrors,
+    setValidationErrors,
     handleAccordionToggle,
     handleDataChange,
     syncWithIncomingData
@@ -106,6 +115,15 @@ export function EventSourceEditModeContent({
   });
 
   const combinedErrors = { ...validationErrors, ...apiValidationErrors };
+
+  useEffect(() => {
+    if (shouldValidate) {
+      const isValid = validateAllFields(setValidationErrors);
+      if (onValidationResult) {
+        onValidationResult(isValid);
+      }
+    }
+  }, [shouldValidate, selectedIntegration, resourceName, eventSourceType, onValidationResult]);
 
   useEffect(() => {
     setOpenSections(['general', 'integration', 'webhook']);
@@ -197,6 +215,11 @@ export function EventSourceEditModeContent({
       } else if (integration.spec?.type === 'github') {
         setResourceType('repository');
       }
+
+      setValidationErrors(prev => ({
+        ...prev,
+        integration: ''
+      }));
     }
   };
 
@@ -319,7 +342,15 @@ export function EventSourceEditModeContent({
                     <input
                       type="text"
                       value={resourceName}
-                      onChange={(e) => setResourceName(e.target.value)}
+                      onChange={(e) => {
+                        setResourceName(e.target.value);
+                        if (e.target.value.trim() !== '') {
+                          setValidationErrors(prev => ({
+                            ...prev,
+                            resourceName: ''
+                          }));
+                        }
+                      }}
                       placeholder="my-semaphore-project"
                       className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
                         ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
@@ -386,7 +417,15 @@ export function EventSourceEditModeContent({
                     <input
                       type="text"
                       value={resourceName}
-                      onChange={(e) => setResourceName(e.target.value)}
+                      onChange={(e) => {
+                        setResourceName(e.target.value);
+                        if (e.target.value.trim() !== '') {
+                          setValidationErrors(prev => ({
+                            ...prev,
+                            resourceName: ''
+                          }));
+                        }
+                      }}
                       placeholder="my-repository"
                       className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
                         ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
