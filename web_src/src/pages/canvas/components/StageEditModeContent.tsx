@@ -229,6 +229,12 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       }
     });
 
+
+    if (connections.length === 0) {
+      errors.connections = 'At least one connection is required';
+    }
+
+
     secrets.forEach((secret, index) => {
       const secretErrors = validateSecret(secret, index);
       if (secretErrors.length > 0) {
@@ -254,12 +260,50 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       }
     });
 
-    // Validate executor
-    if (executor.type && executor.type !== '') {
+    // Comprehensive executor validation
+    if (!executor.type || executor.type === '') {
+      errors.executorType = 'Executor type is required';
+    } else {
+      // Validate executor spec exists
       if (!executor.spec || Object.keys(executor.spec).length === 0) {
-        errors.executor = 'Executor specification is required when executor type is set';
+        errors.executorSpec = 'Executor configuration is required';
+      } else {
+        // Type-specific validation
+        if (executor.type === 'semaphore') {
+          if (!executor.integration?.name) {
+            errors.executorIntegration = 'Semaphore integration is required';
+          }
+          if (!executor.resource?.name) {
+            errors.executorProject = 'Project name is required';
+          }
+          if (!executor.spec.branch) {
+            errors.executorBranch = 'Branch is required';
+          }
+          if (!executor.spec.pipelineFile) {
+            errors.executorPipelineFile = 'Pipeline file is required';
+          }
+        } else if (executor.type === 'github') {
+          if (!executor.integration?.name) {
+            errors.executorIntegration = 'GitHub integration is required';
+          }
+          if (!executor.resource?.name) {
+            errors.executorRepository = 'Repository name is required';
+          }
+          if (!executor.spec.workflow) {
+            errors.executorWorkflow = 'Workflow file is required';
+          }
+          if (!executor.spec.ref) {
+            errors.executorRef = 'Ref (branch/tag) is required';
+          }
+        } else if (executor.type === 'http') {
+          if (!executor.spec.url) {
+            errors.executorUrl = 'URL is required';
+          }
+        }
       }
     }
+
+    setValidationErrors(errors);
 
     return Object.keys(errors).length === 0;
   };
@@ -666,6 +710,11 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
             <MaterialSymbol name="add" size="sm" />
             Add Connection
           </button>
+          {validationErrors.connections && (
+            <div className="text-xs text-red-600 mt-1">
+              {validationErrors.connections}
+            </div>
+          )}
         </EditableAccordionSection>
 
         {/* Inputs Section */}
@@ -1775,6 +1824,11 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                 <MaterialSymbol name="add" size="sm" />
                 Add Executor Configuration
               </button>
+              {validationErrors.executorSpec && (
+                <div className="text-xs text-red-600 mt-1">
+                  {validationErrors.executorSpec}
+                </div>
+              )}
             </div>
           )}
         </EditableAccordionSection>
