@@ -1,5 +1,3 @@
-import React from 'react';
-
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -8,10 +6,10 @@ interface SwitchProps {
   'aria-label'?: string;
 }
 
-export function Switch({ 
-  checked, 
-  onChange, 
-  color = 'blue', 
+export function Switch({
+  checked,
+  onChange,
+  color = 'blue',
   className = '',
   'aria-label': ariaLabel
 }: SwitchProps) {
@@ -32,9 +30,8 @@ export function Switch({
     >
       <span
         aria-hidden="true"
-        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-          checked ? 'translate-x-4' : 'translate-x-0'
-        }`}
+        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-4' : 'translate-x-0'
+          }`}
       />
     </button>
   );
