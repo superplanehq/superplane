@@ -75,9 +75,17 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
   }
 
   const handleCreateIntegration = async () => {
-    if (!integrationName.trim() || !integrationUrl.trim()) {
+    const trimmedIntegrationName = integrationName.trim()
+    let trimmedIntegrationUrl = integrationUrl.trim()
+
+    if (!trimmedIntegrationName || !trimmedIntegrationUrl) {
       return
     }
+
+    if (trimmedIntegrationUrl.endsWith('/')) {
+      trimmedIntegrationUrl = trimmedIntegrationUrl.slice(0, -1)
+    }
+
 
     // Validate token authentication requirements
     if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
@@ -85,9 +93,9 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
     }
 
     const integrationData: CreateIntegrationParams = {
-      name: integrationName.trim(),
+      name: trimmedIntegrationName,
       type: selectedType as 'semaphore',
-      url: integrationUrl.trim(),
+      url: trimmedIntegrationUrl,
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
       tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
