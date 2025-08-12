@@ -325,7 +325,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       ) : (
         <>
           {/* Group By Section */}
-          <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
+          <div className="px-3 py-3">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
