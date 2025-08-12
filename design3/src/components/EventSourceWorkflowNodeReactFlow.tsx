@@ -566,17 +566,17 @@ export function EventSourceWorkflowNodeReactFlow({
                   </button>
                   {showGitHubPatInfo && (
                     <div className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
-                      <p>
-                        When creating a fine‑grained PAT, choose the access scope:
-                        either <strong>All repositories</strong> or select specific repositories that Canvas should access.
-                      </p>
-                      <div>
-                        <div className="font-medium">Required permissions:</div>
-                        <ul className="list-disc ml-5 mt-1 space-y-1">
-                          <li>Actions — <strong>Read and Write</strong></li>
-                          <li>Webhooks — <strong>Read and Write</strong></li>
-                        </ul>
-                      </div>
+                      <p>When creating a fine‑grained PAT</p>
+                      <div><strong>Chose the access scope:</strong></div>
+                      <ul className="list-disc ml-5 mt-1 space-y-1">
+                        <li>All repositories</li>
+                        <li>Or select specific repositories</li>
+                      </ul>
+                      <div className="mt-2"><strong>Set required permissions:</strong></div>
+                      <ul className="list-disc ml-5 mt-1 space-y-1">
+                        <li>Actions - Read AND Write</li>
+                        <li>Webhooks - Read AND Write</li>
+                      </ul>
                       <p className="text-xs text-zinc-600 dark:text-zinc-400">
                         Tip: You can manage or rotate the PAT anytime in your GitHub developer settings.
                       </p>
