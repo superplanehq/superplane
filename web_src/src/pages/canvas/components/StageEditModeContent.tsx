@@ -1514,6 +1514,9 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                           type="text"
                           value={(executor.resource?.name as string) || ''}
                           onChange={(e) => {
+                            if (executor.resource?.type !== 'project')
+                              updateExecutorResource('type', 'project');
+
                             updateExecutorResource('name', e.target.value);
                             if (fieldErrors.project) {
                               setFieldErrors(prev => {
