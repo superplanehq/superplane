@@ -40,7 +40,7 @@ export function Dialog({
           className,
           sizes[size],
           'relative w-full min-w-0 rounded-2xl bg-white p-8 shadow-lg ring-1 ring-zinc-950/10 dark:bg-zinc-900 dark:ring-white/10',
-          'max-h-[90vh] overflow-y-auto'
+          'overflow-y-auto max-h-[100vh]'
         )}
         {...props}
       >

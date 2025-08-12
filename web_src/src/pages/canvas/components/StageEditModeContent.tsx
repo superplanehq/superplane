@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
-import { useParams } from 'react-router-dom';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -19,6 +18,8 @@ import IntegrationZeroState from '@/components/IntegrationZeroState';
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
+  canvasId: string;
+  organizationId: string;
   onDataChange?: (data: {
     label: string;
     description?: string;
@@ -33,7 +34,7 @@ interface StageEditModeContentProps {
   }) => void;
 }
 
-export function StageEditModeContent({ data, currentStageId, onDataChange }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
@@ -54,9 +55,6 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   // Validation
   const { validateName } = useValidation();
 
-  // Get URL params and canvas data
-  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
-  const organizationId = orgId || '';
 
   // Fetch secrets and integrations
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
@@ -664,7 +662,12 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       <div className="">
         {/* Show zero state if executor type requires integrations but none are available */}
         {requireIntegration && !hasRequiredIntegrations && (
-          <IntegrationZeroState integrationType={executor?.type || ''} label={getZeroStateLabel()} />
+          <IntegrationZeroState 
+            integrationType={executor?.type || ''} 
+            label={getZeroStateLabel()} 
+            canvasId={canvasId}
+            organizationId={organizationId}
+          />
         )}
 
         {/* Form sections - only show if integrations are available or not required */}

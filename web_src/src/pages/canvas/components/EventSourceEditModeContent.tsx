@@ -202,6 +202,24 @@ export function EventSourceEditModeContent({
     }
   }, [selectedIntegration, resourceType, resourceName, eventSourceType, onDataChange, handleDataChange]);
 
+  // Auto-select first integration when integrations become available
+  useEffect(() => {
+    if (availableIntegrations.length > 0 && !selectedIntegration && requireIntegration) {
+      const firstIntegration = availableIntegrations[0];
+      setSelectedIntegration({
+        name: firstIntegration.metadata?.name,
+        domainType: firstIntegration.metadata?.domainType
+      });
+
+      // Set default resource type based on integration type
+      if (firstIntegration.spec?.type === 'semaphore') {
+        setResourceType('project');
+      } else if (firstIntegration.spec?.type === 'github') {
+        setResourceType('repository');
+      }
+    }
+  }, [availableIntegrations, selectedIntegration, requireIntegration]);
+
   const revertSection = (section: string) => {
     switch (section) {
       case 'integration':
@@ -303,7 +321,12 @@ export function EventSourceEditModeContent({
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className="">
         {requireIntegration && availableIntegrations.length === 0 && (
-          <IntegrationZeroState integrationType={eventSourceType} label={zeroStateLabel} />
+          <IntegrationZeroState
+            integrationType={eventSourceType}
+            label={zeroStateLabel}
+            canvasId={canvasId}
+            organizationId={organizationId}
+          />
         )}
 
 

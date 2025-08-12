@@ -234,7 +234,7 @@ export function Canvas() {
   return (
     <StrictMode>
       {/* Canvas Navigation */}
-      <div className="h-[100vh]">
+      <div className="h-[100vh] overflow-hidden">
 
         <CanvasNavigation
           canvasName={canvasName}

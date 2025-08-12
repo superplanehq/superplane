@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,50 +8,211 @@ import {
   DialogActions,
 } from '../Dialog/dialog';
 import { Button } from '../Button/button';
+import { MaterialSymbol } from '../MaterialSymbol/material-symbol';
+import { Link } from '../Link/link';
+import { useIntegrations, useCreateIntegration } from '../../pages/canvas/hooks/useIntegrations';
+import { useSecrets, useCreateSecret } from '../../pages/canvas/hooks/useSecrets';
+import { GitHubIntegrationForm } from './GitHubIntegrationForm';
+import { SemaphoreIntegrationForm } from './SemaphoreIntegrationForm';
+import { ApiTokenForm } from './ApiTokenForm';
+import { useIntegrationForm } from './useIntegrationForm';
 
 interface IntegrationModalProps {
   open: boolean;
   onClose: () => void;
   integrationType: string;
+  canvasId: string;
+  organizationId: string;
+  onSuccess?: (integrationId: string) => void;
 }
 
-export function IntegrationModal({ open, onClose, integrationType }: IntegrationModalProps) {
-  const getIntegrationDisplayName = () => {
-    switch (integrationType) {
-      case 'semaphore':
-        return 'Semaphore';
-      case 'github':
-        return 'GitHub';
-      default:
-        return integrationType;
+
+export function IntegrationModal({
+  open,
+  onClose,
+  integrationType,
+  canvasId,
+  organizationId: organizationId,
+  onSuccess
+}: IntegrationModalProps) {
+  const [isCreating, setIsCreating] = useState(false);
+  const orgUrlRef = useRef<HTMLInputElement>(null);
+
+  const { data: integrations = [] } = useIntegrations(canvasId, "DOMAIN_TYPE_CANVAS");
+  const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS");
+  const createIntegrationMutation = useCreateIntegration(canvasId, "DOMAIN_TYPE_CANVAS");
+  const createSecretMutation = useCreateSecret(canvasId, "DOMAIN_TYPE_CANVAS");
+
+  const {
+    integrationData,
+    setIntegrationData,
+    apiTokenTab,
+    setApiTokenTab,
+    newSecretName,
+    setNewSecretName,
+    newSecretToken,
+    setNewSecretToken,
+    errors,
+    setErrors,
+    validateForm,
+    resetForm,
+    config
+  } = useIntegrationForm({ integrationType, integrations });
+
+  useEffect(() => {
+    if (open && orgUrlRef.current) {
+      setTimeout(() => {
+        orgUrlRef.current?.focus();
+      }, 100);
+    }
+  }, [open]);
+
+
+  const handleSaveIntegration = async () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      let secretName = integrationData.apiToken.secretName;
+      let secretKey = integrationData.apiToken.secretKey;
+
+      if (apiTokenTab === 'new') {
+        try {
+          const secretData = {
+            name: `${integrationData.name.trim()}-api-key`,
+            environmentVariables: [{
+              name: newSecretName,
+              value: newSecretToken
+            }]
+          };
+
+          await createSecretMutation.mutateAsync(secretData);
+          secretName = secretData.name;
+          secretKey = newSecretName;
+        } catch {
+          setErrors({ apiToken: 'Failed to create a secret, please try to create secret manually and import' });
+          return;
+        }
+      }
+
+      let trimmedUrl = integrationData.orgUrl.trim();
+
+      if (trimmedUrl.endsWith('/')) {
+        trimmedUrl = trimmedUrl.slice(0, -1);
+      }
+
+      const integrationPayload = {
+        name: integrationData.name.trim(),
+        type: integrationType,
+        url: trimmedUrl,
+        authType: 'AUTH_TYPE_TOKEN' as const,
+        tokenSecretName: secretName,
+        tokenSecretKey: secretKey
+      };
+
+      const result = await createIntegrationMutation.mutateAsync(integrationPayload);
+
+      onSuccess?.(result.data?.integration?.metadata?.id || '');
+      onClose();
+      resetForm();
+    } catch (error) {
+      console.error('Failed to create integration:', error);
+    } finally {
+      setIsCreating(false);
     }
   };
+
 
   if (!open) return null;
 
   return createPortal(
-    <Dialog open={open} onClose={() => { }} className="relative z-[9999]" size="md">
-      <DialogTitle>Create {getIntegrationDisplayName()} Integration</DialogTitle>
-      <DialogDescription>
-        Integration creation is coming soon. You'll be able to create and manage integrations directly from this modal.
+    <Dialog
+      open={open}
+      onClose={() => { }}
+      className="relative z-50"
+      size="md"
+    >
+      <DialogTitle>Create {config.displayName} Integration</DialogTitle>
+      <DialogDescription className='text-sm'>
+        New integration will be saved to integrations page. Manage integrations{' '}
+        <Link href={`/organization/${organizationId}/canvas/${canvasId}#integrations`} className='text-blue-600 dark:text-blue-400'> here</Link>.
       </DialogDescription>
 
       <DialogBody className="space-y-6">
-        <div className="rounded-md border border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-6">
-          <div className="text-center">
-            <div className="text-6xl mb-4">🚧</div>
-            <div className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Coming Soon
-            </div>
-            <p className="text-sm text-zinc-700 dark:text-zinc-300">
-              We're working on making integration creation seamless. For now, please create your {getIntegrationDisplayName()} integration through the integrations page.
-            </p>
-          </div>
-        </div>
+        {integrationType === 'github' ? (
+          <GitHubIntegrationForm
+            integrationData={integrationData}
+            setIntegrationData={setIntegrationData}
+            errors={errors}
+            setErrors={setErrors}
+            apiTokenTab={apiTokenTab}
+            setApiTokenTab={setApiTokenTab}
+            newSecretName={newSecretName}
+            setNewSecretName={setNewSecretName}
+            newSecretToken={newSecretToken}
+            setNewSecretToken={setNewSecretToken}
+            secrets={secrets}
+            orgUrlRef={orgUrlRef}
+          />
+        ) : (
+          <SemaphoreIntegrationForm
+            integrationData={integrationData}
+            setIntegrationData={setIntegrationData}
+            errors={errors}
+            setErrors={setErrors}
+            apiTokenTab={apiTokenTab}
+            setApiTokenTab={setApiTokenTab}
+            newSecretName={newSecretName}
+            setNewSecretName={setNewSecretName}
+            newSecretToken={newSecretToken}
+            setNewSecretToken={setNewSecretToken}
+            secrets={secrets}
+            orgUrlRef={orgUrlRef}
+          />
+        )}
+
+        <ApiTokenForm
+          integrationData={integrationData}
+          setIntegrationData={setIntegrationData}
+          errors={errors}
+          setErrors={setErrors}
+          apiTokenTab={apiTokenTab}
+          setApiTokenTab={setApiTokenTab}
+          newSecretName={newSecretName}
+          setNewSecretName={setNewSecretName}
+          newSecretToken={newSecretToken}
+          setNewSecretToken={setNewSecretToken}
+          secrets={secrets}
+          orgUrlRef={orgUrlRef}
+          organizationId={organizationId}
+          canvasId={canvasId}
+        />
       </DialogBody>
 
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          onClick={onClose}
+          disabled={isCreating}
+        >
+          Cancel
+        </Button>
+        <Button
+          color='blue'
+          onClick={handleSaveIntegration}
+          disabled={isCreating}
+        >
+          {isCreating ? (
+            <>
+              <MaterialSymbol name="progress_activity" className="animate-spin" size="sm" />
+              Creating...
+            </>
+          ) : (
+            'Create'
+          )}
+        </Button>
       </DialogActions>
     </Dialog>,
     document.body

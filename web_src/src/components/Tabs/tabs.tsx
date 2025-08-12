@@ -1,5 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import clsx from 'clsx'
+import Tippy from '@tippyjs/react'
+import 'tippy.js/dist/tippy.css'
 
 export interface Tab {
   id: string
@@ -7,6 +9,7 @@ export interface Tab {
   icon?: React.ReactNode
   count?: number
   disabled?: boolean
+  disabledTooltip?: string
 }
 
 export interface TabsProps {
@@ -15,6 +18,7 @@ export interface TabsProps {
   onTabChange?: (tabId: string) => void
   className?: string
   variant?: 'default' | 'pills' | 'underline' | 'dark-underline'
+  buttonClasses?: string
 }
 
 export interface TabsState {
@@ -41,15 +45,15 @@ export function Tabs({
   defaultTab,
   onTabChange,
   className,
-  variant = 'default'
+  variant = 'default',
+  buttonClasses
 }: TabsProps) {
   const [activeTab, setActiveTab] = useState(defaultTab || tabs[0]?.id || '')
 
   const handleTabClick = useCallback((tabId: string) => {
-    if (tabs.find(tab => tab.id === tabId)?.disabled) return
     setActiveTab(tabId)
     onTabChange?.(tabId)
-  }, [tabs, onTabChange])
+  }, [onTabChange])
 
   const baseClasses = clsx(
     'w-full',
@@ -78,6 +82,7 @@ export function Tabs({
             activeTab={activeTab}
             onClick={handleTabClick}
             variant={variant}
+            buttonClasses={buttonClasses}
           />
         ))}
       </nav>
@@ -89,12 +94,14 @@ function TabItem({
   tab,
   activeTab,
   onClick,
-  variant
+  variant,
+  buttonClasses: additionalButtonClasses
 }: {
   tab: Tab
   activeTab: string
   onClick: (tabId: string) => void
   variant: 'default' | 'pills' | 'underline' | 'dark-underline'
+  buttonClasses?: string
 }) {
   const isActive = activeTab === tab.id
   const isDisabled = tab.disabled
@@ -107,6 +114,7 @@ function TabItem({
 
   const buttonClasses = clsx(
     'relative flex items-center gap-2 font-medium text-sm transition-all duration-200 ease-in-out focus:outline-hidden',
+    additionalButtonClasses,
     {
       'px-2 py-3 border-b-2 border-transparent': variant === 'default',
       'text-blue-600 border-blue-500 dark:text-blue-400': variant === 'default' && isActive,
@@ -127,7 +135,7 @@ function TabItem({
     }
   )
 
-  return (
+  const tabButton = (
     <button
       type="button"
       className={buttonClasses}
@@ -140,7 +148,7 @@ function TabItem({
           {tab.icon}
         </span>
       )}
-      <span className="leading-none whitespace-nowrap">
+      <span className="leading-none whitespace-nowrap text-center w-full">
         {tab.label}
       </span>
       {tab.count && tab.count > 0 && (
@@ -159,6 +167,20 @@ function TabItem({
       )}
     </button>
   )
+
+  // Wrap with Tippy if disabled and tooltip is provided
+  if (isDisabled && tab.disabledTooltip) {
+    return (
+      <Tippy
+        content={tab.disabledTooltip}
+        placement="top"
+      >
+        {tabButton}
+      </Tippy>
+    )
+  }
+
+  return tabButton
 }
 
 export function ControlledTabs({
@@ -166,18 +188,19 @@ export function ControlledTabs({
   activeTab,
   onTabChange,
   className,
-  variant = 'default'
+  variant = 'default',
+  buttonClasses
 }: {
   tabs: Tab[]
   activeTab: string
   onTabChange: (tabId: string) => void
   className?: string
-  variant?: 'default' | 'pills' | 'underline' | 'dark-underline'
+  variant?: 'default' | 'pills' | 'underline' | 'dark-underline',
+  buttonClasses?: string
 }) {
   const handleTabClick = useCallback((tabId: string) => {
-    if (tabs.find(tab => tab.id === tabId)?.disabled) return
     onTabChange(tabId)
-  }, [tabs, onTabChange])
+  }, [onTabChange])
 
   const baseClasses = clsx(
     'w-full h-full',
@@ -206,6 +229,7 @@ export function ControlledTabs({
             activeTab={activeTab}
             onClick={handleTabClick}
             variant={variant}
+            buttonClasses={buttonClasses}
           />
         ))}
       </nav>

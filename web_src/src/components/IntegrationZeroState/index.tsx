@@ -5,9 +5,12 @@ import { IntegrationModal } from "./IntegrationModal";
 interface IntegrationZeroStateProps {
   integrationType: string;
   label: string;
+  canvasId: string;
+  organizationId: string;
+  onSuccess?: (integrationId: string) => void;
 }
 
-const IntegrationZeroState = ({ integrationType, label }: IntegrationZeroStateProps) => {
+const IntegrationZeroState = ({ integrationType, label, canvasId, organizationId, onSuccess }: IntegrationZeroStateProps) => {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -23,6 +26,9 @@ const IntegrationZeroState = ({ integrationType, label }: IntegrationZeroStatePr
         open={showModal}
         onClose={() => setShowModal(false)}
         integrationType={integrationType}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        onSuccess={onSuccess}
       />
     </>
   );
