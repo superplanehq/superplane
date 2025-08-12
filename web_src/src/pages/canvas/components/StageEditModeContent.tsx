@@ -1644,7 +1644,12 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                         <input
                           type="text"
                           value={(executor.resource?.name as string) || ''}
-                          onChange={(e) => updateExecutorResource('name', e.target.value)}
+                          onChange={(e) => {
+                            if (executor.resource?.type !== 'repository')
+                              updateExecutorResource('type', 'repository');
+
+                            updateExecutorResource('name', e.target.value)
+                          }}
                           placeholder="my-repository"
                           className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                         />
