@@ -85,9 +85,15 @@ export function EventSourceWorkflowNodeReactFlow({
     value: ''
   });
   
+  // Derived: currently selected existing secret (if any)
+  const selectedExistingSecret = secrets.find(
+    (s) => s.name === integrationData.apiToken.secretName
+  );
+  
   // API Token tabs state
   const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new');
   const [newSecretToken, setNewSecretToken] = useState('');
+  const [showGitHubPatInfo, setShowGitHubPatInfo] = useState(false);
   
   // Selected integration state
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
@@ -234,7 +240,9 @@ export function EventSourceWorkflowNodeReactFlow({
           <div className="flex items-center gap-3">
            
               {data.icon === 'semaphore' ? (
-                <img width={24} height={24} src='https://semaphoreci.com/favicon.ico' alt="Semaphore" />
+                <img width={24} height={24} src='/images/semaphore-logo-sign-black.svg' alt="Semaphore" />
+              ) : data.icon === 'github' ? (
+                <img width={24} height={24} src='/images/github-logo.svg' alt="GitHub" />
               ) : (
                 <img width={24} height={24} src='https://upload.wikimedia.org/wikipedia/commons/3/39/Kubernetes_logo_without_workmark.svg' alt="Kubernetes" />
               )}
@@ -389,7 +397,7 @@ export function EventSourceWorkflowNodeReactFlow({
               </div>
               
                 <h2 className="text-md font-semibold text-gray-900 dark:text-white">
-                  Semaphore Event Source
+                  {data.title}
                 </h2>
               
             
@@ -400,22 +408,18 @@ export function EventSourceWorkflowNodeReactFlow({
 
           {/* Semaphore integration section */}
           <div className="space-y-3 border-t border-gray-200 dark:border-zinc-600 p-4">
-            <div className="text-sm font-medium text-gray-900 dark:text-white">
-              Semaphore integration
-            </div>
-            
             {inlineIntegration ? (
               /* Inline integration form */
               <div className="space-y-4 border border-gray-300 dark:border-zinc-600 rounded-lg p-4">
                 <Field>
                   <Label className="text-sm font-medium text-gray-900 dark:text-white">
-                    Semaphore Organization URL
+                    {data.icon === 'github' ? 'GitHub organization/owner URL' : 'Semaphore Organization URL'}
                   </Label>
                   <Input
                     type="url"
                     value={inlineIntegrationData.orgUrl}
                     onChange={(e) => setInlineIntegrationData(prev => ({ ...prev, orgUrl: e.target.value }))}
-                    placeholder="https://your-org.semaphoreci.com"
+                    placeholder={data.icon === 'github' ? 'https://github.com/owner' : 'https://your-org.semaphoreci.com'}
                     className="w-full"
                   />
                 </Field>
@@ -440,7 +444,7 @@ export function EventSourceWorkflowNodeReactFlow({
                   <DropdownButton outline className="flex items-center w-full !justify-between">
                     {selectedIntegration 
                       ? availableIntegrations.find(i => i.id === selectedIntegration)?.name || 'Select integration'
-                      : 'Select Semaphore integration'
+                      : (data.icon === 'github' ? 'Select GitHub integration' : 'Select Semaphore integration')
                     }
                     <MaterialSymbol name="keyboard_arrow_down" />
                   </DropdownButton>
@@ -462,15 +466,17 @@ export function EventSourceWorkflowNodeReactFlow({
                   </DropdownMenu>
                 </Dropdown>
                 <Field>
-                  <Label className="text-sm font-medium text-gray-900 dark:text-white">Semaphore Project</Label>
-                  <Input  type="text" placeholder="Enter your Semaphore project name" className="w-full" />
+                  <Label className="text-sm font-medium text-gray-900 dark:text-white">{data.icon === 'github' ? 'Repository Name' : 'Semaphore Project'}</Label>
+                  <Input  type="text" placeholder={data.icon === 'github' ? 'owner/repo' : 'Enter your Semaphore project name'} className="w-full" />
                 </Field>
               </div>
             ) : (
               /* Empty state */
               <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-700 border border-gray-200 dark:border-gray-700 rounded-md">
                 <div className="text-gray-500 dark:text-zinc-400 mb-3">
-                  Looks like you haven't connected any Semaphore integrations yet.
+                  {data.icon === 'github' 
+                    ? "Looks like you haven't connected any GitHub accounts yet"
+                    : "Looks like you haven't connected any Semaphore organizations yet"}
                 </div>
                 <Button
                   onClick={handleCreateIntegration}
@@ -504,23 +510,23 @@ export function EventSourceWorkflowNodeReactFlow({
         className="relative z-50"
         size="md"
       >
-        <DialogTitle>Create Semaphore Integration</DialogTitle>
+        <DialogTitle>Create {data.icon === 'github' ? 'GitHub' : 'Semaphore'} Integration</DialogTitle>
         <DialogDescription>
           New integration will be saved to integrations page. Manage integrations  
           <Link href="/integrations" className='text-blue-600 dark:text-blue-400'> here</Link>.
         </DialogDescription>
         
         <DialogBody className="space-y-6">
-          {/* Semaphore Org URL */}
+          {/* Org/Repo URL */}
           <Field>
             <Label className="text-sm font-medium text-gray-900 dark:text-white">
-              Semaphore Org URL
+              {data.icon === 'github' ? 'GitHub organization/owner URL' : 'Semaphore Org URL'}
             </Label>
             <Input
               type="url"
               value={integrationData.orgUrl}
               onChange={(e) => setIntegrationData(prev => ({ ...prev, orgUrl: e.target.value }))}
-              placeholder="https://your-org.semaphoreci.com"
+              placeholder={data.icon === 'github' ? 'https://github.com/owner' : 'https://your-org.semaphoreci.com'}
               className="w-full"
             />
           </Field>
@@ -538,6 +544,48 @@ export function EventSourceWorkflowNodeReactFlow({
               className="w-full"
             />
           </Field>
+
+          {data.icon === 'github' && (
+            <div className="rounded-md border border-gray-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 text-zinc-600 dark:text-zinc-300">
+                  <MaterialSymbol name="info" size="md" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">GitHub Personal Access Token (PAT) required</div>
+                  <p className="text-sm text-zinc-700 dark:text-zinc-300 mt-1">
+                    To connect GitHub, create a fine‑grained Personal Access Token and provide it as the API token.
+                  </p>
+                  <button
+                    type="button"
+                    className="mt-2 text-sm text-blue-600 dark:text-blue-300 hover:underline"
+                    aria-expanded={showGitHubPatInfo}
+                    onClick={() => setShowGitHubPatInfo(v => !v)}
+                  >
+                    {showGitHubPatInfo ? 'Hide details' : 'Show how to configure PAT'}
+                  </button>
+                  {showGitHubPatInfo && (
+                    <div className="mt-3 space-y-2 text-sm text-zinc-700 dark:text-zinc-300">
+                      <p>
+                        When creating a fine‑grained PAT, choose the access scope:
+                        either <strong>All repositories</strong> or select specific repositories that Canvas should access.
+                      </p>
+                      <div>
+                        <div className="font-medium">Required permissions:</div>
+                        <ul className="list-disc ml-5 mt-1 space-y-1">
+                          <li>Actions — <strong>Read and Write</strong></li>
+                          <li>Webhooks — <strong>Read and Write</strong></li>
+                        </ul>
+                      </div>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                        Tip: You can manage or rotate the PAT anytime in your GitHub developer settings.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* API Token Section */}
           <div className="space-y-4">
@@ -563,7 +611,7 @@ export function EventSourceWorkflowNodeReactFlow({
                   /* Select existing secret */
                   <div className="space-y-4">
                     <Field>
-                     
+                      
                       <Dropdown>
                         <DropdownButton outline className='flex items-center w-full !justify-between'>
                           {integrationData.apiToken.secretName || 'Select secret'}
@@ -584,6 +632,33 @@ export function EventSourceWorkflowNodeReactFlow({
                         </DropdownMenu>
                       </Dropdown>
                     </Field>
+                    {selectedExistingSecret && (
+                      <Field className='flex items-start gap-3 w-full'>
+                        <div className='w-50'>
+                          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                            Key name
+                          </Label>
+                          <Input
+                            type="text"
+                            value={selectedExistingSecret.keys[0]?.key || ''}
+                            readOnly
+                            className="w-full bg-gray-50 dark:bg-zinc-800 cursor-default"
+                          />
+                        </div>
+                        <div className='w-50'>
+                          <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
+                            Value
+                          </Label>
+                          <Input
+                            type="password"
+                            value={selectedExistingSecret.keys[0]?.value || ''}
+                            readOnly
+                            disabled
+                            className="w-full bg-gray-50 dark:bg-zinc-800 cursor-not-allowed opacity-75"
+                          />
+                        </div>
+                      </Field>
+                    )}
                   </div>
                 ) : (
                   /* Create new secret */
@@ -625,6 +700,11 @@ export function EventSourceWorkflowNodeReactFlow({
         </DialogBody>
 
         <DialogActions>
+          <Button
+            onClick={() => setShowIntegrationModal(false)}
+          >
+            Cancel
+          </Button>
           <Button
             color='blue'
             onClick={handleSaveIntegration}

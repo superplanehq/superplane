@@ -157,6 +157,14 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
       category: 'Event Sources',
       category_description: 'Emit events that can be used to trigger executions',
     },
+    {
+      id: 'github-event',
+      name: 'GitHub Event Source',
+      description: 'Trigger workflows from GitHub events',
+      icon: 'github',
+      category: 'Event Sources',
+      category_description: 'Emit events that can be used to trigger executions',
+    },
     // Groups
     {
       id: 'connection-group',
@@ -292,6 +300,8 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                               <img width={24} height={24} src='/images/aws-logo.svg' alt="AWS" className="flex-shrink-0" />
                             ) : component.icon === 'code_blocks' ? (
                               <img width={24} height={24} src='/images/git-logo.svg' alt="Git" className="flex-shrink-0" />
+                            ) : component.icon === 'github' ? (
+                              <img width={24} height={24} src='/images/github-logo.svg' alt="GitHub" className="flex-shrink-0" />
                             ) : component.icon === 'javascript' ? (
                               <img width={24} height={24} src='/images/npm-logo.svg' alt="NPM" className="flex-shrink-0" />
                             ) : component.icon === 'bug_report' ? (

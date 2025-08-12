@@ -1038,6 +1038,38 @@ const computedEdges = edges.map(edge => {
         setSidebarOpen(false);
         return;
       }
+
+      // Special handling for github-event - create EventSourceWorkflowNode in edit mode
+      if (nodeType === 'github-event') {
+        const newNode: WorkflowNode = {
+          id: nodeId,
+          type: 'eventSource',
+          position: { x: 300, y: 300 },
+          data: {
+            id: nodeId,
+            title: 'GitHub Event Source',
+            cluster: 'github-cluster',
+            icon: 'github',
+            events: [
+              {
+                id: 'event-1',
+                url: 'https://github.com/owner/repo/settings/hooks',
+                type: 'webhook',
+                enabled: true
+              }
+            ],
+            selected: false,
+            isEditMode: true
+          }
+        };
+        
+        setNodes((nds) => {
+          const updatedNodes = [...nds, newNode];
+          return updatedNodes;
+        });
+        setSidebarOpen(false);
+        return;
+      }
       
       const newNode: WorkflowNode = {
         id: nodeId,
