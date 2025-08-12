@@ -1601,7 +1601,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
                               type="text"
                               value={(executor.spec?.pipelineFile as string) || ''}
                               onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
-                              placeholder=".semaphore/pipeline.yml"
+                              placeholder=".semaphore/semaphore.yml"
                               className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
                             />
                           </ValidationField>
