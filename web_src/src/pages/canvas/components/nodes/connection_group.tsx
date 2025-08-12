@@ -276,7 +276,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               <InlineEditable
                 value={connectionGroupName}
                 onSave={handleConnectionGroupNameChange}
-                placeholder="Event source name"
+                placeholder="Connection group name"
                 className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
                   nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
                   isEditMode ? 'text-sm' : '')}

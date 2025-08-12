@@ -237,7 +237,7 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 ${integration.spec?.type === 'semaphore' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
-                        <img className="w-8 h-8 p-2" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
+                        <img className="w-8 h-8 p-2 object-contain" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
                       <Heading level={3}>
                         {integration.metadata?.name}
@@ -283,7 +283,7 @@ export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrati
                   className="relative flex items-start gap-4 p-6 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left group"
                 >
                   <div className={`p-3 rounded-lg ${integrationType.color} flex items-center justify-center`}>
-                    <img className="w-8 h-8" src={integrationType.icon} alt={integrationType.label} />
+                    <img className="w-8 h-8 object-contain" src={integrationType.icon} alt={integrationType.label} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import { ReactFlow, Background, BackgroundVariant } from "@xyflow/react";
 import '@xyflow/react/dist/style.css';
 
@@ -28,7 +28,8 @@ export const FlowRenderer: React.FC = () => {
   const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
   const fitViewNode = useCanvasStore((state) => state.fitViewNode);
   const setFitViewNodeRef = useCanvasStore((state) => state.setFitViewNodeRef);
-  const [lockedNodes, setLockedNodes] = useState(false);
+  const lockedNodes = useCanvasStore((state) => state.lockedNodes);
+  const setLockedNodes = useCanvasStore((state) => state.setLockedNodes);
 
   const { applyElkAutoLayout } = useAutoLayout();
   const { onNodeDragStop, onInit, fitViewToNode } = useFlowHandlers();

@@ -433,7 +433,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
                 <InlineEditable
                   value={stageName}
                   onSave={handleStageNameChange}
-                  placeholder="Event source name"
+                  placeholder="Stage name"
                   className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
                     nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
                     isEditMode ? 'text-sm' : '')}

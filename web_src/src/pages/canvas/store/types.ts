@@ -57,6 +57,7 @@ export interface CanvasState {
       color: string;
     }
   | undefined;
+  lockedNodes: boolean;
   // flow actions
   syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
   fitViewNode: (nodeId: string) => void;
@@ -81,6 +82,7 @@ export interface CanvasState {
 
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
+  setLockedNodes: (locked: boolean) => void;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}

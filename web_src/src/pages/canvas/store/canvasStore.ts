@@ -29,6 +29,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   edges: [],
   handleDragging: undefined,
+  lockedNodes: true,
 
 
   // Actions (equivalent to the reducer actions in the context implementation)
@@ -325,5 +326,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       delete updatedEventSourceKeys[eventSourceId];
       return { eventSourceKeys: updatedEventSourceKeys };
     });
+  },
+
+  setLockedNodes: (locked: boolean) => {
+    set({ lockedNodes: locked });
   }
 }));

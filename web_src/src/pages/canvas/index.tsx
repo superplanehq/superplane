@@ -10,21 +10,18 @@ import { ComponentSidebar } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
-
-// No props needed as we'll get the ID from the URL params
+import { useAutoLayout } from "./hooks/useAutoLayout";
 
 export function Canvas() {
-  // Get the canvas ID from the URL params
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
 
-  // Determine active view from URL hash or default to editor
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1); // Remove the #
     switch (hash) {
@@ -43,7 +40,6 @@ export function Canvas() {
 
   const activeView = getActiveViewFromHash();
 
-  // Handle view changes by updating URL hash
   const handleViewChange = (view: CanvasView) => {
     if (view === 'editor') {
       navigate(location.pathname);
@@ -57,6 +53,8 @@ export function Canvas() {
 
   // Use the modular node handlers
   const { handleAddNode } = useNodeHandlers(canvasId || '');
+
+  const { applyElkAutoLayout } = useAutoLayout();
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
@@ -190,15 +188,24 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNodeByType = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
+  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
       const nodeId = handleAddNode(nodeType, config);
 
-      // Focus on the newly added node after a short delay to allow the layout to update
-      setTimeout(() => {
-        fitViewNode(nodeId);
-      }, 100);
+      if (lockedNodes) {
+        setTimeout(async () => {
+          const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+          await applyElkAutoLayout(latestNodes, latestEdges);
+          setTimeout(() => {
+            fitViewNode(nodeId);
+          }, 200);
+        }, 50);
+      } else {
+        setTimeout(() => {
+          fitViewNode(nodeId);
+        }, 100);
+      }
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
     }
