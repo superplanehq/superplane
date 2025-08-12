@@ -20,7 +20,7 @@ import 'tippy.js/dist/tippy.css';
 import { twMerge } from 'tailwind-merge';
 
 const StageImageMap = {
-  'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
+  'http': <MaterialSymbol className='-mt-1 -mb-1' name="rocket_launch" size="xl" />,
   'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
   'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
