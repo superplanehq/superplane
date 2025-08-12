@@ -86,7 +86,7 @@ export function EventSourceWorkflowNodeReactFlow({
   });
   
   // API Token tabs state
-  const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('existing');
+  const [apiTokenTab, setApiTokenTab] = useState<'existing' | 'new'>('new');
   const [newSecretToken, setNewSecretToken] = useState('');
   
   // Selected integration state
@@ -103,12 +103,12 @@ export function EventSourceWorkflowNodeReactFlow({
   // Define tabs for API Token section
   const apiTokenTabs: Tab[] = [
     {
-      id: 'existing',
-      label: 'Select from secrets',
-    },
-    {
       id: 'new',
       label: 'Create new secret',
+    },
+    {
+      id: 'existing',
+      label: 'Import from existing secret',
     }
   ];
 
@@ -210,7 +210,7 @@ export function EventSourceWorkflowNodeReactFlow({
       apiToken: { secretName: '', secretKey: '' }
     });
     setNewSecretToken('');
-    setApiTokenTab('existing');
+    setApiTokenTab('new');
   }, [integrationData, apiTokenTab, newSecretToken]);
 
   const truncateUrl = (url: string, maxLength: number = 40) => {
@@ -470,7 +470,7 @@ export function EventSourceWorkflowNodeReactFlow({
               /* Empty state */
               <div className="text-center py-8 bg-zinc-50 dark:bg-zinc-700 border border-gray-200 dark:border-gray-700 rounded-md">
                 <div className="text-gray-500 dark:text-zinc-400 mb-3">
-                  No Semaphore integrations
+                  Looks like you haven't connected any Semaphore integrations yet.
                 </div>
                 <Button
                   onClick={handleCreateIntegration}
@@ -511,20 +511,6 @@ export function EventSourceWorkflowNodeReactFlow({
         </DialogDescription>
         
         <DialogBody className="space-y-6">
-          {/* Integration Name */}
-          <Field>
-            <Label className="text-sm font-medium text-gray-900 dark:text-white">
-              Integration Name
-            </Label>
-            <Input
-              type="text"
-              value={integrationData.name}
-              onChange={(e) => setIntegrationData(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Enter integration name"
-              className="w-full"
-            />
-          </Field>
-
           {/* Semaphore Org URL */}
           <Field>
             <Label className="text-sm font-medium text-gray-900 dark:text-white">
@@ -535,6 +521,20 @@ export function EventSourceWorkflowNodeReactFlow({
               value={integrationData.orgUrl}
               onChange={(e) => setIntegrationData(prev => ({ ...prev, orgUrl: e.target.value }))}
               placeholder="https://your-org.semaphoreci.com"
+              className="w-full"
+            />
+          </Field>
+
+          {/* Integration Name */}
+          <Field>
+            <Label className="text-sm font-medium text-gray-900 dark:text-white">
+              Integration Name
+            </Label>
+            <Input
+              type="text"
+              value={integrationData.name}
+              onChange={(e) => setIntegrationData(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Enter integration name"
               className="w-full"
             />
           </Field>
@@ -589,18 +589,18 @@ export function EventSourceWorkflowNodeReactFlow({
                   /* Create new secret */
                   <div className="space-y-4 w-full">
                     <Text className='text-xs text-gray-500 dark:text-zinc-400'>
-                      New secret will be stored in your canvas secrets. 
-                      Manage your secrets in the secrets tab <Link href="#" className='text-blue-600 dark:text-blue-200'>here</Link>
+                      New secret will be created in your canvas secrets. 
+                      You can review and manage your secrets in the secrets tab <Link href="#" className='text-blue-600 dark:text-blue-200'>here</Link>
                     </Text>
 
                     <Field className='flex items-start gap-3 w-full'>
                       <div className='w-50'>
                         <Label className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-                          Key
+                          Key name
                         </Label>
                         <Input
                           type="text"
-                          placeholder="Enter key"
+                          value="my-api-token"
                           className="w-full"
                         />
                       </div>
