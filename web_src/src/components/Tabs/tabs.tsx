@@ -175,7 +175,9 @@ function TabItem({
         content={tab.disabledTooltip}
         placement="top"
       >
-        {tabButton}
+        <div>
+          {tabButton}
+        </div>
       </Tippy>
     )
   }
