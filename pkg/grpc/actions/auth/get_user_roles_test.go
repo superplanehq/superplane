@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,18 +12,14 @@ import (
 
 func Test_ListUserRoles(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
 	ctx := context.Background()
+	orgID := r.Organization.ID.String()
 
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
-
-	err = authService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
+	err := r.AuthService.AssignRole(r.User.String(), models.RoleOrgAdmin, orgID, models.DomainTypeOrganization)
 	require.NoError(t, err)
 
 	t.Run("successful get user roles", func(t *testing.T) {
-		resp, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, r.User.String(), authService)
+		resp, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, r.User.String(), r.AuthService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Roles)
 
@@ -38,7 +33,7 @@ func Test_ListUserRoles(t *testing.T) {
 	})
 
 	t.Run("invalid request - invalid UUID", func(t *testing.T) {
-		_, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", authService)
+		_, err := ListUserRoles(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid UUIDs")
 	})

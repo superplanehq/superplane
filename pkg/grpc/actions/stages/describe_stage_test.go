@@ -21,23 +21,16 @@ func Test__DescribeStage(t *testing.T) {
 		Approvals:   1,
 	})
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasIdOrName: uuid.New().String(),
-			Name:           r.Stage.Name,
-		})
-
+	t.Run("wrong canvas ID -> error", func(t *testing.T) {
+		_, err := DescribeStage(context.Background(), uuid.New().String(), r.Stage.Name)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
+		assert.Equal(t, codes.NotFound, s.Code())
+		assert.Equal(t, "stage not found", s.Message())
 	})
 
 	t.Run("no name and no ID -> error", func(t *testing.T) {
-		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
+		_, err := DescribeStage(context.Background(), r.Canvas.ID.String(), "")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -45,11 +38,7 @@ func Test__DescribeStage(t *testing.T) {
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Name:           "does-not-exist",
-		})
-
+		_, err := DescribeStage(context.Background(), r.Canvas.ID.String(), uuid.NewString())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -57,11 +46,7 @@ func Test__DescribeStage(t *testing.T) {
 	})
 
 	t.Run("with name", func(t *testing.T) {
-		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Name:           r.Stage.Name,
-		})
-
+		response, err := DescribeStage(context.Background(), r.Canvas.ID.String(), r.Stage.Name)
 		require.NoError(t, err)
 		require.Equal(t, r.Stage.Name, response.Stage.Metadata.Name)
 		require.Equal(t, r.Stage.ID.String(), response.Stage.Metadata.Id)
@@ -77,11 +62,7 @@ func Test__DescribeStage(t *testing.T) {
 	})
 
 	t.Run("with ID", func(t *testing.T) {
-		response, err := DescribeStage(context.Background(), &protos.DescribeStageRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Id:             r.Stage.ID.String(),
-		})
-
+		response, err := DescribeStage(context.Background(), r.Canvas.ID.String(), r.Stage.ID.String())
 		require.NoError(t, err)
 		require.Equal(t, r.Stage.Name, response.Stage.Metadata.Name)
 		require.Equal(t, r.Stage.ID.String(), response.Stage.Metadata.Id)

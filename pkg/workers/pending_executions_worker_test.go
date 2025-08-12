@@ -44,7 +44,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 		executorType, executorSpec, resource := support.Executor(t, r)
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-1").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{
@@ -112,7 +112,7 @@ func Test__PendingExecutionsWorker(t *testing.T) {
 
 		stage, err := builders.NewStageBuilder(r.Registry).
 			WithEncryptor(r.Encryptor).
-			InCanvas(r.Canvas).
+			InCanvas(r.Canvas.ID).
 			WithName("stage-2").
 			WithRequester(r.User).
 			WithConnections([]models.Connection{

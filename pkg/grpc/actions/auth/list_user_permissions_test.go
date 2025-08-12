@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,19 +12,14 @@ import (
 
 func Test_ListUserPermissions(t *testing.T) {
 	r := support.Setup(t)
-	authService := SetupTestAuthService(t)
 	ctx := context.Background()
-
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
+	orgID := r.Organization.ID.String()
 
 	// Assign role to user
-	err = authService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization)
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.AssignRole(r.User.String(), models.RoleOrgViewer, orgID, models.DomainTypeOrganization))
 
 	t.Run("successful list user permissions", func(t *testing.T) {
-		resp, err := ListUserPermissions(ctx, models.DomainTypeOrganization, orgID, r.User.String(), authService)
+		resp, err := ListUserPermissions(ctx, models.DomainTypeOrganization, orgID, r.User.String(), r.AuthService)
 		require.NoError(t, err)
 		assert.NotEmpty(t, resp.Permissions)
 

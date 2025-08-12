@@ -25,38 +25,35 @@ func Test__UpdateStage(t *testing.T) {
 	// Create a stage first that we'll update in tests
 	executor := support.ProtoExecutor(t, r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	stage, err := CreateStage(ctx, r.Encryptor, r.Registry, &protos.CreateStageRequest{
-		CanvasIdOrName: r.Canvas.ID.String(),
-		Stage: &protos.Stage{
-			Metadata: &protos.Stage_Metadata{
-				Name: "test-update-stage",
-			},
-			Spec: &protos.Stage_Spec{
-				Executor: executor,
-				Conditions: []*protos.Condition{
-					{
-						Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
-						Approval: &protos.ConditionApproval{Count: 1},
-					},
-					{
-						Type: protos.Condition_CONDITION_TYPE_TIME_WINDOW,
-						TimeWindow: &protos.ConditionTimeWindow{
-							Start:    "08:00",
-							End:      "17:00",
-							WeekDays: []string{"Monday", "Tuesday"},
-						},
+	stage, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.Stage{
+		Metadata: &protos.Stage_Metadata{
+			Name: "test-update-stage",
+		},
+		Spec: &protos.Stage_Spec{
+			Executor: executor,
+			Conditions: []*protos.Condition{
+				{
+					Type:     protos.Condition_CONDITION_TYPE_APPROVAL,
+					Approval: &protos.ConditionApproval{Count: 1},
+				},
+				{
+					Type: protos.Condition_CONDITION_TYPE_TIME_WINDOW,
+					TimeWindow: &protos.ConditionTimeWindow{
+						Start:    "08:00",
+						End:      "17:00",
+						WeekDays: []string{"Monday", "Tuesday"},
 					},
 				},
-				Connections: []*protos.Connection{
-					{
-						Name: r.Source.Name,
-						Type: protos.Connection_TYPE_EVENT_SOURCE,
-						Filters: []*protos.Filter{
-							{
-								Type: protos.FilterType_FILTER_TYPE_DATA,
-								Data: &protos.DataFilter{
-									Expression: "test == 1",
-								},
+			},
+			Connections: []*protos.Connection{
+				{
+					Name: r.Source.Name,
+					Type: protos.Connection_TYPE_EVENT_SOURCE,
+					Filters: []*protos.Filter{
+						{
+							Type: protos.FilterType_FILTER_TYPE_DATA,
+							Data: &protos.DataFilter{
+								Expression: "test == 1",
 							},
 						},
 					},
@@ -69,24 +66,8 @@ func Test__UpdateStage(t *testing.T) {
 	require.NotNil(t, stage)
 	stageID := stage.Stage.Metadata.Id
 
-	t.Run("invalid stage ID -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       "invalid-uuid",
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Contains(t, s.Message(), "canvas not found")
-	})
-
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       uuid.NewString(),
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), uuid.NewString(), &protos.Stage{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -94,11 +75,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       stageID,
-			CanvasIdOrName: r.Canvas.ID.String(),
-		})
-
+		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -106,17 +83,13 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       stageID,
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &protos.Stage{
-				Spec: &protos.Stage_Spec{
-					Executor: executor,
-					Connections: []*protos.Connection{
-						{
-							Name: "source-does-not-exist",
-							Type: protos.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+			Spec: &protos.Stage_Spec{
+				Executor: executor,
+				Connections: []*protos.Connection{
+					{
+						Name: "source-does-not-exist",
+						Type: protos.Connection_TYPE_EVENT_SOURCE,
 					},
 				},
 			},
@@ -129,22 +102,18 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       stageID,
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &protos.Stage{
-				Spec: &protos.Stage_Spec{
-					Executor: executor,
-					Connections: []*protos.Connection{
-						{
-							Name: r.Source.Name,
-							Type: protos.Connection_TYPE_EVENT_SOURCE,
-							Filters: []*protos.Filter{
-								{
-									Type: protos.FilterType_FILTER_TYPE_DATA,
-									Data: &protos.DataFilter{
-										Expression: "",
-									},
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+			Spec: &protos.Stage_Spec{
+				Executor: executor,
+				Connections: []*protos.Connection{
+					{
+						Name: r.Source.Name,
+						Type: protos.Connection_TYPE_EVENT_SOURCE,
+						Filters: []*protos.Filter{
+							{
+								Type: protos.FilterType_FILTER_TYPE_DATA,
+								Data: &protos.DataFilter{
+									Expression: "",
 								},
 							},
 						},
@@ -160,21 +129,17 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       stageID,
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &protos.Stage{
-				Spec: &protos.Stage_Spec{
-					Executor: executor,
-					Connections: []*protos.Connection{
-						{
-							Name: r.Source.Name,
-							Type: protos.Connection_TYPE_EVENT_SOURCE,
-						},
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+			Spec: &protos.Stage_Spec{
+				Executor: executor,
+				Connections: []*protos.Connection{
+					{
+						Name: r.Source.Name,
+						Type: protos.Connection_TYPE_EVENT_SOURCE,
 					},
-					Conditions: []*protos.Condition{
-						{Type: protos.Condition_CONDITION_TYPE_APPROVAL, Approval: &protos.ConditionApproval{}},
-					},
+				},
+				Conditions: []*protos.Condition{
+					{Type: protos.Condition_CONDITION_TYPE_APPROVAL, Approval: &protos.ConditionApproval{}},
 				},
 			},
 		})
@@ -194,44 +159,40 @@ func Test__UpdateStage(t *testing.T) {
 
 		require.NoError(t, err)
 
-		res, err := UpdateStage(ctx, r.Encryptor, r.Registry, &protos.UpdateStageRequest{
-			IdOrName:       stageID,
-			CanvasIdOrName: r.Canvas.ID.String(),
-			Stage: &protos.Stage{
-				Spec: &protos.Stage_Spec{
-					Executor: &protos.Executor{
-						Type:        executor.Type,
-						Integration: executor.Integration,
-						Resource:    executor.Resource,
-						Spec:        newSpec,
-					},
-					Conditions: []*protos.Condition{},
-					Connections: []*protos.Connection{
-						{
-							Name:           r.Source.Name,
-							Type:           protos.Connection_TYPE_EVENT_SOURCE,
-							FilterOperator: protos.FilterOperator_FILTER_OPERATOR_OR,
-							Filters: []*protos.Filter{
-								{
-									Type: protos.FilterType_FILTER_TYPE_DATA,
-									Data: &protos.DataFilter{
-										Expression: "test == 42",
-									},
+		res, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+			Spec: &protos.Stage_Spec{
+				Executor: &protos.Executor{
+					Type:        executor.Type,
+					Integration: executor.Integration,
+					Resource:    executor.Resource,
+					Spec:        newSpec,
+				},
+				Conditions: []*protos.Condition{},
+				Connections: []*protos.Connection{
+					{
+						Name:           r.Source.Name,
+						Type:           protos.Connection_TYPE_EVENT_SOURCE,
+						FilterOperator: protos.FilterOperator_FILTER_OPERATOR_OR,
+						Filters: []*protos.Filter{
+							{
+								Type: protos.FilterType_FILTER_TYPE_DATA,
+								Data: &protos.DataFilter{
+									Expression: "test == 42",
 								},
-								{
-									Type: protos.FilterType_FILTER_TYPE_DATA,
-									Data: &protos.DataFilter{
-										Expression: "status == 'active'",
-									},
+							},
+							{
+								Type: protos.FilterType_FILTER_TYPE_DATA,
+								Data: &protos.DataFilter{
+									Expression: "status == 'active'",
 								},
 							},
 						},
 					},
 				},
-				Metadata: &protos.Stage_Metadata{
-					Name:        "new-stage-name",
-					Description: "new-stage-description",
-				},
+			},
+			Metadata: &protos.Stage_Metadata{
+				Name:        "new-stage-name",
+				Description: "new-stage-description",
 			},
 		})
 

@@ -4,29 +4,24 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbAuth "github.com/superplanehq/superplane/pkg/protos/authorization"
 	pb "github.com/superplanehq/superplane/pkg/protos/groups"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 func Test_ListGroups(t *testing.T) {
-	authService := SetupTestAuthService(t)
+	r := support.Setup(t)
 	ctx := context.Background()
+	orgID := r.Organization.ID.String()
 
-	orgID := uuid.New().String()
-	err := authService.SetupOrganizationRoles(orgID)
-	require.NoError(t, err)
-
-	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group")
-	require.NoError(t, err)
-	err = authService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group")
-	require.NoError(t, err)
+	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-1", models.RoleOrgAdmin, "Test Group 1", "A test group"))
+	require.NoError(t, r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group-2", models.RoleOrgViewer, "Test Group 2", "Another test group"))
 
 	t.Run("successful list groups", func(t *testing.T) {
-		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
@@ -52,16 +47,10 @@ func Test_ListGroups(t *testing.T) {
 	})
 
 	t.Run("successful canvas groups list", func(t *testing.T) {
-		canvasID := uuid.New().String()
+		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group-1", models.RoleCanvasAdmin, "Canvas Group 1", "A canvas group"))
+		require.NoError(t, r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-group-2", models.RoleCanvasViewer, "Canvas Group 2", "Another canvas group"))
 
-		err := authService.SetupCanvasRoles(canvasID)
-		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group-1", models.RoleCanvasAdmin, "Canvas Group 1", "A canvas group")
-		require.NoError(t, err)
-		err = authService.CreateGroup(canvasID, models.DomainTypeCanvas, "canvas-group-2", models.RoleCanvasViewer, "Canvas Group 2", "Another canvas group")
-		require.NoError(t, err)
-
-		resp, err := ListGroups(ctx, models.DomainTypeCanvas, canvasID, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 		assert.Len(t, resp.Groups, 2)
@@ -69,7 +58,7 @@ func Test_ListGroups(t *testing.T) {
 		for _, group := range resp.Groups {
 			assert.NotEmpty(t, group.Metadata.Name)
 			assert.Equal(t, pbAuth.DomainType_DOMAIN_TYPE_CANVAS, group.Metadata.DomainType)
-			assert.Equal(t, canvasID, group.Metadata.DomainId)
+			assert.Equal(t, r.Canvas.ID.String(), group.Metadata.DomainId)
 			assert.GreaterOrEqual(t, group.Status.MembersCount, int32(0))
 			assert.NotEmpty(t, group.Metadata.CreatedAt)
 			assert.NotEmpty(t, group.Metadata.UpdatedAt)
@@ -85,10 +74,9 @@ func Test_ListGroups(t *testing.T) {
 	})
 
 	t.Run("groups with metadata have timestamps", func(t *testing.T) {
-		err = authService.AddUserToGroup(orgID, "org", "test-user-1", "test-group-1")
-		require.NoError(t, err)
+		require.NoError(t, r.AuthService.AddUserToGroup(orgID, "org", "test-user-1", "test-group-1"))
 
-		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, authService)
+		resp, err := ListGroups(ctx, models.DomainTypeOrganization, orgID, r.AuthService)
 		require.NoError(t, err)
 
 		var groupWithMetadata *pb.Group
