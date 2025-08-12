@@ -9,9 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func AssignRole(ctx context.Context, domainType, domainID, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-
+func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
 	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}

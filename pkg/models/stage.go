@@ -316,7 +316,6 @@ func (s *Stage) AddConnection(tx *gorm.DB, connection Connection) error {
 	connection.CanvasID = s.CanvasID
 	connection.TargetID = s.ID
 	connection.TargetType = ConnectionTargetTypeStage
-	connection.CanvasID = s.CanvasID
 	return tx.Create(&connection).Error
 }
 

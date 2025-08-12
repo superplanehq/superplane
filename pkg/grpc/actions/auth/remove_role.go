@@ -9,16 +9,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func RemoveRole(ctx context.Context, domainType string, domainID string, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
-	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
-
+func RemoveRole(ctx context.Context, orgID, domainType string, domainID string, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.RemoveRoleResponse, error) {
 	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
 	user, err := FindUser(orgID, userID, userEmail)
 	if err != nil {
-		return nil, err
+		return nil, status.Error(codes.InvalidArgument, "user not found")
 	}
 
 	err = authService.RemoveRole(user.ID.String(), roleName, domainID, domainType)

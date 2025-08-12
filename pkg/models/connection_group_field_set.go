@@ -13,7 +13,6 @@ import (
 
 type ConnectionGroupFieldSet struct {
 	ID                uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	CanvasID          uuid.UUID
 	ConnectionGroupID uuid.UUID
 	FieldSet          datatypes.JSONType[map[string]string]
 	FieldSetHash      string
@@ -42,7 +41,6 @@ func (g *ConnectionGroup) CreateFieldSet(tx *gorm.DB, fields map[string]string, 
 	groupSpec := g.Spec.Data()
 	now := time.Now()
 	fieldSet := &ConnectionGroupFieldSet{
-		CanvasID:          g.CanvasID,
 		ConnectionGroupID: g.ID,
 		FieldSet:          datatypes.NewJSONType(fields),
 		FieldSetHash:      hash,

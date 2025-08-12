@@ -57,7 +57,7 @@ func DescribeStage(ctx context.Context, canvasID string, idOrName string) (*pb.D
 
 func findStage(canvasID string, idOrName string) (*models.Stage, error) {
 	if idOrName == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "must specify one of: id or name")
+		return nil, status.Errorf(codes.InvalidArgument, "must specify either the ID or name of the stage")
 	}
 
 	_, err := uuid.Parse(idOrName)

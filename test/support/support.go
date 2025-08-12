@@ -29,6 +29,7 @@ type ResourceRegistry struct {
 	Source           *models.EventSource
 	Stage            *models.Stage
 	Organization     *models.Organization
+	Account          *models.Account
 	Integration      *models.Integration
 	Encryptor        crypto.Encryptor
 	AuthService      *authorization.AuthService
@@ -78,10 +79,21 @@ func SetupWithOptions(t *testing.T, options SetupOptions) *ResourceRegistry {
 	// Create organization and user
 	//
 	var err error
-	user, err := models.CreateUser(r.Organization.ID, uuid.New(), "test@example.com", "Test User")
+	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"), "")
 	require.NoError(t, err)
+	r.AuthService.SetupOrganizationRoles(organization.ID.String())
+	require.NoError(t, err)
+
+	account, err := models.CreateAccount("test@example.com", "test")
+	require.NoError(t, err)
+	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
+	require.NoError(t, err)
+	err = r.AuthService.AssignRole(user.ID.String(), models.RoleOrgOwner, organization.ID.String(), models.DomainTypeOrganization)
+	require.NoError(t, err)
+
+	r.Account = account
 	r.User = user.ID
-	r.Organization = CreateOrganization(t, &r, r.User)
+	r.Organization = organization
 
 	//
 	// Create canvas
@@ -327,6 +339,7 @@ func AuthService(t *testing.T) *authorization.AuthService {
 	return authService
 }
 
+// TODO: this needs to be refactored
 func CreateOrganization(t *testing.T, r *ResourceRegistry, userID uuid.UUID) *models.Organization {
 	organization, err := models.CreateOrganization(RandomName("org"), RandomName("org-display"), "")
 	require.NoError(t, err)
@@ -345,4 +358,13 @@ func CreateCanvas(t *testing.T, r *ResourceRegistry, organizationID, userID uuid
 	err = r.AuthService.AssignRole(userID.String(), models.RoleCanvasOwner, canvas.ID.String(), models.DomainTypeCanvas)
 	require.NoError(t, err)
 	return canvas
+}
+
+func CreateUser(t *testing.T, organizationID uuid.UUID) *models.User {
+	name := RandomName("user")
+	account, err := models.CreateAccount(name, name+"@test.com")
+	require.NoError(t, err)
+	user, err := models.CreateUser(organizationID, account.ID, account.Name, account.Email)
+	require.NoError(t, err)
+	return user
 }

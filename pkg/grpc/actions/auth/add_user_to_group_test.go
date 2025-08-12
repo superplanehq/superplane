@@ -2,12 +2,16 @@ package auth
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/protos/users"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Test_AddUserToGroup(t *testing.T) {
@@ -15,59 +19,82 @@ func Test_AddUserToGroup(t *testing.T) {
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
 
-	// Create a group first
-	err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, "test-group", models.RoleOrgAdmin, "Test Group", "Test group description")
+	groupName := support.RandomName("test-group")
+	err := r.AuthService.CreateGroup(orgID, models.DomainTypeOrganization, groupName, models.RoleOrgAdmin, "", "")
 	require.NoError(t, err)
 
-	t.Run("successful add user to group with user ID", func(t *testing.T) {
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "test-group", r.AuthService)
+	t.Run("add user to group with user ID", func(t *testing.T) {
+		newUser := support.CreateUser(t, r.Organization.ID)
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, newUser.ID.String(), "", groupName, r.AuthService)
 		require.NoError(t, err)
 
-		// TODO: we need to do some assertion here
+		response, err := ListGroupUsers(context.Background(), models.DomainTypeOrganization, orgID, groupName, r.AuthService)
+		require.NoError(t, err)
+		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
+			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
+		}))
 	})
 
-	// t.Run("add user to organization group with email", func(t *testing.T) {
-	// 	email := "test-add-group@example.com"
+	t.Run("add user to organization group with email", func(t *testing.T) {
+		newUser := support.CreateUser(t, r.Organization.ID)
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", newUser.Email, groupName, r.AuthService)
+		require.NoError(t, err)
 
-	// 	err = r.AuthService.CreateGroup(orgID, "org", "test-group-email", models.RoleOrgAdmin, "Test Group Email", "Test group email description")
-	// 	require.NoError(t, err)
-
-	// 	_, err := AddUserToGroup(ctx, models.DomainTypeOrganization, orgID, "", email, "test-group-email", r.AuthService)
-	// 	require.NoError(t, err)
-	// 	assert.Equal(t, email, user.Name)
-	// 	assert.False(t, user.IsActive)
-	// })
+		response, err := ListGroupUsers(context.Background(), models.DomainTypeOrganization, orgID, groupName, r.AuthService)
+		require.NoError(t, err)
+		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
+			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
+		}))
+	})
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrganization, orgID, r.User.String(), "", "", r.AuthService)
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, r.User.String(), "", "", r.AuthService)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "group name must be specified")
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrganization, orgID, "", "", "test-group", r.AuthService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user identifier must be specified")
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "", "", groupName, r.AuthService)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "user not found", s.Message())
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := AddUserToGroup(ctx, models.DomainTypeOrganization, orgID, "invalid-uuid", "", "test-group", r.AuthService)
+		_, err := AddUserToGroup(ctx, orgID, models.DomainTypeOrganization, orgID, "invalid-uuid", "", groupName, r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid user ID")
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "user not found", s.Message())
 	})
 
-	t.Run("canvas groups - group does not exist", func(t *testing.T) {
-		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.User.String(), "", "non-existent-group", r.AuthService)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "group non-existent-group does not exist")
+	t.Run("canvas group does not exist -> error", func(t *testing.T) {
+		newUser := support.CreateUser(t, r.Organization.ID)
+		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", "non-existent-group", r.AuthService)
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.Unknown, s.Code())
+		assert.Contains(t, s.Message(), "group non-existent-group does not exist")
 	})
 
-	t.Run("successful add user to canvas group", func(t *testing.T) {
-		// Create a canvas group first
-		err = r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, "canvas-test-group", models.RoleCanvasAdmin, "Canvas Test Group", "Canvas test group description")
+	t.Run("add user to canvas group", func(t *testing.T) {
+		groupName := support.RandomName("canvas-group")
+		err = r.AuthService.CreateGroup(r.Canvas.ID.String(), models.DomainTypeCanvas, groupName, models.RoleCanvasAdmin, "", "")
 		require.NoError(t, err)
 
-		_, err = AddUserToGroup(ctx, models.DomainTypeCanvas, r.Canvas.ID.String(), r.User.String(), "", "canvas-test-group", r.AuthService)
+		newUser := support.CreateUser(t, r.Organization.ID)
+		_, err = AddUserToGroup(ctx, orgID, models.DomainTypeCanvas, r.Canvas.ID.String(), newUser.ID.String(), "", groupName, r.AuthService)
 		require.NoError(t, err)
+
+		response, err := ListGroupUsers(context.Background(), models.DomainTypeCanvas, r.Canvas.ID.String(), groupName, r.AuthService)
+		require.NoError(t, err)
+		assert.Len(t, response.Users, 1)
+		assert.True(t, slices.ContainsFunc(response.Users, func(user *users.User) bool {
+			return user.Metadata.Id == newUser.ID.String() && user.Metadata.Email == newUser.Email
+		}))
 	})
 }

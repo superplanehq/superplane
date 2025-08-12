@@ -22,15 +22,17 @@ func NewRoleService(authService authorization.Authorization) *RoleService {
 }
 
 func (s *RoleService) AssignRole(ctx context.Context, req *pb.AssignRoleRequest) (*pb.AssignRoleResponse, error) {
+	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.AssignRole(ctx, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
+	return auth.AssignRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
 }
 
 func (s *RoleService) RemoveRole(ctx context.Context, req *pb.RemoveRoleRequest) (*pb.RemoveRoleResponse, error) {
+	orgID := ctx.Value(authorization.OrganizationContextKey).(string)
 	domainType := ctx.Value(authorization.DomainTypeContextKey).(string)
 	domainID := ctx.Value(authorization.DomainIdContextKey).(string)
-	return auth.RemoveRole(ctx, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
+	return auth.RemoveRole(ctx, orgID, domainType, domainID, req.RoleName, req.UserId, req.UserEmail, s.authService)
 }
 
 func (s *RoleService) ListRoles(ctx context.Context, req *pb.ListRolesRequest) (*pb.ListRolesResponse, error) {

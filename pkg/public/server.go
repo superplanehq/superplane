@@ -347,7 +347,6 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	s.Router = r
 }
 
-// TODO: do we need this?
 func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
 	user, ok := authentication.GetUserFromContext(r.Context())
 	if !ok {

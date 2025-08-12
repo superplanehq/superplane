@@ -398,7 +398,7 @@ func (a *Handler) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 	t.Execute(w, data)
 }
 
-func (a *Handler) getAccountFromCookie(w http.ResponseWriter, r *http.Request) (*models.Account, error) {
+func (a *Handler) getAccountFromCookie(r *http.Request) (*models.Account, error) {
 	cookie, err := r.Cookie("account_token")
 	if err != nil {
 		return nil, err
@@ -428,7 +428,7 @@ func (a *Handler) getAccountFromCookie(w http.ResponseWriter, r *http.Request) (
 }
 
 func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http.Request) {
-	account, err := a.getAccountFromCookie(w, r)
+	account, err := a.getAccountFromCookie(r)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 		return
@@ -468,7 +468,7 @@ func (a *Handler) handleOrganizationSelectionPage(w http.ResponseWriter, r *http
 }
 
 func (a *Handler) handleCreateOrganization(w http.ResponseWriter, r *http.Request) {
-	account, err := a.getAccountFromCookie(w, r)
+	account, err := a.getAccountFromCookie(r)
 	if err != nil {
 		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
 		return
