@@ -60,7 +60,7 @@ func (w *PendingStageEventsWorker) Tick() error {
 }
 
 func (w *PendingStageEventsWorker) ProcessStage(stageID uuid.UUID) error {
-	stage, err := models.FindStageByID(stageID.String())
+	stage, err := models.FindUnscopedStage(stageID.String())
 	if err != nil {
 		return fmt.Errorf("error finding stage")
 	}
@@ -114,7 +114,7 @@ func (w *PendingStageEventsWorker) ProcessEvent(stage *models.Stage, event *mode
 	var execution *models.StageExecution
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		var err error
-		execution, err = models.CreateStageExecutionInTransaction(tx, stage.ID, event.ID)
+		execution, err = models.CreateStageExecutionInTransaction(tx, stage.CanvasID, stage.ID, event.ID)
 		if err != nil {
 			return fmt.Errorf("error creating stage execution: %v", err)
 		}

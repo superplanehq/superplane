@@ -8,40 +8,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 func Test__ListConnectionGroups(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		req := &protos.ListConnectionGroupsRequest{
-			CanvasIdOrName: uuid.NewString(),
-		}
-
-		_, err := ListConnectionGroups(context.Background(), req)
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "canvas not found", s.Message())
-	})
-
 	t.Run("no connection groups", func(t *testing.T) {
-		req := &protos.ListConnectionGroupsRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		}
-
-		response, err := ListConnectionGroups(context.Background(), req)
+		response, err := ListConnectionGroups(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.Empty(t, response.ConnectionGroups)
 	})
 
 	t.Run("connection group exists", func(t *testing.T) {
-		_, err := r.Canvas.CreateConnectionGroup(
+		_, err := models.CreateConnectionGroup(
+			r.Canvas.ID,
 			"test",
 			"test",
 			uuid.NewString(),
@@ -57,11 +39,7 @@ func Test__ListConnectionGroups(t *testing.T) {
 			},
 		)
 
-		req := &protos.ListConnectionGroupsRequest{
-			CanvasIdOrName: r.Canvas.ID.String(),
-		}
-
-		response, err := ListConnectionGroups(context.Background(), req)
+		response, err := ListConnectionGroups(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.Len(t, response.ConnectionGroups, 1)

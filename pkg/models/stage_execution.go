@@ -26,6 +26,7 @@ const (
 
 type StageExecution struct {
 	ID           uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	CanvasID     uuid.UUID
 	StageID      uuid.UUID
 	StageEventID uuid.UUID
 	State        string
@@ -238,13 +239,14 @@ func ListExecutionsInState(state string) ([]StageExecution, error) {
 	return executions, nil
 }
 
-func CreateStageExecution(stageID, stageEventID uuid.UUID) (*StageExecution, error) {
-	return CreateStageExecutionInTransaction(database.Conn(), stageID, stageEventID)
+func CreateStageExecution(canvasID, stageID, stageEventID uuid.UUID) (*StageExecution, error) {
+	return CreateStageExecutionInTransaction(database.Conn(), canvasID, stageID, stageEventID)
 }
 
-func CreateStageExecutionInTransaction(tx *gorm.DB, stageID, stageEventID uuid.UUID) (*StageExecution, error) {
+func CreateStageExecutionInTransaction(tx *gorm.DB, canvasID, stageID, stageEventID uuid.UUID) (*StageExecution, error) {
 	now := time.Now()
 	execution := StageExecution{
+		CanvasID:     canvasID,
 		StageID:      stageID,
 		StageEventID: stageEventID,
 		State:        ExecutionPending,
