@@ -14,11 +14,12 @@ import { EditModeActionButtons } from '../EditModeActionButtons';
 import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
+import { twMerge } from 'tailwind-merge';
 
 const EventSourceImageMap = {
-  'webhook': <MaterialSymbol className='w-6 h-5 -mt-2' name="webhook" size="xl" />,
-  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 dark:bg-white dark:rounded-lg" />,
-  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 dark:bg-white dark:rounded-lg" />
+  'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
+  'semaphore': <img src={SemaphoreLogo} alt="Semaphore" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />,
+  'github': <img src={GithubLogo} alt="Github" className="w-6 h-6 object-contain dark:bg-white dark:rounded-lg" />
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
@@ -193,7 +194,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
-      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(173, 5, 5, 0.2) 0px 4px 12px' }}
+      style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons
@@ -222,19 +223,20 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-start">
+      <div className="px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-start flex-1 min-w-0">
-          <div className='max-w-8 mt-2'>
+          <div className='max-w-8 mt-1 flex items-center justify-center'>
             {EventSourceImageMap[eventSourceType as keyof typeof EventSourceImageMap]}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 ml-2">
             <div className="mb-1">
               <InlineEditable
                 value={eventSourceName}
                 onSave={handleEventSourceNameChange}
                 placeholder="Event source name"
-                className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
-                  }`}
+                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                  isEditMode ? 'text-sm' : '')}
                 isEditMode={isEditMode}
                 autoFocus={!!isNewNode}
                 dataTestId="event-source-name-input"
@@ -246,16 +248,19 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               )}
             </div>
             <div>
-              <InlineEditable
+              {isEditMode && <InlineEditable
                 value={eventSourceDescription}
                 onSave={handleEventSourceDescriptionChange}
                 placeholder={isEditMode ? "Add description..." : "No description available"}
                 className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
-              />
+              />}
             </div>
           </div>
         </div>
+        {!isEditMode && (
+          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || 'No description available'}</div>
+        )}
       </div>
 
       {isEditMode ? (
@@ -285,7 +290,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
         <>
           {
             eventSourceKey && eventSourceType === "webhook" && (
-              <div className="px-3 py-3 border-t w-full text-left bg-amber-50 dark:bg-amber-700">
+              <div className="px-3 py-3 w-full text-left bg-amber-50 dark:bg-amber-700">
                 <p className="text-sm text-amber-600 dark:text-amber-400">The Webhook Event Source has been created. Save this webhook signature, it will be displayed only once:</p>
                 <div className="flex items-center justify-between gap-2 mt-2">
                   <input type="text" value={eventSourceKey} readOnly className="w-full p-2 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-zinc-700 dark:text-zinc-200" />
@@ -296,7 +301,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               </div>
             )}
 
-          <div className="px-3 py-3 border-t border-gray-200 dark:border-gray-700 w-full">
+          <div className="px-3 py-3 w-full">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-sm my-2 font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Events</div>
             </div>

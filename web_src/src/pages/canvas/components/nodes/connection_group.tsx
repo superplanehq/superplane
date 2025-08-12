@@ -8,8 +8,9 @@ import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConn
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
-import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
+import { twMerge } from 'tailwind-merge';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
   const isNewNode = props.id && /^\d+$/.test(props.id);
@@ -265,49 +266,44 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-start">
+      <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-start flex-1 min-w-0">
-          <span className="material-symbols-outlined mr-2 text-gray-700 dark:text-gray-300 mt-1">account_tree</span>
-          <div className="flex-1 min-w-0">
+          <div className='max-w-8 mt-1 flex items-center justify-center'>
+            <MaterialSymbol name="account_tree" size="lg" />
+          </div>
+          <div className="flex-1 min-w-0 ml-2">
             <div className="mb-1">
               <InlineEditable
                 value={connectionGroupName}
                 onSave={handleConnectionGroupNameChange}
-                placeholder="Connection group name"
-                className={`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1 ${nameError && isEditMode ? 'border border-red-500 rounded' : ''
-                  }`}
+                placeholder="Event source name"
+                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                  isEditMode ? 'text-sm' : '')}
                 isEditMode={isEditMode}
-                autoFocus={!!isNewNode && !props.data.name}
-                dataTestId="connection-group-name-input"
+                autoFocus={!!isNewNode}
+                dataTestId="event-source-name-input"
               />
               {nameError && isEditMode && (
-                <div className="text-xs text-red-600 mt-1 px-2">
+                <div className="text-xs text-red-600 text-left mt-1 px-2">
                   {nameError}
                 </div>
               )}
             </div>
             <div>
-              <InlineEditable
+              {isEditMode && <InlineEditable
                 value={connectionGroupDescription}
                 onSave={handleConnectionGroupDescriptionChange}
                 placeholder={isEditMode ? "Add description..." : "No description available"}
                 className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
-              />
+              />}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-2">
-          {!isEditMode && (
-            <button
-              onClick={handleEditClick}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-              title="Edit connection group"
-            >
-              <MaterialSymbol name="edit" size="md" />
-            </button>
-          )}
-        </div>
+        {!isEditMode && (
+          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || 'No description available'}</div>
+        )}
       </div>
 
       {isEditMode ? (
@@ -329,7 +325,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       ) : (
         <>
           {/* Group By Section */}
-          <div className="px-3 py-3 border-t w-full">
+          <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -358,7 +354,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           </div>
 
           {/* Connections Section */}
-          <div className="px-3 py-3 border-t w-full">
+          <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Connections</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">

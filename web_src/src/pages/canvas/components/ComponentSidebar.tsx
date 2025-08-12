@@ -299,13 +299,13 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
 
           {/* Search */}
           <div className="p-4 pb-0">
-            <div className="relative flex items-center">
+            <div className="relative flex items-center border border-gray-200 dark:border-zinc-700 rounded-lg">
               <MaterialSymbol name="search" size="md" className="absolute left-3 text-gray-400 dark:text-zinc-500 z-10" />
               <Input
                 name="search"
                 placeholder="Search…"
                 aria-label="Search"
-                className="pl-10 border-0 focus:ring-0 focus:border-0 pl-5"
+                className="pl-14 border-0 focus:ring-0 focus:border-0 pl-5"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -333,7 +333,7 @@ export const ComponentSidebar: React.FC<ComponentSidebarProps> = ({
                     .map((component) => {
                       const disabled = isComponentDisabled(component);
                       const disabledMessage = getDisabledMessage(component);
-                      
+
                       const sidebarItem = (
                         <SidebarItem
                           key={`${component.id}-${component.name}`}
