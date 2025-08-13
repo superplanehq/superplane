@@ -3,6 +3,7 @@ import { CanvasData } from "../types";
 import { CanvasState, EventSourceWithEvents } from './types';
 import { SuperplaneCanvas, SuperplaneConnectionGroup, SuperplaneStage } from "@/api-client/types.gen";
 import { superplaneApproveStageEvent, superplaneListStageEvents } from '@/api-client';
+import { withOrganizationHeader } from '@/utils/withOrganizationHeader';
 import { ReadyState } from 'react-use-websocket';
 import { Connection, Viewport, applyNodeChanges, applyEdgeChanges } from '@xyflow/react';
 import { AllNodeType, EdgeType } from '../types/flow';
@@ -140,14 +141,14 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
     // use post request to approve stage event
     // defined in @/api-client/api
-    superplaneApproveStageEvent({
+    superplaneApproveStageEvent(withOrganizationHeader({
       path: {
         canvasIdOrName: get().canvas.metadata!.id!,
         stageIdOrName: stageId,
         eventId: stageEventId
       },
       body: {}
-    });
+    }));
   },
 
   selectStageId: (stageId: string) => {
@@ -190,12 +191,12 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       return;
     }
 
-    const stageEventsResponse = await superplaneListStageEvents({
+    const stageEventsResponse = await superplaneListStageEvents(withOrganizationHeader({
       path: {
         canvasIdOrName: canvasId,
         stageIdOrName: stageId
       }
-    });
+    }));
     set((state) => ({
       stages: state.stages.map((s) => s.metadata!.id === stageId ? {
         ...updatingStage,

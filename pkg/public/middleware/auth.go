@@ -46,7 +46,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 				return
 			}
 
-			organizationID := r.Header.Get("x-organization-id")
+			organizationID := findOrganizationID(r)
 			if organizationID == "" {
 				http.Error(w, "", http.StatusNotFound)
 				return
@@ -69,6 +69,20 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func findOrganizationID(r *http.Request) string {
+	organizationID := r.Header.Get("x-organization-id")
+	if organizationID != "" {
+		return organizationID
+	}
+
+	organizationID = r.URL.Query().Get("organization_id")
+	if organizationID != "" {
+		return organizationID
+	}
+
+	return ""
 }
 
 func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {

@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -855,13 +856,13 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err = s.authService.CheckCanvasPermission(user.ID.String(), canvasID, "canvas", "read")
+	accessibleCanvases, err := s.authService.GetAccessibleCanvasesForUser(user.ID.String())
 	if err != nil {
+		log.Errorf("Error getting accessible canvases for user %s: %v", user.ID.String(), err)
 		http.Error(w, "", http.StatusInternalServerError)
-		return
 	}
 
-	if !ok {
+	if !slices.Contains(accessibleCanvases, canvasID) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}

@@ -10,7 +10,7 @@ const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'w
  * Custom React hook that sets up the event handlers for the canvas store
  * Registers listeners for relevant events using a single WebSocket connection
  */
-export function useWebsocketEvents(canvasId: string): void {
+export function useWebsocketEvents(canvasId: string, organizationId: string): void {
   // Get store access methods directly within the hook
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
   const eventSources = useCanvasStore((s) => s.eventSources);
@@ -25,7 +25,7 @@ export function useWebsocketEvents(canvasId: string): void {
 
   // WebSocket setup
   const { lastJsonMessage, readyState } = useWebSocket<ServerEvent>(
-    `${SOCKET_SERVER_URL}${canvasId}`,
+    `${SOCKET_SERVER_URL}${canvasId}?organization_id=${organizationId}`,
     {
       shouldReconnect: () => true,
       reconnectAttempts: 10,

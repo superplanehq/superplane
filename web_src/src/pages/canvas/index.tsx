@@ -38,7 +38,7 @@ export function Canvas() {
   };
 
   // Custom hook for setting up event handlers - must be called at top level
-  useWebsocketEvents(canvasId!);
+  useWebsocketEvents(canvasId!, organizationId!);
 
   // Use the modular node handlers
   const { handleAddNode } = useNodeHandlers(canvasId || '');
