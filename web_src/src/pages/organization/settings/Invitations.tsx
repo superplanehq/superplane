@@ -15,6 +15,8 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
+import { organizationsListInvitations, organizationsCreateInvitation } from '../../../api-client/sdk.gen'
+import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 
 interface Invitation {
   id: string
@@ -38,38 +40,24 @@ export function Invitations({ organizationId }: InvitationsProps) {
   const { data: invitations = [], isLoading: loadingInvitations } = useQuery<Invitation[]>({
     queryKey: ['invitations', organizationId],
     queryFn: async () => {
-      const response = await fetch(`/api/v1/organizations/${organizationId}/invitations`, {
-        credentials: 'include',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to fetch invitations')
-      }
-      const data = await response.json()
-      return data.invitations || []
+      const response = await organizationsListInvitations(withOrganizationHeader({
+        path: { idOrName: organizationId }
+      }))
+      return response.data.invitations || []
     },
   })
 
   // Create invitation mutation
   const createInvitationMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await fetch(`/api/v1/organizations/${organizationId}/invitations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+      const response = await organizationsCreateInvitation(withOrganizationHeader({
+        path: { idOrName: organizationId },
+        body: {
           email: email,
           organization_id: organizationId,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.message || 'Failed to send invitation')
-      }
-
-      return response.json()
+        }
+      }))
+      return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invitations', organizationId] })

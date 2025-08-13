@@ -54,11 +54,11 @@ export function Groups({ organizationId }: GroupsProps) {
   const error = groupsError || rolesError
 
   const handleCreateGroup = () => {
-    navigate(`/settings/create-group`)
+    navigate(`/${organizationId}/settings/create-group`)
   }
 
   const handleViewMembers = (groupName: string) => {
-    navigate(`/settings/groups/${groupName}/members`)
+    navigate(`/${organizationId}/settings/groups/${groupName}/members`)
   }
 
   const handleDeleteGroup = async (groupName: string) => {
@@ -245,7 +245,7 @@ export function Groups({ organizationId }: GroupsProps) {
                           />
                           <div>
                             <Link
-                              href={`/settings/groups/${group.metadata?.name}/members`}
+                              href={`/${organizationId}/settings/groups/${group.metadata?.name}/members`}
                               className="cursor-pointer text-sm font-medium text-blue-600 dark:text-blue-400"
                             >
                               {group.spec?.displayName}

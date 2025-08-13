@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Button } from '../../components/Button/button'
@@ -8,7 +8,7 @@ import { Avatar } from '../../components/Avatar/avatar'
 import { CreateCanvasModal } from '../../components/CreateCanvasModal'
 import { useOrganizationCanvases, useCreateCanvas } from '../../hooks/useOrganizationData'
 import { SuperplaneCanvas } from '../../api-client'
-import { User } from '../../stores/userStore'
+import { useAccount } from '../../contexts/AccountContext'
 
 interface Canvas {
   id: string
@@ -25,42 +25,15 @@ interface Canvas {
 
 // Home page component - displays canvases for the current user's organization
 const HomePage = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [showCreateCanvasModal, setShowCreateCanvasModal] = useState(false)
-  const navigate = useNavigate()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const { account } = useAccount()
 
-  // Fetch user data to get organization_id
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/v1/user/profile', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  // Use the organization canvases hook
-  const { data: canvasesData = [], isLoading: canvasesLoading, error: apiError } = useOrganizationCanvases(user?.organization_id || '')
-  const createCanvasMutation = useCreateCanvas(user?.organization_id || '')
+  // Use the organization canvases hook with organization ID from URL
+  const { data: canvasesData = [], isLoading: canvasesLoading, error: apiError } = useOrganizationCanvases(organizationId || '')
+  const createCanvasMutation = useCreateCanvas(organizationId || '')
 
   const error = apiError ? 'Failed to fetch canvases. Please try again later.' : null
 
@@ -71,9 +44,9 @@ const HomePage = () => {
     description: canvas.metadata!.description,
     createdAt: canvas.metadata!.createdAt ? new Date(canvas.metadata!.createdAt!).toLocaleDateString() : 'Unknown',
     createdBy: {
-      name: user?.name || 'Unknown User',
-      initials: user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?',
-      avatar: user?.avatar_url,
+      name: account?.name || 'Unknown User',
+      initials: account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?',
+      avatar: undefined, // We don't have avatar in account data yet
     },
     type: 'canvas' as const
   }))
@@ -95,25 +68,20 @@ const HomePage = () => {
   }
 
   const handleCreateCanvasSubmit = async (data: { name: string; description?: string }) => {
-    if (user?.organization_id) {
-      const newCanvas = await createCanvasMutation.mutateAsync({
+    if (organizationId) {
+      await createCanvasMutation.mutateAsync({
         canvas: {
           metadata: {
             name: data.name,
             description: data.description,
           },
         },
-        organizationId: user.organization_id
+        organizationId: organizationId
       })
-      
-      // Navigate to the new canvas
-      if (newCanvas?.canvas?.metadata?.id) {
-        navigate(`/canvas/${newCanvas.canvas.metadata.id}`)
-      }
     }
   }
 
-  if (loading) {
+  if (canvasesLoading) {
     return (
       <div className="flex justify-center items-center h-40">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -122,7 +90,7 @@ const HomePage = () => {
     )
   }
 
-  if (!user || !user.organization_id) {
+  if (!account || !organizationId) {
     return (
       <div className="text-center py-8">
         <p className="text-gray-500">Unable to load user information</p>
@@ -139,10 +107,10 @@ const HomePage = () => {
             {/* Welcome Header */}
             <div className="text-center mb-8">
               <Heading level={1} className="!text-3xl mb-2">
-                Welcome back, {user.name}!
+                Welcome back, {account.name}!
               </Heading>
               <Text className="text-zinc-600 dark:text-zinc-400">
-                {user.email}
+                {account.email}
               </Text>
             </div>
 
@@ -221,7 +189,7 @@ const HomePage = () => {
                               <div className="flex items-start justify-between space-x-3 flex-1">
                                 <div className='flex flex-col flex-1'>
                                   <Link
-                                    to={`/canvas/${canvas.id}`}
+                                    to={`/${organizationId}/canvas/${canvas.id}`}
                                     className="block text-left w-full"
                                   >
                                     <Heading level={3} className="!text-md font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-0 !leading-6">
@@ -275,7 +243,7 @@ const HomePage = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center space-x-3 mb-1">
                                   <Link
-                                    to={`/canvas/${canvas.id}`}
+                                    to={`/${organizationId}/canvas/${canvas.id}`}
                                     className="block text-left"
                                   >
                                     <Heading level={3} className="text-base font-semibold text-zinc-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate">

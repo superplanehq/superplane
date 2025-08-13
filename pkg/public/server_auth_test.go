@@ -1,7 +1,6 @@
 package public
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -52,42 +51,12 @@ func TestServer_LoginPage(t *testing.T) {
 	assert.Contains(t, response.Body.String(), "Continue with GitHub")
 }
 
-func TestServer_UserProfile_Protected(t *testing.T) {
-	server, account, token := setupTestServer(t)
-
-	t.Run("without auth returns unauthorized", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method: "GET",
-			path:   "/api/v1/user/profile",
-		})
-
-		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
-	})
-
-	t.Run("with valid auth returns profile", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/user/profile", nil)
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: token,
-		})
-
-		w := httptest.NewRecorder()
-		server.Router.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-
-		var profile models.User
-		err := json.Unmarshal(w.Body.Bytes(), &profile)
-		require.NoError(t, err)
-		assert.Equal(t, account.Name, profile.Name)
-	})
-}
-
 func TestServer_Logout(t *testing.T) {
 	server, _, token := setupTestServer(t)
 
 	req := httptest.NewRequest("GET", "/logout", nil)
 	req.AddCookie(&http.Cookie{
-		Name:  "auth_token",
+		Name:  "account_token",
 		Value: token,
 	})
 
@@ -100,7 +69,7 @@ func TestServer_Logout(t *testing.T) {
 	cookies := w.Result().Cookies()
 	var authCookie *http.Cookie
 	for _, cookie := range cookies {
-		if cookie.Name == "auth_token" {
+		if cookie.Name == "account_token" {
 			authCookie = cookie
 			break
 		}

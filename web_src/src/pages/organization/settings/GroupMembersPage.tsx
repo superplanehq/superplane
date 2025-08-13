@@ -31,15 +31,16 @@ import {
   useDeleteGroup,
   useRemoveUserFromGroup
 } from '../../../hooks/useOrganizationData'
-import { useUserStore } from '../../../stores/userStore'
+import { useAccount } from '../../../contexts/AccountContext'
 import { UsersUser } from '@/api-client'
 
 export function GroupMembersPage() {
   const { groupName: encodedGroupName } = useParams<{ groupName: string }>()
   const groupName = encodedGroupName ? decodeURIComponent(encodedGroupName) : undefined
   const navigate = useNavigate()
-  const { user } = useUserStore()
-  const orgId = user?.organization_id
+  const { account: user } = useAccount()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const orgId = organizationId
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isEditingGroupName, setIsEditingGroupName] = useState(false)
@@ -69,7 +70,7 @@ export function GroupMembersPage() {
 
 
   const handleBackToGroups = () => {
-    navigate(`/settings/groups`)
+    navigate(`/${orgId}/settings/groups`)
   }
 
   const handleEditGroupName = () => {

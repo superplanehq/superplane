@@ -1,11 +1,12 @@
-import { useUserStore } from '../../../stores/userStore';
+import { useAccount } from '../../../contexts/AccountContext';
 import { Avatar } from '../../../components/Avatar/avatar';
 import { Text } from '../../../components/Text/text';
 import { Heading } from '../../../components/Heading/heading';
 import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol';
 
 export function Profile() {
-  const { user, loading, error } = useUserStore();
+  const { account: user, loading } = useAccount();
+  const error = null; // AccountContext doesn't expose error state
 
   if (loading) {
     return (
@@ -88,40 +89,13 @@ export function Profile() {
                 Member Since
               </Text>
               <Text className="text-zinc-900 dark:text-white">
-                {new Date(user.created_at).toLocaleDateString()}
+                {/* Created date not available in AccountContext */}
+                Not available
               </Text>
             </div>
           </div>
 
-          {/* Account Providers */}
-          <div>
-            <Text className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3">
-              Connected Accounts
-            </Text>
-            {user.account_providers && user.account_providers.length > 0 ? (
-              <div className="space-y-2">
-                {user.account_providers.map((provider) => (
-                  <div key={provider.id} className="flex items-center space-x-3 p-3 bg-zinc-50 dark:bg-zinc-700 rounded-md">
-                    <MaterialSymbol name="account_circle" className="text-zinc-500 dark:text-zinc-400" />
-                    <div className="flex-1">
-                      <Text className="text-sm font-medium text-zinc-900 dark:text-white">
-                        {provider.name || provider.username || provider.email || 'Unknown'}
-                      </Text>
-                      <Text className="text-xs text-zinc-500 dark:text-zinc-400">
-                        {provider.provider} • Connected {new Date(provider.created_at).toLocaleDateString()}
-                      </Text>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="p-3 bg-zinc-50 dark:bg-zinc-700 rounded-md">
-                <Text className="text-sm text-zinc-500 dark:text-zinc-400">
-                  No connected accounts found
-                </Text>
-              </div>
-            )}
-          </div>
+          {/* Note: Account providers not available in simplified account context */}
         </div>
       </div>
     </div>

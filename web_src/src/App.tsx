@@ -9,7 +9,9 @@ import { Canvas } from './pages/canvas'
 import { OrganizationSettings } from './pages/organization/settings'
 import Navigation from './components/Navigation'
 import AuthGuard from './components/AuthGuard'
-import OrganizationLogin from './pages/auth/OrganizationLogin'
+import OrganizationSelect from './pages/auth/OrganizationSelect'
+import OrganizationCreate from './pages/auth/OrganizationCreate'
+import { AccountProvider } from './contexts/AccountContext'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -43,17 +45,21 @@ const withAuthOnly = (Component: React.ComponentType) => (
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={BASE_PATH}>
-        <Routes>
-          {/* Public auth routes */}
-          <Route path="auth/login" element={<OrganizationLogin />} />
-          
-          {/* Protected routes */}
-          <Route path="" element={withAuthAndNavigation(HomePage)} />
-          <Route path="canvas/:canvasId" element={withAuthOnly(Canvas)} />
-          <Route path="settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
-        </Routes>
-      </BrowserRouter>
+      <AccountProvider>
+        <BrowserRouter basename={BASE_PATH}>
+          <Routes>
+ 
+            {/* Organization-scoped protected routes */}
+            <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
+            <Route path=":organizationId/canvas/:canvasId" element={withAuthOnly(Canvas)} />
+            <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
+            
+            {/* Organization selection and creation */}
+            <Route path="create" element={<OrganizationCreate />} />
+            <Route path="" element={<OrganizationSelect />} />
+          </Routes>
+        </BrowserRouter>
+      </AccountProvider>
     </QueryClientProvider>
   )
 }

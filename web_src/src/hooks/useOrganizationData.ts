@@ -23,6 +23,7 @@ import {
   superplaneDeleteCanvas
 } from '../api-client/sdk.gen'
 import { RolesCreateRoleRequest, AuthorizationDomainType } from '@/api-client'
+import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 
 // Query Keys
 export const organizationKeys = {
@@ -42,9 +43,11 @@ export const useOrganization = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.details(organizationId),
     queryFn: async () => {
-      const response = await organizationsDescribeOrganization({
-        path: { idOrName: organizationId }
-      })
+      const response = await organizationsDescribeOrganization(
+        withOrganizationHeader({
+          path: { idOrName: organizationId }
+        })
+      )
       return response.data?.organization || null
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -57,9 +60,11 @@ export const useOrganizationUsers = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.users(organizationId),
     queryFn: async () => {
-      const response = await usersListUsers({
-        query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
-      })
+      const response = await usersListUsers(
+        withOrganizationHeader({
+          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
+        })
+      )
       return response.data?.users || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -71,9 +76,11 @@ export const useOrganizationRoles = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.roles(organizationId),
     queryFn: async () => {
-      const response = await rolesListRoles({
-        query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
-      })
+      const response = await rolesListRoles(
+        withOrganizationHeader({
+          query: { domainType: 'DOMAIN_TYPE_ORGANIZATION', domainId: organizationId }
+        })
+      )
       return response.data?.roles || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -85,9 +92,11 @@ export const useOrganizationGroups = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.groups(organizationId),
     queryFn: async () => {
-      const response = await groupsListGroups({
-        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
-      })
+      const response = await groupsListGroups(
+        withOrganizationHeader({
+          query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
+        })
+      )
       return response.data?.groups || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -99,10 +108,12 @@ export const useOrganizationGroup = (organizationId: string, groupName: string) 
   return useQuery({
     queryKey: organizationKeys.group(organizationId, groupName),
     queryFn: async () => {
-      const response = await groupsDescribeGroup({
-        path: { groupName },
-        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
-      })
+      const response = await groupsDescribeGroup(
+        withOrganizationHeader({
+          path: { groupName },
+          query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
+        })
+      )
       return response.data?.group || null
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -115,10 +126,12 @@ export const useOrganizationGroupUsers = (organizationId: string, groupName: str
   return useQuery({
     queryKey: organizationKeys.groupUsers(organizationId, groupName),
     queryFn: async () => {
-      const response = await groupsListGroupUsers({
-        path: { groupName },
-        query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
-      })
+      const response = await groupsListGroupUsers(
+        withOrganizationHeader({
+          path: { groupName },
+          query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
+        })
+      )
       return response.data?.users || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -131,13 +144,15 @@ export const useRole = (organizationId: string, roleName: string) => {
   return useQuery({
     queryKey: organizationKeys.role(organizationId, roleName),
     queryFn: async () => {
-      const response = await rolesDescribeRole({
-        query: {
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId,
-          role: roleName
-        }
-      })
+      const response = await rolesDescribeRole(
+        withOrganizationHeader({
+          query: {
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: organizationId,
+            role: roleName
+          }
+        })
+      )
       return response.data?.role || null
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -156,15 +171,17 @@ export const useAssignRole = (organizationId: string) => {
       userEmail?: string,
       roleName: string,
     }) => {
-      return await rolesAssignRole({
-        body: {
-          userId: params.userId,
-          userEmail: params.userEmail,
-          roleName: params.roleName,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        },
-      })
+      return await rolesAssignRole(
+        withOrganizationHeader({
+          body: {
+            userId: params.userId,
+            userEmail: params.userEmail,
+            roleName: params.roleName,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: organizationId
+          },
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
@@ -180,14 +197,16 @@ export const useRemoveRole = (organizationId: string) => {
       userId: string, 
       roleName: string,
     }) => {
-      return await rolesRemoveRole({
-        body: {
-          userId: params.userId,
-          roleName: params.roleName,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-          domainId: organizationId
-        }
-      })
+      return await rolesRemoveRole(
+        withOrganizationHeader({
+          body: {
+            userId: params.userId,
+            roleName: params.roleName,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+            domainId: organizationId
+          }
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.users(organizationId) })
@@ -206,22 +225,24 @@ export const useCreateGroup = (organizationId: string) => {
       description?: string,
       role?: string 
     }) => {
-      return await groupsCreateGroup({
-        body: {
-          group: {
-            metadata: {
-              name: params.groupName,
+      return await groupsCreateGroup(
+        withOrganizationHeader({
+          body: {
+            group: {
+              metadata: {
+                name: params.groupName,
+              },
+              spec: {
+                displayName: params.displayName,
+                description: params.description,
+                role: params.role
+              }
             },
-            spec: {
-              displayName: params.displayName,
-              description: params.description,
-              role: params.role
-            }
-          },
-          domainId: params.organizationId,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-        }
-      })
+            domainId: params.organizationId,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          }
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.groups(organizationId) })
@@ -240,23 +261,25 @@ export const useUpdateGroup = (organizationId: string) => {
       description?: string,
       role?: string 
     }) => {
-      return await groupsUpdateGroup({
-        path: { groupName: params.groupName },
-        body: {
-          group: {
-            metadata: {
-              name: params.groupName,
+      return await groupsUpdateGroup(
+        withOrganizationHeader({
+          path: { groupName: params.groupName },
+          body: {
+            group: {
+              metadata: {
+                name: params.groupName,
+              },
+              spec: {
+                displayName: params.displayName,
+                description: params.description,
+                role: params.role
+              }
             },
-            spec: {
-              displayName: params.displayName,
-              description: params.description,
-              role: params.role
-            }
-          },
-          domainId: params.organizationId,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION',
-        }
-      })
+            domainId: params.organizationId,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION',
+          }
+        })
+      )
     },
     onSuccess: (_, variables) => {
       // Invalidate and refetch groups and specific group data
@@ -271,10 +294,12 @@ export const useDeleteGroup = (organizationId: string) => {
   
   return useMutation({
     mutationFn: async (params: { groupName: string, organizationId: string }) => {
-      return await groupsDeleteGroup({
-        path: { groupName: params.groupName },
-        query: { domainId: params.organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
-      })
+      return await groupsDeleteGroup(
+        withOrganizationHeader({
+          path: { groupName: params.groupName },
+          query: { domainId: params.organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' }
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.groups(organizationId) })
@@ -292,15 +317,17 @@ export const useAddUserToGroup = (organizationId: string) => {
       userEmail?: string, 
       organizationId: string 
     }) => {
-      return await groupsAddUserToGroup({
-        path: { groupName: params.groupName },
-        body: {
-          userId: params.userId,
-          userEmail: params.userEmail,
-          domainId: params.organizationId,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION'
-        }
-      })
+      return await groupsAddUserToGroup(
+        withOrganizationHeader({
+          path: { groupName: params.groupName },
+          body: {
+            userId: params.userId,
+            userEmail: params.userEmail,
+            domainId: params.organizationId,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION'
+          }
+        })
+      )
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.groupUsers(organizationId, variables.groupName) })
@@ -318,14 +345,16 @@ export const useRemoveUserFromGroup = (organizationId: string) => {
       userId: string, 
       organizationId: string 
     }) => {
-      return await groupsRemoveUserFromGroup({
-        path: { groupName: params.groupName },
-        body: {
-          userId: params.userId,
-          domainId: params.organizationId,
-          domainType: 'DOMAIN_TYPE_ORGANIZATION'
-        }
-      })
+      return await groupsRemoveUserFromGroup(
+        withOrganizationHeader({
+          path: { groupName: params.groupName },
+          body: {
+            userId: params.userId,
+            domainId: params.organizationId,
+            domainType: 'DOMAIN_TYPE_ORGANIZATION'
+          }
+        })
+      )
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.groupUsers(organizationId, variables.groupName) })
@@ -338,9 +367,11 @@ export const useCreateRole = (organizationId: string) => {
   
   return useMutation({
     mutationFn: async (params: RolesCreateRoleRequest) => {
-      return await rolesCreateRole({
-        body: params
-      })
+      return await rolesCreateRole(
+        withOrganizationHeader({
+          body: params
+        })
+      )
     },
     onSuccess: () => {
       // Invalidate and refetch roles
@@ -361,23 +392,25 @@ export const useUpdateRole = (organizationId: string) => {
       displayName?: string,
       description?: string
     }) => {
-      return await rolesUpdateRole({
-        path: { roleName: params.roleName },
-        body: {
-          domainType: params.domainType,
-          domainId: params.domainId,
-          role: {
-            metadata: {
-              name: params.roleName,
-            },
-            spec: {
-              permissions: params.permissions,
-              displayName: params.displayName,
-              description: params.description
+      return await rolesUpdateRole(
+        withOrganizationHeader({
+          path: { roleName: params.roleName },
+          body: {
+            domainType: params.domainType,
+            domainId: params.domainId,
+            role: {
+              metadata: {
+                name: params.roleName,
+              },
+              spec: {
+                permissions: params.permissions,
+                displayName: params.displayName,
+                description: params.description
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.roles(organizationId) })
@@ -395,13 +428,15 @@ export const useDeleteRole = (organizationId: string) => {
       domainType: AuthorizationDomainType,
       domainId: string
     }) => {
-      return await rolesDeleteRole({
-        path: { roleName: params.roleName },
-        query: {
-          domainType: params.domainType,
-          domainId: params.domainId
-        }
-      })
+      return await rolesDeleteRole(
+        withOrganizationHeader({
+          path: { roleName: params.roleName },
+          query: {
+            domainType: params.domainType,
+            domainId: params.domainId
+          }
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.roles(organizationId) })
@@ -417,17 +452,19 @@ export const useUpdateOrganization = (organizationId: string) => {
       displayName?: string,
       description?: string
     }) => {
-      return await organizationsUpdateOrganization({
-        path: { idOrName: organizationId },
-        body: {
-          organization: {
-            metadata: {
-              displayName: params.displayName,
-              description: params.description
+      return await organizationsUpdateOrganization(
+        withOrganizationHeader({
+          path: { idOrName: organizationId },
+          body: {
+            organization: {
+              metadata: {
+                displayName: params.displayName,
+                description: params.description
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.details(organizationId) })
@@ -439,7 +476,9 @@ export const useOrganizationCanvases = (organizationId: string) => {
   return useQuery({
     queryKey: organizationKeys.canvases(organizationId),
     queryFn: async () => {
-      const response = await superplaneListCanvases({ query: { organizationId } })
+      const response = await superplaneListCanvases(
+        withOrganizationHeader({ query: { organizationId } })
+      )
       return response.data?.canvases || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -461,9 +500,11 @@ export const useCreateCanvas = (organizationId: string) => {
       },
       organizationId: string
     }) => {
-      return await superplaneCreateCanvas({
-        body: params
-      })
+      return await superplaneCreateCanvas(
+        withOrganizationHeader({
+          body: params
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) })
@@ -478,10 +519,12 @@ export const useDeleteCanvas = (organizationId: string) => {
     mutationFn: async (params: {
       canvasId: string
     }) => {
-      return await superplaneDeleteCanvas({
-        path: { idOrName: params.canvasId },
-        query: { organizationId }
-      })
+      return await superplaneDeleteCanvas(
+        withOrganizationHeader({
+          path: { idOrName: params.canvasId },
+          query: { organizationId }
+        })
+      )
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: organizationKeys.canvases(organizationId) })

@@ -7,7 +7,7 @@ import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
 import { Label, Description } from '../../../components/Fieldset/fieldset'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { useRole, useCreateRole, useUpdateRole } from '../../../hooks/useOrganizationData'
-import { useUserStore } from '../../../stores/userStore'
+import { useAccount } from '../../../contexts/AccountContext'
 import { Heading } from '@/components/Heading/heading'
 
 interface Permission {
@@ -75,8 +75,9 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
 export function CreateRolePage() {
   const { roleName: roleNameParam } = useParams<{ roleName?: string }>()
   const navigate = useNavigate()
-  const { user } = useUserStore()
-  const orgId = user?.organization_id
+  const { account: user } = useAccount()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const orgId = organizationId
   const isEditMode = !!roleNameParam
 
   const [roleName, setRoleName] = useState('')
@@ -183,7 +184,7 @@ export function CreateRolePage() {
         })
       }
 
-      navigate(`/settings/roles`)
+      navigate(`/${orgId}/settings/roles`)
     } catch {
       console.error('Failed to create role')
     }
@@ -201,7 +202,7 @@ export function CreateRolePage() {
               items={[
                 {
                   label: 'Roles',
-                  onClick: () => navigate(`/settings/roles`)
+                  onClick: () => navigate(`/${orgId}/settings/roles`)
                 },
                 {
                   label: isEditMode ? 'Edit organization role' : 'Create new organization role',
@@ -358,7 +359,7 @@ export function CreateRolePage() {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3">
-            <Link to={`/settings/roles`}>
+            <Link to={`/${orgId}/settings/roles`}>
               <Button outline>
                 Cancel
               </Button>

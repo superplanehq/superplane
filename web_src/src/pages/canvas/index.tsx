@@ -11,7 +11,8 @@ import { CanvasNavigation } from "../../components/CanvasNavigation";
 import { SettingsPage } from "../../components/SettingsPage";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
-import { User } from "../../stores/userStore";
+import { useAccount } from "../../contexts/AccountContext";
+import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 
 // No props needed as we'll get the ID from the URL params
 
@@ -25,7 +26,8 @@ export function Canvas() {
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
-  const [user, setUser] = useState<User | null>(null);
+  const { account: user } = useAccount();
+  const { organizationId } = useParams<{ organizationId: string }>();
 
   // Determine active view from URL hash or default to editor
   const activeView = location.hash.startsWith('#settings') ? 'settings' : 'editor';
@@ -47,35 +49,10 @@ export function Canvas() {
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
-  // Fetch user data first
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/v1/user/profile', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (response.ok) {
-          const userData = await response.json();
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('Failed to fetch user:', error);
-        setError("Failed to authenticate user");
-        setIsLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, []);
 
   useEffect(() => {
-    // Return early if no canvas ID or user is available
-    if (!canvasId || !user?.organization_id) {
+    // Return early if no canvas ID or organization ID is available
+    if (!canvasId || !organizationId) {
       if (!canvasId) {
         setError("No canvas ID provided");
         setIsLoading(false);
@@ -88,10 +65,12 @@ export function Canvas() {
         setIsLoading(true);
 
         // Fetch canvas details
-        const canvasResponse = await superplaneDescribeCanvas({
-          path: { id: canvasId },
-          query: { organizationId: user.organization_id }
-        });
+        const canvasResponse = await superplaneDescribeCanvas(
+          withOrganizationHeader({
+            path: { id: canvasId },
+            query: { organizationId: organizationId }
+          })
+        );
 
         if (!canvasResponse.data?.canvas) {
           throw new Error('Failed to fetch canvas data');
@@ -101,9 +80,11 @@ export function Canvas() {
         setCanvasName(canvasResponse.data.canvas.metadata?.name || 'Unknown Canvas');
 
         // Fetch stages for the canvas
-        const stagesResponse = await superplaneListStages({
-          path: { canvasIdOrName: canvasId },
-        });
+        const stagesResponse = await superplaneListStages(
+          withOrganizationHeader({
+            path: { canvasIdOrName: canvasId },
+          })
+        );
 
         // Check if stages data was fetched successfully
         if (!stagesResponse.data?.stages) {
@@ -111,18 +92,22 @@ export function Canvas() {
         }
 
         // Fetch connection groups for the canvas
-        const connectionGroupsResponse = await superplaneListConnectionGroups({
-          path: { canvasIdOrName: canvasId },
-        });
+        const connectionGroupsResponse = await superplaneListConnectionGroups(
+          withOrganizationHeader({
+            path: { canvasIdOrName: canvasId },
+          })
+        );
 
         if (!connectionGroupsResponse.data?.connectionGroups) {
           throw new Error('Failed to fetch connection groups data');
         }
 
         // Fetch event sources for the canvas
-        const eventSourcesResponse = await superplaneListEventSources({
-          path: { canvasIdOrName: canvasId }
-        });
+        const eventSourcesResponse = await superplaneListEventSources(
+          withOrganizationHeader({
+            path: { canvasIdOrName: canvasId }
+          })
+        );
 
         // Check if event sources data was fetched successfully
         if (!eventSourcesResponse.data?.eventSources) {
@@ -138,9 +123,11 @@ export function Canvas() {
 
         // Fetch events for each stage
         for (const stage of mappedStages) {
-          const stageEventsResponse = await superplaneListStageEvents({
-            path: { canvasIdOrName: canvasId!, stageIdOrName: stage.metadata!.id! }
-          });
+          const stageEventsResponse = await superplaneListStageEvents(
+            withOrganizationHeader({
+              path: { canvasIdOrName: canvasId!, stageIdOrName: stage.metadata!.id! }
+            })
+          );
 
           const stageEvents = stageEventsResponse.data?.events || [];
 
@@ -195,7 +182,7 @@ export function Canvas() {
     };
 
     fetchCanvasData();
-  }, [canvasId, initialize, user?.organization_id]);
+  }, [canvasId, initialize, organizationId]);
 
   if (isLoading) {
     return <div className="loading-state">Loading canvas...</div>;
@@ -256,7 +243,7 @@ export function Canvas() {
           canvasName={canvasName}
           activeView={activeView}
           onViewChange={handleViewChange}
-          organizationId={user?.organization_id!}
+          organizationId={organizationId!}
         />
 
         {/* Content based on active view */}
@@ -287,7 +274,7 @@ export function Canvas() {
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)]" >
-            <SettingsPage organizationId={user?.organization_id!} />
+            <SettingsPage organizationId={organizationId!} />
           </div>
         )}
       </div>

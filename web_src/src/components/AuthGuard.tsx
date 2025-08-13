@@ -1,57 +1,24 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useAccount } from '../contexts/AccountContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User } from '../stores/userStore';
 
 interface AuthGuardProps {
   children: React.ReactNode;
 }
 
 const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { account, loading } = useAccount();
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    console.log('[AuthGuard] useEffect triggered, current path:', location.pathname);
-    
-    const fetchUser = async () => {
-      console.log('[AuthGuard] Starting fetchUser');
-      
-      try {
-        const response = await fetch('/api/v1/user/profile', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        console.log('[AuthGuard] Profile response status:', response.status);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch user: ${response.status}`);
-        }
-        
-        const userData = await response.json();
-        console.log('[AuthGuard] User data received:', userData);
-        setUser(userData);
-      } catch (error) {
-        console.log('[AuthGuard] Error fetching user:', error);
-        // User is not authenticated, redirect to login
-        const currentPath = location.pathname + location.search;
-        console.log('[AuthGuard] Redirecting to login from:', currentPath);
-        navigate(`/login?redirect=${encodeURIComponent(currentPath)}`, { replace: true });
-      } finally {
-        console.log('[AuthGuard] Setting loading to false');
-        setLoading(false);
-      }
-    };
+  // If account is not loaded and not loading, redirect to organization select
+  if (!loading && !account) {
+    console.log('[AuthGuard] No account, redirecting to organization select from:', location.pathname);
+    navigate('/', { replace: true });
+    return null;
+  }
 
-    fetchUser();
-  }, []); // Only run once on mount
-
-  // Show loading spinner while fetching user
+  // Show loading spinner while fetching account
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-zinc-900">
@@ -63,7 +30,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     );
   }
 
-  // User is authenticated, render the protected content
+  // Account is authenticated, render the protected content
   return <>{children}</>;
 };
 

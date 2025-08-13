@@ -47,11 +47,11 @@ export function Roles({ organizationId }: RolesProps) {
   const deleteRoleMutation = useDeleteRole(organizationId)
 
   const handleCreateRole = () => {
-    navigate(`/settings/create-role`)
+    navigate(`/${organizationId}/settings/create-role`)
   }
 
   const handleEditRole = (role: RolesRole) => {
-    navigate(`/settings/create-role/${role.metadata?.name}`)
+    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`)
   }
 
   const handleDeleteRole = async (role: RolesRole) => {

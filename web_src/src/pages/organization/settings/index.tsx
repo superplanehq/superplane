@@ -1,5 +1,4 @@
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
 import { Avatar } from '../../../components/Avatar/avatar'
 import { Sidebar, SidebarBody, SidebarDivider, SidebarItem, SidebarLabel, SidebarSection } from '../../../components/Sidebar/sidebar'
 import { General } from './General'
@@ -12,20 +11,17 @@ import { CreateGroupPage } from './CreateGroupPage'
 import { CreateRolePage } from './CreateRolePage'
 import { Profile } from './Profile'
 import { useOrganization } from '../../../hooks/useOrganizationData'
-import { useUserStore } from '../../../stores/userStore'
+import { useAccount } from '../../../contexts/AccountContext'
+import { useParams } from 'react-router-dom'
 
 export function OrganizationSettings() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, fetchUser, loading: userLoading } = useUserStore()
+  const { account: user, loading: userLoading } = useAccount()
+  const { organizationId } = useParams<{ organizationId: string }>()
 
   // Use React Query hook for organization data
-  const { data: organization, isLoading: loading, error } = useOrganization(user?.organization_id || '')
-
-  // Fetch user data when component mounts
-  useEffect(() => {
-    fetchUser()
-  }, [fetchUser])
+  const { data: organization, isLoading: loading, error } = useOrganization(organizationId || '')
 
   // Extract current section from the URL
   const currentSection = location.pathname.split('/').pop() || 'general'
@@ -38,7 +34,7 @@ export function OrganizationSettings() {
     )
   }
 
-  if (!user?.organization_id) {
+  if (!organizationId) {
     return (
       <div className="flex justify-center items-center h-screen">
         <p className="text-zinc-500 dark:text-zinc-400">Organization not found</p>
@@ -87,12 +83,12 @@ export function OrganizationSettings() {
                 />
                 <SidebarLabel className='text-zinc-900 dark:text-white'>{user?.name || 'My Account'}</SidebarLabel>
               </div>
-              <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate('/settings/profile')}>
+              <SidebarItem className={`${currentSection === 'profile' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/${organizationId}/settings/profile`)}>
                 <span className='px-7'>
                   <SidebarLabel>My Profile</SidebarLabel>
                 </span>
               </SidebarItem>
-              <SidebarItem className={`${currentSection === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate('/settings/api_token')}>
+              <SidebarItem className={`${currentSection === 'api_token' ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`} onClick={() => navigate(`/${organizationId}/settings/api_token`)}>
                 <span className='px-7'>
                   <SidebarLabel>API Token</SidebarLabel>
                 </span>
@@ -112,7 +108,7 @@ export function OrganizationSettings() {
               {tabs.filter(tab => tab.id !== 'profile').map((tab) => (
                 <SidebarItem
                   key={tab.id}
-                  onClick={() => navigate(`/settings/${tab.id}`)}
+                  onClick={() => navigate(`/${organizationId}/settings/${tab.id}`)}
                   className={`${currentSection === tab.id ? 'bg-zinc-100 dark:bg-zinc-800 rounded-md' : ''}`}
                 >
                   <span className={`px-7 ${currentSection === tab.id ? 'font-semibold' : 'font-normal'}`}>
@@ -137,10 +133,10 @@ export function OrganizationSettings() {
                   </div>
                 )
               } />
-              <Route path="members" element={<Members organizationId={user?.organization_id || ''} />} />
-              <Route path="invitations" element={<Invitations organizationId={user?.organization_id || ''} />} />
-              <Route path="groups" element={<Groups organizationId={user?.organization_id || ''} />} />
-              <Route path="roles" element={<Roles organizationId={user?.organization_id || ''} />} />
+              <Route path="members" element={<Members organizationId={organizationId || ''} />} />
+              <Route path="invitations" element={<Invitations organizationId={organizationId || ''} />} />
+              <Route path="groups" element={<Groups organizationId={organizationId || ''} />} />
+              <Route path="roles" element={<Roles organizationId={organizationId || ''} />} />
               <Route path="groups/:groupName/members" element={<GroupMembersPage />} />
               <Route path="create-group" element={<CreateGroupPage />} />
               <Route path="create-role" element={<CreateRolePage />} />

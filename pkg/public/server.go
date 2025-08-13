@@ -54,6 +54,7 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcVerifier          *crypto.OIDCVerifier
+	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
 	Router                *mux.Router
@@ -80,7 +81,7 @@ func NewServer(
 ) (*Server, error) {
 
 	// Initialize OAuth providers from environment variables
-	authHandler := authentication.NewHandler(jwtSigner, encryptor, authorizationService, appEnv)
+	authHandler := authentication.NewHandler(jwtSigner, encryptor, appEnv)
 	providers := getOAuthProviders()
 	authHandler.InitializeProviders(providers)
 
@@ -94,6 +95,7 @@ func NewServer(
 		jwt:                   jwtSigner,
 		oidcVerifier:          oidcVerifier,
 		registry:              registry,
+		authService:           authorizationService,
 		upgrader: &websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				// Allow all connections - you may want to restrict this in production
@@ -178,10 +180,9 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
-	// Protect the gRPC gateway routes with authentication
-	protectedGRPCHandler := s.authHandler.Middleware(
-		s.stripIDHeaderHandler(s.grpcGatewayHandler(grpcGatewayMux)),
-	)
+	// Protect the gRPC gateway routes with organization authentication
+	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	s.Router.PathPrefix("/api/v1/users").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
@@ -192,15 +193,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/secrets").Handler(protectedGRPCHandler)
 
 	return nil
-}
-
-// stripUserIDHeaderHandler removes the X-User-Id header from the request before we set it manually
-func (s *Server) stripIDHeaderHandler(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r.Header.Del("X-User-Id")
-		r.Header.Del("X-Organization-Id")
-		next.ServeHTTP(w, r)
-	})
 }
 
 func headersMatcher(key string) (string, bool) {
@@ -214,9 +206,15 @@ func headersMatcher(key string) (string, bool) {
 
 func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, ok := authentication.GetUserFromContext(r.Context())
+		user, ok := middleware.GetUserFromContext(r.Context())
 		if !ok {
 			http.Error(w, "User not found in context", http.StatusUnauthorized)
+			return
+		}
+
+		orgID := r.Header.Get("x-organization-id")
+		if orgID == "" {
+			http.Error(w, "Organization ID not found in headers", http.StatusInternalServerError)
 			return
 		}
 
@@ -225,7 +223,7 @@ func (s *Server) grpcGatewayHandler(grpcGatewayMux *runtime.ServeMux) http.Handl
 		r2.URL = new(url.URL)
 		*r2.URL = *r.URL
 		r2.Header.Set("x-User-id", user.ID.String())
-		r2.Header.Set("x-Organization-id", user.OrganizationID.String())
+		r2.Header.Set("x-Organization-id", orgID)
 		grpcGatewayMux.ServeHTTP(w, r2.WithContext(r.Context()))
 	})
 }
@@ -260,30 +258,37 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 	log.Infof("Registering web routes with base path: %s", webBasePath)
 
 	// WebSocket endpoint - protected by authentication
-	protectedWSHandler := s.authHandler.Middleware(http.HandlerFunc(s.handleWebSocket))
-	s.Router.Handle("/ws/{canvasId}", protectedWSHandler)
+	s.Router.Handle(
+		"/ws/{canvasId}",
+		middleware.AccountAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleWebSocket)),
+	)
 
-	// Check if we're in development mode
+	//
+	// In development mode, we proxy to the Vite dev server.
+	//
 	if s.isDev {
 		log.Info("Running in development mode - proxying to Vite dev server for web app")
 		s.setupDevProxy(webBasePath)
-	} else {
-		log.Info("Running in production mode - serving static web assets")
-
-		handler := web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath)
-
-		// Protect the main web application with authentication
-		protectedWebHandler := s.authHandler.Middleware(handler)
-		s.Router.PathPrefix(webBasePath).Handler(protectedWebHandler)
-
-		s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == webBasePath {
-				http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
-				return
-			}
-			protectedWebHandler.ServeHTTP(w, r)
-		})
+		return
 	}
+
+	log.Info("Running in production mode - serving static web assets")
+
+	handler := middleware.AccountAuthMiddleware(s.jwt).
+		Middleware(
+			web.NewAssetHandler(http.FS(assets.EmbeddedAssets), webBasePath),
+		)
+
+	s.Router.PathPrefix(webBasePath).Handler(handler)
+
+	s.Router.HandleFunc(webBasePath, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == webBasePath {
+			http.Redirect(w, r, webBasePath+"/", http.StatusMovedPermanently)
+			return
+		}
+		handler.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
@@ -329,41 +334,150 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		Headers("Content-Type", "application/json").
 		Methods("POST")
 
-	//
-	// Protected routes (authentication required)
-	//
-	protectedRoute := r.NewRoute().Subrouter()
-	protectedRoute.Use(s.authHandler.Middleware)
-
-	// Add protected API routes here
-	protectedRoute.HandleFunc("/api/v1/user/profile", s.handleUserProfile).Methods("GET")
+	// Account-based endpoints (use account session, not organization context)
+	accountRoute := r.NewRoute().Subrouter()
+	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
+	accountRoute.HandleFunc("/account", s.handleAccountProfile).Methods("GET")
+	accountRoute.HandleFunc("/organizations", s.handleAccountOrganizations).Methods("GET")
+	accountRoute.HandleFunc("/organizations", s.handleCreateOrganization).Methods("POST")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
 		publicRoute.Use(middleware)
-		protectedRoute.Use(middleware)
 	}
 
 	s.Router = r
 }
 
-func (s *Server) handleUserProfile(w http.ResponseWriter, r *http.Request) {
-	user, ok := authentication.GetUserFromContext(r.Context())
+type OrganizationCreationRequest struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+}
+
+func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		http.Error(w, "", http.StatusUnauthorized)
 		return
 	}
 
-	safeUser := UserProfileResponse{
-		ID:             user.ID.String(),
-		OrganizationID: user.OrganizationID.String(),
-		Email:          user.Email,
-		Name:           user.Name,
-		CreatedAt:      user.CreatedAt,
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	var req OrganizationCreationRequest
+	err = json.Unmarshal(body, &req)
+	if err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name == "" || req.DisplayName == "" {
+		http.Error(w, "Name and DisplayName are required", http.StatusBadRequest)
+		return
+	}
+
+	//
+	// TODO: the organization creation should be in a transaction
+	//
+
+	//
+	// Create the organization and set up roles for it.
+	//
+	organization, err := models.CreateOrganization(req.Name, req.DisplayName, "")
+	if err != nil {
+		log.Errorf("Error creating organization: %v", err)
+		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
+		return
+	}
+
+	err = s.authService.SetupOrganizationRoles(organization.ID.String())
+	if err != nil {
+		log.Errorf("Error setting up organization roles for %s: %v", organization.Name, err)
+		models.HardDeleteOrganization(organization.ID.String())
+		http.Error(w, "Failed to set up organization roles", http.StatusInternalServerError)
+		return
+	}
+
+	//
+	// Create the owner user for it
+	//
+	user, err := models.CreateUser(organization.ID, account.ID, account.Email, account.Name)
+	if err != nil {
+		log.Errorf("Error creating user for new organization: %v", err)
+		models.HardDeleteOrganization(organization.ID.String())
+		http.Error(w, "Failed to create user account", http.StatusInternalServerError)
+		return
+	}
+
+	err = s.authService.CreateOrganizationOwner(user.ID.String(), organization.ID.String())
+	if err != nil {
+		log.Errorf("Error creating organization owner for %s: %v", organization.Name, err)
+		models.HardDeleteOrganization(organization.ID.String())
+		http.Error(w, "Failed to create organization owner", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]any{}
+	response["id"] = organization.ID.String()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (s *Server) handleAccountProfile(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		log.Error("Account not found in context")
+		http.Error(w, "Account not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	log.Infof("Account found in context: %v", account)
+
+	accountResponse := map[string]interface{}{
+		"id":    account.ID.String(),
+		"name":  account.Name,
+		"email": account.Email,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(safeUser)
+	json.NewEncoder(w).Encode(accountResponse)
+}
+
+func (s *Server) handleAccountOrganizations(w http.ResponseWriter, r *http.Request) {
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	type Organization struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		DisplayName string `json:"display_name"`
+		Description string `json:"description"`
+	}
+
+	organizations, err := models.FindUserOrganizationsByEmail(account.Email)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	response := []Organization{}
+	for _, organization := range organizations {
+		response = append(response, Organization{
+			ID:          organization.ID.String(),
+			Name:        organization.Name,
+			DisplayName: organization.DisplayName,
+			Description: organization.Description,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
 }
 
 func (s *Server) HealthCheck(w http.ResponseWriter, r *http.Request) {
@@ -726,9 +840,8 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
 
-	_, ok := authentication.GetUserFromContext(r.Context())
+	_, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
-		log.Error("WebSocket connection without authenticated user")
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -743,7 +856,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(websocket.HandshakeError); !ok {
 			log.Println(err)
 		}
-		log.Infof("Failed to upgrade to WebSocket: %v", err)
+		log.Errorf("Failed to upgrade to WebSocket: %v", err)
 		return
 	}
 
@@ -780,8 +893,7 @@ func (s *Server) setupDevProxy(webBasePath string) {
 		proxy.ServeHTTP(w, r)
 	})
 
-	protectedProxy := s.authHandler.Middleware(proxyHandler)
-	s.Router.PathPrefix(webBasePath).Handler(protectedProxy)
+	s.Router.PathPrefix(webBasePath).Handler(middleware.AccountAuthMiddleware(s.jwt).Middleware(proxyHandler))
 }
 
 func getBaseURL() string {

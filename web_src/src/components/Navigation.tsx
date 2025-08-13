@@ -1,20 +1,17 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Avatar } from './Avatar/avatar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from './Dropdown/dropdown';
 import { Text } from './Text/text';
 import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
 import { useOrganization } from '../hooks/useOrganizationData';
-import { useUserStore } from '../stores/userStore';
+import { useAccount } from '../contexts/AccountContext';
+import { useParams } from 'react-router-dom';
 
 const Navigation: React.FC = () => {
-  const { user, fetchUser, clearUser } = useUserStore();
-
-  const { data: organization } = useOrganization(user?.organization_id || '');
-
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
+  const { account: user } = useAccount();
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { data: organization } = useOrganization(organizationId || '');
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
       <div className="flex items-center justify-between px-2 py-[8px]">
@@ -95,34 +92,34 @@ const Navigation: React.FC = () => {
 
                   {/* Organization Actions */}
                   <DropdownSection>
-                    <DropdownItem href="/settings/general">
+                    <DropdownItem href={`/${organizationId}/settings/general`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="business" data-slot="icon" size='sm' />
                         <DropdownLabel>Organization Settings</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href="/settings/members">
+                    <DropdownItem href={`/${organizationId}/settings/members`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="person" data-slot="icon" size='sm' />
                         <DropdownLabel>Members</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href="/settings/groups">
+                    <DropdownItem href={`/${organizationId}/settings/groups`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="group" data-slot="icon" size='sm' />
                         <DropdownLabel>Groups</DropdownLabel>
                       </span>
                     </DropdownItem>
-                    <DropdownItem href="/settings/roles">
+                    <DropdownItem href={`/${organizationId}/settings/roles`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="shield" data-slot="icon" size='sm' />
                         <DropdownLabel>Roles</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href="/settings/billing">
+                    <DropdownItem href={`/${organizationId}/settings/billing`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
                         <DropdownLabel>Billing & Plans</DropdownLabel>
@@ -136,8 +133,7 @@ const Navigation: React.FC = () => {
               {/* Sign Out Section */}
               <DropdownSection>
                 <DropdownItem onClick={() => {
-                  // Clear user from store and redirect to login
-                  clearUser();
+                  // Redirect to logout
                   window.location.href = '/logout';
                 }}>
                   <span className="flex items-center gap-x-2">

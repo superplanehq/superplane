@@ -57,18 +57,6 @@ func FindUserByID(orgID, id string) (*User, error) {
 	return &user, err
 }
 
-func FindUserByProviderId(providerId, provider string) (*User, error) {
-	var user User
-
-	err := database.Conn().
-		Joins("JOIN account_providers ON users.id = account_providers.user_id").
-		Where("account_providers.provider_id = ?", providerId).
-		Where("account_providers.provider = ?", provider).
-		First(&user).Error
-
-	return &user, err
-}
-
 func FindUserByEmail(orgID, email string) (*User, error) {
 	var user User
 
@@ -79,18 +67,6 @@ func FindUserByEmail(orgID, email string) (*User, error) {
 		Error
 
 	return &user, err
-}
-
-func ListUsersInOrganization(orgID uuid.UUID) ([]User, error) {
-	var users []User
-
-	err := database.Conn().
-		Where("organization_id = ?", orgID).
-		Order("name ASC").
-		Find(&users).
-		Error
-
-	return users, err
 }
 
 func FindUserOrganizationsByEmail(email string) ([]Organization, error) {
