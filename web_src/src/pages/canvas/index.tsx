@@ -16,7 +16,7 @@ export function Canvas() {
   const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -192,6 +192,17 @@ export function Canvas() {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
       const nodeId = handleAddNode(nodeType, config);
+
+      setFocusedNodeId(nodeId);
+
+      setTimeout(() => {
+        const currentNodes = useCanvasStore.getState().nodes;
+        const updatedNodes = currentNodes.map(node => ({
+          ...node,
+          selected: node.id === nodeId
+        }));
+        setNodes(updatedNodes);
+      }, 10);
 
       if (lockedNodes) {
         setTimeout(async () => {
