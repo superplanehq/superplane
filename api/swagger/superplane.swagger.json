@@ -3884,12 +3884,10 @@
       "type": "object",
       "properties": {
         "providerType": {
-          "type": "string",
-          "title": "e.g., \"google\", \"github\", \"email\""
+          "type": "string"
         },
         "providerId": {
-          "type": "string",
-          "title": "unique ID from the provider"
+          "type": "string"
         },
         "email": {
           "type": "string"
@@ -3899,9 +3897,6 @@
         },
         "avatarUrl": {
           "type": "string"
-        },
-        "isPrimary": {
-          "type": "boolean"
         },
         "createdAt": {
           "type": "string",
@@ -3979,8 +3974,7 @@
         "status": {
           "$ref": "#/definitions/UsersUserStatus"
         }
-      },
-      "title": "User data structure"
+      }
     },
     "UsersUserMetadata": {
       "type": "object",
@@ -4029,9 +4023,6 @@
       "type": "object",
       "properties": {
         "displayName": {
-          "type": "string"
-        },
-        "avatarUrl": {
           "type": "string"
         },
         "accountProviders": {

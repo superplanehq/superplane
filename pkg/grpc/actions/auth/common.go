@@ -157,44 +157,31 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
 	dbUser, err := models.FindUnscopedUserByID(userID)
 	if err != nil {
-		return &pb.User{
-			Metadata: &pb.User_Metadata{
-				Id:        userID,
-				Email:     "test@example.com",
-				CreatedAt: timestamppb.Now(),
-				UpdatedAt: timestamppb.Now(),
-			},
-			Spec: &pb.User_Spec{
-				DisplayName:      "Test User",
-				AvatarUrl:        "",
-				AccountProviders: []*pbUsers.AccountProvider{},
-			},
-			Status: &pb.User_Status{
-				RoleAssignments: roleAssignments,
-			},
-		}, nil
+		return nil, err
 	}
 
-	// TODO: revisit this
+	account, err := models.FindAccountByID(dbUser.AccountID.String())
+	if err != nil {
+		return nil, err
+	}
 
-	// accountProviders, err := dbUser.GetAccountProviders()
-	// if err != nil {
-	// 	accountProviders = []models.AccountProvider{}
-	// }
+	providers, err := account.GetAccountProviders()
+	if err != nil {
+		return nil, err
+	}
 
-	// pbAccountProviders := make([]*pbUsers.AccountProvider, len(accountProviders))
-	// for i, provider := range accountProviders {
-	// 	pbAccountProviders[i] = &pb.AccountProvider{
-	// 		ProviderType: provider.Provider,
-	// 		ProviderId:   provider.ProviderID,
-	// 		Email:        provider.Email,
-	// 		DisplayName:  provider.Name,
-	// 		AvatarUrl:    provider.AvatarURL,
-	// 		IsPrimary:    i == 0, // TODO: Change when we have another login besides github
-	// 		CreatedAt:    timestamppb.New(provider.CreatedAt),
-	// 		UpdatedAt:    timestamppb.New(provider.UpdatedAt),
-	// 	}
-	// }
+	pbAccountProviders := make([]*pbUsers.AccountProvider, len(providers))
+	for i, provider := range providers {
+		pbAccountProviders[i] = &pb.AccountProvider{
+			ProviderType: provider.Provider,
+			ProviderId:   provider.ProviderID,
+			Email:        provider.Email,
+			DisplayName:  provider.Name,
+			AvatarUrl:    provider.AvatarURL,
+			CreatedAt:    timestamppb.New(provider.CreatedAt),
+			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
+		}
+	}
 
 	return &pb.User{
 		Metadata: &pb.User_Metadata{
@@ -204,19 +191,11 @@ func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssign
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},
 		Spec: &pb.User_Spec{
-			DisplayName: dbUser.Name,
-			// AvatarUrl:        avatarURL(accountProviders),
-			// AccountProviders: pbAccountProviders,
+			DisplayName:      dbUser.Name,
+			AccountProviders: pbAccountProviders,
 		},
 		Status: &pb.User_Status{
 			RoleAssignments: roleAssignments,
 		},
 	}, nil
-}
-
-func avatarURL(accountProviders []models.AccountProvider) string {
-	if len(accountProviders) > 0 {
-		return accountProviders[0].AvatarURL
-	}
-	return ""
 }

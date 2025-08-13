@@ -70,7 +70,7 @@ export function Members({ organizationId }: MembersProps) {
         role: primaryRoleDisplayName,
         roleName: primaryRoleName,
         initials: initials,
-        avatar: user.spec?.avatarUrl
+        avatar: user.spec?.accountProviders?.[0]?.avatarUrl
       }
     })
   }, [users])

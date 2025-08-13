@@ -21,7 +21,6 @@ var _ MappedNullable = &UsersUserSpec{}
 // UsersUserSpec struct for UsersUserSpec
 type UsersUserSpec struct {
 	DisplayName *string `json:"displayName,omitempty"`
-	AvatarUrl *string `json:"avatarUrl,omitempty"`
 	AccountProviders []UsersAccountProvider `json:"accountProviders,omitempty"`
 }
 
@@ -74,38 +73,6 @@ func (o *UsersUserSpec) SetDisplayName(v string) {
 	o.DisplayName = &v
 }
 
-// GetAvatarUrl returns the AvatarUrl field value if set, zero value otherwise.
-func (o *UsersUserSpec) GetAvatarUrl() string {
-	if o == nil || IsNil(o.AvatarUrl) {
-		var ret string
-		return ret
-	}
-	return *o.AvatarUrl
-}
-
-// GetAvatarUrlOk returns a tuple with the AvatarUrl field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *UsersUserSpec) GetAvatarUrlOk() (*string, bool) {
-	if o == nil || IsNil(o.AvatarUrl) {
-		return nil, false
-	}
-	return o.AvatarUrl, true
-}
-
-// HasAvatarUrl returns a boolean if a field has been set.
-func (o *UsersUserSpec) HasAvatarUrl() bool {
-	if o != nil && !IsNil(o.AvatarUrl) {
-		return true
-	}
-
-	return false
-}
-
-// SetAvatarUrl gets a reference to the given string and assigns it to the AvatarUrl field.
-func (o *UsersUserSpec) SetAvatarUrl(v string) {
-	o.AvatarUrl = &v
-}
-
 // GetAccountProviders returns the AccountProviders field value if set, zero value otherwise.
 func (o *UsersUserSpec) GetAccountProviders() []UsersAccountProvider {
 	if o == nil || IsNil(o.AccountProviders) {
@@ -150,9 +117,6 @@ func (o UsersUserSpec) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
 	if !IsNil(o.DisplayName) {
 		toSerialize["displayName"] = o.DisplayName
-	}
-	if !IsNil(o.AvatarUrl) {
-		toSerialize["avatarUrl"] = o.AvatarUrl
 	}
 	if !IsNil(o.AccountProviders) {
 		toSerialize["accountProviders"] = o.AccountProviders

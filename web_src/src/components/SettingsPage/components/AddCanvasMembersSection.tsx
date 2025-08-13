@@ -245,7 +245,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                           }}
                         />
                         <Avatar
-                          src={member.spec?.avatarUrl}
+                          src={member.spec?.accountProviders?.[0]?.avatarUrl}
                           initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />

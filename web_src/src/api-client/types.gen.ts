@@ -735,7 +735,6 @@ export type UsersAccountProvider = {
     email?: string;
     displayName?: string;
     avatarUrl?: string;
-    isPrimary?: boolean;
     createdAt?: string;
     updatedAt?: string;
 };
@@ -782,7 +781,6 @@ export type UsersUserRoleAssignment = {
 
 export type UsersUserSpec = {
     displayName?: string;
-    avatarUrl?: string;
     accountProviders?: Array<UsersAccountProvider>;
 };
 

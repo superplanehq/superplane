@@ -75,7 +75,7 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
         email: user.metadata?.email || `${user.metadata?.id}@email.placeholder`,
         role: primaryRoleDisplayName,
         initials: initials,
-        avatar: user.spec?.avatarUrl,
+        avatar: user.spec?.accountProviders?.[0]?.avatarUrl,
         roleName: primaryRoleName // Keep track of the actual role name for mutations
       }
     })
