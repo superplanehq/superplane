@@ -45,7 +45,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [eventSourceDescription, setEventSourceDescription] = useState(props.data.description || '');
   const [apiError, setApiError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const [shouldValidateFields, setShouldValidateFields] = useState(false);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
 
@@ -77,6 +76,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
   };
+
   const handleSaveEventSource = async () => {
     if (!currentFormData || !currentEventSource) {
       return;
@@ -86,24 +86,10 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       return;
     }
 
+    if (eventSourceType === 'webhook' || validationPassed === true) {
+      proceedWithSave();
+    }
     setValidationPassed(null);
-    setShouldValidateFields(true);
-
-    setTimeout(() => {
-      setShouldValidateFields(false);
-
-      setTimeout(() => {
-        const isWebhook = eventSourceType === 'webhook';
-
-        if (isWebhook) {
-          proceedWithSave();
-        } else {
-          if (validationPassed === true) {
-            proceedWithSave();
-          }
-        }
-      }, 50);
-    }, 100);
   };
 
   const proceedWithSave = async () => {
@@ -212,7 +198,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return "webhook";
   }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
 
-
   return (
     <div
       className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
@@ -307,7 +292,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           }}
           onDelete={handleDiscardEventSource}
           apiError={apiError}
-          shouldValidate={shouldValidateFields}
+          shouldValidate={true}
           onValidationResult={setValidationPassed}
         />
       ) : (
