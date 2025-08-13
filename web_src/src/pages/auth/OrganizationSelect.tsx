@@ -63,19 +63,32 @@ const OrganizationSelect: React.FC = () => {
       <div className="text-4xl pt-8 pb-0 text-left pl-8">🛩️</div>
       <div className="p-8 pt-6">
         <div className="max-w-7xl w-full">
-          <div className="mb-8">
+          <div className="mb-4">
             <Text className="text-2xl font-bold text-gray-700 dark:text-gray-300 text-left">
               Hey there{account?.name ? `, ${account.name}` : ''}! How's it going?
             </Text>
-            <Text className="text-2xl font-bold text-gray-700 dark:text-gray-300 text-left">
-              Select one of your organizations below to get started:
-            </Text>
+            {organizations.length > 0 && (
+              <Text className="text-2xl font-bold text-gray-700 dark:text-gray-300 text-left">
+                Select one of your organizations below to get started:
+              </Text>
+            )}
           </div>
 
         {error && (
           <div className="mb-6 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
             <Text className="text-red-700 dark:text-red-400 text-sm">
               {error}
+            </Text>
+          </div>
+        )}
+
+        {organizations.length === 0 && (
+          <div className="text-left py-2 mb-4">
+            <Text className="text-gray-600 dark:text-gray-400">
+              You're not a member of any organizations yet.
+            </Text>
+            <Text className="text-gray-600 dark:text-gray-400">
+              Create a new organization to get started!
             </Text>
           </div>
         )}
@@ -114,17 +127,6 @@ const OrganizationSelect: React.FC = () => {
             </Text>
           </div>
         </div>
-
-        {organizations.length === 0 && (
-          <div className="text-center py-8 mb-6">
-            <Text className="text-gray-600 dark:text-gray-400">
-              You're not a member of any organizations yet.
-            </Text>
-            <Text className="text-gray-600 dark:text-gray-400">
-              Create a new organization to get started!
-            </Text>
-          </div>
-        )}
         </div>
       </div>
     </div>
