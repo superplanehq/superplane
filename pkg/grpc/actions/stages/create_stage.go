@@ -26,8 +26,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, stage *pb.Stage) (*pb.CreateStageResponse, error) {
-	canvas, err := models.FindUnscopedCanvasByID(canvasID)
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, orgID, canvasID string, stage *pb.Stage) (*pb.CreateStageResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID, uuid.MustParse(orgID))
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}

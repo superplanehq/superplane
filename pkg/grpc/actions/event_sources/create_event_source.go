@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	uuid "github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
@@ -21,8 +22,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, newSource *pb.EventSource) (*pb.CreateEventSourceResponse, error) {
-	canvas, err := models.FindUnscopedCanvasByID(canvasID)
+func CreateEventSource(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, orgID, canvasID string, newSource *pb.EventSource) (*pb.CreateEventSourceResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID, uuid.MustParse(orgID))
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
