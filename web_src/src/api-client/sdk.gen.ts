@@ -406,7 +406,7 @@ export const integrationsDescribeIntegration = <ThrowOnError extends boolean = t
  */
 export const organizationsDeleteOrganization = <ThrowOnError extends boolean = true>(options: Options<OrganizationsDeleteOrganizationData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).delete<OrganizationsDeleteOrganizationResponse2, OrganizationsDeleteOrganizationError, ThrowOnError>({
-        url: '/api/v1/organizations/{idOrName}',
+        url: '/api/v1/organizations/{id}',
         ...options
     });
 };
@@ -417,7 +417,7 @@ export const organizationsDeleteOrganization = <ThrowOnError extends boolean = t
  */
 export const organizationsDescribeOrganization = <ThrowOnError extends boolean = true>(options: Options<OrganizationsDescribeOrganizationData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<OrganizationsDescribeOrganizationResponse2, OrganizationsDescribeOrganizationError, ThrowOnError>({
-        url: '/api/v1/organizations/{idOrName}',
+        url: '/api/v1/organizations/{id}',
         ...options
     });
 };
@@ -428,7 +428,7 @@ export const organizationsDescribeOrganization = <ThrowOnError extends boolean =
  */
 export const organizationsUpdateOrganization = <ThrowOnError extends boolean = true>(options: Options<OrganizationsUpdateOrganizationData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).patch<OrganizationsUpdateOrganizationResponse2, OrganizationsUpdateOrganizationError, ThrowOnError>({
-        url: '/api/v1/organizations/{idOrName}',
+        url: '/api/v1/organizations/{id}',
         ...options,
         headers: {
             'Content-Type': 'application/json',
@@ -443,7 +443,7 @@ export const organizationsUpdateOrganization = <ThrowOnError extends boolean = t
  */
 export const organizationsListInvitations = <ThrowOnError extends boolean = true>(options: Options<OrganizationsListInvitationsData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).get<OrganizationsListInvitationsResponse2, OrganizationsListInvitationsError, ThrowOnError>({
-        url: '/api/v1/organizations/{idOrName}/invitations',
+        url: '/api/v1/organizations/{id}/invitations',
         ...options
     });
 };
@@ -454,7 +454,7 @@ export const organizationsListInvitations = <ThrowOnError extends boolean = true
  */
 export const organizationsCreateInvitation = <ThrowOnError extends boolean = true>(options: Options<OrganizationsCreateInvitationData, ThrowOnError>) => {
     return (options.client ?? _heyApiClient).post<OrganizationsCreateInvitationResponse2, OrganizationsCreateInvitationError, ThrowOnError>({
-        url: '/api/v1/organizations/{idOrName}/invitations',
+        url: '/api/v1/organizations/{id}/invitations',
         ...options,
         headers: {
             'Content-Type': 'application/json',

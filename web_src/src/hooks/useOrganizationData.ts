@@ -45,7 +45,7 @@ export const useOrganization = (organizationId: string) => {
     queryFn: async () => {
       const response = await organizationsDescribeOrganization(
         withOrganizationHeader({
-          path: { idOrName: organizationId }
+          path: { id: organizationId }
         })
       )
       return response.data?.organization || null
@@ -454,7 +454,7 @@ export const useUpdateOrganization = (organizationId: string) => {
     }) => {
       return await organizationsUpdateOrganization(
         withOrganizationHeader({
-          path: { idOrName: organizationId },
+          path: { id: organizationId },
           body: {
             organization: {
               metadata: {

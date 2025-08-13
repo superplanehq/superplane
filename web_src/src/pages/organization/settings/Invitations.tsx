@@ -35,7 +35,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
     queryKey: ['invitations', organizationId],
     queryFn: async () => {
       const response = await organizationsListInvitations(withOrganizationHeader({
-        path: { idOrName: organizationId }
+        path: { id: organizationId }
       }))
       return response.data.invitations || []
     },
@@ -45,7 +45,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
   const createInvitationMutation = useMutation({
     mutationFn: async (email: string) => {
       const response = await organizationsCreateInvitation(withOrganizationHeader({
-        path: { idOrName: organizationId },
+        path: { id: organizationId },
         body: {
           email: email,
         }

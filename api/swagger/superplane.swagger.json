@@ -1276,7 +1276,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{idOrName}": {
+    "/api/v1/organizations/{id}": {
       "get": {
         "summary": "Get organization details",
         "description": "Returns the details of a specific organization (can be referenced by ID or name)",
@@ -1297,7 +1297,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1327,7 +1327,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1357,7 +1357,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1376,7 +1376,7 @@
         ]
       }
     },
-    "/api/v1/organizations/{idOrName}/invitations": {
+    "/api/v1/organizations/{id}/invitations": {
       "get": {
         "summary": "List organization invitations",
         "description": "Returns pending invitations for an organization",
@@ -1397,7 +1397,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1427,7 +1427,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"

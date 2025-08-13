@@ -169,7 +169,7 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string, organizationID string) (string, string, error) {
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeOrganization {
-		return getOrganizationIdFromRequest(req)
+		return getOrganizationId(organizationID)
 	}
 
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeCanvas {
@@ -240,30 +240,10 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizat
 	}
 }
 
-func getOrganizationIdFromRequest(req interface{}) (string, string, error) {
-	var domainID string
-	switch r := req.(type) {
-	case interface{ GetOrganizationId() string }:
-		domainID = r.GetOrganizationId()
-	case interface{ GetIdOrName() string }:
-		domainID = r.GetIdOrName()
-	default:
-		return "", "", fmt.Errorf("missing organization ID")
-	}
-
-	_, err := uuid.Parse(domainID)
+func getOrganizationId(id string) (string, string, error) {
+	org, err := models.FindOrganizationByID(id)
 	if err != nil {
-		// Try to find organization by name if not a valid UUID
-		org, err := models.FindOrganizationByName(domainID)
-		if err != nil {
-			return "", "", fmt.Errorf("organization %s not found", domainID)
-		}
-		return models.DomainTypeOrganization, org.ID.String(), nil
-	}
-
-	org, err := models.FindOrganizationByID(domainID)
-	if err != nil {
-		return "", "", fmt.Errorf("organization %s not found", domainID)
+		return "", "", fmt.Errorf("organization %s not found", id)
 	}
 
 	return models.DomainTypeOrganization, org.ID.String(), nil

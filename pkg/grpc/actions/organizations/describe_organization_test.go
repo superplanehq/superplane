@@ -7,21 +7,16 @@ import (
 	uuid "github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/database"
-	"github.com/superplanehq/superplane/pkg/models"
-	protos "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 func Test__DescribeOrganization(t *testing.T) {
-	require.NoError(t, database.TruncateTables())
+	r := support.Setup(t)
 
 	t.Run("organization does not exist -> error", func(t *testing.T) {
-		_, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
-			IdOrName: uuid.New().String(),
-		})
-
+		_, err := DescribeOrganization(context.Background(), uuid.New().String())
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -29,51 +24,16 @@ func Test__DescribeOrganization(t *testing.T) {
 	})
 
 	t.Run("describe organization by ID", func(t *testing.T) {
-		organization, err := models.CreateOrganization("test-org", "Test Organization", "This is a test organization for describe")
-		require.NoError(t, err)
-
-		response, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
-			IdOrName: organization.ID.String(),
-		})
-
+		response, err := DescribeOrganization(context.Background(), r.Organization.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, response)
 		require.NotNil(t, response.Organization)
 		require.NotNil(t, response.Organization.Metadata)
-		assert.Equal(t, organization.ID.String(), response.Organization.Metadata.Id)
-		assert.Equal(t, organization.Name, response.Organization.Metadata.Name)
-		assert.Equal(t, organization.DisplayName, response.Organization.Metadata.DisplayName)
-		assert.Equal(t, organization.Description, response.Organization.Metadata.Description)
-		assert.Equal(t, *organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
-		assert.Equal(t, *organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
-	})
-
-	t.Run("describe organization by name", func(t *testing.T) {
-		organization, err := models.CreateOrganization("test-org-by-name", "Test Organization By Name", "This is a test organization for describe by name")
-		require.NoError(t, err)
-
-		response, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
-			IdOrName: organization.Name,
-		})
-
-		require.NoError(t, err)
-		require.NotNil(t, response)
-		require.NotNil(t, response.Organization)
-		require.NotNil(t, response.Organization.Metadata)
-		assert.Equal(t, organization.ID.String(), response.Organization.Metadata.Id)
-		assert.Equal(t, organization.Name, response.Organization.Metadata.Name)
-		assert.Equal(t, organization.DisplayName, response.Organization.Metadata.DisplayName)
-		assert.Equal(t, organization.Description, response.Organization.Metadata.Description)
-	})
-
-	t.Run("empty id_or_name -> error", func(t *testing.T) {
-		_, err := DescribeOrganization(context.Background(), &protos.DescribeOrganizationRequest{
-			IdOrName: "",
-		})
-
-		s, ok := status.FromError(err)
-		assert.True(t, ok)
-		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "id_or_name is required", s.Message())
+		assert.Equal(t, r.Organization.ID.String(), response.Organization.Metadata.Id)
+		assert.Equal(t, r.Organization.Name, response.Organization.Metadata.Name)
+		assert.Equal(t, r.Organization.DisplayName, response.Organization.Metadata.DisplayName)
+		assert.Equal(t, r.Organization.Description, response.Organization.Metadata.Description)
+		assert.Equal(t, *r.Organization.CreatedAt, response.Organization.Metadata.CreatedAt.AsTime())
+		assert.Equal(t, *r.Organization.UpdatedAt, response.Organization.Metadata.UpdatedAt.AsTime())
 	})
 }

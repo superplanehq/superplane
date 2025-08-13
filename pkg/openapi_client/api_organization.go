@@ -27,7 +27,7 @@ type OrganizationAPIService service
 type ApiOrganizationsCreateInvitationRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
-	idOrName string
+	id string
 	body *OrganizationsCreateInvitationBody
 }
 
@@ -46,14 +46,14 @@ OrganizationsCreateInvitation Create an organization invitation
 Invites a user to join an organization by email
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
+ @param id
  @return ApiOrganizationsCreateInvitationRequest
 */
-func (a *OrganizationAPIService) OrganizationsCreateInvitation(ctx context.Context, idOrName string) ApiOrganizationsCreateInvitationRequest {
+func (a *OrganizationAPIService) OrganizationsCreateInvitation(ctx context.Context, id string) ApiOrganizationsCreateInvitationRequest {
 	return ApiOrganizationsCreateInvitationRequest{
 		ApiService: a,
 		ctx: ctx,
-		idOrName: idOrName,
+		id: id,
 	}
 }
 
@@ -72,8 +72,8 @@ func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrgan
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{idOrName}/invitations"
-	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invitations"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -149,7 +149,7 @@ func (a *OrganizationAPIService) OrganizationsCreateInvitationExecute(r ApiOrgan
 type ApiOrganizationsDeleteOrganizationRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
-	idOrName string
+	id string
 }
 
 func (r ApiOrganizationsDeleteOrganizationRequest) Execute() (map[string]interface{}, *http.Response, error) {
@@ -162,14 +162,14 @@ OrganizationsDeleteOrganization Delete an organization
 Deletes the specified organization (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
+ @param id
  @return ApiOrganizationsDeleteOrganizationRequest
 */
-func (a *OrganizationAPIService) OrganizationsDeleteOrganization(ctx context.Context, idOrName string) ApiOrganizationsDeleteOrganizationRequest {
+func (a *OrganizationAPIService) OrganizationsDeleteOrganization(ctx context.Context, id string) ApiOrganizationsDeleteOrganizationRequest {
 	return ApiOrganizationsDeleteOrganizationRequest{
 		ApiService: a,
 		ctx: ctx,
-		idOrName: idOrName,
+		id: id,
 	}
 }
 
@@ -188,8 +188,8 @@ func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrg
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/organizations/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -260,7 +260,7 @@ func (a *OrganizationAPIService) OrganizationsDeleteOrganizationExecute(r ApiOrg
 type ApiOrganizationsDescribeOrganizationRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
-	idOrName string
+	id string
 }
 
 func (r ApiOrganizationsDescribeOrganizationRequest) Execute() (*OrganizationsDescribeOrganizationResponse, *http.Response, error) {
@@ -273,14 +273,14 @@ OrganizationsDescribeOrganization Get organization details
 Returns the details of a specific organization (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
+ @param id
  @return ApiOrganizationsDescribeOrganizationRequest
 */
-func (a *OrganizationAPIService) OrganizationsDescribeOrganization(ctx context.Context, idOrName string) ApiOrganizationsDescribeOrganizationRequest {
+func (a *OrganizationAPIService) OrganizationsDescribeOrganization(ctx context.Context, id string) ApiOrganizationsDescribeOrganizationRequest {
 	return ApiOrganizationsDescribeOrganizationRequest{
 		ApiService: a,
 		ctx: ctx,
-		idOrName: idOrName,
+		id: id,
 	}
 }
 
@@ -299,8 +299,8 @@ func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiO
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/organizations/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -371,7 +371,7 @@ func (a *OrganizationAPIService) OrganizationsDescribeOrganizationExecute(r ApiO
 type ApiOrganizationsListInvitationsRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
-	idOrName string
+	id string
 }
 
 func (r ApiOrganizationsListInvitationsRequest) Execute() (*OrganizationsListInvitationsResponse, *http.Response, error) {
@@ -384,14 +384,14 @@ OrganizationsListInvitations List organization invitations
 Returns pending invitations for an organization
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
+ @param id
  @return ApiOrganizationsListInvitationsRequest
 */
-func (a *OrganizationAPIService) OrganizationsListInvitations(ctx context.Context, idOrName string) ApiOrganizationsListInvitationsRequest {
+func (a *OrganizationAPIService) OrganizationsListInvitations(ctx context.Context, id string) ApiOrganizationsListInvitationsRequest {
 	return ApiOrganizationsListInvitationsRequest{
 		ApiService: a,
 		ctx: ctx,
-		idOrName: idOrName,
+		id: id,
 	}
 }
 
@@ -410,8 +410,8 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{idOrName}/invitations"
-	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/organizations/{id}/invitations"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
@@ -482,7 +482,7 @@ func (a *OrganizationAPIService) OrganizationsListInvitationsExecute(r ApiOrgani
 type ApiOrganizationsUpdateOrganizationRequest struct {
 	ctx context.Context
 	ApiService *OrganizationAPIService
-	idOrName string
+	id string
 	body *OrganizationsUpdateOrganizationBody
 }
 
@@ -501,14 +501,14 @@ OrganizationsUpdateOrganization Update an organization
 Updates the specified organization (can be referenced by ID or name)
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
- @param idOrName
+ @param id
  @return ApiOrganizationsUpdateOrganizationRequest
 */
-func (a *OrganizationAPIService) OrganizationsUpdateOrganization(ctx context.Context, idOrName string) ApiOrganizationsUpdateOrganizationRequest {
+func (a *OrganizationAPIService) OrganizationsUpdateOrganization(ctx context.Context, id string) ApiOrganizationsUpdateOrganizationRequest {
 	return ApiOrganizationsUpdateOrganizationRequest{
 		ApiService: a,
 		ctx: ctx,
-		idOrName: idOrName,
+		id: id,
 	}
 }
 
@@ -527,8 +527,8 @@ func (a *OrganizationAPIService) OrganizationsUpdateOrganizationExecute(r ApiOrg
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/organizations/{idOrName}"
-	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
+	localVarPath := localBasePath + "/api/v1/organizations/{id}"
+	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}

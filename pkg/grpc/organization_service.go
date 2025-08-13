@@ -19,15 +19,18 @@ func NewOrganizationService(authorizationService authorization.Authorization) *O
 }
 
 func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationRequest) (*pb.DescribeOrganizationResponse, error) {
-	return organizations.DescribeOrganization(ctx, req)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganization(ctx, orgID)
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
-	return organizations.UpdateOrganization(ctx, req)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
-	return organizations.DeleteOrganization(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
 }
 
 func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {

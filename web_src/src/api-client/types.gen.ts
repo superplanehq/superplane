@@ -1650,10 +1650,10 @@ export type IntegrationsDescribeIntegrationResponse2 = IntegrationsDescribeInteg
 export type OrganizationsDeleteOrganizationData = {
     body?: never;
     path: {
-        idOrName: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/organizations/{idOrName}';
+    url: '/api/v1/organizations/{id}';
 };
 
 export type OrganizationsDeleteOrganizationErrors = {
@@ -1677,10 +1677,10 @@ export type OrganizationsDeleteOrganizationResponse2 = OrganizationsDeleteOrgani
 export type OrganizationsDescribeOrganizationData = {
     body?: never;
     path: {
-        idOrName: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/organizations/{idOrName}';
+    url: '/api/v1/organizations/{id}';
 };
 
 export type OrganizationsDescribeOrganizationErrors = {
@@ -1704,10 +1704,10 @@ export type OrganizationsDescribeOrganizationResponse2 = OrganizationsDescribeOr
 export type OrganizationsUpdateOrganizationData = {
     body: OrganizationsUpdateOrganizationBody;
     path: {
-        idOrName: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/organizations/{idOrName}';
+    url: '/api/v1/organizations/{id}';
 };
 
 export type OrganizationsUpdateOrganizationErrors = {
@@ -1731,10 +1731,10 @@ export type OrganizationsUpdateOrganizationResponse2 = OrganizationsUpdateOrgani
 export type OrganizationsListInvitationsData = {
     body?: never;
     path: {
-        idOrName: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/organizations/{idOrName}/invitations';
+    url: '/api/v1/organizations/{id}/invitations';
 };
 
 export type OrganizationsListInvitationsErrors = {
@@ -1758,10 +1758,10 @@ export type OrganizationsListInvitationsResponse2 = OrganizationsListInvitations
 export type OrganizationsCreateInvitationData = {
     body: OrganizationsCreateInvitationBody;
     path: {
-        idOrName: string;
+        id: string;
     };
     query?: never;
-    url: '/api/v1/organizations/{idOrName}/invitations';
+    url: '/api/v1/organizations/{id}/invitations';
 };
 
 export type OrganizationsCreateInvitationErrors = {
