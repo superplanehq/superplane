@@ -61,7 +61,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setConnectionGroupDescription(props.data.description || '');
   };
 
-  const handleSaveConnectionGroup = async (saveAsDraft = false) => {
+  const handleSaveConnectionGroup = async () => {
     if (!currentFormData || !currentConnectionGroup) {
       return;
     }
@@ -74,7 +74,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     const isNewConnectionGroup = !currentConnectionGroup.metadata?.id || isTemporaryId;
 
     try {
-      if (isNewConnectionGroup && !saveAsDraft) {
+      if (isNewConnectionGroup) {
 
         const result = await createConnectionGroupMutation.mutateAsync({
           name: connectionGroupName,
@@ -89,7 +89,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         if (newConnectionGroup) {
           removeConnectionGroup(props.id);
         }
-      } else if (!isNewConnectionGroup && !saveAsDraft) {
+      } else if (!isNewConnectionGroup) {
 
         if (!currentConnectionGroup.metadata?.id) {
           throw new Error('Connection Group ID is required for update');
@@ -122,29 +122,6 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
             timeoutBehavior: currentFormData.timeoutBehavior
           }
         });
-
-        props.data.name = connectionGroupName;
-        props.data.description = connectionGroupDescription;
-      } else if (saveAsDraft) {
-
-        const draftConnectionGroup = {
-          ...currentConnectionGroup,
-          metadata: {
-            ...currentConnectionGroup.metadata,
-            name: connectionGroupName,
-            description: connectionGroupDescription
-          },
-          spec: {
-            ...currentConnectionGroup.spec!,
-            connections: currentFormData.connections,
-            groupBy: {
-              fields: currentFormData.groupByFields
-            },
-            timeout: currentFormData.timeout,
-            timeoutBehavior: currentFormData.timeoutBehavior
-          }
-        };
-        updateConnectionGroup(draftConnectionGroup);
 
         props.data.name = connectionGroupName;
         props.data.description = connectionGroupDescription;

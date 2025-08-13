@@ -4,7 +4,6 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { StageNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import type { StageWithEventQueue } from '../../store/types';
 import { useUpdateStage, useCreateStage } from '@/hooks/useCanvasData';
 import { SuperplaneExecution, SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneValueDefinition, SuperplaneCondition, SuperplaneStage, SuperplaneInputMapping } from '@/api-client';
 import { StageEditModeContent } from '../StageEditModeContent';
@@ -156,7 +155,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     setStageDescription(props.data.description || '');
   };
 
-  const handleSaveStage = async (saveAsDraft = false) => {
+  const handleSaveStage = async () => {
     if (!currentFormData || !currentStage) {
       return;
     }
@@ -165,7 +164,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
       return;
     }
 
-    if (!currentFormData.isValid && !saveAsDraft) {
+    if (!currentFormData.isValid) {
       return;
     }
 
@@ -173,7 +172,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     const isNewStage = !currentStage.metadata?.id || currentStage.isDraft || isTemporaryId;
 
     try {
-      if (isNewStage && !saveAsDraft) {
+      if (isNewStage) {
         const createParams = {
           name: stageName,
           description: stageDescription,
@@ -187,7 +186,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
         };
         await createStageMutation.mutateAsync(createParams);
         removeStage(props.id);
-      } else if (!isNewStage && !saveAsDraft) {
+      } else if (!isNewStage) {
 
         if (!currentStage.metadata?.id) {
           throw new Error('Stage ID is required for update');
@@ -224,29 +223,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             inputMappings: currentFormData.inputMappings
           }
         });
-
-        props.data.label = stageName;
-        props.data.description = stageDescription;
-      } else if (saveAsDraft) {
-
-        const draftStage: StageWithEventQueue = {
-          ...currentStage,
-          metadata: {
-            ...currentStage.metadata,
-            name: stageName,
-            description: stageDescription
-          },
-          spec: {
-            ...currentStage.spec!,
-            inputs: currentFormData.inputs,
-            outputs: currentFormData.outputs,
-            connections: currentFormData.connections,
-            executor: currentFormData.executor,
-            inputMappings: currentFormData.inputMappings
-          },
-          isDraft: true
-        };
-        updateStage(draftStage);
 
         props.data.label = stageName;
         props.data.description = stageDescription;

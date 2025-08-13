@@ -3,7 +3,6 @@ import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { useCanvasStore } from '../../store/canvasStore';
-import type { EventSourceWithEvents } from '../../store/types';
 import { useCreateEventSource } from '@/hooks/useCanvasData';
 import { SuperplaneEventSource, SuperplaneEventSourceSpec } from '@/api-client';
 import { EventSourceEditModeContent } from '../EventSourceEditModeContent';
@@ -38,7 +37,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [nameError, setNameError] = useState<string | null>(null);
   const [shouldValidateFields, setShouldValidateFields] = useState(false);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
-  const { updateEventSource, setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
   const allEventSources = useCanvasStore(state => state.eventSources);
   const currentEventSource = useCanvasStore(state =>
     state.eventSources.find(es => es.metadata?.id === props.id)
@@ -76,7 +75,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setEventSourceName(props.data.name);
     setEventSourceDescription(props.data.description || '');
   };
-  const handleSaveEventSource = async (saveAsDraft = false) => {
+  const handleSaveEventSource = async () => {
     if (!currentFormData || !currentEventSource) {
       return;
     }
@@ -85,34 +84,27 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
       return;
     }
 
-    // Trigger field validation
-    setValidationPassed(null); // Reset validation state
+    setValidationPassed(null);
     setShouldValidateFields(true);
-    
-    // Reset validation trigger after a short delay and wait for validation result
+
     setTimeout(() => {
       setShouldValidateFields(false);
-      
-      // Wait for validation result to be set
+
       setTimeout(() => {
-        // For webhook event sources, validation is not required
         const isWebhook = eventSourceType === 'webhook';
-        
+
         if (isWebhook) {
-          // Webhooks don't require field validation, proceed with save
-          proceedWithSave(saveAsDraft);
+          proceedWithSave();
         } else {
-          // For semaphore/github sources, only proceed if validation explicitly passed
           if (validationPassed === true) {
-            proceedWithSave(saveAsDraft);
+            proceedWithSave();
           }
-          // If validationPassed is false or null, don't proceed (validation failed or didn't complete)
         }
       }, 50);
     }, 100);
   };
 
-  const proceedWithSave = async (saveAsDraft = false) => {
+  const proceedWithSave = async () => {
     if (!currentFormData || !currentEventSource) {
       return;
     }
@@ -121,17 +113,15 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     const isNewEventSource = !currentEventSource.metadata?.id || isTemporaryId;
 
     try {
-      // Clear any previous errors
       setApiError(null);
 
-      if (isNewEventSource && !saveAsDraft) {
+      if (isNewEventSource) {
 
         const result = await createEventSourceMutation.mutateAsync({
           name: eventSourceName,
           description: eventSourceDescription,
           spec: currentFormData.spec
         });
-
 
         const newEventSource = result.data?.eventSource;
 
@@ -140,18 +130,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           updateEventSourceKey(newEventSource.metadata?.id || '', generatedKey || '');
           removeEventSource(props.id);
         }
-      } else if (saveAsDraft) {
-
-        const draftEventSource: EventSourceWithEvents = {
-          ...currentEventSource,
-          metadata: {
-            ...currentEventSource.metadata,
-            name: eventSourceName,
-            description: eventSourceDescription,
-          },
-          spec: currentFormData.spec
-        };
-        updateEventSource(draftEventSource);
       }
       setIsEditMode(false);
       setEditingEventSource(null);

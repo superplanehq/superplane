@@ -4,7 +4,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 import { YamlCodeEditor } from './YamlCodeEditor';
 
 interface EditModeActionButtonsProps {
-  onSave: (saveAsDraft: boolean) => void;
+  onSave: () => void;
   onCancel: () => void;
   onDiscard?: () => void;
   onEdit?: () => void; // For non-edit mode
@@ -56,7 +56,7 @@ export function EditModeActionButtons({
           </button>
 
           <button
-            onClick={() => onSave(false)}
+            onClick={() => onSave()}
             className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
             title="Save"
           >
