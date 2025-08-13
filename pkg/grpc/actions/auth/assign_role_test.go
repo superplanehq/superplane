@@ -4,10 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func Test_AssignRole(t *testing.T) {
@@ -15,40 +18,52 @@ func Test_AssignRole(t *testing.T) {
 	ctx := context.Background()
 	orgID := r.Organization.ID.String()
 
-	t.Run("successful role assignment with user ID", func(t *testing.T) {
-		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, r.User.String(), "", r.AuthService)
+	t.Run("user is not part of organization -> error", func(t *testing.T) {
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, uuid.NewString(), "", r.AuthService)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "user not found", s.Message())
+	})
+
+	t.Run("assign role with user ID", func(t *testing.T) {
+		newUser := support.CreateUser(t, r.Organization.ID)
+		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, newUser.ID.String(), "", r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
 	})
 
-	t.Run("successful role assignment with user email", func(t *testing.T) {
-		testEmail := "test@example.com"
-		resp, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", testEmail, r.AuthService)
+	t.Run("assign role with user email", func(t *testing.T) {
+		newUser := support.CreateUser(t, r.Organization.ID)
+		resp, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", newUser.Email, r.AuthService)
 		require.NoError(t, err)
 		assert.NotNil(t, resp)
-
-		// Verify user was created
-		user, err := models.FindInactiveUserByEmail(testEmail)
-		require.NoError(t, err)
-		assert.Equal(t, testEmail, user.Name)
-		assert.False(t, user.IsActive)
 	})
 
 	t.Run("invalid request - missing role", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, "", r.User.String(), "", r.AuthService)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, "", r.User.String(), "", r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid role")
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid role", s.Message())
 	})
 
 	t.Run("invalid request - missing user identifier", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "", "", r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid user ID or Email")
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "user not found", s.Message())
 	})
 
 	t.Run("invalid request - invalid user ID", func(t *testing.T) {
-		_, err := AssignRole(ctx, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", r.AuthService)
+		_, err := AssignRole(ctx, orgID, models.DomainTypeOrganization, orgID, models.RoleOrgAdmin, "invalid-uuid", "", r.AuthService)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "invalid user ID")
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "user not found", s.Message())
 	})
 }

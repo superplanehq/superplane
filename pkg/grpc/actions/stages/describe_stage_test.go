@@ -34,7 +34,7 @@ func Test__DescribeStage(t *testing.T) {
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
-		assert.Equal(t, "must specify one of: id or name", s.Message())
+		assert.Equal(t, "must specify either the ID or name of the stage", s.Message())
 	})
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {

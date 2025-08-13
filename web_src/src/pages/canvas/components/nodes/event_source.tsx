@@ -23,10 +23,9 @@ const EventSourceImageMap = {
 }
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
-  const { orgId } = useParams<{ orgId: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
   const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
   const canvasId = useCanvasStore(state => state.canvasId) || '';
-  const organizationId = orgId || '';
   const createEventSourceMutation = useCreateEventSource(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
   const allEventSources = useCanvasStore(state => state.eventSources);
@@ -291,7 +290,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
             })
           }}
           canvasId={canvasId}
-          organizationId={organizationId}
+          organizationId={organizationId!}
           eventSourceType={eventSourceType}
           onDataChange={({ spec }) => {
             if (JSON.stringify(spec) !== JSON.stringify(currentFormData?.spec || {})) {

@@ -37,7 +37,6 @@ type AuthorizationSetup interface {
 
 // User access and role query interface
 type UserAccessQuery interface {
-	GetAccessibleOrgsForUser(userID string) ([]string, error)
 	GetAccessibleCanvasesForUser(userID string) ([]string, error)
 	GetUserRolesForOrg(userID string, orgID string) ([]*RoleDefinition, error)
 	GetUserRolesForCanvas(userID string, canvasID string) ([]*RoleDefinition, error)

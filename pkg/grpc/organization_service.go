@@ -18,22 +18,27 @@ func NewOrganizationService(authorizationService authorization.Authorization) *O
 	}
 }
 
-func (s *OrganizationService) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
-	return organizations.CreateOrganization(ctx, req, s.authorizationService)
-}
-
 func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationRequest) (*pb.DescribeOrganizationResponse, error) {
-	return organizations.DescribeOrganization(ctx, req)
-}
-
-func (s *OrganizationService) ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
-	return organizations.ListOrganizations(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DescribeOrganization(ctx, orgID)
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {
-	return organizations.UpdateOrganization(ctx, req)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.UpdateOrganization(ctx, orgID, req.Organization)
 }
 
 func (s *OrganizationService) DeleteOrganization(ctx context.Context, req *pb.DeleteOrganizationRequest) (*pb.DeleteOrganizationResponse, error) {
-	return organizations.DeleteOrganization(ctx, req, s.authorizationService)
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.DeleteOrganization(ctx, s.authorizationService, orgID)
+}
+
+func (s *OrganizationService) CreateInvitation(ctx context.Context, req *pb.CreateInvitationRequest) (*pb.CreateInvitationResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.CreateInvitation(ctx, orgID, req.Email)
+}
+
+func (s *OrganizationService) ListInvitations(ctx context.Context, req *pb.ListInvitationsRequest) (*pb.ListInvitationsResponse, error) {
+	orgID := ctx.Value(authorization.DomainIdContextKey).(string)
+	return organizations.ListInvitations(ctx, orgID)
 }

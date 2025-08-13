@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/builders"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/integrations/semaphore"
@@ -28,9 +29,13 @@ import (
 )
 
 func Test__HealthCheckEndpoint(t *testing.T) {
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -59,7 +64,7 @@ func Test__ReceiveWebhookFromIntegration(t *testing.T) {
 		Create()
 
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", r.AuthService)
 	require.NoError(t, err)
 
 	validEvent, _ := json.Marshal(semaphore.Hook{
@@ -184,8 +189,12 @@ func Test__ReceiveCustomWebhook(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Source: true})
 	defer r.Close()
 
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
 	key, err := r.Encryptor.Decrypt(context.Background(), r.Source.Key, []byte(r.Source.ID.String()))
@@ -319,6 +328,10 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 		Integration: true,
 	})
 
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	executorType, executorSpec, resource := support.Executor(t, r)
 	stage, err := builders.NewStageBuilder(r.Registry).
 		WithEncryptor(r.Encryptor).
@@ -343,7 +356,7 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
-	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
 	execution := support.CreateExecution(t, r.Source, stage)
@@ -520,9 +533,13 @@ func Test__HandleExecutionOutputs(t *testing.T) {
 func Test__OpenAPIEndpoints(t *testing.T) {
 	checkSwaggerFiles(t)
 
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -586,9 +603,13 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 }
 
 func Test__GRPCGatewayRegistration(t *testing.T) {
+	authService, err := authorization.NewAuthService()
+	require.NoError(t, err)
+	authService.EnableCache(false)
+
 	signer := jwt.NewSigner("test")
 	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "", authService)
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")

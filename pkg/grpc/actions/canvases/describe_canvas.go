@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -14,7 +15,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
+func DescribeCanvas(ctx context.Context, orgID string, req *pb.DescribeCanvasRequest) (*pb.DescribeCanvasResponse, error) {
 	err := actions.ValidateUUIDs(req.Id)
 	if err != nil {
 		return nil, err
@@ -22,10 +23,10 @@ func DescribeCanvas(ctx context.Context, req *pb.DescribeCanvasRequest) (*pb.Des
 
 	var canvas *models.Canvas
 	if req.Name != "" {
-		canvas, err = models.FindCanvasByName(req.Name)
+		canvas, err = models.FindCanvasByName(req.Name, uuid.MustParse(orgID))
 
 	} else {
-		canvas, err = models.FindCanvasByID(req.Id)
+		canvas, err = models.FindCanvasByID(req.Id, uuid.MustParse(orgID))
 	}
 
 	if err != nil {

@@ -1,22 +1,17 @@
-import React, { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import React from 'react';
 import { Avatar } from './Avatar/avatar';
 import { Dropdown, DropdownButton, DropdownDivider, DropdownHeader, DropdownItem, DropdownLabel, DropdownMenu, DropdownSection } from './Dropdown/dropdown';
 import { Text } from './Text/text';
 import { MaterialSymbol } from './MaterialSymbol/material-symbol';
 import { Link } from './Link/link';
 import { useOrganization } from '../hooks/useOrganizationData';
-import { useUserStore } from '../stores/userStore';
+import { useAccount } from '../contexts/AccountContext';
+import { useParams } from 'react-router-dom';
 
 const Navigation: React.FC = () => {
-  const { orgId } = useParams<{ orgId?: string }>();
-  const { user, fetchUser } = useUserStore();
-
-  const { data: organization } = useOrganization(orgId || '');
-
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
+  const { account } = useAccount();
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const { data: organization } = useOrganization(organizationId || '');
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 border-b">
       <div className="flex items-center justify-between px-2 py-[8px]">
@@ -33,13 +28,13 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || user?.name}</Text>
+              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || account?.name}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
-                src={user?.avatar_url}
-                initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                alt={user?.name || 'User'}
+                src={account?.avatar_url}
+                initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                alt={account?.name || 'User'}
                 className="w-7 h-7"
               />
             </DropdownButton>
@@ -49,14 +44,14 @@ const Navigation: React.FC = () => {
               <DropdownHeader>
                 <div className="flex items-center space-x-3">
                   <Avatar
-                    src={user?.avatar_url}
-                    initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                    alt={user?.name || 'User'}
+                    src={account?.avatar_url}
+                    initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                    alt={account?.name || 'User'}
                     className="size-8"
                   />
                   <div className="flex-1 min-w-0">
-                    <Text className="font-medium truncate">{user?.name || 'Loading...'}</Text>
-                    <Text className="text-sm text-zinc-500 truncate">{user?.email || 'Loading...'}</Text>
+                    <Text className="font-medium truncate">{account?.name || 'Loading...'}</Text>
+                    <Text className="text-sm text-zinc-500 truncate">{account?.email || 'Loading...'}</Text>
                   </div>
                 </div>
               </DropdownHeader>
@@ -78,9 +73,8 @@ const Navigation: React.FC = () => {
                 </DropdownItem>
               </DropdownSection>
 
-              {/* Organization Section - Only show when in organization context */}
-              {orgId && (
-                <>
+              {/* Organization Section */}
+              <>
                   <DropdownDivider />
 
                   <DropdownHeader>
@@ -98,33 +92,34 @@ const Navigation: React.FC = () => {
 
                   {/* Organization Actions */}
                   <DropdownSection>
-                    <DropdownItem href={`/organization/${orgId}/settings/general`}>
+                    <DropdownItem href={`/${organizationId}/settings/general`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="business" data-slot="icon" size='sm' />
                         <DropdownLabel>Organization Settings</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href={`/organization/${orgId}/settings/members`}>
+                    <DropdownItem href={`/${organizationId}/settings/members`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="person" data-slot="icon" size='sm' />
                         <DropdownLabel>Members</DropdownLabel>
                       </span>
                     </DropdownItem>
-                    <DropdownItem href={`/organization/${orgId}/settings/groups`}>
+
+                    <DropdownItem href={`/${organizationId}/settings/groups`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="group" data-slot="icon" size='sm' />
                         <DropdownLabel>Groups</DropdownLabel>
                       </span>
                     </DropdownItem>
-                    <DropdownItem href={`/organization/${orgId}/settings/roles`}>
+                    <DropdownItem href={`/${organizationId}/settings/roles`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="shield" data-slot="icon" size='sm' />
                         <DropdownLabel>Roles</DropdownLabel>
                       </span>
                     </DropdownItem>
 
-                    <DropdownItem href={`/organization/${orgId}/settings/billing`}>
+                    <DropdownItem href={`/${organizationId}/settings/billing`}>
                       <span className="flex items-center gap-x-2">
                         <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
                         <DropdownLabel>Billing & Plans</DropdownLabel>
@@ -132,13 +127,15 @@ const Navigation: React.FC = () => {
                     </DropdownItem>
                   </DropdownSection>
                 </>
-              )}
 
               <DropdownDivider />
 
               {/* Sign Out Section */}
               <DropdownSection>
-                <DropdownItem onClick={() => {}}>
+                <DropdownItem onClick={() => {
+                  // Redirect to logout
+                  window.location.href = '/logout';
+                }}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="logout" data-slot="icon" size='sm' />
                     <DropdownLabel>Sign Out</DropdownLabel>

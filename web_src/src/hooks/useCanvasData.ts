@@ -16,6 +16,7 @@ import {
   superplaneDescribeConnectionGroup,
   integrationsListIntegrations,
 } from '../api-client/sdk.gen'
+import { withOrganizationHeader } from '../utils/withOrganizationHeader'
 import type { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, IntegrationsResourceRef, SuperplaneEventSourceSpec, SuperplaneValueDefinition, GroupByField, SpecTimeoutBehavior, SuperplaneInputMapping } from '../api-client/types.gen'
 
 export const canvasKeys = {
@@ -36,9 +37,9 @@ export const useCanvasRoles = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.roles(canvasId),
     queryFn: async () => {
-      const response = await rolesListRoles({
+      const response = await rolesListRoles(withOrganizationHeader({
         query: { domainId: canvasId, domainType: 'DOMAIN_TYPE_CANVAS' },
-      })
+      }))
       return response.data?.roles || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -51,9 +52,9 @@ export const useCanvasUsers = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.users(canvasId),
     queryFn: async () => {
-      const response = await usersListUsers({
+      const response = await usersListUsers(withOrganizationHeader({
         query: { domainId: canvasId, domainType: 'DOMAIN_TYPE_CANVAS' },
-      })
+      }))
       return response.data?.users || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -66,9 +67,9 @@ export const useOrganizationUsersForCanvas = (organizationId: string) => {
   return useQuery({
     queryKey: ['organizationUsers', organizationId],
     queryFn: async () => {
-      const response = await usersListUsers({
+      const response = await usersListUsers(withOrganizationHeader({
         query: { domainId: organizationId, domainType: 'DOMAIN_TYPE_ORGANIZATION' },
-      })
+      }))
       return response.data?.users || []
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -86,7 +87,7 @@ export const useAssignCanvasRole = (canvasId: string) => {
       userEmail?: string,
       role: string,
     }) => {
-      return await rolesAssignRole({
+      return await rolesAssignRole(withOrganizationHeader({
         body: {
           userId: params.userId,
           userEmail: params.userEmail,
@@ -94,7 +95,7 @@ export const useAssignCanvasRole = (canvasId: string) => {
           domainId: canvasId,
           domainType: 'DOMAIN_TYPE_CANVAS'
         }
-      })
+      }))
     },
     onSuccess: () => {
       // Invalidate and refetch canvas users
@@ -111,14 +112,14 @@ export const useRemoveCanvasRole = (canvasId: string) => {
       userId: string, 
       role: string,
     }) => {
-      return await rolesRemoveRole({
+      return await rolesRemoveRole(withOrganizationHeader({
         body: {
           userId: params.userId,
           roleName: params.role,
           domainId: canvasId,
           domainType: 'DOMAIN_TYPE_CANVAS'
         }
-      })
+      }))
     },
     onSuccess: () => {
       // Invalidate and refetch canvas users
@@ -132,9 +133,11 @@ export const useCanvasStages = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.stages(canvasId),
     queryFn: async () => {
-      const response = await superplaneListStages({
-        path: { canvasIdOrName: canvasId }
-      })
+      const response = await superplaneListStages(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId }
+        })
+      )
       return response.data?.stages || []
     },
     staleTime: 30 * 1000, // 30 seconds
@@ -147,9 +150,11 @@ export const useStageDetails = (canvasId: string, stageId: string) => {
   return useQuery({
     queryKey: canvasKeys.stage(canvasId, stageId),
     queryFn: async () => {
-      const response = await superplaneDescribeStage({
-        path: { canvasIdOrName: canvasId, id: stageId }
-      })
+      const response = await superplaneDescribeStage(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: stageId }
+        })
+      )
       return response.data?.stage
     },
     staleTime: 30 * 1000, // 30 seconds
@@ -173,27 +178,29 @@ export const useCreateStage = (canvasId: string) => {
       conditions?: SuperplaneCondition[];
       inputMappings?: SuperplaneInputMapping[];
     }) => {
-      return await superplaneCreateStage({
-        path: { canvasIdOrName: canvasId },
-        body: {
-          stage: {
-            metadata: {
-              name: stageData.name,
-              canvasId: canvasId,
-              description: stageData.description,
-            },
-            spec: {
-              inputs: stageData.inputs || [],
-              outputs: stageData.outputs || [],
-              connections: stageData.connections || [],
-              executor: stageData.executor,
-              secrets: stageData.secrets || [],
-              conditions: stageData.conditions || [],
-              inputMappings: stageData.inputMappings || []
+      return await superplaneCreateStage(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            stage: {
+              metadata: {
+                name: stageData.name,
+                canvasId: canvasId,
+                description: stageData.description,
+              },
+              spec: {
+                inputs: stageData.inputs || [],
+                outputs: stageData.outputs || [],
+                connections: stageData.connections || [],
+                executor: stageData.executor,
+                secrets: stageData.secrets || [],
+                conditions: stageData.conditions || [],
+                inputMappings: stageData.inputMappings || []
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: () => {
       // Invalidate and refetch canvas stages
@@ -222,24 +229,26 @@ export const useCreateStageWithIntegration = (canvasId: string) => {
       };
       conditions?: SuperplaneCondition[];
     }) => {
-      return await superplaneCreateStage({
-        path: { canvasIdOrName: canvasId },
-        body: {
-          stage: {
-            metadata: {
-              name: stageData.name,
-              canvasId: canvasId
-            },
-            spec: {
-              inputs: stageData.inputs || [],
-              outputs: stageData.outputs || [],
-              connections: stageData.connections || [],
-              executor: stageData.executor,
-              conditions: stageData.conditions || []
+      return await superplaneCreateStage(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            stage: {
+              metadata: {
+                name: stageData.name,
+                canvasId: canvasId
+              },
+              spec: {
+                inputs: stageData.inputs || [],
+                outputs: stageData.outputs || [],
+                connections: stageData.connections || [],
+                executor: stageData.executor,
+                conditions: stageData.conditions || []
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: () => {
       // Invalidate and refetch canvas stages
@@ -264,27 +273,29 @@ export const useUpdateStage = (canvasId: string) => {
       conditions?: SuperplaneCondition[];
       inputMappings?: SuperplaneInputMapping[];
     }) => {
-      return await superplaneUpdateStage({
-        path: { canvasIdOrName: canvasId, idOrName: params.stageId },
-        body: {
-          stage: {
-            metadata: {
-              name: params.name,
-              canvasId: canvasId,
-              description: params.description,
-            },
-            spec: {
-              inputs: params.inputs || [],
-              outputs: params.outputs || [],
-              connections: params.connections || [],
-              executor: params.executor,
-              secrets: params.secrets || [],
-              conditions: params.conditions || [],
-              inputMappings: params.inputMappings || []
+      return await superplaneUpdateStage(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: params.stageId },
+          body: {
+            stage: {
+              metadata: {
+                name: params.name,
+                canvasId: canvasId,
+                description: params.description,
+              },
+              spec: {
+                inputs: params.inputs || [],
+                outputs: params.outputs || [],
+                connections: params.connections || [],
+                executor: params.executor,
+                secrets: params.secrets || [],
+                conditions: params.conditions || [],
+                inputMappings: params.inputMappings || []
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: (_, variables) => {
       // Invalidate and refetch canvas stages and specific stage
@@ -299,9 +310,11 @@ export const useEventSourceDetails = (canvasId: string, eventSourceId: string) =
   return useQuery({
     queryKey: canvasKeys.eventSource(canvasId, eventSourceId),
     queryFn: async () => {
-      const response = await superplaneDescribeEventSource({
-        path: { canvasIdOrName: canvasId, id: eventSourceId }
-      })
+      const response = await superplaneDescribeEventSource(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: eventSourceId }
+        })
+      )
       return response.data?.eventSource
     },
     staleTime: 30 * 1000, // 30 seconds
@@ -319,19 +332,21 @@ export const useCreateEventSource = (canvasId: string) => {
       description?: string;
       spec: SuperplaneEventSourceSpec;
     }) => {
-      return await superplaneCreateEventSource({
-        path: { canvasIdOrName: canvasId },
-        body: {
-          eventSource: {
-            metadata: {
-              name: eventSourceData.name,
-              description: eventSourceData.description,
-              canvasId: canvasId
-            },
-            spec: eventSourceData.spec
+      return await superplaneCreateEventSource(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            eventSource: {
+              metadata: {
+                name: eventSourceData.name,
+                description: eventSourceData.description,
+                canvasId: canvasId
+              },
+              spec: eventSourceData.spec
+            }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: () => {
       // Invalidate and refetch canvas event sources
@@ -345,9 +360,11 @@ export const useCanvasConnectionGroups = (canvasId: string) => {
   return useQuery({
     queryKey: canvasKeys.connectionGroups(canvasId),
     queryFn: async () => {
-      const response = await superplaneListConnectionGroups({
-        path: { canvasIdOrName: canvasId }
-      })
+      const response = await superplaneListConnectionGroups(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId }
+        })
+      )
       return response.data?.connectionGroups || []
     },
     staleTime: 30 * 1000, // 30 seconds
@@ -360,9 +377,11 @@ export const useConnectionGroupDetails = (canvasId: string, connectionGroupId: s
   return useQuery({
     queryKey: canvasKeys.connectionGroup(canvasId, connectionGroupId),
     queryFn: async () => {
-      const response = await superplaneDescribeConnectionGroup({
-        path: { canvasIdOrName: canvasId, idOrName: connectionGroupId }
-      })
+      const response = await superplaneDescribeConnectionGroup(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: connectionGroupId }
+        })
+      )
       return response.data?.connectionGroup
     },
     staleTime: 30 * 1000, // 30 seconds
@@ -383,26 +402,28 @@ export const useCreateConnectionGroup = (canvasId: string) => {
       timeout?: number;
       timeoutBehavior?: SpecTimeoutBehavior;
     }) => {
-      return await superplaneCreateConnectionGroup({
-        path: { canvasIdOrName: canvasId },
-        body: {
-          connectionGroup: {
-            metadata: {
-              name: connectionGroupData.name,
-              description: connectionGroupData.description,
-              canvasId: canvasId
-            },
-            spec: {
-              connections: connectionGroupData.connections,
-              groupBy: {
-                fields: connectionGroupData.groupByFields
+      return await superplaneCreateConnectionGroup(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId },
+          body: {
+            connectionGroup: {
+              metadata: {
+                name: connectionGroupData.name,
+                description: connectionGroupData.description,
+                canvasId: canvasId
               },
-              timeout: connectionGroupData.timeout,
-              timeoutBehavior: connectionGroupData.timeoutBehavior
+              spec: {
+                connections: connectionGroupData.connections,
+                groupBy: {
+                  fields: connectionGroupData.groupByFields
+                },
+                timeout: connectionGroupData.timeout,
+                timeoutBehavior: connectionGroupData.timeoutBehavior
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: () => {
       // Invalidate and refetch canvas connection groups
@@ -424,26 +445,28 @@ export const useUpdateConnectionGroup = (canvasId: string) => {
       timeout?: number;
       timeoutBehavior?: SpecTimeoutBehavior;
     }) => {
-      return await superplaneUpdateConnectionGroup({
-        path: { canvasIdOrName: canvasId, idOrName: params.connectionGroupId },
-        body: {
-          connectionGroup: {
-            metadata: {
-              name: params.name,
-              description: params.description,
-              canvasId: canvasId
-            },
-            spec: {
-              connections: params.connections,
-              groupBy: {
-                fields: params.groupByFields
+      return await superplaneUpdateConnectionGroup(
+        withOrganizationHeader({
+          path: { canvasIdOrName: canvasId, idOrName: params.connectionGroupId },
+          body: {
+            connectionGroup: {
+              metadata: {
+                name: params.name,
+                description: params.description,
+                canvasId: canvasId
               },
-              timeout: params.timeout,
-              timeoutBehavior: params.timeoutBehavior
+              spec: {
+                connections: params.connections,
+                groupBy: {
+                  fields: params.groupByFields
+                },
+                timeout: params.timeout,
+                timeoutBehavior: params.timeoutBehavior
+              }
             }
           }
-        }
-      })
+        })
+      )
     },
     onSuccess: (_, variables) => {
       // Invalidate and refetch canvas connection groups and specific connection group
@@ -458,7 +481,7 @@ export const useIntegrations = () => {
   return useQuery({
     queryKey: canvasKeys.integrations(),
     queryFn: async () => {
-      const response = await integrationsListIntegrations()
+      const response = await integrationsListIntegrations(withOrganizationHeader())
       return response.data?.integrations || []
     },
     staleTime: 2 * 60 * 1000, // 2 minutes

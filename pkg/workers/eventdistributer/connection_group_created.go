@@ -35,7 +35,6 @@ func HandleConnectionGroupCreated(messageBody []byte, wsHub *ws.Hub) error {
 		return fmt.Errorf("failed to marshal websocket event: %w", err)
 	}
 
-	// Send to all clients subscribed to this canvas
 	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
 	log.Debugf("Broadcasted connection_group_added event to canvas %s", pbMsg.CanvasId)
 

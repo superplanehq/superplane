@@ -1,7 +1,6 @@
 package public
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,56 +10,33 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/crypto"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
-	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/test/support"
 )
 
-func setupTestServer(t *testing.T) (*Server, *models.User, string) {
-	require.NoError(t, database.TruncateTables())
-
+func setupTestServer(r *support.ResourceRegistry, t *testing.T) (*Server, *models.Account, string) {
 	// Set test environment variables
 	os.Setenv("GITHUB_CLIENT_ID", "test-client-id")
 	os.Setenv("GITHUB_CLIENT_SECRET", "test-client-secret")
 	os.Setenv("BASE_URL", "http://localhost:8000")
 
 	signer := jwt.NewSigner("test-client-secret")
-	registry := registry.NewRegistry(&crypto.NoOpEncryptor{})
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, crypto.NewOIDCVerifier(), "", "")
+	server, err := NewServer(r.Encryptor, r.Registry, signer, crypto.NewOIDCVerifier(), "", "", r.AuthService)
 	require.NoError(t, err)
 
-	// Create test user
-	user := &models.User{
-		Name: "Test User",
-	}
-	require.NoError(t, user.Create())
-
-	// Create test repo host account
-	account := &models.AccountProvider{
-		UserID:      user.ID,
-		Provider:    "github",
-		ProviderID:  "12345",
-		Username:    "testuser",
-		Email:       "test@example.com",
-		Name:        "Test User",
-		AccessToken: "encrypted-token",
-	}
-	require.NoError(t, account.Create())
-
-	// Generate auth token
-	token, err := signer.Generate(user.ID.String(), time.Hour)
+	token, err := signer.Generate(r.Account.ID.String(), time.Hour)
 	require.NoError(t, err)
 
 	server.RegisterWebRoutes("")
 
-	return server, user, token
+	return server, r.Account, token
 }
 
-func TestServer_LoginPage(t *testing.T) {
-	server, _, _ := setupTestServer(t)
+func Test__Login(t *testing.T) {
+	r := support.Setup(t)
+	server, _, _ := setupTestServer(r, t)
 
 	response := execRequest(server, requestParams{
 		method: "GET",
@@ -72,111 +48,13 @@ func TestServer_LoginPage(t *testing.T) {
 	assert.Contains(t, response.Body.String(), "Continue with GitHub")
 }
 
-func TestServer_AuthMe_Unauthorized(t *testing.T) {
-	server, _, _ := setupTestServer(t)
-
-	response := execRequest(server, requestParams{
-		method: "GET",
-		path:   "/auth/me",
-	})
-
-	assert.Equal(t, http.StatusUnauthorized, response.Code)
-}
-
-func TestServer_AuthMe_WithToken(t *testing.T) {
-	server, user, token := setupTestServer(t)
-
-	req := httptest.NewRequest("GET", "/auth/me", nil)
-	req.AddCookie(&http.Cookie{
-		Name:  "auth_token",
-		Value: token,
-	})
-
-	w := httptest.NewRecorder()
-	server.Router.ServeHTTP(w, req)
-
-	assert.Equal(t, http.StatusOK, w.Code)
-
-	var authUser authentication.User
-	err := json.Unmarshal(w.Body.Bytes(), &authUser)
-	require.NoError(t, err)
-
-	assert.Equal(t, user.Name, authUser.Name)
-	assert.Len(t, authUser.AccountProviders, 1)
-}
-
-func TestServer_UserProfile_Protected(t *testing.T) {
-	server, user, token := setupTestServer(t)
-
-	t.Run("without auth returns unauthorized", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method: "GET",
-			path:   "/api/v1/user/profile",
-		})
-
-		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
-	})
-
-	t.Run("with valid auth returns profile", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/user/profile", nil)
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: token,
-		})
-
-		w := httptest.NewRecorder()
-		server.Router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var profile models.User
-		err := json.Unmarshal(w.Body.Bytes(), &profile)
-		require.NoError(t, err)
-
-		assert.Equal(t, user.Name, profile.Name)
-	})
-}
-
-func TestServer_UserAccountProviders_Protected(t *testing.T) {
-	server, _, token := setupTestServer(t)
-
-	t.Run("without auth returns unauthorized", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method: "GET",
-			path:   "/api/v1/user/account-providers",
-		})
-
-		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
-	})
-
-	t.Run("with valid auth returns accounts", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/api/v1/user/account-providers", nil)
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: token,
-		})
-
-		w := httptest.NewRecorder()
-		server.Router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusOK, w.Code)
-
-		var accounts []models.AccountProvider
-		err := json.Unmarshal(w.Body.Bytes(), &accounts)
-		require.NoError(t, err)
-
-		assert.Len(t, accounts, 1)
-		assert.Equal(t, "github", accounts[0].Provider)
-		assert.Equal(t, "testuser", accounts[0].Username)
-	})
-}
-
-func TestServer_Logout(t *testing.T) {
-	server, _, token := setupTestServer(t)
+func Test__Logout(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
 
 	req := httptest.NewRequest("GET", "/logout", nil)
 	req.AddCookie(&http.Cookie{
-		Name:  "auth_token",
+		Name:  "account_token",
 		Value: token,
 	})
 
@@ -189,7 +67,7 @@ func TestServer_Logout(t *testing.T) {
 	cookies := w.Result().Cookies()
 	var authCookie *http.Cookie
 	for _, cookie := range cookies {
-		if cookie.Name == "auth_token" {
+		if cookie.Name == "account_token" {
 			authCookie = cookie
 			break
 		}
@@ -199,25 +77,107 @@ func TestServer_Logout(t *testing.T) {
 	assert.Equal(t, -1, authCookie.MaxAge)
 }
 
-func TestServer_DisconnectProvider(t *testing.T) {
-	server, _, token := setupTestServer(t)
+func Test__GetAccount(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
 
-	req := httptest.NewRequest("POST", "/auth/github/disconnect", nil)
-	req.AddCookie(&http.Cookie{
-		Name:  "auth_token",
-		Value: token,
+	t.Run("no authenticated account -> unauthorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/account", nil)
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
+		assert.Equal(t, "/login", response.Header().Get("Location"))
 	})
 
-	w := httptest.NewRecorder()
-	server.Router.ServeHTTP(w, req)
+	t.Run("authenticated account -> authorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusOK, response.Code)
+	})
+}
 
-	assert.Equal(t, http.StatusOK, w.Code)
+func Test__ListAccountOrganizations(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
 
-	var response map[string]string
-	err := json.Unmarshal(w.Body.Bytes(), &response)
-	require.NoError(t, err)
+	t.Run("no authenticated account -> unauthorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/organizations", nil)
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusTemporaryRedirect, response.Code)
+		assert.Equal(t, "/login", response.Header().Get("Location"))
+	})
 
-	assert.Contains(t, response["message"], "Successfully disconnected github account")
+	t.Run("authenticated account -> authorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/organizations", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusOK, response.Code)
+	})
+}
+
+func Test__CanvasWebSocket(t *testing.T) {
+	r := support.Setup(t)
+	server, _, token := setupTestServer(r, t)
+
+	t.Run("no authenticated account -> unauthorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
+		req.Header.Set("Connection", "upgrade")
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Sec-WebSocket-Version", "13")
+		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
+
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusUnauthorized, response.Code)
+	})
+
+	t.Run("no organization ID header -> unauthorized", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
+		req.Header.Set("Connection", "upgrade")
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Sec-WebSocket-Version", "13")
+		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("canvas that does not exist", func(t *testing.T) {
+		req, _ := http.NewRequest(http.MethodGet, "/ws/"+uuid.NewString(), nil)
+		req.Header.Set("Connection", "upgrade")
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Sec-WebSocket-Version", "13")
+		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+
+	t.Run("user does not have access to canvas", func(t *testing.T) {
+		user := support.CreateUser(t, r.Organization.ID)
+		canvas := support.CreateCanvas(t, r, r.Organization.ID, user.ID)
+
+		req, _ := http.NewRequest(http.MethodGet, "/ws/"+canvas.ID.String(), nil)
+		req.Header.Set("Connection", "upgrade")
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Sec-WebSocket-Version", "13")
+		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusUnauthorized, response.Code)
+	})
 }
 
 func TestServer_ProviderConfiguration(t *testing.T) {
@@ -238,43 +198,4 @@ func TestServer_ProviderConfiguration(t *testing.T) {
 	assert.Equal(t, "test-client-id", providers["github"].Key)
 	assert.Equal(t, "test-client-secret", providers["github"].Secret)
 	assert.Equal(t, "http://localhost:8000/auth/github/callback", providers["github"].CallbackURL)
-}
-
-func TestServer_WebSocketAuth(t *testing.T) {
-	server, _, token := setupTestServer(t)
-
-	canvasID := uuid.New().String()
-
-	t.Run("websocket without auth fails", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/ws/"+canvasID, nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-
-		w := httptest.NewRecorder()
-		server.Router.ServeHTTP(w, req)
-
-		assert.Equal(t, http.StatusTemporaryRedirect, w.Code)
-	})
-
-	t.Run("websocket with auth allows connection", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/ws/"+canvasID, nil)
-		req.Header.Set("Connection", "upgrade")
-		req.Header.Set("Upgrade", "websocket")
-		req.Header.Set("Sec-WebSocket-Version", "13")
-		req.Header.Set("Sec-WebSocket-Key", "test-client-id")
-		req.AddCookie(&http.Cookie{
-			Name:  "auth_token",
-			Value: token,
-		})
-
-		w := httptest.NewRecorder()
-		server.Router.ServeHTTP(w, req)
-
-		// WebSocket upgrade will fail in tests, but auth should pass
-		// The error will be about websocket upgrade, not auth
-		assert.NotEqual(t, http.StatusTemporaryRedirect, w.Code)
-		assert.NotEqual(t, http.StatusUnauthorized, w.Code)
-	})
 }

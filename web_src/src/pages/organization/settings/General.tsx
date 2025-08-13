@@ -8,21 +8,24 @@ import type { OrganizationsOrganization } from '../../../api-client/types.gen'
 import { useParams } from 'react-router-dom'
 import { Textarea } from '@/components/Textarea/textarea'
 
-interface GeneralSettingsProps {
+interface GeneralProps {
   organization: OrganizationsOrganization
 }
 
-export function GeneralSettings({ organization }: GeneralSettingsProps) {
-  const { orgId } = useParams<{ orgId: string }>()
+export function General({ organization }: GeneralProps) {
+  const { organizationId } = useParams<{ organizationId: string }>()
   const [displayName, setDisplayName] = useState(organization.metadata?.displayName || '')
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [organizationDescription, setOrganizationDescription] = useState(organization.metadata?.description || '')
 
   // Use React Query mutation hook
-  const updateOrganizationMutation = useUpdateOrganization(orgId || '')
+  const updateOrganizationMutation = useUpdateOrganization(organizationId || '')
 
   const handleSave = async () => {
-    if (!orgId) return
+    if (!organizationId) {
+      console.error('Organization ID is missing')
+      return
+    }
 
     try {
       setSaveMessage(null)

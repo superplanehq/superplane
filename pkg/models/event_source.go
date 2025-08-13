@@ -190,10 +190,10 @@ func FindInternalEventSourceByName(canvasID string, name string) (*EventSource, 
 	return &eventSource, nil
 }
 
-func (c *Canvas) ListEventSources() ([]EventSource, error) {
+func ListEventSources(canvasID string) ([]EventSource, error) {
 	var sources []EventSource
 	err := database.Conn().
-		Where("canvas_id = ?", c.ID).
+		Where("canvas_id = ?", canvasID).
 		Where("scope = ?", EventSourceScopeExternal).
 		Find(&sources).
 		Error

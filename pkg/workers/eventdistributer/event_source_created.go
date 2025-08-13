@@ -35,6 +35,7 @@ func HandleEventSourceCreated(messageBody []byte, wsHub *ws.Hub) error {
 	}
 
 	wsHub.BroadcastToCanvas(pbMsg.CanvasId, wsEventJSON)
+
 	log.Debugf("Broadcasted event_source_added event to canvas %s", pbMsg.CanvasId)
 
 	return nil

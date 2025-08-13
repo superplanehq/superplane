@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
 	"google.golang.org/grpc/codes"
@@ -14,27 +13,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationRequest) (*pb.DescribeOrganizationResponse, error) {
-	if req.IdOrName == "" {
-		return nil, status.Error(codes.InvalidArgument, "id_or_name is required")
-	}
-
-	var organization *models.Organization
-	var err error
-
-	err = actions.ValidateUUIDs(req.IdOrName)
-	if err != nil {
-		organization, err = models.FindOrganizationByName(req.IdOrName)
-	} else {
-		organization, err = models.FindOrganizationByID(req.IdOrName)
-	}
-
+func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrganizationResponse, error) {
+	organization, err := models.FindOrganizationByID(orgID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "organization not found")
 		}
 
-		log.Errorf("Error describing organization. Request: %v. Error: %v", req, err)
+		log.Errorf("Error describing organization %s: %v", orgID, err)
 		return nil, err
 	}
 
@@ -45,7 +31,6 @@ func DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationReque
 				Name:        organization.Name,
 				DisplayName: organization.DisplayName,
 				Description: organization.Description,
-				CreatedBy:   organization.CreatedBy.String(),
 				CreatedAt:   timestamppb.New(*organization.CreatedAt),
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},

@@ -371,7 +371,7 @@ func GetDomainForSecret(domainTypeForResource string, domainIdForResource *uuid.
 	// If a canvas-level resource is being created and is using a org-level secret,
 	// we need to find the organization ID for the canvas where the resource is being created.
 	//
-	canvas, err := models.FindCanvasByID(domainIdForResource.String())
+	canvas, err := models.FindUnscopedCanvasByID(domainIdForResource.String())
 	if err != nil {
 		return "", nil, fmt.Errorf("canvas not found")
 	}

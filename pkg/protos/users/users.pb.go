@@ -378,7 +378,6 @@ func (x *ListUsersResponse) GetUsers() []*User {
 	return nil
 }
 
-// User data structure
 type User struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Metadata      *User_Metadata         `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -525,14 +524,13 @@ func (x *UserRoleAssignment) GetAssignedAt() *timestamp.Timestamp {
 
 type AccountProvider struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	ProviderType  string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"` // e.g., "google", "github", "email"
-	ProviderId    string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`       // unique ID from the provider
+	ProviderType  string                 `protobuf:"bytes,1,opt,name=provider_type,json=providerType,proto3" json:"provider_type,omitempty"`
+	ProviderId    string                 `protobuf:"bytes,2,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	Email         string                 `protobuf:"bytes,3,opt,name=email,proto3" json:"email,omitempty"`
 	DisplayName   string                 `protobuf:"bytes,4,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
 	AvatarUrl     string                 `protobuf:"bytes,5,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	IsPrimary     bool                   `protobuf:"varint,6,opt,name=is_primary,json=isPrimary,proto3" json:"is_primary,omitempty"`
-	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	CreatedAt     *timestamp.Timestamp   `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamp.Timestamp   `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -600,13 +598,6 @@ func (x *AccountProvider) GetAvatarUrl() string {
 		return x.AvatarUrl
 	}
 	return ""
-}
-
-func (x *AccountProvider) GetIsPrimary() bool {
-	if x != nil {
-		return x.IsPrimary
-	}
-	return false
 }
 
 func (x *AccountProvider) GetCreatedAt() *timestamp.Timestamp {
@@ -694,8 +685,7 @@ func (x *User_Metadata) GetUpdatedAt() *timestamp.Timestamp {
 type User_Spec struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	DisplayName      string                 `protobuf:"bytes,1,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
-	AvatarUrl        string                 `protobuf:"bytes,2,opt,name=avatar_url,json=avatarUrl,proto3" json:"avatar_url,omitempty"`
-	AccountProviders []*AccountProvider     `protobuf:"bytes,3,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
+	AccountProviders []*AccountProvider     `protobuf:"bytes,2,rep,name=account_providers,json=accountProviders,proto3" json:"account_providers,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -737,13 +727,6 @@ func (x *User_Spec) GetDisplayName() string {
 	return ""
 }
 
-func (x *User_Spec) GetAvatarUrl() string {
-	if x != nil {
-		return x.AvatarUrl
-	}
-	return ""
-}
-
 func (x *User_Spec) GetAccountProviders() []*AccountProvider {
 	if x != nil {
 		return x.AccountProviders
@@ -753,7 +736,6 @@ func (x *User_Spec) GetAccountProviders() []*AccountProvider {
 
 type User_Status struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
-	IsActive        bool                   `protobuf:"varint,1,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
 	RoleAssignments []*UserRoleAssignment  `protobuf:"bytes,2,rep,name=role_assignments,json=roleAssignments,proto3" json:"role_assignments,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -787,13 +769,6 @@ func (x *User_Status) ProtoReflect() protoreflect.Message {
 // Deprecated: Use User_Status.ProtoReflect.Descriptor instead.
 func (*User_Status) Descriptor() ([]byte, []int) {
 	return file_users_proto_rawDescGZIP(), []int{6, 2}
-}
-
-func (x *User_Status) GetIsActive() bool {
-	if x != nil {
-		return x.IsActive
-	}
-	return false
 }
 
 func (x *User_Status) GetRoleAssignments() []*UserRoleAssignment {
@@ -835,7 +810,7 @@ const file_users_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x02 \x01(\tR\bdomainId\"A\n" +
 	"\x11ListUsersResponse\x12,\n" +
-	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xe7\x04\n" +
+	"\x05users\x18\x01 \x03(\v2\x16.Superplane.Users.UserR\x05users\"\xaa\x04\n" +
 	"\x04User\x12;\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x1f.Superplane.Users.User.MetadataR\bmetadata\x12/\n" +
 	"\x04spec\x18\x02 \x01(\v2\x1b.Superplane.Users.User.SpecR\x04spec\x125\n" +
@@ -846,14 +821,11 @@ const file_users_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a\x98\x01\n" +
+	"updated_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1ay\n" +
 	"\x04Spec\x12!\n" +
-	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12\x1d\n" +
-	"\n" +
-	"avatar_url\x18\x02 \x01(\tR\tavatarUrl\x12N\n" +
-	"\x11account_providers\x18\x03 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1av\n" +
-	"\x06Status\x12\x1b\n" +
-	"\tis_active\x18\x01 \x01(\bR\bisActive\x12O\n" +
+	"\fdisplay_name\x18\x01 \x01(\tR\vdisplayName\x12N\n" +
+	"\x11account_providers\x18\x02 \x03(\v2!.Superplane.Users.AccountProviderR\x10accountProviders\x1aY\n" +
+	"\x06Status\x12O\n" +
 	"\x10role_assignments\x18\x02 \x03(\v2$.Superplane.Users.UserRoleAssignmentR\x0froleAssignments\"\xa9\x02\n" +
 	"\x12UserRoleAssignment\x12\x1b\n" +
 	"\trole_name\x18\x01 \x01(\tR\broleName\x12*\n" +
@@ -863,7 +835,7 @@ const file_users_proto_rawDesc = "" +
 	"domainType\x12\x1b\n" +
 	"\tdomain_id\x18\x05 \x01(\tR\bdomainId\x12;\n" +
 	"\vassigned_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"assignedAt\"\xc4\x02\n" +
+	"assignedAt\"\xa5\x02\n" +
 	"\x0fAccountProvider\x12#\n" +
 	"\rprovider_type\x18\x01 \x01(\tR\fproviderType\x12\x1f\n" +
 	"\vprovider_id\x18\x02 \x01(\tR\n" +
@@ -871,13 +843,11 @@ const file_users_proto_rawDesc = "" +
 	"\x05email\x18\x03 \x01(\tR\x05email\x12!\n" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1d\n" +
 	"\n" +
-	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\x12\x1d\n" +
+	"avatar_url\x18\x05 \x01(\tR\tavatarUrl\x129\n" +
 	"\n" +
-	"is_primary\x18\x06 \x01(\bR\tisPrimary\x129\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
-	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9a\x05\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt2\x9a\x05\n" +
 	"\x05Users\x12\xfe\x01\n" +
 	"\x13ListUserPermissions\x12,.Superplane.Users.ListUserPermissionsRequest\x1a-.Superplane.Users.ListUserPermissionsResponse\"\x89\x01\x92A[\n" +
 	"\x05Users\x12\x15List user permissions\x1a;Returns all permissions a user has within a specific domain\x82\xd3\xe4\x93\x02%\x12#/api/v1/users/{user_id}/permissions\x12\xd8\x01\n" +

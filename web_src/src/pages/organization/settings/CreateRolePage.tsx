@@ -72,8 +72,10 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
 ]
 
 export function CreateRolePage() {
-  const { orgId, roleName: roleNameParam } = useParams<{ orgId: string; roleName?: string }>()
+  const { roleName: roleNameParam } = useParams<{ roleName?: string }>()
   const navigate = useNavigate()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const orgId = organizationId
   const isEditMode = !!roleNameParam
 
   const [roleName, setRoleName] = useState('')
@@ -180,16 +182,13 @@ export function CreateRolePage() {
         })
       }
 
-      navigate(`/organization/${orgId}/settings/roles`)
+      navigate(`/${orgId}/settings/roles`)
     } catch {
       console.error('Failed to create role')
     }
   }
 
 
-  if (!orgId) {
-    return <div>Error: Organization ID not found</div>
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-4 text-left">
@@ -201,7 +200,7 @@ export function CreateRolePage() {
               items={[
                 {
                   label: 'Roles',
-                  onClick: () => navigate(`/organization/${orgId}/settings/roles`)
+                  onClick: () => navigate(`/${orgId}/settings/roles`)
                 },
                 {
                   label: isEditMode ? 'Edit organization role' : 'Create new organization role',
@@ -358,7 +357,7 @@ export function CreateRolePage() {
 
           {/* Action Buttons */}
           <div className="flex justify-end gap-3">
-            <Link to={`/organization/${orgId}/settings/roles`}>
+            <Link to={`/${orgId}/settings/roles`}>
               <Button outline>
                 Cancel
               </Button>

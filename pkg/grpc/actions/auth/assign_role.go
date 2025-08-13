@@ -9,17 +9,17 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func AssignRole(ctx context.Context, domainType, domainID, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
+func AssignRole(ctx context.Context, orgID, domainType, domainID, roleName, userID, userEmail string, authService authorization.Authorization) (*pb.AssignRoleResponse, error) {
 	if roleName == "" {
 		return nil, status.Error(codes.InvalidArgument, "invalid role")
 	}
 
-	resolvedUserID, err := ResolveUserID(userID, userEmail)
+	user, err := FindUser(orgID, userID, userEmail)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "invalid user ID or Email")
+		return nil, status.Error(codes.InvalidArgument, "user not found")
 	}
 
-	err = authService.AssignRole(resolvedUserID, roleName, domainID, domainType)
+	err = authService.AssignRole(user.ID.String(), roleName, domainID, domainType)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to assign role")
 	}

@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/models"
 	protos "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -15,20 +14,14 @@ import (
 func Test__ListStages(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("no stages -> empty list", func(t *testing.T) {
-		org, err := models.CreateOrganization(uuid.New(), "test", "test", "")
-		require.NoError(t, err)
-
-		canvas, err := models.CreateCanvas(r.User, org.ID, "empty-canvas", "empty canvas")
-		require.NoError(t, err)
-
-		res, err := ListStages(context.Background(), canvas.ID.String())
+	t.Run("return empty of stages", func(t *testing.T) {
+		res, err := ListStages(context.Background(), uuid.NewString())
 		require.NoError(t, err)
 		require.NotNil(t, res)
-		assert.Empty(t, res.Stages)
+		require.Empty(t, res.Stages)
 	})
 
-	t.Run("with stage -> list", func(t *testing.T) {
+	t.Run("return list of stages in the canvas", func(t *testing.T) {
 		res, err := ListStages(context.Background(), r.Canvas.ID.String())
 		require.NoError(t, err)
 		require.NotNil(t, res)

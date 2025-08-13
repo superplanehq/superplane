@@ -32,23 +32,22 @@ var getCanvasCmd = &cobra.Command{
 }
 
 var getEventSourceCmd = &cobra.Command{
-	Use:     "event-source [ID]",
+	Use:     "event-source [ID_OR_NAME]",
 	Short:   "Get event source details",
 	Long:    `Get details about a specific event source`,
 	Aliases: []string{"event-sources", "eventsource", "eventsources"},
 	Args:    cobra.ExactArgs(1),
 
 	Run: func(cmd *cobra.Command, args []string) {
-		id := args[0]
-		name, _ := cmd.Flags().GetString("name")
+		idOrName := args[0]
 		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
 		response, _, err := c.EventSourceAPI.SuperplaneDescribeEventSource(
 			context.Background(),
 			canvasIDOrName,
-			id,
-		).Name(name).Execute()
+			idOrName,
+		).Execute()
 		Check(err)
 
 		out, err := yaml.Marshal(response.EventSource)
@@ -91,7 +90,6 @@ var getStageCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		idOrName := args[0]
-
 		canvasIDOrName := getOneOrAnotherFlag(cmd, "canvas-id", "canvas-name", true)
 
 		c := DefaultClient()
@@ -99,7 +97,7 @@ var getStageCmd = &cobra.Command{
 			context.Background(),
 			canvasIDOrName,
 			idOrName,
-		).Name(idOrName).Execute()
+		).Execute()
 		Check(err)
 
 		out, err := yaml.Marshal(response.Stage)
@@ -190,7 +188,6 @@ func init() {
 
 	// Event Source command
 	getCmd.AddCommand(getEventSourceCmd)
-	getEventSourceCmd.Flags().String("name", "", "Name of the event source (alternative to ID)")
 	getEventSourceCmd.Flags().String("canvas-id", "", "ID of the canvas (alternative to --canvas-name)")
 	getEventSourceCmd.Flags().String("canvas-name", "", "Name of the canvas (alternative to --canvas-id)")
 

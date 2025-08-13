@@ -3,6 +3,7 @@ package eventsources
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -10,14 +11,10 @@ import (
 )
 
 func ListEventSources(ctx context.Context, canvasID string) (*pb.ListEventSourcesResponse, error) {
-	canvas, err := models.FindCanvasByID(canvasID)
+	sources, err := models.ListEventSources(canvasID)
 	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
-	}
-
-	sources, err := canvas.ListEventSources()
-	if err != nil {
-		return nil, err
+		log.Errorf("error listing event sources for canvas %s: %v", canvasID, err)
+		return nil, status.Error(codes.Internal, "error listing event sources")
 	}
 
 	protoSources, err := serializeEventSources(sources)

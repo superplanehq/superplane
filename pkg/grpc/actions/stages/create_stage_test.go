@@ -29,11 +29,11 @@ func Test__CreateStage(t *testing.T) {
 		Integration: true,
 	})
 
-	executor := support.ProtoExecutor(t, r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+	executor := support.ProtoExecutor(t, r)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, uuid.New().String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), uuid.New().String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -49,7 +49,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -65,7 +65,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -98,7 +98,7 @@ func Test__CreateStage(t *testing.T) {
 		err := internalSource.Create()
 		require.NoError(t, err)
 
-		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -120,7 +120,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -145,7 +145,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no start -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -173,7 +173,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no end -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -203,7 +203,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid start -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -233,7 +233,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with no week days list -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -264,7 +264,7 @@ func Test__CreateStage(t *testing.T) {
 	})
 
 	t.Run("time window condition with invalid day -> error", func(t *testing.T) {
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: "test",
 			},
@@ -302,7 +302,7 @@ func Test__CreateStage(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("test")
-		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{Name: name},
 			Spec: &pb.Stage_Spec{
 				Executor: &pb.Executor{
@@ -334,7 +334,7 @@ func Test__CreateStage(t *testing.T) {
 
 		name := support.RandomName("test")
 		description := support.RandomName("description")
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name:        name,
 				Description: description,
@@ -446,7 +446,7 @@ func Test__CreateStage(t *testing.T) {
 		})
 
 		name := support.RandomName("test")
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{Name: name},
 			Spec: &pb.Stage_Spec{
 				Executor: &pb.Executor{
@@ -505,7 +505,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create first stage using the demo-project Semaphore project integration resource.
 		//
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: support.RandomName("test"),
 			},
@@ -527,7 +527,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Create second stage using the demo-project Semaphore project integration resource.
 		//
-		res, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		res, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: support.RandomName("test"),
 			},
@@ -564,7 +564,7 @@ func Test__CreateStage(t *testing.T) {
 		// First stage works
 		//
 		name := support.RandomName("test")
-		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		res, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: name,
 			},
@@ -585,7 +585,7 @@ func Test__CreateStage(t *testing.T) {
 		//
 		// Second stage with the same name fails
 		//
-		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &pb.Stage{
+		_, err = CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &pb.Stage{
 			Metadata: &pb.Stage_Metadata{
 				Name: name,
 			},

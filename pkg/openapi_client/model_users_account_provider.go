@@ -26,7 +26,6 @@ type UsersAccountProvider struct {
 	Email *string `json:"email,omitempty"`
 	DisplayName *string `json:"displayName,omitempty"`
 	AvatarUrl *string `json:"avatarUrl,omitempty"`
-	IsPrimary *bool `json:"isPrimary,omitempty"`
 	CreatedAt *time.Time `json:"createdAt,omitempty"`
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 }
@@ -208,38 +207,6 @@ func (o *UsersAccountProvider) SetAvatarUrl(v string) {
 	o.AvatarUrl = &v
 }
 
-// GetIsPrimary returns the IsPrimary field value if set, zero value otherwise.
-func (o *UsersAccountProvider) GetIsPrimary() bool {
-	if o == nil || IsNil(o.IsPrimary) {
-		var ret bool
-		return ret
-	}
-	return *o.IsPrimary
-}
-
-// GetIsPrimaryOk returns a tuple with the IsPrimary field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *UsersAccountProvider) GetIsPrimaryOk() (*bool, bool) {
-	if o == nil || IsNil(o.IsPrimary) {
-		return nil, false
-	}
-	return o.IsPrimary, true
-}
-
-// HasIsPrimary returns a boolean if a field has been set.
-func (o *UsersAccountProvider) HasIsPrimary() bool {
-	if o != nil && !IsNil(o.IsPrimary) {
-		return true
-	}
-
-	return false
-}
-
-// SetIsPrimary gets a reference to the given bool and assigns it to the IsPrimary field.
-func (o *UsersAccountProvider) SetIsPrimary(v bool) {
-	o.IsPrimary = &v
-}
-
 // GetCreatedAt returns the CreatedAt field value if set, zero value otherwise.
 func (o *UsersAccountProvider) GetCreatedAt() time.Time {
 	if o == nil || IsNil(o.CreatedAt) {
@@ -328,9 +295,6 @@ func (o UsersAccountProvider) ToMap() (map[string]interface{}, error) {
 	}
 	if !IsNil(o.AvatarUrl) {
 		toSerialize["avatarUrl"] = o.AvatarUrl
-	}
-	if !IsNil(o.IsPrimary) {
-		toSerialize["isPrimary"] = o.IsPrimary
 	}
 	if !IsNil(o.CreatedAt) {
 		toSerialize["createdAt"] = o.CreatedAt

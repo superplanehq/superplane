@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../../../components/Button/button'
 import { Input } from '../../../components/Input/input'
 import {
@@ -17,8 +17,9 @@ import { useCreateGroup, useOrganizationRoles } from '../../../hooks/useOrganiza
 import { Heading } from '@/components/Heading/heading'
 
 export function CreateGroupPage() {
-  const { orgId } = useParams<{ orgId: string }>()
   const navigate = useNavigate()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const orgId = organizationId
 
   const [groupName, setGroupName] = useState('')
   const [groupDescription, setGroupDescription] = useState('')
@@ -50,7 +51,7 @@ export function CreateGroupPage() {
         description: groupDescription
       })
 
-      navigate(`/organization/${orgId}/settings/groups`)
+      navigate(`/${orgId}/settings/groups`)
     } catch {
       setError('Failed to create group. Please try again.')
     } finally {
@@ -65,9 +66,6 @@ export function CreateGroupPage() {
     }
   }
 
-  if (!orgId) {
-    return <div>Error: Organization ID not found</div>
-  }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-900 pt-20 text-left">
@@ -79,7 +77,7 @@ export function CreateGroupPage() {
               items={[
                 {
                   label: 'Groups',
-                  onClick: () => navigate(`/organization/${orgId}/settings/groups`)
+                  onClick: () => navigate(`/${orgId}/settings/groups`)
                 },
                 {
                   label: 'Create new group',
@@ -160,7 +158,7 @@ export function CreateGroupPage() {
                           Create a role first to assign it to this group.
                         </p>
                         <Link
-                          to={`/organization/${orgId}/settings/create-role`}
+                          to={`/${orgId}/settings/create-role`}
                           className="inline-flex items-center gap-1 mt-2 text-yellow-800 dark:text-yellow-200 hover:text-yellow-900 dark:hover:text-yellow-100 font-medium"
                         >
                           <MaterialSymbol name="add" size="sm" />
@@ -203,7 +201,7 @@ export function CreateGroupPage() {
               {isCreating ? 'Creating...' : 'Create Group'}
             </Button>
 
-            <Link to={`/organization/${orgId}/settings/groups`}>
+            <Link to={`/${orgId}/settings/groups`}>
               <Button outline>
                 Cancel
               </Button>

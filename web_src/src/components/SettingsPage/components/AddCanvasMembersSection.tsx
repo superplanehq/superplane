@@ -1,6 +1,5 @@
 import { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react'
 import { Button } from '../../Button/button'
-import { Textarea } from '../../Textarea/textarea'
 import { Input, InputGroup } from '../../Input/input'
 import { Avatar } from '../../Avatar/avatar'
 import { Checkbox } from '../../Checkbox/checkbox'
@@ -14,15 +13,12 @@ import {
 } from '../../Dropdown/dropdown'
 import { MaterialSymbol } from '../../MaterialSymbol/material-symbol'
 import { Text } from '../../Text/text'
-import { Field, Label } from '../../Fieldset/fieldset'
-import { Tabs, type Tab } from '../../Tabs/tabs'
 import {
   useCanvasRoles,
   useCanvasUsers,
   useOrganizationUsersForCanvas,
   useAssignCanvasRole
 } from '../../../hooks/useCanvasData'
-import Papa from 'papaparse'
 
 interface AddCanvasMembersSectionProps {
   canvasId: string
@@ -37,11 +33,7 @@ export interface AddCanvasMembersSectionRef {
 
 const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, AddCanvasMembersSectionProps>(
   ({ canvasId, organizationId, onMemberAdded, className }, ref) => {
-    const [addMembersTab, setAddMembersTab] = useState<'emails' | 'upload' | 'existing'>('emails')
-    const [emailsInput, setEmailsInput] = useState('')
-    const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [bulkUserRole, setBulkUserRole] = useState('')
-    const [emailRole, setEmailRole] = useState('')
     const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set())
     const [memberSearchTerm, setMemberSearchTerm] = useState('')
 
@@ -56,11 +48,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
     const isInviting = assignRoleMutation.isPending
     const error = rolesError || orgUsersError
 
-    const addMembersTabs: Tab[] = [
-      { id: 'emails', label: 'By emails' },
-      { id: 'existing', label: 'From organization' },
-      { id: 'upload', label: 'By file' }
-    ]
 
 
     const existingMembers = useMemo(() => {
@@ -76,7 +63,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
         const canvasMemberRole = canvasRoles.find(role => role.metadata?.name?.includes('member'))
         const defaultRole = canvasMemberRole?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
         setBulkUserRole(defaultRole)
-        setEmailRole(defaultRole)
       }
     }, [canvasRoles])
 
@@ -87,134 +73,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       }
     }), [])
 
-    const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0]
-      if (file) {
-        setUploadFile(file)
-      }
-    }
-
-    const handleBulkAddSubmit = async () => {
-      if (!uploadFile) {
-        console.error('No file selected')
-        return
-      }
-
-      if (!bulkUserRole) {
-        console.error('No role selected')
-        return
-      }
-
-      try {
-
-        const fileContent = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = (e) => resolve(e.target?.result as string)
-          reader.onerror = reject
-          reader.readAsText(uploadFile)
-        })
-
-
-
-        let parseResult = Papa.parse(fileContent, {
-          header: true,
-          skipEmptyLines: true,
-          delimiter: ',',
-          transformHeader: (header) => header.toLowerCase().trim()
-        })
-
-        const delimiters = [',', ';', '\t', '|']
-
-        for (const delimiter of delimiters) {
-          const tempResult = Papa.parse(fileContent, {
-            header: true,
-            skipEmptyLines: true,
-            delimiter: delimiter,
-            transformHeader: (header) => header.toLowerCase().trim()
-          })
-
-          if (tempResult.data && tempResult.data.length > 0) {
-            const criticalErrors = tempResult.errors.filter(error =>
-              error.type === 'Delimiter' && error.code === 'UndetectableDelimiter'
-            )
-            if (criticalErrors.length === 0) {
-              parseResult = tempResult
-              break
-            }
-          }
-        }
-
-
-        const criticalErrors = parseResult?.errors?.filter(error =>
-          error.type !== 'Delimiter' || error.code !== 'UndetectableDelimiter'
-        ) || []
-
-        if (criticalErrors.length > 0) {
-          throw new Error(`CSV parsing errors: ${criticalErrors.map(e => e.message).join(', ')}`)
-        }
-
-
-        const csvData = parseResult.data as Array<{ email?: string;[key: string]: string | undefined }>
-
-        const emailsToAdd = csvData
-          .map(row => row.email || row['email address'] || '')
-          .filter(email => email && isEmailValid(email))
-
-
-        if (emailsToAdd.length === 0) {
-          throw new Error('No valid email addresses found in the CSV file. Please ensure the CSV has an "email" column.')
-        }
-
-        const roleToAssign = bulkUserRole
-
-
-        for (const email of emailsToAdd) {
-          await assignRoleMutation.mutateAsync({
-            userEmail: email,
-            role: roleToAssign
-          })
-        }
-
-        setUploadFile(null)
-        const defaultRole = canvasRoles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
-        setBulkUserRole(defaultRole)
-        setAddMembersTab('emails')
-
-        onMemberAdded?.()
-      } catch (error) {
-        alert(`Failed to add members: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      }
-    }
-
-    const isEmailValid = (email: string) => {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return emailRegex.test(email)
-    }
-
-    const handleEmailsSubmit = async () => {
-      if (!emailsInput.trim()) return
-
-      try {
-        const emails = emailsInput.split(',').map(email => email.trim()).filter(email => email.length > 0 && isEmailValid(email))
-        const roleToAssign = emailRole
-
-
-        for (const email of emails) {
-          await assignRoleMutation.mutateAsync({
-            userEmail: email,
-            role: roleToAssign
-          })
-        }
-
-        setEmailsInput('')
-        const defaultRole = canvasRoles.find(r => r.metadata?.name?.includes('member'))?.metadata?.name || canvasRoles[0]?.metadata?.name || ''
-        setEmailRole(defaultRole)
-
-        onMemberAdded?.()
-      } catch {
-        alert('Failed to add members by email')
-      }
-    }
 
     const handleExistingMembersSubmit = async () => {
       if (selectedMembers.size === 0) return
@@ -271,12 +129,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
       )
     }
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault()
-        handleEmailsSubmit()
-      }
-    }
 
     return (
       <div className={`bg-white dark:bg-zinc-950 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6 ${className}`}>
@@ -305,57 +157,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
           </div>
         )}
 
-        {/* Add Members Tabs */}
-        <div className="mb-6">
-          <Tabs
-            tabs={addMembersTabs}
-            defaultTab={addMembersTab}
-            variant='underline'
-            onTabChange={(tabId) => setAddMembersTab(tabId as 'emails' | 'upload' | 'existing')}
-          />
-        </div>
-
-        {/* Tab Content */}
-        {!loadingRoles && addMembersTab === 'emails' ? (
-
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <Textarea
-                rows={1}
-                placeholder="Email addresses, separated by commas"
-                className="flex-1"
-                value={emailsInput}
-                onChange={(e) => setEmailsInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-              />
-
-              <Dropdown>
-                <DropdownButton outline className="flex items-center gap-2 text-sm">
-                  {emailRole ? canvasRoles.find(r => r.metadata?.name === emailRole)?.spec?.displayName || emailRole : 'Select Role'}
-                  <MaterialSymbol name="keyboard_arrow_down" />
-                </DropdownButton>
-                <DropdownMenu>
-                  {canvasRoles.map((role) => (
-                    <DropdownItem key={role.metadata?.name} onClick={() => setEmailRole(role.metadata?.name || '')}>
-                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
-                    </DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
-
-              <Button
-                color="blue"
-                className='flex items-center text-sm gap-2'
-                onClick={handleEmailsSubmit}
-                disabled={!emailsInput.trim() || isInviting || !emailRole}
-              >
-                <MaterialSymbol name="add" size="sm" />
-                {isInviting ? 'Adding...' : 'Add to Canvas'}
-              </Button>
-            </div>
-          </div>
-        ) : !loadingRoles && addMembersTab === 'existing' ? (
+        {!loadingRoles && (
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -443,7 +245,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                           }}
                         />
                         <Avatar
-                          src={member.spec?.avatarUrl}
+                          src={member.spec?.accountProviders?.[0]?.avatarUrl}
                           initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />
@@ -455,14 +257,6 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
                             {member.metadata?.email || "Invalid email"}
                           </div>
                         </div>
-                        <div className="flex items-center">
-                          <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status?.isActive
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                            }`}>
-                            {member.status?.isActive ? 'Active' : 'Pending'}
-                          </span>
-                        </div>
                       </div>
                     ))}
                   </div>
@@ -470,77 +264,7 @@ const AddCanvasMembersSectionComponent = forwardRef<AddCanvasMembersSectionRef, 
               </div>
             )}
           </div>
-        ) : !loadingRoles ? (
-
-          <div className="space-y-6 text-left">
-            {/* File Upload */}
-            <Field>
-              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                CSV/Excel Spreadsheet *
-              </Label>
-              <div className="border-2 border-dashed border-zinc-300 dark:border-zinc-600 rounded-lg p-6 text-center">
-                <MaterialSymbol name="cloud_upload" size="4xl" className="text-zinc-400 mb-2" />
-                <div className="space-y-2">
-                  <Text className="!text-lg text-zinc-600 dark:text-zinc-400">
-                    {uploadFile ? uploadFile.name : 'Drag and drop .csv or'}
-                  </Text>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="add-canvas-members-upload"
-                  />
-
-                  <label
-                    htmlFor="add-canvas-members-upload"
-                    className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-600 rounded-md hover:bg-zinc-50 dark:hover:bg-zinc-700 cursor-pointer"
-                  >
-                    <MaterialSymbol name="folder_open" size="sm" />
-                    Browse
-                  </label>
-                </div>
-              </div>
-              <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
-                The CSV file should have an "email" column with email addresses.
-              </Text>
-            </Field>
-
-            {/* Role Selection */}
-            <Field>
-              <Label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                Role
-              </Label>
-              <Dropdown>
-                <DropdownButton outline className="flex items-center gap-2 text-sm justify-between">
-                  {bulkUserRole ? canvasRoles.find(r => r.metadata?.name === bulkUserRole)?.spec?.displayName || bulkUserRole : 'Select Role'}
-                  <MaterialSymbol name="keyboard_arrow_down" />
-                </DropdownButton>
-                <DropdownMenu>
-                  {canvasRoles.map((role) => (
-                    <DropdownItem key={role.metadata?.name} onClick={() => setBulkUserRole(role.metadata?.name || '')}>
-                      <DropdownLabel>{role.spec?.displayName}</DropdownLabel>
-                      <DropdownDescription>{role.spec?.description || 'No description available'}</DropdownDescription>
-                    </DropdownItem>
-                  ))}
-                </DropdownMenu>
-              </Dropdown>
-            </Field>
-
-            {/* Upload Button */}
-            <div className="flex justify-end">
-              <Button
-                color="blue"
-                onClick={handleBulkAddSubmit}
-                disabled={!uploadFile || isInviting || !bulkUserRole}
-                className="flex items-center gap-2"
-              >
-                <MaterialSymbol name="add" size="sm" />
-                {isInviting ? 'Processing...' : 'Add to Canvas'}
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        )}
       </div>
     )
   })
