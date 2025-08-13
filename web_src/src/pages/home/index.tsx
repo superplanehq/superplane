@@ -248,7 +248,7 @@ const HomePage = () => {
                                 </div>
 
                                 <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
-                                  {canvas.description || 'No description available'}
+                                  {canvas.description || ''}
                                 </Text>
                               </div>
                             </div>

@@ -267,7 +267,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               {isEditMode && <InlineEditable
                 value={eventSourceDescription}
                 onSave={handleEventSourceDescriptionChange}
-                placeholder={isEditMode ? "Add description..." : "No description available"}
+                placeholder={isEditMode ? "Add description..." : ""}
                 className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
               />}
@@ -275,7 +275,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
           </div>
         </div>
         {!isEditMode && (
-          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || 'No description available'}</div>
+          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{eventSourceDescription || ''}</div>
         )}
       </div>
 

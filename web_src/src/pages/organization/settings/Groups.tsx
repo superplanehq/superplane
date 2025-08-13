@@ -250,7 +250,7 @@ export function Groups({ organizationId }: GroupsProps) {
                             >
                               {group.spec?.displayName}
                             </Link>
-                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.spec?.description || 'No description available'}</p>
+                            <p className="text-xs text-zinc-500 dark:text-zinc-400">{group.spec?.description || ''}</p>
                           </div>
                         </div>
                       </TableCell>
@@ -287,7 +287,7 @@ export function Groups({ organizationId }: GroupsProps) {
                               >
                                 <DropdownLabel>{role.spec?.displayName || role.metadata!.name}</DropdownLabel>
                                 <DropdownDescription>
-                                  {role.spec?.description || 'No description available'}
+                                  {role.spec?.description || ''}
                                 </DropdownDescription>
                               </DropdownItem>
                             ))}
