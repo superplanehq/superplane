@@ -123,6 +123,12 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = acceptPendingInvitations(account)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	a.handleSuccessfulAuth(w, r, mockUser)
 }
 
