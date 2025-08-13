@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { EventSourceNodeType } from '@/canvas/types/flow';
 import { SuperplaneEventSourceSpec, IntegrationsIntegrationRef } from '@/api-client/types.gen';
 import { useIntegrations } from '../hooks/useIntegrations';
@@ -35,8 +35,21 @@ export function EventSourceEditModeContent({
   const [selectedIntegration, setSelectedIntegration] = useState<IntegrationsIntegrationRef | null>(data.integration);
   const [resourceType, setResourceType] = useState(data.resource?.type);
   const [resourceName, setResourceName] = useState(data.resource?.name || '');
-  const [integrationConfig, setIntegrationConfig] = useState<Record<string, string | boolean>>({});
   const [apiValidationErrors, setApiValidationErrors] = useState<Record<string, string>>({});
+  const resourceNameRef = useRef<HTMLInputElement | null>(null);
+
+
+  const handleResourceNameChange = (value: string) => {
+    setResourceName(value);
+
+    if (value.trim() !== '') {
+      setValidationErrors(prev => ({
+        ...prev,
+        resourceName: ''
+      }));
+    }
+  };
+
 
   const parseApiError = (errorMessage: string) => {
     const errors: Record<string, string> = {};
@@ -224,13 +237,16 @@ export function EventSourceEditModeContent({
     }
   }, [availableIntegrations, selectedIntegration, requireIntegration]);
 
+  useEffect(() => {
+    resourceNameRef.current?.focus();
+  }, [selectedIntegration])
+
   const revertSection = (section: string) => {
     switch (section) {
       case 'integration':
         setSelectedIntegration(originalData.spec.integration || null);
         setResourceType(originalData.spec.resource?.type || (eventSourceType === 'semaphore' ? 'project' : ''));
         setResourceName(originalData.spec.resource?.name || '');
-        setIntegrationConfig({});
         break;
     }
   };
@@ -253,71 +269,6 @@ export function EventSourceEditModeContent({
         ...prev,
         integration: ''
       }));
-    }
-  };
-
-  const updateIntegrationConfig = (key: string, value: string | boolean) => {
-    setIntegrationConfig(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  const renderIntegrationSpecificFields = () => {
-    if (!selectedIntegration) return null;
-
-    const integration = availableIntegrations.find(
-      int => int.metadata?.name === selectedIntegration.name
-    );
-
-    if (!integration) return null;
-
-    // Render fields based on integration type
-    switch (integration.spec?.type) {
-      case 'TYPE_SEMAPHORE':
-        return (
-          <div className="space-y-3">
-            <ValidationField label="Project Name">
-              <input
-                type="text"
-                value={String(integrationConfig.project || '')}
-                onChange={(e) => updateIntegrationConfig('project', e.target.value)}
-                placeholder="my-semaphore-project"
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </ValidationField>
-          </div>
-        );
-
-      case 'TYPE_GITHUB':
-        return (
-          <div className="space-y-3">
-            <ValidationField label="Repository">
-              <input
-                type="text"
-                value={String(integrationConfig.repository || '')}
-                onChange={(e) => updateIntegrationConfig('repository', e.target.value)}
-                placeholder="owner/repository-name"
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </ValidationField>
-            <ValidationField label="Events">
-              <select
-                value={String(integrationConfig.events || 'push')}
-                onChange={(e) => updateIntegrationConfig('events', e.target.value)}
-                className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="push">Push</option>
-                <option value="pull_request">Pull Request</option>
-                <option value="issues">Issues</option>
-                <option value="release">Release</option>
-              </select>
-            </ValidationField>
-          </div>
-        );
-
-      default:
-        return null;
     }
   };
 
@@ -376,17 +327,10 @@ export function EventSourceEditModeContent({
                     required={true}
                   >
                     <input
+                      ref={resourceNameRef}
                       type="text"
                       value={resourceName}
-                      onChange={(e) => {
-                        setResourceName(e.target.value);
-                        if (e.target.value.trim() !== '') {
-                          setValidationErrors(prev => ({
-                            ...prev,
-                            resourceName: ''
-                          }));
-                        }
-                      }}
+                      onChange={(e) => handleResourceNameChange(e.target.value)}
                       placeholder="my-semaphore-project"
                       className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
                         ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
@@ -394,9 +338,6 @@ export function EventSourceEditModeContent({
                         }`}
                     />
                   </ValidationField>
-
-                  {/* Integration-specific configuration fields */}
-                  {renderIntegrationSpecificFields()}
                 </div>
               )}
             </div>
@@ -444,17 +385,10 @@ export function EventSourceEditModeContent({
                     required={true}
                   >
                     <input
+                      ref={resourceNameRef}
                       type="text"
                       value={resourceName}
-                      onChange={(e) => {
-                        setResourceName(e.target.value);
-                        if (e.target.value.trim() !== '') {
-                          setValidationErrors(prev => ({
-                            ...prev,
-                            resourceName: ''
-                          }));
-                        }
-                      }}
+                      onChange={(e) => handleResourceNameChange(e.target.value)}
                       placeholder="my-repository"
                       className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${combinedErrors.resourceName
                         ? 'border-red-500 dark:border-red-400 focus:ring-red-500'
@@ -462,9 +396,6 @@ export function EventSourceEditModeContent({
                         }`}
                     />
                   </ValidationField>
-
-                  {/* Integration-specific configuration fields */}
-                  {renderIntegrationSpecificFields()}
                 </div>
               )}
             </div>
