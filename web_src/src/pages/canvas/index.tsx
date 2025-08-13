@@ -14,7 +14,7 @@ import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 import { useAutoLayout } from "./hooks/useAutoLayout";
 
 export function Canvas() {
-  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
+  const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes } = useCanvasStore();
@@ -22,7 +22,6 @@ export function Canvas() {
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
-  const { organizationId } = useParams<{ organizationId: string }>();
 
   const getActiveViewFromHash = (): CanvasView => {
     const hash = location.hash.substring(1); // Remove the #
@@ -286,7 +285,7 @@ export function Canvas() {
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >
-            <CanvasNavigationContent canvasId={canvasId!} activeView={activeView} organizationId={orgId!} />
+            <CanvasNavigationContent canvasId={canvasId!} activeView={activeView} organizationId={organizationId!} />
           </div>
         )}
       </div>
