@@ -58,14 +58,14 @@ const Navigation: React.FC = () => {
 
               {/* User Actions */}
               <DropdownSection>
-                <DropdownItem onClick={() => {}}>
+                <DropdownItem onClick={() => { }}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="person" data-slot="icon" size='sm' />
                     <DropdownLabel>Your Profile</DropdownLabel>
                   </span>
                 </DropdownItem>
 
-                <DropdownItem onClick={() => {}}>
+                <DropdownItem onClick={() => { }}>
                   <span className="flex items-center gap-x-2">
                     <MaterialSymbol name="settings" data-slot="icon" size='sm' />
                     <DropdownLabel>Account Settings</DropdownLabel>
@@ -75,58 +75,58 @@ const Navigation: React.FC = () => {
 
               {/* Organization Section */}
               <>
-                  <DropdownDivider />
+                <DropdownDivider />
 
-                  <DropdownHeader>
-                    <div className="flex items-center space-x-3">
-                      <Avatar
-                        initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
-                        alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
-                        className="size-8"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <Text className="font-medium truncate">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
-                      </div>
+                <DropdownHeader>
+                  <div className="flex items-center space-x-3">
+                    <Avatar
+                      initials={(organization?.metadata?.displayName || organization?.metadata?.name || 'Organization').charAt(0).toUpperCase()}
+                      alt={organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}
+                      className="size-8"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <Text className="font-medium truncate">{organization?.metadata?.displayName || organization?.metadata?.name || 'Organization'}</Text>
                     </div>
-                  </DropdownHeader>
+                  </div>
+                </DropdownHeader>
 
-                  {/* Organization Actions */}
-                  <DropdownSection>
-                    <DropdownItem href={`/${organizationId}/settings/general`}>
-                      <span className="flex items-center gap-x-2">
-                        <MaterialSymbol name="business" data-slot="icon" size='sm' />
-                        <DropdownLabel>Organization Settings</DropdownLabel>
-                      </span>
-                    </DropdownItem>
+                {/* Organization Actions */}
+                <DropdownSection>
+                  <DropdownItem href={`/${organizationId}/settings/general`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="business" data-slot="icon" size='sm' />
+                      <DropdownLabel>Organization Settings</DropdownLabel>
+                    </span>
+                  </DropdownItem>
 
-                    <DropdownItem href={`/${organizationId}/settings/members`}>
-                      <span className="flex items-center gap-x-2">
-                        <MaterialSymbol name="person" data-slot="icon" size='sm' />
-                        <DropdownLabel>Members</DropdownLabel>
-                      </span>
-                    </DropdownItem>
+                  <DropdownItem href={`/${organizationId}/settings/members`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="person" data-slot="icon" size='sm' />
+                      <DropdownLabel>Members</DropdownLabel>
+                    </span>
+                  </DropdownItem>
 
-                    <DropdownItem href={`/${organizationId}/settings/groups`}>
-                      <span className="flex items-center gap-x-2">
-                        <MaterialSymbol name="group" data-slot="icon" size='sm' />
-                        <DropdownLabel>Groups</DropdownLabel>
-                      </span>
-                    </DropdownItem>
-                    <DropdownItem href={`/${organizationId}/settings/roles`}>
-                      <span className="flex items-center gap-x-2">
-                        <MaterialSymbol name="shield" data-slot="icon" size='sm' />
-                        <DropdownLabel>Roles</DropdownLabel>
-                      </span>
-                    </DropdownItem>
+                  <DropdownItem href={`/${organizationId}/settings/groups`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="group" data-slot="icon" size='sm' />
+                      <DropdownLabel>Groups</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                  <DropdownItem href={`/${organizationId}/settings/roles`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="shield" data-slot="icon" size='sm' />
+                      <DropdownLabel>Roles</DropdownLabel>
+                    </span>
+                  </DropdownItem>
 
-                    <DropdownItem href={`/${organizationId}/settings/billing`}>
-                      <span className="flex items-center gap-x-2">
-                        <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
-                        <DropdownLabel>Billing & Plans</DropdownLabel>
-                      </span>
-                    </DropdownItem>
-                  </DropdownSection>
-                </>
+                  <DropdownItem href={`/${organizationId}/settings/billing`}>
+                    <span className="flex items-center gap-x-2">
+                      <MaterialSymbol name="credit_card" data-slot="icon" size='sm' />
+                      <DropdownLabel>Billing & Plans</DropdownLabel>
+                    </span>
+                  </DropdownItem>
+                </DropdownSection>
+              </>
 
               <DropdownDivider />
 
