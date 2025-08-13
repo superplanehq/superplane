@@ -38,8 +38,6 @@ interface CanvasMember {
   email: string
   role: string
   roleName: string
-  status: 'Active' | 'Pending' | 'Inactive'
-  lastActive: string
   initials: string
   avatar?: string
 }
@@ -76,10 +74,8 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
         name: name,
         email: user.metadata?.email || `${user.metadata?.id}@email.placeholder`,
         role: primaryRoleDisplayName,
-        status: user.status?.isActive ? 'Active' as const : 'Pending' as const,
-        lastActive: user.status?.isActive ? 'Recently' : 'Never',
         initials: initials,
-        avatar: user.spec?.avatarUrl,
+        avatar: user.spec?.accountProviders?.[0]?.avatarUrl,
         roleName: primaryRoleName // Keep track of the actual role name for mutations
       }
     })
@@ -227,15 +223,6 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
                       <MaterialSymbol name={getSortIcon('role')} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Status
-                      <MaterialSymbol name={getSortIcon('status')} size="sm" className="text-zinc-400" />
-                    </div>
-                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -252,9 +239,6 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
                         <div>
                           <div className="text-sm font-medium text-zinc-900 dark:text-white">
                             {member.name}
-                          </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Last active: {member.lastActive}
                           </div>
                         </div>
                       </div>
@@ -288,16 +272,6 @@ export function CanvasMembers({ canvasId, organizationId }: CanvasMembersProps) 
                           )}
                         </DropdownMenu>
                       </Dropdown>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status === 'Active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                        : member.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                        }`}>
-                        {member.status}
-                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">

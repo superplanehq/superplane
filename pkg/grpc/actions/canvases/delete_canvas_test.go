@@ -22,7 +22,7 @@ func Test__DeleteCanvas(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := DeleteCanvas(context.Background(), &protos.DeleteCanvasRequest{
+		_, err := DeleteCanvas(context.Background(), uuid.New().String(), &protos.DeleteCanvasRequest{
 			IdOrName: uuid.New().String(),
 		}, authService)
 
@@ -33,14 +33,14 @@ func Test__DeleteCanvas(t *testing.T) {
 	})
 
 	t.Run("delete canvas successfully", func(t *testing.T) {
-		organization, err := models.CreateOrganization(userID, "test-org", "Test Organization", "")
+		organization, err := models.CreateOrganization("test-org", "Test Organization", "")
 		require.NoError(t, err)
 		canvas, err := models.CreateCanvas(userID, organization.ID, "test", "test")
 		require.NoError(t, err)
 		err = authService.SetupCanvasRoles(canvas.ID.String())
 		require.NoError(t, err)
 
-		response, err := DeleteCanvas(context.Background(), &protos.DeleteCanvasRequest{
+		response, err := DeleteCanvas(context.Background(), organization.ID.String(), &protos.DeleteCanvasRequest{
 			IdOrName: canvas.ID.String(),
 		}, authService)
 

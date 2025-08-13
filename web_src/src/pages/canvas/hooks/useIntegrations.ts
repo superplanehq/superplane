@@ -4,6 +4,7 @@ import {
   integrationsCreateIntegration,
   integrationsDescribeIntegration,
 } from '../../../api-client/sdk.gen'
+import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import type { IntegrationsCreateIntegrationData } from '../../../api-client/types.gen'
 
 export const integrationKeys = {
@@ -16,9 +17,9 @@ export const useIntegrations = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
   return useQuery({
     queryKey: integrationKeys.byDomain(domainId, domainType),
     queryFn: async () => {
-      const response = await integrationsListIntegrations({
+      const response = await integrationsListIntegrations(withOrganizationHeader({
         query: { domainId: domainId, domainType: domainType }
-      })
+      }))
       return response.data?.integrations || []
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -31,7 +32,7 @@ export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS
   return useQuery({
     queryKey: integrationKeys.detail(domainId, domainType, integrationId),
     queryFn: async () => {
-      const response = await integrationsDescribeIntegration({
+      const response = await integrationsDescribeIntegration(withOrganizationHeader({
         query: {
           domainId: domainId,
           domainType: domainType,
@@ -39,7 +40,7 @@ export const useIntegration = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS
         path: { 
           idOrName: integrationId 
         }
-      })
+      }))
       return response.data?.integration || null
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -95,9 +96,9 @@ export const useCreateIntegration = (domainId: string, domainType: "DOMAIN_TYPE_
         }
       }
 
-      return await integrationsCreateIntegration({
+      return await integrationsCreateIntegration(withOrganizationHeader({
         body: integration
-      })
+      }))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 

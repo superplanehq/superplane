@@ -1,6 +1,9 @@
 package auth
 
 import (
+	"fmt"
+
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -69,77 +72,26 @@ func convertPermissionToProto(permission *authorization.Permission) *pbAuth.Perm
 	}
 }
 
-func ResolveUserID(userID, userEmail string) (string, error) {
-	if userID == "" && userEmail == "" {
-		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
+func FindUser(org, id, email string) (*models.User, error) {
+	if id == "" && email == "" {
+		return nil, fmt.Errorf("user identifier must be specified")
 	}
 
-	if userID != "" {
-		return resolveByID(userID)
-	}
-
-	return resolveByEmail(userEmail, true)
-}
-
-func ResolveUserIDWithoutCreation(userID, userEmail string) (string, error) {
-	if userID == "" && userEmail == "" {
-		return "", status.Error(codes.InvalidArgument, "user identifier must be specified")
-	}
-
-	if userID != "" {
-		return resolveByID(userID)
-	}
-
-	return resolveByEmail(userEmail, false)
-}
-
-func resolveByID(userID string) (string, error) {
-	if err := actions.ValidateUUIDs(userID); err != nil {
-		return "", status.Error(codes.InvalidArgument, "invalid user ID")
-	}
-
-	if _, err := models.FindUserByID(userID); err != nil {
-		return "", status.Error(codes.NotFound, "user not found")
-	}
-
-	return userID, nil
-}
-
-func resolveByEmail(userEmail string, create bool) (string, error) {
-	if !create {
-		user, err := models.FindUserByEmail(userEmail)
-		if err != nil {
-			return "", status.Error(codes.NotFound, "user not found")
-		}
-		return user.ID.String(), nil
-	}
-
-	user, err := findOrCreateUser(userEmail)
+	orgID, err := uuid.Parse(org)
 	if err != nil {
-		return "", err
-	}
-	return user.ID.String(), nil
-}
-
-func findOrCreateUser(email string) (*models.User, error) {
-	if user, err := models.FindUserByEmail(email); err == nil {
-		return user, nil
+		return nil, fmt.Errorf("invalid org ID: %v", err)
 	}
 
-	if user, err := models.FindInactiveUserByEmail(email); err == nil {
-		return user, nil
+	if id != "" {
+		userID, err := uuid.Parse(id)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %v", err)
+		}
+
+		return models.FindUserByID(orgID.String(), userID.String())
 	}
 
-	user := &models.User{
-		Name:     email,
-		IsActive: false,
-	}
-
-	if err := user.Create(); err != nil {
-		return nil, status.Error(codes.Internal, "failed to create user")
-	}
-
-	return user, nil
+	return models.FindUserByEmail(orgID.String(), email)
 }
 
 func GetUsersWithRolesInDomain(domainID, domainType string, authService authorization.Authorization) ([]*pbUsers.User, error) {
@@ -203,75 +155,46 @@ func GetUsersWithRolesInDomain(domainID, domainType string, authService authoriz
 }
 
 func convertUserToProto(userID string, roleAssignments []*pbUsers.UserRoleAssignment) (*pbUsers.User, error) {
-	dbUser, err := models.FindUserByID(userID)
+	dbUser, err := models.FindUnscopedUserByID(userID)
 	if err != nil {
-		return &pb.User{
-			Metadata: &pb.User_Metadata{
-				Id:        userID,
-				Email:     "test@example.com",
-				CreatedAt: timestamppb.Now(),
-				UpdatedAt: timestamppb.Now(),
-			},
-			Spec: &pb.User_Spec{
-				DisplayName:      "Test User",
-				AvatarUrl:        "",
-				AccountProviders: []*pbUsers.AccountProvider{},
-			},
-			Status: &pb.User_Status{
-				IsActive:        false,
-				RoleAssignments: roleAssignments,
-			},
-		}, nil
+		return nil, err
 	}
 
-	accountProviders, err := dbUser.GetAccountProviders()
+	account, err := models.FindAccountByID(dbUser.AccountID.String())
 	if err != nil {
-		accountProviders = []models.AccountProvider{}
+		return nil, err
 	}
 
-	pbAccountProviders := make([]*pbUsers.AccountProvider, len(accountProviders))
-	for i, provider := range accountProviders {
+	providers, err := account.GetAccountProviders()
+	if err != nil {
+		return nil, err
+	}
+
+	pbAccountProviders := make([]*pbUsers.AccountProvider, len(providers))
+	for i, provider := range providers {
 		pbAccountProviders[i] = &pb.AccountProvider{
 			ProviderType: provider.Provider,
 			ProviderId:   provider.ProviderID,
 			Email:        provider.Email,
 			DisplayName:  provider.Name,
 			AvatarUrl:    provider.AvatarURL,
-			IsPrimary:    i == 0, // TODO: Change when we have another login besides github
 			CreatedAt:    timestamppb.New(provider.CreatedAt),
 			UpdatedAt:    timestamppb.New(provider.UpdatedAt),
-		}
-	}
-
-	// Determine primary email and avatar
-	primaryEmail := ""
-	primaryAvatar := ""
-	primaryDisplayName := dbUser.Name
-
-	if !dbUser.IsActive {
-		primaryEmail = dbUser.Name
-	} else if len(accountProviders) > 0 {
-		primaryEmail = accountProviders[0].Email
-		primaryAvatar = accountProviders[0].AvatarURL
-		if primaryDisplayName == "" {
-			primaryDisplayName = accountProviders[0].Name
 		}
 	}
 
 	return &pb.User{
 		Metadata: &pb.User_Metadata{
 			Id:        userID,
-			Email:     primaryEmail,
+			Email:     dbUser.Email,
 			CreatedAt: timestamppb.New(dbUser.CreatedAt),
 			UpdatedAt: timestamppb.New(dbUser.UpdatedAt),
 		},
 		Spec: &pb.User_Spec{
-			DisplayName:      primaryDisplayName,
-			AvatarUrl:        primaryAvatar,
+			DisplayName:      dbUser.Name,
 			AccountProviders: pbAccountProviders,
 		},
 		Status: &pb.User_Status{
-			IsActive:        dbUser.IsActive,
 			RoleAssignments: roleAssignments,
 		},
 	}, nil

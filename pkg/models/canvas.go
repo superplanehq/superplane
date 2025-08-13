@@ -12,7 +12,10 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var ErrNameAlreadyUsed = fmt.Errorf("name already used")
+var (
+	ErrNameAlreadyUsed         = fmt.Errorf("name already used")
+	ErrInvitationAlreadyExists = fmt.Errorf("invitation already exists")
+)
 
 type Canvas struct {
 	ID             uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
@@ -171,7 +174,7 @@ func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
-func FindCanvasByID(id string) (*Canvas, error) {
+func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().
@@ -186,11 +189,26 @@ func FindCanvasByID(id string) (*Canvas, error) {
 	return &canvas, nil
 }
 
-func FindCanvasByName(name string) (*Canvas, error) {
+func FindCanvasByID(id string, organizationID uuid.UUID) (*Canvas, error) {
 	canvas := Canvas{}
 
 	err := database.Conn().
-		Where("name = ?", name).
+		Where("id = ? AND organization_id = ?", id, organizationID).
+		First(&canvas).
+		Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &canvas, nil
+}
+
+func FindCanvasByName(name string, organizationID uuid.UUID) (*Canvas, error) {
+	canvas := Canvas{}
+
+	err := database.Conn().
+		Where("name = ? AND organization_id = ?", name, organizationID).
 		First(&canvas).
 		Error
 

@@ -25,32 +25,9 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
-  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List organizations";
-      description: "Returns a list of all organizations ordered by display name";
-      tags: "Organization";
-    };
-  }
-
-  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create a new organization";
-      description: "Creates a new organization with the given name and display name";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
     option (google.api.http) = {
-      get: "/api/v1/organizations/{id_or_name}"
+      get: "/api/v1/organizations/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get organization details";
@@ -61,7 +38,7 @@ service Organizations {
 
   rpc UpdateOrganization(UpdateOrganizationRequest) returns (UpdateOrganizationResponse) {
     option (google.api.http) = {
-      patch: "/api/v1/organizations/{id_or_name}"
+      patch: "/api/v1/organizations/{id}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
@@ -73,7 +50,7 @@ service Organizations {
 
   rpc DeleteOrganization(DeleteOrganizationRequest) returns (DeleteOrganizationResponse) {
     option (google.api.http) = {
-      delete: "/api/v1/organizations/{id_or_name}"
+      delete: "/api/v1/organizations/{id}"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Delete an organization";
@@ -81,6 +58,30 @@ service Organizations {
       tags: "Organization";
     };
   }
+
+  rpc CreateInvitation(CreateInvitationRequest) returns (CreateInvitationResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/organizations/{id}/invitations"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create an organization invitation";
+      description: "Invites a user to join an organization by email";
+      tags: "Organization";
+    };
+  }
+
+  rpc ListInvitations(ListInvitationsRequest) returns (ListInvitationsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/organizations/{id}/invitations"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List organization invitations";
+      description: "Returns pending invitations for an organization";
+      tags: "Organization";
+    };
+  }
+
 }
 
 message Organization {
@@ -89,30 +90,15 @@ message Organization {
     string name = 2;
     string display_name = 3;
     string description = 4;
-    string created_by = 5;
-    google.protobuf.Timestamp created_at = 6;
-    google.protobuf.Timestamp updated_at = 7;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp updated_at = 6;
   }
 
   Metadata metadata = 1;
 }
 
-message ListOrganizationsRequest {}
-
-message ListOrganizationsResponse {
-  repeated Organization organizations = 1;
-}
-
-message CreateOrganizationRequest {
-  Organization organization = 1;
-}
-
-message CreateOrganizationResponse {
-  Organization organization = 1;
-}
-
 message DescribeOrganizationRequest {
-  string id_or_name = 1;
+  string id = 1;
 }
 
 message DescribeOrganizationResponse {
@@ -120,8 +106,8 @@ message DescribeOrganizationResponse {
 }
 
 message UpdateOrganizationRequest {
-  Organization organization = 1;
-  string id_or_name = 2;
+  string id = 1;
+  Organization organization = 2;
 }
 
 message UpdateOrganizationResponse {
@@ -129,10 +115,36 @@ message UpdateOrganizationResponse {
 }
 
 message DeleteOrganizationRequest {
-  string id_or_name = 1;
+  string id = 1;
 }
 
 message DeleteOrganizationResponse {}
+
+message Invitation {
+  string id = 1;
+  string organization_id = 2;
+  string email = 3;
+  string status = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message CreateInvitationRequest {
+  string id = 1;
+  string email = 2;
+}
+
+message CreateInvitationResponse {
+  Invitation invitation = 1;
+}
+
+message ListInvitationsRequest {
+  string id = 1;
+}
+
+message ListInvitationsResponse {
+  repeated Invitation invitations = 1;
+}
+
 
 // Event messages for organization lifecycle events
 message OrganizationCreated {

@@ -22,12 +22,12 @@ import {
 import { useOrganizationRoles, useDeleteRole } from '../../../hooks/useOrganizationData'
 import { RolesRole } from '../../../api-client/types.gen'
 
-interface RolesSettingsProps {
+interface RolesProps {
   organizationId: string
 }
 
 
-export function RolesSettings({ organizationId }: RolesSettingsProps) {
+export function Roles({ organizationId }: RolesProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [sortConfig, setSortConfig] = useState<{
@@ -47,11 +47,11 @@ export function RolesSettings({ organizationId }: RolesSettingsProps) {
   const deleteRoleMutation = useDeleteRole(organizationId)
 
   const handleCreateRole = () => {
-    navigate(`/organization/${organizationId}/settings/create-role`)
+    navigate(`/${organizationId}/settings/create-role`)
   }
 
   const handleEditRole = (role: RolesRole) => {
-    navigate(`/organization/${organizationId}/settings/create-role/${role.metadata?.name}`)
+    navigate(`/${organizationId}/settings/create-role/${role.metadata?.name}`)
   }
 
   const handleDeleteRole = async (role: RolesRole) => {

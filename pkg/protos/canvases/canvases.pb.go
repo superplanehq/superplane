@@ -5942,7 +5942,7 @@ const file_canvases_proto_rawDesc = "" +
 	"\x12FILTER_TYPE_HEADER\x10\x02*A\n" +
 	"\x0eFilterOperator\x12\x17\n" +
 	"\x13FILTER_OPERATOR_AND\x10\x00\x12\x16\n" +
-	"\x12FILTER_OPERATOR_OR\x10\x012\xaa)\n" +
+	"\x12FILTER_OPERATOR_OR\x10\x012\x81)\n" +
 	"\n" +
 	"Superplane\x12\xa5\x01\n" +
 	"\fListCanvases\x12\x1f.Superplane.ListCanvasesRequest\x1a .Superplane.ListCanvasesResponse\"R\x92A7\n" +
@@ -5960,9 +5960,9 @@ const file_canvases_proto_rawDesc = "" +
 	"\vCreateStage\x12\x1e.Superplane.CreateStageRequest\x1a\x1f.Superplane.CreateStageResponse\"\xa4\x01\x92Ak\n" +
 	"\x05Stage\x12\x12Create a new stage\x1aNCreates a new stage for the specified canvas (can be referenced by ID or name)\x82\xd3\xe4\x93\x020:\x01*\"+/api/v1/canvases/{canvas_id_or_name}/stages\x12\xbf\x01\n" +
 	"\x0eDescribeCanvas\x12!.Superplane.DescribeCanvasRequest\x1a\".Superplane.DescribeCanvasResponse\"f\x92AF\n" +
-	"\x06Canvas\x12\x12Get canvas details\x1a(Returns the details of a specific canvas\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/canvases/{id}\x12\x86\x02\n" +
-	"\rDescribeStage\x12 .Superplane.DescribeStageRequest\x1a!.Superplane.DescribeStageResponse\"\xaf\x01\x92Al\n" +
-	"\x05Stage\x12\x11Get stage details\x1aPReturns the details of a specific stage (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02:\x128/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}\x12\xb4\x02\n" +
+	"\x06Canvas\x12\x12Get canvas details\x1a(Returns the details of a specific canvas\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/canvases/{id}\x12\xdd\x01\n" +
+	"\rDescribeStage\x12 .Superplane.DescribeStageRequest\x1a!.Superplane.DescribeStageResponse\"\x86\x01\x92AC\n" +
+	"\x05Stage\x12\x11Get stage details\x1a'Returns the details of a specific stage\x82\xd3\xe4\x93\x02:\x128/api/v1/canvases/{canvas_id_or_name}/stages/{id_or_name}\x12\xb4\x02\n" +
 	"\x13DescribeEventSource\x12&.Superplane.DescribeEventSourceRequest\x1a'.Superplane.DescribeEventSourceResponse\"\xcb\x01\x92A\x80\x01\n" +
 	"\vEventSource\x12\x18Get event source details\x1aWReturns the details of a specific event source (canvas can be referenced by ID or name)\x82\xd3\xe4\x93\x02A\x12?/api/v1/canvases/{canvas_id_or_name}/event-sources/{id_or_name}\x12\xd0\x02\n" +
 	"\x17DescribeConnectionGroup\x12*.Superplane.DescribeConnectionGroupRequest\x1a+.Superplane.DescribeConnectionGroupResponse\"\xdb\x01\x92A\x8c\x01\n" +

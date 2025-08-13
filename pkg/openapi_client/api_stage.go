@@ -281,13 +281,7 @@ type ApiSuperplaneDescribeStageRequest struct {
 	ctx context.Context
 	ApiService *StageAPIService
 	canvasIdOrName string
-	id string
-	name *string
-}
-
-func (r ApiSuperplaneDescribeStageRequest) Name(name string) ApiSuperplaneDescribeStageRequest {
-	r.name = &name
-	return r
+	idOrName string
 }
 
 func (r ApiSuperplaneDescribeStageRequest) Execute() (*SuperplaneDescribeStageResponse, *http.Response, error) {
@@ -297,19 +291,19 @@ func (r ApiSuperplaneDescribeStageRequest) Execute() (*SuperplaneDescribeStageRe
 /*
 SuperplaneDescribeStage Get stage details
 
-Returns the details of a specific stage (canvas can be referenced by ID or name)
+Returns the details of a specific stage
 
  @param ctx context.Context - for authentication, logging, cancellation, deadlines, tracing, etc. Passed from http.Request or context.Background().
  @param canvasIdOrName
- @param id
+ @param idOrName
  @return ApiSuperplaneDescribeStageRequest
 */
-func (a *StageAPIService) SuperplaneDescribeStage(ctx context.Context, canvasIdOrName string, id string) ApiSuperplaneDescribeStageRequest {
+func (a *StageAPIService) SuperplaneDescribeStage(ctx context.Context, canvasIdOrName string, idOrName string) ApiSuperplaneDescribeStageRequest {
 	return ApiSuperplaneDescribeStageRequest{
 		ApiService: a,
 		ctx: ctx,
 		canvasIdOrName: canvasIdOrName,
-		id: id,
+		idOrName: idOrName,
 	}
 }
 
@@ -328,17 +322,14 @@ func (a *StageAPIService) SuperplaneDescribeStageExecute(r ApiSuperplaneDescribe
 		return localVarReturnValue, nil, &GenericOpenAPIError{error: err.Error()}
 	}
 
-	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{id}"
+	localVarPath := localBasePath + "/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}"
 	localVarPath = strings.Replace(localVarPath, "{"+"canvasIdOrName"+"}", url.PathEscape(parameterValueToString(r.canvasIdOrName, "canvasIdOrName")), -1)
-	localVarPath = strings.Replace(localVarPath, "{"+"id"+"}", url.PathEscape(parameterValueToString(r.id, "id")), -1)
+	localVarPath = strings.Replace(localVarPath, "{"+"idOrName"+"}", url.PathEscape(parameterValueToString(r.idOrName, "idOrName")), -1)
 
 	localVarHeaderParams := make(map[string]string)
 	localVarQueryParams := url.Values{}
 	localVarFormParams := url.Values{}
 
-	if r.name != nil {
-		parameterAddToHeaderOrQuery(localVarQueryParams, "name", r.name, "", "")
-	}
 	// to determine the Content-Type header
 	localVarHTTPContentTypes := []string{}
 

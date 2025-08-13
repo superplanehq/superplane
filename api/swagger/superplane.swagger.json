@@ -367,6 +367,44 @@
         ]
       }
     },
+    "/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}": {
+      "get": {
+        "summary": "Get event source details",
+        "description": "Returns the details of a specific event source (canvas can be referenced by ID or name)",
+        "operationId": "Superplane_DescribeEventSource",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeEventSourceResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "EventSource"
+        ]
+      }
+    },
     "/api/v1/canvases/{canvasIdOrName}/event-sources/{idOrName}/reset-key": {
       "post": {
         "summary": "Reset the key for an event source",
@@ -406,50 +444,6 @@
             "schema": {
               "$ref": "#/definitions/SuperplaneResetEventSourceKeyBody"
             }
-          }
-        ],
-        "tags": [
-          "EventSource"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/event-sources/{id}": {
-      "get": {
-        "summary": "Get event source details",
-        "description": "Returns the details of a specific event source (canvas can be referenced by ID or name)",
-        "operationId": "Superplane_DescribeEventSource",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeEventSourceResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -528,6 +522,42 @@
       }
     },
     "/api/v1/canvases/{canvasIdOrName}/stages/{idOrName}": {
+      "get": {
+        "summary": "Get stage details",
+        "description": "Returns the details of a specific stage",
+        "operationId": "Superplane_DescribeStage",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/SuperplaneDescribeStageResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "canvasIdOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idOrName",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Stage"
+        ]
+      },
       "patch": {
         "summary": "Update a stage",
         "description": "Updates the specified stage (canvas can be referenced by ID or name)",
@@ -566,50 +596,6 @@
             "schema": {
               "$ref": "#/definitions/SuperplaneUpdateStageBody"
             }
-          }
-        ],
-        "tags": [
-          "Stage"
-        ]
-      }
-    },
-    "/api/v1/canvases/{canvasIdOrName}/stages/{id}": {
-      "get": {
-        "summary": "Get stage details",
-        "description": "Returns the details of a specific stage (canvas can be referenced by ID or name)",
-        "operationId": "Superplane_DescribeStage",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/SuperplaneDescribeStageResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "canvasIdOrName",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "name",
-            "in": "query",
-            "required": false,
-            "type": "string"
           }
         ],
         "tags": [
@@ -1290,63 +1276,7 @@
         ]
       }
     },
-    "/api/v1/organizations": {
-      "get": {
-        "summary": "List organizations",
-        "description": "Returns a list of all organizations ordered by display name",
-        "operationId": "Organizations_ListOrganizations",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsListOrganizationsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Organization"
-        ]
-      },
-      "post": {
-        "summary": "Create a new organization",
-        "description": "Creates a new organization with the given name and display name",
-        "operationId": "Organizations_CreateOrganization",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsCreateOrganizationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/OrganizationsCreateOrganizationRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Organization"
-        ]
-      }
-    },
-    "/api/v1/organizations/{idOrName}": {
+    "/api/v1/organizations/{id}": {
       "get": {
         "summary": "Get organization details",
         "description": "Returns the details of a specific organization (can be referenced by ID or name)",
@@ -1367,7 +1297,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1397,7 +1327,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1427,7 +1357,7 @@
         },
         "parameters": [
           {
-            "name": "idOrName",
+            "name": "id",
             "in": "path",
             "required": true,
             "type": "string"
@@ -1438,6 +1368,76 @@
             "required": true,
             "schema": {
               "$ref": "#/definitions/OrganizationsUpdateOrganizationBody"
+            }
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/invitations": {
+      "get": {
+        "summary": "List organization invitations",
+        "description": "Returns pending invitations for an organization",
+        "operationId": "Organizations_ListInvitations",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsListInvitationsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Organization"
+        ]
+      },
+      "post": {
+        "summary": "Create an organization invitation",
+        "description": "Invites a user to join an organization by email",
+        "operationId": "Organizations_CreateInvitation",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/OrganizationsCreateInvitationResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/googlerpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/OrganizationsCreateInvitationBody"
             }
           }
         ],
@@ -2487,19 +2487,19 @@
         }
       }
     },
-    "OrganizationsCreateOrganizationRequest": {
+    "OrganizationsCreateInvitationBody": {
       "type": "object",
       "properties": {
-        "organization": {
-          "$ref": "#/definitions/OrganizationsOrganization"
+        "email": {
+          "type": "string"
         }
       }
     },
-    "OrganizationsCreateOrganizationResponse": {
+    "OrganizationsCreateInvitationResponse": {
       "type": "object",
       "properties": {
-        "organization": {
-          "$ref": "#/definitions/OrganizationsOrganization"
+        "invitation": {
+          "$ref": "#/definitions/OrganizationsInvitation"
         }
       }
     },
@@ -2514,14 +2514,35 @@
         }
       }
     },
-    "OrganizationsListOrganizationsResponse": {
+    "OrganizationsInvitation": {
       "type": "object",
       "properties": {
-        "organizations": {
+        "id": {
+          "type": "string"
+        },
+        "organizationId": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrganizationsListInvitationsResponse": {
+      "type": "object",
+      "properties": {
+        "invitations": {
           "type": "array",
           "items": {
             "type": "object",
-            "$ref": "#/definitions/OrganizationsOrganization"
+            "$ref": "#/definitions/OrganizationsInvitation"
           }
         }
       }
@@ -2547,9 +2568,6 @@
           "type": "string"
         },
         "description": {
-          "type": "string"
-        },
-        "createdBy": {
           "type": "string"
         },
         "createdAt": {
@@ -3866,12 +3884,10 @@
       "type": "object",
       "properties": {
         "providerType": {
-          "type": "string",
-          "title": "e.g., \"google\", \"github\", \"email\""
+          "type": "string"
         },
         "providerId": {
-          "type": "string",
-          "title": "unique ID from the provider"
+          "type": "string"
         },
         "email": {
           "type": "string"
@@ -3881,9 +3897,6 @@
         },
         "avatarUrl": {
           "type": "string"
-        },
-        "isPrimary": {
-          "type": "boolean"
         },
         "createdAt": {
           "type": "string",
@@ -3961,8 +3974,7 @@
         "status": {
           "$ref": "#/definitions/UsersUserStatus"
         }
-      },
-      "title": "User data structure"
+      }
     },
     "UsersUserMetadata": {
       "type": "object",
@@ -4013,9 +4025,6 @@
         "displayName": {
           "type": "string"
         },
-        "avatarUrl": {
-          "type": "string"
-        },
         "accountProviders": {
           "type": "array",
           "items": {
@@ -4028,9 +4037,6 @@
     "UsersUserStatus": {
       "type": "object",
       "properties": {
-        "isActive": {
-          "type": "boolean"
-        },
         "roleAssignments": {
           "type": "array",
           "items": {

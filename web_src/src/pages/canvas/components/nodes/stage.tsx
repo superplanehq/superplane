@@ -26,7 +26,7 @@ const StageImageMap = {
 }
 
 export default function StageNode(props: NodeProps<StageNodeType>) {
-  const { orgId } = useParams<{ orgId: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
   const isNewNode = Boolean(props.data.isDraft) || (props.id && /^\d+$/.test(props.id));
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -60,7 +60,6 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
     return true;
   };
   const canvasId = useCanvasStore(state => state.canvasId) || '';
-  const organizationId = orgId || '';
   const updateStageMutation = useUpdateStage(canvasId);
   const createStageMutation = useCreateStage(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
@@ -460,7 +459,7 @@ export default function StageNode(props: NodeProps<StageNodeType>) {
             }}
             currentStageId={props.id}
             canvasId={canvasId}
-            organizationId={organizationId}
+            organizationId={organizationId!}
             onDataChange={handleDataChange}
           />
         ) : (

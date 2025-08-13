@@ -20,7 +20,6 @@ var _ MappedNullable = &UsersUserStatus{}
 
 // UsersUserStatus struct for UsersUserStatus
 type UsersUserStatus struct {
-	IsActive *bool `json:"isActive,omitempty"`
 	RoleAssignments []UsersUserRoleAssignment `json:"roleAssignments,omitempty"`
 }
 
@@ -39,38 +38,6 @@ func NewUsersUserStatus() *UsersUserStatus {
 func NewUsersUserStatusWithDefaults() *UsersUserStatus {
 	this := UsersUserStatus{}
 	return &this
-}
-
-// GetIsActive returns the IsActive field value if set, zero value otherwise.
-func (o *UsersUserStatus) GetIsActive() bool {
-	if o == nil || IsNil(o.IsActive) {
-		var ret bool
-		return ret
-	}
-	return *o.IsActive
-}
-
-// GetIsActiveOk returns a tuple with the IsActive field value if set, nil otherwise
-// and a boolean to check if the value has been set.
-func (o *UsersUserStatus) GetIsActiveOk() (*bool, bool) {
-	if o == nil || IsNil(o.IsActive) {
-		return nil, false
-	}
-	return o.IsActive, true
-}
-
-// HasIsActive returns a boolean if a field has been set.
-func (o *UsersUserStatus) HasIsActive() bool {
-	if o != nil && !IsNil(o.IsActive) {
-		return true
-	}
-
-	return false
-}
-
-// SetIsActive gets a reference to the given bool and assigns it to the IsActive field.
-func (o *UsersUserStatus) SetIsActive(v bool) {
-	o.IsActive = &v
 }
 
 // GetRoleAssignments returns the RoleAssignments field value if set, zero value otherwise.
@@ -115,9 +82,6 @@ func (o UsersUserStatus) MarshalJSON() ([]byte, error) {
 
 func (o UsersUserStatus) ToMap() (map[string]interface{}, error) {
 	toSerialize := map[string]interface{}{}
-	if !IsNil(o.IsActive) {
-		toSerialize["isActive"] = o.IsActive
-	}
 	if !IsNil(o.RoleAssignments) {
 		toSerialize["roleAssignments"] = o.RoleAssignments
 	}

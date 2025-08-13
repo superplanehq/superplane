@@ -61,7 +61,7 @@ func Test_DescribeGroup(t *testing.T) {
 	})
 
 	t.Run("different organization - group not found", func(t *testing.T) {
-		anotherOrg, err := models.CreateOrganization(r.User, "test-org", "Test Organization", "")
+		anotherOrg, err := models.CreateOrganization("test-org", "Test Organization", "")
 		require.NoError(t, err)
 		require.NoError(t, r.AuthService.SetupOrganizationRoles(anotherOrg.ID.String()))
 

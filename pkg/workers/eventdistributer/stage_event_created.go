@@ -22,7 +22,7 @@ func HandleStageEventCreated(messageBody []byte, wsHub *ws.Hub) error {
 
 	describeStageResp, err := stages.DescribeStage(context.Background(), pbMsg.CanvasId, pbMsg.StageId)
 	if err != nil {
-		log.Warnf("Failed to describe stage: %v, continuing with basic info", err)
+		return err
 	}
 
 	event, err := json.Marshal(map[string]any{

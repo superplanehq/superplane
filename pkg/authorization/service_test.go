@@ -381,17 +381,9 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 
 func Test__AuthService_AccessibleResources(t *testing.T) {
 	r := support.Setup(t)
-	org1 := r.Organization
 	canvas1 := r.Canvas
 	org2 := support.CreateOrganization(t, r, r.User)
 	canvas2 := support.CreateCanvas(t, r, org2.ID, r.User)
-
-	t.Run("get accessible organizations", func(t *testing.T) {
-		orgs, err := r.AuthService.GetAccessibleOrgsForUser(r.User.String())
-		require.NoError(t, err)
-		assert.Contains(t, orgs, org1.ID.String())
-		assert.Contains(t, orgs, org2.ID.String())
-	})
 
 	t.Run("get accessible canvases", func(t *testing.T) {
 		canvases, err := r.AuthService.GetAccessibleCanvasesForUser(r.User.String())
@@ -1003,7 +995,7 @@ func Test__AuthService_DetectMissingPermissions(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("detect missing permissions", func(t *testing.T) {
-		newOrg, err := models.CreateOrganization(uuid.New(), "test-org", "Test Organization", "Test Organization")
+		newOrg, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
 		require.NoError(t, err)
 
 		newCanvas, err := models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
@@ -1032,7 +1024,7 @@ func Test__AuthService_SyncDefaultRoles(t *testing.T) {
 
 	t.Run("sync default roles for existing entities", func(t *testing.T) {
 		// First check that we have missing permissions
-		newOrg, err := models.CreateOrganization(uuid.New(), "test-org", "Test Organization", "Test Organization")
+		newOrg, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
 		require.NoError(t, err)
 		_, err = models.CreateCanvas(uuid.New(), newOrg.ID, "Test Canvas", "Test Canvas")
 		require.NoError(t, err)
@@ -1091,7 +1083,7 @@ func Test__AuthService_CheckAndSyncMissingPermissions(t *testing.T) {
 	require.NoError(t, err)
 	authService.EnableCache(false)
 
-	org, err := models.CreateOrganization(uuid.New(), "test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
 	require.NoError(t, err)
 	canvas, err := models.CreateCanvas(uuid.New(), org.ID, "Test Canvas", "Test Canvas")
 	require.NoError(t, err)
@@ -1139,7 +1131,7 @@ func Test__AuthService_SyncOrganizationRoles(t *testing.T) {
 	authService.EnableCache(false)
 
 	userID := uuid.New()
-	org, err := models.CreateOrganization(userID, "test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
 	require.NoError(t, err)
 	orgID := org.ID.String()
 
@@ -1201,7 +1193,7 @@ func Test__AuthService_SyncCanvasRoles(t *testing.T) {
 	authService.EnableCache(false)
 
 	userID := uuid.New()
-	org, err := models.CreateOrganization(userID, "test-org", "Test Organization", "Test Organization")
+	org, err := models.CreateOrganization("test-org", "Test Organization", "Test Organization")
 	require.NoError(t, err)
 	canvas, err := models.CreateCanvas(userID, org.ID, "Test Canvas", "Test Canvas")
 	require.NoError(t, err)

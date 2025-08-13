@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -20,12 +21,14 @@ func ListGroupUsers(ctx context.Context, domainType, domainID, groupName string,
 
 	userIDs, err := authService.GetGroupUsers(domainID, domainType, groupName)
 	if err != nil {
+		log.Errorf("failed to get group users: %v", err)
 		return nil, status.Error(codes.Internal, "failed to get group users")
 	}
 
 	role, err := authService.GetGroupRole(domainID, domainType, groupName)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "failed to get group roles")
+		log.Errorf("failed to get group role: %v", err)
+		return nil, status.Error(codes.Internal, "failed to get group role")
 	}
 
 	roleMetadataMap, err := models.FindRoleMetadataByNames([]string{role}, domainType, domainID)

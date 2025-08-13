@@ -19,8 +19,6 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("successful group creation", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
 			Group: &pb.Group{
 				Metadata: &pb.Group_Metadata{
 					Name: "test-group",
@@ -46,8 +44,6 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("successful canvas group creation", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_CANVAS,
-			DomainId:   r.Canvas.ID.String(),
 			Group: &pb.Group{
 				Metadata: &pb.Group_Metadata{
 					Name: "canvas-group",
@@ -70,8 +66,6 @@ func Test_CreateGroup(t *testing.T) {
 
 	t.Run("invalid request - missing group name", func(t *testing.T) {
 		req := &pb.CreateGroupRequest{
-			DomainType: pbAuth.DomainType_DOMAIN_TYPE_ORGANIZATION,
-			DomainId:   orgID,
 			Group: &pb.Group{
 				Metadata: &pb.Group_Metadata{
 					Name: "",

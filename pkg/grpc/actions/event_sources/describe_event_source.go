@@ -38,7 +38,7 @@ func DescribeEventSource(ctx context.Context, canvasID string, idOrName string) 
 
 func findEventSource(canvasID string, idOrName string) (*models.EventSource, error) {
 	if idOrName == "" {
-		return nil, status.Errorf(codes.InvalidArgument, "must specify one of: id or name")
+		return nil, status.Errorf(codes.InvalidArgument, "must specify either the ID or name of the stage")
 	}
 
 	ID, err := uuid.Parse(idOrName)

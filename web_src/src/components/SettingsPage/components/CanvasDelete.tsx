@@ -37,7 +37,7 @@ export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
   const handleConfirmDelete = async () => {
     if (confirmationText === 'DELETE') {
       await deleteCanvasMutation.mutateAsync({ canvasId })
-      navigate(`/organization/${organizationId}`)
+      navigate(`/${organizationId}`)
     }
     handleCloseModal()
   }

@@ -3,6 +3,7 @@ package canvases
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
@@ -13,13 +14,13 @@ import (
 	"gorm.io/gorm"
 )
 
-func DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest, authService authorization.Authorization) (*pb.DeleteCanvasResponse, error) {
+func DeleteCanvas(ctx context.Context, orgID string, req *pb.DeleteCanvasRequest, authService authorization.Authorization) (*pb.DeleteCanvasResponse, error) {
 	var canvas *models.Canvas
 	err := actions.ValidateUUIDs(req.IdOrName)
 	if err != nil {
-		canvas, err = models.FindCanvasByName(req.IdOrName)
+		canvas, err = models.FindCanvasByName(req.IdOrName, uuid.MustParse(orgID))
 	} else {
-		canvas, err = models.FindCanvasByID(req.IdOrName)
+		canvas, err = models.FindCanvasByID(req.IdOrName, uuid.MustParse(orgID))
 	}
 
 	if err != nil {

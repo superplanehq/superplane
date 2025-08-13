@@ -6,9 +6,12 @@ import './App.css'
 // Import pages
 import HomePage from './pages/home'
 import { Canvas } from './pages/canvas'
-import OrganizationPage from './pages/organization'
 import { OrganizationSettings } from './pages/organization/settings'
 import Navigation from './components/Navigation'
+import AuthGuard from './components/AuthGuard'
+import OrganizationSelect from './pages/auth/OrganizationSelect'
+import OrganizationCreate from './pages/auth/OrganizationCreate'
+import { AccountProvider } from './contexts/AccountContext'
 
 // Create a client
 const queryClient = new QueryClient({
@@ -24,26 +27,39 @@ const queryClient = new QueryClient({
 // Get the base URL from environment or default to '/app' for production
 const BASE_PATH = import.meta.env.BASE_URL || '/app'
 
-// Helper function to wrap components with Navigation
-const withNavigation = (Component: React.ComponentType) => (
-  <>
+// Helper function to wrap components with Navigation and Auth Guard
+const withAuthAndNavigation = (Component: React.ComponentType) => (
+  <AuthGuard>
     <Navigation />
     <Component />
-  </>
+  </AuthGuard>
+)
+
+const withAuthOnly = (Component: React.ComponentType) => (
+  <AuthGuard>
+    <Component />
+  </AuthGuard>
 )
 
 // Main App component with router
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename={BASE_PATH}>
-        <Routes>
-          <Route path="" element={withNavigation(HomePage)} />
-          <Route path="organization/:orgId" element={withNavigation(OrganizationPage)} />
-          <Route path="organization/:orgId/canvas/:canvasId" element={<Canvas />} />
-          <Route path="organization/:orgId/settings/*" element={withNavigation(OrganizationSettings)} />
-        </Routes>
-      </BrowserRouter>
+      <AccountProvider>
+        <BrowserRouter basename={BASE_PATH}>
+          <Routes>
+ 
+            {/* Organization-scoped protected routes */}
+            <Route path=":organizationId" element={withAuthAndNavigation(HomePage)} />
+            <Route path=":organizationId/canvas/:canvasId" element={withAuthOnly(Canvas)} />
+            <Route path=":organizationId/settings/*" element={withAuthAndNavigation(OrganizationSettings)} />
+            
+            {/* Organization selection and creation */}
+            <Route path="create" element={<OrganizationCreate />} />
+            <Route path="" element={<OrganizationSelect />} />
+          </Routes>
+        </BrowserRouter>
+      </AccountProvider>
     </QueryClientProvider>
   )
 }

@@ -21,13 +21,18 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID, idOrName string, newStage *pb.Stage) (*pb.UpdateStageResponse, error) {
+func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, orgID, canvasID, idOrName string, newStage *pb.Stage) (*pb.UpdateStageResponse, error) {
 	userID, userIsSet := authentication.GetUserIdFromMetadata(ctx)
 	if !userIsSet {
 		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
 	}
 
-	err := actions.ValidateUUIDs(idOrName)
+	canvas, err := models.FindCanvasByID(canvasID, uuid.MustParse(orgID))
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "canvas not found")
+	}
+
+	err = actions.ValidateUUIDs(idOrName)
 	var stage *models.Stage
 	if err != nil {
 		stage, err = models.FindStageByName(canvasID, idOrName)
@@ -57,11 +62,6 @@ func UpdateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 
 	if newStage.Metadata != nil && newStage.Metadata.Description != "" {
 		stage.Description = newStage.Metadata.Description
-	}
-
-	canvas, err := models.FindCanvasByID(canvasID)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
 
 	//

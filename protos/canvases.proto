@@ -127,7 +127,7 @@ service Superplane {
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Get stage details";
-      description: "Returns the details of a specific stage (canvas can be referenced by ID or name)";
+      description: "Returns the details of a specific stage";
       tags: "Stage";
     };
   }

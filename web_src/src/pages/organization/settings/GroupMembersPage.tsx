@@ -34,9 +34,11 @@ import {
 import { UsersUser } from '@/api-client'
 
 export function GroupMembersPage() {
-  const { orgId, groupName: encodedGroupName } = useParams<{ orgId: string; groupName: string }>()
+  const { groupName: encodedGroupName } = useParams<{ groupName: string }>()
   const groupName = encodedGroupName ? decodeURIComponent(encodedGroupName) : undefined
   const navigate = useNavigate()
+  const { organizationId } = useParams<{ organizationId: string }>()
+  const orgId = organizationId
   const addMembersSectionRef = useRef<AddMembersSectionRef>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isEditingGroupName, setIsEditingGroupName] = useState(false)
@@ -66,7 +68,7 @@ export function GroupMembersPage() {
 
 
   const handleBackToGroups = () => {
-    navigate(`/organization/${orgId}/settings/groups`)
+    navigate(`/${orgId}/settings/groups`)
   }
 
   const handleEditGroupName = () => {
@@ -446,15 +448,6 @@ export function GroupMembersPage() {
                       <MaterialSymbol name={getSortIcon('email')} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Status
-                      <MaterialSymbol name={getSortIcon('status')} size="sm" className="text-zinc-400" />
-                    </div>
-                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -464,7 +457,7 @@ export function GroupMembersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar
-                          src={member.spec?.avatarUrl}
+                          src={member.spec?.accountProviders?.[0]?.avatarUrl}
                           initials={member.spec?.displayName?.charAt(0) || 'U'}
                           className="size-8"
                         />
@@ -480,18 +473,6 @@ export function GroupMembersPage() {
                     </TableCell>
                     <TableCell>
                       {member.metadata?.email}
-                    </TableCell>
-                    <TableCell>
-                      {
-                        member.status?.isActive ?
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">
-                            Active
-                          </span>
-                          :
-                          <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400">
-                            Pending
-                          </span>
-                      }
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">

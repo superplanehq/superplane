@@ -28,7 +28,7 @@ func Test__CreateEventSource(t *testing.T) {
 	r := support.SetupWithOptions(t, support.SetupOptions{Integration: true})
 
 	t.Run("canvas does not exist -> error", func(t *testing.T) {
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, uuid.NewString(), &protos.EventSource{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), uuid.NewString(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: "test",
 			},
@@ -47,7 +47,7 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("source")
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -72,7 +72,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// First one is created.
 		//
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -82,7 +82,7 @@ func Test__CreateEventSource(t *testing.T) {
 		//
 		// Second one fails.
 		//
-		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		_, err = CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -101,7 +101,7 @@ func Test__CreateEventSource(t *testing.T) {
 
 		name := support.RandomName("source")
 		description := support.RandomName("description")
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name:        name,
 				Description: description,
@@ -134,7 +134,7 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("event source for integration that does not exist -> error", func(t *testing.T) {
 		name := support.RandomName("source")
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -184,7 +184,7 @@ func Test__CreateEventSource(t *testing.T) {
 		defer testconsumer.Stop()
 
 		name := support.RandomName("source")
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -217,7 +217,7 @@ func Test__CreateEventSource(t *testing.T) {
 
 	t.Run("event source for the same integration resource -> error", func(t *testing.T) {
 		name := support.RandomName("source")
-		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		_, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: name,
 			},
@@ -259,7 +259,7 @@ func Test__CreateEventSource(t *testing.T) {
 		// Create external source for the same integration resource
 		//
 		externalName := support.RandomName("external")
-		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.EventSource{
+		response, err := CreateEventSource(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.EventSource{
 			Metadata: &protos.EventSource_Metadata{
 				Name: externalName,
 			},

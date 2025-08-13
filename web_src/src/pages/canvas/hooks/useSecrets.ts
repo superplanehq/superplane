@@ -6,6 +6,7 @@ import {
   secretsUpdateSecret,
   secretsDeleteSecret,
 } from '../../../api-client/sdk.gen'
+import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 import type { SecretsCreateSecretData, SecretsUpdateSecretData } from '../../../api-client/types.gen'
 
 export const secretKeys = {
@@ -18,9 +19,9 @@ export const useSecrets = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | 
   return useQuery({
     queryKey: secretKeys.byDomain(domainId, domainType),
     queryFn: async () => {
-      const response = await secretsListSecrets({
+      const response = await secretsListSecrets(withOrganizationHeader({
         query: { domainId: domainId, domainType: domainType },
-      })
+      }))
       return response.data?.secrets || []
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
@@ -33,13 +34,13 @@ export const useSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVAS" | "
   return useQuery({
     queryKey: secretKeys.detail(domainId, domainType, secretId),
     queryFn: async () => {
-      const response = await secretsDescribeSecret({
+      const response = await secretsDescribeSecret(withOrganizationHeader({
         query: { 
           domainType: domainType,
           domainId: domainId,
         },
         path: { idOrName: secretId }
-      })
+      }))
       return response.data?.secret || null
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -83,9 +84,9 @@ export const useCreateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
         domainType
       }
 
-      return await secretsCreateSecret({
+      return await secretsCreateSecret(withOrganizationHeader({
         body: secret
-      })
+      }))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -130,7 +131,7 @@ export const useUpdateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
       domainType
     }
 
-      return await secretsUpdateSecret({
+      return await secretsUpdateSecret(withOrganizationHeader({
         body: {
           secret: secret.secret,
           domainId,
@@ -139,7 +140,7 @@ export const useUpdateSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
         path: {
           idOrName: secretId
         }
-      })
+      }))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -157,7 +158,7 @@ export const useDeleteSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
   
   return useMutation({
     mutationFn: async (secretId: string) => {
-      return await secretsDeleteSecret({
+      return await secretsDeleteSecret(withOrganizationHeader({
         path: {
           idOrName: secretId
         },
@@ -165,7 +166,7 @@ export const useDeleteSecret = (domainId: string, domainType: "DOMAIN_TYPE_CANVA
           domainId: domainId,
           domainType: domainType
         }
-      })
+      }))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 

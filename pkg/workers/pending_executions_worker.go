@@ -245,7 +245,7 @@ func secretProvider(encryptor crypto.Encryptor, secretDef *models.ValueDefinitio
 		return secrets.NewProvider(encryptor, secretDef.Name, secretDef.DomainType, stage.CanvasID)
 	}
 
-	canvas, err := models.FindCanvasByID(stage.CanvasID.String())
+	canvas, err := models.FindUnscopedCanvasByID(stage.CanvasID.String())
 	if err != nil {
 		return nil, fmt.Errorf("error finding canvas %s: %v", stage.CanvasID, err)
 	}

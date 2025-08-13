@@ -25,7 +25,7 @@ func Test__UpdateStage(t *testing.T) {
 	// Create a stage first that we'll update in tests
 	executor := support.ProtoExecutor(t, r)
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-	stage, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), &protos.Stage{
+	stage, err := CreateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), &protos.Stage{
 		Metadata: &protos.Stage_Metadata{
 			Name: "test-update-stage",
 		},
@@ -67,7 +67,7 @@ func Test__UpdateStage(t *testing.T) {
 	stageID := stage.Stage.Metadata.Id
 
 	t.Run("stage does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), uuid.NewString(), &protos.Stage{})
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), uuid.NewString(), &protos.Stage{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -75,7 +75,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("unauthenticated user -> error", func(t *testing.T) {
-		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{})
+		_, err := UpdateStage(context.Background(), r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{})
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.Unauthenticated, s.Code())
@@ -83,7 +83,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("connection for source that does not exist -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{
 			Spec: &protos.Stage_Spec{
 				Executor: executor,
 				Connections: []*protos.Connection{
@@ -102,7 +102,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid filter -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{
 			Spec: &protos.Stage_Spec{
 				Executor: executor,
 				Connections: []*protos.Connection{
@@ -129,7 +129,7 @@ func Test__UpdateStage(t *testing.T) {
 	})
 
 	t.Run("invalid approval condition -> error", func(t *testing.T) {
-		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+		_, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{
 			Spec: &protos.Stage_Spec{
 				Executor: executor,
 				Connections: []*protos.Connection{
@@ -159,7 +159,7 @@ func Test__UpdateStage(t *testing.T) {
 
 		require.NoError(t, err)
 
-		res, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Canvas.ID.String(), stageID, &protos.Stage{
+		res, err := UpdateStage(ctx, r.Encryptor, r.Registry, r.Organization.ID.String(), r.Canvas.ID.String(), stageID, &protos.Stage{
 			Spec: &protos.Stage_Spec{
 				Executor: &protos.Executor{
 					Type:        executor.Type,

@@ -26,8 +26,8 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, canvasID string, stage *pb.Stage) (*pb.CreateStageResponse, error) {
-	canvas, err := models.FindCanvasByID(canvasID)
+func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *registry.Registry, orgID, canvasID string, stage *pb.Stage) (*pb.CreateStageResponse, error) {
+	canvas, err := models.FindCanvasByID(canvasID, uuid.MustParse(orgID))
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas not found")
 	}
@@ -147,7 +147,6 @@ func CreateStage(ctx context.Context, encryptor crypto.Encryptor, registry *regi
 	}
 
 	err = messages.NewStageCreatedMessage(newStage).Publish()
-
 	if err != nil {
 		logging.ForStage(newStage).Errorf("failed to publish stage created message: %v", err)
 	}

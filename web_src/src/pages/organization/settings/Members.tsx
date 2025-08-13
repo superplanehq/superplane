@@ -19,7 +19,6 @@ import {
   TableHeader,
   TableCell
 } from '../../../components/Table/table'
-import { AddMembersSection } from './AddMembersSection'
 import { useOrganizationUsers, useOrganizationRoles, useAssignRole, useRemoveRole } from '../../../hooks/useOrganizationData'
 
 interface Member {
@@ -28,17 +27,15 @@ interface Member {
   email: string
   role: string
   roleName: string
-  status: 'Active' | 'Pending' | 'Inactive'
-  lastActive: string
   initials: string
   avatar?: string
 }
 
-interface MembersSettingsProps {
+interface MembersProps {
   organizationId: string
 }
 
-export function MembersSettings({ organizationId }: MembersSettingsProps) {
+export function Members({ organizationId }: MembersProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Member | null
@@ -66,20 +63,14 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
       const primaryRoleName = user.status?.roleAssignments?.[0]?.roleName || 'Member'
       const primaryRoleDisplayName = user.status?.roleAssignments?.[0]?.roleDisplayName || primaryRoleName
 
-      // Calculate last active time
-      const lastLoginAt = user.status?.isActive ? Date.now() : null
-      const lastActive = lastLoginAt ? new Date(lastLoginAt).toLocaleDateString() : 'Never'
-
       return {
         id: user.metadata?.id || '',
         name: name,
         email: user.metadata?.email || '',
         role: primaryRoleDisplayName,
         roleName: primaryRoleName,
-        status: user.status?.isActive ? 'Active' : 'Pending',
-        lastActive: lastActive,
         initials: initials,
-        avatar: user.spec?.avatarUrl
+        avatar: user.spec?.accountProviders?.[0]?.avatarUrl
       }
     })
   }, [users])
@@ -158,9 +149,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
     }
   }
 
-  const handleMemberAdded = () => {
-    // No need to manually refresh - React Query will handle cache invalidation
-  }
 
   return (
     <div className="space-y-6 pt-6">
@@ -169,11 +157,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
           Members
         </Heading>
       </div>
-
-      <AddMembersSection
-        organizationId={organizationId}
-        onMemberAdded={handleMemberAdded}
-      />
 
       {error && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -234,15 +217,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                       <MaterialSymbol name={getSortIcon('role')} size="sm" className="text-zinc-400" />
                     </div>
                   </TableHeader>
-                  <TableHeader
-                    className="cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Status
-                      <MaterialSymbol name={getSortIcon('status')} size="sm" className="text-zinc-400" />
-                    </div>
-                  </TableHeader>
                   <TableHeader></TableHeader>
                 </TableRow>
               </TableHead>
@@ -259,9 +233,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                         <div>
                           <div className="text-sm font-medium text-zinc-900 dark:text-white">
                             {member.name}
-                          </div>
-                          <div className="text-xs text-zinc-500 dark:text-zinc-400">
-                            Last active: {member.lastActive}
                           </div>
                         </div>
                       </div>
@@ -295,16 +266,6 @@ export function MembersSettings({ organizationId }: MembersSettingsProps) {
                           )}
                         </DropdownMenu>
                       </Dropdown>
-                    </TableCell>
-                    <TableCell>
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${member.status === 'Active'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
-                        : member.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-400'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400'
-                        }`}>
-                        {member.status}
-                      </span>
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end">
