@@ -381,7 +381,6 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	//
 	// TODO: the organization creation should be in a transaction
-	// TODO: this should all be moved into pkg/models/organization.go
 	// Create the organization and set up roles for it.
 	//
 	organization, err := models.CreateOrganization(req.Name, req.DisplayName, "")
