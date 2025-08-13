@@ -67,8 +67,22 @@ export function useArrayEditor<T extends Record<string, unknown>>({
   }, [items, removeItem]);
 
   const saveEdit = useCallback(() => {
+    if (editingIndex !== null && validateItem && setValidationErrors) {
+      const item = items[editingIndex];
+      const errors = validateItem(item, editingIndex);
+      
+      if (errors.length > 0) {
+        // Don't save if there are validation errors
+        setValidationErrors(prev => ({
+          ...prev,
+          [`${errorPrefix}_${editingIndex}`]: errors.join(', ')
+        }));
+        return;
+      }
+    }
+    
     setEditingIndex(null);
-  }, []);
+  }, [editingIndex, items, validateItem, setValidationErrors, errorPrefix]);
 
   const startEdit = useCallback((index: number) => {
     setEditingIndex(index);

@@ -1,11 +1,12 @@
 import { SuperplaneConnection, SuperplaneConnectionType, SuperplaneFilter } from '@/api-client/types.gen';
 import { ValidationField } from './ValidationField';
 import { useConnectionOptions } from '../../hooks/useConnectionOptions';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 interface ConnectionSelectorProps {
   connection: SuperplaneConnection;
   index: number;
-  onConnectionUpdate: (index: number, field: keyof SuperplaneConnection, value: string | SuperplaneConnectionType) => void;
+  onConnectionUpdate: (index: number, type: SuperplaneConnectionType, name: string) => void;
   onFilterAdd: (connectionIndex: number) => void;
   onFilterUpdate: (connectionIndex: number, filterIndex: number, updates: Partial<SuperplaneFilter>) => void;
   onFilterRemove: (connectionIndex: number, filterIndex: number) => void;
@@ -30,12 +31,12 @@ export function ConnectionSelector({
   const { getConnectionOptions } = useConnectionOptions(currentEntityId);
 
   const renderConnectionOptions = () => {
-    const options = getConnectionOptions(connection.type);
+    const options = getConnectionOptions();
 
     if (options.length === 0 && connection.type) {
       return (
         <option value="" disabled>
-          No {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}s available
+          No connections available
         </option>
       );
     }
@@ -53,7 +54,7 @@ export function ConnectionSelector({
     return Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
       <optgroup key={groupName} label={groupName}>
         {groupOptions.map(option => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={`${option.type}\u001F${option.value}`}>
             {option.label}
           </option>
         ))}
@@ -63,35 +64,20 @@ export function ConnectionSelector({
 
   return (
     <div className="space-y-3">
-      <ValidationField 
-        label="Connection Type"
+      <ValidationField
+        label="Connection"
         error={validationError}
       >
         <select
-          value={connection.type || 'TYPE_EVENT_SOURCE'}
-          onChange={(e) => onConnectionUpdate(index, 'type', e.target.value as SuperplaneConnectionType)}
+          value={`${connection.type}\u001F${connection.name}`}
+          onChange={(e) => {
+            const [type, name] = e.target.value.split('\u001F');
+            onConnectionUpdate(index, type as SuperplaneConnectionType, name)
+          }}
           className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
             ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
             : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-          }`}
-        >
-          <option value="TYPE_EVENT_SOURCE">Event Source</option>
-          <option value="TYPE_STAGE">Stage</option>
-          <option value="TYPE_CONNECTION_GROUP">Connection Group</option>
-        </select>
-      </ValidationField>
-
-      <ValidationField 
-        label="Connection Name"
-        error={validationError}
-      >
-        <select
-          value={connection.name || ''}
-          onChange={(e) => onConnectionUpdate(index, 'name', e.target.value)}
-          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationError
-            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-          }`}
+            }`}
         >
           <option value="">
             {connection.type ? 'Select a connection...' : 'Select connection type first'}
@@ -105,12 +91,6 @@ export function ConnectionSelector({
         <div className="border-t border-zinc-200 dark:border-zinc-700 pt-3">
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-medium text-gray-900 dark:text-zinc-100">Filters</label>
-            <button
-              onClick={() => onFilterAdd(index)}
-              className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-            >
-              + Add Filter
-            </button>
           </div>
           <div className="space-y-2">
             {(connection.filters || []).map((filter, filterIndex) => (
@@ -176,6 +156,13 @@ export function ConnectionSelector({
               </div>
             ))}
           </div>
+          <button
+            onClick={() => onFilterAdd(index)}
+            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <MaterialSymbol name="add" size="sm" />
+            Add Filter
+          </button>
         </div>
       )}
     </div>

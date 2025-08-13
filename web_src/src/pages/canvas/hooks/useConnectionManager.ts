@@ -11,25 +11,25 @@ interface UseConnectionManagerProps {
 export function useConnectionManager({ connections, setConnections, currentEntityId }: UseConnectionManagerProps) {
   const { getConnectionOptions } = useConnectionOptions(currentEntityId);
 
-  const updateConnection = useCallback((index: number, field: keyof SuperplaneConnection, value: SuperplaneConnectionType | SuperplaneFilterOperator | string) => {
+  const updateConnection = useCallback((index: number, type: SuperplaneConnectionType, name: string) => {
     setConnections(connections.map((conn, i) => {
       if (i === index) {
-        const updatedConnection = { ...conn, [field]: value };
-
-        // If connection type changed, clear the connection name since available options will be different
-        if (field === 'type' && updatedConnection.name) {
-          const newOptions = getConnectionOptions(value as SuperplaneConnectionType);
-          const isCurrentNameValid = newOptions.some(option => option.value === updatedConnection.name);
-          if (!isCurrentNameValid) {
-            updatedConnection.name = '';
-          }
-        }
-
+        const updatedConnection = { ...conn, type, name };
         return updatedConnection;
       }
       return conn;
     }));
-  }, [connections, setConnections, getConnectionOptions]);
+  }, [connections, setConnections]);
+
+  const updateFilterOperator = useCallback((index: number, operator: SuperplaneFilterOperator) => {
+    setConnections(connections.map((conn, i) => {
+      if (i === index) {
+        const updatedConnection = { ...conn, filterOperator: operator };
+        return updatedConnection;
+      }
+      return conn;
+    }));
+  }, [connections, setConnections]);
 
   const addFilter = useCallback((connectionIndex: number) => {
     const newFilter: SuperplaneFilter = {
@@ -70,17 +70,44 @@ export function useConnectionManager({ connections, setConnections, currentEntit
     const newOperator: SuperplaneFilterOperator =
       current === 'FILTER_OPERATOR_AND' ? 'FILTER_OPERATOR_OR' : 'FILTER_OPERATOR_AND';
 
-    updateConnection(connectionIndex, 'filterOperator', newOperator);
-  }, [connections, updateConnection]);
+    updateFilterOperator(connectionIndex, newOperator);
+  }, [connections, updateFilterOperator]);
 
   const validateConnection = useCallback((connection: SuperplaneConnection): string[] => {
     const errors: string[] = [];
+    
     if (!connection.name || connection.name.trim() === '') {
       errors.push('Connection name is required');
     }
+    
     if (!connection.type) {
       errors.push('Connection type is required');
     }
+    
+    if (connection.filters && connection.filters.length > 0) {
+      const emptyFilters: number[] = [];
+      
+      connection.filters.forEach((filter, index) => {
+        if (filter.type === 'FILTER_TYPE_DATA') {
+          if (!filter.data?.expression || filter.data.expression.trim() === '') {
+            emptyFilters.push(index + 1);
+          }
+        } else if (filter.type === 'FILTER_TYPE_HEADER') {
+          if (!filter.header?.expression || filter.header.expression.trim() === '') {
+            emptyFilters.push(index + 1);
+          }
+        }
+      });
+      
+      if (emptyFilters.length > 0) {
+        if (emptyFilters.length === 1) {
+          errors.push(`Filter ${emptyFilters[0]} is incomplete - all filter fields must be filled`);
+        } else {
+          errors.push(`Filters ${emptyFilters.join(', ')} are incomplete - all filter fields must be filled`);
+        }
+      }
+    }
+    
     return errors;
   }, []);
 

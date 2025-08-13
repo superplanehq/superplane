@@ -82,9 +82,8 @@ export function ErrorMessage({
 }: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <div
-      data-slot="error"
       {...props}
-      className={clsx(className, 'text-base/6 text-red-600 data-disabled:opacity-50 sm:text-sm/6 dark:text-red-500')}
+      className={clsx(className, 'ml-1 text-xs absolute text-red-600 data-disabled:opacity-50 dark:text-red-500')}
     />
   )
 }

@@ -9,11 +9,11 @@ import { useSecrets, useSecret } from '../../../pages/canvas/hooks/useSecrets'
 import { IntegrationsIntegration } from '@/api-client'
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg'
 import GithubLogo from '@/assets/github-mark.svg'
-import { TabType } from '../SettingsPage'
+import { useNavigate } from 'react-router-dom'
 
 interface CanvasIntegrationsProps {
   canvasId: string
-  updateActiveTab: (tab: TabType) => void
+  organizationId: string
 }
 
 type IntegrationSection = 'list' | 'choose-type' | 'new' | 'edit'
@@ -37,7 +37,7 @@ const INTEGRATION_TYPES = [
   },
 ]
 
-export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrationsProps) {
+export function CanvasIntegrations({ canvasId, organizationId }: CanvasIntegrationsProps) {
   const [section, setSection] = useState<IntegrationSection>('list')
   const [selectedType, setSelectedType] = useState<string>('semaphore')
   const [integrationName, setIntegrationName] = useState('')
@@ -52,6 +52,8 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   const updateIntegrationMutation = useUpdateIntegration(canvasId, "DOMAIN_TYPE_CANVAS", editingIntegration?.metadata?.id || '')
   const { data: secrets = [] } = useSecrets(canvasId, "DOMAIN_TYPE_CANVAS")
   const { data: selectedSecret } = useSecret(canvasId, "DOMAIN_TYPE_CANVAS", selectedSecretId)
+
+  const navigate = useNavigate()
 
   const handleAddIntegration = () => {
     setSection('choose-type')
@@ -73,9 +75,17 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   }
 
   const handleCreateIntegration = async () => {
-    if (!integrationName.trim() || !integrationUrl.trim()) {
+    const trimmedIntegrationName = integrationName.trim()
+    let trimmedIntegrationUrl = integrationUrl.trim()
+
+    if (!trimmedIntegrationName || !trimmedIntegrationUrl) {
       return
     }
+
+    if (trimmedIntegrationUrl.endsWith('/')) {
+      trimmedIntegrationUrl = trimmedIntegrationUrl.slice(0, -1)
+    }
+
 
     // Validate token authentication requirements
     if (authType === 'AUTH_TYPE_TOKEN' && (!selectedSecretId || !selectedSecretKey)) {
@@ -83,9 +93,9 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
     }
 
     const integrationData: CreateIntegrationParams = {
-      name: integrationName.trim(),
+      name: trimmedIntegrationName,
       type: selectedType as 'semaphore',
-      url: integrationUrl.trim(),
+      url: trimmedIntegrationUrl,
       authType,
       tokenSecretName: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretId : undefined,
       tokenSecretKey: authType === 'AUTH_TYPE_TOKEN' ? selectedSecretKey : undefined,
@@ -143,7 +153,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
   const hasIntegrations = integrations && integrations.length > 0
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         {section === 'choose-type' && (
@@ -235,7 +245,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 ${integration.spec?.type === 'semaphore' ? 'bg-gray-200' : 'bg-orange-500'} rounded flex items-center justify-center`}>
-                        <img className="w-8 h-8 p-2" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
+                        <img className="w-8 h-8 p-2 object-contain" src={integration.spec?.type === 'semaphore' ? SemaphoreLogo : ''} alt={integration.metadata?.name} />
                       </div>
                       <Heading level={3}>
                         {integration.metadata?.name}
@@ -281,7 +291,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
                   className="relative flex items-start gap-4 p-6 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-left group"
                 >
                   <div className={`p-3 rounded-lg ${integrationType.color} flex items-center justify-center`}>
-                    <img className="w-8 h-8" src={integrationType.icon} alt={integrationType.label} />
+                    <img className="w-8 h-8 object-contain" src={integrationType.icon} alt={integrationType.label} />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
@@ -404,7 +414,7 @@ export function CanvasIntegrations({ canvasId, updateActiveTab }: CanvasIntegrat
                     {secrets.length === 0 && (
                       <Text className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
                         No secrets available. Create a secret first in the &nbsp;
-                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => updateActiveTab('secrets')}>secrets section</span>.
+                        <span className="text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/organization/${organizationId}/canvas/${canvasId}#secrets`)}>secrets section</span>.
                       </Text>
                     )}
                   </div>

@@ -19,9 +19,25 @@ export const useFlowHandlers = () => {
     instance.fitView();
   }, []);
 
+  const fitViewToNode = useCallback((nodeId: string) => {
+    if (reactFlowInstanceRef.current) {
+      const nodes = reactFlowInstanceRef.current.getNodes();
+      const targetNode = nodes.find(node => node.id === nodeId);
+      
+      if (targetNode) {
+        reactFlowInstanceRef.current.fitView({
+          nodes: [targetNode],
+          duration: 800,
+          padding: 0.3
+        });
+      }
+    }
+  }, []);
+
   return {
     onNodeDragStop,
     onInit,
-    reactFlowInstanceRef
+    reactFlowInstanceRef,
+    fitViewToNode
   };
 };

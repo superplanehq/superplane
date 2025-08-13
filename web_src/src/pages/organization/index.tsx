@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Heading } from '../../components/Heading/heading'
 import { Text } from '../../components/Text/text'
 import { Button } from '../../components/Button/button'
@@ -28,6 +28,7 @@ const HomePage = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const showIcons = false
+  const navigate = useNavigate()
 
   // New canvas modal state
   const [showCreateCanvasModal, setShowCreateCanvasModal] = useState(false)
@@ -77,7 +78,7 @@ const HomePage = () => {
 
   const handleCreateCanvasSubmit = async (data: { name: string; description?: string }) => {
     if (organizationId) {
-      await createCanvasMutation.mutateAsync({
+      const result = await createCanvasMutation.mutateAsync({
         canvas: {
           metadata: {
             name: data.name,
@@ -86,6 +87,8 @@ const HomePage = () => {
         },
         organizationId: organizationId
       })
+
+      navigate(`/organization/${organizationId}/canvas/${result.data?.canvas?.metadata?.id}`)
     }
   }
 
@@ -93,12 +96,13 @@ const HomePage = () => {
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-900 pt-10">
       {/* Main Content */}
       <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className='bg-zinc-50 dark:bg-zinc-900 w-full flex-grow-1 p-6'>
+        <div className='bg-zinc-50 dark:bg-zinc-900 w-full flex-grow-1 p-6 mt-3'>
           <div className="p-4">
             {/* Page Header */}
             <div className='flex items-center justify-between mb-8'>
               <Heading level={1} className="!text-3xl mb-2">Canvases</Heading>
               <Button
+                color='blue'
                 className='flex items-center bg-blue-700 text-white hover:bg-blue-600'
                 onClick={handleCreateCanvasClick}
               >
@@ -208,7 +212,7 @@ const HomePage = () => {
                             <div className="mb-4">
 
                               <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 line-clamp-2 mt-2">
-                                {canvas.description || 'No description available'}
+                                {canvas.description || ''}
                               </Text>
                             </div>
                           </div>
@@ -222,7 +226,7 @@ const HomePage = () => {
                                 alt={canvas.createdBy.name}
                                 className="w-6 h-6 bg-blue-700 dark:bg-blue-900 text-blue-100 dark:text-blue-100"
                               />
-                              <div className="text-zinc-500">
+                              <div className="text-zinc-500 text-left">
                                 <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-none mb-1">
                                   Created by <strong>{canvas.createdBy.name}</strong>
                                 </p>
@@ -265,7 +269,7 @@ const HomePage = () => {
                                 </div>
 
                                 <Text className="text-sm text-left text-zinc-600 dark:text-zinc-400 mb-2 line-clamp-1 !mb-0">
-                                  {canvas.description || 'No description available'}
+                                  {canvas.description || ''}
                                 </Text>
                               </div>
                             </div>

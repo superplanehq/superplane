@@ -26,29 +26,38 @@ export const FlowRenderer: React.FC = () => {
   const onEdgesChange = useCanvasStore((state) => state.onEdgesChange);
   const onConnect = useCanvasStore((state) => state.onConnect);
   const setFocusedNodeId = useCanvasStore((state) => state.setFocusedNodeId);
+  const fitViewNode = useCanvasStore((state) => state.fitViewNode);
+  const setFitViewNodeRef = useCanvasStore((state) => state.setFitViewNodeRef);
+  const lockedNodes = useCanvasStore((state) => state.lockedNodes);
+  const setLockedNodes = useCanvasStore((state) => state.setLockedNodes);
 
   const { applyElkAutoLayout } = useAutoLayout();
-  const { onNodeDragStop, onInit } = useFlowHandlers();
+  const { onNodeDragStop, onInit, fitViewToNode } = useFlowHandlers();
+
+  React.useEffect(() => {
+    setFitViewNodeRef(fitViewToNode);
+  }, [fitViewToNode, setFitViewNodeRef]);
 
   const animatedEdges = useMemo(() => {
-    const runningStages = new Set<string>();
+    const runningEdges = new Set<string>();
 
     stages.forEach(stage => {
-      const allExecutions = stage.queue?.flatMap(event => event.execution)
+      const allExecutions = stage.queue?.flatMap(event => ({ ...event.execution, sourceId: event.sourceId }))
         .filter(execution => execution)
         .sort((a, b) => new Date(b?.createdAt || '').getTime() - new Date(a?.createdAt || '').getTime()) || [];
 
-      const executionRunning = allExecutions.some(execution => execution?.state === 'STATE_STARTED');
-      const isRunning = executionRunning || stage.metadata?.name?.toLowerCase().includes('running');
+      const executionsRunning = allExecutions.filter(execution => execution?.state === 'STATE_STARTED');
+      const sourceIdStageIdPairs = executionsRunning.map(execution => `${execution.sourceId}-${stage.metadata?.id}`);
+      const isRunning = sourceIdStageIdPairs.length > 0;
 
-      if (isRunning && stage.metadata?.id) {
-        runningStages.add(stage.metadata.id);
+      if (isRunning) {
+        sourceIdStageIdPairs.forEach(pair => runningEdges.add(pair));
       }
     });
 
     return edges.map(edge => ({
       ...edge,
-      animated: runningStages.has(edge.target)
+      animated: runningEdges.has(`${edge.source}-${edge.target}`)
     }));
   }, [edges, stages]);
 
@@ -63,12 +72,14 @@ export const FlowRenderer: React.FC = () => {
         onConnect={onConnect}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={(_, node) => {
-          setFocusedNodeId(node.id)
+          setFocusedNodeId(node.id);
+          fitViewNode(node.id);
         }}
         onNodeDrag={(_, node) => {
           setFocusedNodeId(node.id)
         }}
         onInit={onInit}
+        nodesDraggable={!lockedNodes}
         fitView
         minZoom={0.4}
         maxZoom={1.5}
@@ -78,6 +89,8 @@ export const FlowRenderer: React.FC = () => {
           onAutoLayout={applyElkAutoLayout}
           nodes={nodes}
           edges={animatedEdges}
+          onLockToggle={setLockedNodes}
+          isLocked={lockedNodes}
         />
         <Background
           variant={BackgroundVariant.Dots}

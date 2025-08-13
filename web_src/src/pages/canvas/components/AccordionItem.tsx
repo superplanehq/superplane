@@ -15,7 +15,7 @@ export const AccordionItem = memo(function AccordionItem({ id, title, children, 
         className="w-full px-4 py-3 text-left flex justify-between items-center hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
         onClick={() => onToggle(id)}
       >
-        <div className="font-medium text-zinc-900 dark:text-zinc-100 w-full">{title}</div>
+        <div className={`${isOpen ? 'font-bold' : 'font-normal'} text-zinc-900 dark:text-zinc-100 w-full`}>{title}</div>
         <span className="material-symbols-outlined text-zinc-500 dark:text-zinc-400">
           {isOpen ? 'expand_less' : 'expand_more'}
         </span>

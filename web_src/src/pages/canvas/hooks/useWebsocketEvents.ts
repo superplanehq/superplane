@@ -21,7 +21,8 @@ export function useWebsocketEvents(canvasId: string): void {
   const syncStageEvents = useCanvasStore((s) => s.syncStageEvents);
   const addEventSource = useCanvasStore((s) => s.addEventSource);
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
-
+  const syncToReactFlow = useCanvasStore((s) => s.syncToReactFlow);
+  const lockedNodes = useCanvasStore((s) => s.lockedNodes);
 
   // WebSocket setup
   const { lastJsonMessage, readyState } = useWebSocket<ServerEvent>(
@@ -37,6 +38,12 @@ export function useWebsocketEvents(canvasId: string): void {
       share: false, // Setting share to false to avoid issues with multiple connections
     }
   );
+
+  const syncReactFlowWithTimeout = (autoLayout: boolean) => {
+    setTimeout(() => {
+      syncToReactFlow({ autoLayout });
+    }, 100);
+  }
 
   // Update connection status in the store
   useEffect(() => {
@@ -60,16 +67,20 @@ export function useWebsocketEvents(canvasId: string): void {
     // Route the event to the appropriate handler
     switch (event) {
       case 'stage_added':
-        addStage(payload as EventMap['stage_added']);
+        addStage(payload as EventMap['stage_added'], false);
+        syncReactFlowWithTimeout(lockedNodes);
         break;
       case 'connection_group_added':
         addConnectionGroup(payload as EventMap['connection_group_added']);
+        syncReactFlowWithTimeout(lockedNodes);
         break;
       case 'stage_updated':
         updateStage(payload as EventMap['stage_updated']);
+        syncReactFlowWithTimeout(lockedNodes);
         break;
       case 'event_source_added':
         addEventSource(payload as EventMap['event_source_added']);
+        syncReactFlowWithTimeout(lockedNodes);
         break;
       case 'canvas_updated':
         updateCanvas(payload as EventMap['canvas_updated']);

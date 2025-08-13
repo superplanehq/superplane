@@ -43,7 +43,7 @@ export function CanvasDelete({ canvasId, organizationId }: CanvasDeleteProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <Heading level={3} className="text-left text-black dark:text-white sm:text-sm">Danger Zone</Heading>
 
       <div className="text-left bg-red-50 dark:bg-zinc-800 rounded-lg border border-red-200 dark:border-red-800 p-6">

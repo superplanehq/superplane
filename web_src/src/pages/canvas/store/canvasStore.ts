@@ -29,6 +29,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: [],
   edges: [],
   handleDragging: undefined,
+  lockedNodes: true,
 
 
   // Actions (equivalent to the reducer actions in the context implementation)
@@ -45,7 +46,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow({ autoLayout: true });
   },
 
-  addStage: (stage: SuperplaneStage, draft = false) => {
+  addStage: (stage: SuperplaneStage, draft = false, autoLayout = false) => {
     set((state) => ({
       stages: [...state.stages, {
         ...stage,
@@ -53,7 +54,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         isDraft: draft
       }]
     }));
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout });
   },
 
   removeStage: (stageId: string) => {
@@ -96,11 +97,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     get().syncToReactFlow();
   },
 
-  addEventSource: (eventSource: EventSourceWithEvents) => {
+  addEventSource: (eventSource: EventSourceWithEvents, autoLayout = false) => {
     set((state) => ({
       eventSources: [...state.eventSources, eventSource]
     }));
-    get().syncToReactFlow();
+    get().syncToReactFlow({ autoLayout });
   },
 
   removeEventSource: (eventSourceId: string) => {
@@ -296,9 +297,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ handleDragging: data });
   },
 
-  // Initialization with default properties
-  fitViewNode: () => {
-    // Will be replaced when setReactFlowInstance is called
+  // Flow instance reference
+  fitViewNodeRef: null as ((nodeId: string) => void) | null,
+  
+  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => {
+    set({ fitViewNodeRef: fitViewNodeFn });
+  },
+
+  fitViewNode: (nodeId: string) => {
+    const { fitViewNodeRef } = get();
+    if (fitViewNodeRef) {
+      fitViewNodeRef(nodeId);
+    }
   },
 
   updateEventSourceKey: (eventSourceId: string, key: string) => {
@@ -316,5 +326,9 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       delete updatedEventSourceKeys[eventSourceId];
       return { eventSourceKeys: updatedEventSourceKeys };
     });
+  },
+
+  setLockedNodes: (locked: boolean) => {
+    set({ lockedNodes: locked });
   }
 }));

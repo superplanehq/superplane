@@ -4,7 +4,7 @@ import { Dropdown, DropdownButton, DropdownItem, DropdownLabel, DropdownMenu } f
 import { YamlCodeEditor } from './YamlCodeEditor';
 
 interface EditModeActionButtonsProps {
-  onSave: (saveAsDraft: boolean) => void;
+  onSave: () => void;
   onCancel: () => void;
   onDiscard?: () => void;
   onEdit?: () => void; // For non-edit mode
@@ -12,6 +12,7 @@ interface EditModeActionButtonsProps {
   entityData?: unknown; // The current entity data for YAML editing
   onYamlApply?: (updatedData: unknown) => void; // Callback when YAML changes are applied
   isEditMode: boolean; // To determine which buttons to show
+  isNewNode?: boolean;
 }
 
 export function EditModeActionButtons({
@@ -22,7 +23,8 @@ export function EditModeActionButtons({
   entityType = "item",
   entityData,
   onYamlApply,
-  isEditMode
+  isEditMode,
+  isNewNode
 }: EditModeActionButtonsProps) {
   const [isCodeEditorOpen, setIsCodeEditorOpen] = useState(false);
 
@@ -53,28 +55,25 @@ export function EditModeActionButtons({
             Code
           </button>
 
-          <Dropdown>
-            <DropdownButton plain className='flex items-center gap-2'>
-              <MaterialSymbol name="save" size="md" />
-              Save
-              <MaterialSymbol name="expand_more" size="md" />
-            </DropdownButton>
-            <DropdownMenu anchor="bottom start">
-              <DropdownItem className='flex items-center gap-2' onClick={() => onSave(false)}>
-                <DropdownLabel>Save & Commit</DropdownLabel>
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+          <button
+            onClick={() => onSave()}
+            className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
+            title="Save"
+          >
+            <MaterialSymbol name="save" size="md" />
+            Save
+          </button>
 
           <button
-            onClick={onCancel}
+            onClick={isNewNode ? onDiscard : onCancel}
             className="flex font-semibold items-center gap-2 px-3 py-2 text-gray-900 dark:text-zinc-100 hover:text-gray-800 dark:hover:text-zinc-200 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md transition-colors"
             title="Cancel"
           >
+            <MaterialSymbol name="cancel" size="md" />
             Cancel
           </button>
 
-          <Dropdown>
+          {!isNewNode && <Dropdown>
             <DropdownButton plain className='flex items-center gap-2'>
               <MaterialSymbol name="more_vert" size="md" />
             </DropdownButton>
@@ -84,7 +83,7 @@ export function EditModeActionButtons({
                 <DropdownLabel>Delete</DropdownLabel>
               </DropdownItem>
             </DropdownMenu>
-          </Dropdown>
+          </Dropdown>}
 
         </div>
 
