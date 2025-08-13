@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import CustomBarHandle from './handle';
 import { EventSourceNodeType } from '@/canvas/types/flow';
@@ -14,6 +14,7 @@ import { useParams } from 'react-router-dom';
 import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
+import { useIntegrations } from '../../hooks/useIntegrations';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -23,6 +24,15 @@ const EventSourceImageMap = {
 
 export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const { orgId } = useParams<{ orgId: string }>();
+  const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
+  const canvasId = useCanvasStore(state => state.canvasId) || '';
+  const organizationId = orgId || '';
+  const createEventSourceMutation = useCreateEventSource(canvasId);
+  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
+  const allEventSources = useCanvasStore(state => state.eventSources);
+  const currentEventSource = useCanvasStore(state =>
+    state.eventSources.find(es => es.metadata?.id === props.id)
+  );
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -38,10 +48,8 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [shouldValidateFields, setShouldValidateFields] = useState(false);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
   const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
-  const allEventSources = useCanvasStore(state => state.eventSources);
-  const currentEventSource = useCanvasStore(state =>
-    state.eventSources.find(es => es.metadata?.id === props.id)
-  );
+
+  const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
   const validateEventSourceName = (name: string) => {
     if (!name || name.trim() === '') {
@@ -62,12 +70,6 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     setNameError(null);
     return true;
   };
-
-  const eventSourceKey = useCanvasStore(state => state.eventSourceKeys[props.id]);
-  const canvasId = useCanvasStore(state => state.canvasId) || '';
-  const organizationId = orgId || '';
-  const createEventSourceMutation = useCreateEventSource(canvasId);
-  const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
 
   const handleEditClick = () => {
     setIsEditMode(true);
@@ -198,10 +200,18 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     }
   };
 
-  let eventSourceType = props.data.eventSourceType ? props.data.eventSourceType : (props.data.integration?.name ? "semaphore" : "webhook");
-  if (props.data.integration?.name?.includes('github')) {
-    eventSourceType = 'github';
-  }
+  const eventSourceType = useMemo(() => {
+    if (props.data.eventSourceType)
+      return props.data.eventSourceType;
+
+    const integrationName = props.data.integration?.name;
+    const integration = canvasIntegrations.find(integration => integration.metadata?.name === integrationName);
+    if (integration && integration.spec?.type) {
+      return integration.spec?.type;
+    }
+    return "webhook";
+  }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
+
 
   return (
     <div
