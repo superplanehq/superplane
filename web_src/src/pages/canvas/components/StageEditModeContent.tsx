@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { StageNodeType } from '@/canvas/types/flow';
 import { SuperplaneInputDefinition, SuperplaneOutputDefinition, SuperplaneValueDefinition, SuperplaneConnection, SuperplaneExecutor, SuperplaneCondition, SuperplaneConditionType, SuperplaneInputMapping } from '@/api-client/types.gen';
-import { useParams } from 'react-router-dom';
 import { useSecrets } from '../hooks/useSecrets';
 import { useIntegrations } from '../hooks/useIntegrations';
 import { useEditModeState } from '../hooks/useEditModeState';
@@ -12,13 +11,15 @@ import { EditableAccordionSection } from './shared/EditableAccordionSection';
 import { InlineEditor } from './shared/InlineEditor';
 import { ValidationField } from './shared/ValidationField';
 import { ConnectionSelector } from './shared/ConnectionSelector';
-import { Field } from './Field';
-import { Label } from './Label';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
+import { ControlledTabs } from '@/components/Tabs/tabs';
+import IntegrationZeroState from '@/components/IntegrationZeroState';
 
 interface StageEditModeContentProps {
   data: StageNodeType['data'];
   currentStageId?: string;
+  canvasId: string;
+  organizationId: string;
   onDataChange?: (data: {
     label: string;
     description?: string;
@@ -33,10 +34,11 @@ interface StageEditModeContentProps {
   }) => void;
 }
 
-export function StageEditModeContent({ data, currentStageId, onDataChange }: StageEditModeContentProps) {
+export function StageEditModeContent({ data, currentStageId, canvasId, organizationId, onDataChange }: StageEditModeContentProps) {
   // Component-specific state
   const [inputs, setInputs] = useState<SuperplaneInputDefinition[]>(data.inputs || []);
   const [outputs, setOutputs] = useState<SuperplaneOutputDefinition[]>(data.outputs || []);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [connections, setConnections] = useState<SuperplaneConnection[]>(data.connections || []);
   const [secrets, setSecrets] = useState<SuperplaneValueDefinition[]>(data.secrets || []);
   const [conditions, setConditions] = useState<SuperplaneCondition[]>(data.conditions || []);
@@ -48,19 +50,53 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
   const [semaphoreExecutionType, setSemaphoreExecutionType] = useState<'workflow' | 'task'>(
     (executor.spec?.task as string) ? 'task' : 'workflow'
   );
+  const [isEditingExecutor, setIsEditingExecutor] = useState(false);
 
   // Validation
   const { validateName } = useValidation();
 
-  // Get URL params and canvas data
-  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
-  const organizationId = orgId || '';
 
   // Fetch secrets and integrations
   const { data: canvasSecrets = [], isLoading: loadingCanvasSecrets } = useSecrets(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: organizationSecrets = [], isLoading: loadingOrganizationSecrets } = useSecrets(organizationId, "DOMAIN_TYPE_ORGANIZATION");
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
   const { data: orgIntegrations = [] } = useIntegrations(organizationId, "DOMAIN_TYPE_ORGANIZATION");
+
+  // API Error parsing function
+  const parseApiErrorMessage = useCallback((errorMessage: string): { field: string; message: string } | null => {
+    if (!errorMessage) return null;
+
+    // Check for project not found error
+    const projectNotFoundMatch = errorMessage.match(/project\s+([^\s]+)\s+not\s+found/i);
+    if (projectNotFoundMatch) {
+      return {
+        field: 'project',
+        message: `Project "${projectNotFoundMatch[1]}" not found`
+      };
+    }
+
+    return null;
+  }, []);
+
+  // Handle API errors by highlighting fields
+  const handleApiError = useCallback((errorMessage: string) => {
+    const parsedError = parseApiErrorMessage(errorMessage);
+    if (parsedError) {
+      setFieldErrors(prev => ({
+        ...prev,
+        [parsedError.field]: parsedError.message
+      }));
+    }
+  }, [parseApiErrorMessage]);
+
+  // Expose handleApiError to global scope for stage.tsx to call
+  useEffect(() => {
+    (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError = handleApiError;
+
+    return () => {
+      delete (window as { handleStageApiError?: (errorMessage: string) => void }).handleStageApiError;
+    };
+  }, [handleApiError]);
 
   // Helper functions
   const getAllSecrets = () => {
@@ -100,13 +136,21 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
 
   // Validation functions
   const validateInput = (input: SuperplaneInputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+
     const nameErrors = validateName(input.name, inputs, index);
-    return nameErrors;
+    errors.push(...nameErrors);
+
+    return errors;
   };
 
   const validateOutput = (output: SuperplaneOutputDefinition, index: number): string[] => {
+    const errors: string[] = [];
+
     const nameErrors = validateName(output.name, outputs, index);
-    return nameErrors;
+    errors.push(...nameErrors);
+
+    return errors;
   };
 
   const validateSecret = (secret: SuperplaneValueDefinition, index: number): string[] => {
@@ -184,6 +228,12 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       }
     });
 
+
+    if (connections.length === 0) {
+      errors.connections = 'At least one connection is required';
+    }
+
+
     secrets.forEach((secret, index) => {
       const secretErrors = validateSecret(secret, index);
       if (secretErrors.length > 0) {
@@ -198,12 +248,61 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
       }
     });
 
-    // Validate executor
-    if (executor.type && executor.type !== '') {
+    // Validate input mappings
+    inputMappings.forEach((mapping, index) => {
+      const mappingErrors: string[] = [];
+      if (!mapping.when?.triggeredBy?.connection) {
+        mappingErrors.push('Trigger connection is required');
+      }
+      if (mappingErrors.length > 0) {
+        errors[`inputMapping_${index}`] = mappingErrors.join(', ');
+      }
+    });
+
+    // Comprehensive executor validation
+    if (!executor.type || executor.type === '') {
+      errors.executorType = 'Executor type is required';
+    } else {
+      // Validate executor spec exists
       if (!executor.spec || Object.keys(executor.spec).length === 0) {
-        errors.executor = 'Executor specification is required when executor type is set';
+        errors.executorSpec = 'Executor configuration is required';
+      } else {
+        // Type-specific validation
+        if (executor.type === 'semaphore') {
+          if (!executor.integration?.name) {
+            errors.executorIntegration = 'Semaphore integration is required';
+          }
+          if (!executor.resource?.name) {
+            errors.executorProject = 'Project name is required';
+          }
+          if (!executor.spec.branch) {
+            errors.executorBranch = 'Branch is required';
+          }
+          if (!executor.spec.pipelineFile) {
+            errors.executorPipelineFile = 'Pipeline file is required';
+          }
+        } else if (executor.type === 'github') {
+          if (!executor.integration?.name) {
+            errors.executorIntegration = 'GitHub integration is required';
+          }
+          if (!executor.resource?.name) {
+            errors.executorRepository = 'Repository name is required';
+          }
+          if (!executor.spec.workflow) {
+            errors.executorWorkflow = 'Workflow file is required';
+          }
+          if (!executor.spec.ref) {
+            errors.executorRef = 'Ref (branch/tag) is required';
+          }
+        } else if (executor.type === 'http') {
+          if (!executor.spec.url) {
+            errors.executorUrl = 'URL is required';
+          }
+        }
       }
     }
+
+    setValidationErrors(errors);
 
     return Object.keys(errors).length === 0;
   };
@@ -294,20 +393,40 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     errorPrefix: 'condition'
   });
 
-  const inputMappingsEditor = useArrayEditor({
-    items: inputMappings,
-    setItems: setInputMappings,
-    createNewItem: () => ({
-      when: { triggeredBy: { connection: '' } },
-      values: []
-    }),
-    validateItem: (item) => {
-      const hasConnection = !!item.when?.triggeredBy?.connection;
-      return hasConnection ? [] : ['Trigger connection is required'];
-    },
-    setValidationErrors,
-    errorPrefix: 'inputMapping'
-  });
+  // Executor management functions
+  const hasExecutor = () => {
+    return !!executor.spec
+  };
+
+  const addExecutorConfig = () => {
+    setIsEditingExecutor(true);
+    // Use the existing executor type if available, otherwise default to 'semaphore'
+    const executorType = executor?.type && executor.type !== '' ? executor.type : 'semaphore';
+    setExecutor({ type: executorType, spec: {} });
+  };
+
+  const saveExecutorConfig = () => {
+    setIsEditingExecutor(false);
+  };
+
+  const cancelExecutorConfig = () => {
+    setIsEditingExecutor(false);
+    if (!originalData.executor || !originalData.executor.type) {
+      setExecutor({ type: executor.type, spec: {} });
+    } else {
+      setExecutor({ ...originalData.executor });
+    }
+  };
+
+  const deleteExecutorConfig = () => {
+    setExecutor({ type: executor.type, spec: undefined });
+    setIsEditingExecutor(false);
+  };
+
+  const startEditingExecutor = () => {
+    setIsEditingExecutor(true);
+  };
+
 
   // Sync component state with incoming data prop changes
   useEffect(() => {
@@ -354,7 +473,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         conditions,
         inputMappings
       });
-    }
+    }// eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.label, data.description, inputs, outputs, connections, executor, secrets, conditions, inputMappings, onDataChange]);
 
   // Revert function for each section
@@ -382,10 +501,7 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
         break;
       case 'executor':
         setExecutor({ ...originalData.executor });
-        break;
-      case 'inputMappings':
-        setInputMappings([...(originalData.inputMappings || [])]);
-        inputMappingsEditor.setEditingIndex(null);
+        setIsEditingExecutor(false);
         break;
     }
   };
@@ -522,1150 +638,1241 @@ export function StageEditModeContent({ data, currentStageId, onDataChange }: Sta
     }
   };
 
+  const availableIntegrations = getAllIntegrations();
+  const semaphoreIntegrations = availableIntegrations.filter(int => int.spec?.type === 'semaphore');
+  const githubIntegrations = availableIntegrations.filter(int => int.spec?.type === 'github');
+  const requireIntegration = ['semaphore', 'github'].includes(executor?.type || '');
+  const hasRequiredIntegrations = (executor.type === 'semaphore' && semaphoreIntegrations.length > 0) ||
+    (executor.type === 'github' && githubIntegrations.length > 0) ||
+    (!executor.type || (executor.type !== 'semaphore' && executor.type !== 'github'));
+
+  const getZeroStateLabel = () => {
+    switch (executor.type) {
+      case 'semaphore':
+        return 'Semaphore organizations';
+      case 'github':
+        return 'GitHub accounts';
+      default:
+        return 'integrations';
+    }
+  };
+
   return (
     <div className="w-full h-full text-left" onClick={(e) => e.stopPropagation()}>
       <div className="">
-        {/* Connections Section */}
-        <EditableAccordionSection
-          id="connections"
-          title="Connections"
-          isOpen={openSections.includes('connections')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(connections, 'connections')}
-          onRevert={revertSection}
-          count={connections.length}
-          countLabel="connections"
-        >
-          {connections.map((connection, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={connectionsEditor.editingIndex === index}
-                onSave={connectionsEditor.saveEdit}
-                onCancel={() => connectionsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
-                onEdit={() => connectionsEditor.startEdit(index)}
-                onDelete={() => connectionsEditor.removeItem(index)}
-                displayName={connection.name || `Connection ${index + 1}`}
-                badge={connection.type && (
-                  <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
-                    {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
-                  </span>
-                )}
-                editForm={
-                  <ConnectionSelector
-                    connection={connection}
-                    index={index}
-                    onConnectionUpdate={connectionManager.updateConnection}
-                    onFilterAdd={connectionManager.addFilter}
-                    onFilterUpdate={connectionManager.updateFilter}
-                    onFilterRemove={connectionManager.removeFilter}
-                    onFilterOperatorToggle={connectionManager.toggleFilterOperator}
-                    currentEntityId={currentStageId}
-                    validationError={validationErrors[`connection_${index}`]}
-                    showFilters={true}
-                  />
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={connectionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Connection
-          </button>
-        </EditableAccordionSection>
+        {/* Show zero state if executor type requires integrations but none are available */}
+        {requireIntegration && !hasRequiredIntegrations && (
+          <IntegrationZeroState 
+            integrationType={executor?.type || ''} 
+            label={getZeroStateLabel()} 
+            canvasId={canvasId}
+            organizationId={organizationId}
+          />
+        )}
 
-        {/* Inputs Section */}
-        <EditableAccordionSection
-          id="inputs"
-          title="Inputs"
-          isOpen={openSections.includes('inputs')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(inputs, 'inputs')}
-          onRevert={revertSection}
-          count={inputs.length}
-          countLabel="inputs"
-        >
-          {inputs.map((input, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={inputsEditor.editingIndex === index}
-                onSave={inputsEditor.saveEdit}
-                onCancel={() => inputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
-                onEdit={() => inputsEditor.startEdit(index)}
-                onDelete={() => inputsEditor.removeItem(index)}
-                displayName={input.name || `Input ${index + 1}`}
-                badge={null}
-                editForm={
-                  <div className="space-y-3">
-                    <ValidationField
-                      label="Name"
-                      error={validationErrors[`input_${index}`]}
-                    >
-                      <input
-                        type="text"
-                        value={input.name || ''}
-                        onChange={(e) => inputsEditor.updateItem(index, 'name', e.target.value)}
-                        placeholder="Input name"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-                    <ValidationField label="Description">
-                      <textarea
-                        value={input.description || ''}
-                        onChange={(e) => inputsEditor.updateItem(index, 'description', e.target.value)}
-                        placeholder="Input description"
-                        rows={2}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </ValidationField>
+        {/* Form sections - only show if integrations are available or not required */}
+        {hasRequiredIntegrations && (
+          <>
+            {/* Connections Section */}
+            <EditableAccordionSection
+              id="connections"
+              title="Connections"
+              isOpen={openSections.includes('connections')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(connections, 'connections')}
+              onRevert={revertSection}
+              count={connections.length}
+              countLabel="connections"
+            >
+              {connections.map((connection, index) => (
+                <div key={index}>
+                  <InlineEditor
+                    isEditing={connectionsEditor.editingIndex === index}
+                    onSave={connectionsEditor.saveEdit}
+                    onCancel={() => connectionsEditor.cancelEdit(index, (item) => {
+                      if (!item.name || item.name.trim() === '') {
+                        return true;
+                      }
 
-                  </div>
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={inputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Input
-          </button>
-        </EditableAccordionSection>
+                      if (item.filters && item.filters.length > 0) {
+                        const hasIncompleteFilters = item.filters.some(filter => {
+                          if (filter.type === 'FILTER_TYPE_DATA') {
+                            return !filter.data?.expression || filter.data.expression.trim() === '';
+                          }
+                          if (filter.type === 'FILTER_TYPE_HEADER') {
+                            return !filter.header?.expression || filter.header.expression.trim() === '';
+                          }
+                          return false;
+                        });
+                        return hasIncompleteFilters;
+                      }
 
-        {/* Input Mappings Section */}
-        <EditableAccordionSection
-          id="inputMappings"
-          title="Input Mappings"
-          isOpen={openSections.includes('inputMappings')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(inputMappings, 'inputMappings')}
-          onRevert={revertSection}
-          count={inputMappings.length}
-          countLabel="mappings"
-        >
-          {inputMappings.map((mapping, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={inputMappingsEditor.editingIndex === index}
-                onSave={inputMappingsEditor.saveEdit}
-                onCancel={() => inputMappingsEditor.cancelEdit(index, (item) => !item.when?.triggeredBy?.connection)}
-                onEdit={() => inputMappingsEditor.startEdit(index)}
-                onDelete={() => inputMappingsEditor.removeItem(index)}
-                displayName={mapping.when?.triggeredBy?.connection ? `Triggered by ${mapping.when.triggeredBy.connection}` : `Mapping ${index + 1}`}
-                editForm={
-                  <div className="space-y-4">
-                    {/* Trigger Connection */}
-                    <ValidationField
-                      label="Triggered by Connection"
-                      error={validationErrors[`inputMapping_${index}`]}
-                    >
-                      <select
-                        value={mapping.when?.triggeredBy?.connection || ''}
-                        onChange={(e) => inputMappingsEditor.updateItem(index, 'when', {
-                          ...mapping.when,
-                          triggeredBy: { connection: e.target.value }
-                        })}
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      >
-                        <option value="">Select trigger connection</option>
-                        {connections.map((conn, connIndex) => (
-                          <option key={connIndex} value={conn.name}>{conn.name}</option>
-                        ))}
-                      </select>
-                      <p className="text-xs text-zinc-600 dark:text-zinc-400 dark:text-zinc-400 mt-1">
-                        This mapping applies when the selected connection triggers the stage
-                      </p>
-                    </ValidationField>
-
-                    {/* Input Values */}
-                    <div>
-                      <div className="flex justify-between items-center mb-3 text-zinc-600 dark:text-zinc-400">
-                        <label className="text-sm font-medium">Input Values</label>
-                        <button
-                          onClick={() => {
-                            const newValues = [...(mapping.values || []), { name: '', value: '' }];
-                            inputMappingsEditor.updateItem(index, 'values', newValues);
-                          }}
-                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                        >
-                          + Add Value
-                        </button>
-                      </div>
-
-                      <div className="space-y-3 text-zinc-600 dark:text-zinc-400">
-                        {(mapping.values || []).map((value, valueIndex) => (
-                          <div key={valueIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
-                            {/* Input Name */}
-                            <div className="mb-3">
-                              <label className="block text-xs font-medium mb-1">Input Name</label>
-                              <select
-                                value={value.name || ''}
-                                onChange={(e) => {
-                                  const newValues = [...(mapping.values || [])];
-                                  newValues[valueIndex] = { ...newValues[valueIndex], name: e.target.value };
-                                  inputMappingsEditor.updateItem(index, 'values', newValues);
-                                }}
-                                className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                              >
-                                <option value="">Select input to map</option>
-                                {inputs.map((input, inputIndex) => (
-                                  <option key={inputIndex} value={input.name}>{input.name}</option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {/* Value Mode Toggle */}
-                            <div className="mb-3">
-                              <label className="flex items-center gap-2 text-sm">
-                                <input
-                                  type="checkbox"
-                                  checked={!!value.valueFrom?.eventData}
-                                  onChange={(e) => {
-                                    const newValues = [...(mapping.values || [])];
-                                    if (e.target.checked) {
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        value: undefined,
-                                        valueFrom: {
-                                          eventData: {
-                                            connection: '',
-                                            expression: newValues[valueIndex]?.value || ''
-                                          }
-                                        }
-                                      };
-                                    } else {
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        value: newValues[valueIndex]?.valueFrom?.eventData?.expression || '',
-                                        valueFrom: undefined
-                                      };
-                                    }
-                                    inputMappingsEditor.updateItem(index, 'values', newValues);
-                                  }}
-                                  className="w-4 h-4"
-                                />
-                                Use expression (dynamic value)
-                              </label>
-                            </div>
-
-                            {value.valueFrom?.eventData ? (
-                              /* Expression Mode */
-                              <div className="space-y-2">
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Data Source Connection</label>
-                                  <select
-                                    value={value.valueFrom.eventData.connection || ''}
-                                    onChange={(e) => {
-                                      const newValues = [...(mapping.values || [])];
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        valueFrom: {
-                                          eventData: {
-                                            ...newValues[valueIndex]?.valueFrom?.eventData,
-                                            connection: e.target.value
-                                          }
-                                        }
-                                      };
-                                      inputMappingsEditor.updateItem(index, 'values', newValues);
-                                    }}
-                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  >
-                                    <option value="">Select data source</option>
-                                    {connections.map((conn, connIndex) => (
-                                      <option key={connIndex} value={conn.name}>{conn.name}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Expression</label>
-                                  <input
-                                    value={value.valueFrom.eventData.expression || ''}
-                                    onChange={(e) => {
-                                      const newValues = [...(mapping.values || [])];
-                                      newValues[valueIndex] = {
-                                        ...newValues[valueIndex],
-                                        valueFrom: {
-                                          eventData: {
-                                            ...newValues[valueIndex]?.valueFrom?.eventData,
-                                            expression: e.target.value
-                                          }
-                                        }
-                                      };
-                                      inputMappingsEditor.updateItem(index, 'values', newValues);
-                                    }}
-                                    placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
-                                    className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              /* Static Value Mode */
-                              <div>
-                                <label className="block text-xs font-medium mb-1">Static Value</label>
-                                <input
-                                  value={value.value || ''}
-                                  onChange={(e) => {
-                                    const newValues = [...(mapping.values || [])];
-                                    newValues[valueIndex] = { ...newValues[valueIndex], value: e.target.value };
-                                    inputMappingsEditor.updateItem(index, 'values', newValues);
-                                  }}
-                                  placeholder="e.g., production, staging"
-                                  className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                                />
-                              </div>
-                            )}
-
-                            {/* Remove Value Button */}
-                            <div className="flex justify-end mt-2">
-                              <button
-                                onClick={() => {
-                                  const newValues = (mapping.values || []).filter((_, vi) => vi !== valueIndex);
-                                  inputMappingsEditor.updateItem(index, 'values', newValues);
-                                }}
-                                className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300 text-xs"
-                              >
-                                Remove Value
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {(mapping.values || []).length === 0 && (
-                        <div className="text-center py-4 text-zinc-500 dark:text-zinc-400 text-sm">
-                          No input values configured. Click "Add Value" to start.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={inputMappingsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Input Mapping
-          </button>
-        </EditableAccordionSection>
-
-        {/* Outputs Section */}
-        <EditableAccordionSection
-          id="outputs"
-          title="Outputs"
-          isOpen={openSections.includes('outputs')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(outputs, 'outputs')}
-          onRevert={revertSection}
-          count={outputs.length}
-          countLabel="outputs"
-        >
-          {outputs.map((output, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={outputsEditor.editingIndex === index}
-                onSave={outputsEditor.saveEdit}
-                onCancel={() => outputsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
-                onEdit={() => outputsEditor.startEdit(index)}
-                onDelete={() => outputsEditor.removeItem(index)}
-                displayName={output.name || `Output ${index + 1}`}
-                badge={output.required && (
-                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Required</span>
-                )}
-                editForm={
-                  <div className="space-y-3">
-                    <ValidationField
-                      label="Name"
-                      error={validationErrors[`output_${index}`]}
-                    >
-                      <input
-                        type="text"
-                        value={output.name || ''}
-                        onChange={(e) => outputsEditor.updateItem(index, 'name', e.target.value)}
-                        placeholder="Output name"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`output_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
-                    <ValidationField label="Description">
-                      <textarea
-                        value={output.description || ''}
-                        onChange={(e) => outputsEditor.updateItem(index, 'description', e.target.value)}
-                        placeholder="Output description"
-                        rows={2}
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </ValidationField>
-                    <ValidationField label="Required">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`required-${index}`}
-                          checked={output.required || false}
-                          onChange={(e) => outputsEditor.updateItem(index, 'required', e.target.checked)}
-                          className="w-4 h-4 text-blue-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-blue-500"
-                        />
-                        <label className="text-gray-900 dark:text-zinc-100" htmlFor={`required-${index}`}>Required</label>
-                      </div>
-                    </ValidationField>
-                  </div>
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={outputsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Output
-          </button>
-        </EditableAccordionSection>
-
-        {/* Conditions Section */}
-        <EditableAccordionSection
-          id="conditions"
-          title="Conditions"
-          isOpen={openSections.includes('conditions')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(conditions, 'conditions')}
-          onRevert={revertSection}
-          count={conditions.length}
-          countLabel="conditions"
-        >
-          {conditions.map((condition, index) => (
-            <div key={index} className="p-3 border border-zinc-200 dark:border-zinc-700 rounded-md bg-zinc-50 dark:bg-zinc-800">
-              {conditionsEditor.editingIndex === index ? (
-                <div className="space-y-3">
-                  <ValidationField
-                    label="Condition Type"
-                    error={validationErrors[`condition_${index}`]}
-                  >
-                    <select
-                      value={condition.type || 'CONDITION_TYPE_APPROVAL'}
-                      onChange={(e) => updateConditionType(index, e.target.value as SuperplaneConditionType)}
-                      className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
-                        ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                        : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                        }`}
-                    >
-                      <option value="CONDITION_TYPE_APPROVAL">Approval</option>
-                      <option value="CONDITION_TYPE_TIME_WINDOW">Time Window</option>
-                    </select>
-                  </ValidationField>
-
-                  {condition.type === 'CONDITION_TYPE_APPROVAL' && (
-                    <ValidationField label="Required Approvals">
-                      <input
-                        type="number"
-                        min="1"
-                        value={condition.approval?.count || 1}
-                        onChange={(e) => conditionsEditor.updateItem(index, 'approval', { count: parseInt(e.target.value) || 1 })}
-                        placeholder="Number of required approvals"
-                        className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </ValidationField>
-                  )}
-
-                  {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-3">
-                        <ValidationField label="Start Time">
-                          <input
-                            type="time"
-                            value={condition.timeWindow?.start || ''}
-                            onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
-                              ...condition.timeWindow,
-                              start: e.target.value
-                            })}
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </ValidationField>
-                        <ValidationField label="End Time">
-                          <input
-                            type="time"
-                            value={condition.timeWindow?.end || ''}
-                            onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
-                              ...condition.timeWindow,
-                              end: e.target.value
-                            })}
-                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </ValidationField>
-                      </div>
-                      <ValidationField label="Days of Week">
-                        <div className="grid grid-cols-7 gap-1">
-                          {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                            <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
-                              <input
-                                type="checkbox"
-                                checked={condition.timeWindow?.weekDays?.includes(day) || false}
-                                onChange={(e) => {
-                                  const currentDays = condition.timeWindow?.weekDays || [];
-                                  const newDays = e.target.checked
-                                    ? [...currentDays, day]
-                                    : currentDays.filter(d => d !== day);
-                                  conditionsEditor.updateItem(index, 'timeWindow', {
-                                    ...condition.timeWindow,
-                                    weekDays: newDays
-                                  });
-                                }}
-                                className="w-3 h-3"
-                              />
-                              <span className="text-gray-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </ValidationField>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-2">
-                    <button
-                      onClick={() => conditionsEditor.saveEdit()}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    >
-                      <MaterialSymbol name="check" size="sm" />
-                    </button>
-                    <button
-                      onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                    >
-                      <MaterialSymbol name="delete" size="sm" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-medium text-sm text-gray-900 dark:text-zinc-100">
-                      {condition.type === 'CONDITION_TYPE_APPROVAL' && `Approval (${condition.approval?.count || 1} required)`}
-                      {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`}
-                    </div>
-                    {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
-                      <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                        {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
-                      </div>
+                      return false;
+                    })}
+                    onEdit={() => connectionsEditor.startEdit(index)}
+                    onDelete={() => connectionsEditor.removeItem(index)}
+                    displayName={connection.name || `Connection ${index + 1}`}
+                    badge={connection.type && (
+                      <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
+                        {connection.type.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
+                      </span>
                     )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => conditionsEditor.startEdit(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-                    >
-                      <MaterialSymbol name="edit" size="sm" />
-                    </button>
-                    <button
-                      onClick={() => conditionsEditor.removeItem(index)}
-                      className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                    >
-                      <MaterialSymbol name="delete" size="sm" />
-                    </button>
-                  </div>
+                    editForm={
+                      <ConnectionSelector
+                        connection={connection}
+                        index={index}
+                        onConnectionUpdate={connectionManager.updateConnection}
+                        onFilterAdd={connectionManager.addFilter}
+                        onFilterUpdate={connectionManager.updateFilter}
+                        onFilterRemove={connectionManager.removeFilter}
+                        onFilterOperatorToggle={connectionManager.toggleFilterOperator}
+                        currentEntityId={currentStageId}
+                        validationError={validationErrors[`connection_${index}`]}
+                        showFilters={true}
+                      />
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                onClick={connectionsEditor.addItem}
+                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                <MaterialSymbol name="add" size="sm" />
+                Add Connection
+              </button>
+              {validationErrors.connections && (
+                <div className="text-xs text-red-600 mt-1">
+                  {validationErrors.connections}
                 </div>
               )}
-            </div>
-          ))}
-          <button
-            onClick={conditionsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Condition
-          </button>
-        </EditableAccordionSection>
+            </EditableAccordionSection>
 
-        {/* Secrets Section */}
-        <EditableAccordionSection
-          id="secrets"
-          title="Secrets Management"
-          isOpen={openSections.includes('secrets')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(secrets, 'secrets')}
-          onRevert={revertSection}
-          count={secrets.length}
-          countLabel="secrets"
-        >
-          {secrets.map((secret, index) => (
-            <div key={index}>
-              <InlineEditor
-                isEditing={secretsEditor.editingIndex === index}
-                onSave={secretsEditor.saveEdit}
-                onCancel={() => secretsEditor.cancelEdit(index, (item) => !item.name || item.name.trim() === '')}
-                onEdit={() => secretsEditor.startEdit(index)}
-                onDelete={() => secretsEditor.removeItem(index)}
-                displayName={secret.name || `Secret ${index + 1}`}
-                badge={null}
-                editForm={
-                  <div className="space-y-3">
-                    <ValidationField
-                      label="Secret Name"
-                      error={validationErrors[`secret_${index}`]}
-                    >
-                      <input
-                        type="text"
-                        value={secret.name || ''}
-                        onChange={(e) => secretsEditor.updateItem(index, 'name', e.target.value)}
-                        placeholder="Secret name"
-                        className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
-                          ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                          : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                          }`}
-                      />
-                    </ValidationField>
+            {/* Inputs Section */}
+            <EditableAccordionSection
+              id="inputs"
+              title="Inputs"
+              isOpen={openSections.includes('inputs')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(inputs, 'inputs')}
+              onRevert={revertSection}
+              count={inputs.length}
+              countLabel="inputs"
+            >
+              {inputs.map((input, index) => {
+                // Get mappings for this specific input
+                const inputMappingsForInput = inputMappings.filter(mapping =>
+                  mapping.values?.some(value => value.name === input.name)
+                );
 
-                    <ValidationField label="Value Source">
-                      <div className="flex items-center gap-4 mb-2">
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2">
+                return (
+                  <div key={`input-${currentStageId}-${index}`}>
+                    <InlineEditor
+                      isEditing={inputsEditor.editingIndex === index}
+                      onSave={inputsEditor.saveEdit}
+                      onCancel={() => inputsEditor.cancelEdit(index, (item) => {
+                        if (!item.name || item.name.trim() === '') {
+                          return true;
+                        }
+
+                        const isNewInput = index >= originalData.inputs.length ||
+                          !originalData.inputs[index] ||
+                          originalData.inputs[index].name !== item.name;
+
+                        return isNewInput;
+                      })}
+                      onEdit={() => inputsEditor.startEdit(index)}
+                      onDelete={() => {
+                        const inputName = input.name;
+
+                        inputsEditor.removeItem(index);
+
+                        if (inputName) {
+                          const updatedMappings = inputMappings.map(mapping => ({
+                            ...mapping,
+                            values: mapping.values?.filter(value => value.name !== inputName) || []
+                          })).filter(mapping =>
+                            // Remove mappings that have no values left
+                            mapping.values && mapping.values.length > 0
+                          );
+                          setInputMappings(updatedMappings);
+                        }
+                      }}
+                      displayName={input.name || `Input ${index + 1}`}
+                      badge={inputMappingsForInput.length > 0 ? (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                          {inputMappingsForInput.length} mapping{inputMappingsForInput.length !== 1 ? 's' : ''}
+                        </span>
+                      ) : null}
+                      editForm={
+                        <div className="space-y-4">
+                          <ValidationField
+                            label="Name"
+                            error={validationErrors[`input_${index}`]}
+                          >
                             <input
-                              type="radio"
-                              name={`valueSource-${index}`}
-                              checked={!secret.valueFrom}
-                              onChange={() => updateSecretMode(index, false)}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-zinc-100">Direct Value</span>
-                          </label>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="radio"
-                              name={`valueSource-${index}`}
-                              checked={!!secret.valueFrom}
-                              onChange={() => updateSecretMode(index, true)}
-                              className="w-4 h-4"
-                            />
-                            <span className="text-sm text-gray-900 dark:text-zinc-100">From Secret</span>
-                          </label>
-                        </div>
-                      </div>
-
-                      {!secret.valueFrom ? (
-                        <input
-                          type="password"
-                          value={secret.value || ''}
-                          onChange={(e) => secretsEditor.updateItem(index, 'value', e.target.value)}
-                          placeholder="Secret value"
-                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
-                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
-                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
-                            }`}
-                        />
-                      ) : (
-                        <div className="space-y-2">
-                          <ValidationField label="Secret Name">
-                            <select
-                              value={secret.valueFrom?.secret?.name || ''}
+                              type="text"
+                              value={input.name || ''}
                               onChange={(e) => {
-                                const selectedSecretName = e.target.value;
-                                secretsEditor.updateItem(index, 'valueFrom', {
-                                  ...secret.valueFrom,
-                                  secret: {
-                                    ...secret.valueFrom?.secret,
-                                    name: selectedSecretName,
-                                    key: ''
-                                  }
-                                });
+                                const oldName = input.name;
+                                const newName = e.target.value;
+
+                                // Update the input name
+                                inputsEditor.updateItem(index, 'name', newName);
+
+                                // Update input mappings that reference this input
+                                if (oldName && newName !== oldName) {
+                                  const updatedMappings = inputMappings.map(mapping => ({
+                                    ...mapping,
+                                    values: mapping.values?.map(value =>
+                                      value.name === oldName
+                                        ? { ...value, name: newName }
+                                        : value
+                                    ) || []
+                                  }));
+                                  setInputMappings(updatedMappings);
+                                }
                               }}
+                              placeholder="Input name"
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`input_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                            />
+                          </ValidationField>
+                          <ValidationField label="Description">
+                            <textarea
+                              value={input.description || ''}
+                              onChange={(e) => inputsEditor.updateItem(index, 'description', e.target.value)}
+                              placeholder="Input description"
+                              rows={2}
                               className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
-                            >
-                              <option value="">
-                                {loadingCanvasSecrets || loadingOrganizationSecrets
-                                  ? 'Loading secrets...'
-                                  : 'Select a secret...'}
-                              </option>
-                              {(() => {
-                                if (loadingCanvasSecrets || loadingOrganizationSecrets) {
-                                  return null;
-                                }
+                            />
+                          </ValidationField>
 
-                                const allSecrets = getAllSecrets();
-                                if (allSecrets.length === 0) {
-                                  return (
-                                    <option value="" disabled>
-                                      No secrets available
-                                    </option>
-                                  );
-                                }
+                          {/* Input Mappings for this specific input */}
+                          <div className="border-t border-zinc-200 dark:border-zinc-700 pt-4">
+                            <div className="flex justify-between items-center mb-3">
+                              <label className="text-sm font-medium text-zinc-600 dark:text-zinc-400">Input Mappings</label>
 
-                                const canvasSecretsFiltered = allSecrets.filter(s => s.source === 'Canvas');
-                                const orgSecretsFiltered = allSecrets.filter(s => s.source === 'Organization');
+                            </div>
+
+                            <div className="space-y-3">
+                              {inputMappingsForInput.map((mapping) => {
+                                const actualMappingIndex = inputMappings.findIndex(m => m === mapping);
+                                const inputValue = mapping.values?.find(v => v.name === input.name);
 
                                 return (
-                                  <>
-                                    {canvasSecretsFiltered.length > 0 && (
-                                      <optgroup label="Canvas Secrets">
-                                        {canvasSecretsFiltered.map(secretItem => (
-                                          <option key={`canvas-${secretItem.name}`} value={secretItem.name}>
-                                            {secretItem.name}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                    {orgSecretsFiltered.length > 0 && (
-                                      <optgroup label="Organization Secrets">
-                                        {orgSecretsFiltered.map(secretItem => (
-                                          <option key={`org-${secretItem.name}`} value={secretItem.name}>
-                                            {secretItem.name}
-                                          </option>
-                                        ))}
-                                      </optgroup>
-                                    )}
-                                  </>
+                                  <div key={actualMappingIndex} className="p-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded">
+                                    <div className="space-y-3">
+                                      {/* Trigger Connection */}
+                                      <ValidationField
+                                        label="Triggered by Connection"
+                                        error={validationErrors[`inputMapping_${actualMappingIndex}`]}
+                                      >
+                                        <select
+                                          value={mapping.when?.triggeredBy?.connection || ''}
+                                          onChange={(e) => {
+                                            const newMappings = [...inputMappings];
+                                            newMappings[actualMappingIndex] = {
+                                              ...newMappings[actualMappingIndex],
+                                              when: {
+                                                ...newMappings[actualMappingIndex].when,
+                                                triggeredBy: { connection: e.target.value }
+                                              }
+                                            };
+                                            setInputMappings(newMappings);
+                                          }}
+                                          className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`inputMapping_${actualMappingIndex}`]
+                                            ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                            : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                            }`}
+                                        >
+                                          <option value="">Select trigger connection</option>
+                                          {connections.map((conn, connIndex) => (
+                                            <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                          ))}
+                                        </select>
+                                      </ValidationField>
+
+                                      {/* Value Mode Toggle */}
+                                      <div className="mb-3">
+                                        <label className="flex items-center gap-2 text-sm">
+                                          <input
+                                            type="checkbox"
+                                            checked={!!inputValue?.valueFrom?.eventData}
+                                            onChange={(e) => {
+                                              const newMappings = [...inputMappings];
+                                              const values = [...(newMappings[actualMappingIndex].values || [])];
+                                              const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                              if (valueIndex !== -1) {
+                                                if (e.target.checked) {
+                                                  values[valueIndex] = {
+                                                    ...values[valueIndex],
+                                                    value: undefined,
+                                                    valueFrom: {
+                                                      eventData: {
+                                                        connection: '',
+                                                        expression: values[valueIndex]?.value || ''
+                                                      }
+                                                    }
+                                                  };
+                                                } else {
+                                                  values[valueIndex] = {
+                                                    ...values[valueIndex],
+                                                    value: values[valueIndex]?.valueFrom?.eventData?.expression || '',
+                                                    valueFrom: undefined
+                                                  };
+                                                }
+                                                newMappings[actualMappingIndex].values = values;
+                                                setInputMappings(newMappings);
+                                              }
+                                            }}
+                                            className="w-4 h-4"
+                                          />
+                                          Use expression (dynamic value)
+                                        </label>
+                                      </div>
+
+                                      {inputValue?.valueFrom?.eventData ? (
+                                        /* Expression Mode */
+                                        <div className="space-y-2">
+                                          <div>
+                                            <label className="block text-xs font-medium mb-1">Data Source Connection</label>
+                                            <select
+                                              value={inputValue.valueFrom.eventData.connection || ''}
+                                              onChange={(e) => {
+                                                const newMappings = [...inputMappings];
+                                                const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                if (valueIndex !== -1) {
+                                                  values[valueIndex] = {
+                                                    ...values[valueIndex],
+                                                    valueFrom: {
+                                                      eventData: {
+                                                        ...values[valueIndex]?.valueFrom?.eventData,
+                                                        connection: e.target.value
+                                                      }
+                                                    }
+                                                  };
+                                                  newMappings[actualMappingIndex].values = values;
+                                                  setInputMappings(newMappings);
+                                                }
+                                              }}
+                                              className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                            >
+                                              <option value="">Select data source</option>
+                                              {connections.map((conn, connIndex) => (
+                                                <option key={connIndex} value={conn.name}>{conn.name}</option>
+                                              ))}
+                                            </select>
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-medium mb-1">Expression</label>
+                                            <input
+                                              value={inputValue.valueFrom.eventData.expression || ''}
+                                              onChange={(e) => {
+                                                const newMappings = [...inputMappings];
+                                                const values = [...(newMappings[actualMappingIndex].values || [])];
+                                                const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                                if (valueIndex !== -1) {
+                                                  values[valueIndex] = {
+                                                    ...values[valueIndex],
+                                                    valueFrom: {
+                                                      eventData: {
+                                                        ...values[valueIndex]?.valueFrom?.eventData,
+                                                        expression: e.target.value
+                                                      }
+                                                    }
+                                                  };
+                                                  newMappings[actualMappingIndex].values = values;
+                                                  setInputMappings(newMappings);
+                                                }
+                                              }}
+                                              placeholder="e.g., commit_sha[0:7], DEPLOY_URL"
+                                              className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                            />
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        /* Static Value Mode */
+                                        <div>
+                                          <label className="block text-xs font-medium mb-1">Static Value</label>
+                                          <input
+                                            value={inputValue?.value || ''}
+                                            onChange={(e) => {
+                                              const newMappings = [...inputMappings];
+                                              const values = [...(newMappings[actualMappingIndex].values || [])];
+                                              const valueIndex = values.findIndex(v => v.name === input.name);
+
+                                              if (valueIndex !== -1) {
+                                                values[valueIndex] = { ...values[valueIndex], value: e.target.value };
+                                                newMappings[actualMappingIndex].values = values;
+                                                setInputMappings(newMappings);
+                                              }
+                                            }}
+                                            placeholder="e.g., production, staging"
+                                            className="w-full px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                          />
+                                        </div>
+                                      )}
+
+                                      {/* Remove Mapping Button */}
+                                      <div className="flex justify-end">
+                                        <button
+                                          onClick={() => {
+                                            const newMappings = inputMappings.filter((_, i) => i !== actualMappingIndex);
+                                            setInputMappings(newMappings);
+                                          }}
+                                          className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs"
+                                        >
+                                          Remove Mapping
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 );
-                              })()}
-                            </select>
-                          </ValidationField>
-                          <ValidationField label="Secret Key">
-                            <select
-                              value={secret.valueFrom?.secret?.key || ''}
-                              onChange={(e) => secretsEditor.updateItem(index, 'valueFrom', {
-                                ...secret.valueFrom,
-                                secret: { ...secret.valueFrom?.secret, key: e.target.value }
                               })}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              // Add a new mapping for this specific input
+                              const newMapping = {
+                                when: { triggeredBy: { connection: '' } },
+                                values: [{ name: input.name, value: '' }]
+                              };
+                              setInputMappings(prev => [...prev, newMapping]);
+                            }}
+                            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                          >
+                            <MaterialSymbol name="add" size="sm" />
+                            Add Mapping
+                          </button>
+                        </div>
+                      }
+                    />
+                  </div>
+                );
+              })}
+              <button
+                onClick={inputsEditor.addItem}
+                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                <MaterialSymbol name="add" size="sm" />
+                Add Input
+              </button>
+            </EditableAccordionSection>
+
+
+            {/* Outputs Section */}
+            <EditableAccordionSection
+              id="outputs"
+              title="Outputs"
+              isOpen={openSections.includes('outputs')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(outputs, 'outputs')}
+              onRevert={revertSection}
+              count={outputs.length}
+              countLabel="outputs"
+            >
+              {outputs.map((output, index) => (
+                <div key={index}>
+                  <InlineEditor
+                    isEditing={outputsEditor.editingIndex === index}
+                    onSave={outputsEditor.saveEdit}
+                    onCancel={() => outputsEditor.cancelEdit(index, (item) => {
+                      if (!item.name || item.name.trim() === '') {
+                        return true;
+                      }
+
+                      const isNewOutput = index >= originalData.outputs.length ||
+                        !originalData.outputs[index] ||
+                        originalData.outputs[index].name !== item.name;
+
+                      return isNewOutput;
+                    })}
+                    onEdit={() => outputsEditor.startEdit(index)}
+                    onDelete={() => outputsEditor.removeItem(index)}
+                    displayName={output.name || `Output ${index + 1}`}
+                    badge={output.required && (
+                      <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">Required</span>
+                    )}
+                    editForm={
+                      <div className="space-y-3">
+                        <ValidationField
+                          label="Name"
+                          error={validationErrors[`output_${index}`]}
+                        >
+                          <input
+                            type="text"
+                            value={output.name || ''}
+                            onChange={(e) => outputsEditor.updateItem(index, 'name', e.target.value)}
+                            placeholder="Output name"
+                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`output_${index}`]
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                              }`}
+                          />
+                        </ValidationField>
+                        <ValidationField label="Description">
+                          <textarea
+                            value={output.description || ''}
+                            onChange={(e) => outputsEditor.updateItem(index, 'description', e.target.value)}
+                            placeholder="Output description"
+                            rows={2}
+                            className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </ValidationField>
+                        <ValidationField label="Required">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              id={`required-${index}`}
+                              checked={output.required || false}
+                              onChange={(e) => outputsEditor.updateItem(index, 'required', e.target.checked)}
+                              className="w-4 h-4 text-blue-600 bg-white dark:bg-zinc-800 border-zinc-300 dark:border-zinc-600 rounded focus:ring-blue-500"
+                            />
+                            <label className="text-gray-900 dark:text-zinc-100" htmlFor={`required-${index}`}>Required</label>
+                          </div>
+                        </ValidationField>
+                      </div>
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                onClick={outputsEditor.addItem}
+                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                <MaterialSymbol name="add" size="sm" />
+                Add Output
+              </button>
+            </EditableAccordionSection>
+
+            {/* Conditions Section */}
+            <EditableAccordionSection
+              id="conditions"
+              title="Conditions"
+              isOpen={openSections.includes('conditions')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(conditions, 'conditions')}
+              onRevert={revertSection}
+              count={conditions.length}
+              countLabel="conditions"
+            >
+              {conditions.map((condition, index) => (
+                <div key={index}>
+                  <InlineEditor
+                    isEditing={conditionsEditor.editingIndex === index}
+                    onSave={conditionsEditor.saveEdit}
+                    onCancel={() => conditionsEditor.cancelEdit(index, (item) => {
+                      // Remove if condition type is not set or has validation errors
+                      if (!item.type || item.type === 'CONDITION_TYPE_UNKNOWN') {
+                        return true;
+                      }
+
+                      const isNewCondition = index >= originalData.conditions.length ||
+                        !originalData.conditions[index];
+
+                      return isNewCondition;
+                    })}
+                    onEdit={() => conditionsEditor.startEdit(index)}
+                    onDelete={() => conditionsEditor.removeItem(index)}
+                    displayName={
+                      condition.type === 'CONDITION_TYPE_APPROVAL'
+                        ? `Approval (${condition.approval?.count || 1} required)`
+                        : condition.type === 'CONDITION_TYPE_TIME_WINDOW'
+                          ? `Time Window (${condition.timeWindow?.start || 'No start'} - ${condition.timeWindow?.end || 'No end'})`
+                          : `Condition ${index + 1}`
+                    }
+                    badge={condition.type === 'CONDITION_TYPE_TIME_WINDOW' && condition.timeWindow?.weekDays && (
+                      <span className="text-xs bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
+                        {condition.timeWindow.weekDays.map(day => day.slice(0, 3)).join(', ')}
+                      </span>
+                    )}
+                    editForm={
+                      <div className="space-y-4">
+                        <ValidationField
+                          label="Condition Type"
+                          error={validationErrors[`condition_${index}`]}
+                        >
+                          <select
+                            value={condition.type || 'CONDITION_TYPE_APPROVAL'}
+                            onChange={(e) => updateConditionType(index, e.target.value as SuperplaneConditionType)}
+                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`condition_${index}`]
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                              }`}
+                          >
+                            <option value="CONDITION_TYPE_APPROVAL">Approval</option>
+                            <option value="CONDITION_TYPE_TIME_WINDOW">Time Window</option>
+                          </select>
+                        </ValidationField>
+
+                        {condition.type === 'CONDITION_TYPE_APPROVAL' && (
+                          <ValidationField label="Required Approvals">
+                            <input
+                              type="number"
+                              min="1"
+                              value={condition.approval?.count || 1}
+                              onChange={(e) => conditionsEditor.updateItem(index, 'approval', { count: parseInt(e.target.value) || 1 })}
+                              placeholder="Number of required approvals"
                               className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
-                            >
-                              <option value="">
-                                {!secret.valueFrom?.secret?.name
-                                  ? 'Select a secret first...'
-                                  : 'Select a key...'}
-                              </option>
-                              {secret.valueFrom?.secret?.name && (() => {
-                                const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
+                            />
+                          </ValidationField>
+                        )}
 
-                                if (availableKeys.length === 0) {
-                                  return (
-                                    <option value="" disabled>
-                                      No keys available in this secret
-                                    </option>
-                                  );
-                                }
+                        {condition.type === 'CONDITION_TYPE_TIME_WINDOW' && (
+                          <div className="space-y-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <ValidationField label="Start Time">
+                                <input
+                                  type="time"
+                                  value={condition.timeWindow?.start || ''}
+                                  onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
+                                    ...condition.timeWindow,
+                                    start: e.target.value
+                                  })}
+                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </ValidationField>
+                              <ValidationField label="End Time">
+                                <input
+                                  type="time"
+                                  value={condition.timeWindow?.end || ''}
+                                  onChange={(e) => conditionsEditor.updateItem(index, 'timeWindow', {
+                                    ...condition.timeWindow,
+                                    end: e.target.value
+                                  })}
+                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                              </ValidationField>
+                            </div>
+                            <ValidationField label="Days of Week">
+                              <div className="grid grid-cols-7 gap-1">
+                                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                                  <label key={day} className="flex flex-col items-center gap-1 p-2 border border-zinc-300 dark:border-zinc-600 rounded text-xs bg-white dark:bg-zinc-800">
+                                    <input
+                                      type="checkbox"
+                                      checked={condition.timeWindow?.weekDays?.includes(day) || false}
+                                      onChange={(e) => {
+                                        const currentDays = condition.timeWindow?.weekDays || [];
+                                        const newDays = e.target.checked
+                                          ? [...currentDays, day]
+                                          : currentDays.filter(d => d !== day);
+                                        conditionsEditor.updateItem(index, 'timeWindow', {
+                                          ...condition.timeWindow,
+                                          weekDays: newDays
+                                        });
+                                      }}
+                                      className="w-3 h-3"
+                                    />
+                                    <span className="text-zinc-900 dark:text-zinc-100">{day.slice(0, 3)}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </ValidationField>
+                          </div>
+                        )}
+                      </div>
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                onClick={conditionsEditor.addItem}
+                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                <MaterialSymbol name="add" size="sm" />
+                Add Condition
+              </button>
+            </EditableAccordionSection>
 
-                                return availableKeys.map(key => (
-                                  <option key={key} value={key}>
-                                    {key}
+            {/* Secrets Section */}
+            <EditableAccordionSection
+              id="secrets"
+              title="Secrets Management"
+              isOpen={openSections.includes('secrets')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(secrets, 'secrets')}
+              onRevert={revertSection}
+              count={secrets.length}
+              countLabel="secrets"
+            >
+              {secrets.map((secret, index) => (
+                <div key={index}>
+                  <InlineEditor
+                    isEditing={secretsEditor.editingIndex === index}
+                    onSave={secretsEditor.saveEdit}
+                    onCancel={() => secretsEditor.cancelEdit(index, (item) => {
+                      if (!item.name || item.name.trim() === '') {
+                        return true;
+                      }
+
+                      const isNewSecret = index >= originalData.secrets.length ||
+                        !originalData.secrets[index];
+
+                      return isNewSecret;
+                    })}
+                    onEdit={() => secretsEditor.startEdit(index)}
+                    onDelete={() => secretsEditor.removeItem(index)}
+                    displayName={secret.name || `Secret ${index + 1}`}
+                    badge={null}
+                    editForm={
+                      <div className="space-y-3">
+                        <ValidationField
+                          label="Secret Name"
+                          error={validationErrors[`secret_${index}`]}
+                        >
+                          <input
+                            type="text"
+                            value={secret.name || ''}
+                            onChange={(e) => secretsEditor.updateItem(index, 'name', e.target.value)}
+                            placeholder="Secret name"
+                            className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                              ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                              : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                              }`}
+                          />
+                        </ValidationField>
+
+                        <ValidationField label="Value Source">
+                          <div className="mb-2">
+                            <ControlledTabs className="text-left m-0 max-w-[221px]"
+                              tabs={[
+                                {
+                                  id: 'direct',
+                                  label: 'Direct Value',
+                                },
+                                {
+                                  id: 'secret',
+                                  label: 'From Secret',
+                                },
+                              ]}
+                              variant="pills"
+                              activeTab={!secret.valueFrom ? 'direct' : 'secret'}
+                              onTabChange={(tabId) => updateSecretMode(index, tabId === 'secret')}
+                            />
+                          </div>
+
+                          {!secret.valueFrom ? (
+                            <input
+                              type="password"
+                              value={secret.value || ''}
+                              onChange={(e) => secretsEditor.updateItem(index, 'value', e.target.value)}
+                              placeholder="Secret value"
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${validationErrors[`secret_${index}`]
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                            />
+                          ) : (
+                            <div className="space-y-2">
+                              <ValidationField label="Secret Name">
+                                <select
+                                  value={secret.valueFrom?.secret?.name || ''}
+                                  onChange={(e) => {
+                                    const selectedSecretName = e.target.value;
+                                    secretsEditor.updateItem(index, 'valueFrom', {
+                                      ...secret.valueFrom,
+                                      secret: {
+                                        ...secret.valueFrom?.secret,
+                                        name: selectedSecretName,
+                                        key: ''
+                                      }
+                                    });
+                                  }}
+                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={loadingCanvasSecrets || loadingOrganizationSecrets}
+                                >
+                                  <option value="">
+                                    {loadingCanvasSecrets || loadingOrganizationSecrets
+                                      ? 'Loading secrets...'
+                                      : 'Select a secret...'}
                                   </option>
-                                ));
-                              })()}
+                                  {(() => {
+                                    if (loadingCanvasSecrets || loadingOrganizationSecrets) {
+                                      return null;
+                                    }
+
+                                    const allSecrets = getAllSecrets();
+                                    if (allSecrets.length === 0) {
+                                      return (
+                                        <option value="" disabled>
+                                          No secrets available
+                                        </option>
+                                      );
+                                    }
+
+                                    const canvasSecretsFiltered = allSecrets.filter(s => s.source === 'Canvas');
+                                    const orgSecretsFiltered = allSecrets.filter(s => s.source === 'Organization');
+
+                                    return (
+                                      <>
+                                        {canvasSecretsFiltered.length > 0 && (
+                                          <optgroup label="Canvas Secrets">
+                                            {canvasSecretsFiltered.map(secretItem => (
+                                              <option key={`canvas-${secretItem.name}`} value={secretItem.name}>
+                                                {secretItem.name}
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                        )}
+                                        {orgSecretsFiltered.length > 0 && (
+                                          <optgroup label="Organization Secrets">
+                                            {orgSecretsFiltered.map(secretItem => (
+                                              <option key={`org-${secretItem.name}`} value={secretItem.name}>
+                                                {secretItem.name}
+                                              </option>
+                                            ))}
+                                          </optgroup>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
+                                </select>
+                              </ValidationField>
+                              <ValidationField label="Secret Key">
+                                <select
+                                  value={secret.valueFrom?.secret?.key || ''}
+                                  onChange={(e) => secretsEditor.updateItem(index, 'valueFrom', {
+                                    ...secret.valueFrom,
+                                    secret: { ...secret.valueFrom?.secret, key: e.target.value }
+                                  })}
+                                  className="w-full px-3 py-2 border border-zinc-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  disabled={!secret.valueFrom?.secret?.name || loadingCanvasSecrets || loadingOrganizationSecrets}
+                                >
+                                  <option value="">
+                                    {!secret.valueFrom?.secret?.name
+                                      ? 'Select a secret first...'
+                                      : 'Select a key...'}
+                                  </option>
+                                  {secret.valueFrom?.secret?.name && (() => {
+                                    const availableKeys = getSecretKeys(secret.valueFrom.secret.name);
+
+                                    if (availableKeys.length === 0) {
+                                      return (
+                                        <option value="" disabled>
+                                          No keys available in this secret
+                                        </option>
+                                      );
+                                    }
+
+                                    return availableKeys.map(key => (
+                                      <option key={key} value={key}>
+                                        {key}
+                                      </option>
+                                    ));
+                                  })()}
+                                </select>
+                              </ValidationField>
+                            </div>
+                          )}
+                        </ValidationField>
+                      </div>
+                    }
+                  />
+                </div>
+              ))}
+              <button
+                onClick={secretsEditor.addItem}
+                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+              >
+                <MaterialSymbol name="add" size="sm" />
+                Add Secret
+              </button>
+            </EditableAccordionSection>
+
+            {/* Executor Management Section */}
+            <EditableAccordionSection
+              id="executor"
+              title="Executor Configuration"
+              isOpen={openSections.includes('executor')}
+              onToggle={handleAccordionToggle}
+              isModified={isSectionModified(executor, 'executor')}
+              onRevert={revertSection}
+              count={hasExecutor() ? 1 : 0}
+              countLabel="executor"
+            >
+              {hasExecutor() ? (
+                <InlineEditor
+                  isEditing={isEditingExecutor}
+                  onSave={saveExecutorConfig}
+                  onCancel={cancelExecutorConfig}
+                  onEdit={startEditingExecutor}
+                  onDelete={deleteExecutorConfig}
+                  displayName={`${executor.type?.charAt(0).toUpperCase()}${executor.type?.slice(1)} Executor`}
+                  badge={executor.type && (
+                    <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 dark:text-zinc-300 px-2 py-0.5 rounded">
+                      {executor.type}
+                    </span>
+                  )}
+                  editForm={
+                    <div className="space-y-4">
+                      {executor.type === 'semaphore' && (
+                        <div className="space-y-4">
+                          <ValidationField label="Integration">
+                            <select
+                              value={executor.integration?.name || ''}
+                              onChange={(e) => updateExecutorIntegration(e.target.value)}
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            >
+                              <option value="">Select an integration...</option>
+                              {getAllIntegrations()
+                                .filter(integration => integration.spec?.type === 'semaphore')
+                                .map((integration) => (
+                                  <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                                    {integration.metadata?.name}
+                                  </option>
+                                ))}
                             </select>
+                            {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
+                              <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                                No Semaphore integrations available. Create one in canvas settings.
+                              </div>
+                            )}
+                          </ValidationField>
+
+                          <ValidationField
+                            label="Project Name"
+                            error={fieldErrors.project}
+                          >
+                            <input
+                              type="text"
+                              value={(executor.resource?.name as string) || ''}
+                              onChange={(e) => {
+                                if (executor.resource?.type !== 'project')
+                                  updateExecutorResource('type', 'project');
+
+                                updateExecutorResource('name', e.target.value);
+                                if (fieldErrors.project) {
+                                  setFieldErrors(prev => {
+                                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                    const { project, ...rest } = prev;
+                                    return rest;
+                                  });
+                                }
+                              }}
+                              placeholder="my-semaphore-project"
+                              className={`w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 ${fieldErrors.project
+                                ? 'border-red-300 dark:border-red-600 focus:ring-red-500'
+                                : 'border-zinc-300 dark:border-zinc-600 focus:ring-blue-500'
+                                }`}
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Execution Type">
+                            <ControlledTabs className="text-left m-0 max-w-48"
+                              tabs={[
+                                { id: 'workflow', label: 'Workflow' },
+                                { id: 'task', label: 'Task' },
+                              ]}
+                              variant="pills"
+                              activeTab={semaphoreExecutionType}
+                              onTabChange={(tabId) => updateSemaphoreExecutionType(tabId as 'workflow' | 'task')}
+                            />
+                          </ValidationField>
+
+                          {semaphoreExecutionType === 'task' && (
+                            <ValidationField label="Task">
+                              <input
+                                type="text"
+                                value={(executor.spec?.task as string) || ''}
+                                onChange={(e) => updateExecutorField('task', e.target.value)}
+                                placeholder="my-task"
+                                className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                              />
+                            </ValidationField>
+                          )}
+
+                          <ValidationField label="Branch">
+                            <input
+                              type="text"
+                              value={(executor.spec?.branch as string) || ''}
+                              onChange={(e) => updateExecutorField('branch', e.target.value)}
+                              placeholder="main"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Pipeline File">
+                            <input
+                              type="text"
+                              value={(executor.spec?.pipelineFile as string) || ''}
+                              onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
+                              placeholder=".semaphore/semaphore.yml"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Parameters">
+                            <div className="space-y-2">
+                              {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
+                                <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                                  <input
+                                    type="text"
+                                    value={key}
+                                    onChange={(e) => updateExecutorParameter(key, e.target.value, value)}
+                                    placeholder="Parameter name"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={value}
+                                    onChange={(e) => updateExecutorParameter(key, key, e.target.value)}
+                                    placeholder="Parameter value"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <button
+                                    onClick={() => removeExecutorParameter(key)}
+                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
+                                  >
+                                    <MaterialSymbol name="delete" size="sm" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                onClick={addExecutorParameter}
+                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                              >
+                                <MaterialSymbol name="add" size="sm" />
+                                Add Parameter
+                              </button>
+                            </div>
                           </ValidationField>
                         </div>
                       )}
-                    </ValidationField>
-                  </div>
-                }
-              />
-            </div>
-          ))}
-          <button
-            onClick={secretsEditor.addItem}
-            className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <MaterialSymbol name="add" size="sm" />
-            Add Secret
-          </button>
-        </EditableAccordionSection>
 
-        {/* Executor Management Section */}
-        <EditableAccordionSection
-          id="executor"
-          title="Executor Configuration"
-          isOpen={openSections.includes('executor')}
-          onToggle={handleAccordionToggle}
-          isModified={isSectionModified(executor, 'executor')}
-          onRevert={revertSection}
-        >
-          <div className="space-y-3">
-            {executor.type === 'semaphore' && (
-              <div className="space-y-4">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                  Configure your Semaphore executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
-                </div>
+                      {executor.type === 'github' && (
+                        <div className="space-y-4">
+                          <ValidationField label="Integration">
+                            <select
+                              value={executor.integration?.name || ''}
+                              onChange={(e) => updateExecutorIntegration(e.target.value)}
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            >
+                              <option value="">Select an integration...</option>
+                              {getAllIntegrations()
+                                .filter(integration => integration.spec?.type === 'github')
+                                .map((integration) => (
+                                  <option key={integration.metadata?.id} value={integration.metadata?.name}>
+                                    {integration.metadata?.name}
+                                  </option>
+                                ))}
+                            </select>
+                            {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
+                              <div className="text-xs text-zinc-500 mt-1">
+                                No GitHub integrations available. Create one in canvas settings.
+                              </div>
+                            )}
+                          </ValidationField>
 
-                <Field>
-                  <Label>Integration</Label>
-                  <select
-                    value={executor.integration?.name || ''}
-                    onChange={(e) => updateExecutorIntegration(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                          <ValidationField label="Repository Name">
+                            <input
+                              type="text"
+                              value={(executor.resource?.name as string) || ''}
+                              onChange={(e) => {
+                                if (executor.resource?.type !== 'repository')
+                                  updateExecutorResource('type', 'repository');
+
+                                updateExecutorResource('name', e.target.value)
+                              }}
+                              placeholder="my-repository"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Workflow">
+                            <input
+                              type="text"
+                              value={(executor.spec?.workflow as string) || ''}
+                              onChange={(e) => updateExecutorField('workflow', e.target.value)}
+                              placeholder=".github/workflows/task.yml"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Ref">
+                            <input
+                              type="text"
+                              value={(executor.spec?.ref as string) || ''}
+                              onChange={(e) => updateExecutorField('ref', e.target.value)}
+                              placeholder="main"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Inputs">
+                            <div className="space-y-2">
+                              {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value], index) => (
+                                <div key={index} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                                  <input
+                                    type="text"
+                                    value={key}
+                                    onChange={(e) => updateExecutorInput(key, e.target.value, value)}
+                                    placeholder="Input name"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={value}
+                                    onChange={(e) => updateExecutorInput(key, key, e.target.value)}
+                                    placeholder="Input value"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <button
+                                    onClick={() => removeExecutorInput(key)}
+                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
+                                  >
+                                    <MaterialSymbol name="delete" size="sm" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                onClick={addExecutorInput}
+                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                              >
+                                <MaterialSymbol name="add" size="sm" />
+                                Add Input
+                              </button>
+                            </div>
+                          </ValidationField>
+                        </div>
+                      )}
+
+                      {executor.type === 'http' && (
+                        <div className="space-y-4">
+                          <ValidationField label="URL">
+                            <input
+                              type="text"
+                              value={(executor.spec?.url as string) || ''}
+                              onChange={(e) => updateExecutorField('url', e.target.value)}
+                              placeholder="https://api.example.com/endpoint"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Payload (JSON)">
+                            <textarea
+                              value={JSON.stringify(executor.spec?.payload || {}, null, 2)}
+                              onChange={(e) => {
+                                try {
+                                  const parsed = JSON.parse(e.target.value);
+                                  updateExecutorField('payload', parsed);
+                                } catch {
+                                  updateExecutorField('payload', e.target.value);
+                                }
+                              }}
+                              placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
+                              rows={6}
+                              className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
+                            />
+                          </ValidationField>
+
+                          <ValidationField label="Headers">
+                            <div className="space-y-2">
+                              {Object.entries((executor.spec?.headers as Record<string, string>) || {}).map(([key, value]) => (
+                                <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
+                                  <input
+                                    type="text"
+                                    value={key}
+                                    onChange={(e) => {
+                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                                      const updatedHeaders = { ...currentHeaders };
+                                      if (e.target.value !== key) {
+                                        delete updatedHeaders[key];
+                                        updatedHeaders[e.target.value] = value;
+                                      }
+                                      updateExecutorField('headers', updatedHeaders);
+                                    }}
+                                    placeholder="Header name"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={value}
+                                    onChange={(e) => {
+                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                                      updateExecutorField('headers', {
+                                        ...currentHeaders,
+                                        [key]: e.target.value
+                                      });
+                                    }}
+                                    placeholder="Header value"
+                                    className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                                      const updatedHeaders = { ...currentHeaders };
+                                      delete updatedHeaders[key];
+                                      updateExecutorField('headers', updatedHeaders);
+                                    }}
+                                    className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
+                                  >
+                                    <MaterialSymbol name="delete" size="sm" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                onClick={() => {
+                                  const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
+                                  const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
+                                  updateExecutorField('headers', {
+                                    ...currentHeaders,
+                                    [newKey]: ''
+                                  });
+                                }}
+                                className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+                              >
+                                <MaterialSymbol name="add" size="sm" />
+                                Add Header
+                              </button>
+                            </div>
+                          </ValidationField>
+
+                          <ValidationField label="Response Policy - Success Status Codes">
+                            <input
+                              type="text"
+                              value={responsePolicyStatusCodesDisplay}
+                              onChange={(e) => {
+                                const endsWithComma = e.target.value.endsWith(',');
+                                const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
+                                updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
+                                setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
+                              }}
+                              placeholder="200, 201, 202"
+                              className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
+                            />
+                          </ValidationField>
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              ) : (
+                <div className="space-y-3">
+                  <button
+                    onClick={addExecutorConfig}
+                    className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
                   >
-                    <option value="">Select an integration...</option>
-                    {getAllIntegrations()
-                      .filter(integration => integration.spec?.type === 'semaphore')
-                      .map((integration) => (
-                        <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                          {integration.metadata?.name}
-                        </option>
-                      ))}
-                  </select>
-                  {getAllIntegrations().filter(int => int.spec?.type === 'semaphore').length === 0 && (
-                    <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      No Semaphore integrations available. Create one in canvas settings.
+                    <MaterialSymbol name="add" size="sm" />
+                    Add Executor Configuration
+                  </button>
+                  {validationErrors.executorSpec && (
+                    <div className="text-xs text-red-600 mt-1">
+                      {validationErrors.executorSpec}
                     </div>
                   )}
-                </Field>
-
-                <Field>
-                  <Label>Project Name</Label>
-                  <input
-                    type="text"
-                    value={(executor.resource?.name as string) || ''}
-                    onChange={(e) => updateExecutorResource('name', e.target.value)}
-                    placeholder="my-semaphore-project"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Execution Type</Label>
-                  <div className="flex items-center gap-6 mt-2">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="semaphore-execution-type"
-                        value="workflow"
-                        checked={semaphoreExecutionType === 'workflow'}
-                        onChange={() => updateSemaphoreExecutionType('workflow')}
-                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-zinc-100">Workflow</span>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="semaphore-execution-type"
-                        value="task"
-                        checked={semaphoreExecutionType === 'task'}
-                        onChange={() => updateSemaphoreExecutionType('task')}
-                        className="w-4 h-4 text-blue-600 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-900 dark:text-zinc-100">Task</span>
-                    </label>
-                  </div>
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                    {semaphoreExecutionType === 'workflow'
-                      ? 'Uses the workflows API to run a workflow'
-                      : 'Uses the tasks API to run a specific task'}
-                  </div>
-                </Field>
-
-                {semaphoreExecutionType === 'task' && (
-                  <Field>
-                    <Label>Task</Label>
-                    <input
-                      type="text"
-                      value={(executor.spec?.task as string) || ''}
-                      onChange={(e) => updateExecutorField('task', e.target.value)}
-                      placeholder="my-task"
-                      className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                    />
-                  </Field>
-                )}
-
-                <Field>
-                  <Label>Branch</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.branch as string) || ''}
-                    onChange={(e) => updateExecutorField('branch', e.target.value)}
-                    placeholder="main"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Pipeline File</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.pipelineFile as string) || ''}
-                    onChange={(e) => updateExecutorField('pipelineFile', e.target.value)}
-                    placeholder=".semaphore/pipeline.yml"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <div className="flex justify-between items-center mb-2">
-                    <Label>Parameters</Label>
-                    <button
-                      onClick={addExecutorParameter}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                    >
-                      + Add Parameter
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries((executor.spec?.parameters as Record<string, string>) || {}).map(([key, value]) => (
-                      <div key={key} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                        <input
-                          type="text"
-                          value={key}
-                          onChange={(e) => updateExecutorParameter(key, e.target.value, value)}
-                          placeholder="Parameter name"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => updateExecutorParameter(key, key, e.target.value)}
-                          placeholder="Parameter value"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <button
-                          onClick={() => removeExecutorParameter(key)}
-                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                        >
-                          <MaterialSymbol name="delete" size="sm" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Field>
-              </div>
-            )}
-
-            {executor.type === 'github' && (
-              <div className="space-y-4">
-                <div className="text-xs text-zinc-500 mb-2">
-                  Configure your GitHub executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
                 </div>
-
-                <Field>
-                  <Label>Integration</Label>
-                  <select
-                    value={executor.integration?.name || ''}
-                    onChange={(e) => updateExecutorIntegration(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  >
-                    <option value="">Select an integration...</option>
-                    {getAllIntegrations()
-                      .filter(integration => integration.spec?.type === 'github')
-                      .map((integration) => (
-                        <option key={integration.metadata?.id} value={integration.metadata?.name}>
-                          {integration.metadata?.name}
-                        </option>
-                      ))}
-                  </select>
-                  {getAllIntegrations().filter(int => int.spec?.type === 'github').length === 0 && (
-                    <div className="text-xs text-zinc-500 mt-1">
-                      No GitHub integrations available. Create one in canvas settings.
-                    </div>
-                  )}
-                </Field>
-
-                <Field>
-                  <Label>Repository Name</Label>
-                  <input
-                    type="text"
-                    value={(executor.resource?.name as string) || ''}
-                    onChange={(e) => updateExecutorResource('name', e.target.value)}
-                    placeholder="my-repository"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Workflow</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.workflow as string) || ''}
-                    onChange={(e) => updateExecutorField('workflow', e.target.value)}
-                    placeholder=".github/workflows/task.yml"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Ref</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.ref as string) || ''}
-                    onChange={(e) => updateExecutorField('ref', e.target.value)}
-                    placeholder="main"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <div className="flex justify-between items-center mb-2">
-                    <Label>Inputs</Label>
-                    <button
-                      onClick={addExecutorInput}
-                      className="text-blue-600 hover:text-blue-700 text-sm"
-                    >
-                      + Add Input
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries((executor.spec?.inputs as Record<string, string>) || {}).map(([key, value], index) => (
-                      <div key={index} className="w-full flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                        <input
-                          type="text"
-                          value={key}
-                          onChange={(e) => updateExecutorInput(key, e.target.value, value)}
-                          placeholder="Input name"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => updateExecutorInput(key, key, e.target.value)}
-                          placeholder="Input value"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <button
-                          onClick={() => removeExecutorInput(key)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Field>
-              </div>
-            )}
-
-            {executor.type === 'http' && (
-              <div className="space-y-4">
-                <div className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
-                  Configure your HTTP executor. You can use ${'{{ inputs.NAME }}'} and ${'{{ secrets.NAME }}'} syntax.
-                </div>
-
-                <Field>
-                  <Label>URL</Label>
-                  <input
-                    type="text"
-                    value={(executor.spec?.url as string) || ''}
-                    onChange={(e) => updateExecutorField('url', e.target.value)}
-                    placeholder="https://api.example.com/endpoint"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-
-                <Field>
-                  <Label>Payload (JSON)</Label>
-                  <textarea
-                    value={JSON.stringify(executor.spec?.payload || {}, null, 2)}
-                    onChange={(e) => {
-                      try {
-                        const parsed = JSON.parse(e.target.value);
-                        updateExecutorField('payload', parsed);
-                      } catch {
-                        // Invalid JSON, but still update the field to show user input
-                        updateExecutorField('payload', e.target.value);
-                      }
-                    }}
-                    placeholder='{\n  "key1": "value1",\n  "key2": "{{ inputs.KEY2 }}"\n}'
-                    rows={6}
-                    className="nodrag w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500 font-mono"
-                  />
-                </Field>
-
-                <Field>
-                  <div className="flex justify-between items-center mb-2">
-                    <Label>Headers</Label>
-                    <button
-                      onClick={() => {
-                        const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                        const newKey = `Header_${Object.keys(currentHeaders).length + 1}`;
-                        updateExecutorField('headers', {
-                          ...currentHeaders,
-                          [newKey]: ''
-                        });
-                      }}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 text-sm"
-                    >
-                      + Add Header
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {Object.entries((executor.spec?.headers as Record<string, string>) || {}).map(([key, value]) => (
-                      <div key={key} className="flex gap-2 items-center bg-zinc-50 dark:bg-zinc-800 p-2 rounded">
-                        <input
-                          type="text"
-                          value={key}
-                          onChange={(e) => {
-                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                            const updatedHeaders = { ...currentHeaders };
-                            if (e.target.value !== key) {
-                              delete updatedHeaders[key];
-                              updatedHeaders[e.target.value] = value;
-                            }
-                            updateExecutorField('headers', updatedHeaders);
-                          }}
-                          placeholder="Header name"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <input
-                          type="text"
-                          value={value}
-                          onChange={(e) => {
-                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                            updateExecutorField('headers', {
-                              ...currentHeaders,
-                              [key]: e.target.value
-                            });
-                          }}
-                          placeholder="Header value"
-                          className="w-1/2 px-2 py-1 border border-zinc-300 dark:border-zinc-600 rounded text-sm bg-white dark:bg-zinc-700"
-                        />
-                        <button
-                          onClick={() => {
-                            const currentHeaders = (executor.spec?.headers as Record<string, string>) || {};
-                            const updatedHeaders = { ...currentHeaders };
-                            delete updatedHeaders[key];
-                            updateExecutorField('headers', updatedHeaders);
-                          }}
-                          className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-700 dark:text-zinc-300"
-                        >
-                          <MaterialSymbol name="delete" size="sm" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Field>
-
-                <Field>
-                  <Label>Response Policy - Success Status Codes</Label>
-                  <input
-                    type="text"
-                    value={responsePolicyStatusCodesDisplay}
-                    onChange={(e) => {
-                      const endsWithComma = e.target.value.endsWith(',');
-                      const codes = e.target.value.split(',').map(code => parseInt(code.trim())).filter(code => !isNaN(code));
-                      updateExecutorNestedField('responsePolicy', 'statusCodes', codes);
-                      setResponsePolicyStatusCodesDisplay(endsWithComma ? codes.join(',') + ',' : codes.join(','));
-                    }}
-                    placeholder="200, 201, 202"
-                    className="w-full px-3 py-2 border rounded-md bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 border-zinc-300 dark:border-zinc-600 focus:ring-blue-500"
-                  />
-                </Field>
-              </div>
-            )}
-
-            {!executor.type && (
-              <div className="text-sm text-zinc-500 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800 p-3 rounded-md">
-                Select an executor type to configure how this stage will execute when triggered.
-              </div>
-            )}
-          </div>
-        </EditableAccordionSection>
+              )}
+            </EditableAccordionSection>
+          </>
+        )}
       </div>
     </div>
   );

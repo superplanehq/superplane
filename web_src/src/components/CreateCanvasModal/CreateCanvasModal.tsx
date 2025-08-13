@@ -53,11 +53,14 @@ export function CreateCanvasModal({
   }
 
   return (
-    <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left">
+    <Dialog open={isOpen} onClose={handleClose} size="lg" className="text-left relative">
       <DialogTitle>Create New Canvas</DialogTitle>
       <DialogDescription className="text-sm">
         Create a new interactive canvas to build and manage your workflows.
       </DialogDescription>
+      <button onClick={handleClose} className="absolute top-4 right-4">
+        <MaterialSymbol name="close" size="sm" />
+      </button>
 
       <DialogBody>
         <div className="space-y-6">
@@ -93,19 +96,16 @@ export function CreateCanvasModal({
       </DialogBody>
 
       <DialogActions>
-        <Button plain onClick={handleClose}>
-          Cancel
-        </Button>
         <Button
           color="blue"
           onClick={handleSubmit}
           disabled={!canvasName.trim() || isLoading}
           className="flex items-center gap-2"
         >
-          <MaterialSymbol name="add" size="sm" />
-          {isLoading ? 'Creating...' : 'Create Canvas'}
+          {isLoading ? 'Creating...' : 'Create'}
         </Button>
       </DialogActions>
+
     </Dialog>
   )
 }

@@ -8,32 +8,50 @@ import { SuperplaneConnection, GroupByField, SpecTimeoutBehavior, SuperplaneConn
 import { ConnectionGroupEditModeContent } from '../ConnectionGroupEditModeContent';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { InlineEditable } from '../InlineEditable';
-import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { EditModeActionButtons } from '../EditModeActionButtons';
+import { twMerge } from 'tailwind-merge';
+import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 
 export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNodeType>) {
-
   const isNewNode = props.id && /^\d+$/.test(props.id);
   const [isEditMode, setIsEditMode] = useState(Boolean(isNewNode));
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [currentFormData, setCurrentFormData] = useState<{ name: string; description?: string; connections: SuperplaneConnection[]; groupByFields: GroupByField[]; timeout?: number; timeoutBehavior?: SpecTimeoutBehavior; isValid: boolean } | null>(null);
-  const [connectionGroupName, setConnectionGroupName] = useState(props.data.name);
+  const [connectionGroupName, setConnectionGroupName] = useState(props.data.name || '');
   const [connectionGroupDescription, setConnectionGroupDescription] = useState(props.data.description || '');
+  const [nameError, setNameError] = useState<string | null>(null);
   const { updateConnectionGroup, setEditingConnectionGroup, removeConnectionGroup } = useCanvasStore();
+  const allConnectionGroups = useCanvasStore(state => state.connectionGroups);
 
   const currentConnectionGroup = useCanvasStore(state =>
     state.connectionGroups.find(cg => cg.metadata?.id === props.id)
   );
 
+  const validateConnectionGroupName = (name: string) => {
+    if (!name || name.trim() === '') {
+      setNameError('Connection group name is required');
+      return false;
+    }
+
+    const isDuplicate = allConnectionGroups.some(cg =>
+      cg.metadata?.name?.toLowerCase() === name.toLowerCase() &&
+      cg.metadata?.id !== props.id
+    );
+
+    if (isDuplicate) {
+      setNameError('A connection group with this name already exists');
+      return false;
+    }
+
+    setNameError(null);
+    return true;
+  };
 
   const canvasId = useCanvasStore(state => state.canvasId) || '';
   const createConnectionGroupMutation = useCreateConnectionGroup(canvasId);
   const updateConnectionGroupMutation = useUpdateConnectionGroup(canvasId);
   const focusedNodeId = useCanvasStore(state => state.focusedNodeId);
-
-
   const groupByFields = props.data.groupBy?.fields || [];
-
 
   const handleEditClick = () => {
     setIsEditMode(true);
@@ -43,8 +61,12 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     setConnectionGroupDescription(props.data.description || '');
   };
 
-  const handleSaveConnectionGroup = async (saveAsDraft = false) => {
+  const handleSaveConnectionGroup = async () => {
     if (!currentFormData || !currentConnectionGroup) {
+      return;
+    }
+
+    if (!validateConnectionGroupName(connectionGroupName)) {
       return;
     }
 
@@ -52,7 +74,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     const isNewConnectionGroup = !currentConnectionGroup.metadata?.id || isTemporaryId;
 
     try {
-      if (isNewConnectionGroup && !saveAsDraft) {
+      if (isNewConnectionGroup) {
 
         const result = await createConnectionGroupMutation.mutateAsync({
           name: connectionGroupName,
@@ -67,7 +89,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
         if (newConnectionGroup) {
           removeConnectionGroup(props.id);
         }
-      } else if (!isNewConnectionGroup && !saveAsDraft) {
+      } else if (!isNewConnectionGroup) {
 
         if (!currentConnectionGroup.metadata?.id) {
           throw new Error('Connection Group ID is required for update');
@@ -103,29 +125,6 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
         props.data.name = connectionGroupName;
         props.data.description = connectionGroupDescription;
-      } else if (saveAsDraft) {
-
-        const draftConnectionGroup = {
-          ...currentConnectionGroup,
-          metadata: {
-            ...currentConnectionGroup.metadata,
-            name: connectionGroupName,
-            description: connectionGroupDescription
-          },
-          spec: {
-            ...currentConnectionGroup.spec!,
-            connections: currentFormData.connections,
-            groupBy: {
-              fields: currentFormData.groupByFields
-            },
-            timeout: currentFormData.timeout,
-            timeoutBehavior: currentFormData.timeoutBehavior
-          }
-        };
-        updateConnectionGroup(draftConnectionGroup);
-
-        props.data.name = connectionGroupName;
-        props.data.description = connectionGroupDescription;
       }
       setIsEditMode(false);
       setEditingConnectionGroup(null);
@@ -153,6 +152,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
 
   const handleConnectionGroupNameChange = (newName: string) => {
     setConnectionGroupName(newName);
+    validateConnectionGroupName(newName);
     if (currentFormData) {
       setCurrentFormData({
         ...currentFormData,
@@ -204,6 +204,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons
+          isNewNode={!!isNewNode}
           onSave={handleSaveConnectionGroup}
           onCancel={handleCancelEdit}
           onDiscard={() => setShowDiscardConfirm(true)}
@@ -242,41 +243,44 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       )}
 
       {/* Header Section */}
-      <div className="px-4 py-4 flex justify-between items-start">
+      <div className="mt-1 px-4 py-4 justify-between items-start border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-start flex-1 min-w-0">
-          <span className="material-symbols-outlined mr-2 text-gray-700 dark:text-gray-300 mt-1">account_tree</span>
-          <div className="flex-1 min-w-0">
+          <div className='max-w-8 mt-1 flex items-center justify-center'>
+            <MaterialSymbol name="account_tree" size="lg" />
+          </div>
+          <div className="flex-1 min-w-0 ml-2">
             <div className="mb-1">
               <InlineEditable
                 value={connectionGroupName}
                 onSave={handleConnectionGroupNameChange}
                 placeholder="Connection group name"
-                className="font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1"
+                className={twMerge(`font-bold text-gray-900 dark:text-gray-100 text-base text-left px-2 py-1`,
+                  nameError && isEditMode ? 'border border-red-500 rounded-lg' : '',
+                  isEditMode ? 'text-sm' : '')}
                 isEditMode={isEditMode}
+                autoFocus={!!isNewNode}
+                dataTestId="event-source-name-input"
               />
+              {nameError && isEditMode && (
+                <div className="text-xs text-red-600 text-left mt-1 px-2">
+                  {nameError}
+                </div>
+              )}
             </div>
             <div>
-              <InlineEditable
+              {isEditMode && <InlineEditable
                 value={connectionGroupDescription}
                 onSave={handleConnectionGroupDescriptionChange}
                 placeholder={isEditMode ? "Add description..." : "No description available"}
                 className="text-gray-600 dark:text-gray-400 text-sm text-left px-2 py-1"
                 isEditMode={isEditMode}
-              />
+              />}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-2">
-          {!isEditMode && (
-            <button
-              onClick={handleEditClick}
-              className="p-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-              title="Edit connection group"
-            >
-              <MaterialSymbol name="edit" size="md" />
-            </button>
-          )}
-        </div>
+        {!isEditMode && (
+          <div className="text-xs text-left text-gray-600 dark:text-gray-400 w-full mt-1">{connectionGroupDescription || 'No description available'}</div>
+        )}
       </div>
 
       {isEditMode ? (
@@ -298,7 +302,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
       ) : (
         <>
           {/* Group By Section */}
-          <div className="px-3 py-3 border-t w-full">
+          <div className="px-3 py-3">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Group By Fields</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -327,7 +331,7 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
           </div>
 
           {/* Connections Section */}
-          <div className="px-3 py-3 border-t w-full">
+          <div className="px-3 py-3 border-t w-full border-gray-200 dark:border-zinc-700">
             <div className="flex items-center w-full justify-between mb-2">
               <div className="text-xs font-medium text-gray-700 dark:text-gray-300 uppercase tracking-wide">Connections</div>
               <div className="text-xs text-gray-600 dark:text-gray-400">
@@ -339,13 +343,15 @@ export default function ConnectionGroupNode(props: NodeProps<ConnectionGroupNode
               {props.data.connections?.length ? (
                 props.data.connections.map((connection, index) => (
                   <div key={index} className="bg-gray-100 dark:bg-gray-700 rounded p-2">
-                    <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
-                      </span>
-                      <span className="truncate font-medium">{connection.name}</span>
+                    <div className="flex justify-between items-center gap-3 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          <i className="material-icons f3 fill-black rounded-full bg-[var(--washed-green)] black-60 p-1">link</i>
+                        </span>
+                        <span className="truncate font-medium">{connection.name}</span>
+                      </div>
                       <span className="text-xs bg-zinc-100 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-400 px-2 py-0.5 rounded">
-                        {connection.type?.replace('TYPE_', '').replace('_', ' ').toLowerCase()}
+                        {connection.type?.toString().replace('TYPE_', '').replace('_', ' ').toLowerCase()}
                       </span>
                     </div>
                   </div>

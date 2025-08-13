@@ -7,33 +7,46 @@ import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSour
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
-import { CanvasNavigation } from "../../components/CanvasNavigation";
-import { SettingsPage } from "../../components/SettingsPage";
+import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
 import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
-
+import { useAutoLayout } from "./hooks/useAutoLayout";
 
 export function Canvas() {
-  const { canvasId } = useParams<{ canvasId: string }>();
+  const { orgId, canvasId } = useParams<{ orgId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
   const { organizationId } = useParams<{ organizationId: string }>();
 
-  // Determine active view from URL hash or default to editor
-  const activeView = location.hash.startsWith('#settings') ? 'settings' : 'editor';
+  const getActiveViewFromHash = (): CanvasView => {
+    const hash = location.hash.substring(1); // Remove the #
+    switch (hash) {
+      case 'secrets':
+        return 'secrets';
+      case 'integrations':
+        return 'integrations';
+      case 'members':
+        return 'members';
+      case 'delete':
+        return 'delete';
+      default:
+        return 'editor';
+    }
+  };
 
-  // Handle view changes by updating URL hash
-  const handleViewChange = (view: 'editor' | 'settings') => {
-    if (view === 'settings') {
-      navigate(`${location.pathname}#settings`);
-    } else {
+  const activeView = getActiveViewFromHash();
+
+  const handleViewChange = (view: CanvasView) => {
+    if (view === 'editor') {
       navigate(location.pathname);
+    } else {
+      navigate(`${location.pathname}#${view}`);
     }
   };
 
@@ -42,6 +55,8 @@ export function Canvas() {
 
   // Use the modular node handlers
   const { handleAddNode } = useNodeHandlers(canvasId || '');
+
+  const { applyElkAutoLayout } = useAutoLayout();
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
 
@@ -188,38 +203,40 @@ export function Canvas() {
     return <div className="error-state">Error: {error}</div>;
   }
 
-  const handleAddNodeByType = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
+  const handleAddNodeByType = async (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
     try {
       const config = getNodeConfig(nodeType, executorType, eventSourceType);
-      handleAddNode(nodeType, config);
+      const nodeId = handleAddNode(nodeType, config);
+
+      if (lockedNodes) {
+        setTimeout(async () => {
+          const { nodes: latestNodes, edges: latestEdges } = useCanvasStore.getState();
+          await applyElkAutoLayout(latestNodes, latestEdges);
+          setTimeout(() => {
+            fitViewNode(nodeId);
+          }, 200);
+        }, 50);
+      } else {
+        setTimeout(() => {
+          fitViewNode(nodeId);
+        }, 100);
+      }
     } catch (error) {
       console.error(`Failed to add node of type ${nodeType}:`, error);
     }
   };
 
   const getNodeConfig = (nodeType: NodeType, executorType?: string, eventSourceType?: string) => {
-    const stageNames = {
-      semaphore: 'Semaphore Stage',
-      github: 'GitHub Stage',
-      http: 'HTTP Stage'
-    };
-
-    const eventNames = {
-      webhook: 'Webhook Event Source',
-      semaphore: 'Semaphore Event Source',
-      github: 'GitHub Event Source'
-    };
-
     switch (nodeType) {
       case 'stage':
         return executorType ? {
-          name: stageNames[executorType as keyof typeof stageNames] || 'New Stage',
+          name: '',
           executorType
         } : undefined;
 
       case 'event_source':
         return eventSourceType ? {
-          name: eventNames[eventSourceType as keyof typeof eventNames] || 'New Event Source',
+          name: '',
           eventSourceType
         } : undefined;
 
@@ -232,10 +249,9 @@ export function Canvas() {
   return (
     <StrictMode>
       {/* Canvas Navigation */}
-      <div className="h-[100vh]">
+      <div className="h-[100vh] overflow-hidden">
 
         <CanvasNavigation
-          canvasId={canvasId!}
           canvasName={canvasName}
           activeView={activeView}
           onViewChange={handleViewChange}
@@ -269,8 +285,8 @@ export function Canvas() {
             {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
           </div>
         ) : (
-          <div className="h-[calc(100%-2.7rem)]" >
-            <SettingsPage organizationId={organizationId!} />
+          <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >
+            <CanvasNavigationContent canvasId={canvasId!} activeView={activeView} organizationId={orgId!} />
           </div>
         )}
       </div>

@@ -116,7 +116,7 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
         {secretsSection === 'new' && (
@@ -175,7 +175,8 @@ export function CanvasSecrets({ canvasId }: CanvasSecretsProps) {
                       }`}
                   >
                     <div>
-                      <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      <div className="text-sm font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                        <MaterialSymbol name="key" size="sm" />
                         {secret.metadata?.name || 'Unnamed Secret'}
                       </div>
                       <div className="text-xs text-zinc-500 dark:text-zinc-400">

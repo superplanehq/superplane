@@ -7,6 +7,8 @@ interface InlineEditableProps {
   className?: string;
   multiline?: boolean;
   isEditMode?: boolean;
+  autoFocus?: boolean;
+  dataTestId?: string;
 }
 
 export function InlineEditable({
@@ -15,7 +17,9 @@ export function InlineEditable({
   placeholder = 'Click to edit...',
   className = '',
   multiline = false,
-  isEditMode = false
+  isEditMode = false,
+  autoFocus = false,
+  dataTestId
 }: InlineEditableProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -28,10 +32,20 @@ export function InlineEditable({
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
+      // Required to ensure the input is focused after the component is mounted
+      setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 100);
     }
   }, [isEditing]);
+
+  // Auto-focus for new items
+  useEffect(() => {
+    if (autoFocus && isEditMode && !value) {
+      setIsEditing(true);
+    }
+  }, [autoFocus, isEditMode, value]);
 
   const handleClick = () => {
     if (isEditMode) {
@@ -93,6 +107,7 @@ export function InlineEditable({
         onBlur={handleBlur}
         className={`${className} w-full border border-blue-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
         placeholder={placeholder}
+        data-testid={dataTestId}
       />
     );
   }

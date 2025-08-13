@@ -27,17 +27,8 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
           },
           resource: {
             type: 'project',
-            name: 'my-semaphore-project',
+            name: '',
           },
-          spec: {
-            task: '',
-            branch: 'main',
-            pipelineFile: '.semaphore/pipeline.yml',
-            parameters: {
-              VERSION: '${{ inputs.VERSION }}',
-              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
-            }
-          }
         };
       case 'github':
         return {
@@ -49,32 +40,10 @@ export const createEmptyStage = ({ canvasId, name = 'New Stage', executorType }:
             type: 'repository',
             name: 'my-repository',
           },
-          spec: {
-            workflow: '.github/workflows/task.yaml',
-            ref: 'main',
-            inputs: {
-              VERSION: '${{ inputs.VERSION }}',
-              ENVIRONMENT: '${{ inputs.ENVIRONMENT }}'
-            }
-          }
         };
       case 'http':
         return {
           type: 'http',
-          spec: {
-            url: 'https://api.example.com/endpoint',
-            payload: {
-              key1: 'value1',
-              key2: '${{ inputs.KEY2 }}'
-            },
-            headers: {
-              'Authorization': 'Bearer ${{ secrets.API_TOKEN }}',
-              'Content-Type': 'application/json'
-            },
-            responsePolicy: {
-              statusCodes: [200, 201, 202]
-            }
-          }
         };
       default:
         return { type: '', spec: {} };
@@ -153,35 +122,3 @@ export function createEmptyNode(nodeType: NodeType, params: CreateNodeParams): S
       throw new Error(`Unknown node type: ${nodeType}`);
   }
 }
-
-/**
- * Get the display name for a node type
- */
-export const getNodeTypeDisplayName = (nodeType: NodeType): string => {
-  switch (nodeType) {
-    case 'stage':
-      return 'Stage';
-    case 'event_source':
-      return 'Event Source';
-    case 'connection_group':
-      return 'Connection Group';
-    default:
-      return 'Unknown';
-  }
-};
-
-/**
- * Get the default name pattern for a node type
- */
-export const getDefaultNodeName = (nodeType: NodeType): string => {
-  switch (nodeType) {
-    case 'stage':
-      return 'New Stage';
-    case 'event_source':
-      return 'New Event Source';
-    case 'connection_group':
-      return 'New Connection Group';
-    default:
-      return 'New Node';
-  }
-};

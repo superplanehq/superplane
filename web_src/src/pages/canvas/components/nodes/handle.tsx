@@ -21,9 +21,7 @@ import { SuperplaneConnection, SuperplaneCondition, SuperplaneConditionTimeWindo
 const BAR_WIDTH = 48;
 const BAR_HEIGHT = 6;
 
-
-
-export default function CustomBarHandle({ type, conditions, connections }: HandleProps) {
+export default function CustomBarHandle({ type, conditions, connections, internalPadding }: HandleProps) {
 
   // Positioning for left/right bars
   const isLeft = type === 'target';
@@ -42,6 +40,8 @@ export default function CustomBarHandle({ type, conditions, connections }: Handl
     transform: 'translateY(-50%)',
     zIndex: 2,
     boxShadow: '0 1px 6px 0 rgba(19,198,179,0.15)',
+    marginLeft: isLeft && internalPadding ? BAR_HEIGHT / 2 : undefined,
+    marginRight: isRight && internalPadding ? BAR_HEIGHT / 2 : undefined,
   };
 
   switch (type) {

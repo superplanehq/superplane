@@ -43,7 +43,7 @@ export function InlineEditor({
   }
 
   return (
-    <div className={`flex items-center justify-between p-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded ${className}`}>
+    <div className={`flex items-center justify-between py-3 px-2 bg-zinc-50 dark:bg-zinc-800 rounded ${className}`}>
       <div className="flex items-center gap-2">
         <span className="text-sm font-medium text-gray-900 dark:text-zinc-100">{displayName}</span>
         {badge}

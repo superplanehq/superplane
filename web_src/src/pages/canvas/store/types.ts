@@ -22,13 +22,13 @@ export interface CanvasState {
   
   // Actions
   initialize: (data: CanvasData) => void;
-  addStage: (stage: SuperplaneStage, draft?: boolean) => void;
+  addStage: (stage: SuperplaneStage, draft?: boolean, autoLayout?: boolean) => void;
   removeStage: (stageId: string) => void;
   addConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   removeConnectionGroup: (connectionGroupId: string) => void;
   updateConnectionGroup: (connectionGroup: SuperplaneConnectionGroup) => void;
   updateStage: (stage: SuperplaneStage) => void;
-  addEventSource: (eventSource: EventSourceWithEvents) => void;
+  addEventSource: (eventSource: EventSourceWithEvents, autoLayout?: boolean) => void;
   removeEventSource: (eventSourceId: string) => void;
   updateEventSource: (eventSource: EventSourceWithEvents) => void;
   updateCanvas: (canvas: SuperplaneCanvas) => void;
@@ -57,9 +57,12 @@ export interface CanvasState {
       color: string;
     }
   | undefined;
+  lockedNodes: boolean;
   // flow actions
   syncToReactFlow: (options?: { autoLayout?: boolean }) => void;
   fitViewNode: (nodeId: string) => void;
+  fitViewNodeRef: ((nodeId: string) => void) | null;
+  setFitViewNodeRef: (fitViewNodeFn: (nodeId: string) => void) => void;
   onNodesChange: OnNodesChange<AllNodeType>;
   onEdgesChange: OnEdgesChange<EdgeType>;
   onConnect: (connection: Connection) => void;
@@ -79,6 +82,7 @@ export interface CanvasState {
 
   updateEventSourceKey: (eventSourceId: string, key: string) => void;
   resetEventSourceKey: (eventSourceId: string) => void;
+  setLockedNodes: (locked: boolean) => void;
 }
 
 export type StageWithEventQueue = SuperplaneStage & {queue: Array<SuperplaneStageEvent>; isDraft?: boolean}

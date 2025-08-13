@@ -72,6 +72,7 @@ export type HandleProps = {
   type: HandleType;
   conditions?: SuperplaneCondition[];
   connections?: SuperplaneConnection[];
+  internalPadding?: boolean;
 }
 
 export {

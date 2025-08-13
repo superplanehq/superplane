@@ -10,10 +10,9 @@ export const ExecutionTimeline = ({
 }: ExecutionTimelineProps) => {
   if (executions.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
+      <div className="bg-gray-50 rounded-lg">
         <div className="p-4">
           <div className="text-center py-6 text-gray-500">
-            <div className="text-4xl mb-2">📊</div>
             <div className="text-sm">No recent activity</div>
           </div>
         </div>
