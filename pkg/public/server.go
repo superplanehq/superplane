@@ -257,10 +257,10 @@ func (s *Server) RegisterOpenAPIHandler() {
 func (s *Server) RegisterWebRoutes(webBasePath string) {
 	log.Infof("Registering web routes with base path: %s", webBasePath)
 
-	// WebSocket endpoint - protected by authentication
+	// WebSocket endpoint - protected by organization scoped authentication
 	s.Router.Handle(
 		"/ws/{canvasId}",
-		middleware.AccountAuthMiddleware(s.jwt).
+		middleware.OrganizationAuthMiddleware(s.jwt).
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
@@ -841,7 +841,7 @@ func parseHeaders(headers *http.Header) ([]byte, error) {
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	log.Infof("New WebSocket connection from %s", r.RemoteAddr)
 
-	_, ok := middleware.GetUserFromContext(r.Context())
+	user, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
@@ -849,8 +849,22 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	vars := mux.Vars(r)
 	canvasID := vars["canvasId"]
+	_, err := models.FindCanvasByID(canvasID, user.OrganizationID)
+	if err != nil {
+		http.Error(w, "canvas not found", http.StatusNotFound)
+		return
+	}
 
-	// TODO: implement access check once authorization is implemented
+	ok, err = s.authService.CheckCanvasPermission(user.ID.String(), canvasID, "canvas", "read")
+	if err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
 	ws, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {

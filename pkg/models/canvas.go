@@ -174,7 +174,6 @@ func ListCanvasesByIDs(ids []string, organizationID string) ([]Canvas, error) {
 	return canvases, nil
 }
 
-// TODO: review the usage of this function, and remove if possible
 func FindUnscopedCanvasByID(id string) (*Canvas, error) {
 	canvas := Canvas{}
 

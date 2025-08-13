@@ -10,7 +10,32 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
+type contextKey string
+
+const AccountContextKey contextKey = "account"
 const UserContextKey contextKey = "user"
+
+func AccountAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			accountID, err := getAccountFromCookie(r, jwtSigner)
+			if err != nil {
+				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+				return
+			}
+
+			account, err := models.FindAccountByID(accountID)
+			if err != nil {
+				http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), AccountContextKey, account)
+			r = r.WithContext(ctx)
+			next.ServeHTTP(w, r)
+		})
+	}
+}
 
 func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
@@ -44,6 +69,11 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func GetAccountFromContext(ctx context.Context) (*models.Account, bool) {
+	account, ok := ctx.Value(AccountContextKey).(*models.Account)
+	return account, ok
 }
 
 func getAccountFromCookie(r *http.Request, jwtSigner *jwt.Signer) (string, error) {

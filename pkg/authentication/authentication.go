@@ -24,39 +24,10 @@ type Handler struct {
 	isDev     bool
 }
 
-type User struct {
-	ID               string                   `json:"id"`
-	OrganizationID   string                   `json:"organization_id"`
-	Email            string                   `json:"email"`
-	Name             string                   `json:"name"`
-	AvatarURL        string                   `json:"avatar_url"`
-	AccessToken      string                   `json:"access_token"`
-	CreatedAt        time.Time                `json:"created_at"`
-	AccountProviders []models.AccountProvider `json:"account_providers,omitempty"`
-}
-
 type ProviderConfig struct {
 	Key         string
 	Secret      string
 	CallbackURL string
-}
-
-type TokenExchangeRequest struct {
-	GitHubToken      string `json:"github_token"`
-	OrganizationName string `json:"organization_name"`
-}
-
-type TokenExchangeResponse struct {
-	AccessToken string `json:"access_token"`
-	User        User   `json:"user"`
-}
-
-type GitHubUserInfo struct {
-	ID        int    `json:"id"`
-	Login     string `json:"login"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	AvatarURL string `json:"avatar_url"`
 }
 
 func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, appEnv string) *Handler {
@@ -100,9 +71,6 @@ func (a *Handler) RegisterRoutes(router *mux.Router) {
 	// If we are running the application locally,
 	// we provide handlers that auto-autenticate to
 	// avoid having to authenticate with GitHub every time.
-	//
-	// TODO: there's probably a better to do this other than
-	// changing the handler based on a configuration.
 	//
 	if a.isDev {
 		log.Info("Registering development authentication routes")

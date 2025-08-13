@@ -33,7 +33,6 @@ func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
 	return user, nil
 }
 
-// TODO: check this function usage and remove if possible
 func FindUnscopedUserByID(id string) (*User, error) {
 	var user User
 	userUUID, err := uuid.Parse(id)

@@ -169,7 +169,12 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 func (a *AuthorizationInterceptor) getDomainTypeAndId(req interface{}, domainTypes []string, organizationID string) (string, string, error) {
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeOrganization {
-		return getOrganizationId(organizationID)
+		org, err := models.FindOrganizationByID(organizationID)
+		if err != nil {
+			return "", "", fmt.Errorf("organization %s not found", organizationID)
+		}
+
+		return models.DomainTypeOrganization, org.ID.String(), nil
 	}
 
 	if len(domainTypes) == 1 && domainTypes[0] == models.DomainTypeCanvas {
@@ -238,15 +243,6 @@ func getDomainTypeAndId(domainID string, domainType pbAuth.DomainType, organizat
 	default:
 		return "", "", fmt.Errorf("unknown domain type: %v", domainType)
 	}
-}
-
-func getOrganizationId(id string) (string, string, error) {
-	org, err := models.FindOrganizationByID(id)
-	if err != nil {
-		return "", "", fmt.Errorf("organization %s not found", id)
-	}
-
-	return models.DomainTypeOrganization, org.ID.String(), nil
 }
 
 func getCanvasIdFromRequest(req interface{}, organizationID string) (string, string, error) {
