@@ -179,14 +179,6 @@ export type OrganizationsCreateInvitationResponse = {
     invitation?: OrganizationsInvitation;
 };
 
-export type OrganizationsCreateOrganizationRequest = {
-    organization?: OrganizationsOrganization;
-};
-
-export type OrganizationsCreateOrganizationResponse = {
-    organization?: OrganizationsOrganization;
-};
-
 export type OrganizationsDeleteOrganizationResponse = {
     [key: string]: unknown;
 };
@@ -205,10 +197,6 @@ export type OrganizationsInvitation = {
 
 export type OrganizationsListInvitationsResponse = {
     invitations?: Array<OrganizationsInvitation>;
-};
-
-export type OrganizationsListOrganizationsResponse = {
-    organizations?: Array<OrganizationsOrganization>;
 };
 
 export type OrganizationsOrganization = {
@@ -1658,56 +1646,6 @@ export type IntegrationsDescribeIntegrationResponses = {
 };
 
 export type IntegrationsDescribeIntegrationResponse2 = IntegrationsDescribeIntegrationResponses[keyof IntegrationsDescribeIntegrationResponses];
-
-export type OrganizationsListOrganizationsData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/v1/organizations';
-};
-
-export type OrganizationsListOrganizationsErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type OrganizationsListOrganizationsError = OrganizationsListOrganizationsErrors[keyof OrganizationsListOrganizationsErrors];
-
-export type OrganizationsListOrganizationsResponses = {
-    /**
-     * A successful response.
-     */
-    200: OrganizationsListOrganizationsResponse;
-};
-
-export type OrganizationsListOrganizationsResponse2 = OrganizationsListOrganizationsResponses[keyof OrganizationsListOrganizationsResponses];
-
-export type OrganizationsCreateOrganizationData = {
-    body: OrganizationsCreateOrganizationRequest;
-    path?: never;
-    query?: never;
-    url: '/api/v1/organizations';
-};
-
-export type OrganizationsCreateOrganizationErrors = {
-    /**
-     * An unexpected error response.
-     */
-    default: GooglerpcStatus;
-};
-
-export type OrganizationsCreateOrganizationError = OrganizationsCreateOrganizationErrors[keyof OrganizationsCreateOrganizationErrors];
-
-export type OrganizationsCreateOrganizationResponses = {
-    /**
-     * A successful response.
-     */
-    200: OrganizationsCreateOrganizationResponse;
-};
-
-export type OrganizationsCreateOrganizationResponse2 = OrganizationsCreateOrganizationResponses[keyof OrganizationsCreateOrganizationResponses];
 
 export type OrganizationsDeleteOrganizationData = {
     body?: never;

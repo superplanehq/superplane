@@ -19,8 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Organizations_ListOrganizations_FullMethodName    = "/Superplane.Organizations.Organizations/ListOrganizations"
-	Organizations_CreateOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/CreateOrganization"
 	Organizations_DescribeOrganization_FullMethodName = "/Superplane.Organizations.Organizations/DescribeOrganization"
 	Organizations_UpdateOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/UpdateOrganization"
 	Organizations_DeleteOrganization_FullMethodName   = "/Superplane.Organizations.Organizations/DeleteOrganization"
@@ -32,8 +30,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type OrganizationsClient interface {
-	ListOrganizations(ctx context.Context, in *ListOrganizationsRequest, opts ...grpc.CallOption) (*ListOrganizationsResponse, error)
-	CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*CreateOrganizationResponse, error)
 	DescribeOrganization(ctx context.Context, in *DescribeOrganizationRequest, opts ...grpc.CallOption) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(ctx context.Context, in *UpdateOrganizationRequest, opts ...grpc.CallOption) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(ctx context.Context, in *DeleteOrganizationRequest, opts ...grpc.CallOption) (*DeleteOrganizationResponse, error)
@@ -47,26 +43,6 @@ type organizationsClient struct {
 
 func NewOrganizationsClient(cc grpc.ClientConnInterface) OrganizationsClient {
 	return &organizationsClient{cc}
-}
-
-func (c *organizationsClient) ListOrganizations(ctx context.Context, in *ListOrganizationsRequest, opts ...grpc.CallOption) (*ListOrganizationsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListOrganizationsResponse)
-	err := c.cc.Invoke(ctx, Organizations_ListOrganizations_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *organizationsClient) CreateOrganization(ctx context.Context, in *CreateOrganizationRequest, opts ...grpc.CallOption) (*CreateOrganizationResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(CreateOrganizationResponse)
-	err := c.cc.Invoke(ctx, Organizations_CreateOrganization_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *organizationsClient) DescribeOrganization(ctx context.Context, in *DescribeOrganizationRequest, opts ...grpc.CallOption) (*DescribeOrganizationResponse, error) {
@@ -123,8 +99,6 @@ func (c *organizationsClient) ListInvitations(ctx context.Context, in *ListInvit
 // All implementations should embed UnimplementedOrganizationsServer
 // for forward compatibility.
 type OrganizationsServer interface {
-	ListOrganizations(context.Context, *ListOrganizationsRequest) (*ListOrganizationsResponse, error)
-	CreateOrganization(context.Context, *CreateOrganizationRequest) (*CreateOrganizationResponse, error)
 	DescribeOrganization(context.Context, *DescribeOrganizationRequest) (*DescribeOrganizationResponse, error)
 	UpdateOrganization(context.Context, *UpdateOrganizationRequest) (*UpdateOrganizationResponse, error)
 	DeleteOrganization(context.Context, *DeleteOrganizationRequest) (*DeleteOrganizationResponse, error)
@@ -139,12 +113,6 @@ type OrganizationsServer interface {
 // pointer dereference when methods are called.
 type UnimplementedOrganizationsServer struct{}
 
-func (UnimplementedOrganizationsServer) ListOrganizations(context.Context, *ListOrganizationsRequest) (*ListOrganizationsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListOrganizations not implemented")
-}
-func (UnimplementedOrganizationsServer) CreateOrganization(context.Context, *CreateOrganizationRequest) (*CreateOrganizationResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateOrganization not implemented")
-}
 func (UnimplementedOrganizationsServer) DescribeOrganization(context.Context, *DescribeOrganizationRequest) (*DescribeOrganizationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DescribeOrganization not implemented")
 }
@@ -178,42 +146,6 @@ func RegisterOrganizationsServer(s grpc.ServiceRegistrar, srv OrganizationsServe
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Organizations_ServiceDesc, srv)
-}
-
-func _Organizations_ListOrganizations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListOrganizationsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).ListOrganizations(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_ListOrganizations_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).ListOrganizations(ctx, req.(*ListOrganizationsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Organizations_CreateOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateOrganizationRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(OrganizationsServer).CreateOrganization(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Organizations_CreateOrganization_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(OrganizationsServer).CreateOrganization(ctx, req.(*CreateOrganizationRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Organizations_DescribeOrganization_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -313,14 +245,6 @@ var Organizations_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Superplane.Organizations.Organizations",
 	HandlerType: (*OrganizationsServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "ListOrganizations",
-			Handler:    _Organizations_ListOrganizations_Handler,
-		},
-		{
-			MethodName: "CreateOrganization",
-			Handler:    _Organizations_CreateOrganization_Handler,
-		},
 		{
 			MethodName: "DescribeOrganization",
 			Handler:    _Organizations_DescribeOrganization_Handler,

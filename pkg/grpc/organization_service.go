@@ -18,16 +18,8 @@ func NewOrganizationService(authorizationService authorization.Authorization) *O
 	}
 }
 
-func (s *OrganizationService) CreateOrganization(ctx context.Context, req *pb.CreateOrganizationRequest) (*pb.CreateOrganizationResponse, error) {
-	return organizations.CreateOrganization(ctx, req, s.authorizationService)
-}
-
 func (s *OrganizationService) DescribeOrganization(ctx context.Context, req *pb.DescribeOrganizationRequest) (*pb.DescribeOrganizationResponse, error) {
 	return organizations.DescribeOrganization(ctx, req)
-}
-
-func (s *OrganizationService) ListOrganizations(ctx context.Context, req *pb.ListOrganizationsRequest) (*pb.ListOrganizationsResponse, error) {
-	return organizations.ListOrganizations(ctx, req, s.authorizationService)
 }
 
 func (s *OrganizationService) UpdateOrganization(ctx context.Context, req *pb.UpdateOrganizationRequest) (*pb.UpdateOrganizationResponse, error) {

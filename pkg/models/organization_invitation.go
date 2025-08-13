@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"gorm.io/gorm"
 )
 
 const (
@@ -49,9 +50,16 @@ func ListPendingInvitations(organizationID string) ([]OrganizationInvitation, er
 	return invitations, err
 }
 
-func (i *OrganizationInvitation) Accept() error {
-	i.Status = InvitationStatusAccepted
-	return database.Conn().Save(i).Error
+func (i *OrganizationInvitation) Accept(account *Account) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		_, err := CreateUser(i.OrganizationID, account.ID, account.Email, account.Name)
+		if err != nil {
+			return err
+		}
+
+		i.Status = InvitationStatusAccepted
+		return database.Conn().Save(i).Error
+	})
 }
 
 func CreateInvitation(organizationID, invitedBy uuid.UUID, email string) (*OrganizationInvitation, error) {

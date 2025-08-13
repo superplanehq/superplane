@@ -381,17 +381,9 @@ func Test__AuthService_GroupManagement(t *testing.T) {
 
 func Test__AuthService_AccessibleResources(t *testing.T) {
 	r := support.Setup(t)
-	org1 := r.Organization
 	canvas1 := r.Canvas
 	org2 := support.CreateOrganization(t, r, r.User)
 	canvas2 := support.CreateCanvas(t, r, org2.ID, r.User)
-
-	t.Run("get accessible organizations", func(t *testing.T) {
-		orgs, err := r.AuthService.GetAccessibleOrgsForUser(r.User.String())
-		require.NoError(t, err)
-		assert.Contains(t, orgs, org1.ID.String())
-		assert.Contains(t, orgs, org2.ID.String())
-	})
 
 	t.Run("get accessible canvases", func(t *testing.T) {
 		canvases, err := r.AuthService.GetAccessibleCanvasesForUser(r.User.String())

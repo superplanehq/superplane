@@ -530,23 +530,6 @@ func (a *AuthService) DestroyOrganizationRoles(orgID string) error {
 	return nil
 }
 
-func (a *AuthService) GetAccessibleOrgsForUser(userID string) ([]string, error) {
-	prefixedUserID := prefixUserID(userID)
-	orgs, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	orgIDs := []string{}
-	prefixLen := len("org:")
-	for _, org := range orgs {
-		if strings.HasPrefix(org[2], "org:") {
-			orgIDs = append(orgIDs, org[2][prefixLen:])
-		}
-	}
-	return orgIDs, nil
-}
-
 func (a *AuthService) GetAccessibleCanvasesForUser(userID string) ([]string, error) {
 	prefixedUserID := prefixUserID(userID)
 	canvases, err := a.enforcer.GetFilteredGroupingPolicy(0, prefixedUserID)

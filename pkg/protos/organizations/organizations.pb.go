@@ -1068,12 +1068,8 @@ const file_organizations_proto_rawDesc = "" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\"x\n" +
 	"\x13OrganizationDeleted\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\tR\x0eorganizationId\x128\n" +
-	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xc2\x0f\n" +
-	"\rOrganizations\x12\xfd\x01\n" +
-	"\x11ListOrganizations\x122.Superplane.Organizations.ListOrganizationsRequest\x1a3.Superplane.Organizations.ListOrganizationsResponse\"\x7f\x92A_\n" +
-	"\fOrganization\x12\x12List organizations\x1a;Returns a list of all organizations ordered by display name\x82\xd3\xe4\x93\x02\x17\x12\x15/api/v1/organizations\x12\x8f\x02\n" +
-	"\x12CreateOrganization\x123.Superplane.Organizations.CreateOrganizationRequest\x1a4.Superplane.Organizations.CreateOrganizationResponse\"\x8d\x01\x92Aj\n" +
-	"\fOrganization\x12\x19Create a new organization\x1a?Creates a new organization with the given name and display name\x82\xd3\xe4\x93\x02\x1a:\x01*\"\x15/api/v1/organizations\x12\xaf\x02\n" +
+	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp2\xb0\v\n" +
+	"\rOrganizations\x12\xaf\x02\n" +
 	"\x14DescribeOrganization\x125.Superplane.Organizations.DescribeOrganizationRequest\x1a6.Superplane.Organizations.DescribeOrganizationResponse\"\xa7\x01\x92Az\n" +
 	"\fOrganization\x12\x18Get organization details\x1aPReturns the details of a specific organization (can be referenced by ID or name)\x82\xd3\xe4\x93\x02$\x12\"/api/v1/organizations/{id_or_name}\x12\x9e\x02\n" +
 	"\x12UpdateOrganization\x123.Superplane.Organizations.UpdateOrganizationRequest\x1a4.Superplane.Organizations.UpdateOrganizationResponse\"\x9c\x01\x92Al\n" +
@@ -1139,22 +1135,18 @@ var file_organizations_proto_depIdxs = []int32{
 	20, // 12: Superplane.Organizations.OrganizationDeleted.timestamp:type_name -> google.protobuf.Timestamp
 	20, // 13: Superplane.Organizations.Organization.Metadata.created_at:type_name -> google.protobuf.Timestamp
 	20, // 14: Superplane.Organizations.Organization.Metadata.updated_at:type_name -> google.protobuf.Timestamp
-	1,  // 15: Superplane.Organizations.Organizations.ListOrganizations:input_type -> Superplane.Organizations.ListOrganizationsRequest
-	3,  // 16: Superplane.Organizations.Organizations.CreateOrganization:input_type -> Superplane.Organizations.CreateOrganizationRequest
-	5,  // 17: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
-	7,  // 18: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
-	9,  // 19: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
-	12, // 20: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
-	14, // 21: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
-	2,  // 22: Superplane.Organizations.Organizations.ListOrganizations:output_type -> Superplane.Organizations.ListOrganizationsResponse
-	4,  // 23: Superplane.Organizations.Organizations.CreateOrganization:output_type -> Superplane.Organizations.CreateOrganizationResponse
-	6,  // 24: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
-	8,  // 25: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
-	10, // 26: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
-	13, // 27: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
-	15, // 28: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
-	22, // [22:29] is the sub-list for method output_type
-	15, // [15:22] is the sub-list for method input_type
+	5,  // 15: Superplane.Organizations.Organizations.DescribeOrganization:input_type -> Superplane.Organizations.DescribeOrganizationRequest
+	7,  // 16: Superplane.Organizations.Organizations.UpdateOrganization:input_type -> Superplane.Organizations.UpdateOrganizationRequest
+	9,  // 17: Superplane.Organizations.Organizations.DeleteOrganization:input_type -> Superplane.Organizations.DeleteOrganizationRequest
+	12, // 18: Superplane.Organizations.Organizations.CreateInvitation:input_type -> Superplane.Organizations.CreateInvitationRequest
+	14, // 19: Superplane.Organizations.Organizations.ListInvitations:input_type -> Superplane.Organizations.ListInvitationsRequest
+	6,  // 20: Superplane.Organizations.Organizations.DescribeOrganization:output_type -> Superplane.Organizations.DescribeOrganizationResponse
+	8,  // 21: Superplane.Organizations.Organizations.UpdateOrganization:output_type -> Superplane.Organizations.UpdateOrganizationResponse
+	10, // 22: Superplane.Organizations.Organizations.DeleteOrganization:output_type -> Superplane.Organizations.DeleteOrganizationResponse
+	13, // 23: Superplane.Organizations.Organizations.CreateInvitation:output_type -> Superplane.Organizations.CreateInvitationResponse
+	15, // 24: Superplane.Organizations.Organizations.ListInvitations:output_type -> Superplane.Organizations.ListInvitationsResponse
+	20, // [20:25] is the sub-list for method output_type
+	15, // [15:20] is the sub-list for method input_type
 	15, // [15:15] is the sub-list for extension type_name
 	15, // [15:15] is the sub-list for extension extendee
 	0,  // [0:15] is the sub-list for field type_name

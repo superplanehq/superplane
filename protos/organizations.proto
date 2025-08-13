@@ -25,29 +25,6 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
 };
 
 service Organizations {
-  rpc ListOrganizations(ListOrganizationsRequest) returns (ListOrganizationsResponse) {
-    option (google.api.http) = {
-      get: "/api/v1/organizations"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "List organizations";
-      description: "Returns a list of all organizations ordered by display name";
-      tags: "Organization";
-    };
-  }
-
-  rpc CreateOrganization(CreateOrganizationRequest) returns (CreateOrganizationResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/organizations"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create a new organization";
-      description: "Creates a new organization with the given name and display name";
-      tags: "Organization";
-    };
-  }
-
   rpc DescribeOrganization(DescribeOrganizationRequest) returns (DescribeOrganizationResponse) {
     option (google.api.http) = {
       get: "/api/v1/organizations/{id_or_name}"

@@ -1276,62 +1276,6 @@
         ]
       }
     },
-    "/api/v1/organizations": {
-      "get": {
-        "summary": "List organizations",
-        "description": "Returns a list of all organizations ordered by display name",
-        "operationId": "Organizations_ListOrganizations",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsListOrganizationsResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "tags": [
-          "Organization"
-        ]
-      },
-      "post": {
-        "summary": "Create a new organization",
-        "description": "Creates a new organization with the given name and display name",
-        "operationId": "Organizations_CreateOrganization",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/OrganizationsCreateOrganizationResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/googlerpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/OrganizationsCreateOrganizationRequest"
-            }
-          }
-        ],
-        "tags": [
-          "Organization"
-        ]
-      }
-    },
     "/api/v1/organizations/{idOrName}": {
       "get": {
         "summary": "Get organization details",
@@ -2559,22 +2503,6 @@
         }
       }
     },
-    "OrganizationsCreateOrganizationRequest": {
-      "type": "object",
-      "properties": {
-        "organization": {
-          "$ref": "#/definitions/OrganizationsOrganization"
-        }
-      }
-    },
-    "OrganizationsCreateOrganizationResponse": {
-      "type": "object",
-      "properties": {
-        "organization": {
-          "$ref": "#/definitions/OrganizationsOrganization"
-        }
-      }
-    },
     "OrganizationsDeleteOrganizationResponse": {
       "type": "object"
     },
@@ -2615,18 +2543,6 @@
           "items": {
             "type": "object",
             "$ref": "#/definitions/OrganizationsInvitation"
-          }
-        }
-      }
-    },
-    "OrganizationsListOrganizationsResponse": {
-      "type": "object",
-      "properties": {
-        "organizations": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "$ref": "#/definitions/OrganizationsOrganization"
           }
         }
       }

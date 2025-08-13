@@ -159,25 +159,49 @@ func (a *Handler) handleDevAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Handler) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
-	user, err := gothic.CompleteUserAuth(w, r)
+	gothUser, err := gothic.CompleteUserAuth(w, r)
 	if err != nil {
 		http.Error(w, "Authentication failed", http.StatusUnauthorized)
 		return
 	}
 
-	account, err := findOrCreateAccount(user.Name, user.Email)
+	account, err := findOrCreateAccount(gothUser.Name, gothUser.Email)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	err = updateAccountProviders(a.encryptor, account, user)
+	err = updateAccountProviders(a.encryptor, account, gothUser)
 	if err != nil {
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	a.handleSuccessfulAuth(w, r, user)
+	err = acceptPendingInvitations(account)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	a.handleSuccessfulAuth(w, r, gothUser)
+}
+
+func acceptPendingInvitations(account *models.Account) error {
+	invitations, err := account.FindPendingInvitations()
+	if err != nil {
+		log.Errorf("Error finding pending invitations for account %s: %v", account.Email, err)
+		return err
+	}
+
+	for _, invitation := range invitations {
+		err := invitation.Accept(account)
+		if err != nil {
+			log.Errorf("Error accepting invitation to %s for account %s: %v", invitation.OrganizationID, account.Email, err)
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (a *Handler) handleSuccessfulAuth(w http.ResponseWriter, r *http.Request, gothUser goth.User) {
