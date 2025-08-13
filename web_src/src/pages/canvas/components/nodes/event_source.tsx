@@ -15,6 +15,8 @@ import SemaphoreLogo from '@/assets/semaphore-logo-sign-black.svg';
 import GithubLogo from '@/assets/github-mark.svg';
 import { twMerge } from 'tailwind-merge';
 import { useIntegrations } from '../../hooks/useIntegrations';
+import Tippy from '@tippyjs/react';
+import { formatRelativeTime, formatFullTimestamp } from '../../utils/stageEventUtils';
 
 const EventSourceImageMap = {
   'webhook': <MaterialSymbol className='-mt-1 -mb-1' name="webhook" size="xl" />,
@@ -337,11 +339,18 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
               {props.data.events?.length ? (
                 props.data.events.map((event) => (
                   <div key={event.id} className="bg-gray-50 dark:bg-zinc-800 rounded-xl p-2">
-                    <div className="flex justify-start items-center gap-3 overflow-hidden">
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        <MaterialSymbol name="bolt" size="md" />
-                      </span>
-                      <span className="truncate dark:text-zinc-200">{event.id!}</span>
+                    <div className="flex justify-between items-center gap-3 overflow-hidden">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          <MaterialSymbol name="bolt" size="md" />
+                        </span>
+                        <span className="truncate dark:text-zinc-200 font-medium">{event.id!}</span>
+                      </div>
+                      <Tippy content={formatFullTimestamp(event.createdAt)} placement="top">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                          {formatRelativeTime(event.createdAt)}
+                        </span>
+                      </Tippy>
                     </div>
                   </div>
                 ))
