@@ -6,6 +6,7 @@ import { useWebsocketEvents } from "./hooks/useWebsocketEvents";
 import { superplaneDescribeCanvas, superplaneListStages, superplaneListEventSources, superplaneListStageEvents, SuperplaneStageEvent, superplaneListConnectionGroups } from "@/api-client";
 import { EventSourceWithEvents, StageWithEventQueue } from "./store/types";
 import { Sidebar } from "./components/SideBar";
+import { EventSourceSidebar } from "./components/EventSourceSidebar";
 import { ComponentSidebar } from "./components/ComponentSidebar";
 import { CanvasNavigation, CanvasNavigationContent, type CanvasView } from "../../components/CanvasNavigation";
 import { useNodeHandlers } from "./utils/nodeHandlers";
@@ -17,7 +18,7 @@ export function Canvas() {
   const { organizationId, canvasId } = useParams<{ organizationId: string, canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initialize, selectedStageId, cleanSelectedStageId, editingStageId, stages, approveStageEvent, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
+  const { initialize, selectedStageId, cleanSelectedStageId, selectedEventSourceId, cleanSelectedEventSourceId, editingStageId, stages, eventSources, approveStageEvent, fitViewNode, lockedNodes, setFocusedNodeId, setNodes } = useCanvasStore();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
@@ -58,6 +59,7 @@ export function Canvas() {
   const { applyElkAutoLayout } = useAutoLayout();
 
   const selectedStage = useMemo(() => stages.find(stage => stage.metadata!.id === selectedStageId), [stages, selectedStageId]);
+  const selectedEventSource = useMemo(() => eventSources.find(eventSource => eventSource.metadata!.id === selectedEventSourceId), [eventSources, selectedEventSourceId]);
 
 
   useEffect(() => {
@@ -293,6 +295,7 @@ export function Canvas() {
 
             <FlowRenderer />
             {selectedStage && !editingStageId && <Sidebar approveStageEvent={approveStageEvent} selectedStage={selectedStage} onClose={() => cleanSelectedStageId()} />}
+            {selectedEventSource && <EventSourceSidebar selectedEventSource={selectedEventSource} onClose={() => cleanSelectedEventSourceId()} />}
           </div>
         ) : (
           <div className="h-[calc(100%-2.7rem)] p-6 bg-zinc-50 dark:bg-zinc-950" >

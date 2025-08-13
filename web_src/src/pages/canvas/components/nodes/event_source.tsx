@@ -48,7 +48,7 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
   const [apiError, setApiError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [validationPassed, setValidationPassed] = useState<boolean | null>(null);
-  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey } = useCanvasStore();
+  const { setEditingEventSource, removeEventSource, updateEventSourceKey, resetEventSourceKey, selectEventSourceId } = useCanvasStore();
 
   const { data: canvasIntegrations = [] } = useIntegrations(canvasId!, "DOMAIN_TYPE_CANVAS");
 
@@ -209,10 +209,17 @@ export default function EventSourceNode(props: NodeProps<EventSourceNodeType>) {
     return "webhook";
   }, [canvasIntegrations, props.data.eventSourceType, props.data.integration?.name]);
 
+  const handleNodeClick = () => {
+    if (!isEditMode && currentEventSource?.metadata?.id && !props.id.match(/^\d+$/)) {
+      selectEventSourceId(currentEventSource.metadata.id);
+    }
+  };
+
   return (
     <div
-      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative`}
+      className={`bg-white dark:bg-zinc-800 rounded-lg shadow-lg border-2 ${props.selected ? 'border-blue-400' : 'border-gray-200 dark:border-gray-700'} relative cursor-pointer`}
       style={{ width: '360px', height: isEditMode ? 'auto' : 'auto', boxShadow: 'rgba(128, 128, 128, 0.2) 0px 4px 12px' }}
+      onClick={handleNodeClick}
     >
       {focusedNodeId === props.id && (
         <EditModeActionButtons

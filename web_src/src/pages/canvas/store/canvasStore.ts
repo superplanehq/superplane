@@ -20,6 +20,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodePositions: {},
   eventSourceKeys: {},
   selectedStageId: null,
+  selectedEventSourceId: null,
   focusedNodeId: null,
   editingStageId: null,
   editingEventSourceId: null,
@@ -153,11 +154,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   selectStageId: (stageId: string) => {
-    set({ selectedStageId: stageId });
+    set({ selectedStageId: stageId, selectedEventSourceId: null });
   },
 
   cleanSelectedStageId: () => {
     set({ selectedStageId: null });
+  },
+  selectEventSourceId: (eventSourceId: string) => {
+    set({ selectedEventSourceId: eventSourceId, selectedStageId: null });
+  },
+  cleanSelectedEventSourceId: () => {
+    set({ selectedEventSourceId: null });
   },
 
   setFocusedNodeId: (stageId: string | null) => {

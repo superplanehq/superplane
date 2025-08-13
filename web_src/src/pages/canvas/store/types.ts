@@ -13,6 +13,7 @@ export interface CanvasState {
   connectionGroups: SuperplaneConnectionGroup[];
   nodePositions: Record<string, { x: number, y: number }>;
   selectedStageId: string | null;
+  selectedEventSourceId: string | null;
   focusedNodeId: string | null;
   editingStageId: string | null;
   editingEventSourceId: string | null;
@@ -36,6 +37,8 @@ export interface CanvasState {
   approveStageEvent: (stageEventId: string, stageId: string) => void;
   selectStageId: (stageId: string) => void;
   cleanSelectedStageId: () => void;
+  selectEventSourceId: (eventSourceId: string) => void;
+  cleanSelectedEventSourceId: () => void;
   setFocusedNodeId: (stageId: string | null) => void;
   cleanFocusedNodeId: () => void;
   setEditingStage: (stageId: string | null) => void;
