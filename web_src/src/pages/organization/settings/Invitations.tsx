@@ -16,15 +16,9 @@ import {
   TableCell
 } from '../../../components/Table/table'
 import { organizationsListInvitations, organizationsCreateInvitation } from '../../../api-client/sdk.gen'
+import type { OrganizationsInvitation } from '../../../api-client/types.gen'
 import { withOrganizationHeader } from '../../../utils/withOrganizationHeader'
 
-interface Invitation {
-  id: string
-  organizationId: string
-  email: string
-  status: 'pending' | 'accepted'
-  createdAt: string
-}
 
 interface InvitationsProps {
   organizationId: string
@@ -37,7 +31,7 @@ export function Invitations({ organizationId }: InvitationsProps) {
   const queryClient = useQueryClient()
 
   // Fetch pending invitations
-  const { data: invitations = [], isLoading: loadingInvitations } = useQuery<Invitation[]>({
+  const { data: invitations = [], isLoading: loadingInvitations } = useQuery<OrganizationsInvitation[]>({
     queryKey: ['invitations', organizationId],
     queryFn: async () => {
       const response = await organizationsListInvitations(withOrganizationHeader({
@@ -54,7 +48,6 @@ export function Invitations({ organizationId }: InvitationsProps) {
         path: { idOrName: organizationId },
         body: {
           email: email,
-          organization_id: organizationId,
         }
       }))
       return response.data
@@ -133,8 +126,8 @@ export function Invitations({ organizationId }: InvitationsProps) {
     if (!searchTerm) return invitations
     
     return invitations.filter(invitation =>
-      invitation.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invitation.status.toLowerCase().includes(searchTerm.toLowerCase())
+      invitation.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invitation.status?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   }
 
@@ -228,11 +221,11 @@ export function Invitations({ organizationId }: InvitationsProps) {
                       <Text className="font-medium">{invitation.email}</Text>
                     </TableCell>
                     <TableCell>
-                      {getStatusBadge(invitation.status)}
+                      {getStatusBadge(invitation.status || 'unknown')}
                     </TableCell>
                     <TableCell>
                       <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                        {formatDate(invitation.createdAt)}
+                        {formatDate(invitation.createdAt || '')}
                       </Text>
                     </TableCell>
                   </TableRow>

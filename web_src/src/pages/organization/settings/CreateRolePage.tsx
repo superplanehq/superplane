@@ -7,7 +7,6 @@ import { Checkbox, CheckboxField } from '../../../components/Checkbox/checkbox'
 import { Label, Description } from '../../../components/Fieldset/fieldset'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { useRole, useCreateRole, useUpdateRole } from '../../../hooks/useOrganizationData'
-import { useAccount } from '../../../contexts/AccountContext'
 import { Heading } from '@/components/Heading/heading'
 
 interface Permission {
@@ -75,7 +74,6 @@ const ORGANIZATION_PERMISSIONS: PermissionCategory[] = [
 export function CreateRolePage() {
   const { roleName: roleNameParam } = useParams<{ roleName?: string }>()
   const navigate = useNavigate()
-  const { account: user } = useAccount()
   const { organizationId } = useParams<{ organizationId: string }>()
   const orgId = organizationId
   const isEditMode = !!roleNameParam

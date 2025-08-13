@@ -9,7 +9,7 @@ import { useAccount } from '../contexts/AccountContext';
 import { useParams } from 'react-router-dom';
 
 const Navigation: React.FC = () => {
-  const { account: user } = useAccount();
+  const { account } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
   const { data: organization } = useOrganization(organizationId || '');
   return (
@@ -28,13 +28,13 @@ const Navigation: React.FC = () => {
               className="flex items-center justify-between gap-x-4 rounded-md border bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white"
             >
               {/* Organization Avatar with User Avatar Overlay */}
-              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || user?.name}</Text>
+              <Text className="text-sm font-medium flex-1 text-left">{organization?.metadata?.displayName || organization?.metadata?.name || account?.name}</Text>
 
               {/* User Avatar (smaller, overlapping in bottom-right) */}
               <Avatar
-                src={user?.avatar_url}
-                initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                alt={user?.name || 'User'}
+                src={account?.avatar_url}
+                initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                alt={account?.name || 'User'}
                 className="w-7 h-7"
               />
             </DropdownButton>
@@ -44,14 +44,14 @@ const Navigation: React.FC = () => {
               <DropdownHeader>
                 <div className="flex items-center space-x-3">
                   <Avatar
-                    src={user?.avatar_url}
-                    initials={user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
-                    alt={user?.name || 'User'}
+                    src={account?.avatar_url}
+                    initials={account?.name ? account.name.split(' ').map(n => n[0]).join('').toUpperCase() : '?'}
+                    alt={account?.name || 'User'}
                     className="size-8"
                   />
                   <div className="flex-1 min-w-0">
-                    <Text className="font-medium truncate">{user?.name || 'Loading...'}</Text>
-                    <Text className="text-sm text-zinc-500 truncate">{user?.email || 'Loading...'}</Text>
+                    <Text className="font-medium truncate">{account?.name || 'Loading...'}</Text>
+                    <Text className="text-sm text-zinc-500 truncate">{account?.email || 'Loading...'}</Text>
                   </div>
                 </div>
               </DropdownHeader>

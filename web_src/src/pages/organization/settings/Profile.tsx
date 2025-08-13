@@ -2,7 +2,6 @@ import { useAccount } from '../../../contexts/AccountContext';
 import { Avatar } from '../../../components/Avatar/avatar';
 import { Text } from '../../../components/Text/text';
 import { Heading } from '../../../components/Heading/heading';
-import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symbol';
 
 export function Profile() {
   const { account: user, loading } = useAccount();

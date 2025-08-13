@@ -11,13 +11,10 @@ import { CanvasNavigation } from "../../components/CanvasNavigation";
 import { SettingsPage } from "../../components/SettingsPage";
 import { useNodeHandlers } from "./utils/nodeHandlers";
 import { NodeType } from "./utils/nodeFactories";
-import { useAccount } from "../../contexts/AccountContext";
 import { withOrganizationHeader } from "../../utils/withOrganizationHeader";
 
-// No props needed as we'll get the ID from the URL params
 
 export function Canvas() {
-  // Get the canvas ID from the URL params
   const { canvasId } = useParams<{ canvasId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -26,7 +23,6 @@ export function Canvas() {
   const [error, setError] = useState<string | null>(null);
   const [isComponentSidebarOpen, setIsComponentSidebarOpen] = useState(true);
   const [canvasName, setCanvasName] = useState<string>('');
-  const { account: user } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
 
   // Determine active view from URL hash or default to editor

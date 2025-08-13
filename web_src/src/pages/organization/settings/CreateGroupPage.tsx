@@ -14,12 +14,10 @@ import { MaterialSymbol } from '../../../components/MaterialSymbol/material-symb
 import { Text } from '../../../components/Text/text'
 import { Breadcrumbs } from '../../../components/Breadcrumbs/breadcrumbs'
 import { useCreateGroup, useOrganizationRoles } from '../../../hooks/useOrganizationData'
-import { useAccount } from '../../../contexts/AccountContext'
 import { Heading } from '@/components/Heading/heading'
 
 export function CreateGroupPage() {
   const navigate = useNavigate()
-  const { account: user } = useAccount()
   const { organizationId } = useParams<{ organizationId: string }>()
   const orgId = organizationId
 

@@ -121,7 +121,7 @@ const OrganizationSelect: React.FC = () => {
         <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
           <Button
             onClick={() => navigate('/create')}
-            variant="outline"
+            outline
             className="w-full"
           >
             Create New Organization

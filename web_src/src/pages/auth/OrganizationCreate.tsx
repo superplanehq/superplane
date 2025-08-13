@@ -103,7 +103,7 @@ const OrganizationCreate: React.FC = () => {
           <div className="flex space-x-4">
             <Button
               type="button"
-              variant="outline"
+              outline
               onClick={() => navigate('/')}
               className="flex-1"
               disabled={loading}

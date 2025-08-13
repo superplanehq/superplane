@@ -337,9 +337,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	// Account-based endpoints (use account session, not organization context)
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
-	accountRoute.HandleFunc("/account", s.handleAccountProfile).Methods("GET")
-	accountRoute.HandleFunc("/organizations", s.handleAccountOrganizations).Methods("GET")
-	accountRoute.HandleFunc("/organizations", s.handleCreateOrganization).Methods("POST")
+	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
+	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
@@ -354,7 +354,7 @@ type OrganizationCreationRequest struct {
 	DisplayName string `json:"display_name"`
 }
 
-func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request) {
+func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
@@ -381,9 +381,7 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 
 	//
 	// TODO: the organization creation should be in a transaction
-	//
-
-	//
+	// TODO: this should all be moved into pkg/models/organization.go
 	// Create the organization and set up roles for it.
 	//
 	organization, err := models.CreateOrganization(req.Name, req.DisplayName, "")
@@ -426,27 +424,39 @@ func (s *Server) handleCreateOrganization(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(response)
 }
 
-func (s *Server) handleAccountProfile(w http.ResponseWriter, r *http.Request) {
+type AccountResponse struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	AvatarURL string `json:"avatar_url"`
+}
+
+func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
-		log.Error("Account not found in context")
-		http.Error(w, "Account not found in context", http.StatusInternalServerError)
+		http.Error(w, "", http.StatusUnauthorized)
 		return
 	}
 
-	log.Infof("Account found in context: %v", account)
+	providers, err := account.GetAccountProviders()
+	if err != nil {
+		log.Errorf("Error getting account providers for %s: %v", account.Email, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
 
-	accountResponse := map[string]interface{}{
-		"id":    account.ID.String(),
-		"name":  account.Name,
-		"email": account.Email,
+	accountResponse := AccountResponse{
+		ID:        account.ID.String(),
+		Name:      account.Name,
+		Email:     account.Email,
+		AvatarURL: getAvatarURL(providers),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(accountResponse)
 }
 
-func (s *Server) handleAccountOrganizations(w http.ResponseWriter, r *http.Request) {
+func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {
 	account, ok := middleware.GetAccountFromContext(r.Context())
 	if !ok {
 		http.Error(w, "", http.StatusUnauthorized)
@@ -511,14 +521,6 @@ func (s *Server) Close() {
 type OutputsRequest struct {
 	ExecutionID string         `json:"execution_id"`
 	Outputs     map[string]any `json:"outputs"`
-}
-
-type UserProfileResponse struct {
-	ID             string    `json:"id"`
-	OrganizationID string    `json:"organization_id"`
-	Email          string    `json:"email"`
-	Name           string    `json:"name"`
-	CreatedAt      time.Time `json:"created_at"`
 }
 
 func (s *Server) authenticateExecution(w http.ResponseWriter, r *http.Request, req *ExecutionOutputRequest) *models.StageExecution {
@@ -894,6 +896,14 @@ func (s *Server) setupDevProxy(webBasePath string) {
 	})
 
 	s.Router.PathPrefix(webBasePath).Handler(middleware.AccountAuthMiddleware(s.jwt).Middleware(proxyHandler))
+}
+
+func getAvatarURL(providers []models.AccountProvider) string {
+	if len(providers) == 0 {
+		return ""
+	}
+
+	return providers[0].AvatarURL
 }
 
 func getBaseURL() string {

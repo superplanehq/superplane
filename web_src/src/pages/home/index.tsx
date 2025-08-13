@@ -147,16 +147,14 @@ const HomePage = () => {
               {/* View Mode Toggle */}
               <div className="flex items-center">
                 <Button
-                  color={viewMode === 'grid' ? 'light' : undefined}
-                  plain={viewMode !== 'grid'}
+                  {...(viewMode === 'grid' ? { color: 'light' as const } : { plain: true })}
                   onClick={() => setViewMode('grid')}
                   title="Grid view"
                 >
                   <MaterialSymbol name="grid_view" />
                 </Button>
                 <Button
-                  color={viewMode === 'list' ? 'light' : undefined}
-                  plain={viewMode !== 'list'}
+                  {...(viewMode === 'list' ? { color: 'light' as const } : { plain: true })}
                   onClick={() => setViewMode('list')}
                   title="List view"
                 >
