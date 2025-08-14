@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
--- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -213,6 +213,7 @@ CREATE TABLE public.event_sources (
 CREATE TABLE public.events (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     source_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
     source_name character varying(128) NOT NULL,
     source_type character varying(64) NOT NULL,
     received_at timestamp without time zone NOT NULL,
@@ -859,6 +860,13 @@ CREATE INDEX uix_event_sources_canvas ON public.event_sources USING btree (canva
 
 
 --
+-- Name: uix_events_canvas; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX uix_events_canvas ON public.events USING btree (canvas_id);
+
+
+--
 -- Name: uix_events_source; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1075,8 +1083,9 @@ ALTER TABLE ONLY public.users
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg120+1)
--- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
+
+-- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
+-- Dumped by pg_dump version 17.6 (Debian 17.6-1.pgdg13+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1102,4 +1111,6 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 --
 -- PostgreSQL database dump complete
 --
+
+\unrestrict ELPfjAhMmI8g3MuxCo0WePJjHigHx7AphCRtI9ALtibWbfI8HqfJ4Vhx8IAmUzg
 

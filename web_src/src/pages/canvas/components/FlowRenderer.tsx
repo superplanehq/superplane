@@ -78,6 +78,9 @@ export const FlowRenderer: React.FC = () => {
         onNodeDrag={(_, node) => {
           setFocusedNodeId(node.id)
         }}
+        onPaneClick={() => {
+          setFocusedNodeId(null);
+        }}
         onInit={onInit}
         nodesDraggable={!lockedNodes}
         fitView

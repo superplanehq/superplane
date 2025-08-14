@@ -3,6 +3,7 @@ begin;
 CREATE TABLE events (
   id              uuid NOT NULL DEFAULT uuid_generate_v4(),
   source_id       uuid NOT NULL,
+  canvas_id       uuid NOT NULL,
   source_name     CHARACTER VARYING(128) NOT NULL,
   source_type     CHARACTER VARYING(64) NOT NULL,
   received_at     TIMESTAMP NOT NULL,
@@ -13,5 +14,6 @@ CREATE TABLE events (
 );
 
 CREATE INDEX uix_events_source ON events USING btree (source_id);
+CREATE INDEX uix_events_canvas ON events USING btree (canvas_id);
 
 commit;

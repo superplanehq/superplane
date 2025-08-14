@@ -123,9 +123,14 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		err := execution.Finish(stage, models.ResultFailed)
+		newEvent, err := execution.Finish(stage, models.ResultFailed)
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
+		}
+
+		err = messages.NewEventCreatedMessage(stage.CanvasID.String(), newEvent).Publish()
+		if err != nil {
+			return fmt.Errorf("error publishing event created message: %v", err)
 		}
 
 		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
@@ -152,14 +157,24 @@ func (w *PendingExecutionsWorker) handleExecutor(logger *log.Entry, spec []byte,
 		result = models.ResultFailed
 	}
 
-	err = execution.Finish(stage, result)
+	newEvent, err := execution.Finish(stage, result)
 	if err != nil {
 		return err
 	}
 
 	logger.Infof("Finished execution: %s", result)
 
-	return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+	err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+	if err != nil {
+		return fmt.Errorf("error publishing execution finished message: %v", err)
+	}
+
+	err = messages.NewEventCreatedMessage(stage.CanvasID.String(), newEvent).Publish()
+	if err != nil {
+		return fmt.Errorf("error publishing event created message: %v", err)
+	}
+
+	return nil
 }
 
 func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, spec []byte, stage *models.Stage, execution models.StageExecution) error {
@@ -186,12 +201,22 @@ func (w *PendingExecutionsWorker) handleIntegrationExecutor(logger *log.Entry, s
 	statefulResource, err := integrationExecutor.Execute(spec, *parameters)
 	if err != nil {
 		logger.Errorf("Error calling executor: %v - failing execution", err)
-		err := execution.Finish(stage, models.ResultFailed)
+		newEvent, err := execution.Finish(stage, models.ResultFailed)
 		if err != nil {
 			return fmt.Errorf("error moving execution to failed state: %v", err)
 		}
 
-		return messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+		err = messages.NewExecutionFinishedMessage(stage.CanvasID.String(), &execution).Publish()
+		if err != nil {
+			return fmt.Errorf("error publishing execution finished message: %v", err)
+		}
+
+		err = messages.NewEventCreatedMessage(stage.CanvasID.String(), newEvent).Publish()
+		if err != nil {
+			return fmt.Errorf("error publishing event created message: %v", err)
+		}
+
+		return nil
 	}
 
 	_, err = execution.AddResource(statefulResource.Id(), statefulResource.Type(), *stage.ResourceID)

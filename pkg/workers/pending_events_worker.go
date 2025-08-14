@@ -338,7 +338,17 @@ func (w *PendingEventsWorker) handleEventForConnectionGroup(tx *gorm.DB, event *
 	}
 
 	log.Infof("All connections received for group %s and field set %s - %v", connectionGroup.Name, fieldSet.String(), fields)
-	return connectionGroup.EmitInTransaction(tx, fieldSet, models.ConnectionGroupFieldSetStateReasonOK, missing)
+	newEvent, err := connectionGroup.EmitInTransaction(tx, fieldSet, models.ConnectionGroupFieldSetStateReasonOK, missing)
+	if err != nil {
+		return err
+	}
+
+	err = messages.NewEventCreatedMessage(connectionGroup.CanvasID.String(), newEvent).Publish()
+	if err != nil {
+		log.Errorf("failed to publish event created message: %v", err)
+	}
+
+	return nil
 }
 
 func (w *PendingEventsWorker) buildInputs(tx *gorm.DB, event *models.Event, stage models.Stage) (map[string]any, error) {

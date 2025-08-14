@@ -3,6 +3,7 @@ import useWebSocket from 'react-use-websocket';
 import { EventMap, ServerEvent } from '../types/events';
 import { useCanvasStore } from "../store/canvasStore";
 import { EventSourceWithEvents } from '../store/types';
+import { pollEventSourceUntilNoPending } from '../utils/eventSourcePolling';
 
 const SOCKET_SERVER_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/`;
 
@@ -15,10 +16,10 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
   const updateWebSocketConnectionStatus = useCanvasStore((s) => s.updateWebSocketConnectionStatus);
   const eventSources = useCanvasStore((s) => s.eventSources);
   const updateStage = useCanvasStore((s) => s.updateStage);
-  const updateEventSource = useCanvasStore((s) => s.updateEventSource);
   const addStage = useCanvasStore((s) => s.addStage);
   const addConnectionGroup = useCanvasStore((s) => s.addConnectionGroup);
   const syncStageEvents = useCanvasStore((s) => s.syncStageEvents);
+  const syncEventSourceEvents = useCanvasStore((s) => s.syncEventSourceEvents);
   const addEventSource = useCanvasStore((s) => s.addEventSource);
   const updateCanvas = useCanvasStore((s) => s.updateCanvas);
   const syncToReactFlow = useCanvasStore((s) => s.syncToReactFlow);
@@ -62,7 +63,6 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
     let executionFinishedPayload: EventMap['execution_finished']
     let executionStartedPayload: EventMap['execution_started']
     let eventSourceWithNewEvent: EventSourceWithEvents | undefined;
-    let updatedEventSource: EventSourceWithEvents;
     
     // Route the event to the appropriate handler
     switch (event) {
@@ -85,28 +85,26 @@ export function useWebsocketEvents(canvasId: string, organizationId: string): vo
       case 'canvas_updated':
         updateCanvas(payload as EventMap['canvas_updated']);
         break;
+
+      case 'event_created':
+        if (payload.source_type === 'event-source') {
+          eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === payload.source_id);
+          pollEventSourceUntilNoPending(canvasId, eventSourceWithNewEvent?.metadata?.id || '');
+        }
+        break;
+
       case 'new_stage_event':
-        // For stage events, we need to get the current stage first
         newEventPayload = payload as EventMap['new_stage_event'];
         eventSourceWithNewEvent = eventSources.find(es => es.metadata!.id === newEventPayload.source_id);
 
         syncStageEvents(canvasId, newEventPayload.stage_id);
 
-        // Resync to check if stage event needs approval
         setTimeout(() => {
           syncStageEvents(canvasId, newEventPayload.stage_id);
         }, 3000);
 
         if (eventSourceWithNewEvent) {
-          updatedEventSource = {
-            ...eventSourceWithNewEvent,
-            events: [...(eventSourceWithNewEvent.events || []), {
-              ...newEventPayload,
-              createdAt: newEventPayload.timestamp
-            }]
-          };
-          updateEventSource(updatedEventSource);
-
+          syncEventSourceEvents(canvasId, newEventPayload.source_id);
         } else {
           console.error('Event source with new event not found:', newEventPayload.source_id)
         }
