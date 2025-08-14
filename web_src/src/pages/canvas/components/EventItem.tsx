@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { formatRelativeTime } from '../utils/stageEventUtils';
+import { formatFullTimestamp, formatRelativeTime } from '../utils/stageEventUtils';
 import { MaterialSymbol } from '@/components/MaterialSymbol/material-symbol';
 import { PayloadModal } from './PayloadModal';
 import { Button } from '@/components/Button/button';
+import Tippy from '@tippyjs/react';
+import 'tippy.js/dist/tippy.css';
 
 interface EventItemProps {
   eventId: string;
@@ -88,7 +90,9 @@ export const EventItem: React.FC<EventItemProps> = React.memo(({
               </div>
               <div className="flex items-center gap-2">
                 {!isExpanded && (
-                  <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
+                  <Tippy content={formatFullTimestamp(timestamp)} placement="top">
+                    <div className="text-xs text-gray-500 dark:text-zinc-400">{formatRelativeTime(timestamp)}</div>
+                  </Tippy>
                 )}
               </div>
               <button
